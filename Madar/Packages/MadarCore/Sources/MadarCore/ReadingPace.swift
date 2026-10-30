@@ -33,7 +33,7 @@ public enum ReadingPace {
     public static func minutes(forPages pages: Int, secondsPerPage: Double) -> Int? {
         guard pages > 0, secondsPerPage.isFinite, secondsPerPage > 0 else { return nil }
         let minutes = Int((Double(pages) * secondsPerPage / 60).rounded(.up))
-        return min(max(1, minutes), maximumEstimatedMinutes)
+        return minutes <= maximumEstimatedMinutes ? max(1, minutes) : nil
     }
 
     /// The reverse: how many pages a minutes goal usually covers, rounded down, at least one.
@@ -57,10 +57,14 @@ public enum ReadingPace {
 
 /// «فصل»: a chapter is counted from the pages read and the book's own outline, since a session ends mid-chapter as often as not.
 public enum ReadingChapters {
-    /// The number of top-level entries in a book's outline (`Book.tocJSON`), when it has at least two.
+    /// The number of top-level entries in a book's outline (`Book.tocJSON`), when it has at least two. Outlines that record
+    /// nesting (`depth`) count only the shallowest level, so a chapter's sub-sections are not chapters; older outlines, which
+    /// do not, count every entry.
     public static func chapterCount(tocJSON: Data?) -> Int? {
         guard let tocJSON, let object = try? JSONSerialization.jsonObject(with: tocJSON) as? [Any], object.count >= 2 else { return nil }
-        return object.count
+        let depths = object.compactMap { ($0 as? [String: Any])?["depth"] as? Int }
+        let count = depths.count == object.count ? depths.filter { $0 == (depths.min() ?? 0) }.count : object.count
+        return count >= 2 ? count : nil
     }
 
     /// The share of the book's chapters that `pagesRead` pages make: 30 of 300 pages in a 12-chapter book is 1.2 chapters.

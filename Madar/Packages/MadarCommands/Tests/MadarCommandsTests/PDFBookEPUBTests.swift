@@ -145,10 +145,15 @@ struct PDFBookEPUBTests {
             let item = PDFOutline(); item.label = title
             item.destination = PDFDestination(page: try #require(document.page(at: index)), at: CGPoint(x: 0, y: 400))
             root.insertChild(item, at: root.numberOfChildren)
+            if index == 0 {   // one sub-bookmark under the first chapter: it must be recorded one level deeper
+                let child = PDFOutline(); child.label = "فرع"
+                child.destination = PDFDestination(page: try #require(document.page(at: 1)), at: CGPoint(x: 0, y: 400))
+                item.insertChild(child, at: 0)
+            }
         }
         document.outlineRoot = root
-        // PDFKit keeps an in-memory outline; the shared definition reads it with one-based pages.
-        #expect(PDFBookFiles.outline(of: document) == [.init(title: "أول", page: 1), .init(title: "ثالث", page: 3)])
+        // PDFKit keeps an in-memory outline; the shared definition reads it with one-based pages and the nesting level.
+        #expect(PDFBookFiles.outline(of: document) == [.init(title: "أول", page: 1, depth: 0), .init(title: "فرع", page: 2, depth: 1), .init(title: "ثالث", page: 3, depth: 0)])
     }
     /// Owner, 24 Oct 2026: running headers and bare page numbers leave the text, and a paragraph that crosses a
     /// page break stays one paragraph.

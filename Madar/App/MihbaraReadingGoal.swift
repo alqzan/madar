@@ -22,6 +22,8 @@ struct MihbaraReadingGoal {
     /// Seconds a page usually takes this reader (last 30 days), and the pages a chapter of the book in hand holds; nil until the reading says enough.
     var secondsPerPage: Double?
     var pagesPerChapter: Double?
+    /// A book is on the stand but has no page count, so neither chapters nor a finish date can be worked out.
+    var bookHasNoPageCount = false
     var finish: Finish?
     var unit: String { habit?.summary.current?.rule.unit ?? "minutes" }
     func value(_ day: Day) -> Int { unit == "pages" ? day.pages : unit == "chapters" ? day.chapters : day.minutes }
@@ -89,6 +91,7 @@ extension AppMihbaraService {
         }
         var goal = MihbaraReadingGoal(habit: habit, days: days, usual: usual)
         goal.secondsPerPage = ReadingPace.secondsPerPage(samples)
+        if let book, (book.pages ?? 0) <= 0 { goal.bookHasNoPageCount = true }
         if let book, let total = book.pages, total > 0 {
             if let count = ReadingChapters.chapterCount(tocJSON: book.tocJSON) { goal.pagesPerChapter = Double(total) / Double(count) }
             let read = (book.isReadableEPUB || book.isReadablePDF) ? MihbaraCopy.pagesRead(book) : book.page

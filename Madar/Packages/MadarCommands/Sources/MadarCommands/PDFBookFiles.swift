@@ -8,6 +8,8 @@ import MadarData
 public struct PDFBookOutlineItem: Codable, Equatable, Sendable {
     public let title: String
     public let page: Int
+    /// Bookmark nesting, 0 at the top; absent in outlines saved before 30 Oct 2026.
+    public var depth: Int? = nil
 }
 
 public struct PDFBookInspection: Equatable, Sendable, Identifiable {
@@ -42,7 +44,7 @@ public enum PDFBookFiles {
                 if let title = child.label?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty,
                    let page = child.destination?.page {
                     let pageIndex = document.index(for: page)
-                    if pageIndex != NSNotFound { outline.append(.init(title: String(title.prefix(300)), page: pageIndex + 1)) }
+                    if pageIndex != NSNotFound { outline.append(.init(title: String(title.prefix(300)), page: pageIndex + 1, depth: depth)) }
                 }
                 visit(child, depth: depth + 1)
             }

@@ -48,6 +48,12 @@ struct ReadingPaceTests {
         #expect(ReadingChapters.chapterCount(tocJSON: Data(#"[{"title":"أ"}]"#.utf8)) == nil)   // one entry is not a structure
         #expect(ReadingChapters.chapterCount(tocJSON: Data("not json".utf8)) == nil)
         #expect(ReadingChapters.chapterCount(tocJSON: nil) == nil)
+        // Nested outlines: 3 chapters (depth 0) with 2 sub-sections each are 3 chapters, not 9 entries.
+        let nested = Data((0..<9).map { #"{"title":"ع\#($0)","href":"x","depth":\#($0 % 3 == 0 ? 0 : 1)}"# }.joined(separator: ",").utf8)
+        #expect(ReadingChapters.chapterCount(tocJSON: Data("[".utf8) + nested + Data("]".utf8)) == 3)
+        let oneChapter = Data(#"[{"title":"أ","depth":0},{"title":"ب","depth":1},{"title":"ج","depth":1}]"#.utf8)
+        #expect(ReadingChapters.chapterCount(tocJSON: oneChapter) == nil)   // a single top-level entry is not a structure
+        #expect(ReadingPace.minutes(forPages: 500, secondsPerPage: 90) == nil)   // 750 min is past what is worth stating
         let fraction = ReadingChapters.chapters(pagesRead: 30, bookPages: 300, chapterCount: 12)
         #expect(fraction != nil && abs(fraction! - 1.2) < 0.000_001)
         #expect(ReadingChapters.chapters(pagesRead: 30, bookPages: nil, chapterCount: 12) == nil)

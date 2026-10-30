@@ -50,7 +50,8 @@ struct MihbaraHomeView: View {
     #endif
     private var theme: RoomTheme { .init(room: "mihbara", dark: colorScheme == .dark) }
     private var service: AppMihbaraService { .init(app: app) }
-    private var tableBook: MihbaraBook? { reading?.books.first { $0.id == tableID } ?? reading?.books.first { $0.shelf == "reading" } }
+    private var tableBook: MihbaraBook? { reading.flatMap { MihbaraStand.pick(from: $0.books, preferred: tableID) } }
+    private func setStand(_ id: UUID) { tableID = id; MihbaraStand.save(id); try? app.publishSnapshot() }
     private var shelfReadFailurePanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(shelfReadError ?? "تعذّرت قراءة بيانات المحبرة الآن.")
@@ -118,7 +119,7 @@ struct MihbaraHomeView: View {
                                 book: b,
                                 books: r.books,
                                 fileUnavailable: fileUnavailable,
-                                onTable: { tableID = id; sheet = nil },
+                                onTable: { setStand(id); sheet = nil },
                                 onRestoreFile: requestBookFileRestore,
                                 onPaperIndexSaved: { load() },
                                 shape: shapes[id]
@@ -265,7 +266,7 @@ struct MihbaraHomeView: View {
             let loaded = try service.load()
             reading = loaded
             // A failed read keeps the last card; a nil card would offer to create a habit that may already exist.
-            do { readingGoal = try service.readingGoal(today: loaded.day, book: loaded.books.first { $0.shelf == "reading" }) } catch { app.errorMessage = madarUserMessage(error) }
+            do { readingGoal = try service.readingGoal(today: loaded.day, book: MihbaraStand.pick(from: loaded.books, preferred: tableID)) } catch { app.errorMessage = madarUserMessage(error) }
             shelfReadFailed = false
             shelfReadError = nil
             let books = loaded.books
@@ -315,7 +316,7 @@ struct MihbaraHomeView: View {
             return
         case "continue":
             // Siri and Shortcuts cannot read the store, so «أكمل القراءة» names no book: the book on the stand is chosen here.
-            guard let book = reading.books.first(where: { $0.id == tableID }) ?? reading.books.first(where: { $0.shelf == "reading" }) else {
+            guard let book = MihbaraStand.pick(from: reading.books, preferred: tableID) else {
                 app.mihbaraRoute = nil
                 app.errorMessage = "ما على رفّ «أقرؤها» كتاب الآن؛ اختر كتابًا من مكتبتك لتكمله."
                 return
@@ -520,7 +521,7 @@ struct MihbaraHomeView: View {
         Task {
             do {
                 try await app.executeBookCommand("book.moveShelf", payload: payload)
-                if shelf == "reading" { tableID = b.id }
+                if shelf == "reading" { setStand(b.id) }
                 load()
             } catch { app.errorMessage = madarUserMessage(error) }
         }

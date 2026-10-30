@@ -223,3 +223,16 @@ struct MihbaraMotivationCue: Identifiable {
         return data
     }
 }
+
+/// Owner, 30 Oct 2026: the book on the stand is the book «أكمل القراءة» means everywhere (the card, the Siri phrase, the widget, the lobby).
+/// The choice is a per-device convenience kept in defaults, so it survives a relaunch; it is a pick among books on «أقرؤها» only.
+enum MihbaraStand {
+    static let key = "mihbara.standBookID"
+    static func savedID(_ defaults: UserDefaults = .standard) -> UUID? { defaults.string(forKey: key).flatMap(UUID.init(uuidString:)) }
+    static func save(_ id: UUID?, _ defaults: UserDefaults = .standard) { defaults.set(id?.uuidString, forKey: key) }
+    /// The saved book while it is still being read, else the first book on «أقرؤها».
+    static func pick(from books: [MihbaraBook], preferred: UUID? = nil, _ defaults: UserDefaults = .standard) -> MihbaraBook? {
+        let reading = books.filter { $0.shelf == "reading" }
+        return reading.first { $0.id == preferred } ?? reading.first { $0.id == savedID(defaults) } ?? reading.first
+    }
+}
