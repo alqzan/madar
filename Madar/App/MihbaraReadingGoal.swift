@@ -126,9 +126,9 @@ struct MihbaraReadingGoalCard: View {
                     .tint(theme.accentFill).accessibilityHidden(true)
             }
         } else if goal.habit != nil {
-            Text("لا وِرد اليوم؛ يوم إجازة").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+            Text("لا وِرد لهذا اليوم").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
         } else if let today, today.minutes > 0 {
-            Text("قرأت اليوم " + habitUnitCount(today.minutes, "minutes", digits)).font(MadarTypography.body())
+            Text("قرأت اليوم " + habitUnitCount(today.minutes, "minutes", digits, genitive: true)).font(MadarTypography.body())
         } else {
             Text("لم تقرأ هنا اليوم بعد").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
         }
@@ -138,14 +138,15 @@ struct MihbaraReadingGoalCard: View {
 
     private func dayLine(_ day: MihbaraReadingGoal.Day) -> String {
         guard day.minutes > 0 || day.pages > 0 else { return "لم تقرأ في هذا اليوم" }
-        var parts = [habitUnitCount(day.minutes, "minutes", digits)]
-        if day.pages > 0 { parts.append(habitUnitCount(day.pages, "pages", digits)) }
+        var parts = [habitUnitCount(day.minutes, "minutes", digits, genitive: true)]
+        if day.pages > 0 { parts.append(habitUnitCount(day.pages, "pages", digits, genitive: true)) }
         return "قرأت " + parts.joined(separator: " و")
     }
 
     /// Seven columns with the daily target as a quiet line; a tap names the day and its amount.
     private var columns: some View {
-        let target = current?.target ?? 0
+        // The quiet line is the daily goal; a weekly or monthly total is not a line a single day can be measured against.
+        let target = current.map { $0.rule.frequency == .daily ? $0.target : 0 } ?? 0
         let top = max(1, target, goal.days.map(goal.value).max() ?? 0)
         return HStack(alignment: .bottom, spacing: 8) {
             ForEach(goal.days) { day in

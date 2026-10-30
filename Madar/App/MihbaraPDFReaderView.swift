@@ -348,7 +348,8 @@ struct MihbaraPDFReaderView: View {
                 } catch { app.errorMessage = madarUserMessage(error) }
             }
             layer.tool = inkTool
-            layer.onChange = { inkRevision += 1 }
+            // One turn later, so PencilKit has registered the stroke with its undo manager before the bar asks it.
+            layer.onChange = { DispatchQueue.main.async { inkRevision += 1 } }
             return layer
         } catch { return nil }
     }

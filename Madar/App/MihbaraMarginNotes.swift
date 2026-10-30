@@ -75,6 +75,7 @@ struct MihbaraMarginNoteEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
     @State private var saving = false
+    @State private var alert: String?
     @FocusState private var focused: Bool
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -91,8 +92,8 @@ struct MihbaraMarginNoteEditor: View {
             TextEditor(text: $text).font(MadarTypography.body()).scrollContentBackground(.hidden).focused($focused)
                 .padding(10).background(theme.surface, in: .rect(cornerRadius: 16))
                 .accessibilityLabel("نص الملاحظة").accessibilityIdentifier("mihbara-margin-text")
-            Text(text.count > 2000 ? "اختصر الملاحظة إلى ألفي حرف حتى تُحفظ." : "تبقى مربوطة بهذه الفقرة في دفتر الكتاب.")
-                .font(MadarTypography.fine()).foregroundStyle(text.count > 2000 ? theme.ink : theme.secondaryInk)
+            Text(trimmed.count > 2000 ? "اختصر الملاحظة إلى ألفي حرف حتى تُحفظ." : "تبقى مربوطة بهذه الفقرة في دفتر الكتاب.")
+                .font(MadarTypography.fine()).foregroundStyle(trimmed.count > 2000 ? theme.ink : theme.secondaryInk)
         }
         .padding(20)
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent)
@@ -101,11 +102,15 @@ struct MihbaraMarginNoteEditor: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("احفظ") { save() }
-                    .disabled(saving || trimmed.isEmpty || text.count > 2000 || trimmed == note.text.trimmingCharacters(in: .whitespacesAndNewlines))
+                    .disabled(saving || trimmed.isEmpty || trimmed.count > 2000 || trimmed == note.text.trimmingCharacters(in: .whitespacesAndNewlines))
                     .accessibilityIdentifier("mihbara-margin-save")
             }
         }
         .onAppear { text = note.text; focused = true }
+        // The book card is a sheet that covers the app's own alert, so a failed save says so here.
+        .alert("الهامش", isPresented: Binding(get: { alert != nil }, set: { if !$0 { alert = nil } })) {
+            Button("حسنًا", role: .cancel) { alert = nil }
+        } message: { Text(alert ?? "") }
     }
 
     private func save() {
@@ -116,7 +121,7 @@ struct MihbaraMarginNoteEditor: View {
         Task {
             defer { saving = false }
             do { try await app.executeBookCommand("notebook.savePage", payload: payload, undoMessage: "عُدّلت الملاحظة"); onSaved(); dismiss() }
-            catch { app.errorMessage = madarUserMessage(error) }
+            catch { alert = madarUserMessage(error) }
         }
     }
 }

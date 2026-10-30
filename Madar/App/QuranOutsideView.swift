@@ -39,7 +39,7 @@ struct QuranOutsideView: View {
                                 }
                             }.frame(minHeight: 44).accessibilityIdentifier("quran-reminder-choice")
                         }
-                        Toggle("المتأخر قبل أن يبعد", isOn: Binding(get: { app.bool("quran.lateReminder") }, set: { app.set(.bool($0), key: "quran.lateReminder") }))
+                        Toggle("ذكّرني بالورد المتأخر", isOn: Binding(get: { app.bool("quran.lateReminder") }, set: { app.set(.bool($0), key: "quran.lateReminder") }))
                             .accessibilityIdentifier("quran-late-reminder")
                         Text("تصل التذكيرات بعد انتهاء حرمة الصلاة، وضمن ميزانية هذا الجهاز.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         Toggle("تذكيرات هذا الجهاز", isOn: Binding(get: { app.bool("notif.thisDeviceReminders") }, set: { app.set(.bool($0), key: "notif.thisDeviceReminders") }))

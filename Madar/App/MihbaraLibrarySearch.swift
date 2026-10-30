@@ -44,7 +44,7 @@ struct MihbaraTextHit: Identifiable {
         guard case .success(let iterator) = await publication.search(query: needle, options: SearchOptions(caseSensitive: false, diacriticSensitive: false)) else { return [] }
         defer { iterator.close() }
         var hits: [MihbaraTextHit] = []
-        while hits.count < perBook, case .success(let page?) = await iterator.next() {
+        while hits.count < perBook, !Task.isCancelled, case .success(let page?) = await iterator.next() {
             for locator in page.locators where hits.count < perBook {
                 hits.append(.init(bookID: book.id, title: book.title, before: tail(locator.text.before), match: locator.text.highlight ?? needle,
                                   after: head(locator.text.after), locatorJSON: try? locator.jsonString()))
@@ -59,15 +59,16 @@ struct MihbaraTextHit: Identifiable {
             guard let document = PDFDocument(data: data) else { return [] }
             var result: [(Int, String, String, String)] = []
             for selection in document.findString(needle, withOptions: [.caseInsensitive, .diacriticInsensitive]) {
-                guard result.count < perBook, let page = selection.pages.first, let text = page.string as NSString?,
+                if result.count >= perBook || Task.isCancelled { break }
+                guard let page = selection.pages.first, let text = page.string as NSString?,
                       case let range = selection.range(at: 0, on: page), range.location != NSNotFound, NSMaxRange(range) <= text.length else { continue }
                 let start = max(0, range.location - 60), end = min(text.length, NSMaxRange(range) + 60)
-                result.append((document.index(for: page) + 1, text.substring(with: NSRange(location: start, length: range.location - start)),
+                result.append((document.index(for: page), text.substring(with: NSRange(location: start, length: range.location - start)),
                                text.substring(with: range), text.substring(with: NSRange(location: NSMaxRange(range), length: end - NSMaxRange(range)))))
             }
             return result
         }.value
-        return found.map { .init(bookID: book.id, title: book.title, before: tail($0.before), match: $0.match, after: head($0.after), pdfPage: $0.page) }
+        return found.map { .init(bookID: book.id, title: book.title, before: tail($0.before), match: $0.match, after: head($0.after), pdfPage: $0.page) }  // 0-based, as the reader's `startPage` is
     }
 
     private static func clean(_ text: String?) -> String { (text ?? "").replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression) }
@@ -117,7 +118,7 @@ struct MihbaraTextSearchSection: View {
                     ForEach(hits) { hit in
                         Button { open(hit) } label: {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(hit.title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                Text(hit.pdfPage.map { hit.title + "، صفحة " + service.digits.string($0 + 1) } ?? hit.title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                                 (Text(hit.before) + Text(hit.match).bold().foregroundColor(theme.accent) + Text(hit.after))
                                     .font(.custom("Amiri-Regular", size: 16, relativeTo: .body)).lineLimit(3).multilineTextAlignment(.leading)
                             }
@@ -127,6 +128,8 @@ struct MihbaraTextSearchSection: View {
                 }
             }
             .onDisappear { running?.cancel() }
+            // A new word stops the old search, so the offer to search for it appears at once.
+            .onChange(of: trimmed) { _, _ in if running != nil { running?.cancel(); running = nil; runID = nil } }
         }
     }
 

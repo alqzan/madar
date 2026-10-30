@@ -516,6 +516,12 @@ import UIKit
         let mark = content.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.55))
         mark.press(forDuration: 0.05, thenDragTo: content.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.55)))
         XCTAssertTrue(app.buttons["mihbara-pdf-ink-clear"].isEnabled, app.debugDescription)
+        // Undo takes back the marker line only; the pen line stays, so undo is still available, then the marker is redrawn.
+        let undo = app.buttons["mihbara-pdf-ink-undo"]
+        XCTAssertTrue(undo.isEnabled, app.debugDescription)
+        undo.tap()
+        XCTAssertTrue(undo.isEnabled, app.debugDescription)
+        mark.press(forDuration: 0.05, thenDragTo: content.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.55)))
         shot(app, "M6-PK-drawing-L")
         app.buttons["mihbara-pdf-ink-done"].tap()
         XCTAssertTrue(app.buttons["mihbara-pdf-ink"].waitForExistence(timeout: 5))

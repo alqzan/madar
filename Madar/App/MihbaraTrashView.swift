@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import MadarCommands
 import MadarCore
 import MadarData
 import MadarDesign
@@ -61,7 +62,10 @@ struct MihbaraTrashView: View {
 
     /// «قبل ٣ أيام» rather than a date, so no single-calendar date reaches the screen.
     private func ago(_ date: Date) -> String {
-        let days = max(0, Int(app.prayerNow().timeIntervalSince(date) / 86_400))
+        // Days on Madar's own calendar (`core.dayStart`), not 24-hour stretches.
+        let context = ModelContext(app.container), now = app.prayerNow()
+        guard let today = try? DiaryLineRenderer.today(context: context, now: now), let then = try? DiaryLineRenderer.today(context: context, now: date) else { return "قبل مدة" }
+        let days = max(0, Int((today.date(in: .gmt).timeIntervalSince(then.date(in: .gmt)) / 86_400).rounded()))
         return days == 0 ? "اليوم" : days == 1 ? "أمس" : "قبل " + arabicCount(days, ["يوم", "يومين", "أيام", "يومًا"], digits)
     }
 
@@ -86,8 +90,8 @@ struct MihbaraTrashView: View {
                 result.append(.init(id: note.id, kind: .note, title: note.text, detail: note.targetID.flatMap { live[$0] }.map { "ملاحظة على «" + $0 + "»" } ?? "من الدفتر الخاص", deletedAt: note.deletedAt!, payload: ["id": .string(note.id.uuidString), "text": .string(String(note.text.prefix(2000)))]))
             }
             items = result.sorted { $0.deletedAt > $1.deletedAt }
+            loaded = true
         } catch { app.errorMessage = madarUserMessage(error) }
-        loaded = true
     }
 
     private func restore(_ item: Item) {
@@ -101,7 +105,8 @@ struct MihbaraTrashView: View {
         Task {
             defer { restoring = nil }
             do { try await app.executeBookCommand(name, payload: item.payload, undoMessage: message); load(); onRestored() }
-            catch { app.errorMessage = madarUserMessage(error) }
+            // A refused restore (already back, or its book is gone) refreshes the list so the row does not wait for a tap that always fails.
+            catch { app.errorMessage = madarUserMessage(error); load() }
         }
     }
 }
