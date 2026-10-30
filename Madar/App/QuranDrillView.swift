@@ -52,7 +52,7 @@ struct QuranDrillView: View {
                 Button { leave() } label: {
                     Image(systemName: "chevron.forward").font(.system(size: 17, weight: .semibold))
                         .frame(width: 44, height: 44).background(theme.color("track"), in: Circle())
-                }.buttonStyle(.madarPlain).accessibilityLabel("رجوع").accessibilityIdentifier("quran-drill-close")
+                }.buttonStyle(.madarPlain).disabled(busy).accessibilityLabel("رجوع").accessibilityIdentifier("quran-drill-close")
                 Spacer()
             }
         }
