@@ -44,7 +44,7 @@
 	<key>NSHealthShareUsageDescription</key>
 	<string>يقرأ مدار الخطوات أو دقائق الحركة التي تختارها لحساب عادة المشي؛ لا يكتب في تطبيق الصحة.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>يعرف مدار أنك خارج مدينتك ليسألك عن السفر. لا يُحفظ موقعك ولا يغادر جهازك.</string>
+	<string>يعرف مدار أنك خارج مدينتك ليسألك عن السفر، ويملأ مدينتك حين تضغط «استخدم موقعي». لا يحفظ مدار موقعك؛ ولمعرفة اسم المدينة يرسل النظام الموقع إلى Apple مرة واحدة عند طلبك ذلك.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>سجّل صوتك واحفظه في صفحة يومك على هذا الجهاز.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

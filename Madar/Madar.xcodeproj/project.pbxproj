@@ -61,6 +61,7 @@
 		20A1D4AB43B752721792187E /* MihbaraTurathView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DABB3B29EC87D4BECDD9D6 /* MihbaraTurathView.swift */; };
 		211E823EE865926858A063DD /* QuranHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DE6A691DDAF38C2D4B00AA /* QuranHomeView.swift */; };
 		2153D4C5E3F51F1189BBF582 /* PrayerControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F641995C5E5E50050215DA42 /* PrayerControlIntent.swift */; };
+		2174DCBF1D23FD9202A270CB /* CitySearchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D4DA6A41BFC8B46816890E9 /* CitySearchUITests.swift */; };
 		21C2B80D9912FF503F768AFD /* QuranPlanSetupUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 705F1232750D5F205C9CF2B4 /* QuranPlanSetupUITests.swift */; };
 		21DC9186078C32801708C8F8 /* MihbaraEPUBImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 066E8B7BB7CD19C46D956B89 /* MihbaraEPUBImportView.swift */; };
 		22FB5844A23643273F6597EC /* TabShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C581755E2CC15BBDCFF8899 /* TabShell.swift */; };
@@ -109,6 +110,7 @@
 		3846AE9F59E142D9B68CC921 /* LegacyMove.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F71A4EDE8E264501B5E13C /* LegacyMove.swift */; };
 		3859F83C777BEA291396548E /* MihbaraReadingGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93AF4C5A3669C16B24D77DEC /* MihbaraReadingGoal.swift */; };
 		38AE591E8BDE4EDC317D7087 /* MadarInbox in Frameworks */ = {isa = PBXBuildFile; productRef = 03F58B856BEE05E94A1DE946 /* MadarInbox */; };
+		391CC1AEE5A16E9388322C95 /* CityCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2322CEC281AFD3E505F2BE /* CityCatalogTests.swift */; };
 		3975AF7B2DC85528E96AF3F9 /* MoneyWidgetContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2FD87508231ACC0B537A9D /* MoneyWidgetContent.swift */; };
 		3A4186587335738C06BE4F42 /* MihbaraPaperIndexEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3812A01C332A1D41AC17898C /* MihbaraPaperIndexEditor.swift */; };
 		3A9F9660D5D5E9652BAB562A /* Money.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 5A8523997C8D124B0ED15941 /* Money.xcstrings */; };
@@ -335,6 +337,7 @@
 		BFA22D41E959792E2671426E /* MoneyZakatDrawings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98A5EBAFEC75637270AA4DE7 /* MoneyZakatDrawings.swift */; };
 		BFA4A93FF8F56E0AFF93E327 /* DiaryIntentionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25C0D6BA40AA1BEA7F9ABDB /* DiaryIntentionUITests.swift */; };
 		BFB147FC87C8EB464FAA94F5 /* DiaryLockPreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD7A72401A474C493641554 /* DiaryLockPreferenceTests.swift */; };
+		C06A698B9FED8BBC401CF2CC /* CityLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD050864F8C550A9BEA27784 /* CityLocator.swift */; };
 		C1B3EC7F682D34C4E382458A /* MihbaraReadingGoalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D4D84AF94A6F66CBAD1384 /* MihbaraReadingGoalTests.swift */; };
 		C2F5FA9E4311C1D1A8C04E5B /* MoneyOwnerTrialUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C7A076695904E8109A22623 /* MoneyOwnerTrialUITests.swift */; };
 		C31CBACA57AF34A8B80AB681 /* MihbaraHomeIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 092A021D5BC8018E0BEEF6F1 /* MihbaraHomeIntegrationTests.swift */; };
@@ -376,6 +379,7 @@
 		D80DFFED3C4C3DC05E263906 /* AppWidgetMaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 656BAFAFA45C5E94869809A7 /* AppWidgetMaker.swift */; };
 		D8F98F014EC441B2917DE1CB /* MihbaraFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A55221B883574B87CDF5CF /* MihbaraFixture.swift */; };
 		D91DBE0F03F464917FAFC5C2 /* BahwCustomizeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2D9411E8F26C40A825042E7 /* BahwCustomizeUITests.swift */; };
+		D9355085EAC5578043C58920 /* CityCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D188092E156169BC53A8003 /* CityCatalog.swift */; };
 		D9825E00150A3591A4BBA371 /* MoneyTripSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22009EDA3EF09A49926268E5 /* MoneyTripSheets.swift */; };
 		DA23D00C67DC70824DF82D13 /* FoundationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE67096C4A1239F83DCD8EF6 /* FoundationUITests.swift */; };
 		DA59DE78674858231698527A /* SourceSerif4-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 52CA868B10189C0926274983 /* SourceSerif4-Variable.ttf */; };
@@ -578,6 +582,7 @@
 		3C51B7F621FD8CA7685E7B45 /* MadarPrayerShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadarPrayerShortcuts.swift; sourceTree = "<group>"; };
 		3C5F681423C9EE494E433E64 /* AppDiarySearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiarySearchService.swift; sourceTree = "<group>"; };
 		3CBD6993AEFD01597EAFD5EB /* AppBackupBackgroundTasks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackupBackgroundTasks.swift; sourceTree = "<group>"; };
+		3D4DA6A41BFC8B46816890E9 /* CitySearchUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitySearchUITests.swift; sourceTree = "<group>"; };
 		3F2989DAFF327646B3C614EA /* DiaryTodayUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryTodayUITests.swift; sourceTree = "<group>"; };
 		3FF6E4771F76AE9E6020594D /* MihbaraHomeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraHomeUITests.swift; sourceTree = "<group>"; };
 		417D810C18B9D81E74D00117 /* nawawi40.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = nawawi40.json; sourceTree = "<group>"; };
@@ -696,6 +701,7 @@
 		7A9F1BF70DE8302BBA45121C /* Amiri-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Amiri-Regular.ttf"; sourceTree = "<group>"; };
 		7B4924229AC465C6645BADAE /* MoneySalaryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySalaryModels.swift; sourceTree = "<group>"; };
 		7B9ACE8CD0ACA2E8F081BA36 /* MihbaraPDFReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraPDFReaderView.swift; sourceTree = "<group>"; };
+		7E2322CEC281AFD3E505F2BE /* CityCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityCatalogTests.swift; sourceTree = "<group>"; };
 		7E6EB1F3F05F6A4C2B4D1002 /* AppBackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackupService.swift; sourceTree = "<group>"; };
 		7E78D6FA9A7292B69D980621 /* ScenePrivacyPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenePrivacyPresenter.swift; sourceTree = "<group>"; };
 		7F8E0D1E0A3C1A24D4213E29 /* MoneyEnvelopeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyEnvelopeModels.swift; sourceTree = "<group>"; };
@@ -713,6 +719,7 @@
 		896679F4C7AE5B3F333F22E9 /* BahwPrayerIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BahwPrayerIntegrationTests.swift; sourceTree = "<group>"; };
 		898CA02CE00E58C1CB81BD5F /* DiaryIntentionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryIntentionsView.swift; sourceTree = "<group>"; };
 		8CF5E7B996A522A8D37486E4 /* RoomWidgetsGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomWidgetsGallery.swift; sourceTree = "<group>"; };
+		8D188092E156169BC53A8003 /* CityCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityCatalog.swift; sourceTree = "<group>"; };
 		8D5DA39DDD31B6E747BE357E /* MoneyAnalysisModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyAnalysisModels.swift; sourceTree = "<group>"; };
 		8ECD1459603F766B11AD3B64 /* MoneyMessagesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyMessagesUITests.swift; sourceTree = "<group>"; };
 		8FD6BC425BFCE32221434C0C /* arabic-reader-poc.epub */ = {isa = PBXFileReference; path = "arabic-reader-poc.epub"; sourceTree = "<group>"; };
@@ -849,6 +856,7 @@
 		DC6FBB06EF42EA00A0C3D132 /* MihbaraEPUBLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraEPUBLoader.swift; sourceTree = "<group>"; };
 		DC96F32AC5E7E4164A325940 /* LogPrayerIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogPrayerIntent.swift; sourceTree = "<group>"; };
 		DCC1A35E2703C1EBE5AD46C5 /* QuranStrengthUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranStrengthUITests.swift; sourceTree = "<group>"; };
+		DD050864F8C550A9BEA27784 /* CityLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityLocator.swift; sourceTree = "<group>"; };
 		DDFCDBB5E517E579721BA034 /* DiaryWindowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryWindowUITests.swift; sourceTree = "<group>"; };
 		DF3C48766BA62A35444287C6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		DFA1650F886CEC29CF1CF3CC /* QuranFreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranFreeView.swift; sourceTree = "<group>"; };
@@ -1055,7 +1063,9 @@
 				20304C3F7DCC7BAAB0C5632E /* BahwCustomizeParts.swift */,
 				60F1C857764292ABD2F14C47 /* BahwLobbyView.swift */,
 				9586F680008485EF08F16C54 /* BahwYearView.swift */,
+				8D188092E156169BC53A8003 /* CityCatalog.swift */,
 				92023291C0FE69B0EBEF5B79 /* CityEditor.swift */,
+				DD050864F8C550A9BEA27784 /* CityLocator.swift */,
 				68E6E87340ED90E80146719D /* CustomizationCopy.swift */,
 				722D1062D9A8B6E0872B2931 /* CustomizeMadar.swift */,
 				2234F4C1215CD275CE96CFAD /* DiaryCustomizeView.swift */,
@@ -1266,6 +1276,7 @@
 				C2D9411E8F26C40A825042E7 /* BahwCustomizeUITests.swift */,
 				638BDCBA5000C51E47C80BDA /* BahwLobbyUITests.swift */,
 				9B031AA8A32A509374B4BC38 /* BahwYearUITests.swift */,
+				3D4DA6A41BFC8B46816890E9 /* CitySearchUITests.swift */,
 				249A748FAA0C40882A8F1B35 /* CustomizeSearchUITests.swift */,
 				90F2DDC71492F91157099793 /* DateLabelsUITests.swift */,
 				156373CD20DDBC2829A5AED5 /* DiaryCustomizeUITests.swift */,
@@ -1407,6 +1418,7 @@
 				69131FC804F685E615C3A0DB /* BackupFolderServiceTests.swift */,
 				896679F4C7AE5B3F333F22E9 /* BahwPrayerIntegrationTests.swift */,
 				980BEF9FA1185D7404A6E08E /* CaptureIntentIntegrationTests.swift */,
+				7E2322CEC281AFD3E505F2BE /* CityCatalogTests.swift */,
 				0E84CCAE8F551CE20CBE2B23 /* CommandIntegrationTests.swift */,
 				C63BADA5C6BD423F06356E09 /* CustomizationCopyTests.swift */,
 				2564AF9C513786C475618420 /* DateLabelsIntegrationTests.swift */,
@@ -1765,6 +1777,7 @@
 				1874253CCE5D1CFB70106FE0 /* BackupFolderServiceTests.swift in Sources */,
 				38441C6214CA9DD82E2B16F0 /* BahwPrayerIntegrationTests.swift in Sources */,
 				C8273836B4F26F3C228F43D4 /* CaptureIntentIntegrationTests.swift in Sources */,
+				391CC1AEE5A16E9388322C95 /* CityCatalogTests.swift in Sources */,
 				1696EFC63E82D4D32AD91261 /* CommandIntegrationTests.swift in Sources */,
 				EEFB1D6DFBF9E0E4FA1C18B1 /* CustomizationCopyTests.swift in Sources */,
 				3DF2C322F0D1734190456E87 /* DateLabelsIntegrationTests.swift in Sources */,
@@ -1822,6 +1835,7 @@
 				D91DBE0F03F464917FAFC5C2 /* BahwCustomizeUITests.swift in Sources */,
 				5CEB91C12B25B51E04B5BB09 /* BahwLobbyUITests.swift in Sources */,
 				A44A6C744C7BCFAA082D426D /* BahwYearUITests.swift in Sources */,
+				2174DCBF1D23FD9202A270CB /* CitySearchUITests.swift in Sources */,
 				45957FCDAFA602A3A71F30ED /* CustomizeSearchUITests.swift in Sources */,
 				75CD3B631102D4F233C7A422 /* DateLabelsUITests.swift in Sources */,
 				E39098AF2817AAE1C9916E34 /* DiaryCustomizeUITests.swift in Sources */,
@@ -1949,7 +1963,9 @@
 				69E3D00BAA054BFFC4E07EE5 /* BahwLobbyView.swift in Sources */,
 				1F6725D4AA749A526B4DE664 /* BahwYearView.swift in Sources */,
 				6AD14D30F03BE6A37F6F1ACC /* CaptureIntent.swift in Sources */,
+				D9355085EAC5578043C58920 /* CityCatalog.swift in Sources */,
 				BF23E89931E07B6BC749034D /* CityEditor.swift in Sources */,
+				C06A698B9FED8BBC401CF2CC /* CityLocator.swift in Sources */,
 				ADAA3E8FB93656DDB250C1E7 /* CompleteHabitIntent.swift in Sources */,
 				D368F59501A24EEC8D475168 /* CustomizationCopy.swift in Sources */,
 				E54CDC268D4A484E1FA4F78C /* CustomizeMadar.swift in Sources */,
