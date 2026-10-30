@@ -231,6 +231,9 @@ struct MadarRootView: View {
                 }
             }
         }
+        // Owner, 30 Oct 2026: the «افتح المحبرة» door in «خصّص» used to hang this cover on the settings page, which is rebuilt after every write,
+        // so saving a note closed the whole room. Hosted here at the root it stays up until the reader leaves.
+        .fullScreenCover(isPresented: $session.mihbaraOpen) { MihbaraHomeView(app: session).environment(\.roomTheme, theme) }
         .fullScreenCover(item: $session.moneyExpenseSeed, onDismiss: { session.presentNextMoneyExpenseSeed() }) { seed in MoneyQuickExpense(app: session, seed: seed) }
         .font(MadarTypography.body())
         .environment(\.roomTheme, theme)

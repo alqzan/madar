@@ -1066,9 +1066,22 @@ import UIKit
         // The undo runs a command first, so wait for the restored choice rather than reading it at once.
         undo(app); XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == 'محدد'"), object: afterFajr)], timeout: 5), .completed)
         manual.tap(); XCTAssertEqual(manual.value as? String, "محدد")
-        func selected(_ element: XCUIElement) -> XCTWaiter.Result { XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == 'محدد'"), object: element)], timeout: 5) }
+        // Poll with a fresh query: the reset and the undo each run a command and re-draw the list under the toast.
+        func selected(_ element: XCUIElement) -> XCTWaiter.Result {
+            let id = element.identifier, deadline = Date().addingTimeInterval(10)
+            while Date() < deadline {
+                if app.buttons[id].value as? String == "محدد" { return .completed }
+                usleep(250_000)
+            }
+            return .timedOut
+        }
+        // The toast of the last choice slides in above the list; a tap during that slide lands on the old position.
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-undo"].waitForExistence(timeout: 8), app.debugDescription)
+        usleep(800_000)
         app.buttons["mihbara-rahlOpens-reset"].tap()
         XCTAssertEqual(selected(afterFajr), .completed)
+        // The reset's toast replaces the previous one a moment after the list changes; undoing the old toast would undo the wrong write.
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-undo"].staticTexts["عادت الإعدادات المتفق عليها"].waitForExistence(timeout: 8), app.debugDescription)
         undo(app); XCTAssertEqual(selected(manual), .completed)
         app.buttons["mihbara-rahlOpens-close"].tap(); app.terminate(); app.launch(); open(app)
         reach(app, preferences); preferences.tap()

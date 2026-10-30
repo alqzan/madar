@@ -101,7 +101,6 @@ struct CustomizeMadar: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $session.mihbaraOpen) { MihbaraHomeView(app: session) }
         .navigationDestination(isPresented: $session.moneyOpen) { MoneyRoomView(app: session) }
         .sheet(isPresented: $widgetMaker, onDismiss: { session.widgetMakerRoute = nil; session.widgetMakerRouteID = nil }) {
             WidgetMakerView(session: session)
