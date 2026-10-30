@@ -494,6 +494,46 @@ import UIKit
         let keep = app.alerts.buttons["أبقه PDF"].firstMatch
         if keep.waitForExistence(timeout: 15) { keep.tap() }
     }
+    /// M6-PK (owner, 30 Oct 2026): a finger draws on a PDF page, the drawing is saved beside the book and is there
+    /// again when the book reopens; «امسح» clears the page.
+    func testDrawingOnAPDFPageStaysWithTheBook() {
+        continueAfterFailure = false
+        let storeID = UUID().uuidString
+        let app = app("missingFile", storeID: storeID, pdf: fixturePDF())
+        app.launchEnvironment["MADAR_UI_MIHBARA_PDF_READY"] = "1"
+        app.launch(); open(app)
+        let continueBook = app.buttons["mihbara-book-continue"]
+        reach(app, continueBook); continueBook.tap()
+        let pen = app.buttons["mihbara-pdf-ink"]
+        XCTAssertTrue(pen.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(pen.value as? String, "٠")
+        pen.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-ink-done"].waitForExistence(timeout: 5), app.debugDescription)
+        let content = app.descendants(matching: .any)["mihbara-pdf-content"]
+        let start = content.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.35))
+        start.press(forDuration: 0.05, thenDragTo: content.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.45)))
+        app.buttons["mihbara-pdf-ink-tool-marker"].tap()
+        let mark = content.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.55))
+        mark.press(forDuration: 0.05, thenDragTo: content.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.55)))
+        XCTAssertTrue(app.buttons["mihbara-pdf-ink-clear"].isEnabled, app.debugDescription)
+        shot(app, "M6-PK-drawing-L")
+        app.buttons["mihbara-pdf-ink-done"].tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-ink"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["mihbara-pdf-ink"].value as? String, "١", app.debugDescription)
+        app.buttons["mihbara-pdf-close"].tap()
+
+        // Reopened from the store: the drawing is still on the page.
+        reach(app, continueBook); continueBook.tap()
+        XCTAssertTrue(pen.waitForExistence(timeout: 15), app.debugDescription)
+        let saved = NSPredicate(format: "value == %@", "١")
+        expectation(for: saved, evaluatedWith: pen); waitForExpectations(timeout: 8)
+        shot(app, "M6-PK-reopened-L")
+        pen.tap()
+        app.buttons["mihbara-pdf-ink-clear"].tap()
+        app.buttons["mihbara-pdf-ink-done"].tap()
+        XCTAssertEqual(app.buttons["mihbara-pdf-ink"].value as? String, "٠", app.debugDescription)
+    }
+
     private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false, storeID: String? = nil, pdf: Data? = nil, fileRow: Bool = false, fileNearEnd: Bool = false) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":storeID ?? UUID().uuidString,"MADAR_UI_MIHBARA_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
         if let epub { app.launchEnvironment["MADAR_UI_MIHBARA_EPUB_BASE64"] = epub.base64EncodedString() }

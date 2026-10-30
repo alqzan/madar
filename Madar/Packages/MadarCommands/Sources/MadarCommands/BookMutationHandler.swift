@@ -427,6 +427,34 @@ private struct GoodreadsImportSummary: Codable {
                 row.context = contextText; row.savedAt = now
                 context.insert(row); try touch(row, before: nil)
             }
+        case .savePageInk(let bookID, let page, let drawing):
+            // Owner, 30 Oct 2026 («الرسم على صفحات PDF»): one drawing per file page, kept beside the book as a Media row
+            // keyed by `sourceID`. It is never written into the PDF, whose bytes are pinned by `fileHash`.
+            let owner = try book(bookID)
+            guard owner.kind == "file", ["pdf", "pdfScanned"].contains(owner.format ?? ""), page < 100_000 else { throw DataError.invalidValue("الرسم على صفحات ملفات PDF فقط") }
+            let key = "pdf-ink:\(bookID.uuidString):\(page)"
+            let existing = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { $0.sourceID == key }))
+                .filter { $0.mergedInto == nil }.max(by: { $0.updatedAt < $1.updatedAt })
+            if drawing.isEmpty {
+                guard let row = existing, row.deletedAt == nil else { break }
+                row.deletedAt = now; row.deletionBarrierAt = now; row.data = nil; row.sizeBytes = 0; row.sha256 = ""
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+            } else {
+                let row: Media
+                if let existing { row = existing } else {
+                    let id = StableIdentity.uuid(for: key)
+                    guard try context.fetchCount(FetchDescriptor<Media>(predicate: #Predicate { $0.id == id })) == 0 else { throw DataError.invalidValue("معرّف الرسم مستخدم بالفعل") }
+                    row = Media(); row.id = id; row.createdAt = now; context.insert(row)
+                }
+                if row.deletedAt != nil {
+                    let barrier = row.deletionBarrierAt ?? row.deletedAt ?? .distantPast
+                    row.restoredAt = max(now, barrier.addingTimeInterval(0.001)); row.deletedAt = nil
+                }
+                row.kind = "drawing"; row.contentType = "application/x-pencilkit-drawing"; row.sourceID = key; row.state = "ok"
+                row.data = drawing; row.sizeBytes = drawing.count
+                row.sha256 = SHA256.hash(data: drawing).map({ String(format: "%02x", $0) }).joined()
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+            }
         }
         return command.isUndoable ? try JSONEncoder().encode(BookUndo(changes: changes, importedMediaIDs: importedMediaIDs.isEmpty ? nil : importedMediaIDs,
                                                                       restoredMedia: restoredMedia.isEmpty ? nil : restoredMedia)) : Data()

@@ -30,6 +30,10 @@ struct MihbaraPDFReaderView: View {
     @State private var closing = false
     @State private var searching = false
     @State private var flowing = false
+    @State private var inkLayer: MihbaraInkOverlay?
+    @State private var inking = false
+    @State private var inkTool: MihbaraInkTool = .pen
+    @State private var inkRevision = 0
     #if DEBUG
     @State private var injectedOpenFailure = false
     #endif
@@ -57,7 +61,7 @@ struct MihbaraPDFReaderView: View {
                 header
                 Rectangle().fill(ink.opacity(0.10)).frame(height: 1)
                 if let document {
-                    MihbaraPDFPage(document: document, pageIndex: pageIndex, paper: paper, onPageChange: pageChanged)
+                    MihbaraPDFPage(document: document, pageIndex: pageIndex, paper: paper, ink: inkLayer, inking: inking, onPageChange: pageChanged)
                         .accessibilityIdentifier("mihbara-pdf-content")
                 } else {
                     VStack(spacing: 18) {
@@ -72,6 +76,11 @@ struct MihbaraPDFReaderView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity).padding(28)
                 }
+                if inking, let inkLayer {
+                    MihbaraInkBar(overlay: inkLayer, page: pageIndex, tool: $inkTool, revision: inkRevision) { setInking(false) }
+                        .environment(\.roomTheme, readerTheme)
+                        .overlay(alignment: .top) { Rectangle().fill(ink.opacity(0.10)).frame(height: 1) }
+                }
                 footer
             }
             .foregroundStyle(ink)
@@ -85,7 +94,7 @@ struct MihbaraPDFReaderView: View {
         .task { openPDF() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { resume(at: Date()) } else { pause(at: Date()) }
-            if phase != .active { searching = false; flowing = false }
+            if phase != .active { searching = false; flowing = false; inkLayer?.flushAll() }
         }
         .onChange(of: canRead) { _, authorized in
             if authorized, scenePhase == .active { resume(at: Date()) }
@@ -102,7 +111,8 @@ struct MihbaraPDFReaderView: View {
             MihbaraPDFFlowView(app: app, book: book) { flowing = false }
                 .environment(\.roomTheme, readerTheme).madarSheetErrorAlert(app)
         }
-        .onDisappear { pause(at: Date()) }
+        .onChange(of: inkTool) { _, tool in inkLayer?.tool = tool }
+        .onDisappear { inkLayer?.flushAll(); pause(at: Date()) }
         .toolbarVisibility(.hidden, for: .navigationBar)
     }
 
@@ -126,6 +136,14 @@ struct MihbaraPDFReaderView: View {
                     }
                     .accessibilityLabel("ابحث في PDF واستخرج نصه")
                     .accessibilityIdentifier("mihbara-pdf-search")
+                    if inkLayer != nil {
+                        Button { setInking(!inking) } label: {
+                            Image(systemName: inking ? "pencil.tip.crop.circle.fill" : "pencil.tip.crop.circle").frame(width: 44, height: 44)
+                        }
+                        .accessibilityLabel(inking ? "أنهِ الرسم" : "ارسم على الصفحة")
+                        .accessibilityValue(inkLayer.map { digits.string($0.drawnPages) } ?? "")
+                        .accessibilityIdentifier("mihbara-pdf-ink")
+                    }
                     Button { flowing = true } label: {
                         Image(systemName: "text.justify.leading").frame(width: 44, height: 44)
                     }
@@ -191,6 +209,7 @@ struct MihbaraPDFReaderView: View {
             guard let opened = PDFDocument(data: bytes), !opened.isLocked, opened.pageCount > 0,
                   opened.page(at: 0) != nil else { throw PDFReaderError.unreadable }
             document = opened
+            inkLayer = makeInkLayer()
             pageIndex = startPage.map { min(max($0, 0), opened.pageCount - 1) } ?? restoredIndex(count: opened.pageCount)
             let now = Date()
             beginSegment(at: now)
@@ -319,9 +338,31 @@ struct MihbaraPDFReaderView: View {
         readingClock = nil
     }
 
+    /// Drawings load with the file; a failed read leaves the reader open without the pen rather than risk overwriting them.
+    @MainActor private func makeInkLayer() -> MihbaraInkOverlay? {
+        do {
+            let bookID = book.id
+            let layer = MihbaraInkOverlay(saved: try service.pageInk(bookID: bookID)) { page, data in
+                do {
+                    try await app.executeBookCommand("ink.savePage", payload: ["bookID": .string(bookID.uuidString), "page": .number(Double(page)), "drawing": .string(data.base64EncodedString())])
+                } catch { app.errorMessage = madarUserMessage(error) }
+            }
+            layer.tool = inkTool
+            layer.onChange = { inkRevision += 1 }
+            return layer
+        } catch { return nil }
+    }
+
+    @MainActor private func setInking(_ on: Bool) {
+        if !on { inkLayer?.flushAll() }
+        inkLayer?.drawing = on
+        withAnimation(.snappy) { inking = on }
+    }
+
     @MainActor private func finishAndClose() {
         guard !closing else { return }
         closing = true
+        inkLayer?.flushAll()
         pause(at: Date())
         Task { @MainActor in
             await saveCoordinator.waitForCurrentAttempt()
@@ -491,6 +532,8 @@ private struct MihbaraPDFPage: UIViewRepresentable {
     let document: PDFDocument
     let pageIndex: Int
     let paper: Color
+    var ink: MihbaraInkOverlay? = nil
+    var inking = false
     let onPageChange: (Int, Bool) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onPageChange: onPageChange) }
@@ -501,6 +544,8 @@ private struct MihbaraPDFPage: UIViewRepresentable {
         view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.displayDirection = .vertical
+        // The overlay provider must be set before the document, so every page gets its canvas.
+        view.pageOverlayViewProvider = ink
         view.document = document
         context.coordinator.observer = NotificationCenter.default.addObserver(
             forName: Notification.Name.PDFViewPageChanged, object: view, queue: .main
@@ -518,6 +563,8 @@ private struct MihbaraPDFPage: UIViewRepresentable {
 
     func updateUIView(_ view: RestoringPDFView, context: Context) {
         context.coordinator.onPageChange = onPageChange
+        // While drawing, PDFKit's own gestures step aside so a finger draws instead of scrolling.
+        if view.isInMarkupMode != inking { view.isInMarkupMode = inking }
         guard view.reportsPageChanges, let page = document.page(at: pageIndex), view.currentPage !== page else { return }
         view.go(to: page)
     }

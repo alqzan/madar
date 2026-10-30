@@ -23,6 +23,8 @@ extension AppSession {
                 let media = Media(); media.id = StableIdentity.uuid(for: "mihbara-missing-file-fixture-media")
                 media.kind = "doc"; media.contentType = "com.adobe.pdf"; media.state = "missing"
                 media.sizeBytes = bytes.count; media.sha256 = hash; c.insert(media)
+                // M6-PK: a PDF that is on the device, to draw on.
+                if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_PDF_READY"] == "1" { media.state = "ok"; media.data = bytes; book.title = "كتاب للرسم" }
                 book.format = "pdf"; book.mediaID = media.id; book.fileHash = hash; book.pages = 1; book.currentPage = 1
                 book.createdAt = now; book.updatedAt = now
             } else if let encoded = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_EPUB_BASE64"],

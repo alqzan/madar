@@ -27,11 +27,15 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case savePageNote(id: UUID, bookID: UUID, text: String, locatorJSON: Data, page: Int?)
     /// «أضف إلى كلماتي»: one saved word with its source paragraph and reading position.
     case saveUserWord(id: UUID, word: String, language: String, bookID: UUID, bookTitle: String, locatorJSON: Data, context: String)
+    /// Owner, 30 Oct 2026: the drawing on one PDF file page (0-based), as PencilKit data; empty data clears the page.
+    case savePageInk(bookID: UUID, page: Int, drawing: Data)
     public static let highlightColors: Set<String> = ["yellow", "green", "rose"]
-    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.importGoodreads", "book.delete", "book.restore", "book.removeFile", "book.restoreFile", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
+    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.importGoodreads", "book.delete", "book.restore", "book.removeFile", "book.restoreFile", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save", "ink.savePage"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
         if case .removeBookFile = self { return false }
+        // Saved as the reader draws; PencilKit's own undo covers the strokes while the page is open.
+        if case .savePageInk = self { return false }
         return true
     }
     public static func parse(_ name: String, _ p: [String: JSONValue]) -> Self? {
@@ -68,6 +72,12 @@ public enum BookCommand: Codable, Equatable, Sendable {
         if name == "hadith.mark" {
             guard Set(p.keys) == ["number","edition","understood","day"], let n = integer("number"), (1...42).contains(n), let edition = text("edition"), !edition.isEmpty, edition.count <= 120, case .bool(let understood) = p["understood"], let day = text("day").flatMap({ try? GregorianDay($0) }) else { return nil }
             return .hadith(number: n, edition: edition, understood: understood, day: day)
+        }
+        if name == "ink.savePage" {
+            guard Set(p.keys) == ["bookID", "page", "drawing"], let bookID = text("bookID").flatMap(UUID.init(uuidString:)),
+                  let page = integer("page"), let encoded = text("drawing"), encoded.count <= 11_000_000,
+                  let drawing = Data(base64Encoded: encoded), drawing.count <= 8_000_000 else { return nil }
+            return .savePageInk(bookID: bookID, page: page, drawing: drawing)
         }
         if name == "word.save" {
             guard Set(p.keys) == ["id", "word", "language", "bookID", "bookTitle", "locator", "context"],

@@ -127,6 +127,42 @@ import MadarData
         #expect(freshBook.locatorJSON == Data(locator.utf8))
     }
 
+    /// Owner, 30 Oct 2026: a drawing on a PDF page is one Media row per page beside the book; the PDF's own bytes and
+    /// hash never change, a redraw replaces the row, clearing tombstones it and drawing again brings the same row back.
+    @Test func pageInkIsOneRowPerPageAndNeverTouchesThePDF() async throws {
+        let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appendingPathComponent("Store"))
+        let adapter = DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 })
+        let source = root.appendingPathComponent("كتاب.pdf"); try pdf().write(to: source)
+        let inspection = try PDFBookFiles.stage(source: source, root: adapter.bookStagingDirectory)
+        let id = UUID(), now = Date(), bus = CommandBus(adapter: adapter)
+        _ = try await bus.execute(.init(name: "book.importPDF", payload: .object(["id": .string(id.uuidString), "fileID": .string(inspection.id.uuidString), "sha256": .string(inspection.sha256), "title": .string("كتاب"), "author": .string(""), "language": .string("ar")]), issuedAt: now), now: now)
+        func ink(_ page: Int, _ data: Data, at t: Date) async throws -> CommandOutcome {
+            try await bus.execute(.init(name: "ink.savePage", payload: .object(["bookID": .string(id.uuidString), "page": .number(Double(page)), "drawing": .string(data.base64EncodedString())]), issuedAt: t), now: t)
+        }
+        let first = Data([1, 2, 3]), second = Data([4, 5, 6, 7])
+        let saved = try await ink(1, first, at: now)
+        #expect(saved.status == .applied && saved.undoToken == nil)
+        #expect(try await ink(1, second, at: now.addingTimeInterval(1)).status == .applied)
+        func drawings() throws -> [Media] { try ModelContext(container).fetch(FetchDescriptor<Media>()).filter { $0.kind == "drawing" } }
+        var rows = try drawings()
+        #expect(rows.count == 1 && rows[0].data == second && rows[0].sizeBytes == 4 && rows[0].sourceID == "pdf-ink:\(id.uuidString):1")
+        // `shasum -a 256` of the bytes 04 05 06 07, so a backup restore verifies the drawing like any Media file.
+        #expect(rows[0].sha256 == "c6d44cf418f610e3fe9e1d9294ff43def81c6cdcad6cbb1820cff48d3aa4355d")
+        let pdfMedia = try #require(ModelContext(container).fetch(FetchDescriptor<Media>()).first { $0.kind == "doc" })
+        #expect(pdfMedia.sha256 == inspection.sha256 && pdfMedia.deletedAt == nil)
+        #expect(try await ink(1, Data(), at: now.addingTimeInterval(2)).status == .applied)
+        rows = try drawings()
+        #expect(rows.count == 1 && rows[0].deletedAt != nil && rows[0].data == nil)
+        #expect(try await ink(1, first, at: now.addingTimeInterval(3)).status == .applied)
+        rows = try drawings()
+        #expect(rows.count == 1 && rows[0].deletedAt == nil && rows[0].restoredAt != nil && rows[0].data == first)
+        #expect(try await ink(0, first, at: now.addingTimeInterval(4)).status == .applied)
+        #expect(try drawings().count == 2)
+        // A paper book has no pages to draw on, and a payload without the drawing is refused at parse.
+        #expect(BookCommand.parse("ink.savePage", ["bookID": .string(id.uuidString), "page": .number(0)]) == nil)
+    }
+
     @Test func protectedPDFAndAChangedStagedOriginalAreRejectedWithoutBookOrMedia() async throws {
         let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
         let source = root.appendingPathComponent("محمي.pdf"), staging = root.appendingPathComponent("BookStaging")
