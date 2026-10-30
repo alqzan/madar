@@ -354,7 +354,8 @@ private struct BahwSuggestionsView: View {
         case .diary:
             if let url = URL(string: "madar://notes/write") { session.open(url) }
         case .money: session.open(URL(string: "madar://mal/messages")!)
-        case .mihbara: session.selectedTab = "mihbara"
+        // The suggestion names a book, so it opens that book (a stale id falls back to the room's own alert).
+        case .mihbara(let book): if let book { session.openSpotlightBook(book) } else { session.selectedTab = "mihbara" }
         }
     }
 }

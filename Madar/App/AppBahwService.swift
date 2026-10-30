@@ -212,7 +212,7 @@ struct BahwUpcomingItem: Identifiable, Equatable {
 
 
 struct BahwSuggestion: Identifiable {
-    enum Destination { case prayer, habit(UUID), quran, diary, money, mihbara }
+    enum Destination { case prayer, habit(UUID), quran, diary, money, mihbara(book: UUID?) }
     let id: String
     let title: String
     let detail: String
@@ -248,7 +248,7 @@ extension AppBahwService {
                 result.append(.init(id: "money", title: "راجع رسائلك البنكية", detail: "رسائل تنتظر قرارك قبل أن تصبح حركات", symbol: "MadarMoney", destination: .money))
             }
             if let book = session.mihbaraWidgetSnapshot(locked: false, at: now).currentBook {
-                result.append(.init(id: "mihbara", title: "أكمل «" + book.title + "»", detail: book.currentPage.map { "موضعك محفوظ عند الصفحة " + digits.string($0) } ?? "ابدأ القراءة من رحل المحبرة", symbol: "books.vertical", destination: .mihbara))
+                result.append(.init(id: "mihbara", title: "أكمل «" + book.title + "»", detail: book.currentPage.map { "موضعك محفوظ عند الصفحة " + digits.string($0) } ?? "ابدأ القراءة من رحل المحبرة", symbol: "books.vertical", destination: .mihbara(book: book.id)))
             }
         }
         return result

@@ -75,6 +75,11 @@ struct FixedRoomEntry:TimelineEntry {
     var mihbara:MihbaraSnapshot?=nil
     var mihbaraLocked=false
     var numerals="arabicIndic"
+    /// The Mihbara widget opens the book on its face, so a tap lands in the reader and not on the room's door; every other widget opens its room.
+    var openURL:URL? {
+        if room == .mihbara, !mihbaraLocked, let id=mihbara?.currentBook?.id { return URL(string:room.route+"/book/"+id.uuidString) }
+        return URL(string:room.route)
+    }
     var relevance:TimelineEntryRelevance?{
         let empty = room == .mihbara
             ? mihbara?.currentBook == nil && mihbara?.hadithToday == nil && mihbara?.lastNotebookLine == nil && (mihbara?.shelfCount ?? 0) == 0
@@ -109,7 +114,7 @@ private struct FixedRoomWidgetView:View {
     let entry:FixedRoomEntry
     @Environment(\.widgetFamily)private var family
     @Environment(\.colorScheme)private var scheme
-    var body:some View{RoomWidgetContent(room:entry.room,snapshot:entry.value,template:entry.template,family:family,mihbaraSnapshot:entry.mihbara,mihbaraLocked:entry.mihbaraLocked,numerals:entry.numerals).widgetURL(URL(string:entry.room.route)).containerBackground(for:.widget){if [WidgetFamily.accessoryCircular,.accessoryRectangular,.accessoryInline].contains(family){Color.clear}else if entry.room == .money{MadarToken.colors["widgetIdentity.room.mal.\(scheme == .dark ? "dark" : "light").bg"] ?? .clear}else{RoomTheme(room:entry.room == .mihbara ? "mihbara" : "bahw",dark:scheme == .dark).surface}}}
+    var body:some View{RoomWidgetContent(room:entry.room,snapshot:entry.value,template:entry.template,family:family,mihbaraSnapshot:entry.mihbara,mihbaraLocked:entry.mihbaraLocked,numerals:entry.numerals).widgetURL(entry.openURL).containerBackground(for:.widget){if [WidgetFamily.accessoryCircular,.accessoryRectangular,.accessoryInline].contains(family){Color.clear}else if entry.room == .money{MadarToken.colors["widgetIdentity.room.mal.\(scheme == .dark ? "dark" : "light").bg"] ?? .clear}else{RoomTheme(room:entry.room == .mihbara ? "mihbara" : "bahw",dark:scheme == .dark).surface}}}
 }
 struct FixedRoomWidget<Config:FixedRoomConfiguration>:Widget {
     var body:some WidgetConfiguration {
