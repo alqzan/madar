@@ -19,7 +19,7 @@ struct QuranQiyamView:View {
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:12) {
-                HStack(spacing:12) {Button(action:close) {Image(systemName:"chevron.backward").frame(width:44,height:44)}.accessibilityLabel("رجوع");VStack(alignment:.leading,spacing:2) {Text("ورد القيام").font(quranSerif(22));Text("من قسم الصلاة، يُحسب في القرآن").font(quranFont(11))};Spacer()}
+                HStack(spacing:12) {Button(action:close) {Image(systemName:"chevron.backward").frame(width:44,height:44)}.accessibilityLabel("رجوع").accessibilityIdentifier("quran-qiyam-close");VStack(alignment:.leading,spacing:2) {Text("ورد القيام").font(quranSerif(22));Text("من قسم الصلاة، يُحسب في القرآن").font(quranFont(11))};Spacer()}
                 Text("اقرأ في صلاتك مما في صدرك").font(quranFont(14))
                 Text("ويُحسب لك مراجعة").font(quranSerif(29)).foregroundStyle(QuranNightColors.gold)
                 Text("كم ركعة؟").font(quranFont(13))

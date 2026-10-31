@@ -36,8 +36,34 @@ import XCTest
         XCTAssertTrue(app.buttons["prayer-quran-qiyam"].waitForExistence(timeout:10))
         // OR-08: the sheet says what tonight's reading gives the wird before it hands over to the Quran room.
         let line=app.staticTexts["prayer-qiyam-wird-line"];XCTAssertTrue(line.exists && (line.label.contains("وردك") || line.label.contains("سجل القرآن")),app.debugDescription);capture(app,"OR-08-qiyam-sheet-L")
+        // Four is deliberately different from the Quran preview's default; the prayer sheet owns this count.
+        app.buttons["prayer-qiyam-plus"].tap(); app.buttons["prayer-qiyam-plus"].tap()
+        XCTAssertEqual(app.staticTexts["prayer-qiyam-count"].label, "٤", "The nondefault count must be saved before opening the Quran preview.")
         app.buttons["prayer-quran-qiyam"].tap()
         XCTAssertTrue(app.buttons["quran-qiyam-start"].waitForExistence(timeout:15));capture(app,"M2-V17-prayer-link-L")
+        app.buttons["quran-qiyam-close"].tap()
+        XCTAssertTrue(app.buttons["quran-qiyam-close"].waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 10), app.debugDescription)
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 25), app.debugDescription)
+        let prayerTab = app.tabBars.buttons["الصلاة"]
+        XCTAssertTrue(prayerTab.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(prayerTab.isHittable, app.debugDescription)
+        prayerTab.tap()
+        for _ in 0..<8 {if app.buttons["prayer-qiyam"].isHittable {break};app.swipeUp()};app.buttons["prayer-qiyam"].tap()
+        XCTAssertEqual(app.staticTexts["prayer-qiyam-count"].label, "٤", "The prayer count must still be present after opening the Quran preview.")
+        app.buttons["prayer-qiyam-minus"].tap(); app.buttons["prayer-qiyam-minus"].tap()
+        XCTAssertEqual(app.staticTexts["prayer-qiyam-count"].label, "٠")
+        app.buttons["prayer-quran-qiyam"].tap()
+        XCTAssertTrue(app.buttons["quran-qiyam-start"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["quran-qiyam-close"].tap()
+        XCTAssertTrue(app.buttons["quran-qiyam-close"].waitForNonExistence(timeout: 10), app.debugDescription)
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 25), app.debugDescription)
+        XCTAssertTrue(prayerTab.waitForExistence(timeout: 10), app.debugDescription); prayerTab.tap()
+        for _ in 0..<8 where !app.buttons["prayer-qiyam"].isHittable { app.swipeUp() }
+        app.buttons["prayer-qiyam"].tap()
+        XCTAssertEqual(app.staticTexts["prayer-qiyam-count"].label, "٠", "The edited zero/off night must persist before opening the Quran wird.")
     }
     private func capture(_ app:XCUIApplication,_ name:String) {let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
 }

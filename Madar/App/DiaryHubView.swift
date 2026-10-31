@@ -81,8 +81,8 @@ struct DiaryHubView: View {
 #endif
                 }
             }.background(theme.background).foregroundStyle(theme.ink)
-                .fullScreenCover(isPresented: $bookOpen) { DiaryYearbookView(app: app).environment(\.roomTheme, theme).diaryRootDraftBlocking(app) }
-                .fullScreenCover(isPresented: $exportOpen) { DiaryExportView(app: app).environment(\.roomTheme, theme).diaryRootDraftBlocking(app) }
+                .fullScreenCover(isPresented: $bookOpen) { DiaryYearbookView(app: app).environment(\.roomTheme, theme) }
+                .fullScreenCover(isPresented: $exportOpen) { DiaryExportView(app: app).environment(\.roomTheme, theme) }
                 .fullScreenCover(isPresented: $searchOpen) { DiarySearchView(app: app).environment(\.roomTheme, theme) }
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { searchOpen = true } label: { Image(systemName: "magnifyingglass") }.accessibilityLabel("ابحث في مذكراتك") }; ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward") }.accessibilityIdentifier("diary-hub-close") } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)

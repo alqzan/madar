@@ -59,6 +59,57 @@ import XCTest
         shot(app, "M5-V17-empty-L")
     }
 
+    func testQueuedMoneyExpenseSeedsPresentInFIFOOrderWithoutSaving() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "expense",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00",
+            "MADAR_UI_MONEY_FIFO_HARNESS": "1"]
+        app.launch()
+        let customize = app.buttons["tab-customize"]
+        XCTAssertTrue(customize.waitForExistence(timeout: 20), app.debugDescription); customize.tap()
+        let search = app.textFields["settings-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]
+        XCTAssertTrue(money.waitForExistence(timeout: 8), app.debugDescription); money.tap()
+        XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 15), app.debugDescription)
+        let open = app.buttons["money-expense-open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 15), app.debugDescription)
+        if !open.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(open.isHittable, app.debugDescription); open.tap()
+        let amount = app.staticTexts["money-expense-amount"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 12), app.debugDescription)
+        let firstAmount = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "١٨"), object: amount)
+        XCTAssertEqual(XCTWaiter.wait(for: [firstAmount], timeout: 8), .completed, app.debugDescription)
+        let firstMerchant = app.buttons["money-expense-merchant-edit"]
+        let firstMerchantLabel = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "طلب أول"), object: firstMerchant)
+        XCTAssertEqual(XCTWaiter.wait(for: [firstMerchantLabel], timeout: 8), .completed, app.debugDescription)
+        app.buttons["money-expense-test-queue-two"].tap()
+        XCTAssertTrue(amount.label.contains("١٨"), "New Capture requests must not replace the open expense.")
+
+        app.buttons["money-expense-close"].tap()
+        let discard = app.buttons["money-expense-discard"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 8), app.debugDescription); discard.tap()
+        let secondAmount = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "٧"), object: amount)
+        XCTAssertEqual(XCTWaiter.wait(for: [secondAmount], timeout: 15), .completed, app.debugDescription)
+        let secondMerchant = app.buttons["money-expense-merchant-edit"]
+        let secondMerchantLabel = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "طلب ثانٍ"), object: secondMerchant)
+        XCTAssertEqual(XCTWaiter.wait(for: [secondMerchantLabel], timeout: 8), .completed, app.debugDescription)
+
+        app.buttons["money-expense-close"].tap()
+        let discardSecond = app.buttons["money-expense-discard"].firstMatch
+        XCTAssertTrue(discardSecond.waitForExistence(timeout: 8), app.debugDescription); discardSecond.tap()
+        let thirdAmount = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "٢٣"), object: amount)
+        XCTAssertEqual(XCTWaiter.wait(for: [thirdAmount], timeout: 15), .completed, app.debugDescription)
+        let thirdMerchantLabel = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "طلب ثالث"), object: secondMerchant)
+        XCTAssertEqual(XCTWaiter.wait(for: [thirdMerchantLabel], timeout: 8), .completed, app.debugDescription)
+        app.buttons["money-expense-close"].tap()
+        app.buttons["money-expense-discard"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["money-expense-open"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["undo-button"].exists, "Opening queued drafts must never save them.")
+        app.terminate()
+    }
+
     private func enterTripDuplicate(_ app: XCUIApplication) {
         for key in ["4", "2", "5"] { app.buttons["money-expense-key-" + key].tap() }
         let merchant = app.buttons["money-expense-merchant-TripTest"]

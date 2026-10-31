@@ -11,6 +11,7 @@ struct PrayerTodayView: View {
     @Environment(\.roomTheme) private var inheritedTheme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @State private var selectedSheet: PrayerTodaySheet?
+    @State private var prayerSheetIsVisible = false
     @State private var locator = TravelLocator()
     @State private var requestReadFailed = false
     @State private var pendingPrayerRoute: Route?
@@ -19,6 +20,7 @@ struct PrayerTodayView: View {
     @State private var injectedReadFailure = false
     @State private var injectedRequest = false
     @State private var injectedRoute = false
+    @State private var debugPrayerRouteOpenedAfterDismissal: Bool?
     #endif
     @Environment(\.scenePhase) private var scenePhase
 
@@ -115,17 +117,22 @@ struct PrayerTodayView: View {
         .onChange(of: session.prayerRoute, initial: true) { _, route in
             guard let route else { return }
             session.prayerRoute = nil
+            pendingPrayerRootRequestID = nil
             pendingPrayerRoute = route
+            requestReadFailed = false
             openPrayerRoute(route)
         }
         .onChange(of: session.prayerRootRequestID) { _, requestID in
             guard let requestID else { return }
+            pendingPrayerRoute = nil
             pendingPrayerRootRequestID = requestID
             closeForPrayerRootIfSafe()
         }
-        .onChange(of: session.prayerRootDraftBlockers.isEmpty) { _, empty in if empty { closeForPrayerRootIfSafe() } }
+        .onChange(of: session.prayerRootDraftBlockers.isEmpty) { _, empty in
+            if empty { closeForPrayerRootIfSafe(); dispatchPendingPrayerRoute() }
+        }
         .onChange(of: session.prayerWriteInProgress) { _, isWriting in
-            if !isWriting { closeForPrayerRootIfSafe() }
+            if !isWriting { closeForPrayerRootIfSafe(); dispatchPendingPrayerRoute() }
         }
         .alert("تعذّر فتح تسجيل الصلاة", isPresented: $requestReadFailed) {
             Button("أعد المحاولة") {
@@ -134,18 +141,24 @@ struct PrayerTodayView: View {
             Button("إلغاء", role: .cancel) { session.prayerLogRequest = nil; pendingPrayerRoute = nil }
         } message: { Text("تعذّرت قراءة بيانات الصلاة. يمكنك المحاولة مرة أخرى.") }
         .onChange(of: scenePhase) { _, phase in if phase == .active { detectTravel() } }
-        .sheet(item: $selectedSheet) { route in
+        .sheet(item: $selectedSheet, onDismiss: {
+            prayerSheetIsVisible = false
+            dispatchPendingPrayerRoute()
+        }) { route in
+            let reportRootDraft: (UUID, Bool) -> Void = { id, active in
+                session.setPrayerRootDraftBlocker(id, active: active)
+            }
             Group {
             switch route {
             case .travelQuestion(let fix, let km):
-                PrayerTravelQuestionSheet(session: session, fix: fix, homeKm: km, finished: { selectedSheet = nil })
+                PrayerTravelQuestionSheet(session: session, fix: fix, homeKm: km, finished: { selectedSheet = nil }, rootDraftChanged: reportRootDraft)
             case .trip(let trip):
                 PrayerTripSheet(session: session, trip: trip, fix: locator.fix, thresholdKm: travelThresholdKm, finished: { selectedSheet = nil })
             case .pair(let day, let pair, let cell, let timeZone):
-                PrayerTravelPairSheet(session: session, day: day, pair: pair, alone: { selectedSheet = .log(cell, timeZone) }, finished: { selectedSheet = nil })
+                PrayerTravelPairSheet(session: session, day: day, pair: pair, alone: { selectedSheet = .log(cell, timeZone) }, finished: { selectedSheet = nil }, rootDraftChanged: reportRootDraft)
             case .oldMissed:
                 PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
-                    PrayerOldMissedSheet(session: session, trackingStart: snapshot.tracking.day, finished: { selectedSheet = nil })
+                    PrayerOldMissedSheet(session: session, trackingStart: snapshot.tracking.day, finished: { selectedSheet = nil }, rootDraftChanged: reportRootDraft)
                 }
             case .qiyam:
                 PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
@@ -156,7 +169,7 @@ struct PrayerTodayView: View {
                     PrayerNightLoggingSheet(session: session, snapshot: snapshot, initialNight: night, finished: { selectedSheet = nil })
                 }
             case .heart(let cell):
-                PrayerHeartAnswerSheet(session: session, cell: cell, finished: { selectedSheet = nil })
+                PrayerHeartAnswerSheet(session: session, cell: cell, finished: { selectedSheet = nil }, rootDraftChanged: reportRootDraft)
             case .streaks:
                 PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
                     PrayerStreaksSheet(snapshot: snapshot, levels: PrayerStreakLevel.shown(congregation: session.bool("salah.showMosqueStreak")),
@@ -176,7 +189,13 @@ struct PrayerTodayView: View {
                 }
             case .qadaList:
                 PrayerQadaListSheet(session: session, dateLabel: qadaDate, loadSnapshot: sheetSnapshot,
-                    makeUp: { item in selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day)) },
+                    rootDraftChanged: reportRootDraft,
+                    makeUp: { item in
+                        let continuationBlocker = UUID()
+                        reportRootDraft(continuationBlocker, true)
+                        selectedSheet = .makeUp(item, isFridayNoon: item.isFriday,
+                            dateLabel: qadaDate(item.reference.day), rootBlockerID: continuationBlocker)
+                    },
                     addOld: { selectedSheet = .oldMissed })
             case .log(let cell, let timeZone):
                 PrayerTodayLogSheet(cell: cell,
@@ -194,7 +213,8 @@ struct PrayerTodayView: View {
                             session.recordPrayer(cell.reference, status: status, fridayKind: fridayKind, completion: done)
                         }
                     },
-                    answerHeart: { heart, done in session.answerPrayerHeart(cell.reference, heart: heart, completion: done) })
+                    answerHeart: { heart, done in session.answerPrayerHeart(cell.reference, heart: heart, completion: done) },
+                    rootDraftChanged: reportRootDraft)
             case .prefilledLog(let cell, let timeZone, let status, let heart):
                 PrayerTodayLogSheet(cell: cell,
                     clock: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: timeZone) } ?? "",
@@ -211,20 +231,49 @@ struct PrayerTodayView: View {
                             session.recordPrayer(cell.reference, status: status, fridayKind: fridayKind, completion: done)
                         }
                     },
-                    answerHeart: { heart, done in session.answerPrayerHeart(cell.reference, heart: heart, completion: done) })
-            case .makeUp(let item, let isFridayNoon, let dateLabel):
-                PrayerMakeUpSheet(item: item, isFridayNoon: isFridayNoon, dateLabel: dateLabel, isSaving: session.prayerWriteInProgress) { kind, done in
+                    answerHeart: { heart, done in session.answerPrayerHeart(cell.reference, heart: heart, completion: done) },
+                    rootDraftChanged: reportRootDraft)
+            case .makeUp(let item, let isFridayNoon, let dateLabel, let rootBlockerID):
+                PrayerMakeUpSheet(item: item, isFridayNoon: isFridayNoon, dateLabel: dateLabel,
+                    isSaving: session.prayerWriteInProgress, rootBlockerID: rootBlockerID,
+                    rootDraftChanged: reportRootDraft) { kind, done in
                     session.makeUpPrayer(item.reference, fridayKind: kind, completion: done)
                 }
             case .recovery(let references, let fridayReferences, let timeZone):
-                PrayerGapResolutionSheet(references: references, fridayReferences: fridayReferences, dateLabel: qadaDate, digits: digits) { resolutions, done in
+                PrayerGapResolutionSheet(references: references, fridayReferences: fridayReferences, dateLabel: qadaDate, digits: digits, rootDraftChanged: reportRootDraft) { resolutions, done in
                     session.resolvePrayerGap(resolutions, completion: done)
                 }
             }
             }
+            .onAppear { prayerSheetIsVisible = true }
             .dynamicTypeSize(dynamicType)
             .environment(\.roomTheme, theme)
             .madarSheetErrorAlert(session) // AU-37: a failed write inside a prayer sheet is said there.
+#if DEBUG
+            .overlay(alignment: .topTrailing) {
+                if ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_ROOT_ROUTE_HARNESS"] == "1"
+                    || ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_ROUTE_DISMISSAL_RACE"] == "1" {
+                    VStack(alignment: .trailing, spacing: 8) {
+                        Button("اختبار رابط جذر الصلاة") { session.open(URL(string: "madar://prayer")!) }
+                            .accessibilityIdentifier("prayer-root-test-route")
+                        Button("اختبر رابط الإحصاءات") { session.open(URL(string: "madar://salah/hali")!) }
+                            .accessibilityIdentifier("prayer-deep-route-test")
+                        if ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_ROUTE_DISMISSAL_RACE"] == "1" {
+                            Button("اختبر الرابط أثناء الإغلاق") {
+                                debugPrayerRouteOpenedAfterDismissal = nil
+                                selectedSheet = nil
+                                session.open(URL(string: "madar://salah/hali")!)
+                            }
+                            .accessibilityIdentifier("prayer-test-route-during-dismissal")
+                            if let openedAfterDismissal = debugPrayerRouteOpenedAfterDismissal {
+                                Text(openedAfterDismissal ? "بعد إغلاق الورقة" : "قبل إغلاق الورقة")
+                                    .accessibilityIdentifier("prayer-route-open-after-dismiss")
+                            }
+                        }
+                    }
+                }
+            }
+#endif
         }
     }
 
@@ -274,7 +323,27 @@ struct PrayerTodayView: View {
         pendingPrayerRootRequestID = nil
     }
 
+    private func dispatchPendingPrayerRoute() {
+        guard pendingPrayerRootRequestID == nil,
+              !session.prayerWriteInProgress,
+              session.prayerRootDraftBlockers.isEmpty,
+              let route = pendingPrayerRoute else { return }
+        if selectedSheet != nil { selectedSheet = nil; return }
+        guard !prayerSheetIsVisible else { return }
+        openPrayerRoute(route)
+    }
+
     private func openPrayerRoute(_ route: Route) {
+        guard pendingPrayerRootRequestID == nil,
+              !session.prayerWriteInProgress,
+              session.prayerRootDraftBlockers.isEmpty else { return }
+        if selectedSheet != nil { selectedSheet = nil; return }
+        guard !prayerSheetIsVisible else { return }
+#if DEBUG
+        if ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_ROUTE_DISMISSAL_RACE"] == "1" {
+            debugPrayerRouteOpenedAfterDismissal = !prayerSheetIsVisible
+        }
+#endif
         pendingPrayerRoute = nil
         guard let routeName = route.path.first else { session.errorMessage = "هذا المسار لا يفتح شاشة صلاة معروفة."; return }
         switch routeName {
@@ -305,7 +374,7 @@ struct PrayerTodayView: View {
                 }
                 pendingPrayerRoute = nil
                 requestReadFailed = false
-                selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day))
+                selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day), rootBlockerID: nil)
             } catch {
                 pendingPrayerRoute = route
                 requestReadFailed = true
@@ -620,7 +689,7 @@ struct PrayerTodayView: View {
     }
 
     @ViewBuilder private func buttonsRow(first: PrayerQada) -> some View {
-        let makeUp = Button { selectedSheet = .makeUp(first, isFridayNoon: first.isFriday, dateLabel: qadaDate(first.reference.day)) } label: {
+        let makeUp = Button { selectedSheet = .makeUp(first, isFridayNoon: first.isFriday, dateLabel: qadaDate(first.reference.day), rootBlockerID: nil) } label: {
             Text("قضيتُ واحدة").font(PrayerHomeType.strong).frame(maxWidth: .infinity, minHeight: 54)
                 .foregroundStyle(theme.background).background(theme.ink, in: .rect(cornerRadius: 16))
         }
@@ -1152,14 +1221,17 @@ private struct PrayerQadaListSheet: View {
     let session: AppSession
     let dateLabel: (GregorianDay) -> String
     let loadSnapshot: () throws -> PrayerSnapshot
+    let rootDraftChanged: (UUID, Bool) -> Void
     let makeUp: (PrayerQada) -> Void
     let addOld: () -> Void
     @Environment(\.roomTheme) private var theme
     @State private var chosen: UUID?
+    @State private var rootBlockerID = UUID()
     @State private var contentHeight: CGFloat = 640
     @State private var items: [PrayerQada] = []
     @State private var didLoad = false
     @State private var readFailed = false
+    private var hasUnsavedInput: Bool { chosen != nil }
     private var digits: MadarNumberFormatter { MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi) }
 
     var body: some View {
@@ -1220,6 +1292,8 @@ private struct PrayerQadaListSheet: View {
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(34)
         .task { load() }
+        .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
+        .onDisappear { rootDraftChanged(rootBlockerID, false) }
     }
 
     private func load() {
@@ -1285,7 +1359,7 @@ private enum PrayerTodaySheet: Identifiable {
     case qiyamNight(GregorianDay)
     case oldMissed
     case qadaList
-    case makeUp(PrayerQada, isFridayNoon: Bool, dateLabel: String)
+    case makeUp(PrayerQada, isFridayNoon: Bool, dateLabel: String, rootBlockerID: UUID?)
     case recovery([PrayerReference], Set<PrayerReference>, TimeZone)
     var id: String {
         switch self {
@@ -1302,7 +1376,7 @@ private enum PrayerTodaySheet: Identifiable {
         case .heart(let cell): "heart-\(cell.reference.naturalKey)"
         case .log(let cell, _): "log-\(cell.reference.naturalKey)"
         case .prefilledLog(let cell, _, _, _): "prefilled-log-\(cell.reference.naturalKey)"
-        case .makeUp(let item, _, _): "makeup-\(item.id.uuidString)"
+        case .makeUp(let item, _, _, _): "makeup-\(item.id.uuidString)"
         case .recovery(let references, _, _): "recovery-\(references.first?.naturalKey ?? "empty")"
         }
     }
@@ -1321,26 +1395,37 @@ private struct PrayerTodayLogSheet: View {
     let routePrefilled: Bool
     let save: (PrayerStoredStatus, FridayPrayerKind?, Bool, @escaping (Bool) -> Void) -> Void
     let answerHeart: (PrayerHeart?, @escaping (Bool) -> Void) -> Void
+    let rootDraftChanged: (UUID, Bool) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var selected: PrayerStoredStatus?
     @State private var recorded: Bool
     @State private var heart: PrayerHeart?
     @State private var fridayKind: FridayPrayerKind?
+    @State private var committedStatus: PrayerStoredStatus?
+    @State private var committedRecorded = false
+    @State private var committedHeart: PrayerHeart?
+    @State private var committedFridayKind: FridayPrayerKind?
+    @State private var rootBlockerID = UUID()
     @State private var contentHeight: CGFloat = 430
 
     init(cell: PrayerCell, clock: String, askHeart: Bool, isSaving: Bool,
          prefillStatus: PrayerStoredStatus?, prefillHeart: PrayerHeart?,
          save: @escaping (PrayerStoredStatus, FridayPrayerKind?, Bool, @escaping (Bool) -> Void) -> Void,
-         answerHeart: @escaping (PrayerHeart?, @escaping (Bool) -> Void) -> Void) {
+         answerHeart: @escaping (PrayerHeart?, @escaping (Bool) -> Void) -> Void,
+         rootDraftChanged: @escaping (UUID, Bool) -> Void) {
         self.cell = cell; self.clock = clock; self.askHeart = askHeart; self.isSaving = isSaving
         self.routePrefilled = prefillStatus != nil || prefillHeart != nil
-        self.save = save; self.answerHeart = answerHeart
+        self.save = save; self.answerHeart = answerHeart; self.rootDraftChanged = rootDraftChanged
         let initial: PrayerStoredStatus? = switch cell.status { case .jamaah: .jamaah; case .alone: .alone; case .qada: .qada; case .missed: .missed; default: nil }
         _selected = State(initialValue: prefillStatus ?? initial)
         _recorded = State(initialValue: prefillStatus == nil && initial != nil)
         _heart = State(initialValue: prefillHeart ?? cell.heart)
         _fridayKind = State(initialValue: cell.fridayKind)
+        _committedStatus = State(initialValue: initial)
+        _committedRecorded = State(initialValue: initial != nil)
+        _committedHeart = State(initialValue: cell.heart)
+        _committedFridayKind = State(initialValue: cell.fridayKind)
     }
 
     private var options: [PrayerStoredStatus] {
@@ -1349,6 +1434,9 @@ private struct PrayerTodayLogSheet: View {
     /// Friday noon: everything but «وحدي» (always the noon prayer) waits for the kind.
     private func needsKind(_ option: PrayerStoredStatus) -> Bool { cell.isFriday && option != .alone && fridayKind == nil }
     private var showsHeart: Bool { askHeart && recorded && [.jamaah, .alone, .qada].contains(selected ?? .missed) }
+    private var hasUnsavedInput: Bool {
+        selected != committedStatus || recorded != committedRecorded || heart != committedHeart || fridayKind != committedFridayKind
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1376,6 +1464,8 @@ private struct PrayerTodayLogSheet: View {
         .presentationBackground(theme.background)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(34)
+        .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
+        .onDisappear { rootDraftChanged(rootBlockerID, false) }
     }
 
     // MARK: Header
@@ -1461,6 +1551,9 @@ private struct PrayerTodayLogSheet: View {
         save(option, kind, false) { ok in
             guard ok else { return }
             selected = option; recorded = true
+            committedStatus = option; committedRecorded = true
+            committedFridayKind = cell.isFriday ? (option == .alone ? .dhuhr : kind) : nil
+            fridayKind = committedFridayKind
             if !askHeart { dismiss() }
         }
     }
@@ -1563,13 +1656,22 @@ private struct PrayerMakeUpSheet: View {
     let isFridayNoon: Bool
     let dateLabel: String
     let isSaving: Bool
+    let continuesPendingAction: Bool
+    let rootDraftChanged: (UUID, Bool) -> Void
     let makeUp: (FridayPrayerKind?, @escaping (Bool) -> Void) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var fridayKind: FridayPrayerKind?
+    @State private var rootBlockerID = UUID()
     @State private var contentHeight: CGFloat = 420
-    init(item: PrayerQada, isFridayNoon: Bool, dateLabel: String, isSaving: Bool, makeUp: @escaping (FridayPrayerKind?, @escaping (Bool) -> Void) -> Void) {
-        self.item = item; self.isFridayNoon = isFridayNoon; self.dateLabel = dateLabel; self.isSaving = isSaving; self.makeUp = makeUp
+    private var hasUnsavedInput: Bool { continuesPendingAction || fridayKind != item.fridayKind }
+    init(item: PrayerQada, isFridayNoon: Bool, dateLabel: String, isSaving: Bool, rootBlockerID: UUID?,
+         rootDraftChanged: @escaping (UUID, Bool) -> Void,
+         makeUp: @escaping (FridayPrayerKind?, @escaping (Bool) -> Void) -> Void) {
+        self.item = item; self.isFridayNoon = isFridayNoon; self.dateLabel = dateLabel; self.isSaving = isSaving
+        self.continuesPendingAction = rootBlockerID != nil
+        self.rootDraftChanged = rootDraftChanged; self.makeUp = makeUp
+        _rootBlockerID = State(initialValue: rootBlockerID ?? UUID())
         _fridayKind = State(initialValue: item.fridayKind)
     }
     var body: some View {
@@ -1624,6 +1726,8 @@ private struct PrayerMakeUpSheet: View {
         .presentationBackground(theme.background)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(34)
+        .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
+        .onDisappear { rootDraftChanged(rootBlockerID, false) }
     }
 }
 
@@ -1634,10 +1738,12 @@ private struct PrayerGapResolutionSheet: View {
     let fridayReferences: Set<PrayerReference>
     let dateLabel: (GregorianDay) -> String
     let digits: MadarNumberFormatter
+    let rootDraftChanged: (UUID, Bool) -> Void
     let resolve: ([PrayerGapResolution], @escaping (Bool) -> Void) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var choices: [PrayerReference: Choice] = [:]
+    @State private var rootBlockerID = UUID()
 
     /// One choice as the user reads it; Friday noon carries its kind explicitly (RP5).
     struct Choice: Hashable {
@@ -1646,6 +1752,7 @@ private struct PrayerGapResolutionSheet: View {
     }
 
     private var days: [GregorianDay] { Array(Set(references.map(\.day))).sorted() }
+    private var hasUnsavedInput: Bool { !choices.isEmpty }
     private func prayers(on day: GregorianDay) -> [PrayerReference] {
         references.filter { $0.day == day }.sorted { $0.prayer.rawValue.order < $1.prayer.rawValue.order }
     }
@@ -1664,6 +1771,8 @@ private struct PrayerGapResolutionSheet: View {
         .foregroundStyle(theme.ink)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
+        .onDisappear { rootDraftChanged(rootBlockerID, false) }
     }
 
     private var header: some View {
@@ -2479,11 +2588,15 @@ private struct PrayerHeartAnswerSheet: View {
     let session: AppSession
     let cell: PrayerCell
     let finished: () -> Void
+    let rootDraftChanged: (UUID, Bool) -> Void
     @Environment(\.roomTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var answer: PrayerHeart?
-    init(session: AppSession, cell: PrayerCell, finished: @escaping () -> Void) {
-        self.session = session; self.cell = cell; self.finished = finished; _answer = State(initialValue: cell.heart)
+    @State private var rootBlockerID = UUID()
+    private var hasUnsavedInput: Bool { answer != cell.heart }
+    init(session: AppSession, cell: PrayerCell, finished: @escaping () -> Void, rootDraftChanged: @escaping (UUID, Bool) -> Void) {
+        self.session = session; self.cell = cell; self.finished = finished; self.rootDraftChanged = rootDraftChanged
+        _answer = State(initialValue: cell.heart)
     }
     @State private var contentHeight: CGFloat = 520
     /// RP6 in the room's own paper sheet (was a stock grey Form): three answers as cards, the chosen one marked by the prayer star.
@@ -2516,6 +2629,8 @@ private struct PrayerHeartAnswerSheet: View {
         .presentationBackground(theme.background)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(34)
+        .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
+        .onDisappear { rootDraftChanged(rootBlockerID, false) }
     }
     private func answerCard(_ heart: PrayerHeart) -> some View {
         let chosen = answer == heart
@@ -2588,7 +2703,7 @@ private struct PrayerNightLoggingSheet: View {
     /// The wird link keeps what was typed: it is saved first, then the Quran room opens.
     private func openWird() {
         let go = { finished(); session.open(URL(string: "madar://quran/session/qiyam")!) }
-        guard hasUnsavedInput, rakaat > 0 || witr else { go(); return }
+        guard hasUnsavedInput else { go(); return }
         session.recordQiyamNight(selectedNight, rakaat: rakaat, witr: witr, restoreDeleted: false) { succeeded in if succeeded { go() } }
     }
     private func footprintColor(_ night: GregorianDay) -> Color {
@@ -2775,12 +2890,19 @@ private struct PrayerOldMissedSheet: View {
     @Bindable var session: AppSession
     let trackingStart: GregorianDay
     let finished: () -> Void
+    let rootDraftChanged: (UUID, Bool) -> Void
     @State private var date: Date
     @State private var prayer: Prayer = .fajr
     @State private var fridayKind: FridayPrayerKind? = nil
     @State private var confirmRestore = false
-    init(session: AppSession, trackingStart: GregorianDay, finished: @escaping () -> Void) {
-        self.session = session; self.trackingStart = trackingStart; self.finished = finished
+    @State private var rootBlockerID = UUID()
+    private var hasUnsavedInput: Bool {
+        GregorianDay.containing(date, in: session.activePlace.timeZone) != trackingStart.adding(days: -1)
+            || prayer != .fajr || fridayKind != nil
+    }
+    init(session: AppSession, trackingStart: GregorianDay, finished: @escaping () -> Void,
+         rootDraftChanged: @escaping (UUID, Bool) -> Void) {
+        self.session = session; self.trackingStart = trackingStart; self.finished = finished; self.rootDraftChanged = rootDraftChanged
         _date = State(initialValue: trackingStart.adding(days: -1).date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600))
     }
     private var reference: PrayerReference { .init(day: GregorianDay.containing(date, in: session.activePlace.timeZone), prayer: prayer) }
@@ -2829,6 +2951,8 @@ private struct PrayerOldMissedSheet: View {
             }
             .onChange(of: date) { _, _ in fridayKind = nil }
             .onChange(of: prayer) { _, _ in fridayKind = nil }
+            .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
+            .onDisappear { rootDraftChanged(rootBlockerID, false) }
         }
     }
     private func save(_ restore: Bool) { session.addOldMissedPrayer(reference, fridayKind: fridayNoon ? fridayKind : nil, restoreDeleted: restore) { success in if success { finished() } } }

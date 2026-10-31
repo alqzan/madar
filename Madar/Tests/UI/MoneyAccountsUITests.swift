@@ -2,11 +2,13 @@ import XCTest
 
 @MainActor final class MoneyAccountsUITests: XCTestCase {
     private func shot(_ app: XCUIApplication, _ name: String) { Thread.sleep(forTimeInterval: 0.6); let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
-    private func open(_ fixture: String, unknownBalance: Bool = false, wrappedNames: Bool = false, failReadOnce: Bool = false) -> XCUIApplication {
+    private func open(_ fixture: String, unknownBalance: Bool = false, wrappedNames: Bool = false, failReadOnce: Bool = false, rootRouteHarness: Bool = false, saveHoldMS: Int? = nil) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
         if unknownBalance { app.launchEnvironment["MADAR_UI_UNKNOWN_BALANCE"] = "1" }
         if wrappedNames { app.launchEnvironment["MADAR_UI_WRAPPED_ACCOUNTS"] = "1" }
         if failReadOnce { app.launchEnvironment["MADAR_UI_MONEY_ACCOUNTS_READ_FAILURE_ONCE"] = "1" }
+        if rootRouteHarness { app.launchEnvironment["MADAR_UI_MONEY_ROOT_ROUTE_HARNESS"] = "1" }
+        if let saveHoldMS { app.launchEnvironment["MADAR_UI_MONEY_WRITE_HOLD_MS"] = String(saveHoldMS) }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
         let door = app.buttons["money-accounts-open"]; XCTAssertTrue(door.waitForExistence(timeout: 10)); for _ in 0..<8 where !door.isHittable { app.swipeUp(velocity: .slow) }; door.tap()
@@ -147,5 +149,50 @@ import XCTest
         XCTAssertTrue(app.staticTexts["money-reconcile-expected"].waitForExistence(timeout: 10))
         XCTAssertFalse(unknown.exists)
         shot(app, "M5-18-established-balance-L")
+    }
+
+    func testMoneyRootWaitsForNewAccountDraftThenReturnsAfterSave() {
+        continueAfterFailure = false
+        let app = open("empty", rootRouteHarness: true)
+        app.buttons["money-accounts-add"].tap()
+        let name = app.textFields["money-account-name"]; XCTAssertTrue(name.waitForExistence(timeout: 8))
+        name.tap(); name.typeText("حساب الرابط")
+        let bank = app.textFields["money-account-bank"]; bank.tap(); bank.typeText("مصرف الاختبار")
+        app.buttons["money-account-keyboard-done"].tap()
+        let balance = app.textFields["money-account-opening"]
+        for _ in 0..<5 where !balance.isHittable { app.swipeUp(velocity: .slow) }
+        balance.tap(); balance.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (balance.value as? String)?.count ?? 0) + "1000")
+        app.buttons["money-account-keyboard-done"].tap()
+        let route = app.buttons["money-root-test-route"]
+        for _ in 0..<8 where !route.isHittable { app.swipeDown(velocity: .fast) }
+        XCTAssertTrue(route.isHittable, app.debugDescription); route.tap()
+        XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(name.value as? String, "حساب الرابط")
+        let save = app.buttons["money-account-save"]
+        for _ in 0..<6 where !save.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(save.isEnabled, app.debugDescription); save.tap()
+        XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 15), app.debugDescription)
+    }
+
+    func testMoneyRootWaitsForUnchangedAccountSaveInFlight() {
+        continueAfterFailure = false
+        let app = open("accounts", rootRouteHarness: true, saveHoldMS: 3500)
+        app.buttons["money-account-الحساب الجاري"].tap()
+        let name = app.textFields["money-account-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(name.value as? String, "الحساب الجاري")
+        let save = app.buttons["money-account-save"]
+        for _ in 0..<6 where !save.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(save.isEnabled, app.debugDescription)
+        save.tap()
+        XCTAssertFalse(name.isEnabled, "Account fields cannot change after the save payload has been captured.")
+        XCTAssertFalse(app.textFields["money-account-bank"].isEnabled, app.debugDescription)
+        XCTAssertFalse(app.textFields["money-account-senders"].isEnabled, app.debugDescription)
+        let route = app.buttons["money-root-test-route"]
+        for _ in 0..<8 where !route.isHittable { app.swipeDown(velocity: .fast) }
+        XCTAssertTrue(route.isHittable, app.debugDescription)
+        route.tap()
+        XCTAssertTrue(name.waitForExistence(timeout: 3), "A route must wait even when an unchanged account is saving.")
+        XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 15), app.debugDescription)
     }
 }

@@ -56,6 +56,7 @@ struct MihbaraPaperIndexEditor: View {
     @State private var errorMessage: String?
     @State private var originalSnapshot: PaperIndexDraftSnapshot
     @State private var confirmDiscard = false
+    @State private var rootBlockerID = UUID()
 
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
     private var scanCanRun: Bool { VNDocumentScanAvailability.supported }
@@ -106,6 +107,12 @@ struct MihbaraPaperIndexEditor: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+#if DEBUG
+                if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] == "1" {
+                    Button("اختبر الجذر") { app.open(URL(string: "madar://mihbara")!) }
+                        .accessibilityIdentifier("mihbara-paper-root-route")
+                }
+#endif
                 HStack {
                     Button { if hasUnsavedChanges { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil); confirmDiscard = true } else { dismiss() } } label: {
                         Label("رجوع", systemImage: "chevron.right")
@@ -226,6 +233,10 @@ struct MihbaraPaperIndexEditor: View {
             Button("أكمل الكتابة") { }.accessibilityIdentifier("mihbara-paper-continue")
         } message: { Text("الفهرس غير محفوظ.") }
         .interactiveDismissDisabled(hasUnsavedChanges || saving)
+        .onChange(of: hasUnsavedChanges || saving, initial: true) { _, blocked in
+            app.setMihbaraRootDraftBlocker(rootBlockerID, active: blocked)
+        }
+        .onDisappear { app.setMihbaraRootDraftBlocker(rootBlockerID, active: false) }
         .alert("تعذّر الإكمال", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("حسنًا", role: .cancel) { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }

@@ -132,6 +132,8 @@ import UIKit
         app.buttons["mihbara-library"].tap()
         let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-library-book-' AND label CONTAINS 'ملف قابل للتعديل'")).firstMatch
         XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let bookSheetMarker = app.staticTexts["mihbara-book-size"]
+        XCTAssertTrue(bookSheetMarker.waitForExistence(timeout: 5), app.debugDescription)
         let note = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-margin-note-'")).firstMatch
         for _ in 0..<4 where !(note.exists && note.isHittable) { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(note.waitForExistence(timeout: 8), app.debugDescription)
@@ -236,6 +238,26 @@ import UIKit
         app.terminate()
     }
 
+    func testMihbaraDeskRouteClosesReaderAndReturnsToTable() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL))
+        app.launch(); open(app)
+        let continueBook = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(continueBook.waitForExistence(timeout: 10), app.debugDescription)
+        reach(app, continueBook); continueBook.tap()
+        let closeReader = app.buttons["mihbara-reader-close"]
+        XCTAssertTrue(closeReader.waitForExistence(timeout: 20), app.debugDescription)
+
+        app.open(URL(string: "madar://mihbara/desk")!)
+
+        XCTAssertTrue(closeReader.waitForNonExistence(timeout: 10), app.debugDescription)
+        let desk = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(desk.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(desk.isHittable, app.debugDescription)
+        app.terminate()
+    }
+
     func testMihbaraRootRouteClosesLibraryAndReturnsToShelf() throws {
         continueAfterFailure = false
         let app = app("home")
@@ -250,6 +272,173 @@ import UIKit
         XCTAssertTrue(search.waitForNonExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(library.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(library.isHittable, app.debugDescription)
+        app.terminate()
+    }
+
+    func testMihbaraDeskRouteClosesLibraryAndReturnsToTable() {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launch(); open(app)
+        let library = app.buttons["mihbara-library"]
+        reach(app, library); library.tap()
+        let search = app.textFields["mihbara-library-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription)
+        let deskRoute = app.buttons["mihbara-desk-test-route"]
+        XCTAssertTrue(deskRoute.waitForExistence(timeout: 5), app.debugDescription); deskRoute.tap()
+        XCTAssertTrue(search.waitForNonExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-book-continue"].waitForExistence(timeout: 8), app.debugDescription)
+        app.terminate()
+    }
+
+    func testMihbaraRootWaitsForMarginNoteDraftThenReturnsAfterSave() throws {
+        continueAfterFailure = false
+        let app = app("home", fileRow: true)
+        app.launchEnvironment["MADAR_UI_MIHBARA_MARGIN_NOTE"] = "1"
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
+        app.launch(); open(app)
+        app.buttons["mihbara-library"].tap()
+        let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-library-book-' AND label CONTAINS 'ملف قابل للتعديل'")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let bookSheetMarker = app.staticTexts["mihbara-book-size"]
+        XCTAssertTrue(bookSheetMarker.waitForExistence(timeout: 5), app.debugDescription)
+        let note = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-margin-note-'")).firstMatch
+        for _ in 0..<4 where !(note.exists && note.isHittable) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(note.waitForExistence(timeout: 8), app.debugDescription); note.tap()
+        let editor = app.textViews["mihbara-margin-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 8), app.debugDescription)
+        let draft = " مسودة الجذر"
+        editor.tap(); editor.typeText(draft)
+        let rootRoute = app.buttons["mihbara-margin-root-route"]
+        XCTAssertTrue(rootRoute.waitForExistence(timeout: 5), app.debugDescription)
+        rootRoute.tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 5), "The root request must wait for an unsaved passage note.\n" + app.debugDescription)
+        XCTAssertTrue((editor.value as? String)?.contains(draft) == true, app.debugDescription)
+        app.buttons["mihbara-margin-save"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(bookSheetMarker.waitForNonExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 15), app.debugDescription)
+        app.terminate()
+    }
+
+    func testMihbaraRootWaitsForReaderPageNoteDraftThenReturnsAfterSave() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL))
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
+        app.launch(); open(app)
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
+        useReaderMode(app, "scroll")
+        let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
+        XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
+        sleep(1)
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.15)).press(forDuration: 1.2)
+        let wordNote = app.buttons["mihbara-word-note"]
+        XCTAssertTrue(wordNote.waitForExistence(timeout: 8), app.debugDescription); wordNote.tap()
+        let editor = app.textViews["mihbara-note-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 8), app.debugDescription)
+        let draft = " مسودة رابط جذر القارئ"
+        editor.tap(); editor.typeText(draft)
+        let rootRoute = app.buttons["mihbara-page-note-root-route"]
+        XCTAssertTrue(rootRoute.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(rootRoute.isHittable, app.debugDescription); rootRoute.tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue((editor.value as? String)?.contains(draft) == true, app.debugDescription)
+        app.buttons["mihbara-note-save"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForNonExistence(timeout: 15), app.debugDescription)
+        let addPaper = app.buttons["mihbara-add-paper"]
+        XCTAssertTrue(addPaper.waitForExistence(timeout: 15), app.debugDescription)
+        app.terminate()
+    }
+
+    func testMihbaraPaperIndexRootRouteWaitsForUnsavedChapterUntilDiscard() {
+        continueAfterFailure = false
+        let app = app("empty", paperIndex: true)
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
+        app.launch(); open(app)
+        app.buttons["mihbara-add-paper"].tap()
+        app.descendants(matching: .any)["mihbara-add-source-paper"].tap()
+        let chapter = app.textFields["mihbara-paper-chapter-title-0"]
+        XCTAssertTrue(chapter.waitForExistence(timeout: 10), app.debugDescription)
+        chapter.tap(); chapter.typeText(" تعديل لم يُحفظ")
+        if app.toolbars.buttons["تمّ"].exists { app.toolbars.buttons["تمّ"].tap() }
+        let root = app.buttons["mihbara-paper-root-route"]
+        XCTAssertTrue(root.waitForExistence(timeout: 8), app.debugDescription)
+        if !root.isHittable { app.swipeDown(velocity: .slow) }
+        XCTAssertTrue(root.isHittable, app.debugDescription); root.tap()
+        XCTAssertTrue(chapter.waitForExistence(timeout: 5), "The root route must wait for an unsaved paper index.\n" + app.debugDescription)
+        XCTAssertTrue((chapter.value as? String)?.contains("تعديل لم يُحفظ") == true, app.debugDescription)
+
+        let back = app.buttons["mihbara-paper-back"]
+        if !back.isHittable { app.swipeDown(velocity: .slow) }
+        back.tap()
+        let discard = app.buttons.matching(identifier: "mihbara-paper-discard").firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 8), app.debugDescription); discard.tap()
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-add-source-paper"].exists, "After an explicit discard, the queued root route closes the add-book flow.")
+        app.terminate()
+    }
+
+    func testMihbaraReaderQuoteDraftWaitsForRoomLinkUntilClosed() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL))
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
+        app.launch(); open(app)
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
+        useReaderMode(app, "pages")
+        let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
+        XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.15)).press(forDuration: 1.2)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-word-card"].waitForExistence(timeout: 8), app.debugDescription)
+        app.buttons["mihbara-highlight-yellow"].tap()
+        app.buttons["mihbara-quote-card-open"].tap()
+        let preview = app.descendants(matching: .any)["mihbara-quote-card-preview"]
+        let editor = app.textViews["mihbara-quote-card-text"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(editor.waitForExistence(timeout: 8), app.debugDescription)
+        editor.tap(); editor.typeText(" تجربة محفوظة مؤقتًا")
+        if app.buttons["mihbara-quote-card-done"].exists { app.buttons["mihbara-quote-card-done"].tap() }
+        let root = app.buttons["mihbara-quote-card-root-route"]
+        XCTAssertTrue(root.waitForExistence(timeout: 8), app.debugDescription); root.tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 5), "The reader root link must wait while the quote card has edits.\n" + app.debugDescription)
+        XCTAssertTrue((editor.value as? String)?.contains("تجربة محفوظة مؤقتًا") == true, app.debugDescription)
+        app.buttons["mihbara-quote-card-close"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForNonExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 12), app.debugDescription)
+        app.terminate()
+    }
+
+    func testMihbaraHadithRouteArrivingFromCustomizeCoverOpensInVisibleRoom() {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launch(); open(app)
+        app.open(URL(string: "madar://mihbara/hadith/today")!)
+        XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 20), app.debugDescription)
+        app.terminate()
+    }
+
+    func testMihbaraNotebookDeepLinkOpensItsRequestedPrivateNote() {
+        continueAfterFailure = false
+        let app = app("home"); app.launchEnvironment["MADAR_UI_MIHBARA_MULTIPLE_NOTES"] = "1"; app.launch(); open(app)
+        let notebook = app.buttons["mihbara-notebook"]
+        reach(app, notebook); notebook.tap()
+        let notes = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add"))
+        XCTAssertEqual(notes.count, 2, app.debugDescription)
+        let selectedText = "ملاحظة ثانية لاختبار اختيارها"
+        let note = notes.matching(NSPredicate(format: "label CONTAINS %@", selectedText)).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 10), app.debugDescription)
+        let prefix = "mihbara-note-"
+        let noteID = String(note.identifier.dropFirst(prefix.count))
+        XCTAssertNotNil(UUID(uuidString: noteID), "The deep link must use the selected note's UUID.")
+        app.buttons["mihbara-notebook-close"].tap()
+        XCTAssertTrue(notebook.waitForExistence(timeout: 8), app.debugDescription)
+        app.open(URL(string: "madar://mihbara/notebook/\(noteID)")!)
+        let editor = app.textViews["mihbara-note-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue((editor.value as? String)?.contains(selectedText) == true, app.debugDescription)
         app.terminate()
     }
 
@@ -465,6 +654,60 @@ import UIKit
         XCTAssertFalse(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 4), "A link must not replace a note being written.")
         XCTAssertTrue(editor.exists, app.debugDescription)
         XCTAssertEqual(editor.value as? String, draft)
+        app.buttons["mihbara-note-save"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 8), app.debugDescription)
+        app.buttons["mihbara-notebook-close"].tap()
+        XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 15), app.debugDescription)
+        app.terminate()
+    }
+
+    func testMihbaraNotebookTargetLinkWaitsForDraftThenOpensRequestedNote() {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launchEnvironment["MADAR_UI_MIHBARA_MULTIPLE_NOTES"] = "1"
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
+        app.launch()
+        app.tabBars.buttons["المحبرة"].tap()
+        let notebook = app.buttons["mihbara-notebook"]
+        XCTAssertTrue(notebook.waitForExistence(timeout: 15), app.debugDescription); reach(app, notebook); notebook.tap()
+        let note = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "mihbara-note-", "سر لا يظهر قبل المصادقة")).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 10), app.debugDescription); note.tap()
+        let editor = app.textViews["mihbara-note-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        let draft = "\nمسودة قبل رابط الملاحظة الثانية"
+        editor.tap(); editor.typeText(draft)
+        let secondNoteRoute = app.buttons["ui-test-open-mihbara-second-note"]
+        XCTAssertTrue(secondNoteRoute.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(secondNoteRoute.isHittable, app.debugDescription); secondNoteRoute.tap()
+        XCTAssertTrue((editor.value as? String)?.contains(draft) == true, app.debugDescription)
+        XCTAssertFalse(app.textViews["mihbara-hadith-text"].exists, app.debugDescription)
+
+        app.buttons["mihbara-note-save"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 10), app.debugDescription)
+        app.buttons["mihbara-notebook-close"].tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue((editor.value as? String)?.contains("ملاحظة ثانية لاختبار اختيارها") == true, app.debugDescription)
+        XCTAssertFalse((editor.value as? String)?.contains("سر لا يظهر قبل المصادقة") == true, app.debugDescription)
+        app.terminate()
+    }
+
+    func testMihbaraPendingLibraryRenameRouteOpensAfterAlertCloses() {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launchEnvironment["MADAR_UI_MIHBARA_LIBRARY_ACTION_ROUTE_HARNESS"] = "1"
+        app.launch()
+        open(app)
+        let library = app.buttons["mihbara-library"]
+        reach(app, library); library.tap()
+
+        let action = app.buttons["ui-test-mihbara-rename-then-route"]
+        XCTAssertTrue(action.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(action.isHittable, app.debugDescription); action.tap()
+        let rename = app.alerts["اسم الكتاب"]
+        XCTAssertTrue(rename.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(app.textViews["mihbara-hadith-text"].exists, "The route waits for the active library action to close.")
+        rename.buttons["إلغاء"].tap()
+        XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 15), app.debugDescription)
         app.terminate()
     }
 

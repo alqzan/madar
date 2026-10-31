@@ -2847,7 +2847,7 @@ enum MihbaraQuoteExtra: String, CaseIterable, Identifiable {
 }
 
 private struct MihbaraQuoteCardSheet: View {
-    let app: AppSession
+    @Bindable var app: AppSession
     let card: MihbaraQuoteCardContent
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
@@ -2855,6 +2855,7 @@ private struct MihbaraQuoteCardSheet: View {
     @State private var extras: Set<MihbaraQuoteExtra> = []
     @State private var shareError: String?
     @State private var sharing = false
+    @State private var rootBlockerID = UUID()
     @FocusState private var editing: Bool
 
     init(app: AppSession, card: MihbaraQuoteCardContent) {
@@ -2867,6 +2868,7 @@ private struct MihbaraQuoteCardSheet: View {
     private var ink: SwiftUI.Color { theme.ink }
     private var secondaryInk: SwiftUI.Color { theme.secondaryInk }
     private var trimmedQuote: String { quote.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var blocksRootRoute: Bool { quote != card.quote || !extras.isEmpty || sharing }
 
     /// Extras with nothing to show (a book without an author, a page without a printed label) are not offered.
     private var offeredExtras: [MihbaraQuoteExtra] {
@@ -2885,6 +2887,12 @@ private struct MihbaraQuoteCardSheet: View {
 
     var body: some View {
         VStack(spacing: 12) {
+#if DEBUG
+            if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] == "1" {
+                Button("اختبر الجذر") { app.open(URL(string: "madar://mihbara")!) }
+                    .accessibilityIdentifier("mihbara-quote-card-root-route")
+            }
+#endif
             GlassEffectContainer(spacing: 12) {
                 ZStack {
                     Text("بطاقة اقتباس").font(MadarTypography.section())
@@ -2913,6 +2921,11 @@ private struct MihbaraQuoteCardSheet: View {
         }
         .padding(.horizontal, 12).padding(.top, 14).padding(.bottom, 12)
         .foregroundStyle(ink).background(background.ignoresSafeArea())
+        .interactiveDismissDisabled(blocksRootRoute)
+        .onChange(of: blocksRootRoute, initial: true) { _, blocked in
+            app.setMihbaraRootDraftBlocker(rootBlockerID, active: blocked)
+        }
+        .onDisappear { app.setMihbaraRootDraftBlocker(rootBlockerID, active: false) }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -3212,6 +3225,14 @@ private struct MihbaraPageNoteSheet: View {
             HStack {
                 Button("إلغاء") { dismiss() }.font(MadarTypography.body()).frame(minHeight: 44)
                     .accessibilityIdentifier("mihbara-note-cancel")
+#if DEBUG
+                if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] == "1",
+                   ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil {
+                    Button("الجذر") { app.open(URL(string: "madar://mihbara")!) }
+                        .font(MadarTypography.fine()).frame(minHeight: 44)
+                        .accessibilityIdentifier("mihbara-page-note-root-route")
+                }
+#endif
                 Spacer()
                 Text("ملاحظة على الصفحة").font(MadarTypography.section())
                 Spacer()

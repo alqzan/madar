@@ -19,15 +19,23 @@ struct MoneyCardSheet: View {
     @State private var last4 = ""
     @State private var kind = "debit"
     @State private var accountID: UUID?
+    @State private var initialAccountID: UUID?
     @State private var senders = ""
     @State private var accounts: [(id: UUID, name: String, bank: String)] = []
     @State private var saving = false
     @State private var failure: String?
+    @State private var rootBlockerID = UUID()
     @FocusState private var editing: Bool
-    /// Typed text is held back from a stray swipe-down; «إغلاق» stays the explicit way out.
+    /// Keep typed and selected card details from being lost to a room-root link.
     private var hasUnsavedInput: Bool {
-        [name, bank, last4, senders].contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !bank.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || digits.count > 0
+            || !normalizedAliases.isEmpty
+            || kind != "debit"
+            || accountID != initialAccountID
     }
+    private var blocksRootRoute: Bool { hasUnsavedInput || saving }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var digits: String { last4.map { c in c.wholeNumberValue.map(String.init) ?? String(c) }.joined() }
     private var canSave: Bool {
@@ -47,13 +55,14 @@ struct MoneyCardSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack { Text("بطاقة جديدة").font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.frame(minHeight: 44).accessibilityIdentifier("money-card-editor-close") }
+                    HStack { Text("بطاقة جديدة").font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.disabled(saving).frame(minHeight: 44).accessibilityIdentifier("money-card-editor-close") }
+                    rootRouteTestButton
                     field("اسم البطاقة") { TextField("مثل: بطاقة المشتريات", text: $name).focused($editing).accessibilityIdentifier("money-card-name") }
                     field("البنك") { TextField("اسم البنك", text: $bank).focused($editing).accessibilityIdentifier("money-card-bank") }
                     field("آخر أربعة أرقام") { TextField("آخر ٤", text: $last4).keyboardType(.numberPad).focused($editing).accessibilityIdentifier("money-card-last4") }
                     Picker("النوع", selection: $kind) {
                         Text("مدى").tag("debit"); Text("ائتمانية").tag("credit"); Text("مسبقة الدفع").tag("prepaid")
-                    }.pickerStyle(.segmented).accessibilityIdentifier("money-card-kind")
+                    }.pickerStyle(.segmented).disabled(saving).accessibilityIdentifier("money-card-kind")
                     Text(kind == "credit" ? "مشترياتها دين عليك حتى تسددها، ويظهر موعد سدادها في «تقويم السداد»." : "تُخصم مشترياتها من حسابك مباشرة، فاختر الحساب.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                     VStack(alignment: .leading, spacing: 8) {
@@ -71,7 +80,7 @@ struct MoneyCardSheet: View {
                                         }
                                         Spacer(minLength: 0)
                                     }.padding(10).frame(minHeight: 48).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }.contentShape(Rectangle())
-                                }.accessibilityAddTraits(accountID == account.id ? .isSelected : []).accessibilityIdentifier("money-card-account-\(account.id.uuidString)")
+                                }.disabled(saving).accessibilityAddTraits(accountID == account.id ? .isSelected : []).accessibilityIdentifier("money-card-account-\(account.id.uuidString)")
                             }
                         }
                     }
@@ -86,12 +95,28 @@ struct MoneyCardSheet: View {
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-card-keyboard-done") } }
                 .task { loadAccounts() }
                 .onChange(of: kind) { _, value in if value != "credit", accountID == nil, accounts.count == 1 { accountID = accounts[0].id } }
-                .interactiveDismissDisabled(hasUnsavedInput || saving)
+                .interactiveDismissDisabled(blocksRootRoute)
         }
+        .onChange(of: blocksRootRoute, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
+        .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }
+    }
+
+    @ViewBuilder private var rootRouteTestButton: some View {
+#if DEBUG
+        if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_ROOT_ROUTE_HARNESS"] == "1" {
+            Button("اختبار رابط جذر المال") { app.open(URL(string: "madar://mal")!) }
+                .accessibilityIdentifier("money-root-test-route")
+        }
+#endif
+    }
+
+    private var normalizedAliases: [String] {
+        Array(Set(senders.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0.count <= 80 })).sorted().prefix(20).map { $0 }
     }
 
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 5) { Text(title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); content().font(MadarTypography.body()).padding(10).frame(minHeight: 44).overlay { Rectangle().stroke(theme.line, lineWidth: 1) } }
+        VStack(alignment: .leading, spacing: 5) { Text(title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); content().font(MadarTypography.body()).padding(10).frame(minHeight: 44).overlay { Rectangle().stroke(theme.line, lineWidth: 1) } }.disabled(saving)
     }
 
     private func loadAccounts() {
@@ -99,6 +124,7 @@ struct MoneyCardSheet: View {
         accounts = rows.filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.ownership == "mine" && $0.tracked }
             .sorted { $0.name < $1.name }.map { (id: $0.id, name: $0.name, bank: $0.bank) }
         if accounts.count == 1, kind != "credit" { accountID = accounts[0].id }
+        initialAccountID = accountID
     }
 
     private func save() {

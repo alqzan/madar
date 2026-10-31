@@ -57,6 +57,15 @@ struct MoneyExpenseView: View {
                     Text("سجّل مصروفًا").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer()
                     Button { details.toggle() } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44) }.accessibilityLabel("تفاصيل المصروف").accessibilityIdentifier("money-expense-details")
                 }
+#if DEBUG
+                if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIFO_HARNESS"] == "1",
+                   ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil {
+                    Button("اختبر طلبين بعد المصروف") {
+                        app.presentMoneyExpenseSeed(.init(id: UUID(uuidString: "00000000-0000-0000-0000-000000000102")!, amount: "٧", merchant: "طلب ثانٍ", homeCurrency: true))
+                        app.presentMoneyExpenseSeed(.init(id: UUID(uuidString: "00000000-0000-0000-0000-000000000103")!, amount: "٢٣", merchant: "طلب ثالث", homeCurrency: true))
+                    }.accessibilityIdentifier("money-expense-test-queue-two")
+                }
+#endif
                 if let reading {
                     amountHeading(reading)
                     if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-expense-reveal") }

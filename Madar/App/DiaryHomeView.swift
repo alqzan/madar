@@ -22,21 +22,24 @@ struct DiaryRoomView: View {
     }
 }
 private struct DiaryEditorTarget: Identifiable {
-    var id: String { margin?.description ?? "write" }
+    var id: String { margin.map { "margin-\($0.description)" } ?? "write-\(day)" }
     let margin: GregorianDay?
     var day = "today"
 }
 private struct DiaryRootDraftBlocking: ViewModifier {
     @Bindable var app: AppSession
+    let isBlocking: Bool
     @State private var blockerID = UUID()
     func body(content: Content) -> some View {
         content
-            .onAppear { app.setDiaryRootDraftBlocker(blockerID, active: true) }
+            .onChange(of: isBlocking, initial: true) { _, blocked in app.setDiaryRootDraftBlocker(blockerID, active: blocked) }
             .onDisappear { app.setDiaryRootDraftBlocker(blockerID, active: false) }
     }
 }
 extension View {
-    func diaryRootDraftBlocking(_ app: AppSession) -> some View { modifier(DiaryRootDraftBlocking(app: app)) }
+    func diaryRootDraftBlocking(_ app: AppSession, isBlocking: Bool = true) -> some View {
+        modifier(DiaryRootDraftBlocking(app: app, isBlocking: isBlocking))
+    }
 }
 struct DiaryHomeView: View {
     @Bindable var app: AppSession
@@ -48,6 +51,7 @@ struct DiaryHomeView: View {
     @State private var archiveOpen = false
     @State private var searchOpen = false
     @State private var editor: DiaryEditorTarget?
+    @State private var queuedDiaryRoute: Route?
     @State private var reader: GregorianDay?
     @State private var pendingDiaryRootRequestID: UUID?
     @State private var readerEntryID: UUID?
@@ -153,35 +157,34 @@ struct DiaryHomeView: View {
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
         }
         .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() }; applyPendingDiaryRootIfReady() }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
-        .sheet(item: $editor, onDismiss: { applyPendingDiaryRootIfReady() }) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
+        .sheet(item: $editor, onDismiss: editorDidDismiss) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
         .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil; readerEntryID = nil; readerEntryRouteID = nil } }), onDismiss: { applyPendingDiaryRootIfReady() }) {
             if let reader { DiaryDayView(app: app, day: reader, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
         }
         .onChange(of: app.diaryRoute, initial: true) { _, route in
             guard let route else { return }; app.diaryRoute = nil
-            if route.path.first == "write" { editor = .init(margin: nil, day: route.parameters["day"] ?? "today") }
-            else if route.path.first == "day", let key = route.path.last, let day = try? GregorianDay(key) { readerEntryID = nil; readerEntryRouteID = nil; reader = day }
-            else if route.path.first == "entry", route.path.count == 2, let rawID = route.path.last, let id = UUID(uuidString: rawID) {
-                do {
-                    guard let day = try service.entryDay(id) else { app.errorMessage = "هذا السطر لم يعد موجودًا في مذكراتك."; return }
-                    readerEntryID = id; readerEntryRouteID = UUID(); reader = day
-                } catch { app.errorMessage = madarUserMessage(error) }
+            if editor != nil {
+                if route.path.first == "write", route.path.count == 1,
+                   editor?.id == DiaryEditorTarget(margin: nil, day: route.parameters["day"] ?? "today").id { return }
+                queuedDiaryRoute = route
+                if app.diaryRootDraftBlockers.isEmpty { editor = nil }
+                return
             }
-            else if route.path.first == "letters" { routedHubTab = "letters"; archiveOpen = true }
-            else if route.path.first == "letter", route.path.count == 2, let rawID = route.path.last, let id = UUID(uuidString: rawID) {
-                routedHubTab = "letters"; routedLetterID = id; routedLetterRequestID = UUID(); archiveOpen = true
+            if !app.diaryRootDraftBlockers.isEmpty {
+                queuedDiaryRoute = route
+                return
             }
-            else if route.path.first == "project", route.path.count == 2, let rawID = route.path.last, let id = UUID(uuidString: rawID) {
-                routedHubTab = "projects"; routedProjectID = id; routedProjectRequestID = UUID(); archiveOpen = true
-            }
-            else if route.path.first == "today" { readerEntryID = nil; readerEntryRouteID = nil; reader = try? service.currentDay() }
+            openDiaryRoute(route)
         }
         .onChange(of: app.diaryRootRequestID, initial: true) { _, requestID in
             guard let requestID else { pendingDiaryRootRequestID = nil; return }
             pendingDiaryRootRequestID = requestID
             applyPendingDiaryRootIfReady()
         }
-        .onChange(of: app.diaryRootDraftBlockers) { _, _ in applyPendingDiaryRootIfReady() }
+        .onChange(of: app.diaryRootDraftBlockers) { _, _ in
+            applyPendingDiaryRootIfReady()
+            applyQueuedDiaryRouteIfReady()
+        }
         .onChange(of: app.searchRoute, initial: true) { _, route in
             guard let route, route.parameters["room"] == nil || route.parameters["room"] == "notes" else { return }
             app.searchRoute = nil
@@ -191,13 +194,52 @@ struct DiaryHomeView: View {
         }
     }
     private func clearHubRoute() { routedHubTab = nil; routedLetterID = nil; routedProjectID = nil; routedLetterRequestID = nil; routedProjectRequestID = nil }
+    private func editorDidDismiss() {
+        if pendingDiaryRootRequestID != nil {
+            queuedDiaryRoute = nil
+            applyPendingDiaryRootIfReady()
+        } else if let route = queuedDiaryRoute {
+            applyQueuedDiaryRouteIfReady()
+        } else {
+            applyPendingDiaryRootIfReady()
+        }
+    }
+    private func applyQueuedDiaryRouteIfReady() {
+        guard editor == nil, pendingDiaryRootRequestID == nil,
+              app.diaryRootDraftBlockers.isEmpty, let route = queuedDiaryRoute else { return }
+        queuedDiaryRoute = nil
+        openDiaryRoute(route)
+    }
+    private func openDiaryRoute(_ route: Route) {
+        if route.path.first == "write", route.path.count == 1 {
+            editor = .init(margin: nil, day: route.parameters["day"] ?? "today")
+        }
+        else if route.path.first == "day", let key = route.path.last, let day = try? GregorianDay(key) {
+            readerEntryID = nil; readerEntryRouteID = nil; reader = day
+        }
+        else if route.path.first == "entry", route.path.count == 2, let rawID = route.path.last, let id = UUID(uuidString: rawID) {
+            do {
+                guard let day = try service.entryDay(id) else { app.errorMessage = "هذا السطر لم يعد موجودًا في مذكراتك."; return }
+                readerEntryID = id; readerEntryRouteID = UUID(); reader = day
+            } catch { app.errorMessage = madarUserMessage(error) }
+        }
+        else if route.path.first == "letters" { routedHubTab = "letters"; archiveOpen = true }
+        else if route.path.first == "letter", route.path.count == 2, let rawID = route.path.last, let id = UUID(uuidString: rawID) {
+            routedHubTab = "letters"; routedLetterID = id; routedLetterRequestID = UUID(); archiveOpen = true
+        }
+        else if route.path.first == "project", route.path.count == 2, let rawID = route.path.last, let id = UUID(uuidString: rawID) {
+            routedHubTab = "projects"; routedProjectID = id; routedProjectRequestID = UUID(); archiveOpen = true
+        }
+        else if route.path.first == "today" { readerEntryID = nil; readerEntryRouteID = nil; reader = try? service.currentDay() }
+    }
     private func applyPendingDiaryRootIfReady() {
         guard let requestID = pendingDiaryRootRequestID,
               app.diaryRootRequestID == requestID,
-              app.diaryRootDraftBlockers.isEmpty,
-              editor == nil else { return }
+              app.diaryRootDraftBlockers.isEmpty else { return }
+        if editor != nil { editor = nil; return }
         pendingDiaryRootRequestID = nil
         app.diaryRootRequestID = nil
+        queuedDiaryRoute = nil
         searchOpen = false
         archiveOpen = false
         customizing = false

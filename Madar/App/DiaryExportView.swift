@@ -20,6 +20,9 @@ struct DiaryExportView:View {
         NavigationStack {
             ScrollView {
                 VStack(alignment:.leading,spacing:18){
+#if DEBUG
+                    if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" { Button("اختبر الجذر"){app.open(URL(string:"madar://notes")!)}.accessibilityIdentifier("diary-export-root-route") }
+#endif
                     Text("تصدير المذكرات").font(DiaryType.title)
                     Text("كلّها أو سنة أو شهر").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     card {
@@ -44,7 +47,8 @@ struct DiaryExportView:View {
                     if let artifact { ready(artifact) }
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink).navigationBarTitleDisplayMode(.inline)
-                .toolbar{ToolbarItem(placement:.topBarLeading){Button{dismiss()}label:{HStack{Image(systemName:"chevron.backward");Text("رجوع").font(DiaryType.label)}}.disabled(busy).accessibilityIdentifier("diary-export-close")}}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
+                .toolbar{ToolbarItemGroup(placement:.topBarLeading){Button{dismiss()}label:{HStack{Image(systemName:"chevron.backward");Text("رجوع").font(DiaryType.label)}}.disabled(busy).accessibilityIdentifier("diary-export-close")
+                }}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
                 .task{do{years=Set(try service.exportPages(.init()).map(\.day.year)+[service.currentDay().year]).sorted(by:>)}catch{failure=madarUserMessage(error)}}
                 .onChange(of:options.year){_,_ in options.month=nil;clear()}.onChange(of:options.month){_,_ in clear()}.onChange(of:options.format){_,_ in clear()}.onChange(of:options.margins){_,_ in clear()}.onChange(of:options.sources){_,_ in clear()}
                 .onChange(of:phase){_,value in if value == .background {preview=false;clear()}}

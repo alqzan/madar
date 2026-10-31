@@ -46,6 +46,13 @@ struct QuranPlanSetupView: View {
             let forecastKey = input.map { QuranUIForecastKey(input: $0, day: forecastDay) }
             VStack(spacing: 0) {
             QuranScreenHeader(title: "خطة الحفظ") { if step > 0 { step -= 1 } else { close() } }.padding(.horizontal, 16)
+#if DEBUG
+            if ProcessInfo.processInfo.environment["MADAR_UI_QURAN_ROUTE_SETUP_HARNESS"] == "1",
+               ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil {
+                Button("اختبر رابط الوجه") { service.app.open(URL(string: "madar://quran/page/2")!) }
+                    .accessibilityIdentifier("ui-test-open-quran-page-from-setup")
+            }
+#endif
             Text("تُقبل في قلبك من حيث أنت").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
             HStack(spacing: 5) { ForEach(0..<4) { n in Capsule().fill(n <= step ? theme.color("hifz") : theme.color("track")).frame(height: 4) } }.padding(16).accessibilityLabel("الخطوة " + service.numerals.string(min(step + 1,4)) + " من أربع")
             ScrollView {

@@ -33,6 +33,11 @@ struct DiaryYearbookView:View {
         NavigationStack {
             ScrollView {
                 VStack(alignment:.leading,spacing:20) {
+#if DEBUG
+                    if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" {
+                        Button("اختبر الجذر"){app.open(URL(string:"madar://notes")!)}.accessibilityIdentifier("diary-book-root-route")
+                    }
+#endif
                     HStack{Text("كتاب السنة").font(DiaryType.title);Spacer();Picker("السنة الميلادية",selection:Binding(get:{selectedYear},set:{year=$0})){ForEach(years,id:\.self){year in yearOption(year).tag(year)}}.labelsHidden().accessibilityIdentifier("diary-book-year")}
                     Text("سنة في كتاب واحد، وكل يوم يبدأ صفحة").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     cover.frame(maxWidth:.infinity)
@@ -52,7 +57,8 @@ struct DiaryYearbookView:View {
                     if let artifact {HStack{Button("اقرأ الكتاب"){preview=true}.accessibilityIdentifier("diary-book-preview");Spacer();Button("حفظ أو مشاركة"){Task{do{try await service.shareDiary(artifact)}catch{failure=madarUserMessage(error)}}}}}
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink).navigationBarTitleDisplayMode(.inline)
-                .toolbar{ToolbarItem(placement:.topBarLeading){Button{dismiss()}label:{HStack{Image(systemName:"chevron.backward");Text("رجوع").font(DiaryType.label)}}.disabled(busy).accessibilityIdentifier("diary-book-close")}}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
+                .toolbar{ToolbarItemGroup(placement:.topBarLeading){Button{dismiss()}label:{HStack{Image(systemName:"chevron.backward");Text("رجوع").font(DiaryType.label)}}.disabled(busy).accessibilityIdentifier("diary-book-close")
+                }}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
                 .task(id:attempt){do{
                     years=Set(try service.exportPages(.init()).map(\.day.year)+[service.currentDay().year]).sorted(by:>)
                     load()

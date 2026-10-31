@@ -73,6 +73,10 @@ extension AppSession {
             }
             let old = Book(); old.title = "قراءة قديمة"; old.author = "من مكتبتك"; old.shelf = "old"; old.finishedAt = ISO8601DateFormatter().date(from: "2016-10-01T12:00:00Z"); c.insert(old)
             let note = NotebookNote(); note.id = StableIdentity.uuid(for: "mihbara-fixture-private-note"); note.text = "سر لا يظهر قبل المصادقة"; note.isPrivate = true; note.link = "general"; note.updatedAt = now; c.insert(note)
+            if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_MULTIPLE_NOTES"] == "1" {
+                let second = NotebookNote(); second.id = StableIdentity.uuid(for: "mihbara-fixture-second-private-note")
+                second.text = "ملاحظة ثانية لاختبار اختيارها"; second.isPrivate = true; second.link = "general"; second.updatedAt = now.addingTimeInterval(-1); c.insert(second)
+            }
             let pageNote = NotebookNote(); pageNote.id = StableIdentity.uuid(for: "mihbara-fixture-page-note"); pageNote.text = "أكمل من هذا الموضع على مهل."; pageNote.isPrivate = true; pageNote.link = "page"; pageNote.targetID = r.id; pageNote.page = 147; pageNote.updatedAt = now; c.insert(pageNote)
             if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_SECOND_READING"] == "1" {
                 // OR-32: a second book in hand, read an hour before the one on the stand.

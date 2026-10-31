@@ -65,12 +65,43 @@ import XCTest
         XCTAssertEqual(saved.count, 1, "Opening a template does not change the saved widget before «احفظها».")
         app.terminate()
     }
+    func testTemplateRouteWaitsForInFlightSaveThenStartsANewDraft() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_WIDGET_WRITE_HOLD_MS": "2200",
+            "MADAR_UI_WIDGET_MAKER_ROUTE_HARNESS": "1"]
+        app.launch(); app.open(URL(string: "madar://bahw/widget-maker?template=quran")!)
+        let quran = app.buttons["widget-item-quranCoverage"]
+        XCTAssertTrue(quran.waitForExistence(timeout: 20), app.debugDescription); XCTAssertTrue(quran.isSelected)
+        let name = app.textFields["widget-maker-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 8), app.debugDescription); name.tap(); name.typeText("قالب القرآن")
+        let save = app.buttons["widget-maker-save"]
+        if !save.isHittable { app.swipeUp(velocity: .slow) }
+        save.tap()
+        let writing = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == false"), object: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [writing], timeout: 5), .completed, app.debugDescription)
+
+        app.buttons["ui-test-widget-maker-template-money"].tap()
+        XCTAssertTrue(quran.isSelected, "The route waits until the captured Quran draft finishes saving.")
+        let money = app.buttons["widget-item-moneyNow"]
+        let moneySelected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: money)
+        XCTAssertEqual(XCTWaiter.wait(for: [moneySelected], timeout: 12), .completed, app.debugDescription)
+        XCTAssertFalse(quran.isSelected, app.debugDescription)
+        XCTAssertNotEqual(name.value as? String, "قالب القرآن", "The route starts a fresh draft after the Quran draft is saved.")
+        let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "widget-saved-")).firstMatch
+        reach(app, saved)
+        XCTAssertTrue(saved.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(saved.label.contains("قالب القرآن"), saved.label)
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "widget-saved-")).count, 1)
+        app.terminate()
+    }
     func testNamedWidgetContentStyleRelaunchDeleteAndUndo() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_HABIT_FIXTURE": "showcase",
                                  "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_MIHBARA_FIXTURE": "home",
-                                 "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light"]
+                                 "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light", "MADAR_UI_DIARY_COMMAND_HOLD_MS": "2500"]
         app.launch(); open(app)
         XCTAssertFalse(app.buttons["widget-maker-save"].isEnabled)
         capture(app, "OR-03-X3-empty-L")
@@ -97,6 +128,11 @@ import XCTest
         let delete = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "widget-delete-")).firstMatch
         reach(app, delete); delete.tap()
         let confirm = app.buttons["احذفها"]; XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
+        let nameInput = app.textFields["widget-maker-name"]
+        let editorLocked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == false"), object: nameInput)
+        XCTAssertEqual(XCTWaiter.wait(for: [editorLocked], timeout: 2), .completed, app.debugDescription)
+        let editorReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: nameInput)
+        XCTAssertEqual(XCTWaiter.wait(for: [editorReady], timeout: 8), .completed, app.debugDescription)
         XCTAssertTrue(saved.waitForNonExistence(timeout: 10))
         let undo = app.buttons["widget-maker-undo"]; reach(app, undo); undo.tap()
         reach(app, saved); XCTAssertTrue(saved.waitForExistence(timeout: 10))

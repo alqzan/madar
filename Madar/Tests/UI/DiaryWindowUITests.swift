@@ -1,11 +1,14 @@
 import XCTest
 
 @MainActor final class DiaryWindowUITests: XCTestCase {
-    private func launch(_ variant: String, rootRouteHarness: Bool = false) -> XCUIApplication {
+    private func launch(_ variant: String, rootRouteHarness: Bool = false, diaryCommandHoldMS: Int? = nil,
+                        now: String = "2026-10-15T15:00:00+03:00", dayBoundaryHarness: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         var environment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": variant,
-            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": now]
         if rootRouteHarness { environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] = "1" }
+        if dayBoundaryHarness { environment["MADAR_UI_DIARY_DAY_BOUNDARY_HARNESS"] = "1" }
+        if let diaryCommandHoldMS { environment["MADAR_UI_DIARY_COMMAND_HOLD_MS"] = String(diaryCommandHoldMS) }
         app.launchEnvironment = environment
         app.launch(); XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 25), app.debugDescription)
         return app
@@ -34,6 +37,220 @@ import XCTest
         XCTAssertFalse(editor.exists)
         app.buttons["diary-today"].tap()
         XCTAssertTrue(app.staticTexts["مسودة تحفظ قبل الرجوع"].waitForExistence(timeout: 10), app.debugDescription)
+    }
+    func testDiaryWriteRouteQueuesDifferentDayUntilCurrentDraftIsSaved() {
+        continueAfterFailure = false
+        let app = launch("empty", rootRouteHarness: true)
+        app.buttons["diary-write"].tap()
+        let editor = app.textViews["diary-editor-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        editor.tap(); editor.typeText("مسودة اليوم")
+        let todayRoute = app.buttons["ui-test-open-diary-today"]
+        todayRoute.tap(); todayRoute.tap()
+        XCTAssertEqual(editor.value as? String, "مسودة اليوم", "The same write target must not replace its live draft.")
+        XCTAssertEqual(app.textViews.matching(identifier: "diary-editor-text").count, 1, "Repeating the same route must not stack a second editor.")
+        app.buttons["ui-test-open-diary-yesterday"].tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 5), "A different day route must wait for the current editor.")
+        XCTAssertEqual(editor.value as? String, "مسودة اليوم")
+        XCTAssertTrue(app.buttons["diary-editor-today"].isSelected, app.debugDescription)
+        app.buttons["diary-editor-save"].tap()
+        let yesterday = app.buttons["diary-editor-yesterday"]
+        XCTAssertTrue(yesterday.waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(yesterday.isSelected, app.debugDescription)
+        XCTAssertFalse((app.textViews["diary-editor-text"].value as? String)?.contains("مسودة اليوم") ?? false)
+        app.terminate()
+    }
+    func testDiaryTodayDraftDisclosesAndKeepsItsOriginalDayAfterFajr() {
+        continueAfterFailure = false
+        let app = launch("empty", rootRouteHarness: true, now: "2026-10-15T03:00:00+03:00", dayBoundaryHarness: true)
+        app.buttons["diary-write"].tap()
+        let editor = app.textViews["diary-editor-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["diary-editor-today"].isSelected, app.debugDescription)
+        editor.tap(); editor.typeText("كتابة عبر فجر اليوم")
+        app.buttons["ui-test-advance-diary-clock"].tap()
+        let originalDayNotice = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "تُحفظ في صفحتها الأصلية")).firstMatch
+        XCTAssertTrue(originalDayNotice.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["diary-editor-today"].isSelected, app.debugDescription)
+        app.buttons["ui-test-open-diary-original-day"].tap()
+        XCTAssertTrue(editor.exists, "The original-day route waits while the draft remains open.")
+        app.buttons["diary-editor-save"].tap()
+        let savedLine = app.staticTexts["diary-day-line"]
+        XCTAssertTrue(savedLine.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(savedLine.label.contains("كتابة عبر فجر اليوم"), savedLine.label)
+        app.terminate()
+    }
+    func testDiaryRootClosesCleanYearbookAndExport() {
+        continueAfterFailure = false
+        let app = launch("home", rootRouteHarness: true)
+        let days = app.buttons["diary-days"]
+        XCTAssertTrue(days.waitForExistence(timeout: 8), app.debugDescription); days.tap()
+        let yearbook = app.buttons["diary-yearbook"]
+        for _ in 0..<8 where !yearbook.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(yearbook.isHittable, app.debugDescription); yearbook.tap()
+        let bookRoot = app.buttons["diary-book-root-route"]
+        XCTAssertTrue(bookRoot.waitForExistence(timeout: 8), app.debugDescription); bookRoot.tap()
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertFalse(app.buttons["diary-book-close"].exists, app.debugDescription)
+
+        app.buttons["diary-days"].tap()
+        let export = app.buttons["diary-export"]
+        for _ in 0..<8 where !export.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(export.isHittable, app.debugDescription); export.tap()
+        let exportRoot = app.buttons["diary-export-root-route"]
+        XCTAssertTrue(exportRoot.waitForExistence(timeout: 8), app.debugDescription); exportRoot.tap()
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertFalse(app.buttons["diary-export-close"].exists, app.debugDescription)
+        app.terminate()
+    }
+    func testDiaryRootClosesEmptyProjectDraft() {
+        continueAfterFailure = false
+        let app = launch("letters", rootRouteHarness: true)
+        app.buttons["diary-days"].tap()
+        let projects = app.buttons["diary-hub-projects"]
+        XCTAssertTrue(projects.waitForExistence(timeout: 10), app.debugDescription); projects.tap()
+        app.buttons["diary-project-new"].tap()
+        let name = app.textFields["diary-project-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 8), app.debugDescription)
+        app.buttons["diary-project-editor-root-route"].tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 10), app.debugDescription)
+        let home = app.staticTexts["diary-home-title"]
+        XCTAssertTrue(home.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(home.isHittable, app.debugDescription)
+        app.terminate()
+    }
+    func testDiaryRootWaitsForUnsavedProjectReflectionThenOpensQueuedProject() {
+        continueAfterFailure = false
+        let app = launch("lettersRoutes", rootRouteHarness: true)
+        app.buttons["diary-days"].tap()
+        let projectsTab = app.buttons["diary-hub-projects"]
+        XCTAssertTrue(projectsTab.waitForExistence(timeout: 10), app.debugDescription); projectsTab.tap()
+        let project = app.buttons["diary-project-row"].firstMatch
+        XCTAssertTrue(project.waitForExistence(timeout: 10), app.debugDescription); project.tap()
+        XCTAssertTrue(app.navigationBars["ترتيب البيت"].waitForExistence(timeout: 8), app.debugDescription)
+        app.buttons["diary-project-finish"].tap()
+        let reflection = app.textFields["diary-project-reflection"]
+        XCTAssertTrue(reflection.waitForExistence(timeout: 8), app.debugDescription)
+        reflection.tap(); reflection.typeText("خاتمة لم تُحفظ")
+        app.buttons["diary-project-detail-second-route"].tap()
+        XCTAssertTrue(reflection.waitForExistence(timeout: 5), "The second-project route must wait for the reflection draft.\n" + app.debugDescription)
+        XCTAssertEqual(reflection.value as? String, "خاتمة لم تُحفظ")
+        app.buttons["diary-project-detail-close"].tap()
+        let discard = app.buttons.matching(identifier: "diary-project-reflection-discard").firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 8), app.debugDescription); discard.tap()
+        XCTAssertTrue(app.navigationBars["المشروع الثاني"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(app.textFields["diary-project-reflection"].waitForNonExistence(timeout: 5), app.debugDescription)
+        app.terminate()
+    }
+    func testDiaryRootClosesCleanLetterComposerAndReschedule() {
+        continueAfterFailure = false
+        let app = launch("lettersRoutes", rootRouteHarness: true)
+        app.buttons["diary-days"].tap()
+        app.buttons["diary-hub-letters"].tap()
+        app.buttons["diary-letter-compose"].tap()
+        let composer = app.textViews["diary-letter-text-input"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 8), app.debugDescription)
+        app.buttons["diary-letter-root-route"].tap()
+        XCTAssertTrue(composer.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 10), app.debugDescription)
+
+        app.buttons["diary-days"].tap()
+        app.buttons["diary-hub-letters"].tap()
+        app.buttons["diary-letter-orphan-date"].tap()
+        let reschedule = app.buttons["diary-letter-reschedule-save"]
+        XCTAssertTrue(reschedule.waitForExistence(timeout: 8), app.debugDescription)
+        app.buttons["diary-letter-reschedule-root-route"].tap()
+        XCTAssertTrue(reschedule.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 10), app.debugDescription)
+        app.terminate()
+    }
+    func testDiaryRootWaitsForDirtyLetterComposerUntilExplicitDiscard() {
+        continueAfterFailure = false
+        let app = launch("letters", rootRouteHarness: true)
+        app.buttons["diary-days"].tap(); app.buttons["diary-hub-letters"].tap()
+        app.buttons["diary-letter-compose"].tap()
+        let composer = app.textViews["diary-letter-text-input"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 8), app.debugDescription)
+        let draft = "رسالة تبقى حتى أختار تجاهلها"
+        composer.tap(); composer.typeText(draft)
+        app.buttons["diary-letter-root-route"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5), "The root route must wait for an unsaved letter.\n" + app.debugDescription)
+        XCTAssertTrue((composer.value as? String)?.contains(draft) == true, app.debugDescription)
+        app.buttons["diary-letter-cancel"].tap()
+        let discard = app.alerts.buttons["تجاهل الرسالة"]
+        XCTAssertTrue(discard.waitForExistence(timeout: 8), app.debugDescription); discard.tap()
+        XCTAssertTrue(composer.waitForNonExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 10), app.debugDescription)
+        app.terminate()
+    }
+    func testDiaryLetterLocksInputsAndWaitsForSealBeforeRootRoute() {
+        continueAfterFailure = false
+        let app = launch("letters", rootRouteHarness: true, diaryCommandHoldMS: 3500)
+        app.buttons["diary-days"].tap(); app.buttons["diary-hub-letters"].tap()
+        app.buttons["diary-letter-compose"].tap()
+        let composer = app.textViews["diary-letter-text-input"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 8), app.debugDescription)
+        composer.tap(); composer.typeText("رسالة محفوظة مرة واحدة")
+        let seal = app.buttons["diary-letter-seal"]
+        XCTAssertTrue(seal.waitForExistence(timeout: 8), app.debugDescription)
+        let readyToSeal = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: seal)
+        XCTAssertEqual(XCTWaiter.wait(for: [readyToSeal], timeout: 8), .completed, app.debugDescription); seal.tap()
+        XCTAssertFalse(composer.isEnabled, app.debugDescription)
+        XCTAssertFalse(app.buttons["diary-letter-cancel"].isEnabled, app.debugDescription)
+
+        let root = app.buttons["diary-letter-root-route"]
+        if !root.isHittable { app.swipeDown(velocity: .slow) }
+        XCTAssertTrue(root.isHittable, app.debugDescription); root.tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5), "The root request must wait for the sealing command.")
+        XCTAssertFalse(composer.isEnabled, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(composer.waitForNonExistence(timeout: 8), app.debugDescription)
+        app.terminate()
+    }
+    func testDiaryProjectReflectionLocksAndWaitsForFinishBeforeRootRoute() {
+        continueAfterFailure = false
+        let app = launch("lettersRoutes", rootRouteHarness: true, diaryCommandHoldMS: 3500)
+        app.buttons["diary-days"].tap()
+        app.buttons["diary-hub-projects"].tap()
+        let project = app.buttons["diary-project-row"].firstMatch
+        XCTAssertTrue(project.waitForExistence(timeout: 10), app.debugDescription); project.tap()
+        XCTAssertTrue(app.navigationBars["ترتيب البيت"].waitForExistence(timeout: 8), app.debugDescription)
+        app.buttons["diary-project-finish"].tap()
+        let reflection = app.textFields["diary-project-reflection"]
+        XCTAssertTrue(reflection.waitForExistence(timeout: 8), app.debugDescription)
+        reflection.tap(); reflection.typeText("خاتمة تُحفظ قبل الرجوع")
+        let finish = app.buttons["diary-project-finish-confirm"]
+        XCTAssertTrue(finish.isEnabled, app.debugDescription); finish.tap()
+        XCTAssertFalse(reflection.isEnabled, app.debugDescription)
+        XCTAssertFalse(finish.isEnabled, app.debugDescription)
+
+        let root = app.buttons["diary-project-detail-root-route"]
+        if !root.isHittable { app.swipeDown(velocity: .slow) }
+        XCTAssertTrue(root.isHittable, app.debugDescription); root.tap()
+        XCTAssertTrue(reflection.waitForExistence(timeout: 5), "The root request must wait while the project is being finished.")
+        XCTAssertFalse(reflection.isEnabled, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(reflection.waitForNonExistence(timeout: 8), app.debugDescription)
+        app.terminate()
+    }
+    func testDiaryProjectDeleteLocksAndWaitsForRootRoute() {
+        continueAfterFailure = false
+        let app = launch("lettersRoutes", rootRouteHarness: true, diaryCommandHoldMS: 2500)
+        app.buttons["diary-days"].tap()
+        let projectsTab = app.buttons["diary-hub-projects"]
+        XCTAssertTrue(projectsTab.waitForExistence(timeout: 10), app.debugDescription); projectsTab.tap()
+        let project = app.buttons["diary-project-row"].firstMatch
+        XCTAssertTrue(project.waitForExistence(timeout: 10), app.debugDescription); project.tap()
+        XCTAssertTrue(app.navigationBars["ترتيب البيت"].waitForExistence(timeout: 8), app.debugDescription)
+        app.buttons["diary-project-delete"].tap()
+        let confirm = app.buttons.matching(identifier: "diary-project-delete-confirm").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 6), app.debugDescription); confirm.tap()
+        let deleteLocked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == false"), object: app.buttons["diary-project-delete"])
+        XCTAssertEqual(XCTWaiter.wait(for: [deleteLocked], timeout: 2), .completed, app.debugDescription)
+        app.buttons["diary-project-detail-root-route"].tap()
+        XCTAssertTrue(app.navigationBars["ترتيب البيت"].exists, "The root route waits for project deletion to finish.")
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 15), app.debugDescription)
+        app.terminate()
     }
     func testWindowYearsMarginTodayAndRelaunch() throws {
         continueAfterFailure = false
@@ -132,7 +349,7 @@ import XCTest
         app.terminate()
     }
     func testSameLetterAndProjectRoutesReopenTheirDetails() throws {
-        let app = launch("letters")
+        let app = launch("letters", rootRouteHarness: true)
         let letterURL = URL(string: "madar://notes/letter/33333333-3333-4333-8333-333333333331")!
         app.open(letterURL)
         let letterOpen = app.buttons["diary-letter-open"]
@@ -151,6 +368,8 @@ import XCTest
         XCTAssertTrue(projectTitle.waitForNonExistence(timeout: 8), app.debugDescription)
         app.open(projectURL)
         XCTAssertTrue(app.navigationBars["ترتيب البيت"].waitForExistence(timeout: 12), app.debugDescription)
+        app.buttons["diary-project-detail-root-route"].tap()
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 12), app.debugDescription)
         app.terminate()
     }
     func testDiaryRootLinkClosesTheOpenArchiveAndLetter() throws {

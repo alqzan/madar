@@ -143,12 +143,22 @@ struct PrayerTravelQuestionSheet: View {
     let fix: TravelFix
     let homeKm: Double
     let finished: () -> Void
+    let rootDraftChanged: (UUID, Bool) -> Void
     @Environment(\.roomTheme) private var theme
     @State private var method: PrayerCalculationMethod
+    @State private var rootBlockerID = UUID()
+    @State private var startingTrip = false
+    private let initialMethod: PrayerCalculationMethod
+    private var hasUnsavedInput: Bool { method != initialMethod }
+    private var blocksRootRoute: Bool { hasUnsavedInput || startingTrip }
 
-    init(session: AppSession, fix: TravelFix, homeKm: Double, finished: @escaping () -> Void) {
+    init(session: AppSession, fix: TravelFix, homeKm: Double, finished: @escaping () -> Void,
+         rootDraftChanged: @escaping (UUID, Bool) -> Void) {
         self.session = session; self.fix = fix; self.homeKm = homeKm; self.finished = finished
-        _method = State(initialValue: TravelRule.suggestedMethod(country: fix.country))
+        self.rootDraftChanged = rootDraftChanged
+        let suggested = TravelRule.suggestedMethod(country: fix.country)
+        self.initialMethod = suggested
+        _method = State(initialValue: suggested)
     }
 
     var body: some View {
@@ -165,20 +175,29 @@ struct PrayerTravelQuestionSheet: View {
                         Picker("الطريقة", selection: $method) {
                             ForEach(PrayerCalculationMethod.allCases, id: \.self) { Text(PrayerTravelCopy.methodName($0)).tag($0) }
                         }
-                        .pickerStyle(.menu).accessibilityIdentifier("prayer-travel-method")
+                        .pickerStyle(.menu).disabled(startingTrip).accessibilityIdentifier("prayer-travel-method")
                     }
                 }
-                TravelPrimaryButton(title: "نعم، أنا مسافر", id: "prayer-travel-yes", busy: session.prayerWriteInProgress) {
-                    session.startPrayerTrip(city: fix.city, country: fix.country, place: fix.place, homeKm: homeKm, method: method) { if $0 { finished() } }
+                TravelPrimaryButton(title: "نعم، أنا مسافر", id: "prayer-travel-yes", busy: startingTrip || session.prayerWriteInProgress) {
+                    guard !startingTrip else { return }
+                    startingTrip = true
+                    rootDraftChanged(rootBlockerID, true)
+                    session.startPrayerTrip(city: fix.city, country: fix.country, place: fix.place, homeKm: homeKm, method: method) { succeeded in
+                        startingTrip = false
+                        rootDraftChanged(rootBlockerID, hasUnsavedInput)
+                        if succeeded { finished() }
+                    }
                 }
                 TravelSecondaryButton(title: "لا، أنا مقيم هنا", id: "prayer-travel-no") {
                     PrayerTravelCopy.decline(fix.place); finished()
-                }
+                }.disabled(startingTrip)
             }
             .padding(24)
         }
         .background(theme.background).foregroundStyle(theme.ink)
         .presentationDetents([.medium, .large])
+        .onChange(of: blocksRootRoute, initial: true) { _, blocked in rootDraftChanged(rootBlockerID, blocked) }
+        .onDisappear { rootDraftChanged(rootBlockerID, false) }
     }
 }
 
@@ -260,10 +279,13 @@ struct PrayerTravelPairSheet: View {
     let pair: PrayerPair
     let alone: () -> Void
     let finished: () -> Void
+    let rootDraftChanged: (UUID, Bool) -> Void
     @Environment(\.roomTheme) private var theme
     @State private var status: PrayerStoredStatus = .jamaah
     @State private var mode: PrayerPairMode = .takhir
     @State private var shortened = true
+    @State private var rootBlockerID = UUID()
+    private var hasUnsavedInput: Bool { status != .jamaah || mode != .takhir || !shortened }
 
     private var title: String { pair == .dhuhrAsr ? "الظهر والعصر" : "المغرب والعشاء" }
     private func chip(_ label: String, on: Bool, id: String, action: @escaping () -> Void) -> some View {
@@ -299,5 +321,7 @@ struct PrayerTravelPairSheet: View {
         }
         .background(theme.background).foregroundStyle(theme.ink)
         .presentationDetents([.medium, .large])
+        .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
+        .onDisappear { rootDraftChanged(rootBlockerID, false) }
     }
 }

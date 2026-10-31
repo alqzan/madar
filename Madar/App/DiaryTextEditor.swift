@@ -27,14 +27,39 @@ struct DiaryTextEditor: View {
     @State private var voice: DiaryVoiceController?
     @State private var day = "today"
     @State private var writingDay: GregorianDay?
+    @State private var currentMadarDay: GregorianDay?
     @State private var saving = false
     @State private var failure: String?
     /// AU-95: a failed «تمّ» stays on screen; the next quiet draft save must not wipe it while the page is uncommitted.
     @State private var commitFailed = false
     @FocusState private var focused: Bool
+    private var blocksRootRoute: Bool {
+        !text.isEmpty || saving || importing || voice?.recording == true || voice?.savingAudio == true || voice?.converting == true
+    }
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+#if DEBUG
+                if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" {
+                    HStack(spacing: 10) {
+                        Button(app.diaryRootDraftBlockers.isEmpty ? "اختبر الجذر" : "اختبر الجذر مع مسودة") { app.open(URL(string: "madar://notes")!) }
+                            .accessibilityIdentifier("ui-test-open-diary-root")
+                        if margin == nil {
+                            Button("اختبر الكتابة اليوم") { app.open(URL(string: "madar://notes/write")!) }
+                                .accessibilityIdentifier("ui-test-open-diary-today")
+                            Button("اختبر الكتابة في أمس") { app.open(URL(string: "madar://notes/write?day=yesterday")!) }
+                                .accessibilityIdentifier("ui-test-open-diary-yesterday")
+                            if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_DAY_BOUNDARY_HARNESS"] == "1" {
+                                Button("قدّم الساعة ٦ ساعات") { app.advanceDiaryBoundaryUITestClock(hours: 6) }
+                                    .accessibilityIdentifier("ui-test-advance-diary-clock")
+                                Button("اختبر صفحة يوم المسودة") {
+                                    if let writingDay { app.open(URL(string: "madar://notes/day/\(writingDay.description)")!) }
+                                }.accessibilityIdentifier("ui-test-open-diary-original-day")
+                            }
+                        }
+                    }.frame(minHeight: 40)
+                }
+#endif
                 if let margin {
                     Text("هامش " + AppDiaryService(app: app).bothDates(margin)).font(MadarTypography.caption()).padding(14)
                 } else {
@@ -43,7 +68,8 @@ struct DiaryTextEditor: View {
                         Spacer()
                     }.padding(.horizontal, 16).padding(.bottom, 14)
                 }
-                if let writingDay, let today = try? AppDiaryService(app: app).currentDay(), writingDay < today.adding(days: -1) {
+                if let writingDay, let today = currentMadarDay,
+                   (day == "today" && writingDay < today || day == "yesterday" && writingDay < today.adding(days: -1)) {
                     Text(MadarInlineText.joined(["مسودة عن " + AppDiaryService(app: app).bothDates(writingDay), "تُحفظ في صفحتها الأصلية"])).font(MadarTypography.fine()).padding(.horizontal, 16)
                 }
                 ZStack(alignment: .topLeading) {
@@ -111,11 +137,6 @@ struct DiaryTextEditor: View {
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {
                     Button("إغلاق") { Task { await close() } }.disabled(saving || importing || voice?.savingAudio == true).accessibilityIdentifier("diary-editor-cancel")
-#if DEBUG
-                    if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" {
-                        Button(app.diaryRootDraftBlockers.isEmpty ? "اختبر الجذر" : "اختبر الجذر مع مسودة") { app.open(URL(string:"madar://notes")!) }.accessibilityIdentifier("ui-test-open-diary-root")
-                    }
-#endif
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(saving ? "يُحفظ…" : "تمّ") { Task { await save() } }.fontWeight(.bold)
@@ -126,7 +147,7 @@ struct DiaryTextEditor: View {
         }
         .task {
             day = initialDay
-            writingDay = (try? AppDiaryService(app: app).currentDay()).map { initialDay == "yesterday" ? $0.adding(days: -1) : $0 }
+            writingDay = (try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()).map { initialDay == "yesterday" ? $0.adding(days: -1) : $0 }
             do { if let draft = try AppDiaryService(app: app).draft(margin: margin) { draftID = draft.id; hasDraftRecord = true; text = draft.text; day = draft.day; writingDay = draft.writingDay; draftStatus = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "مسودة مستعادة" } }
             catch { failure = madarUserMessage(error) }
             // AU-38: let the restored text's onChange pass first, so «مسودة مستعادة» stays until the user types.
@@ -140,6 +161,17 @@ struct DiaryTextEditor: View {
                 if !Task.isCancelled, voice?.recording != true { focused = true }
             }
         }
+        .task {
+            while !Task.isCancelled {
+                currentMadarDay = try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()
+                do { try await Task.sleep(for: .seconds(30)) } catch { return }
+            }
+        }
+#if DEBUG
+        .task(id: app.diaryBoundaryUITestClockOverride) {
+            currentMadarDay = try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()
+        }
+#endif
         .onChange(of: text) { _, _ in scheduleDraft() }
         .onChange(of: day) { _, _ in scheduleDraft() }
         .onChange(of: photo) { _, item in Task {
@@ -165,7 +197,7 @@ struct DiaryTextEditor: View {
         .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast) } }
         .interactiveDismissDisabled(!text.isEmpty || saving || importing || voice?.recording == true || voice?.savingAudio == true)
         .onDisappear { draftTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
-        .diaryRootDraftBlocking(app)
+        .diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
     }
     /// The selected range, or an empty range at the cursor (the end when nothing is focused yet).
     private var selectedOffsets: Range<Int> {
@@ -207,7 +239,7 @@ struct DiaryTextEditor: View {
             .accessibilityLabel(voice.recording ? "أوقف التسجيل واحفظه" : "سجّل صوتًا").accessibilityIdentifier("diary-editor-record")
     }
     private func choice(_ value: String, _ label: String) -> some View {
-        Button { day = value; writingDay = (try? AppDiaryService(app: app).currentDay()).map { value == "yesterday" ? $0.adding(days: -1) : $0 } } label: { Text(label).font(MadarTypography.caption()).padding(.horizontal, 16).frame(minHeight: 42).foregroundStyle(day == value ? theme.background : theme.ink).background(day == value ? theme.ink : theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) } }
+        Button { day = value; writingDay = (try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()).map { value == "yesterday" ? $0.adding(days: -1) : $0 } } label: { Text(label).font(MadarTypography.caption()).padding(.horizontal, 16).frame(minHeight: 42).foregroundStyle(day == value ? theme.background : theme.ink).background(day == value ? theme.ink : theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) } }
             .buttonStyle(.madarPlain).disabled(saving || importing || voice?.recording == true).accessibilityIdentifier("diary-editor-" + value).accessibilityAddTraits(day == value ? .isSelected : [])
     }
     private func scheduleDraft() {

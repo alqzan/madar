@@ -24,6 +24,7 @@ struct WidgetMakerView: View {
     @State private var deleting: WidgetMakerDraft?
     @State private var discard = false
     @State private var pendingSelection: WidgetMakerDraft?
+    @State private var pendingTemplateRoom: String?
     @State private var selectionRevision = 0
     @State private var makerDataReady = false
     @State private var beforeReset: (WidgetMakerStyle, String)?
@@ -102,6 +103,7 @@ struct WidgetMakerView: View {
         }
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accentFill)
+        .disabled(busy)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .bottom) { saveBar }
         .interactiveDismissDisabled(dirty)
@@ -125,7 +127,9 @@ struct WidgetMakerView: View {
             applyInitialRoom(session.widgetMakerRoute?.parameters["template"])
         }
         .onChange(of: session.widgetMakerRouteID) { _, requestID in
-            guard makerDataReady, requestID != nil, let room = session.widgetMakerRoute?.parameters["template"] else { return }
+            guard makerDataReady, requestID != nil else { return }
+            guard let room = session.widgetMakerRoute?.parameters["template"] else { pendingTemplateRoom = nil; return }
+            if busy { pendingTemplateRoom = room; return }
             applyInitialRoom(room)
         }
         .task(id: draft.items.joined(separator: "|") + "-\(draft.style.iftarCountdown)-\(draft.style.surface)-\(session.prayerRevision)") {
@@ -253,9 +257,15 @@ struct WidgetMakerView: View {
     }
     private var saveBar: some View {
         VStack(spacing: 6) {
+#if DEBUG
+            if ProcessInfo.processInfo.environment["MADAR_UI_WIDGET_MAKER_ROUTE_HARNESS"] == "1" {
+                Button("اختبر رابط قالب المال") { session.open(URL(string: "madar://bahw/widget-maker?template=mal")!) }
+                    .accessibilityIdentifier("ui-test-widget-maker-template-money")
+            }
+#endif
             if !status.isEmpty { Text(status).font(MadarTypography.fine()).accessibilityIdentifier("widget-maker-status") }
             HStack(spacing: 8) {
-                TextField("سَمِّ ودجتك…", text: $draft.name).focused($nameFocused).submitLabel(.done).onSubmit { nameFocused = false }.font(MadarTypography.body()).padding(12).background(theme.surface, in: .capsule).accessibilityIdentifier("widget-maker-name")
+                TextField("سَمِّ ودجتك…", text: $draft.name).focused($nameFocused).submitLabel(.done).onSubmit { nameFocused = false }.font(MadarTypography.body()).padding(12).background(theme.surface, in: .capsule).disabled(busy).accessibilityIdentifier("widget-maker-name")
                 Button { save() } label: { if busy { ProgressView() } else { Text("احفظها").font(MadarTypography.section()) } }
                     .frame(minWidth: 88, minHeight: 48).background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent)
                     .disabled(busy || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draft.name.count > 80 || draft.items.isEmpty).accessibilityIdentifier("widget-maker-save")
@@ -316,11 +326,32 @@ struct WidgetMakerView: View {
         else { draft = routed; baseline = routed; baselineIsPersisted = false; beforeReset = nil; status = ""; selectionRevision += 1 }
     }
     private func save() {
+        guard !busy else { return }
         busy = true; let value = draft
-        Task { defer { busy = false }; do { try await session.saveWidget(value); baseline = value; baselineIsPersisted = true; status = "حُفظت «" + value.name + "»"; reload() } catch { session.errorMessage = madarUserMessage(error) } }
+        Task {
+            defer { busy = false; applyPendingTemplateIfNeeded() }
+            do {
+                try await session.saveWidget(value)
+                baseline = value; baselineIsPersisted = true; status = "حُفظت «" + value.name + "»"; reload()
+            } catch { session.errorMessage = madarUserMessage(error) }
+        }
     }
     private func remove(_ item: WidgetMakerDraft) {
+        guard !busy else { return }
         deleting = nil
-        Task { do { try await session.executeDiaryCommand("widget.delete", payload: ["id": .string(item.id.uuidString)]); if draft.id == item.id { draft = .init(); baseline = nil; baselineIsPersisted = false }; reload() } catch { session.errorMessage = madarUserMessage(error) } }
+        busy = true
+        Task {
+            defer { busy = false; applyPendingTemplateIfNeeded() }
+            do {
+                try await session.executeDiaryCommand("widget.delete", payload: ["id": .string(item.id.uuidString)])
+                if draft.id == item.id { draft = .init(); baseline = nil; baselineIsPersisted = false }
+                reload()
+            } catch { session.errorMessage = madarUserMessage(error) }
+        }
+    }
+    private func applyPendingTemplateIfNeeded() {
+        guard let room = pendingTemplateRoom else { return }
+        pendingTemplateRoom = nil
+        applyInitialRoom(room)
     }
 }

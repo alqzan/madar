@@ -97,6 +97,111 @@ import XCTest
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertFalse(app.buttons["quran-index-unit-surah"].exists, app.debugDescription)
     }
+    func testPageLinkReplacesTheOpenIndexAfterItDismisses() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_QURAN_ROUTE": "madar://quran/fihris"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["quran-index-screen"].waitForExistence(timeout: 30), app.debugDescription)
+
+        app.open(URL(string: "madar://quran/page/2")!)
+
+        let page = app.descendants(matching: .any)["quran-mushaf-page"]
+        XCTAssertTrue(page.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["quran-index-screen"].exists, app.debugDescription)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.staticTexts["quran-mushaf-number"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(app.staticTexts["quran-mushaf-number"].label, "الوجه ٢")
+        app.buttons["quran-mushaf-close"].tap()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 10), app.debugDescription)
+        app.terminate()
+    }
+    func testLatestQuranLinkWinsWhenAnotherPresentationIsDismissing() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+            "MADAR_UI_QURAN_ROUTE": "madar://quran/fihris", "MADAR_UI_QURAN_ROUTE_DISMISS_HOLD_MS": "5000"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["quran-index-screen"].waitForExistence(timeout: 30), app.debugDescription)
+
+        app.open(URL(string: "madar://quran/page/2")!)
+        app.open(URL(string: "madar://quran/juz/30")!)
+
+        XCTAssertTrue(app.staticTexts["quran-index-selected-item-30"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["quran-mushaf-page"].exists, app.debugDescription)
+        app.terminate()
+    }
+    func testQuranPageLinkWaitsForPlanSetupToClose() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+            "MADAR_UI_QURAN_ROUTE_SETUP_HARNESS": "1"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 25), app.debugDescription)
+        app.buttons["quran-streak"].tap()
+        let edit = app.buttons["quran-plan-edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 12), app.debugDescription)
+        let editReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: edit)
+        XCTAssertEqual(XCTWaiter.wait(for: [editReady], timeout: 15), .completed, app.debugDescription)
+        edit.tap()
+        let custom = app.buttons["quran-setup-custom"]
+        XCTAssertTrue(custom.waitForExistence(timeout: 10), app.debugDescription); custom.tap()
+
+        app.buttons["ui-test-open-quran-page-from-setup"].tap()
+        XCTAssertTrue(app.staticTexts["quran-setup-title"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["quran-mushaf-page"].exists, app.debugDescription)
+
+        let closeSetup = app.buttons.matching(identifier: "quran-screen-close").firstMatch
+        XCTAssertTrue(closeSetup.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(closeSetup.isHittable, app.debugDescription); closeSetup.tap()
+        let closePlan = app.buttons.matching(identifier: "quran-screen-close").firstMatch
+        XCTAssertTrue(closePlan.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(closePlan.isHittable, app.debugDescription); closePlan.tap()
+        let page = app.descendants(matching: .any)["quran-mushaf-page"]
+        XCTAssertTrue(page.waitForExistence(timeout: 20), app.debugDescription)
+        let pageNumber = app.staticTexts.matching(identifier: "quran-mushaf-page")
+            .matching(NSPredicate(format: "label == %@", "٢")).firstMatch
+        XCTAssertTrue(pageNumber.exists, app.debugDescription)
+        app.terminate()
+    }
+    func testQuranSaveFailureStaysVisibleBeforeQueuedPageLinkOpens() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+            "MADAR_UI_QURAN_LEVEL_WRITE_HOLD_MS": "5000", "MADAR_UI_QURAN_LEVEL_WRITE_FAIL_ONCE": "1",
+            "MADAR_UI_QURAN_ROUTE_FAILURE_HARNESS": "1"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 25), app.debugDescription)
+        let level = app.buttons["quran-level-hifz-simple"]
+        XCTAssertTrue(level.waitForExistence(timeout: 8), app.debugDescription)
+        let levelReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: level)
+        XCTAssertEqual(XCTWaiter.wait(for: [levelReady], timeout: 10), .completed, app.debugDescription)
+        level.tap()
+        let levelLocked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == false"), object: level)
+        XCTAssertEqual(XCTWaiter.wait(for: [levelLocked], timeout: 5), .completed, app.debugDescription)
+        let route = app.buttons["ui-test-quran-page-route-during-save"]
+        XCTAssertTrue(route.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(route.isHittable, app.debugDescription); route.tap()
+        let refresh = app.buttons["ui-test-quran-refresh-during-save"]
+        XCTAssertTrue(refresh.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(refresh.isHittable, app.debugDescription); refresh.tap()
+
+        let error = app.alerts["تعذّر إتمام العملية"]
+        XCTAssertTrue(error.waitForExistence(timeout: 15), app.debugDescription)
+        let message = error.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "تعذّر حفظ مستوى الورد")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["quran-mushaf-page"].exists, app.debugDescription)
+        error.buttons["تمّ"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["quran-mushaf-page"].waitForExistence(timeout: 20), app.debugDescription)
+        let pageNumber = app.staticTexts.matching(identifier: "quran-mushaf-page")
+            .matching(NSPredicate(format: "label == %@", "٢")).firstMatch
+        XCTAssertTrue(pageNumber.exists, app.debugDescription)
+        app.terminate()
+    }
     func testQuranRouteArrivingDuringBusyOperationRunsAfterward() throws {
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",

@@ -45,8 +45,8 @@ struct DiaryProjectsPanel: View {
             handledRouteID = nil
             if !projects.isEmpty { openRoutedProject(initialProjectID) }
         }
-        .sheet(isPresented: $creating) { DiaryProjectEditor(app: app).environment(\.roomTheme, theme).presentationDetents([.medium, .large]).diaryRootDraftBlocking(app) }
-        .sheet(item: $detail) { project in DiaryProjectDetail(app: app, project: project).environment(\.roomTheme, theme).diaryRootDraftBlocking(app) }
+        .sheet(isPresented: $creating) { DiaryProjectEditor(app: app).environment(\.roomTheme, theme).presentationDetents([.medium, .large]) }
+        .sheet(item: $detail) { project in DiaryProjectDetail(app: app, project: project).environment(\.roomTheme, theme) }
     }
     private func loadProjects() {
         do {
@@ -92,13 +92,20 @@ struct DiaryProjectEditor: View {
     @State private var intention = ""
     @State private var keyword = ""
     @State private var failure: String?
-    @State private var identity = UUID()
     @State private var saving = false
+    @State private var identity = UUID()
     @State private var confirmDiscard = false
     private var hasUnsavedInput: Bool { !name.isEmpty || !intention.isEmpty || !keyword.isEmpty }
+    private var blocksRootRoute: Bool { hasUnsavedInput || saving }
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
+#if DEBUG
+                if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" {
+                    Button("اختبر الجذر") { app.open(URL(string: "madar://notes")!) }
+                        .accessibilityIdentifier("diary-project-editor-root-route")
+                }
+#endif
                 field("اسم المشروع", $name, id: "diary-project-name")
                 field("نيّتك منه", $intention, id: "diary-project-intention")
                 field("كلمة تدلّ عليه في كتابتك", $keyword, id: "diary-project-keyword")
@@ -108,7 +115,9 @@ struct DiaryProjectEditor: View {
             }.padding(18).background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle("مشروع جديد").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if hasUnsavedInput { confirmDiscard = true } else { dismiss() } }.disabled(saving) }
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("إلغاء") { if hasUnsavedInput { confirmDiscard = true } else { dismiss() } }.disabled(saving)
+                    }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("احفظ") {
                             guard !saving else { return }; saving = true
@@ -120,14 +129,14 @@ struct DiaryProjectEditor: View {
                             .disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("diary-project-save")
                     }
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
-                .interactiveDismissDisabled(hasUnsavedInput)
+                .interactiveDismissDisabled(blocksRootRoute)
                 .confirmationDialog("تجاهل كتابة المشروع؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
                     Button("تجاهل المسودة", role: .destructive) { dismiss() }.accessibilityIdentifier("diary-project-discard")
                     Button("أكمل الكتابة") { }
                 } message: {
                     Text("لم تحفظ المشروع بعد.")
                 }
-        }
+        }.diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
     }
     private func field(_ title: String, _ value: Binding<String>, id: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -149,12 +158,22 @@ struct DiaryProjectDetail: View {
     @State private var confirmDiscardReflection = false
     @State private var confirmDelete = false
     @State private var failure: String?
+    @State private var saving = false
     private var service: AppDiaryService { .init(app: app) }
     private var hasUnsavedReflection: Bool { finishing && !reflection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var blocksRootRoute: Bool { hasUnsavedReflection || saving }
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+#if DEBUG
+                    if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" {
+                        Button("اختبر الجذر") { app.open(URL(string: "madar://notes")!) }
+                            .accessibilityIdentifier("diary-project-detail-root-route")
+                        Button("اختبر رابط مشروع آخر") { app.open(URL(string: "madar://notes/project/44444444-4444-4444-8444-444444444442")!) }
+                            .accessibilityIdentifier("diary-project-detail-second-route")
+                    }
+#endif
                     if !project.intention.isEmpty { Text(project.intention).font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")) }
                     if let reflection = project.reflection { Text("خاتمة: " + reflection).font(DiaryType.writing) }
                     if project.lines.isEmpty { Text("لم تُربط سطور بعد.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")) }
@@ -166,29 +185,32 @@ struct DiaryProjectDetail: View {
                     }
                     if project.finishedAt == nil {
                         if finishing {
-                            TextField("كلمة تختم بها المشروع", text: $reflection, axis: .vertical).font(DiaryType.writing).focused($reflectionFocused).padding(12).background(theme.surface, in: .rect(cornerRadius: 12)).accessibilityIdentifier("diary-project-reflection")
-                            Button { Task { do { try await service.finishProject(project.id, reflection: reflection); dismiss() } catch { failure = madarUserMessage(error) } } } label: {
+                            TextField("كلمة تختم بها المشروع", text: $reflection, axis: .vertical).font(DiaryType.writing).focused($reflectionFocused).padding(12).background(theme.surface, in: .rect(cornerRadius: 12)).disabled(saving).accessibilityIdentifier("diary-project-reflection")
+                            Button { guard !saving else { return }; saving = true; Task { defer { saving = false }; do { try await service.finishProject(project.id, reflection: reflection); dismiss() } catch { failure = madarUserMessage(error) } } } label: {
                                 Text("أنهِ المشروع").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
-                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-project-finish-confirm")
+                            }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("diary-project-finish-confirm")
                         } else {
                             Button { finishing = true } label: { Text("أنهِ المشروع").font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 46).overlay { Capsule().stroke(theme.line) } }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-project-finish")
                         }
                     }
-                    Button(role: .destructive) { confirmDelete = true } label: { Text("احذف المشروع").font(DiaryType.label).frame(minHeight: 44) }.accessibilityIdentifier("diary-project-delete")
+                    Button(role: .destructive) { guard !saving else { return }; confirmDelete = true } label: { Text("احذف المشروع").font(DiaryType.label).frame(minHeight: 44) }.disabled(saving).accessibilityIdentifier("diary-project-delete")
                     if let failure { Text(failure).font(MadarTypography.body()) }
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle(project.name).navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تمّ") { if hasUnsavedReflection { reflectionFocused = false; confirmDiscardReflection = true } else { dismiss() } }.accessibilityIdentifier("diary-project-detail-close") } }
+                .toolbar { ToolbarItemGroup(placement: .topBarLeading) {
+                    Button("تمّ") { if hasUnsavedReflection { reflectionFocused = false; confirmDiscardReflection = true } else { dismiss() } }.disabled(saving).accessibilityIdentifier("diary-project-detail-close")
+                } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
-                .interactiveDismissDisabled(hasUnsavedReflection)
+                .interactiveDismissDisabled(blocksRootRoute)
                 .confirmationDialog("تتجاهل خاتمة المشروع؟", isPresented: $confirmDiscardReflection, titleVisibility: .visible) {
-                    Button("تجاهل الخاتمة", role: .destructive) { reflection = ""; finishing = false; dismiss() }.accessibilityIdentifier("diary-project-reflection-discard")
+                    Button("تجاهل الخاتمة", role: .destructive) { guard !saving else { return }; reflection = ""; finishing = false; dismiss() }.disabled(saving).accessibilityIdentifier("diary-project-reflection-discard")
                     Button("أكمل الكتابة") {}.accessibilityIdentifier("diary-project-reflection-continue")
                 } message: { Text("لم تُحفظ الخاتمة. يمكنك إكمالها أو إنهاء المشروع بها.") }
                 .confirmationDialog("تبقى السطور بنصّها، ويختفي ربطها. يمكنك التراجع.", isPresented: $confirmDelete, titleVisibility: .visible) {
-                    Button("احذف المشروع", role: .destructive) { Task { do { try await service.deleteProject(project.id); dismiss() } catch { failure = madarUserMessage(error) } } }
+                    Button("احذف المشروع", role: .destructive) { guard !saving else { return }; saving = true; Task { defer { saving = false }; do { try await service.deleteProject(project.id); dismiss() } catch { failure = madarUserMessage(error) } } }.disabled(saving).accessibilityIdentifier("diary-project-delete-confirm")
                 }
         }
+        .diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
     }
 }

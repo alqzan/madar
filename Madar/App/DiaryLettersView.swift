@@ -85,10 +85,10 @@ struct DiaryLettersPanel: View {
             handledRouteID = nil
             if !letters.isEmpty { openRoutedLetter(initialLetterID) }
         }
-        .sheet(isPresented: $composing) { DiaryLetterComposer(app: app).environment(\.roomTheme, theme).diaryRootDraftBlocking(app) }
+        .sheet(isPresented: $composing) { DiaryLetterComposer(app: app).environment(\.roomTheme, theme) }
         .sheet(item: $opening) { letter in DiaryLetterMoment(app: app, letter: letter).environment(\.roomTheme, theme) }
         .sheet(item: $reading) { letter in DiaryLetterReader(text: letter.text ?? "", written: service.bothDates(letter.writtenDay)).environment(\.roomTheme, theme).presentationDetents([.medium, .large]) }
-        .sheet(item: $rescheduling) { letter in DiaryLetterReschedule(app: app, letter: letter).environment(\.roomTheme, theme).presentationDetents([.medium]).diaryRootDraftBlocking(app) }
+        .sheet(item: $rescheduling) { letter in DiaryLetterReschedule(app: app, letter: letter).environment(\.roomTheme, theme).presentationDetents([.medium]) }
     }
     private func load() async {
         do {
@@ -219,6 +219,7 @@ struct DiaryLetterComposer: View {
     @State private var failure: String?
     @State private var saving = false
     private var service: AppDiaryService { .init(app: app) }
+    private var blocksRootRoute: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving }
     private var pickerOffset: Int { choice?.trigger == .hijriDate ? service.letterPickerOffset : 0 }
     private var pickerDate: Binding<Date> {
         Binding(get: { service.letterPickerDate(date, by: pickerOffset) },
@@ -232,20 +233,26 @@ struct DiaryLetterComposer: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+#if DEBUG
+                    if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" {
+                        Button("اختبر الجذر") { app.open(URL(string: "madar://notes")!) }
+                            .accessibilityIdentifier("diary-letter-root-route")
+                    }
+#endif
                     TextEditor(text: $text).font(DiaryType.writing).scrollContentBackground(.hidden).frame(minHeight: 200)
                         .padding(12).background(theme.surface, in: .rect(cornerRadius: 14)).overlay { RoundedRectangle(cornerRadius: 14).stroke(theme.line) }
                         .overlay(alignment: .topLeading) { if text.isEmpty { Text("إلى نفسي…").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(20).allowsHitTesting(false) } }
-                        .accessibilityIdentifier("diary-letter-text-input")
+                        .disabled(saving).accessibilityIdentifier("diary-letter-text-input")
                     Text("متى تُفتح؟").font(DiaryType.heading)
                     ForEach(choices) { item in
                         Button { choice = item } label: {
                             HStack { Text(item.title).font(DiaryType.writing); Spacer(); Image(systemName: choice == item ? "largecircle.fill.circle" : "circle").foregroundStyle(choice == item ? theme.accent : theme.color("ink3Text")) }.frame(minHeight: 44).contentShape(.rect)
-                        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-letter-trigger-" + item.id).accessibilityAddTraits(choice == item ? .isSelected : [])
+                        }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("diary-letter-trigger-" + item.id).accessibilityAddTraits(choice == item ? .isSelected : [])
                     }
                     if choice?.trigger == .date || choice?.trigger == .hijriDate {
                         DatePicker("اليوم", selection: pickerDate, in: firstDate..., displayedComponents: .date)
                             .environment(\.calendar, service.letterPickerCalendar(hijri: choice?.trigger == .hijriDate))
-                            .environment(\.timeZone, app.activePlace.timeZone).font(DiaryType.writing)
+                            .environment(\.timeZone, app.activePlace.timeZone).font(DiaryType.writing).disabled(saving)
                             .accessibilityIdentifier("diary-letter-date")
                         MadarDateLabel(app.dateLabels(GregorianDay.containing(date, in: app.activePlace.timeZone)))
                     }
@@ -259,7 +266,7 @@ struct DiaryLetterComposer: View {
             }.background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle("رسالة لنفسك").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { dismiss() } else { confirmDiscard = true } }.accessibilityIdentifier("diary-letter-cancel") }
+                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { dismiss() } else { confirmDiscard = true } }.disabled(saving).accessibilityIdentifier("diary-letter-cancel") }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("اختمها") {
                             guard !saving, let choice else { return }; saving = true
@@ -271,12 +278,12 @@ struct DiaryLetterComposer: View {
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .task { loadChoices() }
                 // A letter in progress is not lost to a stray swipe or cancel.
-                .interactiveDismissDisabled(!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving)
+                .interactiveDismissDisabled(blocksRootRoute)
                 .alert("تتجاهل رسالتك؟", isPresented: $confirmDiscard) {
                     Button("تجاهل الرسالة", role: .destructive) { dismiss() }
                     Button("أكمل الكتابة", role: .cancel) {}
                 }
-        }
+        }.diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
     }
     private func loadChoices() {
         do { choices = try service.letterChoices(); choice = choice ?? choices.first; failure = nil } catch { failure = madarUserMessage(error) }
@@ -291,8 +298,17 @@ struct DiaryLetterReschedule: View {
     @State private var date = Date().addingTimeInterval(7 * 86_400)
     @State private var failure: String?
     @State private var rescheduling = false
+    @State private var originalDay: GregorianDay?
+    @State private var dateChanged = false
+    private var blocksRootRoute: Bool { dateChanged || rescheduling }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+#if DEBUG
+            if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" {
+                Button("اختبر الجذر") { app.open(URL(string: "madar://notes")!) }
+                    .accessibilityIdentifier("diary-letter-reschedule-root-route")
+            }
+#endif
             Text("اختر موعدًا لرسالتك").font(DiaryType.heading)
             DatePicker("اليوم", selection: $date, in: Date().addingTimeInterval(86_400)..., displayedComponents: .date).font(DiaryType.writing)
             MadarDateLabel(app.dateLabels(GregorianDay.containing(date, in: app.activePlace.timeZone)))
@@ -301,5 +317,12 @@ struct DiaryLetterReschedule: View {
                 Text("احفظ الموعد").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
             }.buttonStyle(.madarPlain).disabled(rescheduling).accessibilityIdentifier("diary-letter-reschedule-save")
         }.padding(22).frame(maxHeight: .infinity, alignment: .top).background(theme.background).foregroundStyle(theme.ink)
+            .interactiveDismissDisabled(blocksRootRoute)
+            .onAppear { originalDay = GregorianDay.containing(date, in: app.activePlace.timeZone) }
+            .onChange(of: date) { _, value in
+                let selectedDay = GregorianDay.containing(value, in: app.activePlace.timeZone)
+                dateChanged = originalDay.map { $0 != selectedDay } ?? false
+            }
+            .diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
     }
 }

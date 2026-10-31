@@ -69,6 +69,7 @@ final class AppSession {
 #if DEBUG
     var notificationTestResult = ""
     var bankCorpusImportedInputCount = 0
+    var diaryBoundaryUITestClockOverride: Date?
 #endif
     @ObservationIgnored weak var prayerNotifications: PrayerNotificationCoordinator?
     @ObservationIgnored private var privacyScopeTransitionPending = false
@@ -108,6 +109,9 @@ final class AppSession {
     #if DEBUG
     @ObservationIgnored var failFirstNotebookSave = false
     @ObservationIgnored private var failFirstGoodreadsImport = false
+    @ObservationIgnored private var failFirstQuranLevelWrite = false
+    @ObservationIgnored private var quranLevelWriteHoldMilliseconds: Int?
+    @ObservationIgnored private var quranLevelWriteHoldUsed = false
     #endif
     var settingsQuery = ""
     private let bus: CommandBus
@@ -165,6 +169,14 @@ final class AppSession {
         failFirstGoodreadsImport = notebookTest["MADAR_UI_MIHBARA_IMPORT_GOODREADS_FAIL_ONCE"] == "1"
             && notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent
             && group.deletingLastPathComponent().lastPathComponent == "UITestStores"
+        failFirstQuranLevelWrite = notebookTest["MADAR_UI_QURAN_LEVEL_WRITE_FAIL_ONCE"] == "1"
+            && notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent
+            && group.deletingLastPathComponent().lastPathComponent == "UITestStores"
+        if notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent,
+           group.deletingLastPathComponent().lastPathComponent == "UITestStores",
+           let milliseconds = Int(notebookTest["MADAR_UI_QURAN_LEVEL_WRITE_HOLD_MS"] ?? ""), (1...5000).contains(milliseconds) {
+            quranLevelWriteHoldMilliseconds = milliseconds
+        }
         #endif
         snapshotStore = SnapshotStore(directory: group.appending(path: "Snapshots", directoryHint: .isDirectory))
         pendingInbox = PendingInbox(directory: group.appending(path: "PendingInbox", directoryHint: .isDirectory))
@@ -338,8 +350,20 @@ final class AppSession {
         return try PrayerRepository(context: ModelContext(container)).snapshot(now: now)
     }
     func prayerNow(_ fallback: Date = .now) -> Date {
+#if DEBUG
+        if let diaryBoundaryUITestClockOverride { return diaryBoundaryUITestClockOverride }
+#endif
         return prayerUITestClock(fallback)
     }
+#if DEBUG
+    func advanceDiaryBoundaryUITestClock(hours: Int) {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+              environment["MADAR_UI_DIARY_DAY_BOUNDARY_HARNESS"] == "1" else { return }
+        diaryBoundaryUITestClockOverride = (diaryBoundaryUITestClockOverride ?? prayerUITestClock(.now))
+            .addingTimeInterval(Double(hours) * 60 * 60)
+    }
+#endif
     func recordPrayer(_ reference: PrayerReference, status: PrayerStoredStatus, fridayKind: FridayPrayerKind? = nil, completion: ((Bool) -> Void)? = nil) {
         guard [.jamaah, .alone, .missed].contains(status) else { completion?(false); return }
         let payload: MadarCore.JSONValue = .object([
@@ -381,7 +405,8 @@ final class AppSession {
     }
     /// RP4/RP7: the owner answered the one question. The method is stored first; times then use it for this trip only.
     func startPrayerTrip(city: String, country: String, place: ActivePlace, homeKm: Double?, method: PrayerCalculationMethod, completion: ((Bool) -> Void)? = nil) {
-        set(.string(method.rawValue), key: "salah.tripMethod") { [self] in
+        setWithResult(.string(method.rawValue), key: "salah.tripMethod") { [self] saved in
+            guard saved else { completion?(false); return }
             var payload: [String: MadarCore.JSONValue] = ["city": .string(city), "country": .string(country), "lat": .number(place.latitude), "lon": .number(place.longitude), "tzID": .string(place.timeZoneID)]
             if let homeKm { payload["homeKm"] = .number(homeKm) }
             sendPrayerCommand(name: "prayer.startTrip", payload: .object(payload), undoMessage: "بدأت الرحلة", completion: completion)
@@ -739,6 +764,9 @@ final class AppSession {
         }
         execute(name: "settings.set", values: [key: value], message: "حُفظ التعديل", completion: completion)
     }
+    private func setWithResult(_ value: JSONValue, key: String, completion: @escaping (Bool) -> Void) {
+        execute(name: "settings.set", values: [key: value], message: "حُفظ التعديل", resultCompletion: completion)
+    }
     func setMany(_ values: [String: JSONValue], completion: (() -> Void)? = nil) {
         execute(name: "settings.set", values: values, message: "حُفظ التعديل", completion: completion)
     }
@@ -797,11 +825,20 @@ final class AppSession {
             } catch { errorMessage = "لم يكتمل التراجع. \(madarUserMessage(error))" }
         }
     }
-    private func execute(name: String, values: [String: JSONValue], message: String, completion: (() -> Void)? = nil) {
-        guard beginWrite() else { return }
+    private func execute(name: String, values: [String: JSONValue], message: String, completion: (() -> Void)? = nil,
+                         resultCompletion: ((Bool) -> Void)? = nil) {
+        guard beginWrite() else { resultCompletion?(false); return }
         Task {
             defer { pendingWrites -= 1 }
             do {
+#if DEBUG
+                if values["salah.tripMethod"] != nil,
+                   ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+                   let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_TRIP_METHOD_WRITE_HOLD_MS"] ?? ""),
+                   (1...5000).contains(milliseconds) {
+                    try await Task.sleep(for: .milliseconds(milliseconds))
+                }
+#endif
                 try await withSerializedPrayerNotificationMutation {
                     let encoder = JSONEncoder()
                     let typed = try values.mapValues { try JSONDecoder().decode(MadarCore.JSONValue.self, from: encoder.encode($0)) }
@@ -820,7 +857,11 @@ final class AppSession {
                 }
                 if values["core.spotlightIndex"] != nil { await reconcileSpotlightIndex(reportFailure: true) }
                 completion?()
-            } catch { errorMessage = "لم يُحفظ التعديل. \(madarUserMessage(error))" }
+                resultCompletion?(true)
+            } catch {
+                errorMessage = "لم يُحفظ التعديل. \(madarUserMessage(error))"
+                resultCompletion?(false)
+            }
         }
     }
     private func beginWrite() -> Bool {
@@ -897,6 +938,17 @@ final class AppSession {
     func executeQuranCommand(_ name: String, payload: [String: MadarCore.JSONValue]) async throws -> CommandOutcome {
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
+#if DEBUG
+        if name == "quran.setTodayLevel", !quranLevelWriteHoldUsed,
+           let milliseconds = quranLevelWriteHoldMilliseconds {
+            quranLevelWriteHoldUsed = true
+            try await Task.sleep(for: .milliseconds(Int64(milliseconds)))
+        }
+        if failFirstQuranLevelWrite && name == "quran.setTodayLevel" {
+            failFirstQuranLevelWrite = false
+            throw DataError.invalidValue("تعذّر حفظ مستوى الورد في اختبار الواجهة.")
+        }
+#endif
         let result = try await withSerializedPrayerNotificationMutation {
             let result = try await bus.execute(CommandEnvelope(name: name, payload: .object(payload)))
             guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "Quran command") }
@@ -959,6 +1011,14 @@ final class AppSession {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
+#if DEBUG
+        if ["money.saveAccount", "money.saveCard"].contains(name),
+           ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
+           let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_MONEY_WRITE_HOLD_MS"] ?? ""),
+           (1...5000).contains(milliseconds) {
+            try await Task.sleep(for: .milliseconds(milliseconds))
+        }
+#endif
         let now = prayerNow()
         let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "money command") }
@@ -1007,6 +1067,12 @@ final class AppSession {
         if name == "habit.complete",
            ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
            let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_HABIT_WRITE_HOLD_MS"] ?? ""),
+           (1...5000).contains(milliseconds) {
+            try await Task.sleep(for: .milliseconds(milliseconds))
+        }
+        if ["diary.sealLetter", "diary.finishProject", "diary.deleteProject", "widget.delete"].contains(name),
+           ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+           let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_DIARY_COMMAND_HOLD_MS"] ?? ""),
            (1...5000).contains(milliseconds) {
             try await Task.sleep(for: .milliseconds(milliseconds))
         }

@@ -25,6 +25,13 @@ extension AppSession {
             }
     }
     func saveWidget(_ draft: WidgetMakerDraft) async throws {
+#if DEBUG
+        if ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
+           let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_WIDGET_WRITE_HOLD_MS"] ?? ""),
+           (1...5000).contains(milliseconds) {
+            try await Task.sleep(for: .milliseconds(milliseconds))
+        }
+#endif
         let style = try JSONDecoder().decode(MadarCore.JSONValue.self, from: JSONEncoder().encode(draft.style))
         try await executeDiaryCommand("widget.save", payload: ["id": .string(draft.id.uuidString), "name": .string(draft.name),
                                                              "familyID": .string(draft.familyID), "items": .array(draft.items.map(MadarCore.JSONValue.string)), "style": style])

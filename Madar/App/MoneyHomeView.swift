@@ -52,7 +52,17 @@ struct MoneyHomeView: View {
     /// The daily action. 22 Oct put it as a full-width bar under «لك الآن»; DA-03 (27 Oct) returns it to the canonical
     /// «+» in the header, always in reach, so the envelopes are back on the first screen.
     private var expenseButton: some View {
-        Button { expenseOpen = true } label: {
+        Button {
+#if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if environment["MADAR_UI_MONEY_FIFO_HARNESS"] == "1",
+               environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil {
+                app.presentMoneyExpenseSeed(.init(id: UUID(uuidString: "00000000-0000-0000-0000-000000000101")!, amount: "١٨", merchant: "طلب أول", homeCurrency: true))
+            } else { expenseOpen = true }
+#else
+            expenseOpen = true
+#endif
+        } label: {
             Image(systemName: "plus").font(.system(size: 20, weight: .medium)).foregroundStyle(theme.ink)
                 .frame(width: 46, height: 46).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }.contentShape(Circle())
         }.buttonStyle(.madarPlain).accessibilityLabel("سجّل مصروفًا").accessibilityIdentifier("money-expense-open")

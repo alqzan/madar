@@ -75,12 +75,22 @@ struct MihbaraMarginNoteEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
     @State private var saving = false
+    @State private var rootBlockerID = UUID()
     @State private var alert: String?
     @FocusState private var focused: Bool
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var blocksRootRoute: Bool {
+        saving || trimmed != note.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+#if DEBUG
+            if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] == "1" {
+                Button("اختبر رابط الجذر") { app.open(URL(string: "madar://mihbara")!) }
+                    .accessibilityIdentifier("mihbara-margin-root-route")
+            }
+#endif
             if let passage = note.passage {
                 HStack(alignment: .top, spacing: 10) {
                     RoundedRectangle(cornerRadius: 2).fill(theme.accentFill).frame(width: 3)
@@ -111,6 +121,11 @@ struct MihbaraMarginNoteEditor: View {
         .alert("الهامش", isPresented: Binding(get: { alert != nil }, set: { if !$0 { alert = nil } })) {
             Button("حسنًا", role: .cancel) { alert = nil }
         } message: { Text(alert ?? "") }
+        .interactiveDismissDisabled(blocksRootRoute)
+        .onChange(of: blocksRootRoute, initial: true) { _, blocked in
+            app.setMihbaraRootDraftBlocker(rootBlockerID, active: blocked)
+        }
+        .onDisappear { app.setMihbaraRootDraftBlocker(rootBlockerID, active: false) }
     }
 
     private func save() {
