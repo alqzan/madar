@@ -92,6 +92,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             sourceNote: nil
         ),
         .init(
+            id: "tabari-2-181",
+            ayahID: 188,
+            kind: .tafsir,
+            text: "فإنما إثمُ التبديلِ على من بدَّلَ وصيَّتَه",
+            book: "تفسير الطبري جامع البيان - ت التركي",
+            author: "ابن جرير الطبري",
+            citation: "٣/ ١٣٩",
+            sourceURL: URL(string: "https://shamela.ws/book/7798/1790")!,
+            sourceNote: nil
+        ),
+        .init(
             id: "saadi-2-182",
             ayahID: 189,
             kind: .tafsir,

@@ -47,7 +47,7 @@ extension AppSession {
             let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 187 }!
             plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 2; plan.rhythm = "light"; plan.activeFrom = now
         } else if variant == "referencePartial" {
-            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 181 }!
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 180 }!
             plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 5; plan.rhythm = "light"; plan.activeFrom = now
         } else if variant == "referenceBoundary" {
             let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 286 }!
