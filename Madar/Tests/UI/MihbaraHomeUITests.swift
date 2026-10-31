@@ -714,7 +714,7 @@ import UIKit
         XCTAssertTrue(app.buttons["mihbara-wird-open"].waitForExistence(timeout:8)); app.terminate(); app.launch(); open(app)
         reach(app,app.buttons["mihbara-book-continue"])
         // M6 audit: the open book says what is left in real pages and time, not a bare number.
-        XCTAssertTrue(app.staticTexts["بقي ١٠٣ صفحات، نحو ساعتين"].exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["بقيت ١٠٣ صفحات، نحو ساعتين"].exists, app.debugDescription)
         app.buttons["mihbara-book-continue"].tap()
         openPaperDetails(app)
         let page = app.textFields["mihbara-paper-position"]; XCTAssertTrue(page.waitForExistence(timeout:8)); page.tap(); page.press(forDuration:1.1)

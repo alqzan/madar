@@ -359,7 +359,7 @@ struct BackupSettingsView: View {
                         note("هذا أكبر مما تتسع له النسخة، فتبقى ملفات كتب كبيرة خارجها، بدءًا بكتب تراث. تبقى الكتب على جهازك، ونسمّيها لك بعد النسخ.")
                             .accessibilityIdentifier("backup-size-over")
                     }
-                    Text("النسخ المحفوظة: \(digits(status.automaticCount)) تلقائية، \(digits(status.manualCount)) يدوية.").font(MadarTypography.body())
+                    Text("النسخ المحفوظة: \(savedCount(status.automaticCount, ["نسخة تلقائية واحدة", "نسختان تلقائيتان", "نسخ تلقائية", "نسخة تلقائية"]))، \(savedCount(status.manualCount, ["نسخة يدوية واحدة", "نسختان يدويتان", "نسخ يدوية", "نسخة يدوية"])).").font(MadarTypography.body())
                         .accessibilityIdentifier("backup-saved-counts")
                     note("نحتفظ بآخر أربع نسخ تلقائية وكل النسخ اليدوية.")
                     if !status.excludedBooks.isEmpty {
@@ -550,6 +550,10 @@ struct BackupSettingsView: View {
         Button("استعد النسخة") { confirmingRestore = true }.buttonStyle(MadarPrimaryButton()).disabled(model.busy).accessibilityIdentifier("restore-confirm")
     }
     private func digits(_ number: Int) -> String { MadarNumberFormatter(style: numerals).string(number) }
+    /// «نسخة تلقائية واحدة»، «نسختان»، «٣ نسخ»، «١٢ نسخة»; zero takes the plural.
+    private func savedCount(_ count: Int, _ forms: [String]) -> String {
+        count == 0 ? digits(0) + " " + forms[2] : arabicCount(count, forms, MadarNumberFormatter(style: numerals))
+    }
     private var resultCopy: String? {
         guard let result = model.restoreResult else { return model.resultMessage }
         return BackupCopy.restoreSummary(result, numerals: numerals)

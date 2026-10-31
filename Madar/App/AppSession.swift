@@ -39,6 +39,7 @@ final class AppSession {
     var moneyRootDraftBlockers: Set<UUID> = []
     /// A Mihbara link waits while a note editor (reader page note, notebook note) holds unsaved text.
     var mihbaraRootDraftBlockers: Set<UUID> = []
+    var prayerRootDraftBlockers: Set<UUID> = []
     var mihbaraOpen = false
     var mihbaraBookToOpen: UUID?
     var mihbaraRoute: Route?
@@ -638,6 +639,10 @@ final class AppSession {
         let day = GregorianDay.containing(instant, in: place.timeZone)
         let prayers = [day.adding(days: -1), day].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: options) }
         return (try? MadarDay.resolve(instant: instant, place: place, boundary: DayBoundary(rawValue: string("core.dayStart")) ?? .fajr, prayerDays: prayers, hijriSource: HijriSource(rawValue: string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(number("core.hijriOffset"))))?.dayKey
+    }
+    func setPrayerRootDraftBlocker(_ id: UUID, active: Bool) {
+        if active { prayerRootDraftBlockers.insert(id) }
+        else { prayerRootDraftBlockers.remove(id) }
     }
     func setMihbaraRootDraftBlocker(_ id: UUID, active: Bool) {
         if active { mihbaraRootDraftBlockers.insert(id) }

@@ -124,6 +124,7 @@ struct BahwYearView: View {
         .toolbarVisibility(.hidden, for: .navigationBar).toolbarVisibility(.hidden, for: .tabBar).hidesRoomAccessory(session, id: "bahw-year")
         .sheet(item: $editing) { draft in BahwDaySheet(session: session, draft: draft).presentationDetents([.large]) }
         .onChange(of: session.yearDayID, initial: true) { _, id in if let id { openRoutedDay(id) } }
+        .onChange(of: editing?.id) { _, id in if id == nil, let routed = session.yearDayID { openRoutedDay(routed) } }
     }
 
     private var topBar: some View {
@@ -287,6 +288,8 @@ struct BahwYearView: View {
     }
 
     private func openRoutedDay(_ id: UUID) {
+        // A link never swaps out an open day sheet that may hold typed edits; it waits and runs once that sheet closes.
+        guard editing == nil else { return }
         defer { session.yearDayID = nil }
         guard let matter = service.matters().first(where: { $0.rowID == id }) else {
             session.errorMessage = "هذا اليوم لم يعد موجودًا في الأيام القادمة."
@@ -334,7 +337,7 @@ struct BahwYearView: View {
 }
 
 /// The add/edit form for a user day. Values are kept as the rule (calendar, month, day, repeat); occurrences are derived.
-struct BahwDayDraft: Identifiable {
+struct BahwDayDraft: Identifiable, Equatable {
     let id: UUID
     var existing: Bool
     var title = ""
@@ -365,12 +368,19 @@ struct BahwDaySheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
     @State var draft: BahwDayDraft
+    /// What the sheet opened with: the swipe-down is held back once the draft differs, so typed edits are never lost by a stray swipe.
+    private let original: BahwDayDraft
     @Environment(\.dismiss) private var dismiss
     @State private var failure: String?
     @State private var saving = false
     @State private var confirmingDelete = false
     private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var digits: MadarNumberFormatter { .init(style: session.string("core.numerals") == "western" ? .western : .hindi) }
+    init(session: AppSession, draft: BahwDayDraft) {
+        _session = Bindable(session)
+        _draft = State(initialValue: draft)
+        original = draft
+    }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -432,6 +442,7 @@ struct BahwDaySheet: View {
             .navigationTitle(draft.existing ? "عدّل اليوم" : "يوم يهمّك").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() } } }
         }.tint(lobby.accent)
+            .interactiveDismissDisabled(draft != original || saving)
     }
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) { Text(title).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk); content() }

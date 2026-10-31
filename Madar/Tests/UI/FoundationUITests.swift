@@ -907,7 +907,7 @@ import XCTest
 
     func test_fixPrevious_M0T13_BackupCountsHonorSelectedNumerals() throws {
         continueAfterFailure = false
-        for (style, expected) in [("hindi", "النسخ المحفوظة: ٠ تلقائية، ٠ يدوية."), ("western", "النسخ المحفوظة: 0 تلقائية، 0 يدوية.")] {
+        for (style, expected) in [("hindi", "النسخ المحفوظة: ٠ نسخ تلقائية، ٠ نسخ يدوية."), ("western", "النسخ المحفوظة: 0 نسخ تلقائية، 0 نسخ يدوية.")] {
             let app = XCUIApplication()
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launch(); finishOnboarding(app)

@@ -123,6 +123,7 @@ struct PrayerTodayView: View {
             pendingPrayerRootRequestID = requestID
             closeForPrayerRootIfSafe()
         }
+        .onChange(of: session.prayerRootDraftBlockers.isEmpty) { _, empty in if empty { closeForPrayerRootIfSafe() } }
         .onChange(of: session.prayerWriteInProgress) { _, isWriting in
             if !isWriting { closeForPrayerRootIfSafe() }
         }
@@ -265,7 +266,7 @@ struct PrayerTodayView: View {
     }
 
     private func closeForPrayerRootIfSafe() {
-        guard pendingPrayerRootRequestID != nil, !session.prayerWriteInProgress else { return }
+        guard pendingPrayerRootRequestID != nil, !session.prayerWriteInProgress, session.prayerRootDraftBlockers.isEmpty else { return }
         session.prayerLogRequest = nil
         pendingPrayerRoute = nil
         requestReadFailed = false
@@ -1449,7 +1450,7 @@ private struct PrayerTodayLogSheet: View {
         }
         .buttonStyle(.madarPlain)
         .opacity(needsKind(option) ? 0.45 : 1)
-        .disabled(needsKind(option))
+        .disabled(needsKind(option) || isSaving)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(on ? .isSelected : [])
         .accessibilityIdentifier("prayer-status-\(option.rawValue)")
@@ -1530,6 +1531,7 @@ private struct PrayerTodayLogSheet: View {
                         .contentShape(.rect(cornerRadius: 20))
                     }
                     .buttonStyle(.madarPlain)
+                    .disabled(isSaving)
                     .accessibilityElement(children: .combine)
                     .accessibilityAddTraits(on ? .isSelected : [])
                     .accessibilityIdentifier("prayer-heart-\(value.rawValue)")
@@ -2560,6 +2562,7 @@ private struct PrayerNightLoggingSheet: View {
     @State private var confirmRestore = false
     @State private var contentHeight: CGFloat = 520
     @State private var wird: (line: String, logged: Bool)?
+    @State private var rootBlockerID = UUID()
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     init(session: AppSession, snapshot: PrayerSnapshot, initialNight: GregorianDay? = nil, finished: @escaping () -> Void) {
@@ -2577,6 +2580,17 @@ private struct PrayerNightLoggingSheet: View {
     private var footprint: [GregorianDay] { (0..<30).reversed().map { snapshot.nightDefault.adding(days: -$0) } }
     private var restoreNeeded: Bool { (try? session.qiyamRequiresRestore(selectedNight)) ?? true }
     private var logged: Bool { hasRecord(selectedNight) }
+    /// What the reader typed differs from what this night already holds.
+    private var hasUnsavedInput: Bool {
+        let stored = snapshot.nights.first { $0.night == selectedNight }
+        return rakaat != (stored?.rakaat ?? 0) || witr != (stored?.witr ?? false)
+    }
+    /// The wird link keeps what was typed: it is saved first, then the Quran room opens.
+    private func openWird() {
+        let go = { finished(); session.open(URL(string: "madar://quran/session/qiyam")!) }
+        guard hasUnsavedInput, rakaat > 0 || witr else { go(); return }
+        session.recordQiyamNight(selectedNight, rakaat: rakaat, witr: witr, restoreDeleted: false) { succeeded in if succeeded { go() } }
+    }
     private func footprintColor(_ night: GregorianDay) -> Color {
         guard let row = snapshot.nights.first(where: { $0.night == night }), row.rakaat > 0 || row.witr else { return theme.ink.opacity(0.1) }
         return row.rakaat >= 8 ? theme.accent : theme.color("goldMid")
@@ -2613,7 +2627,7 @@ private struct PrayerNightLoggingSheet: View {
             HStack(spacing: 10) {
                 Toggle("أوترتُ", isOn: $witr).toggleStyle(PrayerPillToggleStyle()).accessibilityIdentifier("prayer-qiyam-witr")
                 if showWird, wird?.logged == false {
-                    Button { finished(); session.open(URL(string: "madar://quran/session/qiyam")!) } label: {
+                    Button { openWird() } label: {
                         HStack(spacing: 8) {
                             Text("ورد القيام من محفوظك").font(PrayerHomeType.strong).lineLimit(1).minimumScaleFactor(0.8)
                             Spacer(minLength: 4)
@@ -2647,6 +2661,8 @@ private struct PrayerNightLoggingSheet: View {
         .presentationBackground(theme.background)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(34)
+        .onChange(of: hasUnsavedInput, initial: true) { _, dirty in session.setPrayerRootDraftBlocker(rootBlockerID, active: dirty) }
+        .onDisappear { session.setPrayerRootDraftBlocker(rootBlockerID, active: false) }
         .disabled(session.prayerWriteInProgress)
         .confirmationDialog("أعد تسجيل هذه الليلة؟", isPresented: $confirmRestore, titleVisibility: .visible) {
             Button("أعد التسجيل") { save(restoring: true) }

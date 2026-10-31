@@ -100,7 +100,7 @@ struct PrayerSettingsView: View {
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await model.refresh() } } }
         .confirmationDialog("احفظ بداية التتبّع؟", isPresented: $confirmTracking, titleVisibility: .visible) { Button("احفظ التعديل الوحيد") { Task { await model.run { try await model.service.changeTrackingStart(to: trackingDate) }; if model.error == nil { editingTracking = false } } } } message: { Text("بعد نجاح الحفظ لن يُقبل تعديل آخر للبداية. الأيام المضافة تبدأ مهلة تعليقها من يوم التعديل.") }
         .confirmationDialog("أعِد إعدادات الصلاة؟", isPresented: $confirmReset, titleVisibility: .visible) { Button("أعِد المتفق عليه", role: .destructive) { Task { await model.run { try await model.service.resetSettings() } } } } message: { Text("تعود إعدادات الشكل والمواقيت والتذكير. سجلّك وبداية التتبّع محفوظان.") }
-        .alert("تعذّر حفظ الإعداد", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) { Button("حسنًا") { model.error = nil } } message: { Text(model.error ?? "") }
+        .alert("تعذّر إتمام الطلب", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) { Button("حسنًا") { model.error = nil } } message: { Text(model.error ?? "") }
     }
     private func definitions(_ section: String, state: PrayerSettingsUIState) -> [SettingDefinition] {
         let keys: [String]

@@ -16,6 +16,7 @@ struct DiaryDayOneImportView: View {
     @State private var preview: DayOnePreview?
     @State private var choice = DayOneMerge.Choice.automatic
     @State private var importing: (Int, Int)?
+    @State private var rootBlockerID = UUID()
     @State private var receipt: DayOneReceipt?
     @State private var undone = false
     @State private var failure: String?
@@ -51,11 +52,17 @@ struct DiaryDayOneImportView: View {
                     else { failure = "لم يُفتح الملف. جرّب اختياره مرة أخرى." }
                 }
             }
-            .onChange(of: choice) { _, value in if let draft { preview = try? service.preview(draft, choice: value) } }
+            .onChange(of: choice) { _, value in
+                guard let draft else { return }
+                do { preview = try service.preview(draft, choice: value); failure = nil }
+                catch { failure = "تعذّرت قراءة المعاينة بهذا الاختيار. جرّب اختيارًا آخر." }
+            }
             .onChange(of: phase) { _, value in if value == .background, importing == nil, receipt == nil { reset() } }
             // Mid-import the folder is still being read: no swipe away, and nothing is discarded under it.
             .interactiveDismissDisabled(importing != nil)
-            .onDisappear { if importing == nil { service.discard(draft) } }
+            // A «madar://notes» link during the import waits: closing the cover would drop its receipt and undo.
+            .onChange(of: importing != nil, initial: true) { _, running in app.setDiaryRootDraftBlocker(rootBlockerID, active: running) }
+            .onDisappear { app.setDiaryRootDraftBlocker(rootBlockerID, active: false); if importing == nil { service.discard(draft) } }
             .sheet(isPresented: Binding(get: { openDay != nil }, set: { if !$0 { openDay = nil } })) { if let openDay { DiaryDayView(app: app, day: openDay).environment(\.roomTheme, theme).madarSheetErrorAlert(app) } }
         }
     }
@@ -178,7 +185,7 @@ struct DiaryDayOneImportView: View {
             card {
                 let restoredTags = r.summary.restoredTags ?? 0
                 let importedEntries = r.summary.added + r.summary.keptBoth + r.summary.updated
-                let title = r.status == "partial" ? "دخلت صفحاتك، وبعض المرفقات ناقصة" : restoredTags > 0 && importedEntries == 0 ? "استُعيدت وسوم يومياتك" : "دخلت صفحاتك دفترك"
+                let title = r.status == "partial" ? "دخلت صفحاتك، وبعض المرفقات ناقصة" : restoredTags > 0 && importedEntries == 0 ? "استُعيدت وسوم يومياتك" : "دخلت صفحاتك إلى دفترك"
                 HStack(spacing: 10) { Image(systemName: "checkmark.seal"); Text(title).font(MadarTypography.section()) }.accessibilityIdentifier("dayone-done")
                 Divider().overlay(theme.line)
                 if importedEntries > 0 || r.summary.days > 0 {

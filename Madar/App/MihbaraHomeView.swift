@@ -293,6 +293,8 @@ struct MihbaraHomeView: View {
     #endif
     private func openRoute(_ route: Route, using loadedReading: MihbaraHomeReading? = nil) {
         guard !shelfReadFailed, app.mihbaraRootDraftBlockers.isEmpty else { return }
+        // «افتح المحبرة» in «خصّص» hangs a second room over the tab; the one the reader sees takes the link, not the tab hidden underneath.
+        if isTabRoot && app.mihbaraOpen { return }
         guard !route.path.isEmpty else {
             readerRoute = nil
             // The room link closes the read-only sheets; the notebook may hold a draft and keeps its own close path.
@@ -384,6 +386,7 @@ struct MihbaraHomeView: View {
     }
     private func openSpotlightBookIfNeeded(using loadedReading: MihbaraHomeReading? = nil) {
         guard let id = app.mihbaraBookToOpen else { return }
+        if isTabRoot && app.mihbaraOpen { return }
         guard let reading = loadedReading ?? self.reading else { load(); return }
         guard let book = reading.book(id) else {
             app.mihbaraBookToOpen = nil

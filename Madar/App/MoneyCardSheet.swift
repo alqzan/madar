@@ -24,6 +24,10 @@ struct MoneyCardSheet: View {
     @State private var saving = false
     @State private var failure: String?
     @FocusState private var editing: Bool
+    /// Typed text is held back from a stray swipe-down; «إغلاق» stays the explicit way out.
+    private var hasUnsavedInput: Bool {
+        [name, bank, last4, senders].contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var digits: String { last4.map { c in c.wholeNumberValue.map(String.init) ?? String(c) }.joined() }
     private var canSave: Bool {
@@ -82,6 +86,7 @@ struct MoneyCardSheet: View {
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-card-keyboard-done") } }
                 .task { loadAccounts() }
                 .onChange(of: kind) { _, value in if value != "credit", accountID == nil, accounts.count == 1 { accountID = accounts[0].id } }
+                .interactiveDismissDisabled(hasUnsavedInput || saving)
         }
     }
 

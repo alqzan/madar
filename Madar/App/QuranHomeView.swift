@@ -49,7 +49,7 @@ struct QuranHomeView: View {
                             run { active = try await service.resume(draftID: draft.id) }
                         }.font(bodyFont(14, bold: true)).foregroundStyle(theme.ink).padding(14)
                             .frame(maxWidth: .infinity).background(theme.color("hifzTint"), in: .rect(cornerRadius: 16))
-                            .accessibilityIdentifier("quran-resume")
+                            .disabled(busy).accessibilityIdentifier("quran-resume")
                     }
                     if let key = state.missedDayKey {
                         // Owner trial: the card said only «لو فاتك يوم» with three plain lines; it now names the day and asks.
@@ -337,7 +337,7 @@ struct QuranHomeView: View {
                 Text(selected.title).font(bodyFont(12, bold: isSelected)).foregroundStyle(isSelected ? theme.ink : theme.secondaryInk)
                 Text(subtitle).font(bodyFont(11)).foregroundStyle(text).lineLimit(2).multilineTextAlignment(.center).frame(minHeight: 28, alignment: .top)
             }.frame(maxWidth: .infinity).contentShape(Rectangle())
-        }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-level-\(kind.rawValue)-\(selected.rawValue)")
+        }.buttonStyle(.madarPlain).disabled(busy).accessibilityIdentifier("quran-level-\(kind.rawValue)-\(selected.rawValue)")
             .accessibilityLabel((kind == .hifz ? "الحفظ" : "المراجعة") + "، " + selected.title + "، " + subtitle)
             .accessibilityValue(isSelected ? "محدد" : "غير محدد")
             .accessibilityAddTraits(isSelected ? .isSelected : [])

@@ -17,6 +17,12 @@ struct MoneyAccountSheet: View {
     @State private var failure: String?
     @State private var confirmingRemoval = false
     @FocusState private var editing: Bool
+    /// Typed text is held back from a stray swipe-down; «إغلاق» stays the explicit way out.
+    private var hasUnsavedInput: Bool {
+        let aliases = original.senderIDs.joined(separator: "\n")
+        if original.isNew { return [draft.name, draft.bank, draft.last4, balance, senders].contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
+        return draft.name != original.name || draft.bank != original.bank || draft.last4 != original.last4 || senders != aliases
+    }
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var numbersVisible: Bool { visible || revealed }
@@ -78,6 +84,7 @@ struct MoneyAccountSheet: View {
                 }.padding(20)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-account-keyboard-done") } }
+                .interactiveDismissDisabled(hasUnsavedInput || saving)
         }
     }
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

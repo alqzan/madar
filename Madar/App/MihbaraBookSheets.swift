@@ -27,7 +27,7 @@ enum MihbaraCopy {
     }
     /// «بقيت ٤٠ صفحة» (singular, dual and 3-10 take the feminine verb).
     static func pagesLeft(_ count: Int, _ digits: MadarNumberFormatter) -> String {
-        (count <= 10 ? "بقيت " : "بقي ") + pages(count, digits)
+        ((1...10).contains(count % 100) ? "بقيت " : "بقي ") + pages(count, digits)
     }
     /// «نحو ساعة»: an honest estimate at the app's own pace of 1.4 minutes a page (the same pace «حمّسني» uses).
     static func readingTime(pages count: Int, _ digits: MadarNumberFormatter) -> String {

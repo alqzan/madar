@@ -477,6 +477,15 @@ M0-T06 (device acceptance paperwork), M0-T09 privacy matrix (encrypted backup un
 M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open for every-screen visual/state trace and owner/device/system acceptance (owner/Claude), real-device Release performance, iOS 27 runtime, resource release evidence and signed distribution. PDF OCR/search is now local and cancelable; PDF-to-EPUB conversion remains the separate owner/Claude topic. Direct @als is optional/deferred; no provider key/endpoint is available. Store metadata/privacy text is prepared locally; public support/privacy URLs, real review contact and App Store Connect access are still required for publication. The static scanner remains conservative: its UI/font/colour/action references were not bulk-accepted or turned into a fake complete pass; frozen backup/privacy/a11y work remains frozen.
 
 # Handovers
+## Handover — فحص الغرف بمساعدي Haiku وإصلاح ما تحقق منه AU-95 — 2026-10-31 — Claude
+- **Works now:** رابط المحبرة والغطاء مفتوح من «خصّص» تأخذه النسخة التي يراها القارئ؛ رابط «يوم قادم» ينتظر ورقة اليوم المفتوحة وهي لا تُسحب وفيها تعديل؛ استيراد Day One يحجز روابط اليوميات ويذكر سبب فشل المعاينة؛ أوراق الحساب والبطاقة في المال لا تُسحب وفيها نص؛ الصلاة: أزرار الحالة والقلب تُعطَّل أثناء الحفظ، «ورد القيام» يحفظ ما كُتب قبل الانتقال، ورابط الجذر ينتظر ورقة القيام وفيها تعديل؛ أزرار مستوى القرآن و«تابع جلستك» تُعطَّل أثناء الانشغال؛ «١ نسخة تلقائية واحدة»/«نسختان» في النسخ الاحتياطي؛ «بقيت ١٠٣ صفحات».
+- **Verified:** بناء ناجح. `AU95-r22` ٧١ اختبارًا (Bahw/استيراد Day One/حسابات المال/بطاقات المال/أول يوم صلاة/المحبرة) بإخفاقات ٤؛ أُصلح منها اختباران قديمان (نص «مضى» و«بقيت ١٠٣») ونجحا في `AU95-r23` و`AU95-r25`؛ `AU95-r25` ٥/٥ (عدّاد النسخ + القرآن + الورد).
+- **Differences left:** لا فرق بصري مقصود.
+- **Not verified:** لا اختبار أحمر-قبل لأي إصلاح؛ لا اختبار UI لحفظ القيام قبل رابط الورد ولا لرابط الجذر فوق ورقة القيام؛ ولا لورقة اليوم القادم المحجوزة ولا للغطاء مع رابط. `MoneyCardsUITests.testFourTabsSourcesAndDebit` يفشل على HEAD النظيف أيضًا (`AU95-r24-head`): زر `money-card-بطاقة مدى` غير موجود بعد تمرير الشريط.
+- **Next:** أوراق الصلاة الأخرى (حسم الفجوة) ما زال رابط الجذر يغلقها؛ إصلاح اختبار البطاقات أعلاه؛ بقية AU-95؛ تجربة الودجة على iPhone المالك. رُفضت بعد التحقق: «حفظ بداية التتبّع» (الـ`if` داخل الـ`Task`)، و`PrayerRoom.swift` قديم غير مستعمل.
+- **Model/effort:** claude-sonnet-5-5 / غير مكشوف؛ مساعدو Haiku قراءة فقط. حُذفت ٦٠٠ نتيجة xcresult قديمة محلية (نحو ٣٢ جيجا) لأن القرص كاد يمتلئ.
+- **Usage:** ٤٥٪ من نافذة الخمس ساعات عند آخر قراءة.
+
 ## Handover — حاجز مسودة المحبرة وتحديث يوم مدار AU-95/AU-79 — 2026-10-31 — Claude
 - **Works now:** روابط المحبرة تنتظر ما دام محرر ملاحظة الدفتر أو ورقة ملاحظة الصفحة في القارئ فيهما نص غير محفوظ؛ جذر اليوميات يغلق الأرشيف؛ شاشات القرآن (بيت/أسبوع/سنة) تتحدّث عند حدّ يوم مدار (AU-79) لا عند منتصف الليل فقط.
 - **Verified:** `AU95-r18` ٨/٨ (روابط المحبرة والملاحظات)، `AU95-r7` ١/١ (جذر اليوميات)، `AU79-r1` ٦/٦ (القرآن)، بناء generic-simulator ناجح.

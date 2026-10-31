@@ -132,7 +132,7 @@ import XCTest
         let saved = app.descendants(matching: .any).matching(identifier: "bahw-matter-أول يوم").firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 10))
         // 25 Oct 2025 to 25 Oct 2026 is 365 whole days.
-        XCTAssertTrue(saved.label.contains("٣٦٥") && saved.label.contains("مضت"), saved.label)
+        XCTAssertTrue(saved.label.contains("٣٦٥") && saved.label.contains("مضى"), saved.label)
         _ = app.buttons["تراجع"].waitForNonExistence(timeout: 8)
         capture(app, "M4-V03-count-up-saved-L")
     }
