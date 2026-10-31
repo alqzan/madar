@@ -629,6 +629,14 @@ final class AppSession {
         if active { diaryRootDraftBlockers.insert(id) }
         else { diaryRootDraftBlockers.remove(id) }
     }
+    /// The Madar day the clock is in now (honours `core.dayStart`); nil when prayer times cannot be computed.
+    func currentMadarDayKey() -> String? {
+        guard let source = try? PrayerRepository(context: ModelContext(container)) else { return nil }
+        let instant = prayerNow(), place = source.place(at: instant), options = source.calculationOptions(at: instant)
+        let day = GregorianDay.containing(instant, in: place.timeZone)
+        let prayers = [day.adding(days: -1), day].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: options) }
+        return (try? MadarDay.resolve(instant: instant, place: place, boundary: DayBoundary(rawValue: string("core.dayStart")) ?? .fajr, prayerDays: prayers, hijriSource: HijriSource(rawValue: string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(number("core.hijriOffset"))))?.dayKey
+    }
     func setMoneyRootDraftBlocker(_ id: UUID, active: Bool) {
         if active { moneyRootDraftBlockers.insert(id) }
         else { moneyRootDraftBlockers.remove(id) }

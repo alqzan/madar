@@ -117,6 +117,7 @@ struct QuranHomeView: View {
         // Back from the lock screen or past midnight, «مسار اليوم» and a missed day reflect the day it is now.
         .onChange(of: scenePhase) { _, phase in if phase == .active, active == nil { run(refresh: true) { try await refresh() } } }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in if active == nil { run(refresh: true) { try await refresh() } } }
+        .refreshesAtMadarDay(service.app) { if active == nil { run(refresh: true) { try await refresh() } } }
         .onChange(of: service.app.quranRoute, initial: true) { _, route in
             guard let route else { return }
             service.app.quranRoute = nil
@@ -508,3 +509,24 @@ struct QuranHomeView: View {
 }
 
 struct QuranMushafRequest: Identifiable { let id = UUID(); let page: Int }
+
+/// AU-79: the Quran screens follow the Madar day (`core.dayStart`), not only civil midnight.
+struct QuranMadarDayRefresh: ViewModifier {
+    let app: AppSession
+    let refresh: () -> Void
+    @State private var shownKey: String?
+    func body(content: Content) -> some View {
+        content.task {
+            shownKey = app.currentMadarDayKey()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard let key = app.currentMadarDayKey(), key != shownKey else { continue }
+                shownKey = key
+                refresh()
+            }
+        }
+    }
+}
+extension View {
+    func refreshesAtMadarDay(_ app: AppSession, _ refresh: @escaping () -> Void) -> some View { modifier(QuranMadarDayRefresh(app: app, refresh: refresh)) }
+}

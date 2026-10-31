@@ -77,6 +77,7 @@ struct QuranYearView: View {
             }
             // Left open past midnight, the log follows the day it is now.
             .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in load() }
+            .refreshesAtMadarDay(service.app) { load() }
             .sheet(item: $month) { item in
                 ScrollView { VStack(alignment: .leading, spacing: 14) {
                     Text(item.title).font(quranSerif(25))
