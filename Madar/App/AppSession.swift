@@ -34,6 +34,9 @@ final class AppSession {
     /// One-shot: the money room opens straight on the bank messages (after the old-Madar move left some for review).
     var moneyOpensMessages = false
     var moneyRoute: Route?
+    /// A money-root link closes the pushed screens, but waits while the expense draft holds unsaved input.
+    var moneyRootRequestID: UUID?
+    var moneyRootDraftBlockers: Set<UUID> = []
     var mihbaraOpen = false
     var mihbaraBookToOpen: UUID?
     var mihbaraRoute: Route?
@@ -626,6 +629,10 @@ final class AppSession {
         if active { diaryRootDraftBlockers.insert(id) }
         else { diaryRootDraftBlockers.remove(id) }
     }
+    func setMoneyRootDraftBlocker(_ id: UUID, active: Bool) {
+        if active { moneyRootDraftBlockers.insert(id) }
+        else { moneyRootDraftBlockers.remove(id) }
+    }
     func open(_ url: URL) {
         let today = GregorianDay.containing(.now, in: activePlace.timeZone)
         let unavailableSettings = Set(schema.settings.map(\.key)).subtracting(Self.supportedKeys)
@@ -644,7 +651,7 @@ final class AppSession {
                 let raw = route.parameters["amount"].flatMap(Int.init).map { AppMoneyService(app: self).moneyInput($0) } ?? ""
                 presentMoneyExpenseSeed(.init(amount: raw, merchant: String((route.parameters["merchant"] ?? "").prefix(80)), method: route.parameters["method"], homeCurrency: true)); return
             }
-            if route.room == .mal, route.path.isEmpty || route.path == ["now"] { selectedTab = "money"; return }
+            if route.room == .mal, route.path.isEmpty || route.path == ["now"] { moneyRootRequestID = UUID(); selectedTab = "money"; return }
             if route.room == .mal { moneyRoute = route; selectedTab = "money"; return }
             if route.room == .salah {
                 if route.path.isEmpty { prayerRootRequestID = UUID(); selectedTab = "prayer" }

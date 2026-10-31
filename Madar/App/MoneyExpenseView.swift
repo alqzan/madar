@@ -23,6 +23,7 @@ struct MoneyExpenseView: View {
     @State private var details = false
     @State private var date = Date()
     @State private var saving = false
+    @State private var rootBlockerID = UUID()
     @State private var confirmDiscard = false
     @State private var failure: String?
     @FocusState private var editing: Bool
@@ -104,6 +105,8 @@ struct MoneyExpenseView: View {
                 Button("أكمل التسجيل") { }.accessibilityIdentifier("money-expense-continue")
             } message: { Text("المبلغ أو اسم المتجر غير محفوظ.") }
             .interactiveDismissDisabled(hasUnsavedInput || saving)
+            .onChange(of: hasUnsavedInput || saving, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
+            .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }
     }
     private func amountHeading(_ r: MoneyExpenseReading) -> some View {
         VStack(spacing: 0) {

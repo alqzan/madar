@@ -20,6 +20,7 @@ struct MoneyHomeView: View {
     @State private var failure: String?
     @State private var revealed = false
     @State private var basisOpen = false
+    @State private var pendingRootRequest = false
     @State private var envelopesOpen = false
     @State private var messagesOpen = false
     @State private var sinceOpen = false
@@ -164,6 +165,12 @@ struct MoneyHomeView: View {
             else { try? await app.executeMoneyCommand("money.markVisit") }
         }.onChange(of: app.prayerRevision) { load() }
         .onChange(of: app.moneyRoute, initial: true) { _, route in if let route { openMoneyRoute(route) } }
+        .onChange(of: app.moneyRootRequestID) { _, requestID in
+            guard requestID != nil else { return }
+            pendingRootRequest = true
+            closeForMoneyRootIfSafe()
+        }
+        .onChange(of: app.moneyRootDraftBlockers.isEmpty) { _, _ in closeForMoneyRootIfSafe() }
         .onChange(of: app.searchRoute, initial: true) { _, route in
             guard let route, route.parameters["room"] == "mal" else { return }
             app.searchRoute = nil
@@ -433,6 +440,14 @@ struct MoneyHomeView: View {
         }
         catch MoneyCommandError.missingRate { failure = "يلزم سعر تحويل يدوي لجمع أرصدتك بعملة البيت."; reading = nil }
         catch { failure = "تعذّرت قراءة البيانات الآن. أعد المحاولة."; reading = nil }
+    }
+    private func closeForMoneyRootIfSafe() {
+        guard pendingRootRequest, app.moneyRootDraftBlockers.isEmpty else { return }
+        pendingRootRequest = false
+        basisOpen = false; envelopesOpen = false; messagesOpen = false; sinceOpen = false; obligationsOpen = false
+        categoriesOpen = false; cardsOpen = false; logOpen = false; analysisOpen = false; reconcileOpen = false
+        cashbackOpen = false; settingsOpen = false; accountsOpen = false; expenseOpen = false; zakatOpen = false
+        goalOpen = false; guideOpen = false
     }
     private func openMoneyRoute(_ route: Route) {
         guard route.room == .mal else { return }

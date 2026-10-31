@@ -87,6 +87,16 @@ import XCTest
         XCTAssertTrue(surahUnit.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertTrue(surahUnit.isSelected, "The ordinary index must reopen on Surah after dismissing a routed Juz.")
     }
+    func testQuranRootLinkClosesTheOpenIndexAndReturnsHome() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_QURAN_ROUTE": "madar://quran/fihris"]
+        app.launch()
+        XCTAssertTrue(app.buttons["quran-index-unit-surah"].waitForExistence(timeout: 30), app.debugDescription)
+        app.open(URL(string: "madar://quran")!)
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.buttons["quran-index-unit-surah"].exists, app.debugDescription)
+    }
     func testQuranRouteArrivingDuringBusyOperationRunsAfterward() throws {
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",

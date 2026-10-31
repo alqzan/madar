@@ -439,7 +439,11 @@ struct QuranHomeView: View {
         }
         #endif
         if state == nil { try await refresh() }
-        if route.path.first == "page", let number = Int(route.path.last ?? "") { mushaf = .init(page: number) }
+        if route.path.isEmpty {
+            // The room link returns to the home; sessions, setup and free reading keep their own save paths.
+            detail = nil; mushaf = nil; showOutside = false; showIndex = false; showWeek = false; showPlan = false; showStrength = false
+        }
+        else if route.path.first == "page", let number = Int(route.path.last ?? "") { mushaf = .init(page: number) }
         else if route.path.first == "fihris" { indexInitialUnit = .surah; indexInitialItemID = nil; indexRouteRequestID = UUID(); showIndex = true }
         else if route.path.first == "juz", let number = route.path.last {
             indexInitialUnit = .juz

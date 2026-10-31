@@ -67,6 +67,14 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any)["money-zakat"].waitForExistence(timeout: 15), app.debugDescription)
         app.buttons["money-zakat-close"].tap()
     }
+    func testMoneyRootLinkClosesTheOpenScreenAndReturnsHome() throws {
+        let app = app("showcase"); open(app)
+        app.open(URL(string: "madar://mal/categories")!)
+        XCTAssertTrue(app.descendants(matching: .any)["money-categories"].waitForExistence(timeout: 15), app.debugDescription)
+        app.open(URL(string: "madar://mal")!)
+        XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["money-categories"].exists, app.debugDescription)
+    }
     func testRepeatedMoneyRoutesUpdateTheOpenLogAndClearItsFilter() throws {
         let app = app("cards"); open(app)
         let log = app.buttons["money-log-open"]
