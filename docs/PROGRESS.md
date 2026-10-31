@@ -477,9 +477,9 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 ## Handover — أبعاد تطبيق مدار وودجة الأيام القادمة — 2026-10-31 — Codex
-- **Works now:** فُحصت حدود غرف الصلاة والقرآن والمذكرات والمال والعادات والبهو والمحبرة والإعدادات والمكونات المشتركة؛ لم يظهر تجاوز مؤكد سوى ودجة الأيام القادمة الصغيرة. بقي اليومان ظاهرين بعد تصغير الحلقتين إلى ٥٢ نقطة وجعل ضلع المعاينة تابعًا لعرض الحاوية.
-- **Verified:** أعاد اختبار ما قبل الإصلاح قياس ٢٠٤ نقاط. ثم مرّ `xcodebuild test -only-testing:MadarUITests/RoomWidgetsUITests/testUpcomingSmallPreviewKeepsBothDaysInsideItsBounds` ١/١ على iPhone 17 Pro (`after-r3.xcresult`) وiPhone 17e (`17e-r2.xcresult`) / iOS 26.5؛ تحقّق من اليومين والهوامش وحدود الشاشة. بناء التطبيق والودجات و`git diff --check` نجحا. [قبل](../Madar/Artifacts/owner-review/M4-W01-upcoming-small-before-L.png) · [بعد، 17 Pro](../Madar/Artifacts/owner-review/M4-W01-upcoming-small-after-L.png) · [بعد، 17e](../Madar/Artifacts/owner-review/M4-W01-upcoming-small-17e-L.png).
-- **Differences left:** لا قصّ ظاهر في معاينة 17 Pro أو 17e؛ الفحص الساكن لبقية أسطح التطبيق لم يجد تجاوزًا مؤكدًا.
+- **Works now:** فُحصت حدود الغرف والودجات، وأُصلحت معاينة «الأيام القادمة» الصغيرة. خُفّفت النصوص المكررة في الصلاة والقرآن واليومية والمال والعادات والبهو والمحبرة ومعرض الودجات.
+- **Verified:** اختبار الحدود نجح على iPhone 17 Pro و17e؛ بعد الاختصار نجحت اختبارات الواجهات المختارة ١١/١١، واختبار معاينة الودجة الصغيرة ١/١ على iPhone 17 Pro / iOS 26.5. `git diff --check` نظيف. [قبل](../Madar/Artifacts/owner-review/M4-W01-upcoming-small-17e-L.png) · [بعد](../Madar/Artifacts/owner-review/M4-W01-upcoming-small-copy-after-L.png).
+- **Differences left:** لم أجرِ مقارنة canonical شاملة لمسح النصوص؛ لا قصّ ظاهر في معاينة الودجة بعد التعديل.
 - **Not verified:** لم تُجرّب إضافة الودجة أو تحديثها على iPhone المالك. أُوقف زحف الأزرار الشامل لأنه لا يقيس حدود الواجهة.
 - **Next:** تجربة الودجة على iPhone المالك؛ تبقى M4-W01 «approved — pending owner trial» حتى ذلك.
 - **Model/effort:** غير مكشوف / غير مكشوف.

@@ -49,7 +49,7 @@ struct MoneyRulesView: View {
                         merchants(reading)
                     }
                     if let runFailure { Text(runFailure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-rule-failure") }
-                    Label("يتعلّم مدار التاجر من اختيارك، ولا يغيّر نقل القاعدة أو نسيانها حركاتك السابقة.", systemImage: "lightbulb")
+                    Label("نقل القاعدة أو نسيانها لا يغيّر حركاتك السابقة.", systemImage: "lightbulb")
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.top, 6)
                 } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }

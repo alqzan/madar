@@ -1455,7 +1455,6 @@ private struct MihbaraNotebookContent: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack { Text("ملاحظاتك الخاصة").font(MadarTypography.title()); Spacer(); Button { editor = .init(id: UUID(), text: "") } label: { Label("ملاحظة جديدة", systemImage: "plus") }.accessibilityIdentifier("mihbara-note-add") }
-                Text("تبقى هنا في دفتر المحبرة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 if let failure {
                     Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         .accessibilityIdentifier("mihbara-notebook-read-error")

@@ -320,7 +320,6 @@ struct BahwBlockView: View {
                 if size == .icon { EmptyView() }
                 else if size == .small { Text("أضف أول عادة").font(small).foregroundStyle(room.secondaryInk) }
                 else {
-                    Text("أقلّ القليل كل يوم يصير سلسلة تراها هنا").font(small).foregroundStyle(room.secondaryInk)
                     Button { service.session.habitsOpen = true } label: { Label("أضف أول عادة", systemImage: "plus").font(label).padding(.horizontal,18).frame(minHeight:44).foregroundStyle(room.onAccent).background(room.accentFill, in: .capsule) }
                         .buttonStyle(.madarPlain).disabled(!interactive).padding(.top,6).accessibilityIdentifier("bahw-habits-add-first")
                 }

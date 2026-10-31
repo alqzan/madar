@@ -27,13 +27,12 @@ struct RoomWidgetsGallery:View {
                         preview(.habits,family:.systemSmall,template:"today").frame(height:170)
                     }
                     Text("قالب العادات القادمة").font(MadarTypography.section())
-                    Text("المتوسطة · أقرب ٣ مواعيد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text("المتوسطة").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     previewContent(.habits,family:.systemMedium,template:"coming").frame(height:170).accessibilityIdentifier("room-widget-habits-coming-medium")
                     HStack(alignment:.top,spacing:12) {
                         previewContent(.habits,family:.systemSmall,template:"coming").frame(width:170,height:170).accessibilityIdentifier("room-widget-habits-coming-small")
                         VStack(alignment:.leading,spacing:6) {
                             Text("الصغيرة").font(MadarTypography.section())
-                            Text("أقرب موعد وآخر إنجاز").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         }.frame(maxWidth:.infinity,minHeight:170,alignment:.center)
                     }
                     preview(.upcoming,family:.systemMedium,template:"upcoming").frame(height:180)
@@ -41,10 +40,7 @@ struct RoomWidgetsGallery:View {
                         let side = geometry.size.width * 0.44
                         HStack(alignment:.top,spacing:12) {
                             previewContent(.upcoming,family:.systemSmall,template:"upcoming").frame(width:side,height:side).accessibilityIdentifier("room-widget-upcoming-small")
-                            VStack(alignment:.leading,spacing:6) {
-                                Text("الصغيرة").font(MadarTypography.section())
-                                Text("اليومان الأقرب مع مصدرهما").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                            }.frame(maxWidth:.infinity,minHeight:side,alignment:.center)
+                            Text("الصغيرة").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:side,alignment:.center)
                         }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
                     }.frame(height:180)
                     Link(destination:URL(string:"madar://mal")!){previewContent(.money,family:.systemMedium,template:"now")}.buttonStyle(.madarPlain).frame(height:180).accessibilityIdentifier("room-widget-money")

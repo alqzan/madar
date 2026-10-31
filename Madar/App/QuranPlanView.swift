@@ -131,10 +131,10 @@ struct QuranPlanView: View {
         let highest = max(0.000001, days.map { $0.base + $0.extra }.max() ?? 1)
         return VStack(alignment: .leading, spacing: 12) {
             Divider().overlay(theme.line)
-            Text("معاينة: لو فاتك ورد واحد").font(quranFont(14, bold: true))
-            Text("وردك المعتاد في المثال: " + overview.habitualAmount).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-plan-example-amount")
+            Text("لو فاتك ورد واحد").font(quranFont(14, bold: true))
+            Text("وردك المعتاد: " + overview.habitualAmount).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-plan-example-amount")
             if policy == "ask" {
-                Text("هذا مثال للتوزيع؛ ستختار عند الفوات.").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+                Text("تختار التوزيع عند الفوات.").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
             }
             HStack(alignment: .top, spacing: 8) {
                 ForEach(days) { day in

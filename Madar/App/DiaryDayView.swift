@@ -84,7 +84,7 @@ struct DiaryDayView: View {
                 if let returnDay,!returnDismissed {
                     VStack(alignment:.leading,spacing:8){
                         Text("آخر صفحة كتبتها: "+service.bothDates(returnDay,calendar:first)).font(DiaryType.label)
-                        Text("يمكنك أن تبدأ من اليوم أو تفتح يومًا سابقًا. لا تحتاج إلى تعويض شيء.").font(MadarTypography.body())
+                        Text("لا تحتاج إلى تعويض شيء.").font(MadarTypography.body())
                         HStack(spacing:8){
                             Button{archiveOpen=true}label:{Text("افتح يومًا سابقًا").frame(maxWidth:.infinity,minHeight:44).overlay{Capsule().stroke(theme.line)}}.accessibilityIdentifier("diary-return-days")
                             Button{returnDismissed=true;writing=true}label:{Text("ابدأ من اليوم").frame(maxWidth:.infinity,minHeight:44).foregroundStyle(theme.background).background(theme.ink,in:.capsule)}.accessibilityIdentifier("diary-return-write")

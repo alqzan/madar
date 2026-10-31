@@ -400,8 +400,8 @@ struct PrayerTodayView: View {
             } else if snapshot.hasTimes {
                 Text("اكتمل يوم الصلاة").font(MadarTypography.cardTitle())
             } else {
-                Text("لا تُحسب المواقيت هنا اليوم").font(MadarTypography.cardTitle())
-                Text("لا أوقات ولا عدّ تنازلي في هذا اليوم، وصلاتك تُسجَّل كالمعتاد.")
+                Text("لا مواقيت اليوم").font(MadarTypography.cardTitle())
+                Text("سجّل الصلاة كالمعتاد.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
         }

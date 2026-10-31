@@ -58,7 +58,7 @@ struct MoneyAccountsView: View {
                     if r.rows.isEmpty {
                         // Audit 28 Oct: the empty tree offers its first account right where it asks for one.
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("من هنا تبدأ الجذور. أضف حسابك ورصيده، ثم تصله رسائل البنك.").font(MadarTypography.body()).accessibilityIdentifier("money-accounts-empty")
+                            Text("أضف حسابك ورصيده، ثم تصله رسائل البنك.").font(MadarTypography.body()).accessibilityIdentifier("money-accounts-empty")
                             Button(action: addAccount) { Label("أضف أول حساب", systemImage: "plus").font(MadarTypography.body().bold()).padding(.horizontal, 18).frame(minHeight: 44).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-accounts-empty-add")
                         }.padding(.vertical, 20)
                     }

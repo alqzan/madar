@@ -53,7 +53,7 @@ struct QuranWeekView: View {
                             Text(day.review > 0 ? "راجعت " + service.faceCount(day.review, accusative: true) : "لم تراجع").font(font(16)).accessibilityIdentifier("quran-week-day-review")
                         }
                         if day.partialAyahs > 0 { Text(QuranDayCloseCopy.ayahs(day.partialAyahs, digits: service.numerals) + " من وجه لم يكتمل بعد").font(font(14)) }
-                        Text("الحفظ في الحلقة الخارجية من وجه واحد، والمراجعة في الداخلية من ثمانية أوجه. يوم الراحة خارج مقام أيام الحفظ.").font(font(13)).foregroundStyle(theme.secondaryInk)
+                        Text("الخارجية لحفظ وجه، والداخلية لمراجعة ثمانية أوجه؛ يوم الراحة لا يدخل في أيام الحفظ.").font(font(13)).foregroundStyle(theme.secondaryInk)
                         Button("تمّ") { selected = nil }.frame(maxWidth: .infinity, minHeight: 44)
                     }.padding(24)
                 }.foregroundStyle(theme.ink).background(theme.surface).presentationDetents([.height(400), .large]).presentationDragIndicator(.visible).environment(\.layoutDirection, .rightToLeft)
@@ -62,7 +62,7 @@ struct QuranWeekView: View {
     private func rings(_ value: QuranUIWeek) -> some View {
         card {
             VStack(alignment: .leading, spacing: 14) {
-                HStack { Text("حلقات الأسبوع").font(font(17, bold: true)); Spacer(); Text("آخر سبعة أيام").font(font(11)).foregroundStyle(theme.secondaryInk) }
+                Text("حلقات آخر سبعة أيام").font(font(17, bold: true))
                 Text("أغلقت الحلقتين في " + service.numerals.string(value.closedDays) + " من " + service.numerals.string(value.eligibleDays) + (value.eligibleDays == 1 ? " يوم الحفظ" : value.eligibleDays == 2 ? " يومَي الحفظ" : " أيام الحفظ"))
                     .font(font(14)).accessibilityIdentifier("quran-week-closed")
                 if type.isAccessibilitySize {

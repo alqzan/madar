@@ -397,7 +397,7 @@ struct MoneyAnalysisView: View {
         VStack(alignment: .leading, spacing: 10) {
             Image(systemName: "chart.bar.xaxis").font(.title2).foregroundStyle(theme.color("reserveText"))
             Text("يبدأ التحليل مع دورتك الأولى").font(MadarTypography.cardTitle())
-            Text("حين ينزل الراتب ويُضبط يومك، تظهر هنا أيامك أمام يومك، وأين ذهب صرفك، ومن صرفت عندهم أكثر. لا أرقام قبل أن تكون لها بيانات.")
+            Text("مصروفك اليومي وأبرز التجار.")
                 .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
         }.padding(20).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface).accessibilityIdentifier("money-analysis-empty")
     }
