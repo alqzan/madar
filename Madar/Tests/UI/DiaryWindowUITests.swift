@@ -153,6 +153,17 @@ import XCTest
         XCTAssertTrue(app.navigationBars["ترتيب البيت"].waitForExistence(timeout: 12), app.debugDescription)
         app.terminate()
     }
+    func testDiaryRootLinkClosesTheOpenArchiveAndLetter() throws {
+        let app = launch("letters")
+        app.open(URL(string: "madar://notes/letter/33333333-3333-4333-8333-333333333331")!)
+        XCTAssertTrue(app.buttons["diary-letter-open"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["diary-letter-done"].tap()
+        XCTAssertTrue(app.buttons["diary-hub-memories"].waitForExistence(timeout: 10), app.debugDescription)
+        app.open(URL(string: "madar://notes")!)
+        XCTAssertTrue(app.buttons["diary-hub-memories"].waitForNonExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["diary-home-title"].exists, app.debugDescription)
+        app.terminate()
+    }
     func testMemoriesReadFailureCanRetryInTheArchive() throws {
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters",
