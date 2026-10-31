@@ -92,6 +92,39 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             sourceNote: nil
         ),
         .init(
+            id: "ibn-kathir-2-178-context",
+            ayahID: 185,
+            kind: .context,
+            text: "كانت بنو النضير قد غزت قريظة في الجاهلية وقهروهم",
+            book: "تفسير ابن كثير - ط ابن الجوزي",
+            author: "ابن كثير",
+            citation: "٢/ ٤٤",
+            sourceURL: URL(string: "https://shamela.ws/book/1503/749")!,
+            sourceNote: "يذكره ابن كثير سياقًا يشرح الخلفية التاريخية لأحكام القصاص؛ والموضع لا يصوغه خبرًا صريحًا عن سبب النزول."
+        ),
+        .init(
+            id: "tabari-2-179",
+            ayahID: 186,
+            kind: .tafsir,
+            text: "فكان لكم في حكمِي بينَكم بذلك حياةٌ",
+            book: "تفسير الطبري جامع البيان - ت التركي",
+            author: "ابن جرير الطبري",
+            citation: "٣/ ١٢٠",
+            sourceURL: URL(string: "https://shamela.ws/book/7798/1771")!,
+            sourceNote: nil
+        ),
+        .init(
+            id: "tabari-2-180",
+            ayahID: 187,
+            kind: .tafsir,
+            text: "والخيرُ المالُ",
+            book: "تفسير الطبري جامع البيان - ت التركي",
+            author: "ابن جرير الطبري",
+            citation: "٣/ ١٢٣",
+            sourceURL: URL(string: "https://shamela.ws/book/7798/1774")!,
+            sourceNote: nil
+        ),
+        .init(
             id: "tabari-2-181",
             ayahID: 188,
             kind: .tafsir,

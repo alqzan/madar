@@ -34,14 +34,14 @@ final class QuranWirdReferenceIntegrationTests: XCTestCase {
 
     func testExternalSearchForUncoveredWirdAyahUsesItsExactNormalizedOpening() throws {
         let catalog = try QuranResources.catalog()
-        let ayah = try XCTUnwrap(catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 180 })
-        XCTAssertEqual(ayah.id, 187)
-        XCTAssertEqual(ayah.searchText, "كتب عليكم إذا حضر أحدكم الموت إن ترك خيرا الوصية للوالدين والأقربين بالمعروف حقا على المتقين")
+        let ayah = try XCTUnwrap(catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 177 })
+        XCTAssertEqual(ayah.id, 184)
+        XCTAssertEqual(ayah.searchText, "ليس البر أن تولوا وجوهكم قبل المشرق والمغرب ولكن البر من آمن بالله واليوم الآخر والملائكة والكتاب والنبيين وآتى المال على حبه ذوي القربى واليتامى والمساكين وابن السبيل والسائلين وفي الرقاب وأقام الصلاة وآتى الزكاة والموفون بعهدهم إذا عاهدوا والصابرين في البأساء والضراء وحين البأس أولئك الذين صدقوا وأولئك هم المتقون")
 
         let url = try XCTUnwrap(QuranWirdReferenceSearch.url(for: ayah))
         let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
         XCTAssertEqual(components.queryItems?.first(where: { $0.name == "q" })?.value,
-                       "\"كتب عليكم إذا حضر أحدكم الموت إن ترك خيرا الوصية للوالدين والأقربين\"")
+                       "\"ليس البر أن تولوا وجوهكم قبل المشرق والمغرب ولكن البر من آمن\"")
         XCTAssertFalse(url.absoluteString.contains("ﰀ"))
     }
 
@@ -52,6 +52,9 @@ final class QuranWirdReferenceIntegrationTests: XCTestCase {
             ("qurtubi-1-3-in-ibn-kathir", 1, 3, .tafsir, "ليكون من باب قرن الترغيب بعد الترهيب", "١/ ٢٠٢", "https://shamela.ws/book/1503/257"),
             ("ibn-kathir-1-4", 1, 4, .tafsir, "وكلاهما صحيح متواتر في السبع", "١/ ٢٠٢", "https://shamela.ws/book/1503/257"),
             ("ibn-kathir-1-5", 1, 5, .tafsir, "وفي الشرع عبارة عما يجمع كمال المحبة والخضوع والخوف", "١/ ٢٠٥", "https://shamela.ws/book/1503/260"),
+            ("ibn-kathir-2-178-context", 2, 178, .context, "كانت بنو النضير قد غزت قريظة في الجاهلية وقهروهم", "٢/ ٤٤", "https://shamela.ws/book/1503/749"),
+            ("tabari-2-179", 2, 179, .tafsir, "فكان لكم في حكمِي بينَكم بذلك حياةٌ", "٣/ ١٢٠", "https://shamela.ws/book/7798/1771"),
+            ("tabari-2-180", 2, 180, .tafsir, "والخيرُ المالُ", "٣/ ١٢٣", "https://shamela.ws/book/7798/1774"),
             ("tabari-2-181", 2, 181, .tafsir, "فإنما إثمُ التبديلِ على من بدَّلَ وصيَّتَه", "٣/ ١٣٩", "https://shamela.ws/book/7798/1790"),
             ("saadi-2-182", 2, 182, .tafsir, "ينبغي لمن حضر الموصي وقت الوصية بها، أن ينصحه بما هو الأحسن والأعدل", "ص ٨٥", "https://shamela.ws/book/42/122"),
             ("saadi-2-183", 2, 183, .tafsir, "فإن الصيام من أكبر أسباب التقوى", "ص ٨٦", "https://shamela.ws/book/42/123"),
@@ -87,5 +90,7 @@ final class QuranWirdReferenceIntegrationTests: XCTestCase {
         XCTAssertTrue(qiraat.sourceNote?.contains("مَلِكِ") == true && qiraat.sourceNote?.contains("مَالِكِ") == true)
         let context = try XCTUnwrap(QuranWirdReferenceExcerpt.verified.first { $0.id == "maathur-3-190-context" })
         XCTAssertTrue(context.sourceNote?.contains("لا يذكر حادثةً سبقت نزولها") == true)
+        let qisasContext = try XCTUnwrap(QuranWirdReferenceExcerpt.verified.first { $0.id == "ibn-kathir-2-178-context" })
+        XCTAssertTrue(qisasContext.sourceNote?.contains("لا يصوغه خبرًا صريحًا عن سبب النزول") == true)
     }
 }
