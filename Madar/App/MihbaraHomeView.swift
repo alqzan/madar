@@ -94,6 +94,7 @@ struct MihbaraHomeView: View {
         .modifier(MihbaraConversionOffer(app: app, book: $offerConversion))
         .onChange(of: app.mihbaraBookToOpen) { _, _ in openSpotlightBookIfNeeded() }
         .onChange(of: app.mihbaraRoute, initial: true) { _, route in if let route { openRoute(route) } }
+        .onChange(of: sheet?.id) { _, id in if id == nil, let route = app.mihbaraRoute { openRoute(route) } }
         .onChange(of: app.undoToken?.id) { load() }
         .onChange(of: app.prayerRevision) { load() }.onChange(of: reading?.day) { folded = false; manuallyOpen = false }
         .modifier(MihbaraHomeConfirmations(
@@ -293,10 +294,13 @@ struct MihbaraHomeView: View {
         guard !shelfReadFailed else { return }
         guard !route.path.isEmpty else {
             readerRoute = nil
-            if case .library? = sheet { sheet = nil }
+            // The room link closes the read-only sheets; the notebook may hold a draft and keeps its own close path.
+            switch sheet { case .library?, .book?, .hadith?: sheet = nil; default: break }
             app.mihbaraRoute = nil
             return
         }
+        // A link never tears down an open sheet that may hold a draft; it waits and runs once that sheet closes.
+        if let sheet { if case .library = sheet {} else { return } }
         guard let reading = loadedReading ?? self.reading else { return }
         #if DEBUG
         let environment = ProcessInfo.processInfo.environment

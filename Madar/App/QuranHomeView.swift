@@ -15,6 +15,8 @@ struct QuranHomeView: View {
     @State private var detail: HomeDetail?
     @State private var active: QuranUISessionState?
     @State private var busy = false
+    /// A refresh asked for while another operation runs is replayed once it ends, so the home never stays stale.
+    @State private var refreshPending = false
     @State private var showDayClose = false
     /// The page travels with the presentation: an `isPresented` cover read `readerPage` stale, so links opened page 1.
     @State private var mushaf: QuranMushafRequest?
@@ -81,7 +83,7 @@ struct QuranHomeView: View {
                     Button("حاول مرة أخرى") {
                         if pendingQuranRoute != nil {
                             retryPendingRoute()
-                        } else { run { try await refresh() } }
+                        } else { run(refresh: true) { try await refresh() } }
                     }
                     .font(bodyFont(14, bold: true))
                     .accessibilityIdentifier("quran-home-retry")
@@ -113,8 +115,8 @@ struct QuranHomeView: View {
         .accessibilityIdentifier("quran-home")
         .task { do { try await refresh() } catch { self.error = quranUserMessage(error) } }
         // Back from the lock screen or past midnight, «مسار اليوم» and a missed day reflect the day it is now.
-        .onChange(of: scenePhase) { _, phase in if phase == .active, active == nil { run { try await refresh() } } }
-        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in if active == nil { run { try await refresh() } } }
+        .onChange(of: scenePhase) { _, phase in if phase == .active, active == nil { run(refresh: true) { try await refresh() } } }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in if active == nil { run(refresh: true) { try await refresh() } } }
         .onChange(of: service.app.quranRoute, initial: true) { _, route in
             guard let route else { return }
             service.app.quranRoute = nil
@@ -166,11 +168,11 @@ struct QuranHomeView: View {
                 .environment(\.layoutDirection, .rightToLeft)
             }
         }
-        .fullScreenCover(item: $active, onDismiss: { run { try await refresh() } }) { initial in
+        .fullScreenCover(item: $active, onDismiss: { run(refresh: true) { try await refresh() } }) { initial in
             QuranHomeSessionFlow(service: service, state: Binding(get: { active ?? initial }, set: { active = $0 }), close: { active = nil })
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
-        .fullScreenCover(isPresented: $showDayClose, onDismiss: { run { try await refresh() } }) {
+        .fullScreenCover(isPresented: $showDayClose, onDismiss: { run(refresh: true) { try await refresh() } }) {
             QuranDayCloseView(service: service, close: { showDayClose = false })
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
@@ -179,17 +181,17 @@ struct QuranHomeView: View {
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
-        .fullScreenCover(isPresented: $showQiyam, onDismiss: { run { try await refresh() } }) { QuranQiyamView(service: service, close: { showQiyam = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
-        .fullScreenCover(isPresented: $showStrength, onDismiss: { run { try await refresh() } }) { QuranStrengthView(service: service, close: { showStrength = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showQiyam, onDismiss: { run(refresh: true) { try await refresh() } }) { QuranQiyamView(service: service, close: { showQiyam = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showStrength, onDismiss: { run(refresh: true) { try await refresh() } }) { QuranStrengthView(service: service, close: { showStrength = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showIndex, onDismiss: clearIndexRoute) {
             QuranIndexView(service: service, initialUnit: indexInitialUnit, initialItemID: indexInitialItemID) {
                 showIndex = false
                 clearIndexRoute()
             }.environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft).id(indexRouteRequestID)
         }
-        .fullScreenCover(isPresented: $showFree, onDismiss: { run { try await refresh() } }) { QuranFreeView(service: service, close: { showFree = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
-        .fullScreenCover(isPresented: $showSetup, onDismiss: { run { try await refresh() } }) { QuranPlanSetupView(service: service, close: { showSetup = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
-        .fullScreenCover(isPresented: $showPlan, onDismiss: { run { try await refresh() } }) { QuranPlanView(service: service, close: { showPlan = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showFree, onDismiss: { run(refresh: true) { try await refresh() } }) { QuranFreeView(service: service, close: { showFree = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showSetup, onDismiss: { run(refresh: true) { try await refresh() } }) { QuranPlanSetupView(service: service, close: { showSetup = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showPlan, onDismiss: { run(refresh: true) { try await refresh() } }) { QuranPlanView(service: service, close: { showPlan = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showWeek, onDismiss: clearLogRoute) {
             QuranLogView(service: service, close: { showWeek = false }, initialTab: logInitialTab, initialSessionID: logInitialSessionID)
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft).id(logRouteRequestID)
@@ -464,8 +466,8 @@ struct QuranHomeView: View {
         }
         error = nil
     }
-    private func run(_ operation: @escaping @MainActor () async throws -> Void) {
-        guard !busy else { return }; busy = true
+    private func run(refresh isRefresh: Bool = false, _ operation: @escaping @MainActor () async throws -> Void) {
+        guard !busy else { if isRefresh { refreshPending = true }; return }; busy = true
 #if DEBUG
         let environment = ProcessInfo.processInfo.environment
         let runHold: Int
@@ -480,7 +482,10 @@ struct QuranHomeView: View {
 #endif
         Task {
             error = nil
-            defer { busy = false }
+            defer {
+                busy = false
+                if refreshPending { refreshPending = false; run(refresh: true) { try await refresh() } }
+            }
             do {
                 if runHold > 0 { try await Task.sleep(for: .milliseconds(Int64(runHold))) }
                 try await operation()

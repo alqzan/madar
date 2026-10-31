@@ -201,6 +201,20 @@ import UIKit
         app.terminate()
     }
 
+    func testMihbaraRootRouteClosesAnOpenHadithSheet() throws {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROUTE"] = "madar://mihbara/hadith/today"
+        app.launch()
+        app.tabBars.buttons["المحبرة"].tap()
+        XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 15), app.debugDescription)
+        app.open(URL(string: "madar://mihbara")!)
+        let gone = NSPredicate(format: "exists == false")
+        expectation(for: gone, evaluatedWith: app.textViews["mihbara-hadith-text"])
+        waitForExpectations(timeout: 10)
+        app.terminate()
+    }
+
     func testMihbaraRootRouteClosesReaderAndReturnsToShelf() throws {
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
