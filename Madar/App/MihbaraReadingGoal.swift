@@ -74,7 +74,7 @@ extension AppMihbaraService {
             return .init(day: day, minutes: seconds[key, default: 0] / 60, pages: pages[key, default: 0], chapters: Int(chapters[key, default: 0].rounded(.down)))
         }
         let prayer = try PrayerRepository(context: context), place = prayer.place(at: now), options = prayer.calculationOptions(at: now)
-        let recent = sessions.filter { $0.start > now.addingTimeInterval(-30 * 86_400) && $0.start <= now }.map { (start: $0.start, seconds: $0.activeSeconds) }
+        let recent = sessions.filter { ReadingPace.isInPaceWindow(start: $0.start, now: now) }.map { (start: $0.start, seconds: $0.activeSeconds) }
         // One prayer calculation per calendar day, not one per session: thirty days hold at most thirty.
         var prayerDays: [String: PrayerDay?] = [:]
         let usual = MihbaraReadingGoal.usualStretch(recent) { date in
@@ -86,7 +86,7 @@ extension AppMihbaraService {
         }
         // Pace and the finish day come from the last 30 days of counted sessions.
         let samples = sessions.compactMap { row -> ReadingPaceSample? in
-            guard row.start > now.addingTimeInterval(-30 * 86_400), let day = try? GregorianDay(row.dayKey) else { return nil }
+            guard ReadingPace.isInPaceWindow(start: row.start, now: now), let day = try? GregorianDay(row.dayKey) else { return nil }
             return ReadingPaceSample(day: day, seconds: row.activeSeconds, pages: max(0, row.pagesCounted))
         }
         var goal = MihbaraReadingGoal(habit: habit, days: days, usual: usual)

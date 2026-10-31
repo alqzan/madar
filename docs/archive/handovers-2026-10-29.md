@@ -55,3 +55,12 @@
 - **Next:** فكرة «صمت بعد العشاء حتى الفجر» في Ideas تنتظر المالك. ما تبقى من تقارير Haiku ولم يُبنَ (منخفض): رسالة خطأ أدق في محرر العادة، تحديث ورقة تفاصيل العادة كل دقيقة، إغلاق أداة الأدراج في البهو عند بقاء ودجة مخفية، مهلة ٢٠ ث لتحويل الصوت الطويل، `try?` في مسودة الخلفية، تحديث القرآن عند تغيّر اليوم والتطبيق مفتوح، إلغاء تنزيل تراث عند المغادرة. القاعدة الجديدة (OWNER-29): صيد الأخطاء بمساعدي Haiku دائمًا.
 - **Model/effort:** claude-opus-5-5، not exposed؛ Sonnet وHaiku للقراءة فقط.
 - **Usage:** ٨٢٪ من الخمس ساعات قبل تجددها، ٥٥٪ أسبوعي؛ لا تغييرات غير ملتزمة.
+
+## Handover — استكمال مدار بعد AU-91 — 2026-10-29 — Codex
+- **Works now:** AU-92 يطابق تلميح التكرار مع عملة الإدخال في الرحلة؛ AU-91 يفتح رابط العادة الثانية والغرفة قائمة؛ AU-90 يمنع حفظ الحساب المعروف برصيد بداية فارغ.
+- **Verified:** `xcodebuild -quiet test … -only-testing:MadarUITests/MoneyExpenseUITests/testTripCurrencyDuplicateHintMatchesStoredCurrency -only-testing:MadarUITests/MoneyExpenseUITests/testTripCurrencyDuplicateHintIgnoresHomeCurrencyMatch -parallel-testing-enabled NO` — 2/2 على `Madar M6 Work` / iOS 26.5، fixtures اصطناعية (`au92-trip-duplicate-r3.xcresult`)؛ لقطة التحذير L/light فُحصت؛ `git diff --check`.
+- **Differences left:** حالة التحذير لا تملك canonical مستقلًا؛ اللقطة البديلة فُحصت بصريًا.
+- **Not verified:** iPhone المالك؛ AU-93 وAU-94 لم يُنفّذا، ولا تغييرات على بيانات المالك.
+- **Next:** AU-93 يمنع حفظ مصروف بعملة الرحلة بتاريخ يسبق بدء الرحلة؛ AU-94 يضيف إعادة محاولة لفتح EPUB بعد الفشل.
+- **Model/effort:** غير مكشوف / غير مكشوف؛ مساعدين Luna للقراءة فقط.
+- **Usage:** ٨٤٪ مستخدم من الخمس ساعات و٧٤٪ أسبوعي؛ أُنهي العمل بطلب المالك قبل بلوغ احتياطي ٥٪.

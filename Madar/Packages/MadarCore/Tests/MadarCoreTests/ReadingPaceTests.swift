@@ -19,6 +19,16 @@ struct ReadingPaceTests {
         #expect(ReadingPace.secondsPerPage([three[0], three[1], .init(day: d, seconds: 59, pages: 10)]) == nil)
     }
 
+    @Test("Page-time pace excludes sessions outside the past thirty days through now")
+    func paceWindow() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let cutoff = now.addingTimeInterval(-Double(ReadingPace.paceWindowDays) * 86_400)
+        #expect(ReadingPace.isInPaceWindow(start: cutoff.addingTimeInterval(1), now: now))
+        #expect(!ReadingPace.isInPaceWindow(start: cutoff, now: now))
+        #expect(ReadingPace.isInPaceWindow(start: now, now: now))
+        #expect(!ReadingPace.isInPaceWindow(start: now.addingTimeInterval(1), now: now))
+    }
+
     @Test("Pages become minutes rounded up, minutes become pages rounded down")
     func conversions() {
         #expect(ReadingPace.minutes(forPages: 10, secondsPerPage: 90) == 15)

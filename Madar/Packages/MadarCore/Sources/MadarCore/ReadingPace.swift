@@ -13,10 +13,17 @@ public struct ReadingPaceSample: Equatable, Sendable {
 public enum ReadingPace {
     /// A pace needs enough reading to be a pace: three sessions and ten pages, and only sessions that counted both time and pages.
     public static let minimumSamples = 3, minimumPages = 10
+    /// A page-time estimate uses the last thirty days through the present moment.
+    public static let paceWindowDays = 30
     /// «بهذه الوتيرة» looks at the last two weeks and needs three different days with reading in them.
     public static let windowDays = 14, minimumReadingDays = 3
     /// An estimate is shown only for a goal this size or smaller: past a day's reading it is no longer a guess about today.
     public static let maximumEstimatedMinutes = 600
+
+    /// Future-dated sessions cannot describe a reader's pace yet.
+    public static func isInPaceWindow(start: Date, now: Date) -> Bool {
+        start > now.addingTimeInterval(-Double(paceWindowDays) * 86_400) && start <= now
+    }
 
     private static func dayGap(from a: GregorianDay, to b: GregorianDay) -> Int {
         Int((b.date(in: .gmt).timeIntervalSince(a.date(in: .gmt)) / 86_400).rounded())
