@@ -58,7 +58,7 @@ import XCTest
     }
     func testEnvelopeSavingChangeRequiresPositiveAmount() throws {
         continueAfterFailure = false; let app = make("salary"); open(app)
-        let trip = app.buttons["money-envelope-رحلة الشتاء"]
+        let trip = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-envelope-رحلة الشتاء")).firstMatch
         reachGoal(trip, in: app); XCTAssertTrue(trip.waitForExistence(timeout: 10)); trip.tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-envelope-detail"].waitForExistence(timeout: 10))
         let increase = app.buttons["money-envelope-saving-add"]
@@ -66,8 +66,16 @@ import XCTest
         let input = app.textFields["money-saving-change-amount"], save = app.buttons["money-saving-change-save"]
         XCTAssertTrue(input.waitForExistence(timeout: 5)); XCTAssertTrue(save.waitForExistence(timeout: 5))
         XCTAssertFalse(save.isEnabled, "An empty saving change cannot be saved")
+        let savingValue = app.descendants(matching: .any)["money-envelope-saving-value"]
+        XCTAssertTrue(savingValue.exists, app.debugDescription)
+        let before = savingValue.label
         input.tap(); input.typeText("50")
         XCTAssertTrue(save.isEnabled, "A positive change enables saving")
+        save.tap()
+        XCTAssertTrue(input.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(savingValue.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertNotEqual(savingValue.label, before, "A successful edit should update the amount shown in the envelope detail.")
+        shot(app, "AU95-money-saving-after-L")
         app.terminate()
     }
     func testHiddenReserveDoesNotLeakDailiesOrCoverage() throws {
