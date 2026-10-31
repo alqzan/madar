@@ -5578,7 +5578,8 @@
     "emptyTitle": "String",
     "locked": "Bool",
     "rows": "[Row] {id, title, value, detail, secondDate, share, route, done}",
-    "periods": "[Row] four habit frequency summaries"
+        "periods": "[Row] four habit frequency summaries",
+        "upcomingHabits": "[Row]? up to 5 upcoming weekly/monthly/yearly habit occurrences with relative due and last-completion hints; optional for older snapshots"
    },
    "contract": "App-only construction; extension JSON-only. No diary text, photos, intentions or sealed-letter contents in diaryWrite. Protected habits/upcoming payloads omit personal rows. Expires at the earlier of next configured Madar day boundary or one hour. One template parameter per fixed room widget; WidgetKit selects family; capacities 2/3/5 (halve, rounded up, at accessibility sizes)."
   }

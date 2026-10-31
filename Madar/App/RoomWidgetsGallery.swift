@@ -26,6 +26,16 @@ struct RoomWidgetsGallery:View {
                         Link(destination:URL(string:"madar://quran")!) {QuranWidgetContent(snapshot:session.snapshotStore.read("quran",as:QuranWidgetSnapshot.self,now:now)?.payload,template:.path,compact:true,smallHome:true).padding(14).frame(height:170).frame(maxWidth:.infinity).background(RoomTheme(room:"quran",dark:colorScheme == .dark).surface,in:.rect(cornerRadius:24))}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widget-quran")
                         preview(.habits,family:.systemSmall,template:"today").frame(height:170)
                     }
+                    Text("قالب العادات القادمة").font(MadarTypography.section())
+                    Text("المتوسطة · أقرب ٣ مواعيد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    previewContent(.habits,family:.systemMedium,template:"coming").frame(height:170).accessibilityIdentifier("room-widget-habits-coming-medium")
+                    HStack(alignment:.top,spacing:12) {
+                        previewContent(.habits,family:.systemSmall,template:"coming").frame(width:170,height:170).accessibilityIdentifier("room-widget-habits-coming-small")
+                        VStack(alignment:.leading,spacing:6) {
+                            Text("الصغيرة").font(MadarTypography.section())
+                            Text("أقرب موعد وآخر إنجاز").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        }.frame(maxWidth:.infinity,minHeight:170,alignment:.center)
+                    }
                     preview(.upcoming,family:.systemMedium,template:"upcoming").frame(height:180)
                     Link(destination:URL(string:"madar://mal")!){previewContent(.money,family:.systemMedium,template:"now")}.buttonStyle(.madarPlain).frame(height:180).accessibilityIdentifier("room-widget-money")
                     Link(destination:URL(string:BuiltRoomWidget.mihbara.route)!){preview(.mihbara,family:.systemMedium,template:"summary").frame(height:190)}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widget-mihbara")

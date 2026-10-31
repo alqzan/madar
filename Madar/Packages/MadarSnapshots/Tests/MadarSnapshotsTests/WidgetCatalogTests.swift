@@ -1,4 +1,5 @@
 import Foundation
+import Foundation
 import Testing
 @testable import MadarSnapshots
 
@@ -30,5 +31,18 @@ struct RoomWidgetSnapshotTests {
         let year = RoomWidgetSnapshot(datePrimary: "السنة", dateSecondary: "", heading: "", emptyTitle: "", rows: [row("hijri")])
         #expect(year.hasVisibleRows(for: .year, template: "hijri"))
         #expect(!year.hasVisibleRows(for: .year, template: "gregorian"))
+    }
+
+    @Test func upcomingHabitTemplateReadsLegacySnapshotsWithoutTheOptionalProjection() throws {
+        let row=RoomWidgetSnapshot.Row(id:"weekly",title:"ورد الأربعاء",value:"غدًا",detail:"آخر مرة أمس",route:"madar://bahw/habits/weekly")
+        let current=RoomWidgetSnapshot(datePrimary:"اليوم",dateSecondary:"",heading:"",emptyTitle:"",upcomingHabits:[row])
+        #expect(current.hasVisibleRows(for:.habits,template:"coming"))
+
+        var legacyObject=try #require(JSONSerialization.jsonObject(with:JSONEncoder().encode(current)) as? [String:Any])
+        legacyObject.removeValue(forKey:"upcomingHabits")
+        let legacyData=try JSONSerialization.data(withJSONObject:legacyObject)
+        let legacy=try JSONDecoder().decode(RoomWidgetSnapshot.self,from:legacyData)
+        #expect(legacy.upcomingHabits == nil)
+        #expect(!legacy.hasVisibleRows(for:.habits,template:"coming"))
     }
 }

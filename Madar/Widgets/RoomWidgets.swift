@@ -10,9 +10,9 @@ protocol FixedRoomConfiguration:WidgetConfigurationIntent {
     var templateName:String{get}
 }
 enum HabitWidgetTemplate:String,AppEnum {
-    case today,periods
+    case today,periods,coming
     static let typeDisplayRepresentation=TypeDisplayRepresentation(name:"قالب العادات")
-    static let caseDisplayRepresentations:[Self:DisplayRepresentation]=[.today:"عاداتك التالية",.periods:"الفترات الأربع"]
+    static let caseDisplayRepresentations:[Self:DisplayRepresentation]=[.today:"عاداتك التالية",.periods:"الفترات الأربع",.coming:"المواعيد القادمة وآخر إنجاز"]
 }
 struct HabitWidgetConfiguration:FixedRoomConfiguration {
     static let title:LocalizedStringResource="العادات"

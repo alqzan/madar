@@ -28,10 +28,13 @@ public struct RoomWidgetSnapshot:Codable,Sendable,Equatable {
     public var emptyTitle:String
     public var rows:[Row]
     public var periods:[Row]
+    /// Optional upcoming recurring habit dates; absent in snapshots written by older app versions.
+    public var upcomingHabits:[Row]? = nil
     public var locked:Bool
-    public init(datePrimary:String,dateSecondary:String,heading:String,emptyTitle:String,rows:[Row]=[],periods:[Row]=[],locked:Bool=false){self.datePrimary=datePrimary;self.dateSecondary=dateSecondary;self.heading=heading;self.emptyTitle=emptyTitle;self.rows=rows;self.periods=periods;self.locked=locked}
+    public init(datePrimary:String,dateSecondary:String,heading:String,emptyTitle:String,rows:[Row]=[],periods:[Row]=[],upcomingHabits:[Row]?=nil,locked:Bool=false){self.datePrimary=datePrimary;self.dateSecondary=dateSecondary;self.heading=heading;self.emptyTitle=emptyTitle;self.rows=rows;self.periods=periods;self.upcomingHabits=upcomingHabits;self.locked=locked}
     public func hasVisibleRows(for room:BuiltRoomWidget, template:String) -> Bool {
         if room == .habits && template == "periods" { return !periods.isEmpty }
+        if room == .habits && template == "coming" { return !(upcomingHabits ?? []).isEmpty }
         if room == .year && ["hijri", "gregorian"].contains(template) { return rows.contains { $0.id == template } }
         return !rows.isEmpty
     }

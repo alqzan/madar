@@ -77,15 +77,19 @@ extension AppSession {
             }
             try context.save(); return
         }
+        let comingWidget = variant == "widgetComing"
         let atRisk = variant == "atRisk", overdue = variant == "sinceOverdue"
         let since = variant == "since" || overdue
         let lobbySix = variant == "lobbySix"
-        guard variant == "showcase" || atRisk || since || lobbySix else{try context.save();return}
+        guard variant == "showcase" || atRisk || since || lobbySix || comingWidget else{try context.save();return}
         let today=GregorianDay.containing(prayerNow(),in:activePlace.timeZone)
-        let names=["الماء","أذكار الصباح","مذاكرة","الاتصال بالأخوال","زيارة الوالدين","صدقة الشهر",since ? "إهداء من تحب" : "العمرة"]
+        let names=comingWidget ? ["مشوار الأربعاء","ورد الشهر","مراجعة السنة"] : ["الماء","أذكار الصباح","مذاكرة","الاتصال بالأخوال","زيارة الوالدين","صدقة الشهر",since ? "إهداء من تحب" : "العمرة"]
         for (index,name) in names.enumerated(){
             let habit=Habit();habit.id=StableIdentity.uuid(for:"habit-fixture-\(index)");habit.name=name;habit.order=index;habit.startDate=today.adding(days:-20).date(in:ActivePlace.riyadh.timeZone);context.insert(habit)
-            let p=HabitPolicy();p.habitID=habit.id;p.effectiveFrom=today.adding(days:-20).description;p.frequency=(lobbySix && index<6) || index<3 ? "daily" : index<5 ? "weekly" : index==5 ? "monthly" : "yearly";p.measure=index==0 ? "count" : "once";p.target=index==0 ? 8 : 1;p.unit=index==0 ? "كوب" : nil;p.minimum=index==0 ? 1 : nil;p.monthCalendar="gregorian";p.yearMonth=12;p.yearDay=15;context.insert(p)
+            let p=HabitPolicy();p.habitID=habit.id;p.effectiveFrom=today.adding(days:-20).description
+            if comingWidget { p.frequency=index == 0 ? "weekly" : index == 1 ? "monthly" : "yearly";p.measure="once";p.target=1;p.weekdays=index == 0 ? ["wed"] : [];p.monthDays=index == 1 ? [15] : [] }
+            else { p.frequency=(lobbySix && index<6) || index<3 ? "daily" : index<5 ? "weekly" : index==5 ? "monthly" : "yearly";p.measure=index==0 ? "count" : "once";p.target=index==0 ? 8 : 1;p.unit=index==0 ? "كوب" : nil;p.minimum=index==0 ? 1 : nil }
+            p.monthCalendar="gregorian";p.yearMonth=12;p.yearDay=15;context.insert(p)
             if since && index == 6 {
                 // Item 26 «ج»: a yearly habit kept by «آخر مرة», two times long ago with that day's diary lines.
                 p.effectiveFrom=today.adding(days:-700).description
@@ -95,6 +99,12 @@ extension AppSession {
                     let event=HabitEvent();event.habitID=habit.id;event.dayKey=d.description;event.periodKey=String(format:"g:%04d",d.year);event.delta=1;event.entryID=offset == latestOffset ? entry.id : nil;event.eventAt=entry.eventAt;event.tzID="Asia/Riyadh";event.dayPolicy="midnight@1";context.insert(event)
                 }
                 let quiet=Entry();quiet.dayKey=today.adding(days:-3).description;quiet.text="مشيت مع أخي بعد العصر.";quiet.eventAt=today.adding(days:-3).date(in:ActivePlace.riyadh.timeZone).addingTimeInterval(57600);quiet.tzID="Asia/Riyadh";quiet.dayPolicy="midnight@1";context.insert(quiet)
+                continue
+            }
+            if comingWidget {
+                let done=today.adding(days:index == 0 ? -3 : -2)
+                let periodKey=p.frequency == "weekly" ? MadarYear.week(done,start:.saturday).start.description : p.frequency == "monthly" ? String(format:"g:%04d-%02d",done.year,done.month) : String(format:"g:%04d",done.year)
+                let event=HabitEvent();event.habitID=habit.id;event.dayKey=done.description;event.periodKey=periodKey;event.delta=1;event.eventAt=done.date(in:ActivePlace.riyadh.timeZone).addingTimeInterval(43200);event.tzID="Asia/Riyadh";event.dayPolicy="midnight@1";context.insert(event)
                 continue
             }
             for offset in 1...18 where (offset+index)%5 != 0 && !(atRisk && index == 0 && offset == 1) {

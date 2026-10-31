@@ -37,8 +37,9 @@ extension AppSession {
             // `detail` carries the compact remainder for the lock-screen circle; empty means nothing is due in this period.
             return .init(id:f.rawValue,title:f.arabic,value:WidgetCopy.periodProgress(met:met,total:group.count,digits:digits),detail:group.isEmpty ? "" : met==group.count ? "تمّ" : digits.string(group.count-met),share:Double(met)/Double(max(1,group.count)),route:BuiltRoomWidget.habits.route,completedCount:met,targetCount:group.count)
         }
+        let upcomingHabits = habitReadFailed || locked ? [] : habitComingWidgetRows(readings, today: today, days: service.calendarDays, now: now)
         let dueToday=eligible.filter{!$0.paused && ($0.summary.current?.target ?? 0)>0}
-        payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:habitReadFailed ? "تعذّر تحديث العادات" : WidgetCopy.habitsHeading(met:dueToday.filter{$0.summary.current?.met==true}.count,total:dueToday.count,digits:digits),emptyTitle:habitReadFailed ? "افتح مدار لإعادة المحاولة" : readings.isEmpty ? "أضف أول عادة" : "لا عادات مستحقة اليوم",rows:habitReadFailed ? [] : rows,periods:habitReadFailed ? [] : periods,locked:locked)
+        payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:habitReadFailed ? "تعذّر تحديث العادات" : WidgetCopy.habitsHeading(met:dueToday.filter{$0.summary.current?.met==true}.count,total:dueToday.count,digits:digits),emptyTitle:habitReadFailed ? "افتح مدار لإعادة المحاولة" : readings.isEmpty ? "أضف أول عادة" : "لا عادات مستحقة اليوم",rows:habitReadFailed ? [] : rows,periods:habitReadFailed ? [] : periods,upcomingHabits:upcomingHabits,locked:locked)
         let year=service.year()
         var yearRows:[RoomWidgetSnapshot.Row]=[
             .init(id:"hijri",title:digits.string(year.hijriYear)+" هـ",value:digits.string(year.hijri.basisPoints/100)+"٪\u{061C}",detail:"بقي "+service.daysPhrase(year.hijri.remaining),share:Double(year.hijri.basisPoints)/10000,route:BuiltRoomWidget.year.route),
@@ -109,6 +110,76 @@ extension AppSession {
             let title=p.rule.measure == .once ? "أتممتها" : p.rule.measure == .duration ? "+"+digits.string(15)+" دقيقة" : "+"+digits.string(1)+" "+(p.rule.unit.map(habitUnitName) ?? "مرة")
             return .init(id:r.id,title:r.name,stepTitle:title,step:step,periodKey:p.key,done:p.met)
         },periodsValidUntil:periodsValidUntil)
+    }
+
+    /// The schedule template is a separate information view, so it can show future occurrences without
+    /// changing the action-oriented «todayOnly» scope of the default habit widget.
+    private func habitComingWidgetRows(_ readings: [HabitReading], today: GregorianDay, days: MadarCalendarDays,
+                                      now: Date) -> [RoomWidgetSnapshot.Row] {
+        let service = AppBahwService(session: self, evaluationDate: now)
+
+        func gregorianMonthLength(_ day: GregorianDay) -> Int {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = .gmt
+            return calendar.range(of: .day, in: .month, for: day.date(in: .gmt))?.count ?? 31
+        }
+        func scheduled(_ day: GregorianDay, rule: HabitRule) -> Bool {
+            guard !rule.restWeekdays.contains(HabitEngine.weekday(day)) else { return false }
+            switch rule.frequency {
+            case .daily:
+                return false
+            case .weekly:
+                // A weekly target without selected weekdays has a period end, not a named occurrence.
+                return !rule.weekdays.isEmpty && rule.weekdays.contains(HabitEngine.weekday(day))
+            case .monthly:
+                guard !rule.monthDays.isEmpty else { return false }
+                let hijri = days.hijri(day)
+                let dayNumber = rule.hijri ? hijri.day : day.day
+                let length = rule.hijri ? days.hijriMonthLength(containing: day) : gregorianMonthLength(day)
+                return rule.monthDays.contains { min($0, length) == dayNumber }
+            case .yearly:
+                let hijri = days.hijri(day)
+                let month = rule.hijri ? hijri.month : day.month
+                let dayNumber = rule.hijri ? hijri.day : day.day
+                let length = rule.hijri ? days.hijriMonthLength(containing: day) : gregorianMonthLength(day)
+                return month == rule.yearMonth && dayNumber == min(rule.yearDay, length)
+            }
+        }
+        func nextDue(for reading: HabitReading) -> GregorianDay? {
+            guard !reading.paused, let current = reading.summary.current, current.target > 0,
+                  current.rule.frequency != .daily else { return nil }
+            let offset = current.met ? 1 : 0
+            let horizon = current.rule.frequency == .weekly ? 14 : 400
+            for daysAhead in offset...horizon {
+                let candidate = today.adding(days: daysAhead)
+                guard candidate >= current.rule.effectiveFrom, scheduled(candidate, rule: current.rule) else { continue }
+                if candidate < current.end && !current.dueDays.contains(candidate) { continue }
+                return candidate
+            }
+            return nil
+        }
+        func dueHint(_ day: GregorianDay) -> String {
+            let distance = MadarCalendarDays.distance(from: today, to: day)
+            if distance == 0 { return "اليوم" }
+            if distance == 1 { return "غدًا" }
+            return "بعد " + service.daysPhrase(distance, afterPreposition: true)
+        }
+        func lastHint(_ reading: HabitReading) -> String {
+            guard let last = reading.lastTime?.day else { return "لم تُسجّل بعد" }
+            let distance = max(0, MadarCalendarDays.distance(from: last, to: today))
+            if distance == 0 { return "آخر مرة اليوم" }
+            if distance == 1 { return "آخر مرة أمس" }
+            return "آخر مرة قبل " + service.daysPhrase(distance, afterPreposition: true)
+        }
+
+        return readings.enumerated().compactMap { index, reading -> (Int, HabitReading, GregorianDay)? in
+            nextDue(for: reading).map { (index, reading, $0) }
+        }
+        .sorted { left, right in left.2 == right.2 ? left.0 < right.0 : left.2 < right.2 }
+        .prefix(5)
+        .map { _, reading, day in
+            .init(id: reading.id.uuidString, title: reading.name, value: dueHint(day), detail: lastHint(reading), route: "madar://bahw/habits/" + reading.id.uuidString)
+        }
     }
 }
 

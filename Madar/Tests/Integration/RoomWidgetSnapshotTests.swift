@@ -100,6 +100,7 @@ import MadarPrayer
         let letter=Letter();letter.text="SECRET-SEALED-LETTER";context.insert(letter);try context.save()
         let payloads=app.roomWidgetPayloads(locked:true)
         XCTAssertEqual(payloads[.habits]?.rows,[]);XCTAssertEqual(payloads[.upcoming]?.rows,[])
+        XCTAssertEqual(payloads[.habits]?.upcomingHabits,[])
         XCTAssertTrue(payloads[.habits]?.locked == true)
         let diary=try XCTUnwrap(payloads[.diaryWrite]),data=try JSONEncoder().encode(diary),text=try XCTUnwrap(String(data:data,encoding:.utf8))
         XCTAssertFalse(text.contains("SECRET"));XCTAssertTrue(diary.rows.isEmpty)
@@ -116,6 +117,42 @@ import MadarPrayer
         XCTAssertTrue(payload.rows.isEmpty)
         XCTAssertTrue(payload.periods.isEmpty)
         XCTAssertFalse(payload.locked)
+    }
+    func testUpcomingHabitWidgetUsesFixedRecurringDatesAndLastCompletion() async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetHabitComing-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
+        let container=try MadarContainerFactory.makeLocal(at:root),app=try AppSession(container:container,groupDirectory:root),context=ModelContext(container)
+        try await app.applySettingsAndWait(["core.faceIDLock":.string("none"),"core.dayStart":.string("midnight")])
+        let today=try GregorianDay("2026-10-31"),zone=TimeZone(identifier:"Asia/Riyadh")!,now=ISO8601DateFormatter().date(from:"2026-10-31T12:00:00+03:00")!
+        var nextOrder=0
+        func addHabit(_ name:String,_ frequency:String,weekdays:[String]?=nil,monthDays:[Int]?=nil,yearMonth:Int?=nil,yearDay:Int?=nil,lastDay:String,lastPeriod:String) throws {
+            let id=UUID(),habit=Habit();habit.id=id;habit.name=name;habit.order=nextOrder;nextOrder+=1;habit.startDate=today.adding(days:-365).date(in:zone);context.insert(habit)
+            let policy=HabitPolicy();policy.habitID=id;policy.effectiveFrom=today.adding(days:-365).description;policy.frequency=frequency;policy.measure="once";policy.target=1;policy.weekdays=weekdays;policy.monthDays=monthDays;policy.monthCalendar="gregorian";policy.yearMonth=yearMonth;policy.yearDay=yearDay;context.insert(policy)
+            let event=HabitEvent();event.habitID=id;event.dayKey=lastDay;event.periodKey=lastPeriod;event.delta=1;event.eventAt=try GregorianDay(lastDay).date(in:zone).addingTimeInterval(12*3600);event.tzID="Asia/Riyadh";event.dayPolicy="midnight@1";context.insert(event)
+        }
+        try addHabit("مشوار الأربعاء","weekly",weekdays:["wed"],lastDay:"2026-10-28",lastPeriod:"2026-10-24")
+        try addHabit("ورد الشهر","monthly",monthDays:[15],lastDay:"2026-10-29",lastPeriod:"g:2026-10")
+        try addHabit("مراجعة السنة","yearly",yearMonth:12,yearDay:15,lastDay:"2026-10-29",lastPeriod:"g:2026")
+        try context.save()
+
+        let snapshot=try XCTUnwrap(app.roomWidgetPayloads(locked:false,at:now)[.habits])
+        let rows=try XCTUnwrap(snapshot.upcomingHabits)
+        XCTAssertEqual(rows.map(\.title),["مشوار الأربعاء","ورد الشهر","مراجعة السنة"])
+        XCTAssertEqual(rows.map(\.value),["بعد ٤ أيام","بعد ١٥ يومًا","بعد ٤٥ يومًا"])
+        XCTAssertEqual(rows.map(\.detail),["آخر مرة قبل ٣ أيام","آخر مرة قبل يومين","آخر مرة قبل يومين"])
+        XCTAssertEqual(rows.map(\.route).count,3)
+    }
+    func testUpcomingHabitWidgetOmitsRecurrencesWithoutANamedDate() async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetHabitComingEmpty-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
+        let container=try MadarContainerFactory.makeLocal(at:root),app=try AppSession(container:container,groupDirectory:root),context=ModelContext(container)
+        try await app.applySettingsAndWait(["core.faceIDLock":.string("none"),"core.dayStart":.string("midnight")])
+        let today=try GregorianDay("2026-10-31"),zone=TimeZone(identifier:"Asia/Riyadh")!
+        for (index,frequency) in ["daily","weekly","monthly"].enumerated() {
+            let habit=Habit();habit.id=UUID();habit.name="عادة \(index)";habit.startDate=today.adding(days:-30).date(in:zone);context.insert(habit)
+            let policy=HabitPolicy();policy.habitID=habit.id;policy.effectiveFrom=today.adding(days:-30).description;policy.frequency=frequency;policy.measure="once";policy.target=1;policy.monthCalendar="gregorian";context.insert(policy)
+        }
+        try context.save()
+        let snapshot=try XCTUnwrap(app.roomWidgetPayloads(locked:false,at:ISO8601DateFormatter().date(from:"2026-10-31T12:00:00+03:00")!)[.habits])
+        XCTAssertTrue(snapshot.upcomingHabits?.isEmpty == true)
     }
     func testMihbaraSnapshotUsesOnlyEligibleBooksAndNotebookLines() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetMihbara-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
