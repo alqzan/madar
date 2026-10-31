@@ -39,6 +39,7 @@ final class QuranWirdReferenceIntegrationTests: XCTestCase {
             ("qurtubi-1-3-in-ibn-kathir", 1, 3, .tafsir, "ليكون من باب قرن الترغيب بعد الترهيب", "١/ ٢٠٢", "https://shamela.ws/book/1503/257"),
             ("ibn-kathir-1-4", 1, 4, .tafsir, "وكلاهما صحيح متواتر في السبع", "١/ ٢٠٢", "https://shamela.ws/book/1503/257"),
             ("ibn-kathir-1-5", 1, 5, .tafsir, "وفي الشرع عبارة عما يجمع كمال المحبة والخضوع والخوف", "١/ ٢٠٥", "https://shamela.ws/book/1503/260"),
+            ("saadi-2-182", 2, 182, .tafsir, "ينبغي لمن حضر الموصي وقت الوصية بها، أن ينصحه بما هو الأحسن والأعدل", "ص ٨٥", "https://shamela.ws/book/42/122"),
             ("saadi-2-183", 2, 183, .tafsir, "فإن الصيام من أكبر أسباب التقوى", "ص ٨٦", "https://shamela.ws/book/42/123"),
             ("ibn-kathir-2-184", 2, 184, .tafsir, "لئلا يشق على النفوس", "٢/ ٥٣", "https://shamela.ws/book/1503/758"),
             ("ibn-kathir-2-185", 2, 185, .tafsir, "يمدح تعالى شهر الصيام من بين سائر الشهور بأن اختاره من بينهن لإنزال القرآن العظيم", "٢/ ٥٧", "https://shamela.ws/book/1503/762"),

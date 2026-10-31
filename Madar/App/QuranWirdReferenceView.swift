@@ -92,6 +92,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             sourceNote: nil
         ),
         .init(
+            id: "saadi-2-182",
+            ayahID: 189,
+            kind: .tafsir,
+            text: "ينبغي لمن حضر الموصي وقت الوصية بها، أن ينصحه بما هو الأحسن والأعدل",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٨٥",
+            sourceURL: URL(string: "https://shamela.ws/book/42/122")!,
+            sourceNote: nil
+        ),
+        .init(
             id: "saadi-2-183",
             ayahID: 190,
             kind: .tafsir,

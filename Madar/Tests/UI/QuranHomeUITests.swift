@@ -322,18 +322,21 @@ import XCTest
 
         let referenceButton = app.buttons["quran-step-reference-hifz"]
         XCTAssertTrue(referenceButton.waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertTrue(referenceButton.label.contains("١٨٢") && referenceButton.label.contains("١٨٦"), referenceButton.label)
+        XCTAssertTrue(referenceButton.label.contains("١٨١") && referenceButton.label.contains("١٨٥"), referenceButton.label)
         referenceButton.tap()
 
         XCTAssertTrue(app.staticTexts["quran-reference-title"].waitForExistence(timeout: 10), app.debugDescription)
+        let saadi182 = app.staticTexts["quran-reference-excerpt-tafsir-189"]
+        XCTAssertTrue(saadi182.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(saadi182.label.contains("الأحسن والأعدل"), saadi182.label)
+        XCTAssertTrue(app.staticTexts["quran-reference-citation-saadi-2-182"].label.contains("ص ٨٥"))
+        XCTAssertTrue(app.descendants(matching: .any)["quran-reference-source-saadi-2-182"].exists)
         XCTAssertTrue(app.staticTexts["quran-reference-excerpt-tafsir-191"].waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(app.staticTexts["quran-reference-excerpt-tafsir-192"].exists)
         XCTAssertTrue(app.staticTexts["quran-reference-citation-ibn-kathir-2-184"].label.contains("٢/ ٥٣"))
         XCTAssertTrue(app.staticTexts["quran-reference-citation-ibn-kathir-2-185"].label.contains("٢/ ٥٧"))
         XCTAssertTrue(app.descendants(matching: .any)["quran-reference-source-ibn-kathir-2-184"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["quran-reference-source-ibn-kathir-2-185"].exists)
-        XCTAssertTrue(app.staticTexts["quran-reference-excerpt-tafsir-193"].label.contains("وَجُعِلَ هَذَا الْخَيْرُ مُرَتَّبًا"))
-        XCTAssertTrue(app.staticTexts["quran-reference-citation-ibn-ashur-2-186"].label.contains("٢/ ١٧٨"))
         app.buttons["quran-reference-filter-context"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["quran-reference-empty"].waitForExistence(timeout: 5), app.debugDescription)
         app.buttons["quran-reference-filter-all"].tap()
@@ -345,8 +348,8 @@ import XCTest
         XCTAssertTrue(coverage.isHittable, app.debugDescription)
         attach(app, "M2-X01-wird-reference-partial-coverage-L")
         app.buttons["quran-reference-ayahs-toggle"].tap()
-        XCTAssertTrue(app.staticTexts["quran-reference-ayah-text-189"].waitForExistence(timeout: 5), app.debugDescription)
-        let uncoveredSearch = app.descendants(matching: .any)["quran-reference-search-189"]
+        XCTAssertTrue(app.staticTexts["quran-reference-ayah-text-188"].waitForExistence(timeout: 5), app.debugDescription)
+        let uncoveredSearch = app.descendants(matching: .any)["quran-reference-search-188"]
         XCTAssertTrue(uncoveredSearch.exists, app.debugDescription)
         for _ in 0..<3 where !uncoveredSearch.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(uncoveredSearch.isHittable, app.debugDescription)
