@@ -1,5 +1,6 @@
 import Foundation
 import MadarCore
+import MadarQuran
 
 // This projection contains domain results and validated read-only resources.
 // UI never invents coverage, a grade, a verse, a draft position or a resource license.
@@ -51,7 +52,7 @@ struct QuranUIForecastState: Sendable {
     }
 }
 struct QuranUIPlan: Sendable { var title: String; var input: QuranUIPlanInput; var forecast: QuranUIForecast; var nextAyah: Int; var versionLabel: String }
-struct QuranUIStep: Identifiable, Sendable { var id: String; var title: String; var detail: String; var kind: QuranUIKind; var completed: Bool; var available: Bool; var range: QuranUIRange? }
+struct QuranUIStep: Identifiable, Sendable { var id: String; var title: String; var detail: String; var kind: QuranUIKind; var completed: Bool; var available: Bool; var range: QuranUIRange?; var ayahRange: QuranAyahRange? = nil }
 struct QuranUIHeatDay: Identifiable, Sendable { var id: String; var title: String; var hifzFraction: Double; var reviewFraction: Double; var accessibilityLabel: String }
 struct QuranUIDraft: Identifiable, Sendable { var id: UUID; var title: String; var isPastDay: Bool }
 struct QuranUIHistorySession: Identifiable, Sendable { var id: UUID; var title: String; var dateLabel: String; var detail: String; var grades: [QuranUIPageGrade]; var warning: String? }

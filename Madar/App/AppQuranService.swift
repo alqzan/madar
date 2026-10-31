@@ -73,12 +73,12 @@ import MadarPrayer
         var steps: [QuranUIStep] = []
         if let bridge = snapshot.hifz?.bridge {
             steps.append(QuranUIStep(id: "bridge", title: "الجسر", detail: portionTitle(bridge, catalog: catalog), kind: .bridge,
-                completed: alreadyHifz, available: true, range: try range(bridge, catalog: catalog)))
+                completed: alreadyHifz, available: true, range: try range(bridge, catalog: catalog), ayahRange: bridge))
         }
         if let portion = snapshot.hifz?.portion {
             steps.append(QuranUIStep(id: "hifz", title: snapshot.hifz?.balance == .consolidation ? "تثبيت الورد" : "الورد",
                 detail: portionTitle(portion, catalog: catalog), kind: .hifz,
-                completed: alreadyHifz, available: true, range: try range(portion, catalog: catalog)))
+                completed: alreadyHifz, available: true, range: try range(portion, catalog: catalog), ayahRange: portion))
         }
         if !snapshot.review.allPages.isEmpty || !snapshot.partialRecent.isEmpty {
             let all = snapshot.review.allPages + snapshot.partialRecent.map(\.page)

@@ -9,7 +9,7 @@ import MadarQuran
 extension AppSession {
     func prepareQuranHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview", "historyRoute"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview", "historyRoute", "reference", "referencePartial", "referenceBoundary", "referenceFatiha", "referenceFatihaOpening", "referenceKursi", "referenceSadi183", "referenceAalImran"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let context = ModelContext(container)
         selectedTab = "quran"
@@ -28,7 +28,31 @@ extension AppSession {
             for page in pages { let grade = PageGrade(); grade.sessionID = row.id; grade.page = page; grade.grade = "mastered"; context.insert(grade) }
             return row
         }
-        if variant == "historyRoute" {
+        if variant == "referenceFatiha" {
+            let target = catalog.ayahs.first { $0.surahID == 1 && $0.ayahNumber == 5 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceFatihaOpening" {
+            let target = catalog.ayahs.first { $0.surahID == 1 && $0.ayahNumber == 2 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 4; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceKursi" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 255 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceSadi183" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 183 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceAalImran" {
+            let target = catalog.ayahs.first { $0.surahID == 3 && $0.ayahNumber == 190 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "reference" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 187 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 2; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referencePartial" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 182 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 5; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceBoundary" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 286 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 2; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "historyRoute" {
             let row = append(kind: "review", first: 1, last: 7, pages: [1], offset: -1, id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!)
             let mistake = MistakeEvent(); mistake.sessionID = row.id; mistake.ayahId = 2; mistake.wordIndex = 1; mistake.kind = "mistake"; mistake.at = row.endedAt; context.insert(mistake)
             let next = append(kind: "hifz", first: 8, last: 14, pages: [2], offset: -2, id: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!)

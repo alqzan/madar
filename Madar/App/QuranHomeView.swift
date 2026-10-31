@@ -20,6 +20,7 @@ struct QuranHomeView: View {
     @State private var showDayClose = false
     /// The page travels with the presentation: an `isPresented` cover read `readerPage` stale, so links opened page 1.
     @State private var mushaf: QuranMushafRequest?
+    @State private var reference: QuranWirdReferenceRequest?
     @State private var showOutside = false
     @State private var showWeek = false
     @State private var logInitialTab: QuranLogTab = .week
@@ -173,6 +174,10 @@ struct QuranHomeView: View {
         .fullScreenCover(item: $mushaf) { request in
             QuranMushafView(service: service, initialPage: request.page, close: { mushaf = nil })
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
+        }
+        .fullScreenCover(item: $reference) { request in
+            QuranWirdReferenceView(request: request, digits: service.numerals, close: { reference = nil })
+                .environment(\.roomTheme, theme)
         }
         .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showQiyam, onDismiss: { run(refresh: true) { try await refresh() } }) { QuranQiyamView(service: service, close: { showQiyam = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
@@ -379,6 +384,17 @@ struct QuranHomeView: View {
                     .font(bodyFont(14, bold: true)).foregroundStyle(theme.onAccent).padding(.horizontal, 20).frame(minHeight: 44)
                     .background(theme.color("accent"), in: Capsule()).contentShape(.capsule).disabled(busy).accessibilityIdentifier("quran-begin")
             }
+            if step.kind == .hifz, let ayahRange = step.ayahRange {
+                Button { reference = QuranWirdReferenceRequest(range: ayahRange) } label: {
+                    Label("تفسير الورد", systemImage: "book.closed")
+                        .font(bodyFont(11, bold: true)).padding(.horizontal, 10).frame(minHeight: 44)
+                        .foregroundStyle(theme.color("hifzText"))
+                        .background(theme.color("hifzTint"), in: Capsule())
+                }
+                .buttonStyle(.madarPlain)
+                .accessibilityLabel("مراجع الورد، " + step.detail)
+                .accessibilityIdentifier("quran-step-reference-" + step.id)
+            }
             }.padding(.horizontal, step.id == next?.id ? 10 : 0).padding(.vertical, step.id == next?.id ? 6 : 0)
                 .overlay { if step.id == next?.id { RoundedRectangle(cornerRadius: 24).stroke(color.opacity(0.65), lineWidth: 1).allowsHitTesting(false) } }
         }
@@ -439,11 +455,12 @@ struct QuranHomeView: View {
         active != nil || showDayClose || showSetup || showFree || showQiyam || showPlan
     }
     private var hasReplaceableQuranPresentation: Bool {
-        detail != nil || mushaf != nil || showOutside || showWeek || showPlan || showIndex || showStrength
+        detail != nil || mushaf != nil || reference != nil || showOutside || showWeek || showPlan || showIndex || showStrength
     }
     private func dismissReplaceableQuranPresentations() {
         detail = nil
         mushaf = nil
+        reference = nil
         showOutside = false
         showWeek = false
         showPlan = false
@@ -512,7 +529,7 @@ struct QuranHomeView: View {
         if state == nil { try await refresh() }
         if route.path.isEmpty {
             // The room link returns to the home; sessions, setup and free reading keep their own save paths.
-            detail = nil; mushaf = nil; showOutside = false; showIndex = false; showWeek = false; showPlan = false; showStrength = false
+            detail = nil; mushaf = nil; reference = nil; showOutside = false; showIndex = false; showWeek = false; showPlan = false; showStrength = false
         }
         else if route.path.first == "page", let number = Int(route.path.last ?? "") { mushaf = .init(page: number) }
         else if route.path.first == "fihris" { indexInitialUnit = .surah; indexInitialItemID = nil; indexRouteRequestID = UUID(); showIndex = true }
