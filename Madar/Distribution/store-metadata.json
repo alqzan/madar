@@ -2,14 +2,14 @@
   "locale": "ar-SA",
   "name": "مدار",
   "subtitle": "للصلاة والقرآن ويومك",
-  "promotionalText": "مساحة عربية تجمع الصلاة والقرآن والمذكرات والعادات والمال والقراءة، مع حفظ محلي وخيار لمزامنة iCloud.",
-  "description": "مدار مساحة ليومك، من أول صلاة إلى آخر سطر.\n\nالصلاة: أوقات الصلاة، والتسجيل والتراجع، والقضاء والسفر.\nالقرآن: خطة للحفظ والمراجعة، ومتابعة جلساتك وموضعك.\nالمذكرات: أيامك وخواطرك وصورك وتسجيلاتك، مع البحث والتصدير.\nالعادات: متابعة ما تكرره، وقراءة تقدّمك من سجلاتك الفعلية.\nالمال: حساباتك ومصاريفك ومظاريفك والتزاماتك، وحساب تقريبي للزكاة وفق الخيارات التي تحددها. أسعار الصرف والمعادن تدخلها يدويًا.\nالمحبرة: مكتبتك الورقية والرقمية، وقارئ EPUB وPDF، وبحث محلي في النص والصور باستخدام التعرّف الضوئي.\n\nواجهة عربية من اليمين إلى اليسار، وتواريخ هجرية وميلادية، وودجات واختصارات للوصول إلى غرفك.\n\nلا تحتاج سجلاتك إلى حساب مدار. تعمل النسخة المحلية بلا مزامنة؛ وفي النسخة المهيأة لـCloudKit تختار تشغيل مزامنة iCloud من إعدادات مدار. عند تشغيلها، تتزامن السجلات المدعومة عبر قاعدة iCloud الخاصة بحسابك، وإيقافها لا يحذف ما سبق رفعه. بعض الخدمات الاختيارية تحتاج إلى الإنترنت، مثل تنزيل الكتب والتحويل الصوتي عبر Apple بعد موافقتك. التعرّف الضوئي قد يخطئ، فتبقى صورة الصفحة مرجعك. حساب الزكاة تقديري ولا يثبت تحقق شروط الوجوب في حالتك.",
+  "promotionalText": "مساحة عربية تجمع الصلاة والقرآن والمذكرات والعادات والمال والقراءة، مع حفظ بياناتك محليًا على جهازك.",
+  "description": "مدار مساحة ليومك، من أول صلاة إلى آخر سطر.\n\nالصلاة: أوقات الصلاة، والتسجيل والتراجع، والقضاء والسفر.\nالقرآن: خطة للحفظ والمراجعة، ومتابعة جلساتك وموضعك.\nالمذكرات: أيامك وخواطرك وصورك وتسجيلاتك، مع البحث والتصدير.\nالعادات: متابعة ما تكرره، وقراءة تقدّمك من سجلاتك الفعلية.\nالمال: حساباتك ومصاريفك ومظاريفك والتزاماتك، وحساب تقريبي للزكاة وفق الخيارات التي تحددها. أسعار الصرف والمعادن تدخلها يدويًا.\nالمحبرة: مكتبتك الورقية والرقمية، وقارئ EPUB وPDF، وبحث محلي في النص والصور باستخدام التعرّف الضوئي.\n\nواجهة عربية من اليمين إلى اليسار، وتواريخ هجرية وميلادية، وودجات واختصارات للوصول إلى غرفك.\n\nلا تحتاج سجلاتك إلى حساب مدار. تحفظ النسخة الحالية بياناتك محليًا على جهازك ولا تتضمن مزامنة iCloud. بعض الخدمات الاختيارية تحتاج إلى الإنترنت، مثل تنزيل الكتب والتحويل الصوتي عبر Apple بعد موافقتك. التعرّف الضوئي قد يخطئ، فتبقى صورة الصفحة مرجعك. حساب الزكاة تقديري ولا يثبت تحقق شروط الوجوب في حالتك.",
   "keywords": "صلاة,قرآن,حفظ,مراجعة,مذكرات,عادات,ميزانية,مصاريف,كتب,قراءة,هجري",
   "primaryCategory": "LIFESTYLE",
   "secondaryCategory": "PRODUCTIVITY",
   "supportURL": null,
   "privacyPolicyURL": null,
-  "reviewNotes": "No account or backend login is required. The default build is local-only because MADAR_CLOUDKIT_CONTAINER is empty. A signed CloudKit build exposes an opt-in iCloud sync toggle; first enablement writes an encrypted checkpoint before mirroring. Turning the toggle off leaves previously synced records in the user’s private CloudKit database. CloudKit-enabled sync has not been tested on a signed owner device; do not treat the local simulator build as CloudKit evidence. On first launch, choose a city and complete onboarding. Face ID is an optional app-level biometric gate; it has no passcode fallback. Widgets and Controls read app-written snapshots; extensions do not open the SwiftData store. HealthKit is optional and read-only for walking totals. Bank messages arrive only via user-initiated paste or a configured Shortcut; the app does not read the Messages database. Metal prices and exchange rates are manual. The Zakat screen labels results as approximate, asks for the nisab/debt method and shows source links. On-device Vision OCR operates on PDF image pages without modifying the original file; OCR text exists only while its search sheet is open. Downloaded Turath books read locally after import. Optional Apple server speech recognition requires separate in-app consent; on-device routes are preferred. Spotlight is optional, off by default, and indexes book titles only. No advertising, tracking SDK or developer analytics is integrated. iOS 27-only widget families are hidden on iOS 26.",
+  "reviewNotes": "The current v1 build is local-only; no Madar account, developer-operated records backend, or CloudKit sync is included. On first launch, choose a city and complete onboarding. Face ID is an optional app-level biometric gate; it has no passcode fallback. Widgets and Controls read app-written snapshots; extensions do not open the SwiftData store. HealthKit is optional and read-only for walking totals. Bank messages arrive only via user-initiated paste or a configured Shortcut; the app does not read the Messages database. Metal prices and exchange rates are manual. The Zakat screen labels results as approximate, asks for the nisab/debt method and shows source links. On-device Vision OCR operates on PDF image pages without modifying the original file; OCR text exists only while its search sheet is open. Downloaded Turath books read locally after import. Optional Apple server speech recognition requires separate in-app consent; on-device routes are preferred. Spotlight is optional, off by default, and indexes book titles only. No advertising, tracking SDK or developer analytics is integrated. iOS 27-only widget families are hidden on iOS 26.",
   "privacyLabelPreparation": {
     "tracking": false,
     "developerOperatedCollection": false,
@@ -36,42 +36,23 @@
       "https://developer.apple.com/app-store/app-privacy-details/",
       "https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy",
       "https://www.apple.com/legal/privacy/data/en/ask-siri-dictation/",
-      "https://developer.apple.com/documentation/cloudkit/ckcontainer/privateclouddatabase",
       "https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy/"
     ],
-    "localOnlyDataAppliesTo": "This local-only description applies when CloudKit is unavailable or the user has not enabled sync; it does not describe a CloudKit-enabled, opted-in build.",
-    "developerOperatedCollectionNote": "No Madar-operated records backend is integrated. This does not mean CloudKit sync is local-only: the app writes supported user records to Apple CloudKit when the signed build is provisioned and the user enables the toggle.",
+    "localOnlyDataAppliesTo": "Describes the current local-only v1 release; CloudKit sync is deferred and is not part of this build.",
+    "developerOperatedCollectionNote": "No Madar-operated records backend or CloudKit sync is included in the current build. Assess optional Apple server speech and the Turath download connection separately.",
     "cloudKitSync": {
-      "availability": "Only a signed build with an entitled MADAR_CLOUDKIT_CONTAINER; the default build remains local-only.",
-      "userOptIn": "The sync setting is off for a newly bound account and the user enables it in SyncSettingsView.",
-      "firstEnableBehavior": "The app requires an encrypted checkpoint before enabling the mirrored store.",
-      "destination": "The signed-in Apple account private CloudKit database; its data counts toward that account’s iCloud storage quota.",
-      "dataCategoriesInSyncedModels": [
-        "Settings and records for prayer, Quran, diary, habits, money, books and reading progress.",
-        "User-entered diary and letter text, pasted bank-message text and financial records.",
-        "Media model payloads, including user-added photos, audio and imported book data.",
-        "Saved trip and place coordinates carried by synced records."
-      ],
-      "deviceOnlyModels": [
-        "DeviceSetting",
-        "NotificationLedger",
-        "CommandReceipt",
-        "PageSchedule",
-        "SessionDraft",
-        "ProcessingJob"
-      ],
-      "turningSyncOffDeletesCloudData": false,
-      "inAppCloudDeleteControl": false,
-      "cloudStorageCountsTowardUserQuota": true,
-      "appPrivacyLabelStatus": "Pending review for the exact release build. Apple defines collection as off-device transmission stored accessibly beyond real-time servicing; assess persistent CloudKit data types and purposes before using any local-only label."
-    }
+      "availability": "Deferred; excluded from current v1 under RA1 until the owner explicitly reopens CloudKit.",
+      "existingGatedCode": "Not validated or activated.",
+      "productionActivation": "Not authorized."
+    },
+    "appPrivacyLabelStatus": "Pending review for the exact local-only release build; assess optional Apple server speech, Turath download networking and HealthKit separately. Do not declare persistent CloudKit data."
   },
   "publicationInputsStillRequired": [
     "A public HTTPS URL for privacy.html and a real support destination; no address or domain has been invented.",
     "App Store Connect account access, distribution signing and review contact details.",
     "Owner and Claude's full-screen comparison captures and later real-device checks.",
     "Confirm the third-party network retention disclosure against the provider's published policy before submitting the privacy label.",
-    "Review App Privacy categories and purposes against the exact CloudKit-enabled release build; do not reuse a local-only answer.",
-    "Implement and verify the owner-approved settings action: request confirmation, delete only the user's private CloudKit copy, and preserve the device copy. Until verified, disclose that turning sync off does not delete previously synced data."
+    "Review App Privacy categories and purposes against the exact local-only release build, including optional Apple server speech, HealthKit and Turath downloads.",
+    "CloudKit sync and its deletion control are deferred under RA1; exclude them from this release and revisit only after explicit owner direction."
   ]
 }
