@@ -446,6 +446,28 @@ import UIKit
         XCTAssertTrue(restoredNote.label.contains("رحلة Goodreads"), restoredNote.label)
     }
 
+    func testMihbaraLinkWaitsForAnUnsavedNotebookDraft() {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
+        app.launch()
+        app.tabBars.buttons["المحبرة"].tap()
+        let notebook = app.buttons["mihbara-notebook"]
+        XCTAssertTrue(notebook.waitForExistence(timeout: 15), app.debugDescription)
+        reach(app, notebook); notebook.tap()
+        let add = app.buttons["mihbara-note-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10)); add.tap()
+        let editor = app.textViews["mihbara-note-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 8))
+        let draft = "ملاحظة لم تُحفظ بعد"
+        editor.tap(); editor.typeText(draft)
+        app.buttons["ui-test-open-mihbara-link"].tap()
+        XCTAssertFalse(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 4), "A link must not replace a note being written.")
+        XCTAssertTrue(editor.exists, app.debugDescription)
+        XCTAssertEqual(editor.value as? String, draft)
+        app.terminate()
+    }
+
     func testPrivateNoteFailedSaveKeepsDraftAndRetryPersistsIt() {
         continueAfterFailure = false
         let app = app("empty")

@@ -472,7 +472,7 @@ struct MihbaraReaderView: View {
             .environment(\.layoutDirection, .rightToLeft).madarSheetErrorAlert(app)
         }
         .sheet(item: $noteDraft) { draft in
-            MihbaraPageNoteSheet(draft: draft, palette: palette, pageText: draft.pageText) { text in
+            MihbaraPageNoteSheet(app: app, draft: draft, palette: palette, pageText: draft.pageText) { text in
                 await savePageNote(text, for: draft)
             }
             .environment(\.layoutDirection, .rightToLeft).madarSheetErrorAlert(app)
@@ -3196,6 +3196,7 @@ private struct MihbaraQuoteCardArtwork: View {
 }
 
 private struct MihbaraPageNoteSheet: View {
+    let app: AppSession
     let draft: MihbaraWordCardState
     let palette: MihbaraReaderPalette
     let pageText: String?
@@ -3203,6 +3204,7 @@ private struct MihbaraPageNoteSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
     @State private var saving = false
+    @State private var rootBlockerID = UUID()
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -3254,6 +3256,8 @@ private struct MihbaraPageNoteSheet: View {
         // A swipe never throws away a written note; «إلغاء» stays the deliberate way out.
         .interactiveDismissDisabled(!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         .onAppear { focused = true }
+        .onChange(of: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving, initial: true) { _, blocked in app.setMihbaraRootDraftBlocker(rootBlockerID, active: blocked) }
+        .onDisappear { app.setMihbaraRootDraftBlocker(rootBlockerID, active: false) }
     }
 }
 

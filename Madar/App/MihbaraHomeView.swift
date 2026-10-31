@@ -95,6 +95,7 @@ struct MihbaraHomeView: View {
         .onChange(of: app.mihbaraBookToOpen) { _, _ in openSpotlightBookIfNeeded() }
         .onChange(of: app.mihbaraRoute, initial: true) { _, route in if let route { openRoute(route) } }
         .onChange(of: sheet?.id) { _, id in if id == nil, let route = app.mihbaraRoute { openRoute(route) } }
+        .onChange(of: app.mihbaraRootDraftBlockers.isEmpty) { _, empty in if empty, let route = app.mihbaraRoute { openRoute(route) } }
         .onChange(of: app.undoToken?.id) { load() }
         .onChange(of: app.prayerRevision) { load() }.onChange(of: reading?.day) { folded = false; manuallyOpen = false }
         .modifier(MihbaraHomeConfirmations(
@@ -291,7 +292,7 @@ struct MihbaraHomeView: View {
     }
     #endif
     private func openRoute(_ route: Route, using loadedReading: MihbaraHomeReading? = nil) {
-        guard !shelfReadFailed else { return }
+        guard !shelfReadFailed, app.mihbaraRootDraftBlockers.isEmpty else { return }
         guard !route.path.isEmpty else {
             readerRoute = nil
             // The room link closes the read-only sheets; the notebook may hold a draft and keeps its own close path.
@@ -1485,7 +1486,7 @@ private struct MihbaraNotebookContent: View {
         }
         .background(theme.background)
         .sheet(item: $editor) { current in
-            MihbaraNotebookEditor(note: current, save: save, delete: delete)
+            MihbaraNotebookEditor(app: app, note: current, save: save, delete: delete)
                 .environment(\.roomTheme, theme).presentationDragIndicator(.visible)
         }
         .toolbar {
@@ -1550,6 +1551,7 @@ private struct MihbaraNotebookContent: View {
 }
 
 private struct MihbaraNotebookEditor: View {
+    let app: AppSession
     let note: MihbaraNotebookContent.Editor
     let save: (MihbaraNotebookContent.Editor, String) async throws -> Void
     let delete: (MihbaraNotebookContent.Editor) async throws -> Void
@@ -1557,6 +1559,7 @@ private struct MihbaraNotebookEditor: View {
     @Environment(\.roomTheme) private var theme
     @State private var text: String
     @State private var isSaving = false
+    @State private var rootBlockerID = UUID()
     @State private var prompt: Prompt?
     private enum Prompt {
         case delete, discard, saveFailed, deleteFailed
@@ -1577,8 +1580,8 @@ private struct MihbaraNotebookEditor: View {
             }
         }
     }
-    init(note: MihbaraNotebookContent.Editor, save: @escaping (MihbaraNotebookContent.Editor, String) async throws -> Void, delete: @escaping (MihbaraNotebookContent.Editor) async throws -> Void) {
-        self.note = note; self.save = save; self.delete = delete; _text = State(initialValue: note.text)
+    init(app: AppSession, note: MihbaraNotebookContent.Editor, save: @escaping (MihbaraNotebookContent.Editor, String) async throws -> Void, delete: @escaping (MihbaraNotebookContent.Editor) async throws -> Void) {
+        self.app = app; self.note = note; self.save = save; self.delete = delete; _text = State(initialValue: note.text)
     }
     var body: some View {
         NavigationStack {
@@ -1590,6 +1593,11 @@ private struct MihbaraNotebookEditor: View {
                         Button("إلغاء") { if text != note.text { prompt = .discard } else { dismiss() } }
                             .accessibilityIdentifier("mihbara-note-cancel")
                         if !note.text.isEmpty { Button("احذف", role: .destructive) { prompt = .delete }.accessibilityIdentifier("mihbara-note-delete") }
+#if DEBUG
+                        if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] == "1" {
+                            Button("اختبر الرابط") { app.open(URL(string: "madar://mihbara/hadith/today")!) }.accessibilityIdentifier("ui-test-open-mihbara-link")
+                        }
+#endif
                     }
                     ToolbarItem(placement: .topBarTrailing) { Button("احفظ") { write(deleting: false) }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.count > 2000).accessibilityIdentifier("mihbara-note-save") }
                 }
@@ -1603,6 +1611,8 @@ private struct MihbaraNotebookEditor: View {
             }
         }
         .interactiveDismissDisabled(isSaving || text != note.text)
+        .onChange(of: isSaving || text != note.text, initial: true) { _, blocked in app.setMihbaraRootDraftBlocker(rootBlockerID, active: blocked) }
+        .onDisappear { app.setMihbaraRootDraftBlocker(rootBlockerID, active: false) }
         .alert(prompt?.title ?? "", isPresented: Binding(get: { prompt != nil }, set: { if !$0 { prompt = nil } }), presenting: prompt) { current in
             switch current {
             case .delete:
