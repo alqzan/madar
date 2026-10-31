@@ -37,6 +37,16 @@ struct RoomWidgetsGallery:View {
                         }.frame(maxWidth:.infinity,minHeight:170,alignment:.center)
                     }
                     preview(.upcoming,family:.systemMedium,template:"upcoming").frame(height:180)
+                    GeometryReader { geometry in
+                        let side = geometry.size.width * 0.44
+                        HStack(alignment:.top,spacing:12) {
+                            previewContent(.upcoming,family:.systemSmall,template:"upcoming").frame(width:side,height:side).accessibilityIdentifier("room-widget-upcoming-small")
+                            VStack(alignment:.leading,spacing:6) {
+                                Text("الصغيرة").font(MadarTypography.section())
+                                Text("اليومان الأقرب مع مصدرهما").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            }.frame(maxWidth:.infinity,minHeight:side,alignment:.center)
+                        }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
+                    }.frame(height:180)
                     Link(destination:URL(string:"madar://mal")!){previewContent(.money,family:.systemMedium,template:"now")}.buttonStyle(.madarPlain).frame(height:180).accessibilityIdentifier("room-widget-money")
                     Link(destination:URL(string:BuiltRoomWidget.mihbara.route)!){preview(.mihbara,family:.systemMedium,template:"summary").frame(height:190)}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widget-mihbara")
                     Text("السنة وسطر اليوم").font(MadarTypography.section())

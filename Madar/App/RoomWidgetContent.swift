@@ -172,7 +172,8 @@ struct RoomWidgetContent:View {
     }
     private func upcoming(_ row:RoomWidgetSnapshot.Row)->some View {
         Link(destination:URL(string:row.route) ?? URL(string:room.route)!) {
-            VStack(spacing:6){ZStack{donut(row.share,width:4,color:sourceColor(row.route));VStack(spacing:0){Text(row.value.split(separator:" ").first.map(String.init) ?? row.value).font(.custom("thmanyahserifdisplay-Bold",size:22,relativeTo:.title2)).minimumScaleFactor(0.7).lineLimit(1);Text(row.value.split(separator:" ").dropFirst().joined(separator:" ")).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2))}.multilineTextAlignment(.center).padding(7)}.frame(width:family == .systemSmall ? 84 : 66,height:family == .systemSmall ? 84 : 66);Text(row.title).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).lineLimit(2).multilineTextAlignment(.center)}.frame(maxWidth:.infinity)
+            let small = family == .systemSmall
+            VStack(spacing:small ? 4 : 6){ZStack{donut(row.share,width:4,color:sourceColor(row.route));VStack(spacing:0){Text(row.value.split(separator:" ").first.map(String.init) ?? row.value).font(.custom("thmanyahserifdisplay-Bold",size:small ? 16 : 22,relativeTo:small ? .body : .title2)).minimumScaleFactor(0.7).lineLimit(1);Text(row.value.split(separator:" ").dropFirst().joined(separator:" ")).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2))}.multilineTextAlignment(.center).padding(small ? 4 : 7)}.frame(width:small ? 52 : 66,height:small ? 52 : 66);Text(row.title).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).lineLimit(2).multilineTextAlignment(.center)}.frame(maxWidth:.infinity)
         }.buttonStyle(.plain).privacySensitive()
     }
 }

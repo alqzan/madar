@@ -56,6 +56,29 @@ import XCTest
         XCTAssertTrue(small.buttons.firstMatch.label.contains("مشوار الأربعاء"),small.buttons.firstMatch.label)
         shot(app,"M4-W01-habits-coming-small-L")
     }
+    func testUpcomingSmallPreviewKeepsBothDaysInsideItsBounds() throws {
+        continueAfterFailure=false
+        let app=openGallery(now:"2026-10-15T12:00:00+03:00")
+        let small=app.descendants(matching:.any).matching(identifier:"room-widget-upcoming-small").firstMatch
+        for _ in 0..<8 where !small.isHittable || small.frame.maxY>app.frame.maxY-28 {app.swipeUp(velocity:.slow)}
+        XCTAssertTrue(small.waitForExistence(timeout:10),app.debugDescription)
+        XCTAssertTrue(small.isHittable,"The small upcoming-days preview should be visible")
+        shot(app,"M4-W01-upcoming-small-L")
+        XCTAssertLessThanOrEqual(small.frame.maxY,app.frame.maxY-28,"The whole small preview should clear the bottom safe area")
+        XCTAssertGreaterThanOrEqual(small.frame.minX,app.frame.minX,"The small preview should stay within the phone's left edge")
+        XCTAssertLessThanOrEqual(small.frame.maxX,app.frame.maxX,"The small preview should stay within the phone's right edge")
+        let widthRatio=small.frame.width/app.frame.width
+        XCTAssertGreaterThan(widthRatio,0.35,"The small preview should stay large enough to read")
+        XCTAssertLessThanOrEqual(widthRatio,0.45,"The small preview should follow the available gallery width without overflowing")
+        XCTAssertEqual(small.buttons.count,2,"The small widget preserves the two-day capacity")
+        let contentLeft=small.frame.minX+14
+        let contentRight=small.frame.maxX-14
+        for button in small.buttons.allElementsBoundByIndex {
+            XCTAssertTrue(button.isHittable,button.label)
+            XCTAssertGreaterThanOrEqual(button.frame.minX,contentLeft,"A day cell must stay inside the widget's left margin")
+            XCTAssertLessThanOrEqual(button.frame.maxX,contentRight,"A day cell must stay inside the widget's right margin")
+        }
+    }
     /// RD7: turning on «محتوى المذكرات في الودجات» adds the memory and last-line templates.
     func testDiaryContentWidgetsAppearOnlyAfterTheOptIn() throws {
         continueAfterFailure=false
