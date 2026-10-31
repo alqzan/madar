@@ -10,6 +10,8 @@ struct QuranHomeSessionFlow: View {
     @State private var showExit = false
     @State private var busy = false
     @State private var queuedReveals: [Int] = []
+    /// A slip long-pressed while another save is running waits its turn; it is never dropped.
+    @State private var queuedMistakes: [QuranUISessionAction] = []
     /// AU-95: «أنهِ وسجّل» or «تجاهل» tapped while a reveal or grade is still saving runs once it lands, instead of
     /// closing the sheet and silently doing nothing.
     @State private var queuedFinish: QuranUISessionAction?
@@ -87,6 +89,7 @@ struct QuranHomeSessionFlow: View {
     }
     /// Only ayahs still covered on the page in front of the reader; anything else is stale.
     private func drainReveals() {
+        if !queuedMistakes.isEmpty { perform(queuedMistakes.removeFirst()); return }
         if let finish = queuedFinish { queuedFinish = nil; queuedReveals = []; perform(finish); return }
         let open = (state.coach?.plannedAyahs ?? []).subtracting(state.coach?.revealedAyahs ?? [])
         queuedReveals.removeAll { !open.contains($0) }
@@ -104,23 +107,26 @@ struct QuranHomeSessionFlow: View {
         if busy {
             switch action {
             case .reveal(let ayah, nil) where !queuedReveals.contains(ayah): queuedReveals.append(ayah)
-            case .commit, .commitPartial, .discard where !finishing: queuedFinish = action
+            case .mistake(let ayah, let word):
+                let queued = queuedMistakes.contains { if case .mistake(ayah, word) = $0 { true } else { false } }
+                if !queued { queuedMistakes.append(action) }
+            case .commit where !finishing, .commitPartial where !finishing, .discard where !finishing: queuedFinish = action
             default: break
             }
             return
         }
         busy = true
         switch action { case .commit, .commitPartial, .discard: finishing = true; default: break }
-        if case .reveal = action {} else { queuedReveals = [] }
+        switch action { case .reveal, .mistake: break; default: queuedReveals = []; queuedMistakes = [] }
         Task { defer { busy = false; finishing = false; drainReveals() }; do { switch try await service.session(draftID: state.id, action: action) {
         case .active(let next): state = next; autoStep(after: action, next)
         case .completed(_, let reachedKhatm):
-            queuedReveals = []; autoAdvance = nil
+            queuedReveals = []; queuedMistakes = []; autoAdvance = nil
             if case .commit = action, state.coach?.pastDay != true {
                 showDayClose = true
                 showKhatmaMoment = reachedKhatm
             } else { close() }
-        case .discarded: queuedReveals = []; close()
+        case .discarded: queuedReveals = []; queuedMistakes = []; close()
         } } catch { self.error = quranUserMessage(error) } }
     }
 }

@@ -121,6 +121,7 @@ private struct MoneyBudgetReceipt: View {
     @Binding var revealed: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @State private var rootBlockerID = UUID()
     @State private var saving = false
     @State private var failure: String?
     @State private var reason = ""
@@ -179,7 +180,7 @@ private struct MoneyBudgetReceipt: View {
                 Button("إلغاء") { dismiss() }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).disabled(saving)
             }.padding(20).padding(.top, 12).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.surface.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme)
-            .presentationDetents([.height(600), .large]).presentationDragIndicator(.visible).interactiveDismissDisabled(saving).accessibilityIdentifier("money-budget-receipt")
+            .presentationDetents([.height(600), .large]).presentationDragIndicator(.visible).interactiveDismissDisabled(saving).onChange(of: saving, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }.onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }.accessibilityIdentifier("money-budget-receipt")
     }
     private func effect(_ title: String, value: Int) -> some View {
         HStack { Text(title); Spacer(); Text((row.excluded ? "يعود " : "لا يُخصم ") + amount(value)).bold().foregroundStyle(theme.color("surplusText")) }.font(MadarTypography.body())

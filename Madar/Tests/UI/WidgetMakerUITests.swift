@@ -43,6 +43,28 @@ import XCTest
         capture(app, "AU-95-widget-route-money-L")
         app.terminate()
     }
+    func testTemplateRouteStartsANewWidgetInsteadOfOverwritingTheSavedOne() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_MONEY_FIXTURE": "showcase"]
+        app.launch(); open(app)
+        let prayer = app.buttons["widget-item-prayerNext"]; reach(app, prayer); prayer.tap()
+        for _ in 0..<8 { if app.staticTexts["widget-maker-title"].isHittable { break }; app.swipeDown(velocity: .slow) }
+        let field = app.textFields["widget-maker-name"]; field.tap(); field.typeText("ودجتي الأولى\n")
+        app.buttons["widget-maker-save"].tap()
+        XCTAssertTrue(app.staticTexts["widget-maker-status"].waitForExistence(timeout: 15))
+        app.open(URL(string: "madar://bahw/widget-maker?template=mal")!)
+        let money = app.buttons["widget-item-moneyNow"]
+        XCTAssertTrue(money.waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(money.isSelected)
+        for _ in 0..<8 { if app.staticTexts["widget-maker-title"].isHittable { break }; app.swipeDown(velocity: .slow) }
+        XCTAssertNotEqual(app.textFields["widget-maker-name"].value as? String, "ودجتي الأولى", "The routed template must not carry the saved widget's identity.")
+        let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "widget-saved-"))
+        reach(app, saved.firstMatch)
+        XCTAssertEqual(saved.count, 1, "Opening a template does not change the saved widget before «احفظها».")
+        app.terminate()
+    }
     func testNamedWidgetContentStyleRelaunchDeleteAndUndo() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

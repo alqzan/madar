@@ -114,7 +114,7 @@ struct WidgetMakerView: View {
         .confirmationDialog("احذف الودجة المحفوظة؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
             if let deleting { Button("احذفها", role: .destructive) { remove(deleting) } }
             Button("إلغاء", role: .cancel) { deleting = nil }
-        } message: { Text("يبقى محتوى غرفك كما هو، ويتاح التراجع. يظل موضع ودجة النظام تحت تحكم iOS.") }
+        } message: { Text(deleting?.id == draft.id && dirty ? "يبقى محتوى غرفك كما هو، ويتاح التراجع. تعديلك الذي لم تحفظه على هذه الودجة لن يبقى. يظل موضع ودجة النظام تحت تحكم iOS." : "يبقى محتوى غرفك كما هو، ويتاح التراجع. يظل موضع ودجة النظام تحت تحكم iOS.") }
         // AU-28: «حُفظت …» stops claiming the widget is saved once it is edited again.
         .onChange(of: draft) { if dirty, !status.isEmpty { status = "" } }
         .task {
@@ -309,7 +309,8 @@ struct WidgetMakerView: View {
         default: nil
         }
         guard let item, WidgetMakerStyle.itemIDs.contains(item) else { return }
-        var routed = draft
+        // A saved widget is never overwritten by a template link: the routed widget starts as a new one.
+        var routed = saved.contains { $0.id == draft.id } ? WidgetMakerDraft() : draft
         routed.items = [item]
         if dirty { select(routed) }
         else { draft = routed; baseline = routed; baselineIsPersisted = false; beforeReset = nil; status = ""; selectionRevision += 1 }

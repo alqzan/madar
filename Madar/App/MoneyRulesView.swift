@@ -207,6 +207,7 @@ struct MoneyCategorizeSheet: View {
     @State private var categories: [MoneyRuleCategory] = []
     @State private var loadFailure: String?
     @State private var failure: String?
+    @State private var rootBlockerID = UUID()
     @State private var saving = false
     @State private var pendingCategoryID: UUID?
     @State private var pendingRemember = true
@@ -279,6 +280,8 @@ struct MoneyCategorizeSheet: View {
         .foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
         .environment(\.layoutDirection, .rightToLeft).toolbarVisibility(.hidden, for: .navigationBar)
         .task { loadCategories() }.interactiveDismissDisabled(saving)
+        .onChange(of: saving, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
+        .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }
         .presentationDetents([.medium, .large])
         .accessibilityIdentifier("money-categorize-sheet")
     }
