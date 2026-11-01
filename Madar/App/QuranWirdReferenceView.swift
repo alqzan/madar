@@ -486,6 +486,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             citation: "ص ٨٩",
             sourceURL: URL(string: "https://shamela.ws/book/42/130")!,
             sourceNote: nil
+        ),
+        .init(
+            id: "saadi-2-195",
+            ayahID: 202,
+            kind: .tafsir,
+            text: "فالجهاد في سبيل الله لا يقوم إلا على ساق النفقة",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٩٠",
+            sourceURL: URL(string: "https://shamela.ws/book/42/131")!,
+            sourceNote: nil
         )
     ]
 }

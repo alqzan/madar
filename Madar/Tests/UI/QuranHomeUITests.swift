@@ -439,6 +439,31 @@ import XCTest
         app.terminate()
     }
 
+    func testDailyWirdReferenceShowsAlBaqarah195TafsirWithItsCitation() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "referenceBaqara195"]
+        app.launch()
+
+        let referenceButton = app.buttons["quran-step-reference-hifz"]
+        XCTAssertTrue(referenceButton.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(referenceButton.label.contains("١٩٥"), referenceButton.label)
+        referenceButton.tap()
+
+        let rangeTitle = app.staticTexts["quran-reference-range"]
+        XCTAssertTrue(rangeTitle.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(rangeTitle.label.contains("١٩٥"), rangeTitle.label)
+        let excerpt = app.staticTexts["quran-reference-excerpt-saadi-2-195"]
+        XCTAssertTrue(excerpt.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(excerpt.label.contains("ساق النفقة"), excerpt.label)
+        XCTAssertTrue(app.staticTexts["quran-reference-citation-saadi-2-195"].label.contains("ص ٩٠"))
+        XCTAssertTrue(app.descendants(matching: .any)["quran-reference-source-saadi-2-195"].exists)
+        attach(app, "M2-X01-wird-reference-baqara-195-L")
+        app.buttons["quran-reference-close"].tap()
+        XCTAssertTrue(referenceButton.waitForExistence(timeout: 5), app.debugDescription)
+        app.terminate()
+    }
+
     func testDailyWirdReferenceSeparatesAlImranContextFromCauseOfRevelation() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

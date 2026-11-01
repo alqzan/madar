@@ -82,6 +82,7 @@ final class QuranWirdReferenceIntegrationTests: XCTestCase {
             ("ibn-kathir-2-192", 2, 192, .tafsir, "فإن تركوا القتال في الحرم وأنابوا إلى الإسلام والتوبة", "٢/ ٨٤", "https://shamela.ws/book/1503/789"),
             ("ibn-kathir-2-193", 2, 193, .tafsir, "فإن انتهوا عما هم فيه من الشرك وقتال المؤمنين فكفوا عنهم", "٢/ ٨٥", "https://shamela.ws/book/1503/790"),
             ("saadi-2-194", 2, 194, .tafsir, "هذا تفسير لصفة المقاصة، وأنها هي المماثلة في مقابلة المعتدي", "ص ٨٩", "https://shamela.ws/book/42/130"),
+            ("saadi-2-195", 2, 195, .tafsir, "فالجهاد في سبيل الله لا يقوم إلا على ساق النفقة", "ص ٩٠", "https://shamela.ws/book/42/131"),
             ("ibn-kathir-2-255", 2, 255, .tafsir, "هذه آية الكرسي، ولها شأن عظيم", "٢/ ٢٣٩", "https://shamela.ws/book/1503/944"),
             ("ibn-ashur-2-255-context", 2, 255, .context, "وَجُعِلَتْ هَذِهِ الْآيَةُ ابْتِدَاءً لِآيَاتِ تَقْرِيرِ الْوَحْدَانِيَّةِ وَالْبَعْثِ", "٣/ ١٧", "https://shamela.ws/book/9776/1273"),
             ("saadi-2-286", 2, 286, .tafsir, "بل هي غذاء للأرواح ودواء للأبدان", "ص ١٢٠", "https://shamela.ws/book/42/195"),
