@@ -9,7 +9,7 @@ import MadarQuran
 extension AppSession {
     func prepareQuranHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview", "historyRoute", "reference", "referencePartial", "referenceBoundary", "referenceFatiha", "referenceFatihaOpening", "referenceKursi", "referenceSadi183", "referenceAalImran", "referenceBaqara178186", "referenceBaqara189", "referenceBaqara190", "referenceBaqara191", "referenceBaqara192", "referenceBaqara193", "referenceBaqara194", "referenceBaqara195"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview", "historyRoute", "reference", "referencePartial", "referenceBoundary", "referenceFatiha", "referenceFatihaOpening", "referenceKursi", "referenceSadi183", "referenceAalImran", "referenceAalImran191195", "referenceAalImran198200", "referenceNisaa36", "referenceBaqara178186", "referenceBaqara189", "referenceBaqara190", "referenceBaqara191", "referenceBaqara192", "referenceBaqara193", "referenceBaqara194", "referenceBaqara195", "referenceBaqara196198", "referenceBaqara199202", "referenceBaqara203206", "referenceBaqara208209", "referenceBaqara211213", "referenceBaqara214215", "referenceBaqara219", "referenceBaqara220"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let context = ModelContext(container)
         selectedTab = "quran"
@@ -43,6 +43,15 @@ extension AppSession {
         } else if variant == "referenceAalImran" {
             let target = catalog.ayahs.first { $0.surahID == 3 && $0.ayahNumber == 190 }!
             plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceAalImran191195" {
+            let target = catalog.ayahs.first { $0.surahID == 3 && $0.ayahNumber == 191 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 5; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceAalImran198200" {
+            let target = catalog.ayahs.first { $0.surahID == 3 && $0.ayahNumber == 198 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 3; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceNisaa36" {
+            let target = catalog.ayahs.first { $0.surahID == 4 && $0.ayahNumber == 36 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
         } else if variant == "referenceBaqara178186" {
             let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 178 }!
             plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 9; plan.rhythm = "light"; plan.activeFrom = now
@@ -66,6 +75,30 @@ extension AppSession {
             plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
         } else if variant == "referenceBaqara195" {
             let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 195 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceBaqara196198" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 196 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 3; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceBaqara199202" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 199 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 4; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceBaqara203206" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 203 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 4; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceBaqara208209" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 208 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 2; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceBaqara211213" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 211 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 3; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceBaqara214215" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 214 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 2; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceBaqara219" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 219 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceBaqara220" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 220 }!
             plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
         } else if variant == "reference" {
             let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 187 }!
