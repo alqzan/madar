@@ -1,5 +1,14 @@
 # Handovers moved off docs/PROGRESS.md on 27 Oct 2026 (verbatim, newest first)
 
+## Handover — توسيع مراجع الورد للبقرة 2:255 و2:286 — 2026-11-01 — Codex
+- **Works now:** 24 مقتطفًا موثقًا؛ أضيف الطبري 2:286 وابن عاشور سياق آية الكرسي 2:255 بهوية فريدة لكل مقتطف. الصور: `M2-X01-wird-reference-boundary-r35-L.png` و`M2-X01-wird-reference-kursi-r40-L.png`.
+- **Verified:** r35 تكامل 4/4 وواجهة 8/8؛ r36 كشف اختلاف التشكيل في التأكيد، صُحّح ثم اجتاز r37 الاختبارات 5/5؛ r38 تعطل مشغّل المحاكي قبل الاختبار، وبعد إعادة تشغيل الجهاز نجح r39 وr40 ‏1/1؛ `git diff --check` نظيف.
+- **Differences left:** لا canonical؛ لا قبول بصري من المالك؛ مجموعة المراجع منتقاة وليست تفسيرًا شاملًا.
+- **Not verified:** iPhone المالك، فتح الروابط خارجيًا end-to-end، أو اكتمال تغطية القرآن.
+- **Next:** واصل M2-X01 بمصدر موثق من الاقتراحات الواردة؛ لا بطاقات ready حاليًا، وتابع البند 27 عند توفر مسار جاهز.
+- **Model/effort:** Codex GPT-6؛ الجهد غير مكشوف؛ المساعدون قراءة فقط والنموذج غير مكشوف.
+- **Usage:** 10% مستخدم من نافذة الخمس ساعات، و32% أسبوعيًا عند آخر قراءة.
+
 ## Handover — owner-data tour, the reader's index on the phone's OCR, converted-book polish — 2026-10-26 — Claude
 - **Works now:** the converted «مشروع العمر» index lists إضاءة, المقدمة and all 22 chapters with their topics, each with its own title (reader TOC ids were `depth-href`, so entries sharing a page repeated one title — now `MihbaraTOCItem.order`). `PDFBookEPUB.printedContents` splits titles OCR merged on one line, shortens a leader-zero number that runs past the next one («٠٧٠٠» → ٧), lets a misread number yield to an earlier heading, and stops at the first text page. The book's printed contents page reads as linked contents (`madar-contents`); section breaks read as «* * #»/«#» become one centred «* * *»; OCR drops ornament Latin letters glued to words and short Latin-only lines on Arabic pages. Conversions ask iOS for background time, resume from page one when the room opens after iOS closed the app (`PDFConversions/pending.json`), and the card shows time left.
 - **Verified:** `swift test --filter 'PDFBook|TextReader|Turath|EPUBBookImport'` 40/40; on simulator DAA1805E: `testOwnerAllDataTrial` passed (852 s, r4), `testOwnerPDFConvertsAndReads` passed (r8, 299 s; asserts chapters ١، ٨، ٩، ١٠, «المقدمة» text, and that the printed contents page's chapter ١ link opens file page ١٢), `MihbaraImportUITests` conversion 30 s and resume-after-close 159 s passed. Logs in `Madar/Artifacts/owner-data/` (local only).

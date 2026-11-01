@@ -359,14 +359,19 @@ import UIKit
         app.launch(); open(app)
         app.buttons["mihbara-add-paper"].tap()
         app.descendants(matching: .any)["mihbara-add-source-paper"].tap()
+        let title = app.textFields["mihbara-paper-title"]
         let chapter = app.textFields["mihbara-paper-chapter-title-0"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(chapter.waitForExistence(timeout: 10), app.debugDescription)
+        title.tap(); title.typeText("عنوان كتاب لم يُحفظ")
+        if app.toolbars.buttons["تمّ"].exists { app.toolbars.buttons["تمّ"].tap() }
         chapter.tap(); chapter.typeText(" تعديل لم يُحفظ")
         if app.toolbars.buttons["تمّ"].exists { app.toolbars.buttons["تمّ"].tap() }
         let root = app.buttons["mihbara-paper-root-route"]
         XCTAssertTrue(root.waitForExistence(timeout: 8), app.debugDescription)
         if !root.isHittable { app.swipeDown(velocity: .slow) }
         XCTAssertTrue(root.isHittable, app.debugDescription); root.tap()
+        XCTAssertTrue((title.value as? String)?.contains("عنوان كتاب لم يُحفظ") == true, app.debugDescription)
         XCTAssertTrue(chapter.waitForExistence(timeout: 5), "The root route must wait for an unsaved paper index.\n" + app.debugDescription)
         XCTAssertTrue((chapter.value as? String)?.contains("تعديل لم يُحفظ") == true, app.debugDescription)
 
@@ -377,6 +382,59 @@ import UIKit
         XCTAssertTrue(discard.waitForExistence(timeout: 8), app.debugDescription); discard.tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 12), app.debugDescription)
         XCTAssertFalse(app.buttons["mihbara-add-source-paper"].exists, "After an explicit discard, the queued root route closes the add-book flow.")
+        app.terminate()
+    }
+
+    func testGoodreadsDraftWaitsForRootRouteAndKeepsPreviewChoicesAfterBack() {
+        continueAfterFailure = false
+        let csv = "Book Id,Title,Author,Additional Authors,ISBN,ISBN13,My Rating,Exclusive Shelf,Date Read,Read Count,My Review,Private Notes,Number of Pages,Year Published,Date Added,Bookshelves\r\n"
+            + "9910,رحلة القراءة,من مكتبتك,,,,4,read,2025/02/01,1,,,,2025,,\r\n"
+        let app = app("home")
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
+        app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_GOODREADS"] = Data(csv.utf8).base64EncodedString()
+        app.launch(); open(app)
+        app.buttons["mihbara-add-paper"].tap()
+
+        let importButton = app.buttons["mihbara-goodreads-import"]
+        XCTAssertTrue(importButton.waitForExistence(timeout: 20), app.debugDescription)
+        let cutoff = app.descendants(matching: .any)["mihbara-goodreads-cutoff-year"]
+        XCTAssertTrue(cutoff.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(cutoff.label.contains("٢٠٢٤"), cutoff.label)
+        app.buttons["سنة أحدث"].tap()
+        let matchMenu = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-goodreads-match-")).firstMatch
+        XCTAssertTrue(matchMenu.waitForExistence(timeout: 8), app.debugDescription)
+        matchMenu.tap()
+        let update = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "حدّث")).firstMatch
+        XCTAssertTrue(update.waitForExistence(timeout: 5), app.debugDescription)
+        update.tap()
+        let selectedMatch = app.staticTexts["سيُحدّث الكتاب الموجود"]
+        XCTAssertTrue(selectedMatch.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(cutoff.label.contains("٢٠٢٥"), cutoff.label)
+
+        let root = app.buttons["mihbara-goodreads-root-route"]
+        XCTAssertTrue(root.waitForExistence(timeout: 8), app.debugDescription)
+        root.tap()
+        XCTAssertTrue(importButton.waitForExistence(timeout: 5), "The root route must wait while the Goodreads CSV is staged.\n" + app.debugDescription)
+        XCTAssertTrue(selectedMatch.exists, app.debugDescription)
+        XCTAssertTrue(cutoff.label.contains("٢٠٢٥"), cutoff.label)
+
+        app.buttons["mihbara-goodreads-back"].tap()
+        XCTAssertTrue(app.buttons["mihbara-add-source-goodreads"].waitForExistence(timeout: 8), app.debugDescription)
+        let reopen = app.buttons["mihbara-goodreads-reopen"]
+        reach(app, reopen); reopen.tap()
+        XCTAssertTrue(importButton.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["سيُحدّث الكتاب الموجود"].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(cutoff.label.contains("٢٠٢٥"), cutoff.label)
+
+        app.buttons["mihbara-goodreads-back"].tap()
+        let discard = app.buttons["mihbara-goodreads-discard"]
+        reach(app, discard); discard.tap()
+        let confirmation = app.buttons.matching(identifier: "mihbara-goodreads-discard-confirm").firstMatch
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5), app.debugDescription)
+        confirmation.tap()
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-add-source-goodreads"].exists,
+                       "After explicitly discarding the staged CSV, the queued root route closes the add-book flow.")
         app.terminate()
     }
 
@@ -584,8 +642,10 @@ import UIKit
         let cutoff = app.descendants(matching: .any)["mihbara-goodreads-cutoff-year"]
         XCTAssertTrue(cutoff.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(cutoff.label.contains("هـ") && cutoff.label.contains(" م"), cutoff.label)
-        XCTAssertTrue(app.staticTexts["أبي أقرأها"].exists, app.debugDescription)
         shot(app, "M6-V17-goodreads-preview-L")
+        let wantShelf = app.staticTexts["أبي أقرأها"]
+        for _ in 0..<3 where !wantShelf.exists { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(wantShelf.waitForExistence(timeout: 5), app.debugDescription)
         importButton.tap()
 
         let importFailure = app.staticTexts["mihbara-goodreads-import-error"]

@@ -76,6 +76,12 @@ struct MihbaraAddBookView: View {
     @State private var previewingPDF = false
     @State private var previewingEPUB = false
     @State private var previewingGoodreads = false
+    @State private var goodreadsSelectedMatches: [String: UUID] = [:]
+    @State private var goodreadsCutoffYear = GoodreadsCSV.defaultCutoffYear
+    @State private var goodreadsMissingDateShelf = "old"
+    @State private var confirmDiscardGoodreads = false
+    @State private var dismissAfterDiscardGoodreads = false
+    @State private var rootBlockerID = UUID()
 
     private var bookTypes: [UTType] {
         [.pdf, UTType("org.idpf.epub-container")!]
@@ -85,7 +91,10 @@ struct MihbaraAddBookView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 HStack {
-                    Button { dismiss() } label: {
+                    Button {
+                        if pendingGoodreadsStage == nil { dismiss() }
+                        else { dismissAfterDiscardGoodreads = true; confirmDiscardGoodreads = true }
+                    } label: {
                         Label("رجوع", systemImage: "chevron.right")
                             .font(MadarTypography.caption())
                             .frame(minHeight: 44)
@@ -156,7 +165,7 @@ struct MihbaraAddBookView: View {
                         )
                     }
                     .buttonStyle(.madarPlain)
-                    .disabled(stagingGoodreads)
+                    .disabled(stagingGoodreads || pendingGoodreadsStage != nil)
                     .accessibilityIdentifier("mihbara-add-source-goodreads")
                     .fileImporter(isPresented: $importingGoodreads, allowedContentTypes: [.commaSeparatedText], allowsMultipleSelection: false) { result in
                         handleGoodreads(result)
@@ -166,9 +175,16 @@ struct MihbaraAddBookView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("وصل مؤخرًا").font(MadarTypography.section())
                     if let pendingGoodreadsFile {
-                        Button { previewingGoodreads = pendingGoodreadsStage != nil } label: {
-                            MihbaraRecentImportRow(name: pendingGoodreadsFile.lastPathComponent, kind: "CSV", theme: theme)
-                        }.buttonStyle(.madarPlain).disabled(pendingGoodreadsStage == nil).accessibilityIdentifier("mihbara-goodreads-reopen")
+                        HStack(spacing: 10) {
+                            Button { previewingGoodreads = pendingGoodreadsStage != nil } label: {
+                                MihbaraRecentImportRow(name: pendingGoodreadsFile.lastPathComponent, kind: "CSV", theme: theme)
+                            }.buttonStyle(.madarPlain).disabled(pendingGoodreadsStage == nil).accessibilityIdentifier("mihbara-goodreads-reopen")
+                            if pendingGoodreadsStage != nil {
+                                Button("تجاهل") { dismissAfterDiscardGoodreads = false; confirmDiscardGoodreads = true }
+                                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                    .accessibilityIdentifier("mihbara-goodreads-discard")
+                            }
+                        }
                     }
                     if let pendingBookFile {
                         Button {
@@ -238,13 +254,21 @@ struct MihbaraAddBookView: View {
         }
         .navigationDestination(isPresented: $previewingGoodreads) {
             if let stage = pendingGoodreadsStage {
-                MihbaraGoodreadsImportView(app: app, stage: stage) {
-                    GoodreadsCSVFiles.discard(id: stage.id, root: app.bookStagingDirectory)
-                    pendingGoodreadsStage = nil
-                    pendingGoodreadsFile = nil
-                    previewingGoodreads = false
-                    onGoodreadsImported()
-                }
+                MihbaraGoodreadsImportView(
+                    app: app,
+                    stage: stage,
+                    selectedMatches: $goodreadsSelectedMatches,
+                    cutoffYear: $goodreadsCutoffYear,
+                    missingDateShelf: $goodreadsMissingDateShelf,
+                    onImported: {
+                        GoodreadsCSVFiles.discard(id: stage.id, root: app.bookStagingDirectory)
+                        pendingGoodreadsStage = nil
+                        pendingGoodreadsFile = nil
+                        previewingGoodreads = false
+                        resetGoodreadsDraft()
+                        onGoodreadsImported()
+                    }
+                )
             }
         }
         .task {
@@ -311,6 +335,34 @@ struct MihbaraAddBookView: View {
             }
             #endif
         }
+        .confirmationDialog("تجاهل ملف Goodreads؟", isPresented: $confirmDiscardGoodreads, titleVisibility: .visible) {
+            Button("تجاهل الملف", role: .destructive) {
+                discardGoodreadsStage()
+                if dismissAfterDiscardGoodreads { dismiss() }
+                dismissAfterDiscardGoodreads = false
+            }.accessibilityIdentifier("mihbara-goodreads-discard-confirm")
+            Button("أكمل المراجعة", role: .cancel) { dismissAfterDiscardGoodreads = false }
+        } message: {
+            Text("لن تُضاف الكتب والاختيارات التي بقيت في الملف.")
+        }
+        .interactiveDismissDisabled(pendingGoodreadsStage != nil)
+        .onChange(of: pendingGoodreadsStage != nil, initial: true) { _, pending in
+            app.setMihbaraRootDraftBlocker(rootBlockerID, active: pending)
+        }
+    }
+
+    private func resetGoodreadsDraft() {
+        goodreadsSelectedMatches = [:]
+        goodreadsCutoffYear = GoodreadsCSV.defaultCutoffYear
+        goodreadsMissingDateShelf = "old"
+    }
+
+    private func discardGoodreadsStage() {
+        if let stage = pendingGoodreadsStage { GoodreadsCSVFiles.discard(id: stage.id, root: app.bookStagingDirectory) }
+        pendingGoodreadsStage = nil
+        pendingGoodreadsFile = nil
+        previewingGoodreads = false
+        resetGoodreadsDraft()
     }
 
     private func handle(_ result: Result<[URL], Error>, assign: (URL) -> Void) {
@@ -722,15 +774,15 @@ private struct MihbaraHadithText: UIViewRepresentable {
 private struct MihbaraGoodreadsImportView: View {
     let app: AppSession
     let stage: GoodreadsCSVStage
+    @Binding var selectedMatches: [String: UUID]
+    @Binding var cutoffYear: Int
+    @Binding var missingDateShelf: String
     let onImported: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var entries: [GoodreadsCSVEntry] = []
     @State private var candidates: [GoodreadsBookCandidate] = []
     @State private var preview: GoodreadsPreview?
-    @State private var selectedMatches: [String: UUID] = [:]
-    @State private var cutoffYear = GoodreadsCSV.defaultCutoffYear
-    @State private var missingDateShelf = "old"
     @State private var loading = true
     @State private var saving = false
     @State private var failure: String?
@@ -745,7 +797,25 @@ private struct MihbaraGoodreadsImportView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+#if DEBUG
+                if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] == "1" {
+                    Button("اختبر الجذر") { app.open(URL(string: "madar://mihbara")!) }
+                        .accessibilityIdentifier("mihbara-goodreads-root-route")
+                }
+#endif
                 VStack(alignment: .leading, spacing: 5) {
+                    HStack {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Label("رجوع", systemImage: "chevron.right")
+                                .font(MadarTypography.caption())
+                                .frame(minHeight: 44)
+                        }
+                        .disabled(saving)
+                        .accessibilityIdentifier("mihbara-goodreads-back")
+                        Spacer(minLength: 8)
+                    }
                     Text("معاينة مكتبة Goodreads").font(MadarTypography.title())
                     Text(stage.fileName).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).lineLimit(2)
                 }
@@ -799,10 +869,6 @@ private struct MihbaraGoodreadsImportView: View {
                 .padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 12).background(theme.background)
                 .accessibilityIdentifier("mihbara-goodreads-import")
             }
-        }
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) { Button("رجوع") { dismiss() }.disabled(saving) }
-            ToolbarItem(placement: .principal) { Text("مكتبة Goodreads").font(MadarTypography.section()) }
         }
         .task(id: stage.id) { load() }
         .onChange(of: cutoffYear) { _, _ in rebuildPreview() }
@@ -900,6 +966,7 @@ private struct MihbaraGoodreadsImportView: View {
         }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
             .background(theme.surface, in: .rect(cornerRadius: 15))
             .overlay { RoundedRectangle(cornerRadius: 15).stroke(theme.line.opacity(0.7), lineWidth: 1) }
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("mihbara-goodreads-row-\(row.entry.rowKey)")
     }
 
