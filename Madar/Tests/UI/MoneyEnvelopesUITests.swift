@@ -8,8 +8,9 @@ import XCTest
     }
     func open(_ app: XCUIApplication) {
         let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
-        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
-        app.buttons["money-open"].tap(); let envelopes = app.buttons["money-envelopes-open"]; XCTAssertTrue(envelopes.waitForExistence(timeout: 10)); envelopes.tap()
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 10))
+        for _ in 0..<12 where !money.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(money.isHittable); money.tap(); let envelopes = app.buttons["money-envelopes-open"]; XCTAssertTrue(envelopes.waitForExistence(timeout: 10)); envelopes.tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-envelopes"].waitForExistence(timeout: 10))
     }
     func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
@@ -96,6 +97,25 @@ import XCTest
         XCTAssertNotEqual(savingValue.label, before, "A successful edit should update the amount shown in the envelope detail.")
         shot(app, "AU95-money-saving-after-L")
         app.terminate()
+    }
+    func testEnvelopeSavingChangeStaysOpenWhileSaving() throws {
+        continueAfterFailure = false; let app = make("salary", saveHoldMS: 5000); open(app)
+        let trip = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-envelope-رحلة الشتاء")).firstMatch
+        reachGoal(trip, in: app); XCTAssertTrue(trip.waitForExistence(timeout: 10)); trip.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["money-envelope-detail"].waitForExistence(timeout: 10))
+        let beforeValue = app.descendants(matching: .any)["money-envelope-saving-value"].label
+        app.buttons["money-envelope-saving-add"].tap()
+        let input = app.textFields["money-saving-change-amount"], save = app.buttons["money-saving-change-save"], close = app.buttons["money-page-close"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5)); XCTAssertTrue(save.waitForExistence(timeout: 5)); XCTAssertTrue(close.waitForExistence(timeout: 5))
+        shot(app, "M5-V04-saving-change-idle-L")
+        input.tap(); input.typeText("50"); XCTAssertTrue(save.isEnabled); save.tap()
+        XCTAssertFalse(save.isEnabled); XCTAssertFalse(close.isEnabled); XCTAssertTrue(save.label.contains("جارٍ الحفظ"), save.label)
+        shot(app, "M5-V04-saving-change-pending-L")
+        app.swipeDown()
+        XCTAssertTrue(input.exists, app.debugDescription); XCTAssertFalse(close.isEnabled)
+        XCTAssertTrue(input.waitForNonExistence(timeout: 12), app.debugDescription)
+        let after = app.descendants(matching: .any)["money-envelope-saving-value"]
+        XCTAssertTrue(after.waitForExistence(timeout: 5), app.debugDescription); XCTAssertNotEqual(after.label, beforeValue)
     }
     func testHiddenReserveDoesNotLeakDailiesOrCoverage() throws {
         continueAfterFailure = false; let app = make("hidden"); open(app)

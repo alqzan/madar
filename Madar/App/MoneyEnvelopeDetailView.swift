@@ -332,14 +332,14 @@ private struct MoneySavingChangeView: View {
     private var service: AppMoneyService { .init(app: app) }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            MoneyPageHeader(title: add ? "زد الادخار" : "قلّل الادخار", close: { dismiss() })
+            MoneyPageHeader(title: add ? "زد الادخار" : "قلّل الادخار", close: { dismiss() }, closeDisabled: working)
             Text("الآن " + service.amount(currentMinor) + " من كل راتب. التعديل للرواتب القادمة.").font(MadarTypography.body())
             TextField("مقدار التغيير", text: $input).keyboardType(.decimalPad).font(MadarTypography.cardTitle()).padding(14).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) }.accessibilityIdentifier("money-saving-change-amount")
             Text("خطة السداد والحركات السابقة تبقى كما هي.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
-            Button("احفظ التعديل", action: save).buttonStyle(MadarPrimaryButton()).disabled(working || changeMinor == nil).accessibilityIdentifier("money-saving-change-save")
+            Button(working ? "جارٍ الحفظ…" : "احفظ التعديل", action: save).buttonStyle(MadarPrimaryButton()).disabled(working || changeMinor == nil).accessibilityIdentifier("money-saving-change-save")
             Spacer(minLength: 0)
-        }.padding(20).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium]).presentationDragIndicator(.visible)
+        }.padding(20).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium]).presentationDragIndicator(.visible).interactiveDismissDisabled(working)
     }
     private func save() {
         guard !working else { return }
