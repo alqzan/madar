@@ -2,13 +2,22 @@ import XCTest
 
 @MainActor final class MoneyCardsUITests: XCTestCase {
     private func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
-    private func open(_ app: XCUIApplication, fixture: String, rootRouteHarness: Bool = false, saveHoldMS: Int? = nil) {
+    private func open(_ app: XCUIApplication, fixture: String, rootRouteHarness: Bool = false, saveHoldMS: Int? = nil, westernNumerals: Bool = false) {
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        if westernNumerals { app.launchEnvironment["MADAR_UI_UNDO_SECONDS"] = "1" }
         if rootRouteHarness { app.launchEnvironment["MADAR_UI_MONEY_ROOT_ROUTE_HARNESS"] = "1" }
         if let saveHoldMS { app.launchEnvironment["MADAR_UI_MONEY_WRITE_HOLD_MS"] = String(saveHoldMS) }
         app.launch()
         let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
-        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap()
+        if westernNumerals {
+            search.typeText("core.numerals\n")
+            let western = app.buttons["option-core.numerals-western"]
+            XCTAssertTrue(western.waitForExistence(timeout: 10), app.debugDescription); western.tap()
+            XCTAssertTrue(western.isSelected, app.debugDescription)
+            app.buttons["settings-clear-search"].tap(); search.tap()
+        }
+        search.typeText("المال")
         let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 10)); money.tap()
         let cards = app.buttons["money-cards-open"]; XCTAssertTrue(cards.waitForExistence(timeout: 10))
         for _ in 0..<8 where !cards.isHittable { app.swipeUp(velocity: .slow) }; cards.tap()
@@ -46,6 +55,23 @@ import XCTest
         XCTAssertLessThanOrEqual(debit.frame.midX, strip.frame.maxX - 20)
         XCTAssertTrue(debit.isHittable); debit.tap(); app.buttons["money-cards-tab-نظرة"].tap()
         XCTAssertTrue(app.staticTexts["تُخصم مشتريات مدى من الحساب مباشرة"].waitForExistence(timeout: 5))
+    }
+    func testInterestEstimateUsesSelectedNumerals() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); open(app, fixture: "cards", westernNumerals: true)
+        let minimum = app.buttons["الحد الأدنى"]
+        for _ in 0..<10 where !minimum.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(minimum.isHittable, app.debugDescription); minimum.tap()
+        let estimate = app.buttons["money-card-interest-estimate"]
+        XCTAssertTrue(estimate.waitForExistence(timeout: 10), app.debugDescription)
+        let formula = app.staticTexts["money-card-interest-formula"]
+        XCTAssertTrue(formula.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(plain(estimate.label).contains("تقدير فائدة 30 يومًا:"), estimate.label)
+        XCTAssertTrue(plain(formula.label).contains("النسبة السنوية × 30 ÷ 365"), formula.label)
+        XCTAssertFalse(plain(formula.label).contains("٣٠") || plain(formula.label).contains("٣٦٥"), formula.label)
+        for _ in 0..<4 where !formula.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(formula.isHittable, app.debugDescription)
+        shot(app, "AU96-money-card-interest-western-L")
     }
     /// 21 Oct 2026: a card can be added from the cards page (before, `money.saveCard` had no screen).
     func testAddCardFromCardsPage() throws {
@@ -119,5 +145,9 @@ import XCTest
         XCTAssertTrue(name.waitForExistence(timeout: 3), "The money root must wait while the card is saving.")
         XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 15), app.debugDescription)
         app.terminate()
+    }
+
+    private func plain(_ value: String) -> String {
+        value.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "")
     }
 }

@@ -164,10 +164,16 @@ struct MoneyCardsView: View {
                 if minimum {
                     let unpaid = max(0, c.billedMinor - (c.minimumMinor ?? 0))
                     Text("يبقى عليك " + amount(unpaid)).font(MadarTypography.body())
-                    if let interest = CardPlanning.interestEstimate(unpaidMinor: unpaid, annualRateBp: c.aprBp, days: 30) {
-                        Button { source = c.sources["aprBp"] } label: { Text("تقدير فائدة ٣٠ يومًا: " + amount(interest)).font(MadarTypography.body()).foregroundStyle(theme.color("reserveText")) }.buttonStyle(.madarPlain)
+                    let interestDays = 30
+                    if let interest = CardPlanning.interestEstimate(unpaidMinor: unpaid, annualRateBp: c.aprBp, days: interestDays) {
+                        Button { source = c.sources["aprBp"] } label: {
+                            Text("تقدير فائدة " + service.digits.string(interestDays) + " يومًا: " + amount(interest))
+                                .font(MadarTypography.body()).foregroundStyle(theme.color("reserveText"))
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("money-card-interest-estimate")
                     } else { Text("نسبة الفائدة غير معروفة؛ لا يمكن تقديرها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
-                    Text("تقدير تقريبي بفائدة بسيطة: النسبة السنوية × ٣٠ ÷ ٣٦٥، دون الرسوم أو التركيب. كشف البنك هو المرجع.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    Text("تقدير تقريبي بفائدة بسيطة: النسبة السنوية × \(service.digits.string(interestDays)) ÷ \(service.digits.string(365))، دون الرسوم أو التركيب. كشف البنك هو المرجع.")
+                        .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        .accessibilityIdentifier("money-card-interest-formula")
                 } else { Label("سداد كامل المتبقي: " + amount(c.billedMinor), systemImage: "checkmark.circle.fill").font(MadarTypography.body()).foregroundStyle(theme.color("surplusText")) }
             }
             HStack { Text(c.kind == "credit" ? "في الكشف القادم" : "المشتريات المسجلة").font(MadarTypography.cardTitle()); Spacer(); if c.kind == "credit" { Button("غير المفوتر " + amount(c.unbilledMinor)) { source = c.sources["unbilled"] }.font(MadarTypography.fine()).buttonStyle(.madarPlain) } }
