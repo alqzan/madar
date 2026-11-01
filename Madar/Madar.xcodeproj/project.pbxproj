@@ -440,6 +440,7 @@
 		EA9C0274CD8227B8EE0ACC77 /* DiaryVoiceControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCEB9293DE2E579C487F98D6 /* DiaryVoiceControls.swift */; };
 		EB339DA68D09F8DFED1B79E7 /* WidgetMaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F702E40E305B7CD472C9E71D /* WidgetMaker.swift */; };
 		EBF0B3D25779863F6C14BDAA /* MihbaraQuoteCardArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDB79AB5E852959A3A3ED2EA /* MihbaraQuoteCardArtwork.swift */; };
+		6D828E890D674C5292DAA8CC /* MihbaraWordCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0009A42374CB48D39015B55F /* MihbaraWordCard.swift */; };
 		7E7BD0B8FD1E47DCB2FA7DAA /* MihbaraTranslationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34AA3EAE352342AEA17C3AC6 /* MihbaraTranslationSheet.swift */; };
 		83FE7D7113A3452785A1AC30 /* MihbaraQuoteFlowRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 633C3BACA5594830866B7563 /* MihbaraQuoteFlowRows.swift */; };
 		EC0CA4865861DA502438DA84 /* MihbaraHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569CDB63CF5C9A6B8C736149 /* MihbaraHomeView.swift */; };
@@ -931,6 +932,7 @@
 		ECCCB31F5C15E710433FEA6F /* DiaryIntentionIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryIntentionIntegrationTests.swift; sourceTree = "<group>"; };
 		ECE97B0E8B0F8498D64AC35B /* QuranQiyamUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranQiyamUITests.swift; sourceTree = "<group>"; };
 		EDB79AB5E852959A3A3ED2EA /* MihbaraQuoteCardArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraQuoteCardArtwork.swift; sourceTree = "<group>"; };
+		0009A42374CB48D39015B55F /* MihbaraWordCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraWordCard.swift; sourceTree = "<group>"; };
 		34AA3EAE352342AEA17C3AC6 /* MihbaraTranslationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraTranslationSheet.swift; sourceTree = "<group>"; };
 		633C3BACA5594830866B7563 /* MihbaraQuoteFlowRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraQuoteFlowRows.swift; sourceTree = "<group>"; };
 		EEE0730F258DD7FDBFB0D3F9 /* QuranOutsideUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranOutsideUITests.swift; sourceTree = "<group>"; };
@@ -1189,6 +1191,7 @@
 				3831B13D14657BAF2CEB0278 /* MihbaraPDFInk.swift */,
 				7B9ACE8CD0ACA2E8F081BA36 /* MihbaraPDFReaderView.swift */,
 				EDB79AB5E852959A3A3ED2EA /* MihbaraQuoteCardArtwork.swift */,
+				0009A42374CB48D39015B55F /* MihbaraWordCard.swift */,
 				34AA3EAE352342AEA17C3AC6 /* MihbaraTranslationSheet.swift */,
 				633C3BACA5594830866B7563 /* MihbaraQuoteFlowRows.swift */,
 				5C97580CAFA86F547D3E0410 /* MihbaraReaderSettingsSheet.swift */,
@@ -2118,6 +2121,7 @@
 				69E47582BD363B1553C07132 /* MihbaraPaperCapture.swift in Sources */,
 				3A4186587335738C06BE4F42 /* MihbaraPaperIndexEditor.swift in Sources */,
 				EBF0B3D25779863F6C14BDAA /* MihbaraQuoteCardArtwork.swift in Sources */,
+				6D828E890D674C5292DAA8CC /* MihbaraWordCard.swift in Sources */,
 				7E7BD0B8FD1E47DCB2FA7DAA /* MihbaraTranslationSheet.swift in Sources */,
 				83FE7D7113A3452785A1AC30 /* MihbaraQuoteFlowRows.swift in Sources */,
 				38C1428C7CD638FBE4B30362 /* MihbaraReaderSettingsSheet.swift in Sources */,
