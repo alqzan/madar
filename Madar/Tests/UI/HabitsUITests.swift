@@ -349,6 +349,33 @@ import UIKit
         XCTAssertTrue(app.buttons["habit-past-save"].waitForExistence(timeout:5));app.buttons["إلغاء"].tap()
         XCTAssertTrue(app.buttons["habit-past-save"].waitForNonExistence(timeout:5))
     }
+    func testPastDayCancelStaysDisabledWhileHabitWriteIsPending() throws {
+        continueAfterFailure = false
+        let app = app("since", habitWriteHoldMS: 3000); open(app)
+        app.buttons["habits-view-all"].tap()
+        let water = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "الماء،")).firstMatch
+        for _ in 0..<6 where !water.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(water.isHittable, app.debugDescription); water.press(forDuration: 1.0)
+        let menu = app.buttons["فعلتها في يوم سابق"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), app.debugDescription); menu.tap()
+
+        let save = app.buttons["habit-past-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5), app.debugDescription)
+        let cancel = app.buttons["إلغاء"]
+        XCTAssertTrue(cancel.isEnabled, app.debugDescription)
+        shot(app, "M4-V02-past-day-idle-L")
+        save.tap()
+        XCTAssertTrue(app.staticTexts["فعلتها في يوم سابق"].exists)
+        XCTAssertTrue(save.exists)
+        XCTAssertTrue(save.isHittable)
+        XCTAssertFalse(save.isEnabled)
+        XCTAssertTrue(cancel.exists)
+        XCTAssertFalse(cancel.isEnabled)
+        shot(app, "M4-V02-past-day-saving-L")
+        XCTAssertTrue(save.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["habits-view-all"].waitForExistence(timeout: 5), app.debugDescription)
+    }
+
     func testSinceTimelineYearLabelsShowBothCalendarsInPreferenceOrder() throws {
         continueAfterFailure = false
         for (calendar, firstMarker) in [("hijri", "هـ"), ("gregorian", "م")] {
