@@ -434,6 +434,7 @@
 		EC0CA4865861DA502438DA84 /* MihbaraHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569CDB63CF5C9A6B8C736149 /* MihbaraHomeView.swift */; };
 		EEEBE18293EEF2E520250B80 /* ReadiumShared in Frameworks */ = {isa = PBXBuildFile; productRef = E87752E9691BA9D50DB38F3B /* ReadiumShared */; };
 		EEFB1D6DFBF9E0E4FA1C18B1 /* CustomizationCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C63BADA5C6BD423F06356E09 /* CustomizationCopyTests.swift */; };
+		EFF9B6B8980D24FA5FCC2E74 /* PrayerMakeUpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C592BA9B0F3E8430BD2D9BA5 /* PrayerMakeUpSheet.swift */; };
 		F01FB1E39BA6CF490D2A3B9A /* LegacyMoveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A143CFD0D071A9A2934F2B2D /* LegacyMoveUITests.swift */; };
 		F057B7AF2041B31DCA597E1F /* AppBackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E6EB1F3F05F6A4C2B4D1002 /* AppBackupService.swift */; };
 		F06811C94AFAB53F8E8F8A3D /* AppQuranService+Journey.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1778D1A629B46A993E5E049 /* AppQuranService+Journey.swift */; };
@@ -839,6 +840,7 @@
 		C4CB5FDECF30C984FC9DD666 /* MoneyCardsIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyCardsIntegrationTests.swift; sourceTree = "<group>"; };
 		C538D823455FBFA53D0B9308 /* IBMPlexSerif-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "IBMPlexSerif-OFL.txt"; sourceTree = "<group>"; };
 		C560FF7B8C4BCB2B0FAC707D /* MoneyReconcileUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyReconcileUITests.swift; sourceTree = "<group>"; };
+		C592BA9B0F3E8430BD2D9BA5 /* PrayerMakeUpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerMakeUpSheet.swift; sourceTree = "<group>"; };
 		C63BADA5C6BD423F06356E09 /* CustomizationCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizationCopyTests.swift; sourceTree = "<group>"; };
 		C653D2280D01272C25CFEC95 /* MoneyCardsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyCardsModels.swift; sourceTree = "<group>"; };
 		C6661268F5C60E85AA211014 /* thmanyahserifdisplay-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahserifdisplay-Bold.otf"; sourceTree = "<group>"; };
@@ -1229,6 +1231,7 @@
 				AC79AED1B314B7B8C603514A /* PrayerActivityBudget.swift */,
 				4E82713EFD04D42E929BB0F7 /* PrayerCustomizeView.swift */,
 				0F06A4255B432C44B5E4C5CA /* PrayerHeartAnswerSheet.swift */,
+				C592BA9B0F3E8430BD2D9BA5 /* PrayerMakeUpSheet.swift */,
 				1D2B7534A65CA14B25771639 /* PrayerNotifications.swift */,
 				0D987FDE73C46EF6D320A153 /* PrayerQadaListSheet.swift */,
 				C1541C81F328C40D5A683888 /* PrayerRoom.swift */,
@@ -2151,6 +2154,7 @@
 				E5BDBCBE77D12CB97306AD51 /* PrayerControlIntent.swift in Sources */,
 				1FB325B489D915F2912F57FC /* PrayerCustomizeView.swift in Sources */,
 				08E6F8D73876FD18B2B1A387 /* PrayerHeartAnswerSheet.swift in Sources */,
+				EFF9B6B8980D24FA5FCC2E74 /* PrayerMakeUpSheet.swift in Sources */,
 				6A0993283286BFD137A6421F /* PrayerNotifications.swift in Sources */,
 				02513070494B4312F415494B /* PrayerQadaListSheet.swift in Sources */,
 				CFF94239BC342BA772C26E44 /* PrayerRoom.swift in Sources */,
