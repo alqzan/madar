@@ -118,7 +118,6 @@ final class AppSession {
     @ObservationIgnored private var remainingMihbaraLocatorFailures = 0
     @ObservationIgnored private var failMihbaraLocatorOnReaderClose = false
     @ObservationIgnored private var failFirstMihbaraSessionSave = false
-    @ObservationIgnored private var quranLevelWriteHoldMilliseconds: Int?
     @ObservationIgnored private var quranLevelWriteHoldUsed = false
     #endif
     var settingsQuery = ""
@@ -194,11 +193,6 @@ final class AppSession {
            group.deletingLastPathComponent().lastPathComponent == "UITestStores" {
             failMihbaraLocatorOnReaderClose = notebookTest["MADAR_UI_MIHBARA_LOCATOR_FAIL_ON_CLOSE"] == "1"
             failFirstMihbaraSessionSave = notebookTest["MADAR_UI_MIHBARA_SESSION_SAVE_FAIL_ONCE"] == "1"
-        }
-        if notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent,
-           group.deletingLastPathComponent().lastPathComponent == "UITestStores",
-           let milliseconds = Int(notebookTest["MADAR_UI_QURAN_LEVEL_WRITE_HOLD_MS"] ?? ""), (1...5000).contains(milliseconds) {
-            quranLevelWriteHoldMilliseconds = milliseconds
         }
         #endif
         snapshotStore = SnapshotStore(directory: group.appending(path: "Snapshots", directoryHint: .isDirectory))
@@ -988,10 +982,9 @@ final class AppSession {
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { endWrite() }
 #if DEBUG
-        if name == "quran.setTodayLevel", !quranLevelWriteHoldUsed,
-           let milliseconds = quranLevelWriteHoldMilliseconds {
+        if name == "quran.setTodayLevel", !quranLevelWriteHoldUsed {
             quranLevelWriteHoldUsed = true
-            try await Task.sleep(for: .milliseconds(Int64(milliseconds)))
+            try await holdWriteForUITest("MADAR_UI_QURAN_LEVEL_WRITE_HOLD_MS")
         }
         if failFirstQuranLevelWrite && name == "quran.setTodayLevel" {
             failFirstQuranLevelWrite = false
