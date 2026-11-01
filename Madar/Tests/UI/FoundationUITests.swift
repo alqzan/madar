@@ -138,6 +138,10 @@ import XCTest
         let taqdim = app.buttons["prayer-pair-taqdim"]
         XCTAssertTrue(taqdim.waitForExistence(timeout: 8), app.debugDescription)
         taqdim.tap()
+        XCTAssertTrue(taqdim.isSelected, app.debugDescription)
+        app.swipeDown()
+        XCTAssertTrue(taqdim.waitForExistence(timeout: 5), "The pair sheet must keep its unsaved choice after a swipe.")
+        XCTAssertTrue(taqdim.isSelected, "The selected combine mode must survive the attempted swipe dismissal.")
         app.buttons["prayer-pair-save"].tap()
         let after = app.descendants(matching: .any).matching(identifier: "prayer-arch-asr").firstMatch
         XCTAssertTrue(NSPredicate(format: "label CONTAINS 'جماعة'").evaluate(with: after) || after.waitForExistence(timeout: 8), app.debugDescription)
@@ -1493,6 +1497,11 @@ import XCTest
         fajr.tap()
         let choice = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "وحدي")).firstMatch
         XCTAssertTrue(choice.waitForExistence(timeout: 5), app.debugDescription); choice.tap()
+        XCTAssertTrue(app.buttons["prayer-gap-save"].isEnabled, app.debugDescription)
+        XCTAssertTrue(fajr.label.contains("وحدي"), fajr.label)
+        app.swipeDown()
+        XCTAssertTrue(fajr.waitForExistence(timeout: 5), "The unrecorded-prayer sheet must keep its pending choice after a swipe.")
+        XCTAssertTrue(fajr.label.contains("وحدي"), "The unsaved prayer state must survive the attempted swipe: " + fajr.label)
         XCTAssertTrue(app.buttons["prayer-gap-save"].isEnabled, app.debugDescription)
 
         let root = app.buttons["prayer-root-test-route"]

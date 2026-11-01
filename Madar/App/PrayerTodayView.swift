@@ -1771,6 +1771,7 @@ private struct PrayerGapResolutionSheet: View {
         .foregroundStyle(theme.ink)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(hasUnsavedInput)
         .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
         .onDisappear { rootDraftChanged(rootBlockerID, false) }
     }

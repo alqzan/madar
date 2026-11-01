@@ -296,6 +296,7 @@ struct PrayerTravelPairSheet: View {
                 .overlay { Capsule().stroke(on ? theme.line : theme.ink.opacity(0.14), lineWidth: 1) }
         }
         .buttonStyle(.madarPlain).accessibilityIdentifier(id)
+            .accessibilityAddTraits(on ? .isSelected : [])
     }
     var body: some View {
         ScrollView {
@@ -321,6 +322,7 @@ struct PrayerTravelPairSheet: View {
         }
         .background(theme.background).foregroundStyle(theme.ink)
         .presentationDetents([.medium, .large])
+        .interactiveDismissDisabled(hasUnsavedInput)
         .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
         .onDisappear { rootDraftChanged(rootBlockerID, false) }
     }
