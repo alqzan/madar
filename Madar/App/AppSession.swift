@@ -856,6 +856,12 @@ final class AppSession {
                    (1...5000).contains(milliseconds) {
                     try await Task.sleep(for: .milliseconds(milliseconds))
                 }
+                if name == "settings.set",
+                   ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+                   let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_MONEY_WRITE_HOLD_MS"] ?? ""),
+                   (1...5000).contains(milliseconds) {
+                    try await Task.sleep(for: .milliseconds(milliseconds))
+                }
 #endif
                 try await withSerializedPrayerNotificationMutation {
                     let encoder = JSONEncoder()
