@@ -6,7 +6,7 @@ enum QuranNightColors {
     static let during = MadarToken.colors["rooms.quran.qiyam.duringPrayer"] ?? .black
     static let text = MadarToken.colors["rooms.quran.qiyam.text"] ?? .white
     static let gold = MadarToken.colors["rooms.quran.light.gold"] ?? .primary
-    static let ink = MadarToken.colors["widgetIdentity.room.quran.light.ink"] ?? .primary
+    static let onGold = MadarToken.colors["rooms.quran.dark.onGold"] ?? .black
 }
 struct QuranQiyamView: View {
     let service: AppQuranService
@@ -19,13 +19,23 @@ struct QuranQiyamView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    Button(action: close) { Image(systemName: "chevron.backward").frame(width: 44, height: 44) }
-                        .accessibilityLabel("رجوع").accessibilityIdentifier("quran-qiyam-close");
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("ورد القيام").font(quranSerif(22));
+                ZStack {
+                    VStack(spacing: 2) {
+                        Text("ورد القيام").font(quranSerif(22))
                         Text("من قسم الصلاة، يُحسب في القرآن").font(quranFont(11))
-                    }; Spacer()
+                    }
+                    .padding(.horizontal, 50)
+                    HStack {
+                        Button(action: close) {
+                            Image(systemName: "chevron.backward")
+                                .frame(width: 44, height: 44)
+                                .background(QuranNightColors.text.opacity(0.12), in: Circle())
+                        }
+                        .buttonStyle(.madarPlain)
+                        .accessibilityLabel("رجوع")
+                        .accessibilityIdentifier("quran-qiyam-close")
+                        Spacer(minLength: 0)
+                    }
                 }
                 Text("اقرأ في صلاتك مما في صدرك").font(quranFont(14))
                 Text("ويُحسب لك مراجعة").font(quranSerif(29)).foregroundStyle(QuranNightColors.gold)
@@ -37,9 +47,13 @@ struct QuranQiyamView: View {
                         } label: {
                             Text(service.numerals.string(n)).font(quranFont(19, bold: true)).frame(
                                 maxWidth: .infinity, minHeight: 44
-                            ).foregroundStyle(rakaat == n ? QuranNightColors.ink : QuranNightColors.gold).background(
-                                rakaat == n ? QuranNightColors.gold : QuranNightColors.text.opacity(0.08),
-                                in: .rect(cornerRadius: 17))
+                            )
+                            .foregroundStyle(rakaat == n ? QuranNightColors.onGold : QuranNightColors.gold)
+                            .background(rakaat == n ? QuranNightColors.gold : .clear, in: .rect(cornerRadius: 17))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 17)
+                                    .stroke(QuranNightColors.text.opacity(0.4), lineWidth: rakaat == n ? 0 : 1)
+                            }
                         }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-qiyam-rakaat-" + String(n))
                             .accessibilityAddTraits(rakaat == n ? .isSelected : [])
                     }
@@ -77,7 +91,7 @@ struct QuranQiyamView: View {
                                     kind: .qiyam, stepID: nil, range: nil, rakaat: rakaat, spotID: nil)
                             } catch { self.error = quranUserMessage(error) }
                         }
-                    }.font(quranFont(16, bold: true)).foregroundStyle(QuranNightColors.ink).frame(
+                    }.font(quranFont(16, bold: true)).foregroundStyle(QuranNightColors.onGold).frame(
                         maxWidth: .infinity, minHeight: 54
                     ).background(QuranNightColors.gold, in: Capsule()).padding(16).background(
                         QuranNightColors.background
@@ -141,7 +155,7 @@ struct QuranQiyamSessionView: View {
                         if qiyam.completed > 0 {
                             Button(qiyam.finished ? "سجّل القيام والمراجعة" : "سجّل ما أتممت") {
                                 action(qiyam.finished && !qiyam.pastDay ? .commit : .commitPartial)
-                            }.font(quranFont(16, bold: true)).foregroundStyle(QuranNightColors.ink).frame(
+                            }.font(quranFont(16, bold: true)).foregroundStyle(QuranNightColors.onGold).frame(
                                 maxWidth: .infinity, minHeight: 54
                             ).background(QuranNightColors.gold, in: Capsule()).accessibilityIdentifier(
                                 "quran-qiyam-save")
