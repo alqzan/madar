@@ -204,7 +204,7 @@ func sectionFor(_ key: String) -> String {
     if ["salah.showMosqueStreak", "salah.askHeart"].contains(key) { return "الصلاة" }
     if key == "core.faceIDLock" { return "الخصوصية" }
     if key == "core.spotlightIndex" { return "البحث" }
-    if ["salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil"].contains(key) { return "الإشعارات" }
+    if ["salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil"].contains(key) { return "الإشعارات" }
     return "المظهر"
 }
 func normalized(_ text: String) -> String {
@@ -328,6 +328,11 @@ struct SettingControl: View {
                               "notif.thisDeviceReminders": "إيقافه يوقف كل تذكيرات مدار على هذا الجهاز، وتبقى مواعيدك وسجلّك كما هي.",
                               "notif.quietAfterIsha": "لا تصلك تذكيرات الغرف من بدء الصمت حتى نهايته التي تختارها: الفجر أو الشروق أو منتصف الليل."][definition.key] {
                 Text(caption).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+            }
+            if definition.key == "notif.dailyBudget" {
+                Text("الحد على هذا الجهاز من \(session.digits(1)) إلى \(session.digits(10)). لا يشمل سؤال الصلاة ولا متابعة القلب ولا النشاط الحي؛ ويُحسب الملخّص و«افتح مدار» تذكيرًا واحدًا لكل منهما.")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("setting-notif.dailyBudget-note")
             }
             if definition.key == "core.spotlightIndex" {
                 Text("يفهرس عناوين كتب المحبرة فقط؛ لا يُفهرس نص الكتب أو المؤلفون أو الملاحظات الخاصة.")
