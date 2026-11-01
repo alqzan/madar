@@ -97,6 +97,25 @@ import XCTest
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertFalse(app.buttons["quran-index-unit-surah"].exists, app.debugDescription)
     }
+    func testQuranRootLinkClosesTheOpenPlanAndReturnsHome() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+            "MADAR_UI_QURAN_PLAN_ROOT_ROUTE_HARNESS": "1"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 25), app.debugDescription)
+        app.buttons["quran-streak"].tap()
+        let edit = app.buttons["quran-plan-edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 15), app.debugDescription)
+        let route = app.buttons["quran-plan-root-route"]
+        XCTAssertTrue(route.waitForExistence(timeout: 8), app.debugDescription)
+        route.tap()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(app.buttons["quran-streak"].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(edit.exists, "The Quran root link must dismiss the replaceable plan presentation.")
+        app.terminate()
+    }
     func testPageLinkReplacesTheOpenIndexAfterItDismisses() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -157,11 +176,9 @@ import XCTest
         let closeSetup = app.buttons.matching(identifier: "quran-screen-close").firstMatch
         XCTAssertTrue(closeSetup.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(closeSetup.isHittable, app.debugDescription); closeSetup.tap()
-        let closePlan = app.buttons.matching(identifier: "quran-screen-close").firstMatch
-        XCTAssertTrue(closePlan.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(closePlan.isHittable, app.debugDescription); closePlan.tap()
         let page = app.descendants(matching: .any)["quran-mushaf-page"]
         XCTAssertTrue(page.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertFalse(app.buttons["quran-plan-edit"].exists, "After setup closes, the queued page link replaces the plan cover.")
         let pageNumber = app.staticTexts.matching(identifier: "quran-mushaf-page")
             .matching(NSPredicate(format: "label == %@", "٢")).firstMatch
         XCTAssertTrue(pageNumber.exists, app.debugDescription)

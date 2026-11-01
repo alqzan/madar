@@ -5,6 +5,7 @@ import MadarCommands
 struct QuranPlanView: View {
     let service: AppQuranService
     let close: () -> Void
+    let onSetupPresentationChange: (Bool) -> Void
     @Environment(\.roomTheme) private var theme
     @State private var overview: QuranUIPlanOverview?
     @State private var error: String?
@@ -13,6 +14,11 @@ struct QuranPlanView: View {
     @State private var previewLevel: QuranUILevel?
     private var app: AppSession { service.app }
     private let resetKeys = ["quran.hifzLevel", "quran.reviewLevel", "quran.restDay", "quran.wirdReminder", "quran.reviewSchedule"]
+    init(service: AppQuranService, close: @escaping () -> Void, onSetupPresentationChange: @escaping (Bool) -> Void = { _ in }) {
+        self.service = service
+        self.close = close
+        self.onSetupPresentationChange = onSetupPresentationChange
+    }
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { _ in
             let evaluatedAt = service.currentTime()
@@ -20,6 +26,13 @@ struct QuranPlanView: View {
             ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 QuranScreenHeader(title: "خطّتك", close: close)
+#if DEBUG
+                if ProcessInfo.processInfo.environment["MADAR_UI_QURAN_PLAN_ROOT_ROUTE_HARNESS"] == "1",
+                   ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil {
+                    Button("اختبر رابط الجذر") { app.open(URL(string: "madar://quran")!) }
+                        .accessibilityIdentifier("quran-plan-root-route")
+                }
+#endif
                 if let overview {
                     let forecasts = overview.day == currentDay ? overview.forecasts : [:]
                     QuranPaperCard {
@@ -120,6 +133,7 @@ struct QuranPlanView: View {
             .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).accessibilityIdentifier("quran-plan-undo") } }
             .fullScreenCover(isPresented: $showSetup, onDismiss: { load(at: service.currentTime()) }) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
             .task(id: currentDay) { load(at: evaluatedAt) }.onChange(of: app.settingsWriteInProgress) { if !app.settingsWriteInProgress { load(at: service.currentTime()) } }.onChange(of: app.undoToken?.id) { load(at: service.currentTime()) }
+            .onChange(of: showSetup, initial: true) { _, presented in onSetupPresentationChange(presented) }
             .onChange(of: app.string("quran.hifzLevel")) { previewLevel = nil }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { app.errorMessage != nil }, set: { if !$0 { app.errorMessage = nil } })) { Button("تمّ") { app.errorMessage = nil } } message: { Text(app.errorMessage ?? "") }
         }

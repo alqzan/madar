@@ -27,6 +27,7 @@ struct QuranHomeView: View {
     @State private var logInitialSessionID: UUID?
     @State private var logRouteRequestID: UUID?
     @State private var showPlan = false
+    @State private var showPlanSetup = false
     @State private var showSetup = false
     @State private var showFree = false
     @State private var showIndex = false
@@ -133,6 +134,9 @@ struct QuranHomeView: View {
         .onChange(of: busy) { _, isBusy in
             if !isBusy { dispatchPendingRoute() }
         }
+        .onChange(of: showPlanSetup) { _, presented in
+            if !presented { dispatchPendingRoute() }
+        }
         .sheet(item: $detail) { item in
             switch item {
             case .hadith:
@@ -190,7 +194,10 @@ struct QuranHomeView: View {
         }
         .fullScreenCover(isPresented: $showFree, onDismiss: { run(refresh: true) { try await refresh() } }) { QuranFreeView(service: service, close: { showFree = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showSetup, onDismiss: { run(refresh: true) { try await refresh() } }) { QuranPlanSetupView(service: service, close: { showSetup = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
-        .fullScreenCover(isPresented: $showPlan, onDismiss: { run(refresh: true) { try await refresh() } }) { QuranPlanView(service: service, close: { showPlan = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showPlan, onDismiss: { run(refresh: true) { try await refresh() } }) {
+            QuranPlanView(service: service, close: { showPlan = false }, onSetupPresentationChange: { showPlanSetup = $0 })
+                .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
+        }
         .fullScreenCover(isPresented: $showWeek, onDismiss: clearLogRoute) {
             QuranLogView(service: service, close: { showWeek = false }, initialTab: logInitialTab, initialSessionID: logInitialSessionID)
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft).id(logRouteRequestID)
@@ -452,7 +459,7 @@ struct QuranHomeView: View {
     /// Keep stateful Quran flows open until the user finishes them. Read-only route covers can be
     /// replaced, but SwiftUI needs the old full-screen presentation to finish dismissing first.
     private var hasProtectedQuranPresentation: Bool {
-        active != nil || showDayClose || showSetup || showFree || showQiyam || showPlan
+        active != nil || showDayClose || showSetup || showFree || showQiyam || showPlanSetup
     }
     private var hasReplaceableQuranPresentation: Bool {
         detail != nil || mushaf != nil || reference != nil || showOutside || showWeek || showPlan || showIndex || showStrength
