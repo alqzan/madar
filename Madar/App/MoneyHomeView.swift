@@ -151,7 +151,7 @@ struct MoneyHomeView: View {
         .onChange(of: reconcileOpen) { if !reconcileOpen { load() } }
         .navigationDestination(isPresented: $cashbackOpen) { MoneyCashbackView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $sinceOpen) {
-            if let reading { MoneySinceView(app: app, home: reading, revealed: $revealed) { sinceOpen = false; messagesOpen = true; Task { try? await app.executeMoneyCommand("money.markVisit") } } }
+            if let reading { MoneySinceView(app: app, home: reading, revealed: $revealed) { sinceOpen = false; messagesOpen = true } }
         }
         .navigationDestination(isPresented: $guideOpen) { MoneyShortcutGuideView(app: app) }
         .navigationDestination(isPresented: $goalOpen) { MoneyGoalView(app: app, revealed: $revealed) }

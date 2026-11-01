@@ -111,6 +111,7 @@ final class AppSession {
     @ObservationIgnored var failFirstNotebookSave = false
     @ObservationIgnored private var failFirstGoodreadsImport = false
     @ObservationIgnored private var failFirstQuranLevelWrite = false
+    @ObservationIgnored private var failFirstMoneyVisitMark = false
     @ObservationIgnored private var remainingMihbaraLocatorFailures = 0
     @ObservationIgnored private var failMihbaraLocatorOnReaderClose = false
     @ObservationIgnored private var quranLevelWriteHoldMilliseconds: Int?
@@ -173,6 +174,10 @@ final class AppSession {
             && notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent
             && group.deletingLastPathComponent().lastPathComponent == "UITestStores"
         failFirstQuranLevelWrite = notebookTest["MADAR_UI_QURAN_LEVEL_WRITE_FAIL_ONCE"] == "1"
+            && notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent
+            && group.deletingLastPathComponent().lastPathComponent == "UITestStores"
+        failFirstMoneyVisitMark = notebookTest["MADAR_UI_MONEY_VISIT_BUSY_ONCE"] == "1"
+            && notebookTest["MADAR_UI_MONEY_FIXTURE"] == "since"
             && notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent
             && group.deletingLastPathComponent().lastPathComponent == "UITestStores"
         if notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent,
@@ -1040,6 +1045,13 @@ final class AppSession {
 
     func executeMoneyCommand(_ name: String, payload: [String: MadarCore.JSONValue] = [:], id: UUID = UUID()) async throws {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
+#if DEBUG
+        if name == "money.markVisit", failFirstMoneyVisitMark {
+            failFirstMoneyVisitMark = false
+            errorMessage = Self.maintenanceBusyMessage
+            throw BackupOperationError.busy
+        }
+#endif
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
 #if DEBUG

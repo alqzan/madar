@@ -30,4 +30,38 @@ import XCTest
         XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["money-since-title"].waitForExistence(timeout: 3), "Seen today: the home opens directly")
     }
+
+    func testFailedVisitMarkKeepsSincePageOpenForRetry() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "since",
+            "MADAR_UI_MONEY_VISIT_BUSY_ONCE": "1", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00"]
+        app.launch()
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let title = app.staticTexts["money-since-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 15), app.debugDescription)
+        let done = app.buttons["money-since-done"]
+        for _ in 0..<4 where !done.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(done.isHittable, app.debugDescription)
+        done.tap()
+
+        let alert = app.alerts["لم تُسجّل الزيارة"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(alert.staticTexts.element(boundBy: 1).label.contains("العملية الحالية"), app.debugDescription)
+        XCTAssertTrue(title.exists, "A rejected visit mark must keep the newspaper open")
+        let retry = alert.buttons["أعِد المحاولة"]
+        XCTAssertTrue(retry.exists, app.debugDescription)
+        shot(app, "M5-V06-since-visit-mark-failed-L")
+        retry.tap()
+        XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 10))
+        XCTAssertFalse(title.waitForExistence(timeout: 2), "The retry should close after the visit mark commits")
+        shot(app, "M5-V06-since-visit-mark-retried-L")
+
+        app.buttons["money-back"].tap()
+        XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 10))
+        XCTAssertFalse(title.waitForExistence(timeout: 3), "The successful retry records the visit for today")
+    }
 }

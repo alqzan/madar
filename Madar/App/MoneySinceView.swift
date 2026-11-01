@@ -17,6 +17,7 @@ struct MoneySinceView: View {
     @State private var reading: MoneySinceReading?
     @State private var selected: GregorianDay?
     @State private var failure: String?
+    @State private var finishFailure: String?
     @State private var finishing = false
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
@@ -27,9 +28,9 @@ struct MoneySinceView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 12) {
                     Text("منذ آخر زيارة").font(MadarTypography.cardTitle()).accessibilityIdentifier("money-since-title")
-                    Button(action: finish) {
+                    Button(action: { finish() }) {
                         Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
-                    }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-since-close")
+                    }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-since-close").disabled(finishing)
                     Spacer()
                 }.padding(.top, 8)
                 if let reading {
@@ -46,16 +47,23 @@ struct MoneySinceView: View {
                     dayDetail(reading)
                     if reading.pending > 0 { decisions(reading) }
                     doors(reading)
-                    Button(action: finish) {
+                    Button(action: { finish() }) {
                         Text("تمّ، افتح المال").font(.custom("thmanyahsans-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.background)
                             .frame(maxWidth: .infinity, minHeight: 58).background(theme.ink)
-                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-since-done").padding(.top, 6)
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-since-done").padding(.top, 6).disabled(finishing)
                 } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task { load() }.accessibilityIdentifier("money-since")
+            .alert("لم تُسجّل الزيارة", isPresented: Binding(get: { finishFailure != nil }, set: { if !$0 { finishFailure = nil } })) {
+                Button("أعِد المحاولة") {
+                    finishFailure = nil
+                    finish()
+                }
+                Button("ابق في الصحيفة", role: .cancel) { finishFailure = nil }
+            } message: { Text(finishFailure ?? "") }
     }
     private func masthead(_ r: MoneySinceReading) -> some View {
         VStack(spacing: 6) {
@@ -196,7 +204,7 @@ struct MoneySinceView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack { Text("يحتاج قرارك").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer()
                 Text(service.pending(r.pending)).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
-            Button(action: openMessages) {
+            Button(action: { finish(openMessagesAfter: true) }) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("رسائل البنك").font(MadarTypography.cardTitle())
@@ -251,11 +259,21 @@ struct MoneySinceView: View {
         }.padding(14).frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading).background(theme.surface, in: .rect(cornerRadius: 18))
             .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.color("reserveText"), lineWidth: 1) }
     }
-    private func finish() {
+    private func finish(openMessagesAfter: Bool = false) {
         // AU-95: one visit mark per close, however fast the two buttons are tapped.
         guard !finishing else { return }
         finishing = true
-        Task { try? await app.executeMoneyCommand("money.markVisit"); dismiss() }
+        finishFailure = nil
+        Task {
+            do {
+                try await app.executeMoneyCommand("money.markVisit")
+                if openMessagesAfter { openMessages() } else { dismiss() }
+            } catch {
+                app.clearRecoveredMaintenanceError()
+                finishFailure = madarUserMessage(error)
+                finishing = false
+            }
+        }
     }
     private func load() {
         do { reading = try service.loadSince(home: home); failure = nil } catch { failure = "تعذّرت قراءة الأيام" }
