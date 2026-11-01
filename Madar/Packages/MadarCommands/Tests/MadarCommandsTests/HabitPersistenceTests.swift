@@ -112,6 +112,46 @@ import MadarData
         #expect(policies.map(\.target) == [2,4])
         #expect(HabitCommand.parse("habit.pause",["id":.string(id.uuidString),"from":.string("invalid")]) == nil)
     }
+    @Test func endingTripResumesItsLinkedHabitPauseThatDay() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitTripPauseEnd-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let bus = CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 }))
+        let departure = ISO8601DateFormatter().date(from: "2026-10-14T20:00:00+03:00")!
+        let dismissal = ISO8601DateFormatter().date(from: "2026-10-15T20:00:00+03:00")!
+        _ = try SettingsStore(context: ModelContext(container)).stage(["core.dayStart": .string("midnight")], now: departure)
+        func run(_ name: String, _ payload: [String: MadarCore.JSONValue], at date: Date) async throws -> CommandOutcome {
+            try await bus.execute(.init(name: name, payload: .object(payload), issuedAt: date), now: date)
+        }
+
+        let habitID = UUID()
+        let rule = HabitRule(effectiveFrom: try GregorianDay("2026-10-14"))
+        #expect(try await run("habit.save", payload(habitID, rule), at: departure).status == .applied)
+        #expect(try await run("prayer.startTrip", [
+            "city": .string("الرياض"), "country": .string("SA"), "lat": .number(24.7136),
+            "lon": .number(46.6753), "tzID": .string("Asia/Riyadh")
+        ], at: departure).status == .applied)
+        #expect(try await run("habit.pause", [
+            "id": .string(habitID.uuidString), "from": .string("2026-10-14"), "trip": .bool(true)
+        ], at: departure).status == .applied)
+
+        let beforeEnd = try #require(try HabitRepository(context: ModelContext(container)).readings(at: dismissal).first)
+        #expect(beforeEnd.paused)
+        let trip = try #require(try ModelContext(container).fetch(FetchDescriptor<Trip>()).first)
+        #expect(try await run("prayer.endTrip", ["tripID": .string(trip.id.uuidString)], at: dismissal).status == .applied)
+
+        let savedTrip = try #require(try ModelContext(container).fetch(FetchDescriptor<Trip>()).first)
+        let linkedPause = try #require(try ModelContext(container).fetch(FetchDescriptor<HabitPause>()).first)
+        #expect(savedTrip.end == dismissal)
+        #expect(linkedPause.tripID == savedTrip.id)
+        #expect(linkedPause.toDayKey == nil, "The linked end is derived from the trip's recorded end instant.")
+
+        let departureDay = try #require(try HabitRepository(context: ModelContext(container)).readings(at: departure).first)
+        #expect(departureDay.paused)
+        #expect(departureDay.summary.current?.outcome == .excluded)
+        let returnDay = try #require(try HabitRepository(context: ModelContext(container)).readings(at: dismissal).first)
+        #expect(!returnDay.paused)
+    }
     @Test func homeOnlyHabitIsFrozenForSameDayTravel() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitSameDayTrip-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
