@@ -541,7 +541,7 @@ struct MoneyCashbackRateSheet: View {
                 }
             }.padding(20)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
-            .presentationDetents([.fraction(0.72), .large]).presentationDragIndicator(.visible)
+            .presentationDetents([.fraction(0.72), .large]).presentationDragIndicator(.visible).interactiveDismissDisabled(saving)
             .accessibilityIdentifier("money-cashback-rate-sheet")
     }
     private func stepButton(_ symbol: String, label: String, id: String, action: @escaping () -> Void) -> some View {

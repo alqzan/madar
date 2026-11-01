@@ -2,9 +2,10 @@ import XCTest
 
 @MainActor final class MoneyCashbackUITests: XCTestCase {
     private func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
-    private func openJar(fixture: String, currency: String? = nil) -> XCUIApplication {
+    private func openJar(fixture: String, currency: String? = nil, saveHoldMS: Int? = nil) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
         if let currency { app.launchEnvironment["MADAR_UI_MONEY_CURRENCY"] = currency }
+        if let saveHoldMS { app.launchEnvironment["MADAR_UI_MONEY_WRITE_HOLD_MS"] = String(saveHoldMS) }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
         app.buttons["money-open"].tap()
@@ -89,6 +90,30 @@ import XCTest
         expectation(for: NSPredicate(format: "label CONTAINS %@", "الوجهة المختارة"), evaluatedWith: envelope)
         waitForExpectations(timeout: 5)
         sleep(1); shot(app, "M5-V16-cashback-destination-glass-L")
+    }
+
+    func testCashbackRateSheetStaysOpenWhileSaving() throws {
+        continueAfterFailure = false
+        let app = openJar(fixture: "cashback", saveHoldMS: 5000)
+        let debit = app.buttons["money-cashback-card-بطاقة مدى"]
+        for _ in 0..<8 where !debit.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(debit.waitForExistence(timeout: 8)); debit.tap()
+        let sheet = app.descendants(matching: .any)["money-cashback-rate-sheet"].firstMatch
+        let value = app.descendants(matching: .any)["money-cashback-rate-value"].firstMatch
+        let save = app.buttons["money-cashback-rate-save"]
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5)); XCTAssertTrue(value.exists); XCTAssertTrue(save.exists)
+        shot(app, "M5-V16-rate-idle-L")
+        app.buttons["money-cashback-rate-chip-100"].tap()
+        app.buttons["money-cashback-rate-minus"].tap(); app.buttons["money-cashback-rate-minus"].tap()
+        XCTAssertTrue(save.isEnabled); save.tap()
+        XCTAssertTrue(sheet.waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertFalse(save.isEnabled)
+        shot(app, "M5-V16-rate-saving-L")
+        app.swipeDown()
+        XCTAssertTrue(sheet.waitForExistence(timeout: 2), app.debugDescription)
+        XCTAssertFalse(save.isEnabled)
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(debit.waitForExistence(timeout: 5)); XCTAssertTrue(debit.label.contains("٠٫٥"), debit.label)
     }
 
     func testPreferredCardIsSavedAndOfferedForExplicitExpenseSelection() throws {
