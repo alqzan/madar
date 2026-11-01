@@ -180,7 +180,7 @@ struct QuranHomeView: View {
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(item: $reference) { request in
-            QuranWirdReferenceView(request: request, digits: service.numerals, close: { reference = nil })
+            QuranWirdReferenceView(request: request, digits: service.numerals, app: service.app, close: { reference = nil })
                 .environment(\.roomTheme, theme)
         }
         .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }

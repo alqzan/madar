@@ -9,7 +9,7 @@ struct QuranWirdReferenceRequest: Identifiable {
     let range: QuranAyahRange
 }
 
-enum QuranWirdReferenceKind: String, Sendable, Equatable {
+enum QuranWirdReferenceKind: String, Codable, Sendable, Equatable {
     case tafsir, asbab, context
 
     var title: String {
@@ -35,7 +35,7 @@ private enum QuranWirdReferenceFilter: String, CaseIterable, Identifiable {
     }
 }
 
-struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
+struct QuranWirdReferenceExcerpt: Codable, Identifiable, Sendable {
     let id: String
     let ayahID: Int
     let kind: QuranWirdReferenceKind
@@ -46,778 +46,10 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
     let sourceURL: URL
     let sourceNote: String?
 
-    static let verified: [Self] = [
-        .init(
-            id: "tabari-1-2",
-            ayahID: 2,
-            kind: .tafsir,
-            text: "الشكرُ للَّهِ خالصًا دونَ سائرِ ما يُعْبَدُ مِن دونِه",
-            book: "تفسير الطبري جامع البيان - ت التركي",
-            author: "ابن جرير الطبري",
-            citation: "١/ ١٣٥",
-            sourceURL: URL(string: "https://shamela.ws/book/7798/315")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-1-2",
-            ayahID: 2,
-            kind: .tafsir,
-            text: "الثناء على الله بصفات الكمال، وبأفعاله الدائرة بين الفضل والعدل",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٣٩",
-            sourceURL: URL(string: "https://shamela.ws/book/42/30")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "qurtubi-1-3-in-ibn-kathir",
-            ayahID: 3,
-            kind: .tafsir,
-            text: "ليكون من باب قرن الترغيب بعد الترهيب",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "القرطبي (نقلًا عن ابن كثير)",
-            citation: "١/ ٢٠٢",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/257")!,
-            sourceNote: "ينقل ابن كثير هذا التعليل عن القرطبي."
-        ),
-        .init(
-            id: "ibn-kathir-1-4",
-            ayahID: 4,
-            kind: .tafsir,
-            text: "وكلاهما صحيح متواتر في السبع",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "ابن كثير",
-            citation: "١/ ٢٠٢",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/257")!,
-            sourceNote: "عن قراءتي «مَلِكِ» و«مَالِكِ» في آية يوم الدين."
-        ),
-        .init(
-            id: "saadi-1-4",
-            ayahID: 4,
-            kind: .tafsir,
-            text: "من آثارها أنه يأمر وينهى، ويثيب ويعاقب",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٣٩",
-            sourceURL: URL(string: "https://shamela.ws/book/42/30")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-1-5",
-            ayahID: 5,
-            kind: .tafsir,
-            text: "لأن تقديم المعمول يفيد الحصر، وهو إثبات الحكم للمذكور، ونفيه عما عداه",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٣٩",
-            sourceURL: URL(string: "https://shamela.ws/book/42/30")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "ibn-kathir-1-5",
-            ayahID: 5,
-            kind: .tafsir,
-            text: "وفي الشرع عبارة عما يجمع كمال المحبة والخضوع والخوف",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "ابن كثير",
-            citation: "١/ ٢٠٥",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/260")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "ibn-kathir-2-178-context",
-            ayahID: 185,
-            kind: .context,
-            text: "كانت بنو النضير قد غزت قريظة في الجاهلية وقهروهم",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "ابن كثير",
-            citation: "٢/ ٤٤",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/749")!,
-            sourceNote: "يذكره ابن كثير سياقًا يشرح الخلفية التاريخية لأحكام القصاص؛ والموضع لا يصوغه خبرًا صريحًا عن سبب النزول."
-        ),
-        .init(
-            id: "saadi-2-178",
-            ayahID: 185,
-            kind: .tafsir,
-            text: "إقامة للعدل والقسط بين العباد",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٨٤",
-            sourceURL: URL(string: "https://shamela.ws/book/42/120")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "tabari-2-179",
-            ayahID: 186,
-            kind: .tafsir,
-            text: "فكان لكم في حكمِي بينَكم بذلك حياةٌ",
-            book: "تفسير الطبري جامع البيان - ت التركي",
-            author: "ابن جرير الطبري",
-            citation: "٣/ ١٢٠",
-            sourceURL: URL(string: "https://shamela.ws/book/7798/1771")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-179",
-            ayahID: 186,
-            kind: .tafsir,
-            text: "لأن من عرف أنه مقتول إذا قتل، لا يكاد يصدر منه القتل",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٨٥",
-            sourceURL: URL(string: "https://shamela.ws/book/42/120")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "tabari-2-180",
-            ayahID: 187,
-            kind: .tafsir,
-            text: "والخيرُ المالُ",
-            book: "تفسير الطبري جامع البيان - ت التركي",
-            author: "ابن جرير الطبري",
-            citation: "٣/ ١٢٣",
-            sourceURL: URL(string: "https://shamela.ws/book/7798/1774")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-180",
-            ayahID: 187,
-            kind: .tafsir,
-            text: "بل يرتبهم على القرب والحاجة",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٨٥",
-            sourceURL: URL(string: "https://shamela.ws/book/42/121")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "tabari-2-181",
-            ayahID: 188,
-            kind: .tafsir,
-            text: "فإنما إثمُ التبديلِ على من بدَّلَ وصيَّتَه",
-            book: "تفسير الطبري جامع البيان - ت التركي",
-            author: "ابن جرير الطبري",
-            citation: "٣/ ١٣٩",
-            sourceURL: URL(string: "https://shamela.ws/book/7798/1790")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-182",
-            ayahID: 189,
-            kind: .tafsir,
-            text: "ينبغي لمن حضر الموصي وقت الوصية بها، أن ينصحه بما هو الأحسن والأعدل",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٨٥",
-            sourceURL: URL(string: "https://shamela.ws/book/42/122")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-183",
-            ayahID: 190,
-            kind: .tafsir,
-            text: "فإن الصيام من أكبر أسباب التقوى",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٨٦",
-            sourceURL: URL(string: "https://shamela.ws/book/42/123")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "ibn-kathir-2-183",
-            ayahID: 190,
-            kind: .tafsir,
-            text: "فلهم فيه أسوة، وليجتهد هؤلاء في أداء هذا الفرض أكمل مما فعله أولئك",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "ابن كثير",
-            citation: "٢/ ٥٣",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/758")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "ibn-kathir-2-184",
-            ayahID: 191,
-            kind: .tafsir,
-            text: "لئلا يشق على النفوس",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "ابن كثير",
-            citation: "٢/ ٥٣",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/758")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-184",
-            ayahID: 191,
-            kind: .tafsir,
-            text: "أن يقضي أياما قصيرة باردة، عن أيام طويلة حارة كالعكس",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٨٦",
-            sourceURL: URL(string: "https://shamela.ws/book/42/123")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "ibn-kathir-2-185",
-            ayahID: 192,
-            kind: .tafsir,
-            text: "يمدح تعالى شهر الصيام من بين سائر الشهور بأن اختاره من بينهن لإنزال القرآن العظيم",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "ابن كثير",
-            citation: "٢/ ٥٧",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/762")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-185",
-            ayahID: 192,
-            kind: .tafsir,
-            text: "يريد الله تعالى أن ييسر عليكم الطرق الموصلة إلى رضوانه",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٨٦",
-            sourceURL: URL(string: "https://shamela.ws/book/42/123")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "ibn-ashur-2-186",
-            ayahID: 193,
-            kind: .tafsir,
-            text: "وَجُعِلَ هَذَا الْخَيْرُ مُرَتَّبًا عَلَى تَقْدِيرِ سُؤَالِهِمْ",
-            book: "تفسير ابن عاشور التحرير والتنوير",
-            author: "ابن عاشور",
-            citation: "٢/ ١٧٨",
-            sourceURL: URL(string: "https://shamela.ws/book/9776/945")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-186",
-            ayahID: 193,
-            kind: .tafsir,
-            text: "فهو قريب أيضا من داعيه، بالإجابة",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٨٧",
-            sourceURL: URL(string: "https://shamela.ws/book/42/124")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "ibn-kathir-2-187",
-            ayahID: 194,
-            kind: .tafsir,
-            text: "هذه رخصة من الله تعالى للمسلمين، ورفع لما كان عليه الأمر في ابتداء الإسلام…",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "ابن كثير",
-            citation: "٢/ ٦٧",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/772")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "bukhari-2-187",
-            ayahID: 194,
-            kind: .asbab,
-            text: "فَلَمَّا انْتَصَفَ النَّهَارُ غُشِيَ عَلَيْهِ، فَذُكِرَ ذَلِكَ لِلنَّبِيِّ ﷺ فَنَزَلَتْ هَذِهِ الْآيَةُ…",
-            book: "صحيح البخاري - ت البغا",
-            author: "البخاري",
-            citation: "٢/ ٦٧٦",
-            sourceURL: URL(string: "https://shamela.ws/book/735/3072")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "maathur-2-188",
-            ayahID: 195,
-            kind: .asbab,
-            text: "وأراد امرؤُ القيس أن يحلف؛ ففيه نزلت: ﴿ولا تأكلوا أموالكم بينكم بالباطل﴾",
-            book: "موسوعة التفسير المأثور",
-            author: "مجموعة من المؤلفين",
-            citation: "٣/ ٤٢٣",
-            sourceURL: URL(string: "https://shamela.ws/book/639/1698")!,
-            sourceNote: "أورده المصدر عن سعيد بن جبير، من طريق عطاء بن دينار؛ ولا يحكم هذا الموضع على إسناده."
-        ),
-        .init(
-            id: "ibn-kathir-2-188",
-            ayahID: 195,
-            kind: .tafsir,
-            text: "أي: تعلمون بطلان ما تدعونه وتروجونه في كلامكم…",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "ابن كثير",
-            citation: "٢/ ٧٩",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/784")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "ibn-kathir-2-255",
-            ayahID: 262,
-            kind: .tafsir,
-            text: "هذه آية الكرسي، ولها شأن عظيم",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "ابن كثير",
-            citation: "٢/ ٢٣٩",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/944")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "ibn-ashur-2-255-context",
-            ayahID: 262,
-            kind: .context,
-            text: "وَجُعِلَتْ هَذِهِ الْآيَةُ ابْتِدَاءً لِآيَاتِ تَقْرِيرِ الْوَحْدَانِيَّةِ وَالْبَعْثِ",
-            book: "تفسير ابن عاشور التحرير والتنوير",
-            author: "ابن عاشور",
-            citation: "٣/ ١٧",
-            sourceURL: URL(string: "https://shamela.ws/book/9776/1273")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-286",
-            ayahID: 293,
-            kind: .tafsir,
-            text: "بل هي غذاء للأرواح ودواء للأبدان",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ١٢٠",
-            sourceURL: URL(string: "https://shamela.ws/book/42/195")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "tabari-2-286",
-            ayahID: 293,
-            kind: .tafsir,
-            text: "فلا يُضَيِّقُ عليها ولا يَجْهَدُها",
-            book: "تفسير الطبري جامع البيان - ت التركي",
-            author: "ابن جرير الطبري",
-            citation: "٥/ ١٥٣",
-            sourceURL: URL(string: "https://shamela.ws/book/7798/3270")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-3-190",
-            ayahID: 483,
-            kind: .tafsir,
-            text: "وخص الله بالآيات أولي الألباب، وهم أهل العقول؛ لأنهم هم المنتفعون بها، الناظرون إليها بعقولهم لا بأبصارهم.",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ١٦١",
-            sourceURL: URL(string: "https://shamela.ws/book/42/284")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-3-191",
-            ayahID: 484,
-            kind: .tafsir,
-            text: "التفكر عبادة من صفات أولياء الله العارفين",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ١٦١",
-            sourceURL: URL(string: "https://shamela.ws/book/42/284")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-3-192",
-            ayahID: 485,
-            kind: .tafsir,
-            text: "لحصوله على السخط من الله، ومن ملائكته، وأوليائه",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ١٦١",
-            sourceURL: URL(string: "https://shamela.ws/book/42/284")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-3-193",
-            ayahID: 486,
-            kind: .tafsir,
-            text: "أجبناه مبادرة، وسارعنا إليه",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ١٦١",
-            sourceURL: URL(string: "https://shamela.ws/book/42/284")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-3-194",
-            ayahID: 487,
-            kind: .tafsir,
-            text: "سألوه الثواب على ذلك",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ١٦١",
-            sourceURL: URL(string: "https://shamela.ws/book/42/284")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-3-195",
-            ayahID: 488,
-            kind: .tafsir,
-            text: "الجميع سيلقون ثواب أعمالهم كاملا موفرا",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ١٦٢",
-            sourceURL: URL(string: "https://shamela.ws/book/42/285")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-3-198",
-            ayahID: 491,
-            kind: .tafsir,
-            text: "فأثابهم البر الرحيم من بره أجرا عظيما",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ١٦٢",
-            sourceURL: URL(string: "https://shamela.ws/book/42/286")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-3-199",
-            ayahID: 492,
-            kind: .tafsir,
-            text: "طائفة موفقة للخير",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ١٦٢",
-            sourceURL: URL(string: "https://shamela.ws/book/42/287")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-3-200",
-            ayahID: 493,
-            kind: .tafsir,
-            text: "الطريق الموصل إلى ذلك لزوم الصبر",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ١٦٢",
-            sourceURL: URL(string: "https://shamela.ws/book/42/287")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-4-36-neighbor",
-            ayahID: 529,
-            kind: .tafsir,
-            text: "كلما كان الجار أقرب بابا كان آكد حقا",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ١٧٧",
-            sourceURL: URL(string: "https://shamela.ws/book/42/316")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "maathur-3-190-context",
-            ayahID: 483,
-            kind: .context,
-            text: "ولِمَ لا أفعل وقد أنزل علي هذه الليلة",
-            book: "موسوعة التفسير المأثور",
-            author: "مجموعة من المؤلفين",
-            citation: "٥/ ٧٦٢",
-            sourceURL: URL(string: "https://shamela.ws/book/639/3482")!,
-            sourceNote: "تورد الموسوعة الخبر عن عائشة في قيام النبي ﷺ وتلاوته الآيات؛ وتنقل حاشيتها عن الألباني: «إسناد جيد». يصف الخبر تلاوة الآيات ولا يذكر حادثةً سبقت نزولها."
-        ),
-        .init(
-            id: "saadi-2-189",
-            ayahID: 196,
-            kind: .context,
-            text: "فلو كان الحساب بالسنة الشمسية، لم يعرفه إلا النادر من الناس",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٨٨",
-            sourceURL: URL(string: "https://shamela.ws/book/42/127")!,
-            sourceNote: "في بيان فائدة جعل الأهلة مواقيت للعبادات والمعاملات."
-        ),
-        .init(
-            id: "ibn-ashur-2-189-context",
-            ayahID: 196,
-            kind: .context,
-            text: "لأن الآيات خطاب للمسلمين وهم الذين سألوا عن الأهلة، والنسيء من أحوال أهل الجاهلية",
-            book: "تفسير ابن عاشور التحرير والتنوير",
-            author: "ابن عاشور",
-            citation: "٢/ ١٩٩",
-            sourceURL: URL(string: "https://shamela.ws/book/9776/966")!,
-            sourceNote: "يردّ ابن عاشور تأويل الآية بأنها مثلٌ للنسيء، ويصفه بالبعد؛ هذا سياق تفسيري لا تقرير لسبب النزول."
-        ),
-        .init(
-            id: "saadi-2-190",
-            ayahID: 197,
-            kind: .tafsir,
-            text: "والنهي عن الاعتداء، يشمل أنواع الاعتداء كلها",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٨٩",
-            sourceURL: URL(string: "https://shamela.ws/book/42/128")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "tabari-2-191",
-            ayahID: 198,
-            kind: .tafsir,
-            text: "والشركُ باللهِ أشدُّ مِن القتلِ",
-            book: "تفسير الطبري جامع البيان - ت التركي",
-            author: "ابن جرير الطبري",
-            citation: "٣/ ٢٩٣",
-            sourceURL: URL(string: "https://shamela.ws/book/7798/1944")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "ibn-kathir-2-192",
-            ayahID: 199,
-            kind: .tafsir,
-            text: "فإن تركوا القتال في الحرم وأنابوا إلى الإسلام والتوبة",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "ابن كثير",
-            citation: "٢/ ٨٤",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/789")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "ibn-kathir-2-193",
-            ayahID: 200,
-            kind: .tafsir,
-            text: "فإن انتهوا عما هم فيه من الشرك وقتال المؤمنين فكفوا عنهم",
-            book: "تفسير ابن كثير - ط ابن الجوزي",
-            author: "ابن كثير",
-            citation: "٢/ ٨٥",
-            sourceURL: URL(string: "https://shamela.ws/book/1503/790")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-194",
-            ayahID: 201,
-            kind: .tafsir,
-            text: "هذا تفسير لصفة المقاصة، وأنها هي المماثلة في مقابلة المعتدي",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٨٩",
-            sourceURL: URL(string: "https://shamela.ws/book/42/130")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-195",
-            ayahID: 202,
-            kind: .tafsir,
-            text: "فالجهاد في سبيل الله لا يقوم إلا على ساق النفقة",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٠",
-            sourceURL: URL(string: "https://shamela.ws/book/42/131")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-196",
-            ayahID: 203,
-            kind: .tafsir,
-            text: "الأمر بإتقانهما وإحسانهما",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٠",
-            sourceURL: URL(string: "https://shamela.ws/book/42/132")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-197",
-            ayahID: 204,
-            kind: .tafsir,
-            text: "والمراد بالأشهر المعلومات عند جمهور العلماء: شوال، وذو القعدة، وعشر من ذي الحجة",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩١",
-            sourceURL: URL(string: "https://shamela.ws/book/42/133")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-198",
-            ayahID: 205,
-            kind: .tafsir,
-            text: "ابتغاء فضل الله بالتكسب في مواسم الحج وغيره، ليس فيه حرج",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٢",
-            sourceURL: URL(string: "https://shamela.ws/book/42/134")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-199",
-            ayahID: 206,
-            kind: .tafsir,
-            text: "أمر تعالى عند الفراغ منها باستغفاره والإكثار من ذكره",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٢",
-            sourceURL: URL(string: "https://shamela.ws/book/42/134")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-200",
-            ayahID: 207,
-            kind: .tafsir,
-            text: "يسأله من مطالب الدنيا ما هو من شهواته",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٣",
-            sourceURL: URL(string: "https://shamela.ws/book/42/134")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-201",
-            ayahID: 208,
-            kind: .tafsir,
-            text: "ومنهم من يدعو الله لمصلحة الدارين، ويفتقر إليه في مهمات دينه ودنياه",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٣",
-            sourceURL: URL(string: "https://shamela.ws/book/42/134")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-202",
-            ayahID: 209,
-            kind: .tafsir,
-            text: "لهم نصيب من كسبهم وعملهم",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٣",
-            sourceURL: URL(string: "https://shamela.ws/book/42/134")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-203",
-            ayahID: 210,
-            kind: .tafsir,
-            text: "وهي أيام التشريق الثلاثة بعد العيد",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٣",
-            sourceURL: URL(string: "https://shamela.ws/book/42/135")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-204",
-            ayahID: 211,
-            kind: .tafsir,
-            text: "لأنه يخالف قوله فعله",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٣",
-            sourceURL: URL(string: "https://shamela.ws/book/42/136")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-205",
-            ayahID: 212,
-            kind: .tafsir,
-            text: "يجتهد على أعمال المعاصي، التي هي إفساد في الأرض",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٣",
-            sourceURL: URL(string: "https://shamela.ws/book/42/136")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-206",
-            ayahID: 213,
-            kind: .tafsir,
-            text: "إذا أمر بتقوى الله تكبر وأنف",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٤",
-            sourceURL: URL(string: "https://shamela.ws/book/42/136")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-208",
-            ayahID: 215,
-            kind: .tafsir,
-            text: "في جميع شرائع الدين، ولا يتركوا منها شيئا",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٤",
-            sourceURL: URL(string: "https://shamela.ws/book/42/138")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-209",
-            ayahID: 216,
-            kind: .tafsir,
-            text: "على علم ويقين",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٤",
-            sourceURL: URL(string: "https://shamela.ws/book/42/138")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-211",
-            ayahID: 218,
-            kind: .tafsir,
-            text: "كفروا بها وبدلوا نعمة الله كفرا",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٥",
-            sourceURL: URL(string: "https://shamela.ws/book/42/140")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-212",
-            ayahID: 219,
-            kind: .tafsir,
-            text: "فيخفف الله عنه بإيمانه وصبره ما لا يكون لغيره",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٥",
-            sourceURL: URL(string: "https://shamela.ws/book/42/141")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-213",
-            ayahID: 220,
-            kind: .tafsir,
-            text: "فكل ما اشتملت عليه الكتب، فهو حق",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٥",
-            sourceURL: URL(string: "https://shamela.ws/book/42/142")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-214",
-            ayahID: 221,
-            kind: .tafsir,
-            text: "الفرج عند الشدة، وكلما ضاق الأمر اتسع",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٦",
-            sourceURL: URL(string: "https://shamela.ws/book/42/143")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-215",
-            ayahID: 222,
-            kind: .tafsir,
-            text: "على حسب القرب والحاجة",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٦",
-            sourceURL: URL(string: "https://shamela.ws/book/42/144")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-219",
-            ayahID: 226,
-            kind: .tafsir,
-            text: "أكبر مما يظنونه من نفعهما",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٨",
-            sourceURL: URL(string: "https://shamela.ws/book/42/148")!,
-            sourceNote: nil
-        ),
-        .init(
-            id: "saadi-2-220",
-            ayahID: 227,
-            kind: .tafsir,
-            text: "إصلاح أموال اليتامى، بحفظها وصيانتها، والاتجار فيها",
-            book: "تفسير السعدي = تيسير الكريم الرحمن",
-            author: "عبد الرحمن السعدي",
-            citation: "ص ٩٩",
-            sourceURL: URL(string: "https://shamela.ws/book/42/150")!,
-            sourceNote: nil
-        )
-    ]
+    static let verified: [Self] = {
+        guard let data = try? QuranWirdReferenceResource.bundledData() else { return [] }
+        return (try? JSONDecoder().decode([Self].self, from: data)) ?? []
+    }()
 }
 
 enum QuranWirdReferenceSearch {
@@ -839,12 +71,16 @@ enum QuranWirdReferenceSearch {
 struct QuranWirdReferenceView: View {
     let request: QuranWirdReferenceRequest
     let digits: MadarNumberFormatter
+    let app: AppSession
     let close: () -> Void
 
     @Environment(\.roomTheme) private var theme
     @State private var ayahs: [QuranAyahResourceRecord] = []
+    @State private var library = QuranTafsirLibrary.shared
+    @State private var selectedBookIDs: [Int] = []
     @State private var filter: QuranWirdReferenceFilter = .all
     @State private var showingAyahs = false
+    @State private var showingTafsirLibrary = false
     @State private var loading = true
     @State private var failed = false
     @State private var retryCount = 0
@@ -858,17 +94,18 @@ struct QuranWirdReferenceView: View {
                         Text("مرجع وردك").font(serif(27)).accessibilityIdentifier("quran-reference-title")
                         Text(rangeTitle).font(bodyFont(14, bold: true)).foregroundStyle(theme.color("hifzText"))
                             .accessibilityIdentifier("quran-reference-range")
-                        Text("مقتطفات موثّقة للتفسير والسياق، وسبب النزول حين يصرّح به المصدر.")
+                        Text("اقرأ التفاسير التي اخترتها لكل آيات هذا الورد، مع بقاء أسباب النزول والسياق في موضعيهما.")
                             .font(bodyFont(12)).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("quran-reference-intro")
                     }
                     filterPicker
+                    tafsirPicker
                     if loading {
                         ProgressView().frame(maxWidth: .infinity, minHeight: 120)
                     } else if failed {
                         failureState
                     } else {
-                        let matchingAyahs = ayahs.filter { !entries(for: $0).isEmpty }
+                        let matchingAyahs = ayahs.filter { hasSourceData(for: $0) }
                         if matchingAyahs.isEmpty {
                             emptyState
                         } else {
@@ -889,7 +126,17 @@ struct QuranWirdReferenceView: View {
         .background(theme.background.ignoresSafeArea())
         .environment(\.layoutDirection, .rightToLeft)
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .task(id: retryCount) { loadAyahs() }
+        .task(id: retryCount) {
+            loadAyahs()
+            await library.loadLocal()
+            restoreBookSelection()
+        }
+        .onChange(of: app.values[QuranTafsirPreferences.lastBooksKey]) { _, _ in
+            restoreBookSelection()
+        }
+        .fullScreenCover(isPresented: $showingTafsirLibrary) {
+            QuranTafsirLibraryView(app: app)
+        }
     }
 
     private var header: some View {
@@ -928,6 +175,63 @@ struct QuranWirdReferenceView: View {
         .scrollIndicators(.hidden)
     }
 
+    private var tafsirPicker: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Menu {
+                Section("التفاسير المحفوظة") {
+                    ForEach(library.books) { book in
+                        Button {
+                            toggleBook(book.id)
+                        } label: {
+                            Label(book.metadata.title, systemImage: selectedBookIDs.contains(book.id) ? "checkmark.circle.fill" : "circle")
+                        }
+                        .accessibilityIdentifier("quran-reference-tafsir-choice-\(book.id)")
+                    }
+                }
+                Button { showingTafsirLibrary = true } label: {
+                    Label("مكتبة التفاسير", systemImage: "books.vertical")
+                }
+                .accessibilityIdentifier("quran-reference-open-tafsir-library")
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "books.vertical")
+                    Text(selectedBookTitles.isEmpty ? "اختر تفسيرًا للورد" : selectedBookTitles.joined(separator: "، "))
+                        .font(bodyFont(13, bold: true)).lineLimit(2).multilineTextAlignment(.leading)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.down").font(.system(size: 11, weight: .semibold))
+                }
+                .padding(.horizontal, 14).frame(minHeight: 48)
+                .foregroundStyle(theme.color("hifzText"))
+                .background(theme.color("hifzTint"), in: .rect(cornerRadius: 16))
+                .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("hifz").opacity(0.6), lineWidth: 1) }
+            }
+            .buttonStyle(.madarPlain)
+            .accessibilityIdentifier("quran-reference-tafsir-picker")
+
+            if !selectedBooks.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(selectedBooks) { book in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(book.metadata.title).font(bodyFont(12, bold: true))
+                                Text(book.metadata.author).font(bodyFont(11)).foregroundStyle(theme.secondaryInk)
+                            }
+                            Spacer(minLength: 4)
+                            if let url = URL(string: book.metadata.shamelaURL) {
+                                Link("الكتاب في الشاملة", destination: url)
+                                    .font(bodyFont(11, bold: true)).frame(minHeight: 40)
+                                    .accessibilityIdentifier("quran-reference-tafsir-book-\(book.id)")
+                            }
+                        }
+                    }
+                }
+                .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                .background(theme.surface, in: .rect(cornerRadius: 16))
+                .accessibilityIdentifier("quran-reference-tafsir-sources")
+            }
+        }
+    }
+
     private var failureState: some View {
         card {
             VStack(alignment: .leading, spacing: 10) {
@@ -942,9 +246,9 @@ struct QuranWirdReferenceView: View {
     private var emptyState: some View {
         card {
             VStack(alignment: .leading, spacing: 8) {
-                Label("لا مقتطف موثّق لهذا الاختيار في فهرس الورد الحالي", systemImage: "books.vertical")
+                Label("لا يوجد تفسير محفوظ لهذه الآيات", systemImage: "books.vertical")
                     .font(bodyFont(14, bold: true)).fixedSize(horizontal: false, vertical: true)
-                Text("عدم ظهور مقتطف هنا لا يعني خلوّ الآيات من التفسير أو سبب النزول.")
+                Text("نزّل تفسيرًا من المكتبة أو اختر سبب النزول والسياق لعرض موادهما الموثّقة.")
                     .font(bodyFont(12)).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
             }
         }.accessibilityIdentifier("quran-reference-empty")
@@ -1010,6 +314,28 @@ struct QuranWirdReferenceView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(ayah.surahNameArabic + " · الآية " + digits.string(ayah.ayahNumber))
                     .font(bodyFont(13, bold: true)).foregroundStyle(theme.color("hifzText"))
+                ForEach(readings(for: ayah)) { reading in
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text(reading.rangeLabel)
+                            .font(bodyFont(12, bold: true)).foregroundStyle(theme.secondaryInk)
+                        Text(reading.passage.text)
+                            .font(.custom("Amiri-Regular", size: 19, relativeTo: .title3))
+                            .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("quran-reference-tafsir-text-\(reading.bookID)-\(reading.passage.firstAyahID)")
+                        ForEach(reading.passage.pages) { page in
+                            if let url = pageURL(bookID: reading.bookID, pageID: page.id) {
+                                Link(citation(for: page), destination: url)
+                                    .font(bodyFont(11, bold: true)).frame(minHeight: 40)
+                                    .accessibilityIdentifier("quran-reference-tafsir-page-\(reading.bookID)-\(reading.passage.firstAyahID)-\(page.id)")
+                            } else {
+                                Text(citation(for: page)).font(bodyFont(11)).foregroundStyle(theme.secondaryInk)
+                            }
+                        }
+                    }
+                    .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(theme.color("hifzTint").opacity(0.55), in: .rect(cornerRadius: 18))
+                    .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line.opacity(0.7), lineWidth: 1) }
+                }
                 ForEach(entries(for: ayah)) { excerpt in
                     VStack(alignment: .leading, spacing: 9) {
                         Text(excerpt.kind.title).font(bodyFont(12, bold: true)).foregroundStyle(theme.secondaryInk)
@@ -1046,8 +372,83 @@ struct QuranWirdReferenceView: View {
 
     private func entries(for ayah: QuranAyahResourceRecord) -> [QuranWirdReferenceExcerpt] {
         QuranWirdReferenceExcerpt.verified.filter { excerpt in
-            excerpt.ayahID == ayah.id && (filter.kind == nil || excerpt.kind == filter.kind)
+            excerpt.ayahID == ayah.id && excerpt.kind != .tafsir && (filter.kind == nil || excerpt.kind == filter.kind)
         }
+    }
+
+    private struct BookReading: Identifiable {
+        let bookID: Int
+        let passage: QuranTafsirPassage
+        let rangeLabel: String
+        var id: String { "\(bookID)-\(passage.id)" }
+    }
+
+    private var selectedBooks: [QuranTafsirLibraryBook] {
+        selectedBookIDs.compactMap { id in library.books.first { $0.id == id } }
+    }
+
+    private var selectedBookTitles: [String] { selectedBooks.map { $0.metadata.title } }
+
+    private func hasSourceData(for ayah: QuranAyahResourceRecord) -> Bool {
+        (!selectedBookIDs.isEmpty && filter.kind != .asbab && filter.kind != .context && !readings(for: ayah).isEmpty)
+            || !entries(for: ayah).isEmpty
+    }
+
+    private func readings(for ayah: QuranAyahResourceRecord) -> [BookReading] {
+        guard filter.kind != .asbab && filter.kind != .context else { return [] }
+        return selectedBookIDs.flatMap { bookID -> [BookReading] in
+            guard let index = library.index(for: bookID) else { return [] }
+            return index.passages(forAyahID: ayah.id).compactMap { passage in
+                guard max(passage.firstAyahID, request.range.first) == ayah.id else { return nil }
+                let first = catalogAyah(passage.firstAyahID)
+                let last = catalogAyah(passage.lastAyahID)
+                let label: String
+                if let first, let last, first.id != last.id {
+                    label = "الآيات " + digits.string(first.ayahNumber) + "–" + digits.string(last.ayahNumber)
+                } else {
+                    label = "الآية " + digits.string(first?.ayahNumber ?? ayah.ayahNumber)
+                }
+                return BookReading(bookID: bookID, passage: passage, rangeLabel: label)
+            }
+        }
+    }
+
+    private func catalogAyah(_ id: Int) -> QuranAyahResourceRecord? {
+        try? QuranResources.catalog().ayah(id: id)
+    }
+
+    private func toggleBook(_ id: Int) {
+        if selectedBookIDs.contains(id) {
+            guard selectedBookIDs.count > 1 else { return }
+            selectedBookIDs.removeAll { $0 == id }
+        } else if selectedBookIDs.count < 8 {
+            selectedBookIDs.append(id)
+        }
+        QuranTafsirPreferences.saveLastBookIDs(selectedBookIDs, in: app)
+    }
+
+    private func restoreBookSelection() {
+        let available = Set(library.books.map(\.id))
+        let stored = QuranTafsirPreferences.lastBookIDs(in: app).filter(available.contains)
+        let selected = stored.isEmpty ? [QuranTafsirPreferences.defaultBookID(in: app)] : stored
+        selectedBookIDs = selected.contains(where: available.contains) ? selected : [42]
+    }
+
+    private func pageURL(bookID: Int, pageID: Int) -> URL? {
+        guard let base = library.index(for: bookID)?.metadata.shamelaURL else { return nil }
+        return URL(string: base.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/\(pageID)")
+    }
+
+    private func citation(for page: QuranTafsirPageReference) -> String {
+        let pageNumber = displayNumber(page.printedPage)
+        let volume = displayNumber(page.volume)
+        if volume.isEmpty { return "الصفحة " + pageNumber }
+        return "الجزء " + volume + " · الصفحة " + pageNumber
+    }
+
+    private func displayNumber(_ value: String) -> String {
+        if let number = Int(value) { return digits.string(number) }
+        return value
     }
 
     private var rangeTitle: String {

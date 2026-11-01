@@ -9,6 +9,7 @@ struct CustomizeMadar: View {
     @State private var confirmReset = false
     @State private var widgetGallery = false
     @State private var widgetMaker = false
+    @State private var quranTafsirLibrary = false
     @State private var missingSettingsRoute = false
     @State private var highlightedSettingKey: String?
     @State private var routedSettingsQuery: String?
@@ -51,6 +52,17 @@ struct CustomizeMadar: View {
                             .padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("money-open")
                 }
+                if query.isEmpty || normalized("القرآن التفسير مكتبة التفاسير مرجع الورد").contains(normalized(query)) {
+                    Button { quranTafsirLibrary = true } label: {
+                        HStack {
+                            Label("خصّص تفاسير القرآن", systemImage: "books.vertical").font(MadarTypography.section())
+                            Spacer()
+                            Image(systemName: "chevron.left")
+                        }
+                        .padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
+                    }
+                    .buttonStyle(.madarPlain).accessibilityIdentifier("quran-tafsir-library-open")
+                }
                 if query.isEmpty || normalized("الودجات وأحجامها البهو الكتل").contains(normalized(query)) { BahwBlocksSection(session: session) }
                 if query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query)) {
                     Button { widgetMaker = true } label: { Label("اصنع ودجة", systemImage: "square.stack.3d.up").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).background(theme.surface, in: .rect(cornerRadius: 20)) }
@@ -60,7 +72,7 @@ struct CustomizeMadar: View {
                     Button {widgetGallery=true} label:{Label("ودجات الشاشة الرئيسية",systemImage:"square.grid.2x2").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:50).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widgets-gallery")
                 }
                 if showsRoomLayouts { RoomHomeLayoutSection(session: session, searching: !query.isEmpty) }
-                if filtered.isEmpty && !showsRoomLayouts && !(query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query))) && !(query.isEmpty || normalized("المال").contains(normalized(query)) || normalized("المحبرة").contains(normalized(query)) || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query))) {
+                if filtered.isEmpty && !showsRoomLayouts && !(query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query))) && !(query.isEmpty || normalized("المال").contains(normalized(query)) || normalized("المحبرة").contains(normalized(query)) || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) || normalized("القرآن التفسير مكتبة التفاسير مرجع الورد").contains(normalized(query))) {
                     ContentUnavailableView.search(text: query)
                 } else {
                     ForEach(sections, id: \.self) { section in
@@ -102,6 +114,7 @@ struct CustomizeMadar: View {
             }
         }
         .navigationDestination(isPresented: $session.moneyOpen) { MoneyRoomView(app: session) }
+        .navigationDestination(isPresented: $quranTafsirLibrary) { QuranTafsirLibraryView(app: session) }
         .sheet(isPresented: $widgetMaker, onDismiss: { session.widgetMakerRoute = nil; session.widgetMakerRouteID = nil }) {
             WidgetMakerView(session: session)
                 .presentationDetents([.large]).madarSheetErrorAlert(session)

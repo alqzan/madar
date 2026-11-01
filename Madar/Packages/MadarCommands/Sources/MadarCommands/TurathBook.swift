@@ -7,6 +7,7 @@ public struct TurathCatalogueBook: Sendable, Identifiable, Hashable {
     public let author: String
     public let authorDeath: Int?
     public let category: String
+    public let categoryID: Int?
     public let pageCount: Int
     public let sizeBytes: Int
     public var link: URL { URL(string: "https://app.turath.io/book/\(id)")! }
@@ -33,7 +34,8 @@ public enum TurathCatalogue {
         return raw.books.values.map { b in
             let a = b.author_id.flatMap { authors[$0] }
             return TurathCatalogueBook(id: b.id, title: b.name, author: a?.name ?? "", authorDeath: a?.death.flatMap { $0 > 0 && $0 < 99_999 ? $0 : nil },
-                                       category: b.cat_id.flatMap { cats[$0] } ?? "", pageCount: b.page_count ?? 0, sizeBytes: b.size ?? 0)
+                                       category: b.cat_id.flatMap { cats[$0] } ?? "", categoryID: b.cat_id,
+                                       pageCount: b.page_count ?? 0, sizeBytes: b.size ?? 0)
         }.sorted { $0.id < $1.id }
     }
 

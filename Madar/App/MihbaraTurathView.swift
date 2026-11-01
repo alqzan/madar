@@ -21,7 +21,10 @@ import MadarDesign
         let age = (try? cache.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate).map { Date().timeIntervalSince($0) }
         if let age, age < 7 * 86_400, let data = try? Data(contentsOf: cache), let books = try? TurathCatalogue.decode(data) { return books }
         do {
-            let (data, response) = try await URLSession.shared.data(from: TurathCatalogue.catalogueURL)
+            var request = URLRequest(url: TurathCatalogue.catalogueURL)
+            request.setValue("Madar/0.1.0 (iOS)", forHTTPHeaderField: "User-Agent")
+            request.setValue("https://app.turath.io/", forHTTPHeaderField: "Referer")
+            let (data, response) = try await URLSession.shared.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw TurathError.unreadable }
             let books = try await Task.detached { try TurathCatalogue.decode(data) }.value
             try? data.write(to: cache, options: .atomic)
@@ -54,7 +57,10 @@ import MadarDesign
 
     nonisolated static func fetch(_ book: TurathCatalogueBook, session: URLSession = .shared, maximumBytes: Int = maximumBytes) async throws -> Data {
         guard book.sizeBytes <= maximumBytes else { throw TurathError.tooLarge }
-        let (bytes, response) = try await session.bytes(from: TurathCatalogue.bookURL(book.id))
+        var request = URLRequest(url: TurathCatalogue.bookURL(book.id))
+        request.setValue("Madar/0.1.0 (iOS)", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://app.turath.io/", forHTTPHeaderField: "Referer")
+        let (bytes, response) = try await session.bytes(for: request)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw TurathError.unreadable }
         let expected = response.expectedContentLength
         guard expected <= 0 || expected <= Int64(maximumBytes) else { throw TurathError.tooLarge }

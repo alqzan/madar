@@ -1801,6 +1801,35 @@
    "preset": true
   },
   {
+   "key": "quran.defaultTafsirBook",
+   "owner": "quran",
+   "section": "مرجع الورد",
+   "title": "التفسير الافتراضي",
+   "type": "int",
+   "default": 42,
+   "scope": "device",
+   "range": [1, 999999],
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": false
+  },
+  {
+   "key": "quran.lastWirdTafsirBooks",
+   "owner": "quran",
+   "section": "مرجع الورد",
+   "title": "تفاسير مرجع الورد الأخيرة",
+   "type": "list",
+   "default": ["42"],
+   "scope": "device",
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": false,
+   "contract": {
+    "unique": true,
+    "minItems": 1,
+    "maxItems": 8,
+    "itemPattern": "^[1-9][0-9]{0,5}$"
+   }
+  },
+  {
    "key": "quran.wirdReminder",
    "owner": "quran",
    "section": "التذكير",
