@@ -52,6 +52,7 @@ struct MoneySalaryView: View {
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .interactiveDismissDisabled(busy)
             .accessibilityIdentifier("money-salary")
     }
 
@@ -59,7 +60,7 @@ struct MoneySalaryView: View {
         HStack(spacing: 12) {
             Button { dismiss() } label: {
                 Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
-            }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-salary-close")
+            }.buttonStyle(.madarPlain).disabled(busy).accessibilityLabel("إغلاق").accessibilityIdentifier("money-salary-close")
             Text("نزل الراتب").font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)).accessibilityAddTraits(.isHeader)
             Spacer()
         }.padding(.top, 8).environment(\.layoutDirection, .rightToLeft)

@@ -39,6 +39,34 @@ import XCTest
         XCTAssertTrue(app.staticTexts["money-messages-title"].waitForExistence(timeout: 10))
         XCTAssertTrue(draft.waitForNonExistence(timeout: 10), "The salary is confirmed and leaves the review list")
     }
+
+    func testSalaryConfirmationStaysOpenWhileSaving() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "salary",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-27T09:00:00+03:00", "MADAR_UI_MONEY_WRITE_HOLD_MS": "5000"]
+        app.launch()
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let tray = app.descendants(matching: .any)["money-pending"]; XCTAssertTrue(tray.waitForExistence(timeout: 10))
+        for _ in 0..<12 where !tray.isHittable { app.swipeDown(velocity: .slow) }
+        tray.tap()
+        let draft = app.descendants(matching: .any)["money-draft-راتب"]; XCTAssertTrue(draft.waitForExistence(timeout: 10), app.debugDescription)
+        draft.buttons["money-draft-confirm"].tap()
+        let confirm = app.buttons["money-salary-confirm"]
+        let close = app.buttons["money-salary-close"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(close.exists); XCTAssertTrue(close.isEnabled)
+        shot(app, "M5-V08-salary-confirm-idle-L")
+        for _ in 0..<8 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(confirm.isHittable); confirm.tap()
+        XCTAssertTrue(close.exists); XCTAssertFalse(close.isEnabled); XCTAssertFalse(confirm.isEnabled)
+        shot(app, "M5-V08-salary-confirm-pending-L")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.5)).press(forDuration: 0.01, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)))
+        XCTAssertTrue(close.exists); XCTAssertFalse(close.isEnabled); XCTAssertFalse(confirm.isEnabled)
+        XCTAssertTrue(close.waitForNonExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["money-messages-title"].waitForExistence(timeout: 5), app.debugDescription)
+    }
     func testDailyComparisonWaitsForMoneyReveal() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
