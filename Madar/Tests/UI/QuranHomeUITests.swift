@@ -77,7 +77,11 @@ import XCTest
     }
 
     func testDailyWirdReferenceShowsVerifiedSourcesAndReturnsToItsRow() throws {
-        try assertDailyWirdReferenceUsesSavedFullTafsir(variant: "reference")
+        try assertDailyWirdReferenceUsesSavedFullTafsir(
+            variant: "reference",
+            expectedExcerptID: "bukhari-2-187",
+            expectedExcerptText: "الرَّفَثُ إِلَى نِسَائِكُمْ"
+        )
     }
 
     func testDailyWirdReferenceCanSelectMultipleSavedTafsirBooks() throws {
@@ -162,13 +166,15 @@ import XCTest
         XCTAssertTrue(rangeTitle.label.contains("١٨٩"), rangeTitle.label)
         let excerpt = app.staticTexts["quran-reference-excerpt-ibn-ashur-2-189-context"]
         XCTAssertTrue(excerpt.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(excerpt.label.contains("وقد قيل في تفسير الآية"), excerpt.label)
         XCTAssertTrue(excerpt.label.contains("الذين سألوا عن الأهلة") && excerpt.label.contains("النسيء"), excerpt.label)
         XCTAssertTrue(app.staticTexts["quran-reference-citation-ibn-ashur-2-189-context"].label.contains("٢/ ١٩٩"))
         XCTAssertTrue(app.descendants(matching: .any)["quran-reference-source-ibn-ashur-2-189-context"].exists)
         let note = app.staticTexts["quran-reference-note-ibn-ashur-2-189-context"]
         XCTAssertTrue(note.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(note.label.contains("مثلٌ للنسيء") && note.label.contains("لا تقرير لسبب النزول"), note.label)
-        attach(app, "M2-X01-wird-reference-baqara-189-after-r49-L")
+        app.buttons["quran-reference-filter-context"].tap()
+        attach(app, "M2-X01-wird-reference-baqara-189-after-cn03-L")
         app.buttons["quran-reference-close"].tap()
         XCTAssertTrue(referenceButton.waitForExistence(timeout: 5), app.debugDescription)
         app.terminate()
@@ -253,12 +259,14 @@ import XCTest
         let context = app.staticTexts["quran-reference-excerpt-maathur-3-190-context"]
         XCTAssertTrue(context.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(context.label.contains("ولِمَ لا أفعل"), context.label)
+        XCTAssertTrue(context.label.contains("سبحانك فقنا عذاب النار"), context.label)
         let note = app.staticTexts["quran-reference-note-maathur-3-190-context"]
         XCTAssertTrue(note.label.contains("إسناد جيد"), note.label)
         XCTAssertTrue(note.label.contains("لا يذكر حادثةً سبقت نزولها"), note.label)
         XCTAssertTrue(app.staticTexts["quran-reference-citation-maathur-3-190-context"].label.contains("٥/ ٧٦٢"))
         XCTAssertTrue(app.descendants(matching: .any)["quran-reference-source-maathur-3-190-context"].exists)
-        attach(app, "M2-X01-wird-reference-alimran-190-L")
+        app.buttons["quran-reference-filter-context"].tap()
+        attach(app, "M2-X01-wird-reference-alimran-190-after-cn03-L")
         app.buttons["quran-reference-close"].tap()
         XCTAssertTrue(referenceButton.waitForExistence(timeout: 5), app.debugDescription)
         app.terminate()
@@ -356,7 +364,11 @@ import XCTest
         XCTAssertTrue(app.staticTexts["quran-plan-forecast"].waitForExistence(timeout: 10))
     }
 
-    private func assertDailyWirdReferenceUsesSavedFullTafsir(variant: String) throws {
+    private func assertDailyWirdReferenceUsesSavedFullTafsir(
+        variant: String,
+        expectedExcerptID: String? = nil,
+        expectedExcerptText: String? = nil
+    ) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = [
@@ -381,7 +393,15 @@ import XCTest
         XCTAssertTrue(reading.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertTrue(app.buttons["quran-reference-tafsir-picker"].label.contains("السعدي"))
         XCTAssertGreaterThan(reading.label.count, 50, "The selected book should show its full sourced passage.")
-        if variant == "reference" { attach(app, "M2-CN07-wird-selected-tafsir-L") }
+        if let expectedExcerptID, let expectedExcerptText {
+            let excerpt = app.staticTexts["quran-reference-excerpt-\(expectedExcerptID)"]
+            XCTAssertTrue(excerpt.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(excerpt.label.contains(expectedExcerptText), excerpt.label)
+            XCTAssertFalse(excerpt.label.contains("…"), excerpt.label)
+            app.buttons["quran-reference-filter-asbab"].tap()
+            XCTAssertTrue(excerpt.isHittable, app.debugDescription)
+            attach(app, "M2-X01-wird-reference-baqara-187-after-cn03-L")
+        }
         app.buttons["quran-reference-close"].tap()
         XCTAssertTrue(referenceButton.waitForExistence(timeout: 5), app.debugDescription)
         app.terminate()
