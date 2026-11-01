@@ -218,7 +218,7 @@ struct MoneyCategorizeSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Button { dismiss() } label: { Label("إلغاء", systemImage: "xmark").font(MadarTypography.caption()).frame(minHeight: 44) }
+                    Button { dismiss() } label: { Label("إلغاء", systemImage: "xmark").font(MadarTypography.caption()).frame(minHeight: 44) }.madarWaitsForSave()
                         .disabled(saving).accessibilityIdentifier("money-categorize-close")
                     Spacer()
                     Text("صنّف الحركة").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
@@ -279,7 +279,7 @@ struct MoneyCategorizeSheet: View {
         }
         .foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
         .environment(\.layoutDirection, .rightToLeft).toolbarVisibility(.hidden, for: .navigationBar)
-        .task { loadCategories() }.interactiveDismissDisabled(saving)
+        .task { loadCategories() }.madarSheetLock(saving: saving)
         .onChange(of: saving, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
         .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }
         .presentationDetents([.medium, .large])

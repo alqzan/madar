@@ -52,7 +52,7 @@ struct MoneyExpenseView: View {
         ScrollView {
             VStack(spacing: 12) {
                 HStack {
-                    Button { if hasUnsavedInput { editing = false; confirmDiscard = true } else { dismiss() } } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
+                    Button { if hasUnsavedInput { editing = false; confirmDiscard = true } else { dismiss() } } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.madarWaitsForSave()
                         .disabled(saving).accessibilityLabel("إغلاق").accessibilityIdentifier("money-expense-close")
                     Text("سجّل مصروفًا").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer()
                     Button { details.toggle() } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44) }.accessibilityLabel("تفاصيل المصروف").accessibilityIdentifier("money-expense-details")
@@ -113,7 +113,7 @@ struct MoneyExpenseView: View {
                 Button("تجاهل المصروف", role: .destructive) { dismiss() }.accessibilityIdentifier("money-expense-discard")
                 Button("أكمل التسجيل") { }.accessibilityIdentifier("money-expense-continue")
             } message: { Text("المبلغ أو اسم المتجر غير محفوظ.") }
-            .interactiveDismissDisabled(hasUnsavedInput || saving)
+            .madarSheetLock(saving: saving, draft: hasUnsavedInput)
             .onChange(of: hasUnsavedInput || saving, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
             .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }
     }

@@ -47,8 +47,8 @@ struct DiaryIntentionsView:View {
                     if saved,app.undoToken != nil {Button("تراجع عن آخر تعديل"){app.undo();saved=false}.font(MadarTypography.body()).frame(minHeight:44).accessibilityIdentifier("diary-niyya-undo")}
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink).scrollDismissesKeyboard(.interactively).navigationBarTitleDisplayMode(.inline)
-                .toolbar{ToolbarItem(placement:.topBarLeading){Button("الصفحة"){if hasUnsavedInput {focused=false;confirmDiscard=true} else {dismiss()}}.disabled(busy).accessibilityIdentifier("diary-niyya-close")}}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
-                .interactiveDismissDisabled(hasUnsavedInput || busy)
+                .toolbar{ToolbarItem(placement:.topBarLeading){Button("الصفحة"){if hasUnsavedInput {focused=false;confirmDiscard=true} else {dismiss()}}.madarWaitsForSave().accessibilityIdentifier("diary-niyya-close")}}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
+                .madarSheetLock(saving: busy, draft: hasUnsavedInput)
                 .confirmationDialog("تتجاهل النيّة؟",isPresented:$confirmDiscard,titleVisibility:.visible){
                     Button("تجاهل المسودة",role:.destructive){text="";editing=nil;dismiss()}.accessibilityIdentifier("diary-niyya-discard")
                     Button("أكمل الكتابة"){}.accessibilityIdentifier("diary-niyya-continue")

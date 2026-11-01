@@ -177,10 +177,10 @@ private struct MoneyBudgetReceipt: View {
                     HStack { if saving { ProgressView() }; Text(row.excluded ? "ارفع الختم وأعدها للميزانية" : "اعتمد الختم · خارج الميزانية") }
                         .font(MadarTypography.body()).bold().frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: Capsule()).foregroundStyle(theme.background)
                 }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-budget-confirm")
-                Button("إلغاء") { dismiss() }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).disabled(saving)
+                Button("إلغاء") { dismiss() }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).madarWaitsForSave()
             }.padding(20).padding(.top, 12).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.surface.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme)
-            .presentationDetents([.height(600), .large]).presentationDragIndicator(.visible).interactiveDismissDisabled(saving).onChange(of: saving, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }.onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }.accessibilityIdentifier("money-budget-receipt")
+            .presentationDetents([.height(600), .large]).presentationDragIndicator(.visible).madarSheetLock(saving: saving).onChange(of: saving, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }.onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }.accessibilityIdentifier("money-budget-receipt")
     }
     private func effect(_ title: String, value: Int) -> some View {
         HStack { Text(title); Spacer(); Text((row.excluded ? "يعود " : "لا يُخصم ") + amount(value)).bold().foregroundStyle(theme.color("surplusText")) }.font(MadarTypography.body())

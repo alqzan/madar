@@ -93,7 +93,7 @@ private struct MadarSceneContent: View {
         Group {
                 if let session, let lock = session.lockController {
                     MadarLockGate(controller: lock, feature: .app) {
-                        MadarRootView(session: session).modelContainer(session.container)
+                        MadarRootView(session: session).modelContainer(session.container).environment(session)
                     }.background(ScenePrivacyBridge(session: session).frame(width: 0, height: 0))
                 }
                 else if let startupError {

@@ -135,7 +135,7 @@ private struct DiaryTranscriptEditor: View {
                 if let error { Text(error).font(MadarTypography.caption()).padding() }
             }.background(theme.background).foregroundStyle(theme.ink).navigationTitle("نص التسجيل").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) { Button("إلغاء") { if hasUnsavedText { editing = false; confirmDiscard = true } else { dismiss() } }.disabled(saving).accessibilityIdentifier("diary-transcript-close") }
+                    ToolbarItem(placement: .topBarLeading) { Button("إلغاء") { if hasUnsavedText { editing = false; confirmDiscard = true } else { dismiss() } }.madarWaitsForSave().accessibilityIdentifier("diary-transcript-close") }
                     ToolbarItem(placement: .topBarTrailing) { Button("احفظ") { Task { saving = true; do { try await app.executeDiaryCommand("diary.setTranscript", payload: ["entryID": .string(media.entryID), "text": .string(text)]); dismiss() } catch { self.error = madarUserMessage(error); saving = false } } }.disabled(saving).accessibilityIdentifier("diary-transcript-save") }
                 }
         }
@@ -144,7 +144,7 @@ private struct DiaryTranscriptEditor: View {
             Button("أكمل التعديل") { }.accessibilityIdentifier("diary-transcript-continue")
         } message: { Text("التعديلات غير محفوظة.") }
         .task { text = original; loaded = true }
-        .interactiveDismissDisabled(hasUnsavedText || saving)
+        .madarSheetLock(saving: saving, draft: hasUnsavedText)
         .diaryRootDraftBlocking(app)
     }
 }

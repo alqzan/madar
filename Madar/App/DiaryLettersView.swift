@@ -266,7 +266,7 @@ struct DiaryLetterComposer: View {
             }.background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle("رسالة لنفسك").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { dismiss() } else { confirmDiscard = true } }.disabled(saving).accessibilityIdentifier("diary-letter-cancel") }
+                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { dismiss() } else { confirmDiscard = true } }.madarWaitsForSave().accessibilityIdentifier("diary-letter-cancel") }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("اختمها") {
                             guard !saving, let choice else { return }; saving = true
@@ -278,7 +278,7 @@ struct DiaryLetterComposer: View {
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .task { loadChoices() }
                 // A letter in progress is not lost to a stray swipe or cancel.
-                .interactiveDismissDisabled(blocksRootRoute)
+                .madarSheetLock(saving: saving, draft: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .alert("تتجاهل رسالتك؟", isPresented: $confirmDiscard) {
                     Button("تجاهل الرسالة", role: .destructive) { dismiss() }
                     Button("أكمل الكتابة", role: .cancel) {}
@@ -317,7 +317,7 @@ struct DiaryLetterReschedule: View {
                 Text("احفظ الموعد").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
             }.buttonStyle(.madarPlain).disabled(rescheduling).accessibilityIdentifier("diary-letter-reschedule-save")
         }.padding(22).frame(maxHeight: .infinity, alignment: .top).background(theme.background).foregroundStyle(theme.ink)
-            .interactiveDismissDisabled(blocksRootRoute)
+            .madarSheetLock(saving: rescheduling, draft: dateChanged)
             .onAppear { originalDay = GregorianDay.containing(date, in: app.activePlace.timeZone) }
             .onChange(of: date) { _, value in
                 let selectedDay = GregorianDay.containing(value, in: app.activePlace.timeZone)

@@ -69,7 +69,7 @@ struct MihbaraPDFImportView: View {
                 ZStack {
                     Text("من ملف").font(.custom("thmanyahserifdisplay-Bold", size: 21, relativeTo: .title2))
                     HStack {
-                        Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right").font(MadarTypography.caption()).frame(minHeight: 44) }
+                        Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right").font(MadarTypography.caption()).frame(minHeight: 44) }.madarWaitsForSave()
                             .disabled(saving).accessibilityIdentifier("mihbara-import-back")
                         Spacer()
                     }
@@ -140,7 +140,7 @@ struct MihbaraPDFImportView: View {
         }
         .foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
         .environment(\.layoutDirection, .rightToLeft).toolbarVisibility(.hidden, for: .navigationBar).statusBarHidden(true)
-        .interactiveDismissDisabled(saving)
+        .madarSheetLock(saving: saving)
         .task { await inspect() }
         .onDisappear { if !saving && !finished { PDFBookFiles.discard(id: fileID, root: app.bookStagingDirectory) } }
     }

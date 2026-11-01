@@ -50,7 +50,7 @@ struct HabitEditorView:View {
     var body:some View {
         VStack(spacing:0) {
             HStack {
-                Button("إلغاء"){dismiss()}.frame(minHeight:44).disabled(busy).accessibilityIdentifier("habit-cancel")
+                Button("إلغاء"){dismiss()}.frame(minHeight:44).madarWaitsForSave().accessibilityIdentifier("habit-cancel")
 #if DEBUG
                 if ProcessInfo.processInfo.environment["MADAR_UI_BAHW_ROOT_ROUTE_HARNESS"] == "1" {
                     Button("اختبر رابط البهو") { session.open(URL(string: "madar://bahw")!) }
@@ -161,7 +161,7 @@ struct HabitEditorView:View {
             if value != "custom" && reading == nil { rule.measure = value == "walking" ? .health : value == "reading" ? .duration : .count;rule.unit=["jamaah":"صلاة","review":"وجه","reading":"minutes","diaryLine":"سطر","walking":"steps"][value];rule.target=value == "walking" ? 6000 : value == "jamaah" ? 5 : value == "reading" ? 15 : 1; if name.isEmpty {name=["jamaah":"الجماعة","review":"المراجعة","reading":"القراءة","diaryLine":"سطر اليوم","walking":"المشي"][value] ?? ""} }
         }
         .onChange(of:rule.measure){old,value in measureChanged(from:old,to:value)}
-        .interactiveDismissDisabled(hasUnsavedChanges || busy)
+        .madarSheetLock(saving: busy, draft: hasUnsavedChanges)
     }
     /// Switching back from minutes to a count drops the «minutes» unit, so a count habit never reads as time.
     private func measureChanged(from old:HabitMeasure,to value:HabitMeasure) {

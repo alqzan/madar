@@ -137,7 +137,7 @@ struct MoneyGoalView: View {
         Text("الموعد تقديري إذا بقي الاقتطاع اليومي كما هو. لا تعاد كتابة مصروفاتك السابقة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         Button(saving ? "جارٍ الإنشاء…" : "اعتمد الخطة") { save() }.frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background).disabled(saving || !valid).accessibilityIdentifier("money-goal-confirm")
         Button("ارجع للتعديل") { preview = false }.frame(minHeight: 44).disabled(saving).accessibilityIdentifier("money-goal-back")
-    }.padding(24).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).presentationDetents([.medium, .large]).interactiveDismissDisabled(saving) }
+    }.padding(24).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).presentationDetents([.medium, .large]).madarSheetLock(saving: saving) }
     private func load() { do { _ = try service.load(); reading = try MoneyRepository(context: ModelContext(app.container)).goalPreparation(at: app.prayerNow()) } catch { failure = "تعذّرت قراءة المال." } }
     private func save() {
         guard let reading, valid, let finish else { return }; saving = true; failure = nil

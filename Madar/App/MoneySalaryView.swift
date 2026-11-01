@@ -52,7 +52,7 @@ struct MoneySalaryView: View {
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task { load() }.onChange(of: app.prayerRevision) { load() }
-            .interactiveDismissDisabled(busy)
+            .madarSheetLock(saving: busy)
             .accessibilityIdentifier("money-salary")
     }
 

@@ -55,7 +55,7 @@ struct MoneyCardSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack { Text("بطاقة جديدة").font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.disabled(saving).frame(minHeight: 44).accessibilityIdentifier("money-card-editor-close") }
+                    HStack { Text("بطاقة جديدة").font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-card-editor-close") }
                     rootRouteTestButton
                     field("اسم البطاقة") { TextField("مثل: بطاقة المشتريات", text: $name).focused($editing).accessibilityIdentifier("money-card-name") }
                     field("البنك") { TextField("اسم البنك", text: $bank).focused($editing).accessibilityIdentifier("money-card-bank") }
@@ -95,7 +95,7 @@ struct MoneyCardSheet: View {
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-card-keyboard-done") } }
                 .task { loadAccounts() }
                 .onChange(of: kind) { _, value in if value != "credit", accountID == nil, accounts.count == 1 { accountID = accounts[0].id } }
-                .interactiveDismissDisabled(blocksRootRoute)
+                .madarSheetLock(saving: saving, draft: hasUnsavedInput)
         }
         .onChange(of: blocksRootRoute, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
         .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }

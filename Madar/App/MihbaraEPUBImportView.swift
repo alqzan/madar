@@ -85,7 +85,7 @@ struct MihbaraEPUBImportView: View {
                 ZStack {
                     Text("من ملف").font(.custom("thmanyahserifdisplay-Bold", size: 21, relativeTo: .title2))
                     HStack {
-                        Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right").font(MadarTypography.caption()).frame(minHeight: 44) }
+                        Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right").font(MadarTypography.caption()).frame(minHeight: 44) }.madarWaitsForSave()
                             .disabled(saving).accessibilityIdentifier("mihbara-epub-import-back")
                         Spacer()
                     }
@@ -250,7 +250,7 @@ struct MihbaraEPUBImportView: View {
                     .background(theme.background.ignoresSafeArea(edges: .bottom))
             }
         }
-        .interactiveDismissDisabled(saving)
+        .madarSheetLock(saving: saving)
         .task { await inspect() }
         .onDisappear {
             departed = true

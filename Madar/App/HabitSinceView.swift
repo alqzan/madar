@@ -151,7 +151,7 @@ struct HabitPastDaySheet:View {
                             .accessibilityIdentifier("ui-test-open-bahw-root")
                     }
 #endif
-                    Spacer(); Button("إلغاء"){dismiss()}.frame(minHeight:44).disabled(busy)
+                    Spacer(); Button("إلغاء"){dismiss()}.frame(minHeight:44).madarWaitsForSave()
                 }
                 Text(reading.name).font(MadarTypography.section()).foregroundStyle(theme.secondaryInk)
                 if first < today {
@@ -181,7 +181,7 @@ struct HabitPastDaySheet:View {
             }.padding(22)
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.roomTheme,theme)
-        .interactiveDismissDisabled(busy || entry != nil || day != defaultDay)
+        .madarSheetLock(saving: busy, draft: entry != nil || day != defaultDay)
         .onAppear { date = gmt(defaultDay) }
         .onChange(of:date) { entry = nil }
     }

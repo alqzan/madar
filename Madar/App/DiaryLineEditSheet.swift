@@ -28,7 +28,7 @@ struct DiaryLineEditSheet: View {
             }.padding(18).background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle("عدّل السطر").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if text == edit.text { dismiss() } else { confirmDiscard = true } }.accessibilityIdentifier("diary-line-edit-cancel") }
+                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if text == edit.text { dismiss() } else { confirmDiscard = true } }.madarWaitsForSave().accessibilityIdentifier("diary-line-edit-cancel") }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("احفظ") { guard !saving else { return }; saving = true; Task { defer { saving = false }
                             do { try await AppDiaryService(app: app).edit(edit.id, text: text); saved(); dismiss() } catch { failure = madarUserMessage(error) } } }
@@ -37,7 +37,7 @@ struct DiaryLineEditSheet: View {
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .onAppear { text = edit.text; focused = true }
                 // A typed change is not lost to a stray swipe or cancel.
-                .interactiveDismissDisabled(text != edit.text || saving)
+                .madarSheetLock(saving: saving, draft: text != edit.text)
                 .alert("تتجاهل تعديلك؟", isPresented: $confirmDiscard) {
                     Button("تجاهل التعديل", role: .destructive) { dismiss() }
                     Button("أكمل التعديل", role: .cancel) {}

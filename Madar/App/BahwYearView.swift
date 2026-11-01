@@ -440,9 +440,9 @@ struct BahwDaySheet: View {
             }
             .background(lobby.background).foregroundStyle(lobby.ink)
             .navigationTitle(draft.existing ? "عدّل اليوم" : "يوم يهمّك").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() }.madarWaitsForSave() } }
         }.tint(lobby.accent)
-            .interactiveDismissDisabled(draft != original || saving)
+            .madarSheetLock(saving: saving, draft: draft != original)
     }
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) { Text(title).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk); content() }

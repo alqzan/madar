@@ -116,7 +116,7 @@ struct DiaryProjectEditor: View {
                 .navigationTitle("مشروع جديد").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("إلغاء") { if hasUnsavedInput { confirmDiscard = true } else { dismiss() } }.disabled(saving)
+                        Button("إلغاء") { if hasUnsavedInput { confirmDiscard = true } else { dismiss() } }.madarWaitsForSave()
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("احفظ") {
@@ -129,7 +129,7 @@ struct DiaryProjectEditor: View {
                             .disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("diary-project-save")
                     }
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
-                .interactiveDismissDisabled(blocksRootRoute)
+                .madarSheetLock(saving: saving, draft: hasUnsavedInput)
                 .confirmationDialog("تجاهل كتابة المشروع؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
                     Button("تجاهل المسودة", role: .destructive) { dismiss() }.accessibilityIdentifier("diary-project-discard")
                     Button("أكمل الكتابة") { }
@@ -199,10 +199,10 @@ struct DiaryProjectDetail: View {
             }.background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle(project.name).navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItemGroup(placement: .topBarLeading) {
-                    Button("تمّ") { if hasUnsavedReflection { reflectionFocused = false; confirmDiscardReflection = true } else { dismiss() } }.disabled(saving).accessibilityIdentifier("diary-project-detail-close")
+                    Button("تمّ") { if hasUnsavedReflection { reflectionFocused = false; confirmDiscardReflection = true } else { dismiss() } }.madarWaitsForSave().accessibilityIdentifier("diary-project-detail-close")
                 } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
-                .interactiveDismissDisabled(blocksRootRoute)
+                .madarSheetLock(saving: saving, draft: hasUnsavedReflection)
                 .confirmationDialog("تتجاهل خاتمة المشروع؟", isPresented: $confirmDiscardReflection, titleVisibility: .visible) {
                     Button("تجاهل الخاتمة", role: .destructive) { guard !saving else { return }; reflection = ""; finishing = false; dismiss() }.disabled(saving).accessibilityIdentifier("diary-project-reflection-discard")
                     Button("أكمل الكتابة") {}.accessibilityIdentifier("diary-project-reflection-continue")

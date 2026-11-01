@@ -1673,7 +1673,7 @@ private struct MihbaraNotebookEditor: View {
                 .toolbar {
                     ToolbarItem(placement: .principal) { Text("ملاحظة خاصة").font(MadarTypography.section()) }
                     ToolbarItemGroup(placement: .topBarLeading) {
-                        Button("إلغاء") { if text != note.text { prompt = .discard } else { dismiss() } }
+                        Button("إلغاء") { if text != note.text { prompt = .discard } else { dismiss() } }.madarWaitsForSave()
                             .accessibilityIdentifier("mihbara-note-cancel")
                         if !note.text.isEmpty { Button("احذف", role: .destructive) { prompt = .delete }.accessibilityIdentifier("mihbara-note-delete") }
 #if DEBUG
@@ -1703,7 +1703,7 @@ private struct MihbaraNotebookEditor: View {
                 }
             }
         }
-        .interactiveDismissDisabled(isSaving || text != note.text)
+        .madarSheetLock(saving: isSaving, draft: text != note.text)
         .onChange(of: isSaving || text != note.text, initial: true) { _, blocked in app.setMihbaraRootDraftBlocker(rootBlockerID, active: blocked) }
         .onDisappear { app.setMihbaraRootDraftBlocker(rootBlockerID, active: false) }
         .alert(prompt?.title ?? "", isPresented: Binding(get: { prompt != nil }, set: { if !$0 { prompt = nil } }), presenting: prompt) { current in

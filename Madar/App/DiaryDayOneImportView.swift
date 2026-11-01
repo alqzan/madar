@@ -59,7 +59,7 @@ struct DiaryDayOneImportView: View {
             }
             .onChange(of: phase) { _, value in if value == .background, importing == nil, receipt == nil { reset() } }
             // Mid-import the folder is still being read: no swipe away, and nothing is discarded under it.
-            .interactiveDismissDisabled(importing != nil)
+            .madarSheetLock(saving: importing != nil)
             // A «madar://notes» link during the import waits: closing the cover would drop its receipt and undo.
             .onChange(of: importing != nil, initial: true) { _, running in app.setDiaryRootDraftBlocker(rootBlockerID, active: running) }
             .onDisappear { app.setDiaryRootDraftBlocker(rootBlockerID, active: false); if importing == nil { service.discard(draft) } }

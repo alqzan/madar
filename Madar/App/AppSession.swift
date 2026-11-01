@@ -58,6 +58,9 @@ final class AppSession {
     let snapshotStore: SnapshotStore
     private(set) var maintenanceInProgress = false
     private var pendingWrites = 0
+    /// AU-97: writes the user started (every `beginWrite`), without inbox drains or notification-store reads; sheets read it
+    /// through `madarSheetLock` so none can be swiped away mid-save.
+    private(set) var userWritesInFlight = 0
     private var notificationStoreAccessSuspended = false
     var backupService: (any BackupUIService)?
     var syncService: (any SyncUIService)?
@@ -482,7 +485,7 @@ final class AppSession {
         Task {
             var succeeded = false
             defer {
-                pendingWrites -= 1
+                endWrite()
                 prayerWriteInProgress = false
                 completion?(succeeded)
                 Task { await MadarIntentHandoff.shared.flush() }
@@ -806,7 +809,7 @@ final class AppSession {
             layouts[definition.owner] = values[definition.key]
         }
         Task {
-            defer { pendingWrites -= 1 }
+            defer { endWrite() }
             do {
                 let encoder = JSONEncoder()
                 let typed = try settings.mapValues { try JSONDecoder().decode(MadarCore.JSONValue.self, from: encoder.encode($0)) }
@@ -821,7 +824,7 @@ final class AppSession {
     func completeOnboarding() {
         guard beginWrite() else { return }
         Task {
-            defer { pendingWrites -= 1 }
+            defer { endWrite() }
             do {
                 let result = try await bus.execute(CommandEnvelope(name: "core.completeOnboarding", payload: .object([:])))
                 guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue("onboarding") }
@@ -833,7 +836,7 @@ final class AppSession {
         guard let token = undoToken else { return }
         guard beginWrite() else { return }
         Task {
-            defer { pendingWrites -= 1 }
+            defer { endWrite() }
             do {
                 try await withSerializedPrayerNotificationMutation {
                     let result = try await bus.execute(CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(token.id.uuidString)])))
@@ -849,21 +852,11 @@ final class AppSession {
                          resultCompletion: ((Bool) -> Void)? = nil) {
         guard beginWrite() else { resultCompletion?(false); return }
         Task {
-            defer { pendingWrites -= 1 }
+            defer { endWrite() }
             do {
 #if DEBUG
-                if values["salah.tripMethod"] != nil,
-                   ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
-                   let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_TRIP_METHOD_WRITE_HOLD_MS"] ?? ""),
-                   (1...5000).contains(milliseconds) {
-                    try await Task.sleep(for: .milliseconds(milliseconds))
-                }
-                if name == "settings.set",
-                   ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
-                   let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_MONEY_WRITE_HOLD_MS"] ?? ""),
-                   (1...5000).contains(milliseconds) {
-                    try await Task.sleep(for: .milliseconds(milliseconds))
-                }
+                try await holdWriteForUITest("MADAR_UI_TRIP_METHOD_WRITE_HOLD_MS", when: values["salah.tripMethod"] != nil)
+                try await holdWriteForUITest("MADAR_UI_MONEY_WRITE_HOLD_MS", when: name == "settings.set")
 #endif
                 try await withSerializedPrayerNotificationMutation {
                     let encoder = JSONEncoder()
@@ -894,8 +887,20 @@ final class AppSession {
         guard !maintenanceInProgress else {
             errorMessage = Self.maintenanceBusyMessage; return false
         }
-        pendingWrites += 1; return true
+        pendingWrites += 1; userWritesInFlight += 1; return true
     }
+    private func endWrite() { pendingWrites -= 1; userWritesInFlight -= 1 }
+    var userWriteInProgress: Bool { userWritesInFlight > 0 }
+#if DEBUG
+    /// UI tests only: the one write hold. A synthetic UI store and `key` set to 1–5000 ms keep the write open so a test can
+    /// act while it saves (AU-97 folded the per-room copies of this into one helper; the keys stay per room).
+    func holdWriteForUITest(_ key: String, when applies: Bool = true) async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard applies, environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+              let milliseconds = Int(environment[key] ?? ""), (1...5000).contains(milliseconds) else { return }
+        try await Task.sleep(for: .milliseconds(milliseconds))
+    }
+#endif
     private static let maintenanceBusyMessage = "مدار يحدّث مخزن البيانات. حاول بعد اكتمال العملية."
     func clearRecoveredMaintenanceError() {
         if errorMessage == Self.maintenanceBusyMessage { errorMessage = nil }
@@ -981,7 +986,7 @@ final class AppSession {
     }
     func executeQuranCommand(_ name: String, payload: [String: MadarCore.JSONValue]) async throws -> CommandOutcome {
         guard beginWrite() else { throw BackupOperationError.busy }
-        defer { pendingWrites -= 1 }
+        defer { endWrite() }
 #if DEBUG
         if name == "quran.setTodayLevel", !quranLevelWriteHoldUsed,
            let milliseconds = quranLevelWriteHoldMilliseconds {
@@ -1061,14 +1066,9 @@ final class AppSession {
         }
 #endif
         guard beginWrite() else { throw BackupOperationError.busy }
-        defer { pendingWrites -= 1 }
+        defer { endWrite() }
 #if DEBUG
-        if ["money.saveAccount", "money.saveCard", "money.saveZakat", "money.saveObligation", "money.setReserveGoal", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.confirmSalary", "money.reconcile", "money.prepareGoal", "money.setEnvelopeSaving", "money.adoptRepayment", "money.repayEnvelopeNow"].contains(name),
-           ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
-           let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_MONEY_WRITE_HOLD_MS"] ?? ""),
-           (1...5000).contains(milliseconds) {
-            try await Task.sleep(for: .milliseconds(milliseconds))
-        }
+        try await holdWriteForUITest("MADAR_UI_MONEY_WRITE_HOLD_MS", when: ["money.saveAccount", "money.saveCard", "money.saveZakat", "money.saveObligation", "money.setReserveGoal", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.confirmSalary", "money.reconcile", "money.prepareGoal", "money.setEnvelopeSaving", "money.adoptRepayment", "money.repayEnvelopeNow"].contains(name))
 #endif
         let now = prayerNow()
         let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
@@ -1085,7 +1085,7 @@ final class AppSession {
     func executeBookCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID(), undoMessage: String = "حُفظ في المحبرة") async throws {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
         guard beginWrite() else { throw BackupOperationError.busy }
-        defer { pendingWrites -= 1 }
+        defer { endWrite() }
         #if DEBUG
         // One failed command in an explicitly named synthetic UI store; never applies to an owner store.
         if failFirstNotebookSave && name == "notebook.savePrivate" {
@@ -1131,20 +1131,10 @@ final class AppSession {
     func executeDiaryCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID()) async throws {
         guard !name.hasPrefix("diary.") || (lockController?.canPresent(.notes) ?? protectedDataAuthorized) else { throw DataError.invalidValue("المذكرات مقفلة") }
         guard beginWrite() else { throw BackupOperationError.busy }
-        defer { pendingWrites -= 1 }
+        defer { endWrite() }
 #if DEBUG
-        if name == "habit.complete",
-           ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
-           let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_HABIT_WRITE_HOLD_MS"] ?? ""),
-           (1...5000).contains(milliseconds) {
-            try await Task.sleep(for: .milliseconds(milliseconds))
-        }
-        if ["diary.sealLetter", "diary.finishProject", "diary.deleteProject", "widget.delete"].contains(name),
-           ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
-           let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_DIARY_COMMAND_HOLD_MS"] ?? ""),
-           (1...5000).contains(milliseconds) {
-            try await Task.sleep(for: .milliseconds(milliseconds))
-        }
+        try await holdWriteForUITest("MADAR_UI_HABIT_WRITE_HOLD_MS", when: name == "habit.complete")
+        try await holdWriteForUITest("MADAR_UI_DIARY_COMMAND_HOLD_MS", when: ["diary.sealLetter", "diary.finishProject", "diary.deleteProject", "widget.delete"].contains(name))
 #endif
         let now = prayerNow()
         func run() async throws -> CommandOutcome {
@@ -1179,7 +1169,7 @@ final class AppSession {
     func performDiaryImport<T>(_ body: (Date) async throws -> T) async throws -> T {
         guard lockController?.canPresent(.notes) ?? protectedDataAuthorized else { throw DataError.invalidValue("المذكرات مقفلة") }
         guard beginWrite() else { throw BackupOperationError.busy }
-        defer { pendingWrites -= 1 }
+        defer { endWrite() }
         let result = try await body(prayerNow())
         try reload(); try publishSnapshot(); WidgetCenter.shared.reloadAllTimelines()
         return result
@@ -1187,7 +1177,7 @@ final class AppSession {
 
     func applySettingsAndWait(_ changes: [String: JSONValue]) async throws {
         guard beginWrite() else { throw BackupOperationError.busy }
-        defer { pendingWrites -= 1 }
+        defer { endWrite() }
         try await withSerializedPrayerNotificationMutation {
             let typed = try changes.mapValues { try JSONDecoder().decode(MadarCore.JSONValue.self, from: $0.canonicalData()) }
             let result = try await bus.execute(CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(typed)])))

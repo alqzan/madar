@@ -43,7 +43,7 @@ struct MoneyZakatEditor: View {
     }
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment:.leading,spacing:16) {
-            HStack { Text("بيانات الزكاة").font(MadarTypography.cardTitle());Spacer();Button("إغلاق"){dismiss()}.frame(minHeight:44).accessibilityIdentifier("money-zakat-editor-close").disabled(saving) }
+            HStack { Text("بيانات الزكاة").font(MadarTypography.cardTitle());Spacer();Button("إغلاق"){dismiss()}.frame(minHeight:44).accessibilityIdentifier("money-zakat-editor-close").madarWaitsForSave() }
             Text("أساس النصاب").font(MadarTypography.section())
             HStack { Button("ذهب ٢٤ قيراطًا") { selectedBasis = .gold; basisChosen = true }.accessibilityIdentifier("money-zakat-editor-gold");Spacer();Button("فضة") { selectedBasis = .silver; basisChosen = true }.accessibilityIdentifier("money-zakat-editor-silver") }.font(MadarTypography.body())
             if basisChosen { Text(selectedBasis == .gold ? "اخترت الذهب عيار ٢٤" : "اخترت الفضة").font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText")) }
@@ -72,7 +72,7 @@ struct MoneyZakatEditor: View {
         }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).scrollDismissesKeyboard(.interactively)
             .toolbar {ToolbarItemGroup(placement:.keyboard){Spacer();Button("تمّ"){focused=false}.accessibilityIdentifier("money-zakat-keyboard-done")}}
             .task {let i=reading.input;selectedBasis=basis;basisChosen=chosen;selectedDebt=debt;gold=i.goldPricePerGramMinor.map{service.moneyInput($0)} ?? "";silver=i.silverPricePerGramMinor.map{service.moneyInput($0)} ?? "";goldWeight=service.moneyInput(i.nisabMg,exponent:3);silverWeight=service.moneyInput(i.nisabSilverMg,exponent:3);other=service.moneyInput(i.otherAssetsMinor);hasHawl = !(i.hawlStartHijri ?? "").isEmpty;date=MoneyHawl.read(i.hawlStartHijri ?? "",app:app)?.chosen.date(in:app.activePlace.timeZone) ?? app.prayerNow()}
-        }.interactiveDismissDisabled(saving)
+        }.madarSheetLock(saving: saving)
     }
     private func field(_ title:String,_ binding:Binding<String>,_ id:String,placeholder:String="اختياري")->some View {VStack(alignment:.leading,spacing:5){Text(title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk);TextField(placeholder,text:binding).font(MadarTypography.body()).keyboardType(.decimalPad).focused($focused).padding(10).background(theme.surface).accessibilityIdentifier("money-zakat-"+id)}}
     private func save(){

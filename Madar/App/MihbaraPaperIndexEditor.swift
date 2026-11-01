@@ -119,7 +119,7 @@ struct MihbaraPaperIndexEditor: View {
                             .font(MadarTypography.caption())
                             .frame(minHeight: 44)
                     }
-                    .disabled(saving).accessibilityIdentifier("mihbara-paper-back")
+                    .madarWaitsForSave().accessibilityIdentifier("mihbara-paper-back")
                     Spacer()
                     Text("كتاب ورقي").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
                     Spacer().frame(width: 48)
@@ -232,7 +232,7 @@ struct MihbaraPaperIndexEditor: View {
             Button("تجاهل التعديلات", role: .destructive) { dismiss() }.accessibilityIdentifier("mihbara-paper-discard")
             Button("أكمل الكتابة") { }.accessibilityIdentifier("mihbara-paper-continue")
         } message: { Text("الفهرس غير محفوظ.") }
-        .interactiveDismissDisabled(hasUnsavedChanges || saving)
+        .madarSheetLock(saving: saving, draft: hasUnsavedChanges)
         .onChange(of: hasUnsavedChanges || saving, initial: true) { _, blocked in
             app.setMihbaraRootDraftBlocker(rootBlockerID, active: blocked)
         }

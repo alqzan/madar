@@ -154,7 +154,7 @@ struct MoneyRepaymentView: View {
                 HStack {
                     Text(reading.envelope.name + " عليه " + service.amount(debt)).font(MadarTypography.title()).foregroundStyle(theme.color("debt"))
                     Spacer()
-                    Button { dismiss() } label: { Image(systemName: "xmark").font(.body).frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-repay-close").foregroundStyle(theme.secondaryInk).disabled(working)
+                    Button { dismiss() } label: { Image(systemName: "xmark").font(.body).frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-repay-close").foregroundStyle(theme.secondaryInk).madarWaitsForSave()
                 }
                 if let cause {
                     HStack(alignment: .firstTextBaseline, spacing: 0) {
@@ -203,7 +203,7 @@ struct MoneyRepaymentView: View {
                     .disabled(working || reading.home.reserveMinor < debt)
                 if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
             }.padding(18)
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.fraction(0.78), .large]).presentationDragIndicator(.visible).interactiveDismissDisabled(working).accessibilityIdentifier("money-repayment-preview")
+        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.fraction(0.78), .large]).presentationDragIndicator(.visible).madarSheetLock(saving: working).accessibilityIdentifier("money-repayment-preview")
     }
     private func outlined(_ title: String, note: String?, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -339,7 +339,7 @@ private struct MoneySavingChangeView: View {
             if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
             Button(working ? "جارٍ الحفظ…" : "احفظ التعديل", action: save).buttonStyle(MadarPrimaryButton()).disabled(working || changeMinor == nil).accessibilityIdentifier("money-saving-change-save")
             Spacer(minLength: 0)
-        }.padding(20).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium]).presentationDragIndicator(.visible).interactiveDismissDisabled(working)
+        }.padding(20).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium]).presentationDragIndicator(.visible).madarSheetLock(saving: working)
     }
     private func save() {
         guard !working else { return }

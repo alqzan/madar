@@ -60,7 +60,7 @@ struct MoneyAccountSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack { Text(original.isNew ? "حساب جديد" : draft.name).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.disabled(saving).frame(minHeight: 44).accessibilityIdentifier("money-account-editor-close") }
+                    HStack { Text(original.isNew ? "حساب جديد" : draft.name).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-account-editor-close") }
                     rootRouteTestButton
                     field("اسم الحساب") { TextField("مثل: حساب الراتب", text: $draft.name).focused($editing).accessibilityIdentifier("money-account-name") }
                     field("البنك أو المحفظة") { TextField("اسم البنك", text: $draft.bank).focused($editing).accessibilityIdentifier("money-account-bank") }
@@ -107,7 +107,7 @@ struct MoneyAccountSheet: View {
                 }.padding(20)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-account-keyboard-done") } }
-                .interactiveDismissDisabled(blocksRootRoute)
+                .madarSheetLock(saving: saving, draft: hasUnsavedInput)
         }
         .onChange(of: blocksRootRoute, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
         .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }

@@ -64,7 +64,7 @@ struct MoneySettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
-                    HStack { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.disabled(app.settingsWriteInProgress).accessibilityLabel("إغلاق").accessibilityIdentifier("money-settings-close"); Text("إعدادات المال").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer() }
+                    HStack { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.madarWaitsForSave().accessibilityLabel("إغلاق").accessibilityIdentifier("money-settings-close"); Text("إعدادات المال").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer() }
                     VStack(spacing: 0) {
                         ScrollView(.horizontal) { HStack(alignment: .bottom, spacing: 4) { ForEach(Page.allCases, id: \.rawValue) { p in
                             Button { editing = false; page = p } label: { VStack(spacing: 3) { Text(service.digits.string(p.rawValue + 1)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")); Text(p.title).font(MadarTypography.caption()); Text(tabValue(p)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }.frame(width: 58, height: p == page ? 76 : 66).background(p == page ? theme.surface : theme.background).clipShape(.rect(topLeadingRadius: 12, topTrailingRadius: 12)).overlay { UnevenRoundedRectangle(topLeadingRadius: 12, topTrailingRadius: 12).stroke(p == page ? theme.color("reserveText") : theme.line, lineWidth: 1) } }.accessibilityIdentifier("money-settings-page-" + String(p.rawValue))
@@ -92,7 +92,7 @@ struct MoneySettingsView: View {
                 .task { load() }.onChange(of: app.prayerRevision) { refreshAfterSettingsChange() }.onChange(of: unit) { every = min(every, unit.maxEvery) }
                 .accessibilityIdentifier("money-settings")
         }
-        .interactiveDismissDisabled(app.settingsWriteInProgress)
+        .madarSheetLock(saving: app.settingsWriteInProgress)
     }
     private var dailyPage: some View {
         VStack(alignment: .leading, spacing: 16) {

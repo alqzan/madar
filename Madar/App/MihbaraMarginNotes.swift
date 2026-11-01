@@ -121,7 +121,7 @@ struct MihbaraMarginNoteEditor: View {
         .alert("الهامش", isPresented: Binding(get: { alert != nil }, set: { if !$0 { alert = nil } })) {
             Button("حسنًا", role: .cancel) { alert = nil }
         } message: { Text(alert ?? "") }
-        .interactiveDismissDisabled(blocksRootRoute)
+        .madarSheetLock(saving: saving, draft: trimmed != note.text.trimmingCharacters(in: .whitespacesAndNewlines))
         .onChange(of: blocksRootRoute, initial: true) { _, blocked in
             app.setMihbaraRootDraftBlocker(rootBlockerID, active: blocked)
         }
