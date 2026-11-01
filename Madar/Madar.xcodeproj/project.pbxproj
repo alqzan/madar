@@ -136,6 +136,7 @@
 		3FEA8FB15F8EB51DEB9ADAA6 /* AppQuranService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD01076802F7C86446475EE9 /* AppQuranService.swift */; };
 		40AEC490ABF0A0DB6D7B4DDE /* QuranDayCloseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C83F53C2034722DE17B40FDF /* QuranDayCloseView.swift */; };
 		41A7643B253AFF8A7C6F7417 /* MadarWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E9A234078D9BE6530E46FC1E /* MadarWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		41AC9AB0B28D9D3EF795414E /* PrayerSnapshotSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2120D9CCB35FD19F23C35DD4 /* PrayerSnapshotSheet.swift */; };
 		41EEAAF9CBDDCA43DE9F7EEF /* MoneyTravelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1AEB93E6F1D18E3D52A9ED5 /* MoneyTravelUITests.swift */; };
 		423964B1866E1DA81AE72505 /* MoneySinceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 582EDF51736DCDF5F9D06E86 /* MoneySinceUITests.swift */; };
 		426A98B3F16AF13682080B56 /* MadarQuran in Frameworks */ = {isa = PBXBuildFile; productRef = 0A7A781426FCB0E78AFCDE6F /* MadarQuran */; };
@@ -559,6 +560,7 @@
 		1EF23F39ED0A12A19345F8B2 /* MihbaraPaperCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraPaperCapture.swift; sourceTree = "<group>"; };
 		1F9E40A347AD27478E3FA224 /* thmanyahseriftext-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahseriftext-Regular.otf"; sourceTree = "<group>"; };
 		20304C3F7DCC7BAAB0C5632E /* BahwCustomizeParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BahwCustomizeParts.swift; sourceTree = "<group>"; };
+		2120D9CCB35FD19F23C35DD4 /* PrayerSnapshotSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerSnapshotSheet.swift; sourceTree = "<group>"; };
 		22009EDA3EF09A49926268E5 /* MoneyTripSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyTripSheets.swift; sourceTree = "<group>"; };
 		2234F4C1215CD275CE96CFAD /* DiaryCustomizeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryCustomizeView.swift; sourceTree = "<group>"; };
 		22667A11D78A7887B0C70B39 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -1245,6 +1247,7 @@
 				0D987FDE73C46EF6D320A153 /* PrayerQadaListSheet.swift */,
 				C1541C81F328C40D5A683888 /* PrayerRoom.swift */,
 				0A7D4FC457636377F6EF5D76 /* PrayerSettingsView.swift */,
+				2120D9CCB35FD19F23C35DD4 /* PrayerSnapshotSheet.swift */,
 				9F86E6D65005B997B3803B0B /* PrayerStatisticsView.swift */,
 				F5BEB0146B6B405B7B607BD4 /* PrayerStreaksView.swift */,
 				D813172B4A91DD6E0930EEA8 /* PrayerTodayView.swift */,
@@ -2171,6 +2174,7 @@
 				02513070494B4312F415494B /* PrayerQadaListSheet.swift in Sources */,
 				CFF94239BC342BA772C26E44 /* PrayerRoom.swift in Sources */,
 				74FD6AB907A73C84CA714668 /* PrayerSettingsView.swift in Sources */,
+				41AC9AB0B28D9D3EF795414E /* PrayerSnapshotSheet.swift in Sources */,
 				95EA523BEB45F2D39DF2E8FE /* PrayerStatisticsView.swift in Sources */,
 				A11A36D051873A05917A2712 /* PrayerStreaksView.swift in Sources */,
 				2E95780F1D439BE926514901 /* PrayerTodayView.swift in Sources */,
