@@ -4,6 +4,8 @@ import MadarCore
 import MadarData
 import MadarCommands
 import MadarMoney
+import MadarInbox
+import MadarSnapshots
 @testable import Madar
 
 /// M4-F01: Siri/Shortcuts requests that need the app run through the app's own command path,
@@ -34,6 +36,52 @@ import MadarMoney
         XCTAssertEqual(app.selectedTab, "notes")
         _ = await app.handleIntentRequest(.diaryLine(text: "فكرة: كتاب عن الجيران", day: "today", id: UUID()))
         XCTAssertTrue(try AppDiaryService(app: app, clock: { .now }).home().todayPage.lines.contains { $0.text == "فكرة: كتاب عن الجيران" })
+    }
+
+    func testWidgetHabitActionQueuesOnlyOnceAndRestoresAfterQueueFailure() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "WidgetHabitAction-\(UUID())", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let now = Date(), day = GregorianDay.containing(now, in: TimeZone(identifier: "Asia/Riyadh")!), habitID = UUID()
+        let store = SnapshotStore(directory: root.appending(path: "Snapshots", directoryHint: .isDirectory))
+        let row = WidgetCatalogSnapshot.Row(id: "habit:\(habitID.uuidString)", title: "شرب الماء", value: "٠ من ٦", glyph: "drop", route: "madar://bahw/habits/\(habitID.uuidString)", habitID: habitID)
+        let config = WidgetCatalogSnapshot.Config(id: UUID(), name: "يومي", familyID: "medium", styleJSON: Data(), rows: [row])
+        let values = WidgetCatalogSnapshot(datePrimary: "اليوم", dateSecondary: "", configs: [config], locked: false)
+        try store.write(.init(name: WidgetCatalogSnapshot.valuesName, generatedAt: now, validUntil: now.addingTimeInterval(3600), dayKey: day.description, tzID: "Asia/Riyadh", privacy: .init(), payload: values))
+        let shortcut = HabitShortcutSnapshot(items: [.init(id: habitID, title: "شرب الماء", stepTitle: "+١ كوب", step: 1, periodKey: "2026-W44", done: false)], periodsValidUntil: now.addingTimeInterval(1800))
+        try store.write(.init(name: HabitShortcutSnapshot.name, generatedAt: now, validUntil: now.addingTimeInterval(3600), dayKey: day.description, tzID: "Asia/Riyadh", privacy: .init(), payload: shortcut))
+
+        let inboxRoot = root.appending(path: "PendingInbox", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: inboxRoot, withIntermediateDirectories: true)
+        try Data("{malformed".utf8).write(to: inboxRoot.appending(path: "Generation.json"))
+        XCTAssertThrowsError(try WidgetCompleteHabitIntent.enqueue(habitID: habitID, root: root, now: now))
+        XCTAssertEqual(store.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: now)?.payload.configs[0].rows[0].habitID, habitID,
+                       "A failed inbox write releases the action claim.")
+
+        try FileManager.default.removeItem(at: inboxRoot.appending(path: "Generation.json"))
+        try WidgetCompleteHabitIntent.enqueue(habitID: habitID, root: root, now: now)
+        XCTAssertNil(store.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: now)?.payload.configs[0].rows[0].habitID)
+        let inbox = PendingInbox(directory: inboxRoot)
+        XCTAssertEqual(try inbox.unacknowledgedHabitIDs(), [habitID])
+        XCTAssertThrowsError(try WidgetCompleteHabitIntent.enqueue(habitID: habitID, root: root, now: now),
+                             "The second tap sees the claimed snapshot and cannot enqueue a duplicate.")
+        XCTAssertEqual(try inbox.unacknowledgedHabitIDs(), [habitID])
+    }
+
+    func testSiriHabitQueueClaimsTheMatchingWidgetAction() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "SiriHabitWidgetClaim-\(UUID())", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let now = Date(), day = GregorianDay.containing(now, in: TimeZone(identifier: "Asia/Riyadh")!), habitID = UUID()
+        let store = SnapshotStore(directory: root.appending(path: "Snapshots", directoryHint: .isDirectory))
+        let row = WidgetCatalogSnapshot.Row(id: "habit:\(habitID.uuidString)", title: "شرب الماء", value: "٠ من ٦", glyph: "drop", route: "madar://bahw/habits/\(habitID.uuidString)", habitID: habitID)
+        let config = WidgetCatalogSnapshot.Config(id: UUID(), name: "يومي", familyID: "medium", styleJSON: Data(), rows: [row])
+        let values = WidgetCatalogSnapshot(datePrimary: "اليوم", dateSecondary: "", configs: [config], locked: false)
+        try store.write(.init(name: WidgetCatalogSnapshot.valuesName, generatedAt: now, validUntil: now.addingTimeInterval(3600), dayKey: day.description, tzID: "Asia/Riyadh", privacy: .init(), payload: values))
+
+        let item = HabitShortcutSnapshot.Item(id: habitID, title: "شرب الماء", stepTitle: "+١ كوب", step: 1, periodKey: "2026-W44", done: false)
+        try CompleteHabitIntent.enqueue(item: item, day: day, root: root, now: now)
+
+        XCTAssertNil(store.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: now)?.payload.configs[0].rows[0].habitID)
+        XCTAssertEqual(try PendingInbox(directory: root.appending(path: "PendingInbox", directoryHint: .isDirectory)).unacknowledgedHabitIDs(), [habitID])
     }
 
     func testCaptureRequestsSurviveStoreMaintenance() async throws {

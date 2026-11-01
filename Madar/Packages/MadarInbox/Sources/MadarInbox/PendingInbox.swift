@@ -128,12 +128,31 @@ public struct PendingInbox: Sendable {
     public func retainForResolution(_ file: URL, reason: String) throws { try retain(file, folder: "unresolved", reason: reason) }
     /// Conservative GC: unreadable files throw so callers cannot accidentally collect dedupe IDs.
     public func unacknowledgedCommandIDs() throws -> Set<UUID> {
+        Set(try unacknowledgedRecords().map { $0.command.commandID })
+    }
+    /// Habit IDs with a delivery still pending, processing or unresolved.
+    /// A malformed record throws so a publisher can fail closed instead of restoring a stale action.
+    public func unacknowledgedHabitIDs() throws -> Set<UUID> {
         var result: Set<UUID> = []
-        for folder in ["pending", "processing", "unresolved", "quarantine"] {
+        for record in try records(in: ["pending", "processing", "unresolved"]) {
+            guard record.command.name == "habit.complete",
+                  case .object(let fields) = record.command.payload,
+                  case .string(let rawID)? = fields["id"],
+                  let id = UUID(uuidString: rawID) else { continue }
+            result.insert(id)
+        }
+        return result
+    }
+    private func unacknowledgedRecords() throws -> [InboxRecord] {
+        try records(in: ["pending", "processing", "unresolved", "quarantine"])
+    }
+    private func records(in folders: [String]) throws -> [InboxRecord] {
+        var result: [InboxRecord] = []
+        for folder in folders {
             for file in try files(in: folder) {
                 let data = try Data(contentsOf: file)
                 guard data.count <= 1_048_576, let record = try? JSONDecoder().decode(InboxRecord.self, from: data) else { throw InboxError.malformedRecord }
-                result.insert(record.command.commandID)
+                result.append(record)
             }
         }
         return result

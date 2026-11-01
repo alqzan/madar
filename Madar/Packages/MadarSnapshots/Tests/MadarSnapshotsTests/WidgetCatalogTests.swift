@@ -4,6 +4,24 @@ import Testing
 @testable import MadarSnapshots
 
 struct WidgetCatalogTests {
+    @Test func queuedHabitCompletionHidesOnlyThatHabitAction() {
+        let pendingID = UUID(), availableID = UUID()
+        let pending = WidgetCatalogSnapshot.Row(id: "pending", title: "ماء", value: "١ من ٦", glyph: "drop", route: "madar://bahw/habits", habitID: pendingID)
+        let available = WidgetCatalogSnapshot.Row(id: "available", title: "قراءة", value: "٠ من ١", glyph: "book", route: "madar://bahw/habits", habitID: availableID)
+        let plain = WidgetCatalogSnapshot.Row(id: "plain", title: "سطر", value: "اكتب", glyph: "note", route: "madar://notes")
+        var snapshot = WidgetCatalogSnapshot(datePrimary: "اليوم", dateSecondary: "", configs: [
+            .init(id: UUID(), name: "يومي", familyID: "medium", styleJSON: Data(), rows: [pending, available, plain])
+        ], locked: false)
+
+        snapshot.hideHabitActions(for: [pendingID])
+
+        let rows = snapshot.configs[0].rows
+        #expect(rows[0].habitID == nil)
+        #expect(rows[0].value == pending.value)
+        #expect(rows[1].habitID == availableID)
+        #expect(rows[2] == plain)
+    }
+
     @Test func timedFocusChangesAndSavedPriorityReturnsAfterTheWindow() {
         let morning = Date(timeIntervalSince1970: 1000), noon = Date(timeIntervalSince1970: 2000)
         var quran = WidgetCatalogSnapshot.Row(id: "quran", title: "القرآن", value: "وجه", glyph: "book", route: "madar://quran")

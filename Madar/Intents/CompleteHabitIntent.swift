@@ -70,12 +70,37 @@ struct CompleteHabitIntent: AppIntent {
         guard let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else {
             throw CompleteHabitIntentError.openMadar
         }
-        let inbox = PendingInbox(directory: group.appending(path: "PendingInbox", directoryHint: .isDirectory))
-        do { try HabitInboxCommandWriter.complete(inbox: inbox, habitID: item.id, delta: item.step, periodKey: item.periodKey, source: .siri, issuedAt: now, day: day) }
+        do { try Self.enqueue(item: item, day: day, root: group, now: now) }
         catch { throw CompleteHabitIntentError.openMadar }
         await MainActor.run { NotificationCenter.default.post(name: .madarInboxChanged, object: nil) }
         WidgetCenter.shared.reloadAllTimelines()
         return .result(dialog: "حُفظت، وتُسجَّل في مدار حين تفتحه.")
+    }
+
+    static func enqueue(item: HabitShortcutSnapshot.Item, day: GregorianDay, root: URL, now: Date) throws {
+        let store = SnapshotStore(directory: root.appending(path: "Snapshots", directoryHint: .isDirectory))
+        let inbox = PendingInbox(directory: root.appending(path: "PendingInbox", directoryHint: .isDirectory))
+        try store.withExclusiveAccess(for: WidgetCatalogSnapshot.valuesName) {
+            let previous = store.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: now)
+            if let previous {
+                var claimed = previous
+                claimed.payload.hideHabitActions(for: [item.id])
+                do { try store.write(claimed) }
+                catch { try? store.write(previous); throw error }
+            }
+            do {
+                try HabitInboxCommandWriter.complete(inbox: inbox, habitID: item.id, delta: item.step,
+                                                     periodKey: item.periodKey, source: .siri,
+                                                     issuedAt: now, day: day)
+            } catch {
+                // The inbox can report a directory sync failure after publishing the record.
+                do {
+                    let pendingIDs = try inbox.unacknowledgedHabitIDs()
+                    if !pendingIDs.contains(item.id), let previous { try store.write(previous) }
+                } catch { /* An unreadable inbox is uncertain; keep the action claimed. */ }
+                throw error
+            }
+        }
     }
 }
 

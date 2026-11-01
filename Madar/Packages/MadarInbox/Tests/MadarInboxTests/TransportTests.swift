@@ -10,6 +10,9 @@ struct TransportTests {
     private func record(generation: UUID = UUID()) -> InboxRecord {
         .init(expectedGenerationID: generation, command: .init(name: "prayer.log", payload: .object(["dayKey": .string("2026-10-10"), "prayer": .string("fajr"), "status": .string("jamaah")]), source: .widget))
     }
+    private func habitRecord(_ id: UUID) -> InboxRecord {
+        .init(expectedGenerationID: nil, command: .init(name: "habit.complete", payload: .object(["id": .string(id.uuidString), "delta": .number(1), "day": .string("2026-11-01")]), source: .widget))
+    }
     @Test func test_M0R03_durableImmutablePublicationAndClaimRecovery() throws {
         let inbox = fixture(), record = record()
         let ticket = try inbox.enqueue(record)
@@ -58,6 +61,25 @@ struct TransportTests {
         #expect(try inbox.unacknowledgedCommandIDs() == [old.command.commandID])
         let diagnostic = try Data(contentsOf: inbox.directory.appending(path: "unresolved/\(old.deliveryID).diagnostic.json"))
         #expect(!String(decoding: diagnostic, as: UTF8.self).contains("jamaah"))
+    }
+    @Test func unacknowledgedHabitIDsCoverLiveAndUnresolvedDeliveryStates() throws {
+        let inbox = fixture(), unresolvedID = UUID(), quarantinedID = UUID(), acknowledgedID = UUID()
+        _ = try inbox.enqueue(habitRecord(unresolvedID))
+        #expect(try inbox.unacknowledgedHabitIDs() == [unresolvedID])
+        let unresolved = try #require(try inbox.claimBatch().first)
+        #expect(try inbox.unacknowledgedHabitIDs() == [unresolvedID])
+        try inbox.retainForResolution(unresolved, reason: "generationChanged")
+
+        _ = try inbox.enqueue(habitRecord(quarantinedID))
+        let quarantined = try #require(try inbox.claimBatch().first)
+        try inbox.quarantine(quarantined, reason: "invalidCommand")
+        #expect(try inbox.unacknowledgedHabitIDs() == [unresolvedID], "A terminal rejection must release the widget action on the next publication.")
+
+        _ = try inbox.enqueue(habitRecord(acknowledgedID))
+        let processing = try #require(try inbox.claimBatch().first)
+        #expect(try inbox.unacknowledgedHabitIDs() == [unresolvedID, acknowledgedID])
+        try inbox.acknowledge(processing)
+        #expect(try inbox.unacknowledgedHabitIDs() == [unresolvedID])
     }
     @Test func test_M0R03_cliAndFoundationTempAliasesClaimTheSameDirectory() throws {
         let inbox = fixture(), accepted = record()

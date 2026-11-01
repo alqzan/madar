@@ -73,6 +73,7 @@ final class AppSession {
 #endif
     @ObservationIgnored weak var prayerNotifications: PrayerNotificationCoordinator?
     @ObservationIgnored private var privacyScopeTransitionPending = false
+    @ObservationIgnored private var widgetHabitRefreshPending = false
     let schema: SettingsSchema
     var store: SettingsStore
     private(set) var values: [String: JSONValue] = [:]
@@ -906,14 +907,32 @@ final class AppSession {
     func drainInbox() async throws -> Bool {
         guard !maintenanceInProgress, !inboxDrainer.isDraining else { return false }
         pendingWrites += 1; defer { pendingWrites -= 1 }
-        let drained = try await withSerializedPrayerNotificationMutation(shouldRefresh: { $0 }) {
-            guard try await inboxDrainer.drain() else { return false }
-            // A malformed/quarantined record may have an unreadable identity: keep all receipts.
-            let pinned: Set<UUID>
-            do { pinned = try pendingInbox.unacknowledgedCommandIDs() }
-            catch InboxError.malformedRecord { return true }
-            try commandAdapter.purgeExpiredReceipts(pinnedIDs: pinned)
-            return true
+        let drained: Bool
+        do {
+            drained = try await withSerializedPrayerNotificationMutation(shouldRefresh: { $0 }) {
+                guard try await inboxDrainer.drain() else { return false }
+                // A malformed/quarantined record may have an unreadable identity: keep all receipts.
+                let pinned: Set<UUID>
+                do { pinned = try pendingInbox.unacknowledgedCommandIDs() }
+                catch InboxError.malformedRecord { return true }
+                try commandAdapter.purgeExpiredReceipts(pinnedIDs: pinned)
+                return true
+            }
+        } catch {
+            // A terminal move can finish and then report a directory-sync error. Reconcile from
+            // durable state so cleared snapshot claims cannot strand their actions across retries.
+            widgetHabitRefreshPending = true
+            do { try reload(); try publishSnapshot(); widgetHabitRefreshPending = false } catch { }
+            WidgetCenter.shared.reloadTimelines(ofKind: "MadarMaker")
+            throw error
+        }
+        if inboxDrainer.needsWidgetHabitRefresh { widgetHabitRefreshPending = true }
+        if drained, widgetHabitRefreshPending {
+            // The drainer's refresh runs before acknowledgement. Publish after terminal moves,
+            // including partial drains and quarantines, so a stale claim cannot remain hidden.
+            do { try reload(); try publishSnapshot(); widgetHabitRefreshPending = false }
+            catch { errorMessage = "تعذّر تحديث الودجة الآن. أعد فتح مدار." }
+            WidgetCenter.shared.reloadTimelines(ofKind: "MadarMaker")
         }
         if drained && notificationStoreAccessSuspended && !maintenanceInProgress {
             notificationStoreAccessSuspended = false

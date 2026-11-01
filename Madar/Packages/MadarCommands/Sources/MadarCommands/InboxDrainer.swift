@@ -5,6 +5,9 @@ import MadarInbox
 /// One coordinator per app session. Extensions never link this writable command package.
 @MainActor public final class InboxDrainer {
     public private(set) var isDraining = false
+    /// A habit delivery or unreadable record reached a terminal state in the most recent drain.
+    /// App publishers use this to reconcile snapshot actions after acknowledgement or rejection.
+    public private(set) var needsWidgetHabitRefresh = false
     private let inbox: PendingInbox
     private let bus: CommandBus
     private let generation: @MainActor () throws -> InboxGeneration
@@ -22,15 +25,15 @@ import MadarInbox
     @discardableResult
     public func drain(now: Date = Date()) async throws -> Bool {
         guard !isDraining, !shouldPause() else { return false }
-        isDraining = true; defer { isDraining = false }
+        isDraining = true; needsWidgetHabitRefresh = false; defer { isDraining = false }
         try Task.checkCancellation()
         let recovering = Set(try inbox.processingFiles().map(\.path))
         let files = try inbox.claimBatch()
         var records: [(URL, InboxRecord)] = []
         for file in files {
             do { records.append((file, try inbox.read(file))) }
-            catch InboxError.malformedRecord { try inbox.quarantine(file, reason: "malformedRecord") }
-            catch InboxError.unknownVersion { try inbox.quarantine(file, reason: "unknownVersion") }
+            catch InboxError.malformedRecord { try inbox.quarantine(file, reason: "malformedRecord"); needsWidgetHabitRefresh = true }
+            catch InboxError.unknownVersion { try inbox.quarantine(file, reason: "unknownVersion"); needsWidgetHabitRefresh = true }
         }
         // Preserve processing recovery priority, then deterministic order inside each batch.
         records.sort {
@@ -50,11 +53,16 @@ import MadarInbox
             // The embedded source is a value, never proof of a user-authorized app call.
             // Foundation app-only writes use the direct UI bus; transport cannot disable locks.
             guard CommandBus.supportedCommandNames.contains(record.command.name) else {
-                try inbox.quarantine(file, reason: "invalidCommand"); continue
+                try inbox.quarantine(file, reason: "invalidCommand")
+                if habitID(in: record.command) != nil { needsWidgetHabitRefresh = true }
+                continue
             }
             if CommandBus.appOnlyCommandNames.contains(record.command.name) { continue } // needsApp; retain for explicit app resolution
             if let denial = authorization(record.command) {
-                if denial.status == .rejected { try inbox.quarantine(file, reason: "invalidCommand") }
+                if denial.status == .rejected {
+                    try inbox.quarantine(file, reason: "invalidCommand")
+                    if habitID(in: record.command) != nil { needsWidgetHabitRefresh = true }
+                }
                 continue // needsUnlock/needsApp preserve the accepted delivery
             }
             // A collected receipt can leave completion provenance in any prior generation.
@@ -69,7 +77,9 @@ import MadarInbox
                 if outcome.reason == "receiptGenerationMismatch" { try inbox.retainForResolution(file, reason: "generationChanged") }
                 else if outcome.reason == "receiptGenerationUnknown" { try inbox.retainForResolution(file, reason: "legacyIdentityAmbiguous") }
                 continue // recoverable; no deletion or false success
-            case .rejected: try inbox.quarantine(file, reason: "invalidCommand")
+            case .rejected:
+                try inbox.quarantine(file, reason: "invalidCommand")
+                if habitID(in: record.command) != nil { needsWidgetHabitRefresh = true }
             case .applied, .duplicate:
                 try Task.checkCancellation()
                 try await refresh()
@@ -80,8 +90,15 @@ import MadarInbox
                 }
                 try inbox.markCommitted(commandID: record.command.commandID, generationID: active.generationID)
                 try inbox.acknowledge(file)
+                if habitID(in: record.command) != nil { needsWidgetHabitRefresh = true }
             }
         }
         return true
+    }
+
+    private func habitID(in command: CommandEnvelope) -> UUID? {
+        guard command.name == "habit.complete", case .object(let fields) = command.payload,
+              case .string(let rawID)? = fields["id"] else { return nil }
+        return UUID(uuidString: rawID)
     }
 }

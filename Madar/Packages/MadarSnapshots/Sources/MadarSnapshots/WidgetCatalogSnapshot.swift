@@ -40,6 +40,17 @@ public struct WidgetCatalogSnapshot: Codable, Sendable, Equatable {
     public init(datePrimary: String, dateSecondary: String, configs: [Config], locked: Bool) {
         self.datePrimary = datePrimary; self.dateSecondary = dateSecondary; self.configs = configs; self.locked = locked
     }
+
+    /// A queued completion owns the tap until the app drains it and republishes current data.
+    public mutating func hideHabitActions(for habitIDs: Set<UUID>) {
+        guard !habitIDs.isEmpty else { return }
+        for configIndex in configs.indices {
+            for rowIndex in configs[configIndex].rows.indices {
+                guard let id = configs[configIndex].rows[rowIndex].habitID, habitIDs.contains(id) else { continue }
+                configs[configIndex].rows[rowIndex].habitID = nil
+            }
+        }
+    }
 }
 
 

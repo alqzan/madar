@@ -36,6 +36,34 @@ struct SnapshotStoreTests {
             try await group.waitForAll()
         }
     }
+    @Test func exclusiveAccessAllowsOnlyOneConcurrentActionClaim() async throws {
+        let store = temporaryStore(); defer { try? FileManager.default.removeItem(at: store.directory) }
+        let now = Date(), name = "ActionClaim"
+        func envelope(_ value: String) -> SnapshotEnvelope<FoundationSnapshot> {
+            .init(name: name, generatedAt: now, validUntil: now.addingTimeInterval(600), dayKey: "2026-11-01", tzID: "Asia/Riyadh", privacy: .init(), payload: .init(firstCalendar: value, numerals: "hindi"))
+        }
+        try store.write(envelope("available"))
+
+        let wins = try await withThrowingTaskGroup(of: Bool.self, returning: Int.self) { group in
+            for _ in 0..<16 {
+                group.addTask {
+                    try store.withExclusiveAccess(for: name) {
+                        guard let current = store.read(name, as: FoundationSnapshot.self, now: now),
+                              current.payload.firstCalendar == "available" else { return false }
+                        Thread.sleep(forTimeInterval: 0.005)
+                        try store.write(envelope("claimed"))
+                        return true
+                    }
+                }
+            }
+            var total = 0
+            for try await didWin in group where didWin { total += 1 }
+            return total
+        }
+
+        #expect(wins == 1)
+        #expect(store.read(name, as: FoundationSnapshot.self, now: now)?.payload.firstCalendar == "claimed")
+    }
 }
 
 /// Expected values come from the S1/S7 canonical: at 16:20 the next prayer is Maghrib 17:34, «بعد ١:١٤».

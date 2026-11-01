@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 public struct SnapshotPrivacy: Codable, Sendable, Equatable {
     public var moneyHidden: Bool
@@ -40,6 +41,20 @@ public struct SnapshotStore: Sendable {
         }
         return directory.appending(path: name + ".json")
     }
+    /// Serializes app and extension updates using a companion file whose inode is never replaced.
+    /// The snapshot itself is still atomically replaced while this lock is held.
+    public func withExclusiveAccess<Result>(for name: String, _ body: () throws -> Result) throws -> Result {
+        _ = try file(name)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let lockURL = directory.appending(path: name + ".lock")
+        let descriptor = Darwin.open(lockURL.path, O_CREAT | O_RDWR | O_EXLOCK, mode_t(0o600))
+        guard descriptor >= 0 else { throw SnapshotError.lockFailed(errno) }
+        defer { Darwin.close(descriptor) }
+        #if os(iOS)
+        try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: lockURL.path)
+        #endif
+        return try body()
+    }
     public func write<P>(_ snapshot: SnapshotEnvelope<P>) throws {
         let url = try file(snapshot.name)
         guard snapshot.schemaVersion == 1, snapshot.validUntil >= snapshot.generatedAt,
@@ -60,10 +75,12 @@ public struct SnapshotStore: Sendable {
     }
     public func remove(_ name: String) throws {
         let url = try file(name)
-        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        try withExclusiveAccess(for: name) {
+            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        }
     }
 }
-public enum SnapshotError: Error { case appGroupUnavailable, invalidName, invalidEnvelope }
+public enum SnapshotError: Error, Equatable, Sendable { case appGroupUnavailable, invalidName, invalidEnvelope, lockFailed(Int32) }
 
 /// Foundation-only snapshot contains no room content and no personal records.
 public struct FoundationSnapshot: Codable, Sendable, Equatable {

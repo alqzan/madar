@@ -51,9 +51,19 @@ extension AppSession {
         case .maghrib: end = PrayerTimesEngine.calculate(day: nextDay, place: location.place, options: location.options)?.maghrib
         }
         let expiry = min(now.addingTimeInterval(3600), end ?? now.addingTimeInterval(900))
-        try snapshotStore.write(SnapshotEnvelope(name: WidgetCatalogSnapshot.valuesName, generatedAt: now, validUntil: expiry, dayKey: day.description, tzID: service.prayerLocation().place.timeZoneID,
-                                                 privacy: SnapshotPrivacy(moneyHidden: bool("core.hideMoneyOutside"), notesLocked: locked),
-                                                 payload: WidgetCatalogSnapshot(datePrimary: dates.primary, dateSecondary: dates.secondary, configs: configs, locked: locked)))
+        try snapshotStore.withExclusiveAccess(for: WidgetCatalogSnapshot.valuesName) {
+            var values = WidgetCatalogSnapshot(datePrimary: dates.primary, dateSecondary: dates.secondary, configs: configs, locked: locked)
+            do {
+                values.hideHabitActions(for: try pendingInbox.unacknowledgedHabitIDs())
+            } catch {
+                // An unreadable inbox record must not make a previously queued tap available again.
+                let allHabitIDs = Set(configs.flatMap(\.rows).compactMap(\.habitID))
+                values.hideHabitActions(for: allHabitIDs)
+            }
+            let envelope = SnapshotEnvelope(name: WidgetCatalogSnapshot.valuesName, generatedAt: now, validUntil: expiry, dayKey: day.description, tzID: service.prayerLocation().place.timeZoneID,
+                                            privacy: SnapshotPrivacy(moneyHidden: bool("core.hideMoneyOutside"), notesLocked: locked), payload: values)
+            try snapshotStore.write(envelope)
+        }
         let metadata = configs.map { WidgetCatalogSnapshot.Config(id: $0.id, name: $0.name, familyID: $0.familyID, styleJSON: $0.styleJSON, rows: []) }
         try snapshotStore.write(SnapshotEnvelope(name: WidgetCatalogSnapshot.name, generatedAt: now, validUntil: now.addingTimeInterval(30 * 86400), dayKey: day.description, tzID: service.prayerLocation().place.timeZoneID,
                                                  privacy: SnapshotPrivacy(moneyHidden: true, notesLocked: locked),
