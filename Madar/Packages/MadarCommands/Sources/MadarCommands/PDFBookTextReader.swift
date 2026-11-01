@@ -164,8 +164,9 @@ public actor PDFBookTextReader {
             .replacingOccurrences(of: "ﷻ", with: " جل جلاله ")
         guard expanded.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) else { return line }
         var kept = expanded.replacingOccurrences(of: #"[%#$&@^~|\\*•]"#, with: " ", options: .regularExpression)
-        // Ornaments and rules read as Latin letters glued to an Arabic word («تميمةvVv», «لV») or a lone «V».
-        kept = kept.replacingOccurrences(of: #"(?<=[\x{0621}-\x{0652}])[A-Za-z]+|[A-Za-z]+(?=[\x{0621}-\x{064A}])"#, with: "", options: .regularExpression)
+        // OCR ornaments resembling «V» may stick to an Arabic word («تميمةvVv», «لV»).
+        // Preserve other attached Latin runs because they may be intentional mixed-script text or abbreviations.
+        kept = kept.replacingOccurrences(of: #"(?<=[\x{0621}-\x{0652}])[Vv]+|[Vv]+(?=[\x{0621}-\x{064A}])"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"(?<![A-Za-z])[Vv]+(?![A-Za-z])"#, with: " ", options: .regularExpression)
         // A straight quote that opens or closes nothing (no partner on the line) is noise.
         for quote in ["'", "\""] where kept.components(separatedBy: quote).count == 2 {

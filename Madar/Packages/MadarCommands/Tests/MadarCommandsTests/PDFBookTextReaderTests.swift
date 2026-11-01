@@ -133,6 +133,7 @@ struct PDFBookTextReaderTests {
         #expect(PDFBookTextReader.withoutLatinNoise(["Short title", "عنوان"].map(line)).count == 2)
         // Owner's scan: ornaments read as Latin letters stuck to words; real Latin words and links stay.
         #expect(PDFBookTextReader.withoutStraySymbols("كانت تميمةvVv في سرورهV") == "كانت تميمة في سروره")
+        #expect(PDFBookTextReader.withoutStraySymbols("كتابPDFنص وشرحSغير") == "كتابPDFنص وشرحSغير")
         #expect(PDFBookTextReader.withoutStraySymbols("الفصل V الأول") == "الفصل الأول")
         #expect(PDFBookTextReader.withoutStraySymbols("زوروا www.alkalam-sy.com للمزيد") == "زوروا www.alkalam-sy.com للمزيد")
         #expect(PDFBookTextReader.withoutStraySymbols("الْأَرْضِ وَاسْتَعْمَرَكُمْ فِيهَا [هود: ٦١]") == "الْأَرْضِ وَاسْتَعْمَرَكُمْ فِيهَا [هود: ٦١]")
