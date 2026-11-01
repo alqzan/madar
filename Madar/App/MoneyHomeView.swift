@@ -69,30 +69,22 @@ struct MoneyHomeView: View {
     }
     /// The room's other doors as drawers of one desk, two to a row, most used first; settings close the desk.
     private var doors: some View {
-        VStack(spacing: 10) {
-            // Not lazy: eight drawers are cheap, and every door must exist before it scrolls into view.
-            Grid(horizontalSpacing: 10, verticalSpacing: 10) {
-                GridRow {
-                    drawer("السجل", "book.pages", "money-log-open", action: openLog)
-                    drawer("التحليل", "chart.bar.xaxis", "money-analysis-open") { analysisOpen = true }
-                }
-                GridRow {
-                    drawer("البطاقات", "creditcard", "money-cards-open", fact: cardsFact) { cardsOpen = true }
-                    drawer("الحسابات", "tree", "money-accounts-open", fact: accountsFact) { accountsOpen = true }
-                }
-                GridRow {
-                    drawer("المطابقة مع البنك", "checkmark.seal", "money-reconcile-open", fact: reconcileFact) { reconcileOpen = true }
-                    drawer("جهّز لشيء قادم", "sparkles", "money-goal-open", fact: goalFact) { goalOpen = true }
-                }
-                GridRow {
-                    drawer("الاسترداد النقدي", "drop", "money-cashback-open") { cashbackOpen = true }
-                    drawer("الزكاة", "scalemass", "money-zakat-open", fact: zakatFact) { zakatOpen = true }
-                }
-            }
-            Button { settingsOpen = true } label: {
-                Label("إعدادات المال", systemImage: "slider.horizontal.3").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(minHeight: 44)
-            }.buttonStyle(.madarPlain).accessibilityIdentifier("money-settings-open")
-        }.padding(.top, 8)
+        MoneyHomeDoors(
+            accountsFact: accountsFact,
+            reconcileFact: reconcileFact,
+            goalFact: goalFact,
+            cardsFact: cardsFact,
+            zakatFact: zakatFact,
+            openLog: openLog,
+            openAnalysis: { analysisOpen = true },
+            openCards: { cardsOpen = true },
+            openAccounts: { accountsOpen = true },
+            openReconcile: { reconcileOpen = true },
+            openGoal: { goalOpen = true },
+            openCashback: { cashbackOpen = true },
+            openZakat: { zakatOpen = true },
+            openSettings: { settingsOpen = true }
+        )
     }
     // «تعمّق وحسّن», all-data walk 24 Oct 2026: a drawer with something in it says one fact; counts only, never amounts.
     private var accountsFact: String? {
@@ -114,24 +106,6 @@ struct MoneyHomeView: View {
     private var zakatFact: String? {
         guard let key = hawlKey, let hawl = MoneyHawl.read(key, app: app) else { return nil }
         return hawl.daysLeft == 0 ? "حولك اليوم" : "حولك بعد " + service.days(hawl.daysLeft)
-    }
-    private func drawer(_ title: String, _ symbol: String, _ id: String, fact: String? = nil, action: @escaping () -> Void) -> some View {
-        // OR-22 (owner: a smoother bottom section): a light chip, icon beside the name, half the old drawer's height.
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: symbol).font(.system(size: 16, weight: .regular)).foregroundStyle(theme.color("reserveText")).frame(width: 22)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(MadarTypography.body()).lineLimit(1).minimumScaleFactor(0.8)
-                    if let fact { Text(fact).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.85) }
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
-            .background(theme.surface.opacity(0.7), in: .rect(cornerRadius: 12))
-            .overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.color("reserveText").opacity(0.25), lineWidth: 0.8) }
-            .contentShape(.rect(cornerRadius: 12))
-        }.buttonStyle(.madarPlain).accessibilityLabel(title).accessibilityValue(fact ?? "").accessibilityIdentifier(id)
     }
     var body: some View {
         ScrollView { homeContent }
@@ -316,8 +290,19 @@ struct MoneyHomeView: View {
             }
             if reading.hasAccounts {
                 Button { basisOpen = true } label: {
-                    HStack { Text(reading.unknownBalanceCount > 0 ? "الأرصدة المعروفة" : "في حسابك"); Spacer(); Text(figure: !reading.hasKnownBalance ? "—" : amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44).contentShape(.rect) // the whole row, Spacer included (owner-data walk 25 Oct)
-                }.buttonStyle(.madarPlain).accessibilityLabel(!reading.hasKnownBalance ? "على أي أساس، لم يُعرف رصيد الحسابات بعد" : "على أي أساس، الأرصدة المعروفة " + amount(reading.basis.inAccountMinor)).accessibilityIdentifier("money-basis-open")
+                    HStack {
+                        Text(reading.unknownBalanceCount > 0 ? "الأرصدة المعروفة" : "في حسابك")
+                        Spacer()
+                        Text(figure: !reading.hasKnownBalance ? "—" : amount(reading.basis.inAccountMinor))
+                            .font(MadarTypography.cardTitle())
+                        Image(systemName: "chevron.left").font(.caption)
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(.rect) // the whole row, Spacer included (owner-data walk 25 Oct)
+                }
+                .buttonStyle(.madarPlain)
+                .accessibilityLabel(!reading.hasKnownBalance ? "على أي أساس، لم يُعرف رصيد الحسابات بعد" : "على أي أساس، الأرصدة المعروفة " + amount(reading.basis.inAccountMinor))
+                .accessibilityIdentifier("money-basis-open")
                 if !amountsVisible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-reveal") }
             }
         }
