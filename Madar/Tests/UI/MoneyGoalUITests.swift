@@ -1,12 +1,34 @@
 import XCTest
 @MainActor final class MoneyGoalUITests: XCTestCase {
     private func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
-    private func open(_ fixture: String = "goal") -> XCUIApplication {
+    private func open(_ fixture: String = "goal", writeHoldMS: Int? = nil) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE":"L", "MADAR_UI_THEME":"light", "MADAR_UI_NOW":"2026-10-17T12:00:00+03:00"]
+        if let writeHoldMS { app.launchEnvironment["MADAR_UI_MONEY_WRITE_HOLD_MS"] = String(writeHoldMS) }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
-        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 10))
+        for _ in 0..<12 where !money.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(money.isHittable); money.tap()
         let door = app.buttons["money-goal-open"]; XCTAssertTrue(door.waitForExistence(timeout: 10)); for _ in 0..<8 where !door.isHittable { app.swipeUp(velocity: .slow) }; door.tap()
         XCTAssertTrue(app.buttons["money-goal-plan-0"].waitForExistence(timeout: 10)); return app
+    }
+    func testGoalConfirmationStaysOpenWhileSaving() throws {
+        continueAfterFailure = false
+        let app = open(writeHoldMS: 5000)
+        let create = app.buttons["money-goal-create"]
+        for _ in 0..<8 where !create.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(create.isEnabled, app.debugDescription)
+        create.tap()
+        let confirm = app.buttons["money-goal-confirm"], back = app.buttons["money-goal-back"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5)); XCTAssertTrue(back.exists); XCTAssertTrue(back.isEnabled)
+        shot(app, "M5-V23-confirm-idle-L")
+        confirm.tap()
+        XCTAssertFalse(confirm.isEnabled); XCTAssertFalse(back.isEnabled)
+        shot(app, "M5-V23-confirm-pending-L")
+        app.swipeDown()
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertFalse(confirm.isEnabled); XCTAssertFalse(back.isEnabled)
+        XCTAssertTrue(app.buttons["money-goal-open"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertFalse(confirm.exists)
     }
     func testEditablePlansPreviewCreationAndUndo() {
         continueAfterFailure = false
