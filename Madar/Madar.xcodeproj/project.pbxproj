@@ -16,6 +16,7 @@
 		02847A3999DE84747D2F606D /* MihbaraPDFFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323D5DC1291D1FF524D61D0D /* MihbaraPDFFlowView.swift */; };
 		043FC0C00F30B850EC288BE4 /* QuranStrengthUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCC1A35E2703C1EBE5AD46C5 /* QuranStrengthUITests.swift */; };
 		04660B832A00D65310A93F43 /* HabitRhythmBands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9CCE045BAC0B101E4D7B737 /* HabitRhythmBands.swift */; };
+		055A838D8DBA31ACDA2B140D /* MihbaraContentsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 553B8E01D18F85CA08BB1E22 /* MihbaraContentsSheet.swift */; };
 		06AB1F5BB5F8C476ACC773E0 /* MoneyAccountsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B351D7CF47341AB376DB1F0 /* MoneyAccountsModels.swift */; };
 		06E46D600A9016F0BD0D3AC9 /* MoneyRulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 058F3A70D57BEAD4B72BF651 /* MoneyRulesView.swift */; };
 		0721790A7CEACD240CBEF2A3 /* LogPrayerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC96F32AC5E7E4164A325940 /* LogPrayerIntent.swift */; };
@@ -644,6 +645,7 @@
 		5411BA4C0C0A0AED3AC7A0AD /* MihbaraStandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraStandTests.swift; sourceTree = "<group>"; };
 		54CAED3F538D952FE59BBE34 /* QuranPageMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranPageMap.swift; sourceTree = "<group>"; };
 		5530CFCEB8EEF7F56BE18E26 /* QuranFreeIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranFreeIntegrationTests.swift; sourceTree = "<group>"; };
+		553B8E01D18F85CA08BB1E22 /* MihbaraContentsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraContentsSheet.swift; sourceTree = "<group>"; };
 		56174C04CFE7BB474B46291C /* Amiri-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Amiri-OFL.txt"; sourceTree = "<group>"; };
 		566844F2238653E3802E5D22 /* RoomGlyphTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomGlyphTests.swift; sourceTree = "<group>"; };
 		567CDB50E861F4A2AEA4E5B8 /* MoneyCashbackUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyCashbackUITests.swift; sourceTree = "<group>"; };
@@ -1144,6 +1146,7 @@
 				5187072B7E3770AA085E0207 /* MadarSheetLock.swift */,
 				AFEBA17862D0A1AC37BFE4D3 /* MihbaraBookCover.swift */,
 				670B069E4D100AE42B2DF468 /* MihbaraBookSheets.swift */,
+				553B8E01D18F85CA08BB1E22 /* MihbaraContentsSheet.swift */,
 				4292483746D1F6C1FCB9A9FD /* MihbaraConversions.swift */,
 				066E8B7BB7CD19C46D956B89 /* MihbaraEPUBImportView.swift */,
 				DC6FBB06EF42EA00A0C3D132 /* MihbaraEPUBLoader.swift */,
@@ -2059,6 +2062,7 @@
 				B3FDF0EF04DBAF95B86037C6 /* MadarSheetLock.swift in Sources */,
 				BD5C4F57A3F671523F4B0969 /* MihbaraBookCover.swift in Sources */,
 				5F0293729AFFDD7733BD9227 /* MihbaraBookSheets.swift in Sources */,
+				055A838D8DBA31ACDA2B140D /* MihbaraContentsSheet.swift in Sources */,
 				A1C62C35076D26EF8096C725 /* MihbaraConversions.swift in Sources */,
 				21DC9186078C32801708C8F8 /* MihbaraEPUBImportView.swift in Sources */,
 				9CBB0A68661B27FAB2625599 /* MihbaraEPUBLoader.swift in Sources */,
