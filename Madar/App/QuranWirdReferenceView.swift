@@ -442,6 +442,50 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             citation: "ص ٨٩",
             sourceURL: URL(string: "https://shamela.ws/book/42/128")!,
             sourceNote: nil
+        ),
+        .init(
+            id: "tabari-2-191",
+            ayahID: 198,
+            kind: .tafsir,
+            text: "والشركُ باللهِ أشدُّ مِن القتلِ",
+            book: "تفسير الطبري جامع البيان - ت التركي",
+            author: "ابن جرير الطبري",
+            citation: "٣/ ٢٩٣",
+            sourceURL: URL(string: "https://shamela.ws/book/7798/1944")!,
+            sourceNote: nil
+        ),
+        .init(
+            id: "ibn-kathir-2-192",
+            ayahID: 199,
+            kind: .tafsir,
+            text: "فإن تركوا القتال في الحرم وأنابوا إلى الإسلام والتوبة",
+            book: "تفسير ابن كثير - ط ابن الجوزي",
+            author: "ابن كثير",
+            citation: "٢/ ٨٤",
+            sourceURL: URL(string: "https://shamela.ws/book/1503/789")!,
+            sourceNote: nil
+        ),
+        .init(
+            id: "ibn-kathir-2-193",
+            ayahID: 200,
+            kind: .tafsir,
+            text: "فإن انتهوا عما هم فيه من الشرك وقتال المؤمنين فكفوا عنهم",
+            book: "تفسير ابن كثير - ط ابن الجوزي",
+            author: "ابن كثير",
+            citation: "٢/ ٨٥",
+            sourceURL: URL(string: "https://shamela.ws/book/1503/790")!,
+            sourceNote: nil
+        ),
+        .init(
+            id: "saadi-2-194",
+            ayahID: 201,
+            kind: .tafsir,
+            text: "هذا تفسير لصفة المقاصة، وأنها هي المماثلة في مقابلة المعتدي",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٨٩",
+            sourceURL: URL(string: "https://shamela.ws/book/42/130")!,
+            sourceNote: nil
         )
     ]
 }
