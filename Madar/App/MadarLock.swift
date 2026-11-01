@@ -28,8 +28,14 @@ enum MadarProtectedFeature: Hashable, Sendable { case app, notes, privateNote, e
     func verify() async throws -> Bool {
         context.localizedCancelTitle = "إلغاء"; context.localizedFallbackTitle = ""
         var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else { throw PrivacyAuthorizationError.refused }
-        return try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "افتح مدار")
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            return try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "افتح مدار")
+        }
+        // Owner 1 Nov: when Face ID is unavailable (permission off, no face, lockout) the iPhone passcode opens Madar, and only then.
+        let code = (error as? LAError)?.code
+        guard code == .biometryNotAvailable || code == .biometryNotEnrolled || code == .biometryLockout,
+              context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else { throw PrivacyAuthorizationError.refused }
+        return try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "تعذّر Face ID، افتح مدار برمز iPhone")
     }
     func invalidate() { context.invalidate() }
 }

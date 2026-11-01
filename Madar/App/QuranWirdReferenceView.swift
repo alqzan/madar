@@ -569,7 +569,7 @@ struct QuranWirdReferenceView: View {
         card {
             VStack(alignment: .leading, spacing: 8) {
                 Label(
-                    "تظهر مقتطفات موثّقة لـ \(digits.string(coveredCount)) من \(digits.string(ayahs.count)) آيات بحسب الاختيار الحالي.",
+                    "تظهر مقتطفات موثّقة لـ \(digits.string(coveredCount)) \(ayahs.count == 1 ? "من آية واحدة" : ayahs.count == 2 ? "من آيتين" : "من " + digits.string(ayahs.count) + ((3...10).contains(ayahs.count % 100) ? " آيات" : " آية")) بحسب الاختيار الحالي.",
                     systemImage: "books.vertical"
                 )
                 .font(bodyFont(13, bold: true)).fixedSize(horizontal: false, vertical: true)
@@ -598,7 +598,7 @@ struct QuranWirdReferenceView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         ForEach(ayahs, id: \.id) { ayah in
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(ayah.surahNameArabic + " · " + digits.string(ayah.ayahNumber))
+                                Text(ayah.surahNameArabic + "، الآية " + digits.string(ayah.ayahNumber))
                                     .font(bodyFont(12, bold: true)).foregroundStyle(theme.color("hifzText"))
                                 Text(ayah.uthmaniText).font(.custom("Amiri-Regular", size: 21, relativeTo: .title3))
                                     .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
@@ -639,7 +639,7 @@ struct QuranWirdReferenceView: View {
                         }
                         VStack(alignment: .leading, spacing: 3) {
                             Text(excerpt.book).font(bodyFont(12, bold: true))
-                            Text(excerpt.author + " · " + excerpt.citation)
+                            Text(excerpt.author + "، " + excerpt.citation)
                                 .font(bodyFont(11)).foregroundStyle(theme.secondaryInk)
                                 .accessibilityIdentifier("quran-reference-citation-\(excerpt.id)")
                         }

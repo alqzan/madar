@@ -206,8 +206,8 @@ struct DiaryDayView: View {
                 .task(id: shownDay.description + ":" + String(app.prayerRevision) + ":" + String(retry)) {
                     do { try await service.prepareClosedDay(shownDay); page = try service.day(shownDay); intentions=try service.intentions(shownDay);arc=service.dayArc(shownDay); appearance=try service.appearance(shownDay);displayNow=service.clock();returnDay=try service.returnAfterAbsence(shownDay);travel=try service.travel(shownDay);travelReturn=travel == nil ? try service.travelReturn(shownDay):nil
                         if shownDay == today {try? await service.refreshLetters()}
-                        let letters=try service.letters();waitingLetter=letters.first{$0.state == .eligible};sealedHere=letters.filter{$0.writtenDay==shownDay && $0.state != .opened}.count
-                        (projectLinks,projectSuggestions)=try service.projectNotes(shownDay); failure = nil }
+                        let letters=(try? service.letters()) ?? [];waitingLetter=letters.first{$0.state == .eligible};sealedHere=letters.filter{$0.writtenDay==shownDay && $0.state != .opened}.count
+                        (projectLinks,projectSuggestions)=(try? service.projectNotes(shownDay)) ?? (projectLinks,projectSuggestions); failure = nil }
                     catch { page = nil; failure = madarUserMessage(error) }
                 }
         }

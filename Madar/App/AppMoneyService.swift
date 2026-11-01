@@ -157,7 +157,9 @@ struct MoneyHomeReading {
             let range = calendar.range(of: .day, in: .month, for: now)!
             parts.day = min(day, range.count)
             guard let date = calendar.date(from: parts) else { continue }
-            let paid = movements.contains { $0.obligationID == bill.id && calendar.isDate($0.eventAt, equalTo: date, toGranularity: .month) }
+            // A bill paid early (rent due the 1st, paid the 30th, maybe in the last cycle) counts for that due date.
+            let earliest = calendar.date(byAdding: .day, value: -15, to: date) ?? date
+            let paid = linked.contains { $0.obligationID == bill.id && (calendar.isDate($0.eventAt, equalTo: date, toGranularity: .month) || ($0.eventAt >= earliest && $0.eventAt < date)) }
             if !paid { due.append(.init(id: bill.id, name: bill.name, amountMinor: bill.amountMinor, due: .containing(date, in: zone))) }
         }
         due.sort { $0.due == $1.due ? $0.id.uuidString < $1.id.uuidString : $0.due < $1.due }

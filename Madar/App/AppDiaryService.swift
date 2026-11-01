@@ -264,7 +264,7 @@ struct DiaryHomeSnapshot {
             if count == 1 { return one }; if count == 2 { return two }
             return digits.string(count) + " " + ((3...10).contains(count % 100) ? few : many)
         }
-        let values = [unit(parts.year ?? 0, "سنة", "سنتين", "سنوات", "سنة"), unit(parts.month ?? 0, "شهر", "شهرين", "أشهر", "شهر"), unit(parts.day ?? 0, "يوم", "يومين", "أيام", "يوم")].compactMap { $0 }
+        let values = [unit(parts.year ?? 0, "سنة", "سنتين", "سنوات", "سنةً"), unit(parts.month ?? 0, "شهر", "شهرين", "أشهر", "شهرًا"), unit(parts.day ?? 0, "يوم", "يومين", "أيام", "يومًا")].compactMap { $0 }
         return values.isEmpty ? "اليوم" : "قبل " + values.joined(separator: " و")
     }
 

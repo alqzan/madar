@@ -159,7 +159,10 @@ private struct PrayerInverse: Codable {
             let pairID = StableIdentity.uuid(for: "PrayerPair:\(day):\(pair.rawValue)")
             for ref in [first, second] {
                 // Only the second of an approved taqdim pair can precede its time.
-                try setLog(ref, status: status, shortened: shortened && ref.prayer != .maghrib, early: true)
+                // A traveller's Friday noon in a combined pair is Dhuhr (RP5 asks only when Jumu'ah is possible).
+                var tripCalendar = Calendar(identifier: .gregorian); tripCalendar.timeZone = trip.place.timeZone
+                let fridayNoon = ref.prayer == .dhuhr && tripCalendar.component(.weekday, from: ref.day.date(in: trip.place.timeZone)) == 6
+                try setLog(ref, status: status, shortened: shortened && ref.prayer != .maghrib, fridayKind: fridayNoon && repository.log(ref)?.fridayKind == nil ? .dhuhr : nil, early: true)
                 let row = try logRow(ref); row.pairID = pairID; row.tripID = trip.id; row.eventAt = times.time(for: ref.prayer); row.tzID = trip.place.timeZoneID; try touch(row)
             }
         case .logQiyam(let night, let rakaat, let witr), .restoreQiyam(let night, let rakaat, let witr):
