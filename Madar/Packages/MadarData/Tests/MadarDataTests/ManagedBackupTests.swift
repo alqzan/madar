@@ -87,7 +87,12 @@ import Testing
             #expect(try coordinator.status().excludedBooks == [BackupBookExclusion(title: "كتابي", bytes: 6_000, fromTurath: false)])
             let saved = try BackupCodec.validate(Data(contentsOf:receipt.fileURL),passphrase:"correct long password").records.first { $0.model == "Media" && $0.id == ids.media }
             #expect(saved?.fields["state"] == .string("missing")); #expect(saved?.fields["data"] == .null)
+            let generationBeforePreview = store.binding.generationID
+            let fingerprintBeforePreview = try RecordFingerprint.hash(RecordBridge.all(store.container.mainContext))
             let preview = try await coordinator.preview(file:receipt.fileURL,passphrase:"correct long password")
+            #expect(preview.warnings.contains("النسخة لا تتضمن ملفات بعض الكتب. يحتفظ الاسترجاع بالملفات المطابقة الموجودة على هذا الجهاز؛ وإلا فأعد استيرادها."))
+            #expect(store.binding.generationID == generationBeforePreview)
+            #expect(try RecordFingerprint.hash(RecordBridge.all(store.container.mainContext)) == fingerprintBeforePreview)
             let result = try await coordinator.restore(preview:preview,mode:mode,now:Date().addingTimeInterval(100))
             let after = try RecordBridge.all(result.container.mainContext).first { $0.model == "Media" && $0.id == ids.media }
             #expect(after?.fields["state"] == .string("ok")); #expect(after?.fields["data"] == before?.fields["data"]); #expect(after?.isLive == true)

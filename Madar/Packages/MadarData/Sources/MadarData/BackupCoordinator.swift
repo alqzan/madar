@@ -100,6 +100,9 @@ import Darwin
         let updates = value.0.records.filter { incoming in records.contains { current in RecordFingerprint.key(current) == RecordFingerprint.key(incoming) && current != incoming } }.count
         let dates = value.0.records.filter(\.isLive).compactMap { row in ["eventAt","endedAt","writtenAt","at","start","createdAt"].compactMap { row.date($0) }.first }
         var warnings = ["تتضمن الأعداد سجلات الحذف والأسماء البديلة.","عند الاستبدال: سيتغيّر هذا على كل أجهزتك بعد تفعيل المزامنة؛ السجلات الحالية الغائبة تصبح محذوفة."]
+        if Self.hasMissingBookFiles(value.0.records) {
+            warnings.append("النسخة لا تتضمن ملفات بعض الكتب. يحتفظ الاسترجاع بالملفات المطابقة الموجودة على هذا الجهاز؛ وإلا فأعد استيرادها.")
+        }
         if store.isCloudBacked { warnings.append("الاستعادة إلى مخزن مرتبط بالسحاب غير متاحة حتى تُثبت المصالحة وانتشار الحذف.") }
         return .init(id:UUID(),fileURL:file,fileName:file.lastPathComponent,createdAt:value.0.manifest.createdAt,counts:Self.counts(value.0.records),currentCounts:Self.counts(records),additions:value.0.records.filter { !existingKeys.contains(RecordFingerprint.key($0)) }.count,updates:updates,deletions:records.filter { $0.isLive && !backupKeys.contains(RecordFingerprint.key($0)) }.count,earliestDate:dates.min(),latestDate:dates.max(),skippedCount:0,warnings:warnings,validated:value.0,fileHash:value.1,generationID:store.binding.generationID,currentFingerprint:try RecordFingerprint.hash(records))
     }
@@ -318,6 +321,20 @@ import Darwin
         let size = try url.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0; guard size > 0, size <= 512*1024*1024 else { throw DataError.invalidBackup }; return try Data(contentsOf:url,options:.mappedIfSafe)
     }
     nonisolated private static func counts(_ records: [DataRecord]) -> [String:Int] { Dictionary(uniqueKeysWithValues:MadarSchema.syncedNames.map { name in (name,records.filter { $0.model == name }.count) }) }
+    nonisolated private static func hasMissingBookFiles(_ records: [DataRecord]) -> Bool {
+        let bookMediaIDs = Set(records.lazy
+            .filter { $0.model == "Book" && $0.isLive }
+            .compactMap { record -> UUID? in
+                guard let rawID = record.fields["mediaID"]?.string else { return nil }
+                return UUID(uuidString: rawID)
+            })
+        return records.contains { row in
+            row.model == "Media" && row.isLive && bookMediaIDs.contains(row.id)
+                && row.fields["kind"] == .string("doc")
+                && row.fields["state"] == .string("missing")
+                && (row.fields["data"] == nil || row.fields["data"] == .null)
+        }
+    }
     static func plan(existing: [DataRecord], incoming: [DataRecord], mode: RestoreMode, now: Date, writerID: String) throws -> [DataRecord] {
         if existing.isEmpty { return incoming } // Clean restore preserves every timestamp, alias, tombstone and media byte.
         return BackupBookFiles.retainingLocalFiles(try planned(existing:existing,incoming:incoming,mode:mode,now:now,writerID:writerID),existing:existing)
