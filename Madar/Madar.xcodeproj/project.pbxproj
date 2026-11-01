@@ -89,6 +89,7 @@
 		2D06E7492272CDA3AB14E4B0 /* MoneyLogUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52980AFF9B623E80DAA76A99 /* MoneyLogUITests.swift */; };
 		2D17AE3E488BB68C5E1D8650 /* DiarySeasonIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C5186966B3BE345A9B38A1 /* DiarySeasonIntegrationTests.swift */; };
 		2E95780F1D439BE926514901 /* PrayerTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D813172B4A91DD6E0930EEA8 /* PrayerTodayView.swift */; };
+		78D5961F653744E39D6B058F /* PrayerTodayArch.swift in Sources */ = {isa = PBXBuildFile; fileRef = D337595891BC496B956B3D09 /* PrayerTodayArch.swift */; };
 		6ACACA4DE9944555A346822D /* PrayerPaperCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93BD2648492F4911B4FE3945 /* PrayerPaperCard.swift */; };
 		F9C8D688C3D74C04BB4CA3D0 /* PrayerLatticePattern.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67FB33241F234FD2A4356592 /* PrayerLatticePattern.swift */; };
 		EE8B53074876429EA1097367 /* PrayerPillToggleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE75AF92D5C4F3D95CD227E /* PrayerPillToggleStyle.swift */; };
@@ -890,6 +891,7 @@
 		D782FD90DCA400C2CA265B25 /* QuranWirdReferenceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranWirdReferenceView.swift; sourceTree = "<group>"; };
 		D80269312D7B18D5290E8E80 /* thmanyahserifdisplay-Black.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahserifdisplay-Black.otf"; sourceTree = "<group>"; };
 		D813172B4A91DD6E0930EEA8 /* PrayerTodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerTodayView.swift; sourceTree = "<group>"; };
+		D337595891BC496B956B3D09 /* PrayerTodayArch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerTodayArch.swift; sourceTree = "<group>"; };
 		93BD2648492F4911B4FE3945 /* PrayerPaperCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerPaperCard.swift; sourceTree = "<group>"; };
 		67FB33241F234FD2A4356592 /* PrayerLatticePattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerLatticePattern.swift; sourceTree = "<group>"; };
 		BCE75AF92D5C4F3D95CD227E /* PrayerPillToggleStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerPillToggleStyle.swift; sourceTree = "<group>"; };
@@ -1275,6 +1277,7 @@
 				9F86E6D65005B997B3803B0B /* PrayerStatisticsView.swift */,
 				F5BEB0146B6B405B7B607BD4 /* PrayerStreaksView.swift */,
 				D813172B4A91DD6E0930EEA8 /* PrayerTodayView.swift */,
+				D337595891BC496B956B3D09 /* PrayerTodayArch.swift */,
 				93BD2648492F4911B4FE3945 /* PrayerPaperCard.swift */,
 				67FB33241F234FD2A4356592 /* PrayerLatticePattern.swift */,
 				BCE75AF92D5C4F3D95CD227E /* PrayerPillToggleStyle.swift */,
@@ -2211,6 +2214,7 @@
 				95EA523BEB45F2D39DF2E8FE /* PrayerStatisticsView.swift in Sources */,
 				A11A36D051873A05917A2712 /* PrayerStreaksView.swift in Sources */,
 				2E95780F1D439BE926514901 /* PrayerTodayView.swift in Sources */,
+				78D5961F653744E39D6B058F /* PrayerTodayArch.swift in Sources */,
 				6ACACA4DE9944555A346822D /* PrayerPaperCard.swift in Sources */,
 				F9C8D688C3D74C04BB4CA3D0 /* PrayerLatticePattern.swift in Sources */,
 				EE8B53074876429EA1097367 /* PrayerPillToggleStyle.swift in Sources */,
