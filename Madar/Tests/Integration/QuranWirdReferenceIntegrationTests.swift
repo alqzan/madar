@@ -49,30 +49,44 @@ final class QuranWirdReferenceIntegrationTests: XCTestCase {
         let catalog = try QuranResources.catalog()
         let expected: [(id: String, surah: Int, number: Int, kind: QuranWirdReferenceKind, quote: String, citation: String, url: String)] = [
             ("tabari-1-2", 1, 2, .tafsir, "الشكرُ للَّهِ خالصًا دونَ سائرِ ما يُعْبَدُ مِن دونِه", "١/ ١٣٥", "https://shamela.ws/book/7798/315"),
+            ("saadi-1-2", 1, 2, .tafsir, "الثناء على الله بصفات الكمال، وبأفعاله الدائرة بين الفضل والعدل", "ص ٣٩", "https://shamela.ws/book/42/30"),
             ("qurtubi-1-3-in-ibn-kathir", 1, 3, .tafsir, "ليكون من باب قرن الترغيب بعد الترهيب", "١/ ٢٠٢", "https://shamela.ws/book/1503/257"),
             ("ibn-kathir-1-4", 1, 4, .tafsir, "وكلاهما صحيح متواتر في السبع", "١/ ٢٠٢", "https://shamela.ws/book/1503/257"),
+            ("saadi-1-4", 1, 4, .tafsir, "من آثارها أنه يأمر وينهى، ويثيب ويعاقب", "ص ٣٩", "https://shamela.ws/book/42/30"),
+            ("saadi-1-5", 1, 5, .tafsir, "لأن تقديم المعمول يفيد الحصر، وهو إثبات الحكم للمذكور، ونفيه عما عداه", "ص ٣٩", "https://shamela.ws/book/42/30"),
             ("ibn-kathir-1-5", 1, 5, .tafsir, "وفي الشرع عبارة عما يجمع كمال المحبة والخضوع والخوف", "١/ ٢٠٥", "https://shamela.ws/book/1503/260"),
             ("ibn-kathir-2-178-context", 2, 178, .context, "كانت بنو النضير قد غزت قريظة في الجاهلية وقهروهم", "٢/ ٤٤", "https://shamela.ws/book/1503/749"),
+            ("saadi-2-178", 2, 178, .tafsir, "إقامة للعدل والقسط بين العباد", "ص ٨٤", "https://shamela.ws/book/42/120"),
             ("tabari-2-179", 2, 179, .tafsir, "فكان لكم في حكمِي بينَكم بذلك حياةٌ", "٣/ ١٢٠", "https://shamela.ws/book/7798/1771"),
+            ("saadi-2-179", 2, 179, .tafsir, "لأن من عرف أنه مقتول إذا قتل، لا يكاد يصدر منه القتل", "ص ٨٥", "https://shamela.ws/book/42/120"),
             ("tabari-2-180", 2, 180, .tafsir, "والخيرُ المالُ", "٣/ ١٢٣", "https://shamela.ws/book/7798/1774"),
+            ("saadi-2-180", 2, 180, .tafsir, "بل يرتبهم على القرب والحاجة", "ص ٨٥", "https://shamela.ws/book/42/121"),
             ("tabari-2-181", 2, 181, .tafsir, "فإنما إثمُ التبديلِ على من بدَّلَ وصيَّتَه", "٣/ ١٣٩", "https://shamela.ws/book/7798/1790"),
             ("saadi-2-182", 2, 182, .tafsir, "ينبغي لمن حضر الموصي وقت الوصية بها، أن ينصحه بما هو الأحسن والأعدل", "ص ٨٥", "https://shamela.ws/book/42/122"),
             ("saadi-2-183", 2, 183, .tafsir, "فإن الصيام من أكبر أسباب التقوى", "ص ٨٦", "https://shamela.ws/book/42/123"),
+            ("ibn-kathir-2-183", 2, 183, .tafsir, "فلهم فيه أسوة، وليجتهد هؤلاء في أداء هذا الفرض أكمل مما فعله أولئك", "٢/ ٥٣", "https://shamela.ws/book/1503/758"),
             ("ibn-kathir-2-184", 2, 184, .tafsir, "لئلا يشق على النفوس", "٢/ ٥٣", "https://shamela.ws/book/1503/758"),
+            ("saadi-2-184", 2, 184, .tafsir, "أن يقضي أياما قصيرة باردة، عن أيام طويلة حارة كالعكس", "ص ٨٦", "https://shamela.ws/book/42/123"),
             ("ibn-kathir-2-185", 2, 185, .tafsir, "يمدح تعالى شهر الصيام من بين سائر الشهور بأن اختاره من بينهن لإنزال القرآن العظيم", "٢/ ٥٧", "https://shamela.ws/book/1503/762"),
+            ("saadi-2-185", 2, 185, .tafsir, "يريد الله تعالى أن ييسر عليكم الطرق الموصلة إلى رضوانه", "ص ٨٦", "https://shamela.ws/book/42/123"),
             ("ibn-ashur-2-186", 2, 186, .tafsir, "وَجُعِلَ هَذَا الْخَيْرُ مُرَتَّبًا عَلَى تَقْدِيرِ سُؤَالِهِمْ", "٢/ ١٧٨", "https://shamela.ws/book/9776/945"),
+            ("saadi-2-186", 2, 186, .tafsir, "فهو قريب أيضا من داعيه، بالإجابة", "ص ٨٧", "https://shamela.ws/book/42/124"),
             ("ibn-kathir-2-187", 2, 187, .tafsir, "هذه رخصة من الله تعالى للمسلمين، ورفع لما كان عليه الأمر في ابتداء الإسلام…", "٢/ ٦٧", "https://shamela.ws/book/1503/772"),
             ("bukhari-2-187", 2, 187, .asbab, "فَلَمَّا انْتَصَفَ النَّهَارُ غُشِيَ عَلَيْهِ، فَذُكِرَ ذَلِكَ لِلنَّبِيِّ ﷺ فَنَزَلَتْ هَذِهِ الْآيَةُ…", "٢/ ٦٧٦", "https://shamela.ws/book/735/3072"),
             ("maathur-2-188", 2, 188, .asbab, "وأراد امرؤُ القيس أن يحلف؛ ففيه نزلت: ﴿ولا تأكلوا أموالكم بينكم بالباطل﴾", "٣/ ٤٢٣", "https://shamela.ws/book/639/1698"),
             ("ibn-kathir-2-188", 2, 188, .tafsir, "أي: تعلمون بطلان ما تدعونه وتروجونه في كلامكم…", "٢/ ٧٩", "https://shamela.ws/book/1503/784"),
             ("saadi-2-189", 2, 189, .context, "فلو كان الحساب بالسنة الشمسية، لم يعرفه إلا النادر من الناس", "ص ٨٨", "https://shamela.ws/book/42/127"),
+            ("ibn-ashur-2-189-context", 2, 189, .context, "لأن الآيات خطاب للمسلمين وهم الذين سألوا عن الأهلة، والنسيء من أحوال أهل الجاهلية", "٢/ ١٩٩", "https://shamela.ws/book/9776/966"),
             ("ibn-kathir-2-255", 2, 255, .tafsir, "هذه آية الكرسي، ولها شأن عظيم", "٢/ ٢٣٩", "https://shamela.ws/book/1503/944"),
+            ("ibn-ashur-2-255-context", 2, 255, .context, "وَجُعِلَتْ هَذِهِ الْآيَةُ ابْتِدَاءً لِآيَاتِ تَقْرِيرِ الْوَحْدَانِيَّةِ وَالْبَعْثِ", "٣/ ١٧", "https://shamela.ws/book/9776/1273"),
             ("saadi-2-286", 2, 286, .tafsir, "بل هي غذاء للأرواح ودواء للأبدان", "ص ١٢٠", "https://shamela.ws/book/42/195"),
+            ("tabari-2-286", 2, 286, .tafsir, "فلا يُضَيِّقُ عليها ولا يَجْهَدُها", "٥/ ١٥٣", "https://shamela.ws/book/7798/3270"),
             ("saadi-3-190", 3, 190, .tafsir, "وخص الله بالآيات أولي الألباب، وهم أهل العقول؛ لأنهم هم المنتفعون بها، الناظرون إليها بعقولهم لا بأبصارهم.", "ص ١٦١", "https://shamela.ws/book/42/284"),
             ("maathur-3-190-context", 3, 190, .context, "ولِمَ لا أفعل وقد أنزل علي هذه الليلة", "٥/ ٧٦٢", "https://shamela.ws/book/639/3482"),
         ]
 
         XCTAssertEqual(QuranWirdReferenceExcerpt.verified.count, expected.count)
+        XCTAssertEqual(Set(QuranWirdReferenceExcerpt.verified.map(\.id)).count, expected.count, "Every excerpt needs a unique accessibility and ForEach identity.")
         for item in expected {
             let excerpt = try XCTUnwrap(QuranWirdReferenceExcerpt.verified.first { $0.id == item.id })
             let ayah = try XCTUnwrap(catalog.ayah(id: excerpt.ayahID))

@@ -59,6 +59,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             sourceNote: nil
         ),
         .init(
+            id: "saadi-1-2",
+            ayahID: 2,
+            kind: .tafsir,
+            text: "الثناء على الله بصفات الكمال، وبأفعاله الدائرة بين الفضل والعدل",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٣٩",
+            sourceURL: URL(string: "https://shamela.ws/book/42/30")!,
+            sourceNote: nil
+        ),
+        .init(
             id: "qurtubi-1-3-in-ibn-kathir",
             ayahID: 3,
             kind: .tafsir,
@@ -79,6 +90,28 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             citation: "١/ ٢٠٢",
             sourceURL: URL(string: "https://shamela.ws/book/1503/257")!,
             sourceNote: "عن قراءتي «مَلِكِ» و«مَالِكِ» في آية يوم الدين."
+        ),
+        .init(
+            id: "saadi-1-4",
+            ayahID: 4,
+            kind: .tafsir,
+            text: "من آثارها أنه يأمر وينهى، ويثيب ويعاقب",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٣٩",
+            sourceURL: URL(string: "https://shamela.ws/book/42/30")!,
+            sourceNote: nil
+        ),
+        .init(
+            id: "saadi-1-5",
+            ayahID: 5,
+            kind: .tafsir,
+            text: "لأن تقديم المعمول يفيد الحصر، وهو إثبات الحكم للمذكور، ونفيه عما عداه",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٣٩",
+            sourceURL: URL(string: "https://shamela.ws/book/42/30")!,
+            sourceNote: nil
         ),
         .init(
             id: "ibn-kathir-1-5",
@@ -103,6 +136,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             sourceNote: "يذكره ابن كثير سياقًا يشرح الخلفية التاريخية لأحكام القصاص؛ والموضع لا يصوغه خبرًا صريحًا عن سبب النزول."
         ),
         .init(
+            id: "saadi-2-178",
+            ayahID: 185,
+            kind: .tafsir,
+            text: "إقامة للعدل والقسط بين العباد",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٨٤",
+            sourceURL: URL(string: "https://shamela.ws/book/42/120")!,
+            sourceNote: nil
+        ),
+        .init(
             id: "tabari-2-179",
             ayahID: 186,
             kind: .tafsir,
@@ -114,6 +158,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             sourceNote: nil
         ),
         .init(
+            id: "saadi-2-179",
+            ayahID: 186,
+            kind: .tafsir,
+            text: "لأن من عرف أنه مقتول إذا قتل، لا يكاد يصدر منه القتل",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٨٥",
+            sourceURL: URL(string: "https://shamela.ws/book/42/120")!,
+            sourceNote: nil
+        ),
+        .init(
             id: "tabari-2-180",
             ayahID: 187,
             kind: .tafsir,
@@ -122,6 +177,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             author: "ابن جرير الطبري",
             citation: "٣/ ١٢٣",
             sourceURL: URL(string: "https://shamela.ws/book/7798/1774")!,
+            sourceNote: nil
+        ),
+        .init(
+            id: "saadi-2-180",
+            ayahID: 187,
+            kind: .tafsir,
+            text: "بل يرتبهم على القرب والحاجة",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٨٥",
+            sourceURL: URL(string: "https://shamela.ws/book/42/121")!,
             sourceNote: nil
         ),
         .init(
@@ -158,6 +224,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             sourceNote: nil
         ),
         .init(
+            id: "ibn-kathir-2-183",
+            ayahID: 190,
+            kind: .tafsir,
+            text: "فلهم فيه أسوة، وليجتهد هؤلاء في أداء هذا الفرض أكمل مما فعله أولئك",
+            book: "تفسير ابن كثير - ط ابن الجوزي",
+            author: "ابن كثير",
+            citation: "٢/ ٥٣",
+            sourceURL: URL(string: "https://shamela.ws/book/1503/758")!,
+            sourceNote: nil
+        ),
+        .init(
             id: "ibn-kathir-2-184",
             ayahID: 191,
             kind: .tafsir,
@@ -166,6 +243,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             author: "ابن كثير",
             citation: "٢/ ٥٣",
             sourceURL: URL(string: "https://shamela.ws/book/1503/758")!,
+            sourceNote: nil
+        ),
+        .init(
+            id: "saadi-2-184",
+            ayahID: 191,
+            kind: .tafsir,
+            text: "أن يقضي أياما قصيرة باردة، عن أيام طويلة حارة كالعكس",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٨٦",
+            sourceURL: URL(string: "https://shamela.ws/book/42/123")!,
             sourceNote: nil
         ),
         .init(
@@ -180,6 +268,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             sourceNote: nil
         ),
         .init(
+            id: "saadi-2-185",
+            ayahID: 192,
+            kind: .tafsir,
+            text: "يريد الله تعالى أن ييسر عليكم الطرق الموصلة إلى رضوانه",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٨٦",
+            sourceURL: URL(string: "https://shamela.ws/book/42/123")!,
+            sourceNote: nil
+        ),
+        .init(
             id: "ibn-ashur-2-186",
             ayahID: 193,
             kind: .tafsir,
@@ -188,6 +287,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             author: "ابن عاشور",
             citation: "٢/ ١٧٨",
             sourceURL: URL(string: "https://shamela.ws/book/9776/945")!,
+            sourceNote: nil
+        ),
+        .init(
+            id: "saadi-2-186",
+            ayahID: 193,
+            kind: .tafsir,
+            text: "فهو قريب أيضا من داعيه، بالإجابة",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٨٧",
+            sourceURL: URL(string: "https://shamela.ws/book/42/124")!,
             sourceNote: nil
         ),
         .init(
@@ -246,6 +356,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             sourceNote: nil
         ),
         .init(
+            id: "ibn-ashur-2-255-context",
+            ayahID: 262,
+            kind: .context,
+            text: "وَجُعِلَتْ هَذِهِ الْآيَةُ ابْتِدَاءً لِآيَاتِ تَقْرِيرِ الْوَحْدَانِيَّةِ وَالْبَعْثِ",
+            book: "تفسير ابن عاشور التحرير والتنوير",
+            author: "ابن عاشور",
+            citation: "٣/ ١٧",
+            sourceURL: URL(string: "https://shamela.ws/book/9776/1273")!,
+            sourceNote: nil
+        ),
+        .init(
             id: "saadi-2-286",
             ayahID: 293,
             kind: .tafsir,
@@ -254,6 +375,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             author: "عبد الرحمن السعدي",
             citation: "ص ١٢٠",
             sourceURL: URL(string: "https://shamela.ws/book/42/195")!,
+            sourceNote: nil
+        ),
+        .init(
+            id: "tabari-2-286",
+            ayahID: 293,
+            kind: .tafsir,
+            text: "فلا يُضَيِّقُ عليها ولا يَجْهَدُها",
+            book: "تفسير الطبري جامع البيان - ت التركي",
+            author: "ابن جرير الطبري",
+            citation: "٥/ ١٥٣",
+            sourceURL: URL(string: "https://shamela.ws/book/7798/3270")!,
             sourceNote: nil
         ),
         .init(
@@ -288,6 +420,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             citation: "ص ٨٨",
             sourceURL: URL(string: "https://shamela.ws/book/42/127")!,
             sourceNote: "في بيان فائدة جعل الأهلة مواقيت للعبادات والمعاملات."
+        ),
+        .init(
+            id: "ibn-ashur-2-189-context",
+            ayahID: 196,
+            kind: .context,
+            text: "لأن الآيات خطاب للمسلمين وهم الذين سألوا عن الأهلة، والنسيء من أحوال أهل الجاهلية",
+            book: "تفسير ابن عاشور التحرير والتنوير",
+            author: "ابن عاشور",
+            citation: "٢/ ١٩٩",
+            sourceURL: URL(string: "https://shamela.ws/book/9776/966")!,
+            sourceNote: "يردّ ابن عاشور تأويل الآية بأنها مثلٌ للنسيء، ويصفه بالبعد؛ هذا سياق تفسيري لا تقرير لسبب النزول."
         )
     ]
 }
@@ -488,7 +631,7 @@ struct QuranWirdReferenceView: View {
                         Text("«" + excerpt.text + "»")
                             .font(.custom("Amiri-Regular", size: 19, relativeTo: .title3))
                             .lineSpacing(4).fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("quran-reference-excerpt-\(excerpt.kind.rawValue)-\(ayah.id)")
+                            .accessibilityIdentifier("quran-reference-excerpt-\(excerpt.id)")
                         if let sourceNote = excerpt.sourceNote {
                             Text(sourceNote).font(bodyFont(11)).foregroundStyle(theme.secondaryInk)
                                 .fixedSize(horizontal: false, vertical: true)
