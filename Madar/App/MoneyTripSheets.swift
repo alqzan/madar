@@ -23,7 +23,7 @@ struct MoneyTripRateSheet: View {
     private var rate: String? { currency == app.string("core.currency") ? "1" : TravelBudget.canonicalRate(raw) }
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 16) {
-            HStack { Text("عملة الرحلة وسعرها").font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق") { dismiss() }.frame(minHeight: 44) }
+            HStack { Text("عملة الرحلة وسعرها").font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق") { dismiss() }.disabled(saving).frame(minHeight: 44).accessibilityIdentifier("money-trip-rate-close") }
             Picker("عملة البلد", selection: $currency) { ForEach(CurrencyExponents.specified.exponents.keys.sorted(), id: \.self) { code in Text(service.currencyName(code) + " (" + code + ")").tag(code) } }.accessibilityIdentifier("money-trip-currency")
             if currency != app.string("core.currency") {
                 Text("كل وحدة من " + service.currencyName(currency) + " تساوي، بعملة البيت:").font(MadarTypography.body())
@@ -46,11 +46,12 @@ struct MoneyTripRateSheet: View {
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { focused = false }.accessibilityIdentifier("money-trip-keyboard-done") } }
             .sheet(isPresented: $previewOpen) { if let preview { repricePreview(preview) } }
             .task { currency = reading.currency ?? app.string("core.currency"); raw = reading.rate.map(service.localizedRate) ?? "" }
+            .interactiveDismissDisabled(saving)
         }
     }
     private func repricePreview(_ p: MoneyTripReprice) -> some View {
         ScrollView { VStack(alignment: .leading, spacing: 14) {
-            HStack { Text("قبل تطبيق السعر").font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق") { previewOpen = false }.frame(minHeight: 44) }
+            HStack { Text("قبل تطبيق السعر").font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق") { previewOpen = false }.disabled(saving).frame(minHeight: 44).accessibilityIdentifier("money-trip-reprice-close") }
             Text("هذه القيم بعملة البيت. المبلغ الأصلي ويوم الحركة لا يتغيّران.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             ForEach(p.lines) { row in HStack { Text(row.title); Spacer(); Text(figure: service.amount(row.beforeMinor) + " ← " + service.amount(row.afterMinor)) }.font(MadarTypography.body()) }
             if p.excludedCount > 0 { Text("تبقى الحركات ذات سعر البنك وتقارير الدورات المغلقة وخطط السداد المعتمدة على أرقامها المحفوظة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
@@ -58,8 +59,8 @@ struct MoneyTripRateSheet: View {
             Button {
                 saving = true
                 Task { do { try await app.executeMoneyCommand("money.repriceTrip", payload: ["id": .string(reading.id.uuidString), "rate": .string(reading.rate!), "signature": .string(p.signature)]); previewOpen = false; dismiss() } catch { failure = "تغيّرت الحركات منذ المعاينة؛ أعد فتحها قبل التطبيق."; previewOpen = false; saving = false } }
-            } label: { Text("طبّق على الحركات المعروضة").frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || p.lines.isEmpty).accessibilityIdentifier("money-trip-reprice-apply")
-        }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
+            } label: { Text(saving ? "جارٍ التطبيق…" : "طبّق على الحركات المعروضة").frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || p.lines.isEmpty).accessibilityIdentifier("money-trip-reprice-apply")
+        }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).interactiveDismissDisabled(saving)
     }
     private func scale(_ code: String) -> Int { (0..<(CurrencyExponents.specified.exponent(code) ?? 2)).reduce(1) { n, _ in n * 10 } }
     private func save() {
@@ -94,7 +95,7 @@ struct MoneyTripFundingSheet: View {
     }
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 16) {
-            HStack { Text("مظروف رحلة " + reading.city).font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق") { dismiss() }.frame(minHeight: 44) }
+            HStack { Text("مظروف رحلة " + reading.city).font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق") { dismiss() }.disabled(saving).frame(minHeight: 44).accessibilityIdentifier("money-trip-fund-close") }
             Text("انقل من مالك المخصّص إلى الرحلة. المجموع لا يتغيّر.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             Text("المبلغ بعملة البيت، " + service.currencyName(app.string("core.currency"))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             TextField("المبلغ", text: $raw).keyboardType(.decimalPad).focused($focused).font(.title2).padding(12).background(theme.surface).accessibilityIdentifier("money-trip-fund-input")
@@ -117,10 +118,11 @@ struct MoneyTripFundingSheet: View {
             if let failure { Text(failure).font(MadarTypography.caption()) }
             // AU-34: hidden numbers say why save waits.
             if !visible { Text("أرقامك مخفية؛ أظهرها من صفحة الرحلة لتحفظ").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-trip-hidden-hint") }
-            Button { save() } label: { Text("انقل للمظروف").frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || !visible || minor.map { $0 > 0 && $0 <= available } != true).accessibilityIdentifier("money-trip-fund-save")
+            Button { save() } label: { Text(saving ? "جارٍ النقل…" : "انقل للمظروف").frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || !visible || minor.map { $0 > 0 && $0 <= available } != true).accessibilityIdentifier("money-trip-fund-save")
         }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { focused = false }.accessibilityIdentifier("money-trip-keyboard-done") } }
             .task { due = max(app.prayerNow(), reading.due?.date(in: app.activePlace.timeZone) ?? reading.today.adding(days: 3).date(in: app.activePlace.timeZone)); if reading.surplusMinor <= 0 { source = "reserve" } }
+            .interactiveDismissDisabled(saving)
         }
     }
     private func save() {

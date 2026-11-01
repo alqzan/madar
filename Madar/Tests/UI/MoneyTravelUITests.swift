@@ -11,9 +11,10 @@ import XCTest
         }
         XCTAssertTrue(button.isHittable)
     }
-    private func open(_ fixture: String, store: String = UUID().uuidString, failTravelReadOnce: Bool = false) -> XCUIApplication {
+    private func open(_ fixture: String, store: String = UUID().uuidString, failTravelReadOnce: Bool = false, writeHoldMS: Int? = nil) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": store, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
         if failTravelReadOnce { app.launchEnvironment["MADAR_UI_MONEY_TRAVEL_READ_FAILURE_ONCE"] = "1" }
+        if let writeHoldMS { app.launchEnvironment["MADAR_UI_MONEY_WRITE_HOLD_MS"] = String(writeHoldMS) }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
         if failTravelReadOnce { XCTAssertTrue(app.staticTexts["money-travel-read-error"].waitForExistence(timeout: 10)) }
@@ -85,6 +86,57 @@ import XCTest
         XCTAssertTrue(remaining.waitForExistence(timeout: 5)); let beforeReprice = remaining.label
         app.buttons["money-travel-rate"].tap(); app.buttons["money-trip-reprice-preview"].tap(); let apply = app.buttons["money-trip-reprice-apply"]; XCTAssertTrue(apply.waitForExistence(timeout: 5)); shot(app, "M5-V21-reprice-L"); apply.tap()
         XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5)); XCTAssertNotEqual(remaining.label, beforeReprice); app.buttons["تراجع"].tap(); XCTAssertEqual(remaining.label, beforeReprice)
+    }
+
+    func testTripRateFundingAndRepriceStayOpenWhileSaving() {
+        continueAfterFailure = false
+        let app = open("travel", writeHoldMS: 5000)
+
+        app.buttons["money-travel-rate"].tap()
+        let rateClose = app.buttons["money-trip-rate-close"]
+        let rate = app.textFields["money-trip-rate-input"]
+        XCTAssertTrue(rate.waitForExistence(timeout: 5))
+        rate.tap(); rate.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10) + "0.2")
+        app.buttons["money-trip-keyboard-done"].tap()
+        let rateSave = app.buttons["money-trip-rate-save"]
+        shot(app, "M5-V21-rate-save-idle-L")
+        rateSave.tap()
+        XCTAssertTrue(rateClose.exists); XCTAssertFalse(rateClose.isEnabled); XCTAssertFalse(rateSave.isEnabled)
+        shot(app, "M5-V21-rate-save-pending-L")
+        app.swipeDown()
+        XCTAssertTrue(rateClose.exists); XCTAssertFalse(rateClose.isEnabled); XCTAssertFalse(rateSave.isEnabled)
+        XCTAssertTrue(rateClose.waitForNonExistence(timeout: 12), app.debugDescription)
+
+        let fund = app.buttons["money-travel-fund"]; reach(app, fund); fund.tap()
+        let fundClose = app.buttons["money-trip-fund-close"]
+        let amount = app.textFields["money-trip-fund-input"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 5)); amount.tap(); amount.typeText("100")
+        app.buttons["money-trip-keyboard-done"].tap()
+        let fundSave = app.buttons["money-trip-fund-save"]; reach(app, fundSave)
+        XCTAssertTrue(fundSave.isEnabled)
+        shot(app, "M5-V21-fund-save-idle-L")
+        fundSave.tap()
+        XCTAssertTrue(fundClose.exists); XCTAssertFalse(fundClose.isEnabled); XCTAssertFalse(fundSave.isEnabled)
+        shot(app, "M5-V21-fund-save-pending-L")
+        app.swipeDown()
+        XCTAssertTrue(fundClose.exists); XCTAssertFalse(fundClose.isEnabled); XCTAssertFalse(fundSave.isEnabled)
+        XCTAssertTrue(fundClose.waitForNonExistence(timeout: 12), app.debugDescription)
+
+        app.buttons["money-travel-rate"].tap()
+        let previewButton = app.buttons["money-trip-reprice-preview"]
+        XCTAssertTrue(previewButton.waitForExistence(timeout: 8), app.debugDescription)
+        previewButton.tap()
+        let previewClose = app.buttons["money-trip-reprice-close"]
+        let apply = app.buttons["money-trip-reprice-apply"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 5))
+        shot(app, "M5-V21-reprice-save-idle-L")
+        apply.tap()
+        XCTAssertTrue(previewClose.exists); XCTAssertFalse(previewClose.isEnabled); XCTAssertFalse(apply.isEnabled)
+        shot(app, "M5-V21-reprice-save-pending-L")
+        app.swipeDown()
+        XCTAssertTrue(previewClose.exists); XCTAssertFalse(previewClose.isEnabled); XCTAssertFalse(apply.isEnabled)
+        XCTAssertTrue(previewClose.waitForNonExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(rateClose.waitForNonExistence(timeout: 5), app.debugDescription)
     }
     func testMissingRateAndHiddenAmounts() {
         continueAfterFailure = false
