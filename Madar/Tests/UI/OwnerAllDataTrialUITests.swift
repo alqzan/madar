@@ -85,7 +85,7 @@ import XCTest
         app.buttons["money-log-search-open"].tap()
         let field = app.textFields["money-log-search"]
         XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText("غيرموجود\n")
-        XCTAssertTrue(app.staticTexts["money-log-empty"].waitForExistence(timeout: 10)); shot(app, "TRIAL-money-log-search-L")
+        XCTAssertTrue(app.staticTexts["money-log-search-empty"].waitForExistence(timeout: 10)); shot(app, "TRIAL-money-log-search-L")
         app.buttons["مسح البحث"].tap(); close(app, "money-log-close"); homeTop(app)
     }
     /// A tab tap can leave the lobby in front, so trust only the money-home marker and fall back to the

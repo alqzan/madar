@@ -65,10 +65,21 @@ public enum LegacyQuranImport {
         guard let root = try JSONSerialization.jsonObject(with: backup) as? [String: Any] else { return result }
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
         func day(_ text: Any?) -> DateComponents? {
-            guard let text = text as? String, text.count == 10 else { return nil }
-            let parts = text.split(separator: "-").compactMap { Int($0) }
-            guard parts.count == 3, (1...12).contains(parts[1]), (1...31).contains(parts[2]) else { return nil }
-            return DateComponents(year: parts[0], month: parts[1], day: parts[2])
+            guard let text = text as? String else { return nil }
+            let bytes = Array(text.utf8)
+            guard bytes.count == 10, bytes[4] == 45, bytes[7] == 45,
+                  bytes[0..<4].allSatisfy({ (48...57).contains($0) }),
+                  bytes[5..<7].allSatisfy({ (48...57).contains($0) }),
+                  bytes[8..<10].allSatisfy({ (48...57).contains($0) }),
+                  let year = Int(String(decoding: bytes[0..<4], as: UTF8.self)),
+                  let month = Int(String(decoding: bytes[5..<7], as: UTF8.self)),
+                  let day = Int(String(decoding: bytes[8..<10], as: UTF8.self)),
+                  (1...9999).contains(year), (1...12).contains(month), (1...31).contains(day) else { return nil }
+            let components = DateComponents(year: year, month: month, day: day)
+            guard let date = calendar.date(from: components) else { return nil }
+            let roundTrip = calendar.dateComponents([.year, .month, .day], from: date)
+            guard roundTrip.year == year, roundTrip.month == month, roundTrip.day == day else { return nil }
+            return components
         }
         func at(_ text: Any?, hour: Int, seconds: Int = 0) -> Date? {
             guard var parts = day(text) else { return nil }
@@ -90,7 +101,15 @@ public enum LegacyQuranImport {
         guard let hifz = root["quranHifz"] as? [String: Any] else { return result }
 
         // Plan v1. Unit raw values copy 1:1; intensity → rhythm; a missing intensity is the legacy default «balanced».
-        let frontier = (hifz["frontierId"] as? NSNumber)?.intValue ?? 0
+        let rawFrontier = hifz["frontierId"]
+        let frontierValue: Int? = {
+            guard let number = rawFrontier as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
+            let value = number.doubleValue
+            guard value.isFinite, value.rounded(.towardZero) == value, value >= 0, value <= 6236 else { return nil }
+            return Int(value)
+        }()
+        let frontier = frontierValue ?? 0
+        if rawFrontier != nil && frontierValue == nil { count("skipped.frontier") }
         var planID: UUID?
         if let plan = hifz["plan"] as? [String: Any] {
             let unit = plan["unit"] as? String, intensity = (plan["intensity"] as? String) ?? "balanced"
@@ -123,8 +142,8 @@ public enum LegacyQuranImport {
             for (index, row) in rows.enumerated() {
                 guard let legacyID = row["id"] as? String, !legacyID.isEmpty, seenIDs.insert(legacyID).inserted else { count("skipped.\(kind).id"); continue }
                 if tombstoned.contains(legacyID) { count("skipped.\(kind).tombstoned"); continue }
-                guard let dayText = row["date"] as? String, day(dayText) != nil,
-                      let from = (row["fromId"] as? NSNumber)?.intValue, let to = (row["toId"] as? NSNumber)?.intValue,
+                guard let dayText = row["date"] as? String, day(dayText) != nil else { count("skipped.\(kind).date"); continue }
+                guard let from = (row["fromId"] as? NSNumber)?.intValue, let to = (row["toId"] as? NSNumber)?.intValue,
                       let range = try? QuranAyahRange(first: from, last: to) else { count("skipped.\(kind).range"); continue }
                 // A missing grade is never «جيد» by default (Q01): the row is excluded and counted.
                 guard let grade = grade(legacy: row["rating"]) else { count("skipped.\(kind).rating"); continue }
@@ -143,19 +162,29 @@ public enum LegacyQuranImport {
             }
         }
 
-        // Q01 gap rule: if the imported hifz does not reach the legacy frontier, one import-sourced session covers it.
+        // Q01 gap rule: synthesize only ayahs absent from imported hifz, splitting disjoint ranges so no session covers
+        // an ayah already represented by an imported session.
         if let plan = result.plan, frontier >= plan.startAyah {
             var covered = Set<Int>()
             for row in result.sessions where row.kind == "hifz" { covered.formUnion(row.fromAyah...row.toAyah) }
-            let missing = (plan.startAyah...frontier).filter { !covered.contains($0) }
-            if let first = missing.first, let last = missing.last {
+            var gaps: [ClosedRange<Int>] = []
+            var gapStart: Int?
+            for ayah in plan.startAyah...frontier {
+                if covered.contains(ayah) {
+                    if let start = gapStart { gaps.append(start...(ayah - 1)); gapStart = nil }
+                } else if gapStart == nil { gapStart = ayah }
+            }
+            if let start = gapStart { gaps.append(start...frontier) }
+            for gap in gaps {
+                let first = gap.lowerBound, last = gap.upperBound
                 let range = try QuranAyahRange(first: first, last: last)
                 let pages = try QuranPortionEngine.pages(for: range, catalog: catalog).map(\.page)
                 let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = timeZone; f.dateFormat = "yyyy-MM-dd"
-                result.sessions.append(SessionRow(id: uuid("myDream:HifzSession:frontierGap"), sourceModel: "HifzFrontierGap", sourceID: "frontierGap",
+                let sourceID = gaps.count == 1 ? "frontierGap" : "frontierGap:\(first)-\(last)"
+                result.sessions.append(SessionRow(id: uuid("myDream:HifzSession:\(sourceID)"), sourceModel: "HifzFrontierGap", sourceID: sourceID,
                     kind: "hifz", dayKey: f.string(from: plan.activeFrom), endedAt: plan.activeFrom, updatedAt: plan.activeFrom,
-                    fromAyah: first, toAyah: last, pages: pages, synthesizedTime: true, raw: json(["frontierId": frontier, "missing": missing.count])))
-                count("hifz.frontierGap"); count("hifz.frontierGapAyahs", missing.count)
+                    fromAyah: first, toAyah: last, pages: pages, synthesizedTime: true, raw: json(["frontierId": frontier, "missing": last - first + 1])))
+                count("hifz.frontierGap"); count("hifz.frontierGapAyahs", last - first + 1)
             }
         }
 

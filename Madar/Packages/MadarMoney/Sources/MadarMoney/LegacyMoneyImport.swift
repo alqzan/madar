@@ -127,7 +127,10 @@ public enum LegacyMoneyImport {
         let scaled = (Decimal(string: String(value)) ?? Decimal(value)) * 100
         var rounded = Decimal(), copy = scaled
         NSDecimalRound(&rounded, &copy, 0, .plain)
-        return NSDecimalNumber(decimal: rounded).intValue
+        guard !rounded.isNaN else { return nil }
+        let minorUnits = NSDecimalNumber(decimal: rounded)
+        guard minorUnits.compare(NSDecimalNumber(value: Int.max)) != .orderedDescending else { return nil }
+        return minorUnits.intValue
     }
 
     private struct Backup: Decodable {

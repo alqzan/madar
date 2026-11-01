@@ -29,6 +29,14 @@ import Testing
         #expect(LegacyMoneyImport.minor(12.3) == 1230); #expect(LegacyMoneyImport.minor(0.07) == 7)
         #expect(LegacyMoneyImport.minor(19.99) == 1999); #expect(LegacyMoneyImport.minor(45) == 4500)
         #expect(LegacyMoneyImport.minor(0) == nil); #expect(LegacyMoneyImport.minor(-3) == nil)
+        #expect(LegacyMoneyImport.minor(1e20) == nil)
+        #expect(LegacyMoneyImport.minor(Double.greatestFiniteMagnitude) == nil)
+    }
+
+    @Test func transactionOutsideMinorUnitRangeIsCountedAndSkipped() throws {
+        let plan = try importPlan([["id": "overflow", "date": "2026-07-03", "amount": 1e20]], keys: Keys())
+        #expect(plan.counts["row.badAmount"] == 1)
+        #expect(plan.steps.contains { if case .logExpense = $0 { true } else { false } } == false)
     }
 
     @Test func spellingOnlyNameMatch() {

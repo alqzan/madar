@@ -35,9 +35,10 @@ import Testing
         ],
     ]
 
-    func run() throws -> LegacyQuranImport.Plan {
-        try LegacyQuranImport.plan(backup: JSONSerialization.data(withJSONObject: fixture), timeZone: zone, catalog: QuranResourceCatalog.bundled(), uuid: { uuid($0) })
+    func run(_ backup: [String: Any]) throws -> LegacyQuranImport.Plan {
+        try LegacyQuranImport.plan(backup: JSONSerialization.data(withJSONObject: backup), timeZone: zone, catalog: QuranResourceCatalog.bundled(), uuid: { uuid($0) })
     }
+    func run() throws -> LegacyQuranImport.Plan { try run(fixture) }
 
     @Test func gradesFollowTheLegacyEnum() {
         #expect(LegacyQuranImport.grade(legacy: 1) == "needs")
@@ -78,6 +79,52 @@ import Testing
         #expect(gap.fromAyah == 8 && gap.toAyah == 12 && gap.kind == "hifz" && gap.pages == [2])
         #expect(plan.counts["hifz.frontierGap"] == 1 && plan.counts["hifz.frontierGapAyahs"] == 5)
         #expect(plan.grades.contains { $0.sessionID == gap.id } == false)
+    }
+
+    @Test func frontierGapsDoNotCoverAyahsAlreadyImported() throws {
+        var backup = fixture
+        var hifz = backup["quranHifz"] as! [String: Any]
+        hifz["frontierId"] = 8
+        hifz["sessions"] = [
+            ["id": "s-prefix", "date": "2026-07-19", "fromId": 1, "toId": 2, "rating": 3],
+            ["id": "s-island", "date": "2026-07-20", "fromId": 5, "toId": 6, "rating": 2],
+        ]
+        hifz["reviews"] = []
+        backup["quranHifz"] = hifz
+
+        let plan = try run(backup)
+        let gaps = plan.sessions.filter { $0.sourceModel == "HifzFrontierGap" }
+        #expect(gaps.map { "\($0.fromAyah)-\($0.toAyah)" } == ["3-4", "7-8"])
+        #expect(Set(gaps.map(\.id)).count == 2)
+        #expect(plan.counts["hifz.frontierGap"] == 2 && plan.counts["hifz.frontierGapAyahs"] == 4)
+    }
+
+    @Test func invalidGregorianSessionDaysAreSkipped() throws {
+        var backup = fixture
+        var hifz = backup["quranHifz"] as! [String: Any]
+        hifz["frontierId"] = 0
+        hifz["sessions"] = [
+            ["id": "s-invalid-day", "date": "2026-02-31", "fromId": 1, "toId": 2, "rating": 3],
+            ["id": "s-malformed-day", "date": "2026--1-01", "fromId": 1, "toId": 2, "rating": 3],
+        ]
+        hifz["reviews"] = [["id": "r-invalid-day", "date": "2026-02-31", "fromId": 1, "toId": 2, "rating": 2]]
+        backup["quranHifz"] = hifz
+
+        let plan = try run(backup)
+        #expect(plan.sessions.isEmpty)
+        #expect(plan.counts["skipped.hifz.date"] == 2 && plan.counts["skipped.review.date"] == 1)
+    }
+
+    @Test func outOfRangeFrontierIsSkippedWithoutAbortingPlan() throws {
+        var backup = fixture
+        var hifz = backup["quranHifz"] as! [String: Any]
+        hifz["frontierId"] = 6237
+        backup["quranHifz"] = hifz
+
+        let plan = try run(backup)
+        #expect(plan.plan?.frontierAyah == nil)
+        #expect(plan.sessions.contains { $0.sourceModel == "HifzFrontierGap" } == false)
+        #expect(plan.counts["skipped.frontier"] == 1)
     }
 
     @Test func mistakesKeepWordsOnlyWhenTheyMatch() throws {
