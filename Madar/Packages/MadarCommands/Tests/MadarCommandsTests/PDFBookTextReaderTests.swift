@@ -137,4 +137,11 @@ struct PDFBookTextReaderTests {
         #expect(PDFBookTextReader.withoutStraySymbols("زوروا www.alkalam-sy.com للمزيد") == "زوروا www.alkalam-sy.com للمزيد")
         #expect(PDFBookTextReader.withoutStraySymbols("الْأَرْضِ وَاسْتَعْمَرَكُمْ فِيهَا [هود: ٦١]") == "الْأَرْضِ وَاسْتَعْمَرَكُمْ فِيهَا [هود: ٦١]")
     }
+
+    @Test func ocrHonorificLigaturesExpandToTheirPrintedWords() {
+        #expect(PDFBookTextReader.withoutStraySymbols("ﷺ") == "صلى الله عليه وسلم")
+        #expect(PDFBookTextReader.withoutStraySymbols("قال ﷺ وذكر ﷻ") == "قال صلى الله عليه وسلم وذكر جل جلاله")
+        #expect(PDFBookTextReader.withoutStraySymbols("محمدﷺ، وذكر الله ﷻ") == "محمد صلى الله عليه وسلم، وذكر الله جل جلاله")
+        #expect(PDFBookTextReader.withoutStraySymbols("بسم الله ﷽") == "بسم الله ﷽")
+    }
 }

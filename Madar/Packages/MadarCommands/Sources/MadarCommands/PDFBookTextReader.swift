@@ -156,11 +156,14 @@ public actor PDFBookTextReader {
         }
     }
 
-    /// Vision reads bold Arabic parentheses as `%`, `#`, `$`, `&` or a lone quote («' شروع العمر '»), ornaments as Latin letters. Those
-    /// marks never occur in Arabic prose, so an Arabic OCR line drops them; no letter is guessed or added.
+    /// Expand the two Unicode Arabic honorific ligatures used in OCR output, then drop known Vision noise.
+    /// No other OCR letters are guessed or added.
     static func withoutStraySymbols(_ line: String) -> String {
-        guard line.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) else { return line }
-        var kept = line.replacingOccurrences(of: #"[%#$&@^~|\\*•]"#, with: " ", options: .regularExpression)
+        let expanded = line
+            .replacingOccurrences(of: "ﷺ", with: " صلى الله عليه وسلم ")
+            .replacingOccurrences(of: "ﷻ", with: " جل جلاله ")
+        guard expanded.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) else { return line }
+        var kept = expanded.replacingOccurrences(of: #"[%#$&@^~|\\*•]"#, with: " ", options: .regularExpression)
         // Ornaments and rules read as Latin letters glued to an Arabic word («تميمةvVv», «لV») or a lone «V».
         kept = kept.replacingOccurrences(of: #"(?<=[\x{0621}-\x{0652}])[A-Za-z]+|[A-Za-z]+(?=[\x{0621}-\x{064A}])"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"(?<![A-Za-z])[Vv]+(?![A-Za-z])"#, with: " ", options: .regularExpression)
