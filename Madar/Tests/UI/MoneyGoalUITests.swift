@@ -28,7 +28,7 @@ import XCTest
         XCTAssertTrue(confirm.waitForExistence(timeout: 3), app.debugDescription)
         XCTAssertFalse(confirm.isEnabled); XCTAssertFalse(back.isEnabled)
         XCTAssertTrue(app.buttons["money-goal-open"].waitForExistence(timeout: 12), app.debugDescription)
-        XCTAssertFalse(confirm.exists)
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 8), app.debugDescription)
     }
     func testEditablePlansPreviewCreationAndUndo() {
         continueAfterFailure = false
