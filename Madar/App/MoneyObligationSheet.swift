@@ -98,7 +98,7 @@ struct MoneyObligationSheet: View {
 
     var body: some View {
         // A navigation container only so the keyboard's «تم» bar can show; its own bar stays hidden.
-        NavigationStack { form.toolbar(.hidden, for: .navigationBar) }.presentationDetents([.large])
+        NavigationStack { form.toolbar(.hidden, for: .navigationBar) }.presentationDetents([.large]).interactiveDismissDisabled(saving)
     }
 
     private var form: some View {
@@ -107,7 +107,7 @@ struct MoneyObligationSheet: View {
                 HStack {
                     Text("التزام جديد").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
                     Spacer()
-                    Button("إلغاء") { dismiss() }.frame(minHeight: 44)
+                    Button("إلغاء") { dismiss() }.frame(minHeight: 44).accessibilityIdentifier("money-obligation-cancel").disabled(saving)
                 }.contentShape(Rectangle()).onTapGesture { field = nil }
                 Picker("النوع", selection: $kind) {
                     Text("فاتورة").tag("bill"); Text("اشتراك").tag("subscription"); Text("قرض").tag("loan"); Text("تقسيط").tag("installment")
