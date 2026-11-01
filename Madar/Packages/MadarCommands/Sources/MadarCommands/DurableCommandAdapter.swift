@@ -123,8 +123,7 @@ private struct ReceiptWire: Codable {
                 existingHash = try MadarCore.JSONValue.object(["settings": .object(existing)]).sha256()
             } else if case .logPrayer(let dayKey, let prayer, let status, let heart, let shortened, let fridayKind) = request.operation {
                 let matches = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.dayKey == dayKey && $0.prayer == prayer.rawValue && $0.mergedInto == nil }
-                if matches.contains(where: { $0.deletedAt != nil }) { return .init(status: .rejected, reason: "explicitRestoreRequired") }
-                if let row = matches.max(by: { $0.updatedAt < $1.updatedAt }), row.status == status,
+                if let row = matches.filter({ $0.deletedAt == nil }).max(by: { $0.updatedAt < $1.updatedAt }), row.status == status,
                    (heart == nil || row.heart == heart), (shortened == nil || row.shortened == shortened),
                    (fridayKind == nil || row.fridayKind == fridayKind) {
                     existingHash = request.payloadHash

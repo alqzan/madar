@@ -88,13 +88,14 @@ private struct PrayerInverse: Codable {
             if status == .missed { let qada = try qadaRow(ref); qada.madeUpAt = nil; try touch(qada, restoringDebt: restoring) }
             else if status == .jamaah || status == .alone || status == .unrecordedHistory || status == .excused { if let qada = repository.qada(ref) { try remove(qada) } }
         }
-        func makeUp(_ ref: PrayerReference, at eventAt: Date? = nil, fridayKind: FridayPrayerKind? = nil) throws {
+        func makeUp(_ ref: PrayerReference, at eventAt: Date? = nil, fridayKind: FridayPrayerKind? = nil, restoringCurrentLog: Bool = false) throws {
             if repository.qada(ref)?.madeUpAt != nil { return }
             let madeUpAt = eventAt ?? now
             guard madeUpAt <= now else { throw PrayerDomainError.invalidRecord }
             let oldAllowed = repository.qada(ref) != nil
             _ = try validate(ref, oldAllowed: oldAllowed)
-            try setLog(ref, status: .qada, fridayKind: fridayKind, oldAllowed: oldAllowed)
+            try setLog(ref, status: .qada, fridayKind: fridayKind, oldAllowed: oldAllowed,
+                       restoring: restoringCurrentLog && ref.day >= track.day)
             let qada = try qadaRow(ref); qada.madeUpAt = madeUpAt; try touch(qada, restoringDebt: true)
         }
         switch operation {
@@ -114,12 +115,12 @@ private struct PrayerInverse: Codable {
             after[key(try old.record())] = try old.record()
         case .record(let ref, let status, let heart, let shortened, let fridayKind):
             guard status != .unrecordedHistory && status != .excused else { throw PrayerDomainError.invalidRecord }
-            if status == .qada { try makeUp(ref, fridayKind: fridayKind); if let heart { let row = try logRow(ref); if row.heart != heart.rawValue { row.heart = heart.rawValue; try touch(row) } } }
+            if status == .qada { try makeUp(ref, fridayKind: fridayKind, restoringCurrentLog: true); if let heart { let row = try logRow(ref, restoring: ref.day >= track.day); if row.heart != heart.rawValue { row.heart = heart.rawValue; try touch(row) } } }
             else {
                 if let row = repository.log(ref), row.status == status.rawValue, heart == nil || row.heart == heart?.rawValue, shortened == nil || row.shortened == shortened, fridayKind == nil || row.fridayKind == fridayKind?.rawValue { break }
-                try setLog(ref, status: status, heart: heart, shortened: shortened, fridayKind: fridayKind)
+                try setLog(ref, status: status, heart: heart, shortened: shortened, fridayKind: fridayKind, restoring: true)
             }
-        case .makeUp(let ref, let at, let fridayKind): try makeUp(ref, at: at, fridayKind: fridayKind)
+        case .makeUp(let ref, let at, let fridayKind): try makeUp(ref, at: at, fridayKind: fridayKind, restoringCurrentLog: true)
         case .addOldMissed(let ref, let fridayKind), .restoreOldMissed(let ref, let fridayKind):
             let restoring: Bool
             if case .restoreOldMissed = operation { restoring = true } else { restoring = false }

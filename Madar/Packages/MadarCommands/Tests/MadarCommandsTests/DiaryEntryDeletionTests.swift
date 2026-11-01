@@ -30,6 +30,9 @@ import MadarData
         #expect(try await run(bus, "diary.editEntry", ["entryID": .string(rootID.uuidString), "revisionID": .string(firstRevisionID.uuidString), "text": .string("التعديل الأول")], at: firstEditAt).status == .applied)
         let secondEditAt = date("2026-10-18T12:00:00+03:00")
         #expect(try await run(bus, "diary.editEntry", ["entryID": .string(firstRevisionID.uuidString), "revisionID": .string(headID.uuidString), "text": .string("آخر تعديل")], at: secondEditAt).status == .applied)
+        let editedRows = try ModelContext(container).fetch(FetchDescriptor<Entry>())
+        #expect(editedRows.count == 3)
+        #expect(editedRows.allSatisfy { $0.attachmentMediaIDs == [mediaID] }, "Every revision head retains the original photo identity.")
 
         let context = ModelContext(container), margin = MarginNote(); margin.targetDayKey = "2026-10-15"; margin.targetEntryID = rootID
         margin.text = "هامش يبقى بعد حذف الأصل"; margin.writtenDayKey = "2026-10-18"; margin.writtenAt = secondEditAt
@@ -51,6 +54,7 @@ import MadarData
         rows = try ModelContext(container).fetch(FetchDescriptor<Entry>())
         #expect(rows.count == 3); #expect(rows.allSatisfy { $0.deletedAt == nil })
         #expect(rows.first { $0.id == headID }?.text == "آخر تعديل")
+        #expect(rows.allSatisfy { $0.attachmentMediaIDs == [mediaID] })
         #expect(try ModelContext(container).fetch(FetchDescriptor<MarginNote>()).first?.targetEntryID == rootID)
         #expect(try ModelContext(container).fetch(FetchDescriptor<Media>()).first { $0.id == mediaID }?.data == Data("private-photo-bytes".utf8))
     }

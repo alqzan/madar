@@ -39,6 +39,52 @@ import MadarPrayer
         while calendar.component(.weekday, from: candidate.date(in: calendar.timeZone)) != 6 { candidate = candidate.adding(days: -1) }
         return candidate
     }
+    @Test func prayerCanBeLoggedAgainAfterUndo() async throws {
+        let now = date("2026-10-15T12:00:00+03:00")
+        let (container, bus, directory) = try fixture(at: now)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let day = prayerDay(now)
+        let payload: [String: MadarCore.JSONValue] = ["dayKey": .string(day.description), "prayer": .string("fajr"), "status": .string("jamaah")]
+        func log(_ commandID: UUID) -> CommandEnvelope { .init(commandID: commandID, name: "prayer.log", payload: .object(payload), issuedAt: now) }
+
+        let firstCommand = UUID(), first = try await bus.execute(log(firstCommand), now: now)
+        #expect(first.status == .applied)
+        #expect(try await bus.execute(.init(name: "system.undo", payload: .object(["undoToken": .string(firstCommand.uuidString)]), issuedAt: now.addingTimeInterval(1)), now: now.addingTimeInterval(1)).status == .applied)
+
+        let pending = try #require(try PrayerRepository(context: ModelContext(container)).day(day, now: now.addingTimeInterval(2)).cells.first { $0.reference.prayer == .fajr })
+        #expect(pending.status == .pending)
+        let secondCommand = UUID()
+        let second = try await bus.execute(log(secondCommand), now: now.addingTimeInterval(3))
+        #expect(second.status == .applied, "A fresh prayer log after undo must restore the natural-key row.")
+
+        let row = try #require(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(row.id == StableIdentity.uuid(for: "PrayerLog:\(day):fajr"))
+        #expect(row.deletedAt == nil && row.restoredAt != nil && row.restoredAt! > row.deletionBarrierAt!)
+        #expect(row.status == "jamaah")
+        let recorded = try #require(try PrayerRepository(context: ModelContext(container)).day(day, now: now.addingTimeInterval(4)).cells.first { $0.reference.prayer == .fajr })
+        #expect(recorded.status == .jamaah)
+    }
+    @Test func qadaCanBeLoggedAgainAfterUndo() async throws {
+        let now = date("2026-10-15T15:00:00+03:00")
+        let (container, bus, directory) = try fixture(at: now)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let day = prayerDay(now)
+        let payload: [String: MadarCore.JSONValue] = ["dayKey": .string(day.description), "prayer": .string("fajr"), "status": .string("qada")]
+        func log(_ commandID: UUID) -> CommandEnvelope { .init(commandID: commandID, name: "prayer.log", payload: .object(payload), issuedAt: now) }
+
+        let firstCommand = UUID()
+        #expect(try await bus.execute(log(firstCommand), now: now).status == .applied)
+        #expect(try await bus.execute(.init(name: "system.undo", payload: .object(["undoToken": .string(firstCommand.uuidString)]), issuedAt: now.addingTimeInterval(1)), now: now.addingTimeInterval(1)).status == .applied)
+
+        let pending = try #require(try PrayerRepository(context: ModelContext(container)).day(day, now: now.addingTimeInterval(2)).cells.first { $0.reference.prayer == .fajr })
+        #expect(pending.status == .pending)
+        let secondCommand = UUID()
+        #expect(try await bus.execute(log(secondCommand), now: now.addingTimeInterval(3)).status == .applied)
+        let row = try #require(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first)
+        let qada = try #require(try ModelContext(container).fetch(FetchDescriptor<QadaItem>()).first)
+        #expect(row.status == "qada" && row.deletedAt == nil && row.restoredAt! > row.deletionBarrierAt!)
+        #expect(qada.madeUpAt != nil && qada.deletedAt == nil)
+    }
     @Test func test_M1T09_OldMissedFridayReplayMakeUpUndoAndRestoration() async throws {
         let now = date("2026-10-08T09:00:00+03:00")
         let (container, bus, directory) = try fixture(at: now)
