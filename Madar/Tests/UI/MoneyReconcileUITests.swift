@@ -2,11 +2,13 @@ import XCTest
 
 @MainActor final class MoneyReconcileUITests: XCTestCase {
     private func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
-    private func openReconcile(fixture: String) -> XCUIApplication {
+    private func openReconcile(fixture: String, writeHoldMS: Int? = nil) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        if let writeHoldMS { app.launchEnvironment["MADAR_UI_MONEY_WRITE_HOLD_MS"] = String(writeHoldMS) }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
-        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
-        app.buttons["money-open"].tap()
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 10))
+        for _ in 0..<12 where !money.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(money.isHittable); money.tap()
         let open = app.buttons["money-reconcile-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10)); for _ in 0..<10 where !open.isHittable { app.swipeUp(velocity: .slow) }; open.tap()
         return app
     }
@@ -51,6 +53,28 @@ import XCTest
         XCTAssertFalse(element(app, "money-reconcile-hint").exists)
         app.swipeDown(velocity: .fast)
         shot(app, "M5-V15-rec-saved-L")
+    }
+
+    func testReconciliationStaysOpenWhileSaving() throws {
+        continueAfterFailure = false
+        let app = openReconcile(fixture: "reconcile", writeHoldMS: 5000)
+        let close = app.buttons["money-reconcile-close"]
+        let save = app.buttons["money-reconcile-save"]
+        XCTAssertTrue(close.exists); XCTAssertTrue(close.isEnabled)
+        XCTAssertTrue(app.buttons["money-reconcile-name-missedSpend"].exists)
+        app.buttons["money-reconcile-name-missedSpend"].tap()
+        XCTAssertTrue(save.isEnabled)
+        shot(app, "M5-V15-reconcile-save-idle-L")
+        save.tap()
+        XCTAssertFalse(close.isEnabled); XCTAssertFalse(save.isEnabled)
+        shot(app, "M5-V15-reconcile-save-pending-L")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.5)).press(forDuration: 0.01, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)))
+        XCTAssertTrue(close.exists); XCTAssertFalse(close.isEnabled); XCTAssertFalse(save.isEnabled)
+        let status = element(app, "money-reconcile-status")
+        let settled = NSPredicate(format: "label CONTAINS %@", "آخر مطابقة")
+        expectation(for: settled, evaluatedWith: status); waitForExpectations(timeout: 12)
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: close)
+        waitForExpectations(timeout: 5)
     }
 
     func testHiddenAmountsAndEmptyStore() throws {

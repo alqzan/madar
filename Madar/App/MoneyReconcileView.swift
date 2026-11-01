@@ -79,6 +79,7 @@ struct MoneyReconcileView: View {
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task { load() }.onChange(of: app.prayerRevision) { load() }
+        .interactiveDismissDisabled(saving)
         .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
         .sheet(item: $unknownAccount, onDismiss: load) { MoneyAccountSheet(app: app, original: $0, visible: visible, revealed: $revealed) }
         .navigationDestination(isPresented: $messagesOpen) { MoneyMessagesView(app: app, revealed: $revealed) }
@@ -89,7 +90,7 @@ struct MoneyReconcileView: View {
         HStack(spacing: 14) {
             Button { dismiss() } label: { Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) } }
                 .buttonStyle(.madarPlain).glassEffect(.regular.interactive(), in: Circle())
-                .accessibilityLabel("إغلاق").accessibilityIdentifier("money-reconcile-close")
+                .disabled(saving).accessibilityLabel("إغلاق").accessibilityIdentifier("money-reconcile-close")
             Text("المطابقة مع البنك").font(.custom("thmanyahserifdisplay-Bold", size: 27, relativeTo: .title)).accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
         }.padding(.top, 6)
