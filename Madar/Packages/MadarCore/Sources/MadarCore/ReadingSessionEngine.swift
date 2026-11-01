@@ -24,8 +24,11 @@ public struct PendingReadingSessionQueue: Equatable, Sendable {
         writes.append(Write(sessionID: sessionID, commandID: commandID, payload: payload))
     }
 
+    /// An explicit retry grants one attempt after a failure without replacing its command ID.
+    public mutating func retryRequested() { authorizationEpoch += 1 }
+
     /// A new authorized foreground grants one retry after a failure, without replacing its command ID.
-    public mutating func authorizedForegroundReturned() { authorizationEpoch += 1 }
+    public mutating func authorizedForegroundReturned() { retryRequested() }
 
     public mutating func beginNext() -> Write? {
         guard canAttempt, let write = writes.first else { return nil }

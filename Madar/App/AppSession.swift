@@ -111,6 +111,8 @@ final class AppSession {
     @ObservationIgnored var failFirstNotebookSave = false
     @ObservationIgnored private var failFirstGoodreadsImport = false
     @ObservationIgnored private var failFirstQuranLevelWrite = false
+    @ObservationIgnored private var remainingMihbaraLocatorFailures = 0
+    @ObservationIgnored private var failMihbaraLocatorOnReaderClose = false
     @ObservationIgnored private var quranLevelWriteHoldMilliseconds: Int?
     @ObservationIgnored private var quranLevelWriteHoldUsed = false
     #endif
@@ -173,6 +175,16 @@ final class AppSession {
         failFirstQuranLevelWrite = notebookTest["MADAR_UI_QURAN_LEVEL_WRITE_FAIL_ONCE"] == "1"
             && notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent
             && group.deletingLastPathComponent().lastPathComponent == "UITestStores"
+        if notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent,
+           group.deletingLastPathComponent().lastPathComponent == "UITestStores",
+           let failures = Int(notebookTest["MADAR_UI_MIHBARA_LOCATOR_FAIL_COUNT"] ?? ""),
+           (1...5).contains(failures) {
+            remainingMihbaraLocatorFailures = failures
+        }
+        if notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent,
+           group.deletingLastPathComponent().lastPathComponent == "UITestStores" {
+            failMihbaraLocatorOnReaderClose = notebookTest["MADAR_UI_MIHBARA_LOCATOR_FAIL_ON_CLOSE"] == "1"
+        }
         if notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent,
            group.deletingLastPathComponent().lastPathComponent == "UITestStores",
            let milliseconds = Int(notebookTest["MADAR_UI_QURAN_LEVEL_WRITE_HOLD_MS"] ?? ""), (1...5000).contains(milliseconds) {
@@ -1064,6 +1076,12 @@ final class AppSession {
             failFirstGoodreadsImport = false
             throw DataError.invalidValue("تعذّرت إضافة كتب Goodreads إلى المحبرة. حاول مرة أخرى.")
         }
+        if name == "book.setLocator" {
+            if remainingMihbaraLocatorFailures > 0 {
+                remainingMihbaraLocatorFailures -= 1
+                throw DataError.invalidValue("mihbara UI locator write failure")
+            }
+        }
         #endif
         let now = prayerNow()
         let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
@@ -1074,6 +1092,14 @@ final class AppSession {
         }
         if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: undoMessage) }
         else if BookCommand.parse(name, payload)?.isUndoable == false { clearUndo() }
+    }
+
+    func armMihbaraLocatorFailureOnReaderCloseForUITest() {
+        #if DEBUG
+        guard failMihbaraLocatorOnReaderClose else { return }
+        failMihbaraLocatorOnReaderClose = false
+        remainingMihbaraLocatorFailures = max(remainingMihbaraLocatorFailures, 1)
+        #endif
     }
 
     var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }

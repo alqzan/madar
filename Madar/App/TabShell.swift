@@ -204,6 +204,7 @@ struct MadarRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
+        let readingSaveCoordinator = MihbaraReadingSaveCoordinator.forSession(session)
         let dark = forcedColorScheme == .dark || (forcedColorScheme == nil && colorScheme == .dark)
         let theme = RoomTheme(dark: dark, calmPaper: false)
         TabShell(session: session, selection: $session.selectedTab,
@@ -260,7 +261,16 @@ struct MadarRootView: View {
             if session.undoToastVisible { UndoToast(message: session.undoMessage, undo: session.undo, dismiss: session.hideUndoToast).padding(.bottom, 86) }
         }
         .fullScreenCover(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in })) { FirstRunView(session: session).environment(\.roomTheme, theme).madarSheetErrorAlert(session) }
-        .alert("لم تكتمل العملية", isPresented: Binding(get: { session.errorMessage != nil }, set: { if !$0 { session.errorMessage = nil } })) {
+        .alert("لم تكتمل العملية", isPresented: Binding(get: {
+            session.errorMessage != nil && !(session.mihbaraOpen && readingSaveCoordinator.canRetryPendingWriteErrorNow)
+        }, set: { if !$0 { session.errorMessage = nil } })) {
+            if readingSaveCoordinator.canRetryPendingWriteErrorNow {
+                Button("إعادة المحاولة") {
+                    readingSaveCoordinator.dismissPendingWriteError()
+                    readingSaveCoordinator.retryPendingWritesNow()
+                }
+                .accessibilityIdentifier("mihbara-reading-save-retry")
+            }
             Button("حسنًا") { session.errorMessage = nil }
         } message: { Text(session.errorMessage ?? "") }
         .onChange(of: session.string("core.backup")) { _, _ in
@@ -312,7 +322,15 @@ struct MadarRootView: View {
 extension View {
     /// AU-36/37: the root alert cannot show over a sheet, so a sheet carries its own for `session.errorMessage`.
     func madarSheetErrorAlert(_ session: AppSession) -> some View {
-        alert("لم تكتمل العملية", isPresented: Binding(get: { session.errorMessage != nil }, set: { if !$0 { session.errorMessage = nil } })) {
+        let readingSaveCoordinator = MihbaraReadingSaveCoordinator.forSession(session)
+        return alert("لم تكتمل العملية", isPresented: Binding(get: { session.errorMessage != nil }, set: { if !$0 { session.errorMessage = nil } })) {
+            if readingSaveCoordinator.canRetryPendingWriteErrorNow {
+                Button("إعادة المحاولة") {
+                    readingSaveCoordinator.dismissPendingWriteError()
+                    readingSaveCoordinator.retryPendingWritesNow()
+                }
+                .accessibilityIdentifier("mihbara-reading-save-retry")
+            }
             Button("حسنًا") { session.errorMessage = nil }
         } message: { Text(session.errorMessage ?? "") }
     }

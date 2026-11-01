@@ -53,6 +53,12 @@ import MadarQuran
         return app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized
     }
     var hasPending: Bool { !sessions.isEmpty || !pendingLocators.isEmpty }
+    var canRetryPendingWritesNow: Bool {
+        hasPending && canWrite && app?.maintenanceInProgress != true
+    }
+    var canRetryPendingWriteErrorNow: Bool {
+        canRetryPendingWritesNow && lastWriteError != nil && app?.errorMessage == lastWriteError
+    }
     private var canAttempt: Bool {
         sessions.canAttempt || (sessions.isEmpty && !pendingLocators.isEmpty && failedLocatorEpoch != sessions.authorizationEpoch)
     }
@@ -93,6 +99,18 @@ import MadarQuran
         sessions.authorizedForegroundReturned()
         failedLocatorEpoch = nil
         flush()
+    }
+
+    func retryPendingWritesNow() {
+        guard canRetryPendingWritesNow else { return }
+        sessions.retryRequested()
+        failedLocatorEpoch = nil
+        flush()
+    }
+
+    func dismissPendingWriteError() {
+        guard let app, let lastWriteError, app.errorMessage == lastWriteError else { return }
+        app.errorMessage = nil
     }
 
     private func clearRecoveredWriteError(in app: AppSession) {
@@ -202,6 +220,7 @@ struct MihbaraReaderView: View {
     @State private var sessionDayStamp: String?
     @State private var lastClockSample: Date?
     @State private var isClosing = false
+    @State private var isPendingSaveAlert = false
     @State private var message: String?
     @State private var readerAlert: String?
     @State private var narrationStarting = false
@@ -494,8 +513,12 @@ struct MihbaraReaderView: View {
                 .environment(\.layoutDirection, .rightToLeft).madarSheetErrorAlert(app)
                 .presentationDetents([.large])
         }
-        .alert("القارئ", isPresented: Binding(get: { readerAlert != nil }, set: { if !$0 { readerAlert = nil } })) {
-            Button("حسنًا", role: .cancel) { readerAlert = nil }
+        .alert("القارئ", isPresented: Binding(get: { readerAlert != nil }, set: { if !$0 { readerAlert = nil; isPendingSaveAlert = false } })) {
+            if isPendingSaveAlert && saveCoordinator.canRetryPendingWritesNow {
+                Button("إعادة المحاولة") { retryPendingSaveAndClose() }
+                    .accessibilityIdentifier("mihbara-reading-save-retry")
+            }
+            Button("حسنًا", role: .cancel) { readerAlert = nil; isPendingSaveAlert = false }
         } message: { Text(readerAlert ?? "") }
     }
 
@@ -1570,12 +1593,38 @@ struct MihbaraReaderView: View {
     @MainActor private func finishAndClose() {
         guard !isClosing else { return }
         isClosing = true
+        app.armMihbaraLocatorFailureOnReaderCloseForUITest()
         pauseReader(at: Date())
         Task { @MainActor in
             await saveCoordinator.waitForCurrentAttempt()
             if saveCoordinator.hasPending {
                 isClosing = false
-                readerAlert = "لم يكتمل حفظ قراءتك. تبقى الجلسة معلّقة وتُعاد المحاولة بعد عودة مدار للمقدمة وفتح القفل."
+                saveCoordinator.dismissPendingWriteError()
+                isPendingSaveAlert = true
+                readerAlert = pendingSaveMessage
+            } else { close() }
+        }
+    }
+
+    private var pendingSaveMessage: String {
+        saveCoordinator.canRetryPendingWritesNow
+            ? "لم يُحفظ موضع القراءة بعد. أعد المحاولة الآن لإكمال الحفظ قبل مغادرة القارئ."
+            : "لم يُحفظ موضع القراءة بعد. أبقِ مدار مفتوحًا حتى يعود الإذن أو ينتهي التحديث، ثم أعد المحاولة."
+    }
+
+    @MainActor private func retryPendingSaveAndClose() {
+        guard !isClosing else { return }
+        isClosing = true
+        readerAlert = nil
+        isPendingSaveAlert = false
+        saveCoordinator.retryPendingWritesNow()
+        Task { @MainActor in
+            await saveCoordinator.waitForCurrentAttempt()
+            if saveCoordinator.hasPending {
+                isClosing = false
+                saveCoordinator.dismissPendingWriteError()
+                isPendingSaveAlert = true
+                readerAlert = pendingSaveMessage
             } else { close() }
         }
     }

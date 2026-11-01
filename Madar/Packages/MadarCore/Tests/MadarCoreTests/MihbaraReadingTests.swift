@@ -186,6 +186,25 @@ import Testing
         #expect(queue.isEmpty)
     }
 
+    @Test func explicitRetryKeepsTheRejectedSessionCommandAndPayload() throws {
+        var queue = PendingReadingSessionQueue()
+        let sessionID = UUID(), commandID = UUID()
+        let payload: [String: JSONValue] = ["id": .string(sessionID.uuidString), "activeSeconds": .number(90)]
+        queue.enqueue(sessionID: sessionID, payload: payload, commandID: commandID)
+        let initialAttemptCandidate = queue.beginNext()
+        let initialAttempt = try #require(initialAttemptCandidate)
+        queue.finish(commandID: initialAttempt.commandID, acknowledged: false)
+        #expect(queue.beginNext() == nil)
+
+        queue.retryRequested()
+        let retryCandidate = queue.beginNext()
+        let retry = try #require(retryCandidate)
+        #expect(retry == initialAttempt)
+        #expect(retry.sessionID == sessionID && retry.commandID == commandID && retry.payload == payload)
+        queue.finish(commandID: retry.commandID, acknowledged: true)
+        #expect(queue.isEmpty)
+    }
+
     @Test func authorizationReturnDuringAnAttemptDoesNotStartAConcurrentRetry() throws {
         var queue = PendingReadingSessionQueue()
         queue.enqueue(sessionID: UUID(), payload: ["activeSeconds": .number(120)])

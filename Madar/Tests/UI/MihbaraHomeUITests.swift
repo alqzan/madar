@@ -953,13 +953,15 @@ import UIKit
         XCTAssertEqual(app.buttons["mihbara-pdf-ink"].value as? String, "٠", app.debugDescription)
     }
 
-    private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false, storeID: String? = nil, pdf: Data? = nil, fileRow: Bool = false, fileNearEnd: Bool = false) -> XCUIApplication {
+    private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false, storeID: String? = nil, pdf: Data? = nil, fileRow: Bool = false, fileNearEnd: Bool = false, readingLocatorFailures: Int = 0, readingLocatorFailureOnClose: Bool = false) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":storeID ?? UUID().uuidString,"MADAR_UI_MIHBARA_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
         if let epub { app.launchEnvironment["MADAR_UI_MIHBARA_EPUB_BASE64"] = epub.base64EncodedString() }
         if let pdf { app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_PDF"] = pdf.base64EncodedString() }
         if paperIndex { app.launchEnvironment["MADAR_UI_MIHBARA_PAPER_INDEX_FIXTURE"] = "1" }
         if fileRow || fileNearEnd { app.launchEnvironment["MADAR_UI_MIHBARA_FILE_ROW"] = "1" }
         if fileNearEnd { app.launchEnvironment["MADAR_UI_MIHBARA_FILE_NEAR_END"] = "1" }
+        if readingLocatorFailures > 0 { app.launchEnvironment["MADAR_UI_MIHBARA_LOCATOR_FAIL_COUNT"] = String(readingLocatorFailures) }
+        if readingLocatorFailureOnClose { app.launchEnvironment["MADAR_UI_MIHBARA_LOCATOR_FAIL_ON_CLOSE"] = "1" }
         return app
     }
     private func open(_ app: XCUIApplication) {
@@ -1551,6 +1553,68 @@ import UIKit
         app.buttons["mihbara-reader-close"].tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-book-continue"].waitForExistence(timeout: 8))
+    }
+
+    func testEPUBCloseOffersRetryForAQueuedLocatorSave() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL), readingLocatorFailureOnClose: true)
+        app.launch(); open(app)
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
+        let close = app.buttons["mihbara-reader-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 20), app.debugDescription)
+        close.tap()
+        let pendingSave = app.alerts["القارئ"]
+        XCTAssertTrue(pendingSave.waitForExistence(timeout: 10), app.debugDescription)
+        shot(app, "AU96-Mihbara-EPUB-save-retry-close-L")
+        let retry = pendingSave.buttons["mihbara-reading-save-retry"].firstMatch
+        XCTAssertTrue(retry.waitForExistence(timeout: 3), app.debugDescription)
+        retry.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription)
+    }
+
+    func testEPUBReadingSaveErrorCanRetryWithoutLeavingTheReader() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL), readingLocatorFailures: 1)
+        app.launch(); open(app)
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
+        let close = app.buttons["mihbara-reader-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 20), app.debugDescription)
+        let writeError = app.alerts["لم تكتمل العملية"]
+        XCTAssertTrue(writeError.waitForExistence(timeout: 12), app.debugDescription)
+        let retry = writeError.buttons["mihbara-reading-save-retry"].firstMatch
+        XCTAssertTrue(retry.waitForExistence(timeout: 3), app.debugDescription)
+        shot(app, "AU96-Mihbara-EPUB-save-retry-immediate-L")
+        retry.tap()
+        XCTAssertTrue(writeError.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(close.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(close.isHittable, app.debugDescription)
+        close.tap()
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription)
+    }
+
+    func testPDFCloseOffersRetryForAQueuedLocatorSave() {
+        continueAfterFailure = false
+        let app = app("missingFile", pdf: fixturePDF(), readingLocatorFailureOnClose: true)
+        app.launchEnvironment["MADAR_UI_MIHBARA_PDF_READY"] = "1"
+        app.launch(); open(app)
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
+        let close = app.buttons["mihbara-pdf-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 15), app.debugDescription)
+        close.tap()
+        let pendingSave = app.alerts["قارئ PDF"]
+        XCTAssertTrue(pendingSave.waitForExistence(timeout: 10), app.debugDescription)
+        let retry = pendingSave.buttons["mihbara-reading-save-retry"].firstMatch
+        XCTAssertTrue(retry.waitForExistence(timeout: 3), app.debugDescription)
+        shot(app, "AU96-Mihbara-PDF-save-retry-L")
+        retry.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription)
     }
 
     func testArabicExpandedReaderSettingsPersistAcrossRelaunchAndUndoReset() throws {

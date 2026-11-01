@@ -28,6 +28,8 @@ struct MihbaraPDFReaderView: View {
     @State private var sessionDayStamp: String?
     @State private var lastClockSample: Date?
     @State private var closing = false
+    @State private var pendingSaveAlert: String?
+    @State private var isPendingSaveAlert = false
     @State private var searching = false
     @State private var flowing = false
     @State private var inkLayer: MihbaraInkOverlay?
@@ -114,6 +116,13 @@ struct MihbaraPDFReaderView: View {
         .onChange(of: inkTool) { _, tool in inkLayer?.tool = tool }
         .onDisappear { inkLayer?.flushAll(); pause(at: Date()) }
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .alert("قارئ PDF", isPresented: Binding(get: { pendingSaveAlert != nil }, set: { if !$0 { pendingSaveAlert = nil; isPendingSaveAlert = false } })) {
+            if isPendingSaveAlert && saveCoordinator.canRetryPendingWritesNow {
+                Button("إعادة المحاولة") { retryPendingSaveAndClose() }
+                    .accessibilityIdentifier("mihbara-reading-save-retry")
+            }
+            Button("حسنًا", role: .cancel) { pendingSaveAlert = nil; isPendingSaveAlert = false }
+        } message: { Text(pendingSaveAlert ?? "") }
     }
 
     private var header: some View {
@@ -363,13 +372,41 @@ struct MihbaraPDFReaderView: View {
     @MainActor private func finishAndClose() {
         guard !closing else { return }
         closing = true
+        app.armMihbaraLocatorFailureOnReaderCloseForUITest()
         inkLayer?.flushAll()
         pause(at: Date())
         Task { @MainActor in
             await saveCoordinator.waitForCurrentAttempt()
             guard !saveCoordinator.hasPending else {
                 closing = false
-                app.errorMessage = "موضعك ينتظر الحفظ. أعد المحاولة حين تتاح بيانات الجهاز."
+                saveCoordinator.dismissPendingWriteError()
+                isPendingSaveAlert = true
+                pendingSaveAlert = pendingSaveMessage
+                return
+            }
+            close()
+        }
+    }
+
+    private var pendingSaveMessage: String {
+        saveCoordinator.canRetryPendingWritesNow
+            ? "لم يُحفظ موضع القراءة بعد. أعد المحاولة الآن لإكمال الحفظ قبل مغادرة القارئ."
+            : "لم يُحفظ موضع القراءة بعد. أبقِ مدار مفتوحًا حتى يعود الإذن أو ينتهي التحديث، ثم أعد المحاولة."
+    }
+
+    @MainActor private func retryPendingSaveAndClose() {
+        guard !closing else { return }
+        closing = true
+        pendingSaveAlert = nil
+        isPendingSaveAlert = false
+        saveCoordinator.retryPendingWritesNow()
+        Task { @MainActor in
+            await saveCoordinator.waitForCurrentAttempt()
+            guard !saveCoordinator.hasPending else {
+                closing = false
+                saveCoordinator.dismissPendingWriteError()
+                isPendingSaveAlert = true
+                pendingSaveAlert = pendingSaveMessage
                 return
             }
             close()
