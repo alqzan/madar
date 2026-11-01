@@ -29,14 +29,21 @@ struct QuranJourneyView: View {
                     }
                     QuranPaperCard {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("منذ البداية").font(quranFont(17, bold: true))
+                            HStack {
+                                Text("منذ البداية").font(quranFont(17, bold: true))
+                                Spacer(minLength: 8)
+                                Text("أرقامك كلها").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+                            }
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
                                 ForEach(value.stats) { stat in
                                     VStack(alignment: .leading, spacing: 5) {
                                         Text(stat.title).font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                                         Text(stat.value).font(quranSerif(25)).accessibilityIdentifier("quran-journey-" + stat.id)
                                         Text(stat.detail).font(quranFont(11)).foregroundStyle(theme.secondaryInk)
-                                    }.frame(maxWidth: .infinity, minHeight: 100, alignment: .leading).padding(10).background(theme.color("reviewTint"), in: .rect(cornerRadius: 15))
+                                    }
+                                    .frame(maxWidth: .infinity, minHeight: 100, alignment: .leading)
+                                    .padding(10)
+                                    .background(statisticBackground(stat.id), in: .rect(cornerRadius: 15))
                                 }
                             }
                         }
@@ -68,6 +75,14 @@ struct QuranJourneyView: View {
             }
             .fullScreenCover(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) { QuranMushafView(service: service, initialPage: reader ?? page, close: { reader = nil }) }
     }
+    private func statisticBackground(_ id: String) -> Color {
+        switch id {
+        case "hifz", "review": theme.color("reviewTint")
+        case "days", "juz": theme.color("gold").opacity(0.22)
+        default: theme.color("gold").opacity(0.12)
+        }
+    }
+
     /// Canonical «رحلة الحفظ»: the line climbs from the first day (right) towards the khatma (top left); quarter rules
     /// are named, the area held is shaded, and each juz still ahead is a gold bead on the dashed estimate.
     private func journeyChart(_ v: QuranUIJourney) -> some View {

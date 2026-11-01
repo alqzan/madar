@@ -31,6 +31,14 @@ Status values: `ready` · `in progress` · `blocked: <reason>` · `matched — a
 
 Every screen card follows protocol §2: canonical files → default-size screenshots → `python3 Madar/scripts/compare-screens.py <board> <shots>` → fix → `matched — awaiting owner` (default text size only; no enlarged-text testing, owner 13 October 2026). Spec for every prayer card: §7.2 `docs/HANDOFF/sections/09-r-salah.md` (the part for that screen), §5 shapes `05-ds.md`, and the fixes listed.
 
+## Owner follow-up — 1 Nov 2026
+
+Owner approved the other 51 states from the pending gallery; real-device/use acceptance remains separate. M2-V10 alone is reopened to match its canonical design, including its crafted details. Spec: §7.4 Quran log in `docs/HANDOFF/sections/11-r-quran.md`, shared shapes §5, existing Quran fixes; no new data or scheduling rule.
+
+| Card | Result / canonical | Status | Notes |
+|---|---|---|---|
+| M2-V10 | All-time log — `screens/quran/12-R18-Sijil-All.jpg` | in progress — owner requested canonical match, 1 Nov 2026 | `QuranJourneyView`: actual coverage journey, planned-scope and whole-Quran pace forecasts, six derived statistics, 604 cells shaded by completion date with status shapes; page history opens the original Mushaf. Uses the engine’s 28-day pace, five-day/50-ayah eligibility and rest-day rule; no invented finish date. Final focused data 1/1 + UI 1/1 passed (`M2-V10-final`); app builds; L/light top/map/page shots `Artifacts/m2-v10-final/`; comparison `R18-Sijil-All.html`. Differences: owner green/1405 palette, native safe area, actual dates/values, longer explanatory copy and accessible page selector; no moon, no scrolled canonical. 1 Nov follow-up: owner approved the other 51 gallery states and reopened this card. Partial canonical pass: three semantic tile background families and «أرقامك كلها» header; no numbers/rules changed. QuranJourneyUITests/testJourneyTotalsForecastAndPageHistory passed 1/1 (`codex-m2-v10-palette-20261101-r1`), screenshots in `-shots`, comparison regenerated. Not matched yet: compact journey/date/forecast hierarchy, visible plot guides, map labels/date legend and six-stat meaning alignment (use real defined data; no sample values). |
+
 ## Owner review page — 26 Oct (do these first; Claude and Codex split by room)
 Source: `~/Downloads/madar-review-notes.md` (owner verdicts on 105 screens: 51 «موافق», 54 «يحتاج تعديل»). All-«موافق» cards were set to approved. Owner answers to follow-up questions are in the last column. «التصميم أحلى» = build the canonical screen as drawn, then improve. Unclear look-and-feel items: make 2–3 mockups first and let the owner pick (owner rule: mockups before design guesses).
 
@@ -486,7 +494,7 @@ Every row in these sections was approved, done or deferred when they left the bo
 | Section M1-V — prayer screens match the design (do in this order) | M1-V01, M1-V02, M1-V03, M1-V04, M1-V05, M1-V06, M1-V07, M1-V08, M1-V09, M1-V10 | `docs/archive/PROGRESS-2026-10-27-finished-sections.md` |
 | Section M1-F — prayer features not built yet (after M1-V) | M1-F01, M1-F02, M1-F03, M1-F04, M1-F05, M1-G | `docs/archive/PROGRESS-2026-10-27-finished-sections.md` |
 | M2 preflight — RQ2, before porting the Quran engine | M2-RQ2 | `docs/archive/PROGRESS-2026-10-27-finished-sections.md` |
-| M2 Quran — engine, data, and screens | M2-E01, M2-E02, M2-R01, M2-E03, M2-E04, M2-E05, M2-D01, M2-V01, M2-V02, M2-V03, M2-V04, M2-V05, M2-V06, M2-V07, M2-V08, M2-V09, M2-V10, M2-V11, M2-V12, M2-V13, M2-V14, M2-V15, M2-V16, M2-V17 | `docs/archive/PROGRESS-2026-10-27-finished-sections.md` |
+| M2 Quran — engine, data, and screens | M2-E01, M2-E02, M2-R01, M2-E03, M2-E04, M2-E05, M2-D01, M2-V01, M2-V02, M2-V03, M2-V04, M2-V05, M2-V06, M2-V07, M2-V08, M2-V09, M2-V11, M2-V12, M2-V13, M2-V14, M2-V15, M2-V16, M2-V17 | `docs/archive/PROGRESS-2026-10-27-finished-sections.md` |
 | UX — owner app trial 15 Oct (do these first, in order) | UX-01, UX-02, UX-03, UX-04, UX-05, UX-06, UX-07, UX-08, UX-09, UX-10, UX-11, UX-12, UX-13, UX-14, UX-15 | `docs/archive/PROGRESS-2026-10-27-finished-sections.md` |
 | Done — software (integrated on main, visual acceptance pending in M1-V) | M0 lean, M1-T01, M1-T02, M1-T03, M1-T04, M1-T05, M1-T06, M1-T07, M1-T08, M1-T09 | `docs/archive/PROGRESS-2026-10-27-finished-sections.md` |
 
@@ -499,6 +507,15 @@ M0-T06 (device acceptance paperwork), M0-T09 privacy matrix (encrypted backup un
 M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open for every-screen visual/state trace and owner/device/system acceptance (owner/Claude), real-device Release performance, iOS 27 runtime, resource release evidence and signed distribution. PDF OCR/search is now local and cancelable; PDF-to-EPUB conversion remains the separate owner/Claude topic. Direct @als is optional/deferred; no provider key/endpoint is available. Store metadata/privacy text is prepared locally; public support/privacy URLs, real review contact and App Store Connect access are still required for publication. The static scanner remains conservative: its UI/font/colour/action references were not bulk-accepted or turned into a fake complete pass; frozen backup/privacy/a11y work remains frozen.
 
 # Handovers
+
+## Handover — اعتماد ٥١ واجهة وبدء مطابقة M2-V10 — 2026-11-01 — Codex
+- **Works now:** موافقة المالك البصرية محفوظة لـ٥١ من ٥٢ حالة في المعرض، واستثناء M2-V10 صريح؛ نُقلت البطاقة من الأرشيف إلى أول متابعة نشطة. بدأت لمسة بطاقات الإحصاءات بثلاث درجات لونية وعنوان «أرقامك كلها».
+- **Verified:** `xcodebuild test -only-testing:MadarUITests/QuranJourneyUITests/testJourneyTotalsForecastAndPageHistory` اجتاز 1/1؛ الحزمة `Madar/Artifacts/codex-m2-v10-palette-20261101-r1.xcresult`، ولقطات L/light في `-shots`؛ مقارنة R18-Sijil-All محدثة. `git diff --check` نظيف.
+- **Differences left:** M2-V10 غير مكتملة: تركيب بطاقة الرحلة وتاريخ البداية/جملة التوقع، وضوح دليل الأرباع، تفاصيل الخريطة وفهرس الصفوف وتدرج التاريخ؛ الإحصاءات الحالية لا تطابق معاني النموذج الستة حرفيًا فلا تُبدّل التسميات بلا تعريف صحيح.
+- **Not verified:** قبول المالك بعد تعديل M2-V10؛ تجربة الجوال والاستخدام الجاد لاحقًا، بعد Apple والتوقيع المحلي، ولا اعتماد جهازي من الموافقة البصرية.
+- **Next:** أكمل M2-V10 وحدها وفق `screens/quran/12-R18-Sijil-All.jpg` و§7.4؛ بقية الـ٥١ معتمدة بصريًا. لا تنسخ أرقام النموذج ولا تغيّر قواعد الوتيرة أو حقول البيانات.
+- **Model/effort:** Codex GPT-6؛ الجهد غير مكشوف؛ المساعد قراءة فقط.
+- **Usage:** آخر قراءة ٩٣٪ مستخدم (٧٪ متبقٍ)؛ توقف بدء العمل، والحفظ والتسليم من الاحتياطي امتثالًا لحد ٥٪.
 
 ## Handover — إنهاء التنظيف وتحسين القيام وتسليم الدفعة — 2026-11-01 — Codex
 - **Works now:** فُصلت معاينة Goodreads ودفتر المحبرة وبحث PDF؛ انتهى تنسيق الملفات التي بدأت في المال واليوميات والقرآن بلا تغيير بنيتها. شاشة القيام أقرب إلى المعتمد: عنوان متمركز ورجوع دائري وخيارات محددة وكتابة داكنة على الذهب. صُحّح توجيه تشغيل الجوال إلى المحلي تحت RA1؛ أُزيل scratch الجلسة واستُثني كاش البناء من Git.
@@ -517,12 +534,3 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Next:** لا توجد الآن قطعة CN-04 مستقلة عالية القيمة جاهزة؛ بقيت الأسطر الطويلة موزعة على ملفات كثيرة. بعد قبول Apple وتجهيز ملفات التوقيع التي تشمل App Group نتابع CN-05 على جوالك. قبولك البصري وتجربة التطبيق ومعلومات الدعم/الخصوصية تبقى لك لاحقًا.
 - **Model/effort:** Codex GPT-6؛ الجهد غير مكشوف.
 - **Usage:** غير مكشوف.
-## Handover — قفل الحفظ الموحّد وملاحظات لكوديكس — 2026-11-01 — Claude
-- **Works now:** AU-97: قفل واحد لكل ورقة أثناء الحفظ (`MadarSheetLock.swift`)، وعدّاد كتابات المستخدم في `AppSession`، ودالة انتظار واحدة للاختبارات. `AppSession` يُحقن في البيئة من `MadarApp`.
-- **Verified:** بناء المحاكي `BUILD SUCCEEDED`؛ ٥/٥ اختبارات واجهة نجحت (MoneySettings وGoal وZakat وSalary «StaysOpenWhileSaving» وHabits past-day cancel)؛ `git diff --check` نظيف. مساعد Haiku دقّق الفرق: لا تغيير في القيم المنطقية؛ أُزيل حارس واحد بلا أثر (زر إغلاق الهدف خارج الورقة المقفلة).
-- **Differences left:** لا تغيير مرئي.
-- **Verified later:** اختبارات «hold» الباقية ١٨/١٨ نجحت (`** TEST SUCCEEDED **`).
-- **Not verified:** جهاز المالك. المالك اشترى حساب المطوّر في ١ نوفمبر، وهو تحت مراجعة Apple؛ أول تشغيل على جهازه يكون بعد قبول الحساب.
-- **Next:** Codex يبدأ بجدول «ملاحظات Claude لكوديكس»: CN-07 (مكتبة التفاسير في مرجع الورد: السعدي وابن كثير وكل التفاسير، بطلب المالك)، ثم CN-08 (التنظيف)، ثم CN-02 إلى CN-06، قبل قائمة Next work. CN-03 ينتظر قرار المالك في «Waiting on the owner».
-- **Model/effort:** Claude Opus 5.5؛ الجهد غير مكشوف.
-- **Usage:** الأسبوعي ٩٥٪ مستخدم عند آخر قراءة؛ سُلّمت المهمة لكوديكس قبل حد الـ٢٪ بطلب المالك.
