@@ -126,7 +126,10 @@ struct MoneyHawlArt: View {
     private var orbit: some View {
         ZStack {
             Canvas { context, size in
-                let gold = theme.color("reserve"), r = min(size.width, size.height) / 2 - 16, o = CGPoint(x: size.width / 2, y: size.height / 2)
+                guard size.width.isFinite, size.height.isFinite else { return }
+                let r = min(size.width, size.height) / 2 - 16
+                guard r > 0 else { return }
+                let gold = theme.color("reserve"), o = CGPoint(x: size.width / 2, y: size.height / 2)
                 // Starts at the top and runs counter-clockwise, the reading direction of the room.
                 func point(_ t: Double) -> CGPoint { let a = -Double.pi / 2 - t * 2 * .pi; return .init(x: o.x + r * cos(a), y: o.y + r * sin(a)) }
                 context.stroke(Path(ellipseIn: CGRect(x: o.x - r, y: o.y - r, width: 2 * r, height: 2 * r)), with: .color(theme.line), lineWidth: 5)

@@ -1055,7 +1055,7 @@ final class AppSession {
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
 #if DEBUG
-        if ["money.saveAccount", "money.saveCard", "money.adoptRepayment", "money.repayEnvelopeNow"].contains(name),
+        if ["money.saveAccount", "money.saveCard", "money.saveZakat", "money.adoptRepayment", "money.repayEnvelopeNow"].contains(name),
            ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
            let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_MONEY_WRITE_HOLD_MS"] ?? ""),
            (1...5000).contains(milliseconds) {

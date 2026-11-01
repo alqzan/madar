@@ -2,8 +2,9 @@ import XCTest
 
 @MainActor final class MoneyZakatUITests:XCTestCase {
     private func shot(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
-    private func open(_ fixture:String,styles:String?=nil)->XCUIApplication{
+    private func open(_ fixture:String,styles:String?=nil,moneyWriteHoldMS:Int?=nil)->XCUIApplication{
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_MONEY_FIXTURE":fixture,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-17T12:00:00+03:00"];if let styles{app.launchEnvironment["MADAR_UI_STYLE_SETTINGS"]=styles}
+        if let moneyWriteHoldMS{app.launchEnvironment["MADAR_UI_MONEY_WRITE_HOLD_MS"]=String(moneyWriteHoldMS)}
         app.launch();let tab=app.buttons["tab-customize"];XCTAssertTrue(tab.waitForExistence(timeout:20));tab.tap()
         let search=app.textFields["settings-search"];XCTAssertTrue(search.waitForExistence(timeout:10));search.tap();search.typeText("المال");app.buttons["money-open"].tap()
         let door=app.buttons["money-zakat-open"];XCTAssertTrue(door.waitForExistence(timeout:10));for _ in 0..<8 where !door.isHittable{app.swipeUp(velocity:.slow)};door.tap();XCTAssertTrue(app.staticTexts["money-zakat-result"].waitForExistence(timeout:10));return app
@@ -26,6 +27,19 @@ import XCTest
         let save=app.buttons["money-zakat-save"];for _ in 0..<5 where !save.isHittable{app.swipeUp(velocity:.slow)};shot(app,"M5-V22-editor-L");save.tap()
         XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout:5));XCTAssertEqual(app.staticTexts["money-zakat-result"].label,before);app.buttons["تراجع"].tap()
         XCTAssertTrue(app.staticTexts["السعر أقدم من ٣٠ يومًا؛ حدّثه"].exists)
+    }
+    func testZakatEditorStaysOpenWhileSaving(){
+        continueAfterFailure=false
+        let app=open("zakat",moneyWriteHoldMS:3000)
+        shot(app,"M5-V22-zakat-frame-guard-L")
+        let price=app.buttons["money-zakat-price"];for _ in 0..<4 where !price.isHittable{app.swipeUp(velocity:.slow)};XCTAssertTrue(price.isHittable);price.tap()
+        let field=app.textFields["money-zakat-gold-price"];XCTAssertTrue(field.waitForExistence(timeout:5));field.tap();field.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:12)+"410");app.buttons["money-zakat-keyboard-done"].tap()
+        let save=app.buttons["money-zakat-save"];for _ in 0..<5 where !save.isHittable{app.swipeUp(velocity:.slow)};XCTAssertTrue(save.isEnabled)
+        let close=app.buttons["money-zakat-editor-close"];XCTAssertTrue(close.exists);XCTAssertTrue(close.isEnabled);shot(app,"M5-V22-editor-idle-L")
+        save.tap()
+        XCTAssertTrue(app.staticTexts["بيانات الزكاة"].exists);XCTAssertTrue(save.exists);XCTAssertFalse(save.isEnabled);XCTAssertTrue(save.label.contains("جارٍ الحفظ"))
+        XCTAssertTrue(close.exists);XCTAssertFalse(close.isEnabled);shot(app,"M5-V22-editor-saving-L")
+        XCTAssertTrue(app.staticTexts["بيانات الزكاة"].waitForNonExistence(timeout:10));XCTAssertTrue(app.staticTexts["money-zakat-result"].waitForExistence(timeout:10))
     }
     func testFirstUseAsksBeforeANumberAndHiddenDoesNotRevealTheScale(){
         continueAfterFailure=false
