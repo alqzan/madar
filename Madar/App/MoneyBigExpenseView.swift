@@ -37,7 +37,7 @@ struct MoneyBigExpenseView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
-                        Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("إغلاق").accessibilityIdentifier("money-big-close")
+                        Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.disabled(saving).accessibilityLabel("إغلاق").accessibilityIdentifier("money-big-close")
                         Text("مصروف كبير").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer()
                     }
                     if let r = reading {
@@ -79,6 +79,7 @@ struct MoneyBigExpenseView: View {
                     else { ProgressView().frame(height: 200) }
                 }.padding(20).frame(maxWidth: 620).frame(maxWidth: .infinity)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
+                .interactiveDismissDisabled(saving)
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false } } }
                 .task { load() }.accessibilityIdentifier("money-big")
         }
