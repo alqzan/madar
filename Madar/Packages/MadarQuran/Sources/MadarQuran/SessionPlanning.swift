@@ -109,10 +109,17 @@ public enum QuranSessionEngine {
                     }
                 }
             }
-            guard !grades.isEmpty else { return nil }
-            for grade in grades {
-                let ayahs = catalog.ayahs(on: grade.page).map(\.id)
-                committedAyahs.formUnion(ayahs.filter { plannedAyahs.contains($0) && coverage.coveredAyahs.contains($0) })
+            if draft.kind == .free, grades.isEmpty {
+                // A free reading with recorded slips remains useful history even without a page rating.
+                // The slip events stay independent of page grades and do not complete any page.
+                committedAyahs = Set(draft.mistakes.filter { $0.kind == .mistake }.map { $0.key.ayahID })
+                guard !committedAyahs.isEmpty else { return nil }
+            } else {
+                guard !grades.isEmpty else { return nil }
+                for grade in grades {
+                    let ayahs = catalog.ayahs(on: grade.page).map(\.id)
+                    committedAyahs.formUnion(ayahs.filter { plannedAyahs.contains($0) && coverage.coveredAyahs.contains($0) })
+                }
             }
         case .drill:
             guard !draft.mistakes.isEmpty else { return nil }

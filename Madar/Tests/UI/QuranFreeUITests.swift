@@ -10,6 +10,22 @@ import XCTest
         app.buttons["quran-session-close"].tap();app.buttons["quran-session-discard"].tap()
         XCTAssertTrue(app.buttons["quran-free-start"].waitForExistence(timeout:10))
     }
+    func testFreeSessionSavesSlipWithoutRating() throws {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00","MADAR_UI_QURAN_FIXTURE":"home"]
+        app.launch();XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout:25))
+        for _ in 0..<5 { if app.buttons["quran-tool-free"].isHittable { break };app.swipeUp() };app.buttons["quran-tool-free"].tap()
+        app.buttons["quran-free-start"].tap()
+        let slip=app.buttons["quran-session-hint"]
+        XCTAssertTrue(slip.waitForExistence(timeout:15),app.debugDescription);XCTAssertEqual(slip.label,"تعثّرت")
+        slip.tap()
+        app.buttons["quran-session-close"].tap()
+        let save=app.buttons["quran-session-save-partial"]
+        XCTAssertTrue(save.waitForExistence(timeout:5),app.debugDescription);save.tap()
+        let closed=NSPredicate(format:"exists == false")
+        expectation(for:closed,evaluatedWith:app.buttons["quran-session-close"]);waitForExpectations(timeout:15)
+        XCTAssertFalse(app.alerts["لم تكتمل العملية"].exists,app.debugDescription)
+    }
     func testSurahChoiceSurvivesSlowIndexAndStartRetry() throws {
         continueAfterFailure=false
         let app=XCUIApplication()

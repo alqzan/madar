@@ -58,6 +58,18 @@ final class SessionPlanningTests: XCTestCase {
         XCTAssertNil(try commit(draft()), "Learning steps without blind passed ayahs create no hifz")
     }
 
+    func testFreeSessionKeepsSlipsWithoutPageGrade() throws {
+        var free = try draft(.free)
+        free.mistakes = [QuranDraftMistake(key: QuranMistakeKey(ayahID: 2, wordIndex: 1),
+            at: date("2026-10-15T10:30:00Z"), kind: .mistake)]
+        let result = try XCTUnwrap(commit(free))
+        XCTAssertEqual(result.ayahs, try QuranAyahRange(first: 2, last: 2))
+        XCTAssertTrue(result.pages.isEmpty)
+        XCTAssertTrue(result.grades.isEmpty)
+        XCTAssertEqual(result.mistakes, free.mistakes)
+        XCTAssertNil(try commit(try draft(.free)), "A free session with no slips or page grade is still discarded")
+    }
+
     func testLastPageRatingWinsAndInvalidWordOrOutOfSessionFactsAreRejected() throws {
         var value = try draft(.review)
         value.grades = [QuranDraftGrade(page: 1, rating: .good), QuranDraftGrade(page: 1, rating: .needsMastery, isTest: true)]

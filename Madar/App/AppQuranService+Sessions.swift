@@ -93,11 +93,14 @@ extension AppQuranService {
             try await command("quran.discardDraft", ["draftID": .string(draftID.uuidString)]); return .discarded
         case .commit, .commitPartial:
             if case .commitPartial = action, draft.grades.isEmpty, draft.blindPassedAyahs.isEmpty, draft.kind != .drill {
-                if draft.mistakes.contains(where: { $0.kind == .mistake }) {
-                    throw DataError.invalidValue("لا يوجد ما يمكن تسجيله بعد؛ سهواتك باقية في المسودة. سجّل وجهًا أو اجتز آيةً بالتسميع المستور أولًا.")
+                let hasMistakes = draft.mistakes.contains { $0.kind == .mistake }
+                guard draft.kind == .free, hasMistakes else {
+                    if hasMistakes {
+                        throw DataError.invalidValue("لا يوجد ما يمكن تسجيله بعد؛ سهواتك باقية في المسودة. سجّل وجهًا أو اجتز آيةً بالتسميع المستور أولًا.")
+                    }
+                    try await command("quran.discardDraft", ["draftID": .string(draftID.uuidString)])
+                    return .discarded
                 }
-                try await command("quran.discardDraft", ["draftID": .string(draftID.uuidString)])
-                return .discarded
             }
             let wasKhatm: Bool
             if draft.kind == .hifz { wasKhatm = try snapshot().coverage.isKhatm } else { wasKhatm = false }

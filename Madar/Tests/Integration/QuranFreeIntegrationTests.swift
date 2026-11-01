@@ -5,6 +5,25 @@ import MadarData
 import MadarCommands
 @testable import Madar
 @MainActor final class QuranFreeIntegrationTests:XCTestCase {
+    func testFreeSessionCommitsRecordedSlipWithoutPageGrade() async throws {
+        let root=FileManager.default.temporaryDirectory.appending(path:"QuranFreeSlip-\(UUID())")
+        let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),context=ModelContext(container)
+        _ = try SettingsStore(context:context).stage(["core.dayStart":.string("midnight")])
+        let saved=HifzSession();saved.fromAyah=1;saved.toAyah=7;saved.pages=[1];saved.dayKey="2026-10-14";saved.endedAt=Date().addingTimeInterval(-86400)
+        context.insert(saved);try context.save()
+        let app=try AppSession(container:container,groupDirectory:root),service=AppQuranService(session:app)
+        let started=try await service.start(kind:.free,stepID:nil,range:.init(fromPage:1,toPage:1),rakaat:nil,spotID:nil)
+        _ = try await service.session(draftID:started.id,action:.mistake(ayahID:2,wordIndex:1))
+        _ = try await service.session(draftID:started.id,action:.commitPartial)
+
+        let verificationContext=ModelContext(container)
+        let free=try XCTUnwrap(try verificationContext.fetch(FetchDescriptor<HifzSession>()).first { $0.kind == "free" })
+        XCTAssertEqual(free.fromAyah,2);XCTAssertEqual(free.toAyah,2);XCTAssertTrue(free.pages.isEmpty);XCTAssertEqual(free.mistakes,1)
+        XCTAssertTrue(try verificationContext.fetch(FetchDescriptor<PageGrade>()).filter { $0.sessionID == free.id }.isEmpty)
+        let events=try verificationContext.fetch(FetchDescriptor<MistakeEvent>()).filter { $0.sessionID == free.id }
+        XCTAssertEqual(events.count,1);XCTAssertEqual(events.first?.ayahId,2);XCTAssertEqual(events.first?.wordIndex,1)
+    }
+
     func testMixedRangeGradesOnlySavedFacesAndFinishesAfterLastPage() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"QuranFree-\(UUID())")
         let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),context=ModelContext(container)
