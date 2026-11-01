@@ -1,13 +1,39 @@
 import XCTest
 
 @MainActor final class MoneyEnvelopeDetailUITests: XCTestCase {
+    func testRepaymentSheetStaysOpenWhileSaving() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00", "MADAR_UI_MONEY_WRITE_HOLD_MS": "3000"]
+        app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
+        let envelopes = app.buttons["money-envelopes-open"]; XCTAssertTrue(envelopes.waitForExistence(timeout: 10)); envelopes.tap()
+        let rent = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-envelope-الإيجار-")).firstMatch
+        for _ in 0..<5 { if rent.isHittable { break }; app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(rent.isHittable); rent.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["money-envelope-detail"].waitForExistence(timeout: 10))
+        app.buttons["money-repay-open"].tap()
+        let preview = app.descendants(matching: .any)["money-repayment-preview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        let close = app.buttons["money-repay-close"]
+        XCTAssertTrue(close.exists); XCTAssertTrue(close.isEnabled)
+        let adopt = app.buttons["money-repay-adopt"]
+        XCTAssertTrue(adopt.isHittable); adopt.tap()
+        XCTAssertTrue(preview.exists)
+        XCTAssertTrue(close.exists); XCTAssertFalse(close.isEnabled)
+        XCTAssertTrue(adopt.exists); XCTAssertFalse(adopt.isEnabled)
+        shot(app, "M5-V26-repayment-saving-L")
+        XCTAssertTrue(preview.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "من الراتب القادم")).firstMatch.waitForExistence(timeout: 10))
+    }
+
     func testDebtPreviewUsesExactAmountsAndDoesNotChangeBalance() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00"]
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
         let envelopes = app.buttons["money-envelopes-open"]; XCTAssertTrue(envelopes.waitForExistence(timeout: 10)); envelopes.tap()
-        let rent = app.buttons["money-envelope-الإيجار"]
+        let rent = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-envelope-الإيجار-")).firstMatch
         for _ in 0..<5 { if rent.isHittable { break }; app.swipeUp(velocity: .slow) }
         XCTAssertTrue(rent.isHittable); rent.tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-envelope-detail"].waitForExistence(timeout: 10))

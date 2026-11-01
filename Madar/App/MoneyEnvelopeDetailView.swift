@@ -154,7 +154,7 @@ struct MoneyRepaymentView: View {
                 HStack {
                     Text(reading.envelope.name + " عليه " + service.amount(debt)).font(MadarTypography.title()).foregroundStyle(theme.color("debt"))
                     Spacer()
-                    Button { dismiss() } label: { Image(systemName: "xmark").font(.body).frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").foregroundStyle(theme.secondaryInk)
+                    Button { dismiss() } label: { Image(systemName: "xmark").font(.body).frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-repay-close").foregroundStyle(theme.secondaryInk).disabled(working)
                 }
                 if let cause {
                     HStack(alignment: .firstTextBaseline, spacing: 0) {
@@ -203,7 +203,7 @@ struct MoneyRepaymentView: View {
                     .disabled(working || reading.home.reserveMinor < debt)
                 if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
             }.padding(18)
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.fraction(0.78), .large]).presentationDragIndicator(.visible).accessibilityIdentifier("money-repayment-preview")
+        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.fraction(0.78), .large]).presentationDragIndicator(.visible).interactiveDismissDisabled(working).accessibilityIdentifier("money-repayment-preview")
     }
     private func outlined(_ title: String, note: String?, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
