@@ -1,8 +1,9 @@
 import XCTest
 
 @MainActor final class MoneyEnvelopesUITests: XCTestCase {
-    func make(_ fixture: String = "showcase") -> XCUIApplication {
+    func make(_ fixture: String = "showcase", saveHoldMS: Int? = nil) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00"]
+        if let saveHoldMS { app.launchEnvironment["MADAR_UI_MONEY_WRITE_HOLD_MS"] = String(saveHoldMS) }
         app.launch(); return app
     }
     func open(_ app: XCUIApplication) {
@@ -55,6 +56,24 @@ import XCTest
         input.tap(); input.typeText("200000")
         XCTAssertTrue(save.isEnabled, "A positive target enables saving")
         app.terminate()
+    }
+    func testReserveGoalSheetStaysOpenWhileSaving() throws {
+        continueAfterFailure = false; let app = make("showcase", saveHoldMS: 5000); open(app)
+        app.buttons["money-reserve-mode-goal"].tap()
+        let input = app.textFields["money-reserve-target-input"], save = app.buttons["money-reserve-target-save"], close = app.buttons["money-page-close"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5)); XCTAssertTrue(save.waitForExistence(timeout: 5)); XCTAssertTrue(close.waitForExistence(timeout: 5))
+        shot(app, "M5-V03-target-idle-L")
+        input.tap(); input.typeText("200000")
+        XCTAssertTrue(save.isEnabled); save.tap()
+        XCTAssertTrue(input.waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(save.exists); XCTAssertFalse(save.isEnabled)
+        XCTAssertTrue(close.exists); XCTAssertFalse(close.isEnabled)
+        shot(app, "M5-V03-target-saving-L")
+        app.swipeDown()
+        XCTAssertTrue(input.waitForExistence(timeout: 2), app.debugDescription)
+        XCTAssertFalse(close.isEnabled)
+        XCTAssertTrue(input.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["money-reserve-target"].firstMatch.label.contains("٢٠٠٬٠٠٠"))
     }
     func testEnvelopeSavingChangeRequiresPositiveAmount() throws {
         continueAfterFailure = false; let app = make("salary"); open(app)

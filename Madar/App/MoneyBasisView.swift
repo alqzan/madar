@@ -86,13 +86,14 @@ struct MoneyBasisView: View {
 struct MoneyPageHeader: View {
     var title: String
     var close: () -> Void
+    var closeDisabled = false
     @Environment(\.roomTheme) private var theme
     var body: some View {
         HStack {
             Text(title).font(MadarTypography.title())
             Spacer()
             Button(action: close) { Image(systemName: "xmark").font(.body).frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
-                .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-page-close")
+                .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-page-close").disabled(closeDisabled)
         }.frame(minHeight: 48)
     }
 }

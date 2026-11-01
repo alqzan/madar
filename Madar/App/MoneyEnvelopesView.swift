@@ -217,7 +217,7 @@ struct MoneyReserveTargetView: View {
     @State private var errorMessage: String?
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            MoneyPageHeader(title: "هدف الاحتياطي", close: { dismiss() })
+            MoneyPageHeader(title: "هدف الاحتياطي", close: { dismiss() }, closeDisabled: working)
             Text("المبلغ الذي تريد أن يصل إليه احتياطك").font(MadarTypography.body())
             if current != nil && !numbersVisible {
                 // A saved goal stays hidden like every other amount until the user reveals the numbers.
@@ -230,7 +230,7 @@ struct MoneyReserveTargetView: View {
             }
             Spacer(minLength: 0)
         }.padding(20).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
-            .presentationDetents([.medium]).presentationDragIndicator(.visible)
+            .presentationDetents([.medium]).presentationDragIndicator(.visible).interactiveDismissDisabled(working)
             .task { fill() }.onChange(of: numbersVisible) { fill() }
     }
     private var numbersVisible: Bool { visible || revealed }
