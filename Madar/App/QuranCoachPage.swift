@@ -21,9 +21,11 @@ struct QuranCoachPage: View {
             if medinaStyle {
                 // Like a printed mushaf: the juz in words on the right, the page number in the middle, the surah on the left.
                 HStack(spacing: 8) {
-                    Text(page.juzTitle).font(.custom("Amiri-Bold", size: 19)).frame(maxWidth: .infinity, alignment: .leading)
+                    Text(page.juzTitle).font(.custom("Amiri-Bold", size: 19)).frame(
+                        maxWidth: .infinity, alignment: .leading)
                     Text(page.numberLabel).font(.custom("Amiri-Regular", size: 17)).fixedSize()
-                    Text("سورة " + page.surahTitle).font(.custom("Amiri-Bold", size: 19)).frame(maxWidth: .infinity, alignment: .trailing)
+                    Text("سورة " + page.surahTitle).font(.custom("Amiri-Bold", size: 19)).frame(
+                        maxWidth: .infinity, alignment: .trailing)
                 }.lineLimit(1).minimumScaleFactor(0.7).foregroundStyle(theme.color("mushafInk"))
                     .padding(.horizontal, 22).frame(height: 34)
             } else {
@@ -40,27 +42,51 @@ struct QuranCoachPage: View {
             }
             ZStack {
                 if coach.review, stage == .review {
-                    QuranCoachTextCanvas(page: page, coach: coach, stage: stage, ink: UIColor(theme.color("mushafInk")), tint: .clear, reveal: { _ in }, blurredWordsOnly: true, medinaStyle: medinaStyle)
-                        .blur(radius: 3.5).opacity(0.28).padding(.horizontal, medinaStyle ? 24 : 8).padding(.vertical, medinaStyle ? 14 : 4)
-                        .allowsHitTesting(false).accessibilityHidden(true)
+                    QuranCoachTextCanvas(
+                        page: page, coach: coach, stage: stage, ink: UIColor(theme.color("mushafInk")), tint: .clear,
+                        reveal: { _ in }, blurredWordsOnly: true, medinaStyle: medinaStyle
+                    )
+                    .blur(radius: 3.5).opacity(0.28).padding(.horizontal, medinaStyle ? 24 : 8).padding(
+                        .vertical, medinaStyle ? 14 : 4
+                    )
+                    .allowsHitTesting(false).accessibilityHidden(true)
                 }
-                QuranCoachTextCanvas(page: page, coach: coach, stage: stage, ink: UIColor(theme.color("mushafInk")), tint: UIColor(theme.color("hifzTint")), reveal: reveal, markWord: markWord, readingTap: readingTap, mark: UIColor(theme.color("due")), sealInk: UIColor(theme.color("hifzText")), sealTint: UIColor(theme.color("reviewTint")), medinaStyle: medinaStyle, gold: UIColor(theme.color("gold")), paper: UIColor(theme.color("mushafPaper")))
-                    .padding(.horizontal, medinaStyle ? 24 : 8).padding(.vertical, medinaStyle ? 14 : 4).accessibilityHidden(true)
+                QuranCoachTextCanvas(
+                    page: page, coach: coach, stage: stage, ink: UIColor(theme.color("mushafInk")),
+                    tint: UIColor(theme.color("hifzTint")), reveal: reveal, markWord: markWord, readingTap: readingTap,
+                    mark: UIColor(theme.color("due")), sealInk: UIColor(theme.color("hifzText")),
+                    sealTint: UIColor(theme.color("reviewTint")), medinaStyle: medinaStyle,
+                    gold: UIColor(theme.color("gold")), paper: UIColor(theme.color("mushafPaper"))
+                )
+                .padding(.horizontal, medinaStyle ? 24 : 8).padding(.vertical, medinaStyle ? 14 : 4)
+                .accessibilityHidden(true)
             }
-            .background { if medinaStyle { QuranMushafFrame(gold: theme.color("gold"), green: theme.color("review")).padding(.horizontal, 6).allowsHitTesting(false) } }
+            .background {
+                if medinaStyle {
+                    QuranMushafFrame(gold: theme.color("gold"), green: theme.color("review")).padding(.horizontal, 6)
+                        .allowsHitTesting(false)
+                }
+            }
             .accessibilityRepresentation {
                 ForEach(page.semanticAyat.filter { coach.plannedAyahs.contains($0.id) }) { ayah in
-                    if stage == .grading { Text(ayah.title + "، " + ayah.text) }
-                    else if (stage == .covered || coach.review) && !coach.revealedAyahs.contains(ayah.id) {
+                    if stage == .grading {
+                        Text(ayah.title + "، " + ayah.text)
+                    } else if (stage == .covered || coach.review) && !coach.revealedAyahs.contains(ayah.id) {
                         Button("اكشف " + ayah.title) { reveal(ayah.id) }
                     } else {
-                        Button { reveal(ayah.id) } label: { Text(ayah.title + "، " + ayah.text) }
+                        Button {
+                            reveal(ayah.id)
+                        } label: {
+                            Text(ayah.title + "، " + ayah.text)
+                        }
                     }
                 }
             }
             if !medinaStyle {
-                HStack { Spacer(); Text(page.numberLabel).font(.custom("Amiri-Bold", size: 13)) }
-                    .foregroundStyle(theme.color("hifzText")).padding(.horizontal, 12).frame(height: 22)
+                HStack {
+                    Spacer(); Text(page.numberLabel).font(.custom("Amiri-Bold", size: 13))
+                }
+                .foregroundStyle(theme.color("hifzText")).padding(.horizontal, 12).frame(height: 22)
             }
         }
         .background(theme.color("mushafPaper"))
@@ -78,17 +104,29 @@ private struct QuranMushafFrame: View {
             context.stroke(Path(inner), with: .color(gold), lineWidth: 1)
             context.stroke(Path(inner.insetBy(dx: -2.5, dy: -2.5)), with: .color(green.opacity(0.55)), lineWidth: 0.6)
             func lozenge(_ c: CGPoint, _ r: CGFloat) -> Path {
-                Path { p in p.move(to: CGPoint(x: c.x, y: c.y - r)); p.addLine(to: CGPoint(x: c.x + r, y: c.y)); p.addLine(to: CGPoint(x: c.x, y: c.y + r)); p.addLine(to: CGPoint(x: c.x - r, y: c.y)); p.closeSubpath() }
+                Path { p in
+                    p.move(to: CGPoint(x: c.x, y: c.y - r)); p.addLine(to: CGPoint(x: c.x + r, y: c.y));
+                    p.addLine(to: CGPoint(x: c.x, y: c.y + r)); p.addLine(to: CGPoint(x: c.x - r, y: c.y));
+                    p.closeSubpath()
+                }
             }
             let mid = band / 2 + 1, step: CGFloat = 11
             var index = 0
-            func bead(_ c: CGPoint) { context.fill(lozenge(c, 2.6), with: .color(index % 2 == 0 ? green.opacity(0.8) : gold)); index += 1 }
+            func bead(_ c: CGPoint) {
+                context.fill(lozenge(c, 2.6), with: .color(index % 2 == 0 ? green.opacity(0.8) : gold)); index += 1
+            }
             var x = outer.minX + mid + step
-            while x < outer.maxX - mid - step / 2 { bead(CGPoint(x: x, y: outer.minY + mid)); bead(CGPoint(x: x, y: outer.maxY - mid)); x += step }
+            while x < outer.maxX - mid - step / 2 {
+                bead(CGPoint(x: x, y: outer.minY + mid)); bead(CGPoint(x: x, y: outer.maxY - mid)); x += step
+            }
             var y = outer.minY + mid + step
-            while y < outer.maxY - mid - step / 2 { bead(CGPoint(x: outer.minX + mid, y: y)); bead(CGPoint(x: outer.maxX - mid, y: y)); y += step }
-            for corner in [CGPoint(x: outer.minX + mid, y: outer.minY + mid), CGPoint(x: outer.maxX - mid, y: outer.minY + mid),
-                           CGPoint(x: outer.minX + mid, y: outer.maxY - mid), CGPoint(x: outer.maxX - mid, y: outer.maxY - mid)] {
+            while y < outer.maxY - mid - step / 2 {
+                bead(CGPoint(x: outer.minX + mid, y: y)); bead(CGPoint(x: outer.maxX - mid, y: y)); y += step
+            }
+            for corner in [
+                CGPoint(x: outer.minX + mid, y: outer.minY + mid), CGPoint(x: outer.maxX - mid, y: outer.minY + mid),
+                CGPoint(x: outer.minX + mid, y: outer.maxY - mid), CGPoint(x: outer.maxX - mid, y: outer.maxY - mid),
+            ] {
                 context.fill(lozenge(corner, 4.2), with: .color(gold))
             }
         }
@@ -114,7 +152,9 @@ private struct QuranCoachTextCanvas: UIViewRepresentable {
     var paper: UIColor = .clear
     func makeUIView(context: Context) -> QuranCoachTextView { QuranCoachTextView() }
     func updateUIView(_ view: QuranCoachTextView, context: Context) {
-        view.page = page; view.coach = coach; view.stage = stage; view.ink = ink; view.tint = tint; view.reveal = reveal; view.markWord = markWord; view.readingTap = readingTap; view.mark = mark; view.blurredWordsOnly = blurredWordsOnly; view.sealInk = sealInk; view.sealTint = sealTint
+        view.page = page; view.coach = coach; view.stage = stage; view.ink = ink; view.tint = tint;
+        view.reveal = reveal; view.markWord = markWord; view.readingTap = readingTap; view.mark = mark;
+        view.blurredWordsOnly = blurredWordsOnly; view.sealInk = sealInk; view.sealTint = sealTint
         view.medinaStyle = medinaStyle; view.gold = gold; view.paper = paper
         view.setNeedsDisplay()
     }
@@ -152,8 +192,9 @@ private final class QuranCoachTextView: UIView {
     required init?(coder: NSCoder) { nil }
     override func draw(_ rect: CGRect) {
         guard let page, let coach, let context = UIGraphicsGetCurrentContext(), bounds.width > 0,
-              let unicodeFont = UIFont(name: page.postScriptName, size: 23.3),
-              let printedName = page.printedPostScriptName, let printedFont = UIFont(name: printedName, size: 23.3) else { return }
+            let unicodeFont = UIFont(name: page.postScriptName, size: 23.3),
+            let printedName = page.printedPostScriptName, let printedFont = UIFont(name: printedName, size: 23.3)
+        else { return }
         hits = []
         let rowHeight = bounds.height / CGFloat(page.lines.count)
         let minimumGap: CGFloat = 2.5
@@ -175,7 +216,10 @@ private final class QuranCoachTextView: UIView {
             if coach.method == "completeAyah" { return (word.index ?? Int.max) < 2 }
             if coach.method == "next" { return false }
             if coach.method == "gradual", let index = word.index {
-                if masks[word.ayahID] == nil { masks[word.ayahID] = QuranCoachProgress.hiddenWordIndices(ayahID: word.ayahID, wordCount: word.ayahWordCount, step: coach.repetition) }
+                if masks[word.ayahID] == nil {
+                    masks[word.ayahID] = QuranCoachProgress.hiddenWordIndices(
+                        ayahID: word.ayahID, wordCount: word.ayahWordCount, step: coach.repetition)
+                }
                 return !(masks[word.ayahID]?.contains(index) ?? false)
             }
             return true
@@ -183,16 +227,28 @@ private final class QuranCoachTextView: UIView {
         for (rowIndex, row) in page.lines.enumerated() {
             let top = CGFloat(rowIndex) * rowHeight
             if row.words.isEmpty {
-                if medinaStyle && row.surahOpening { drawSurahBand(in: CGRect(x: 0, y: top + 2, width: bounds.width, height: rowHeight - 4), context: context) }
+                if medinaStyle && row.surahOpening {
+                    drawSurahBand(
+                        in: CGRect(x: 0, y: top + 2, width: bounds.width, height: rowHeight - 4), context: context)
+                }
                 let text = medinaStyle && row.surahOpening ? "سُورَةُ " + row.glyphs : row.glyphs
-                let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: unicodeFont.withSize(medinaStyle && row.surahOpening ? 21 : preferredSize), .foregroundColor: ink]))
+                let line = CTLineCreateWithAttributedString(
+                    NSAttributedString(
+                        string: text,
+                        attributes: [
+                            .font: unicodeFont.withSize(medinaStyle && row.surahOpening ? 21 : preferredSize),
+                            .foregroundColor: ink,
+                        ]))
                 var ascent: CGFloat = 0, descent: CGFloat = 0
                 let width = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descent, nil))
                 let baseline = top + (rowHeight - ascent - descent) / 2 + ascent
                 draw(line, at: CGPoint(x: (bounds.width - width) / 2, y: baseline), context: context)
                 if row.surahOpening && !medinaStyle {
                     context.setStrokeColor(sealInk.withAlphaComponent(0.22).cgColor); context.setLineWidth(0.5)
-                    for y in [top + 2, top + rowHeight - 2] { context.move(to: CGPoint(x: bounds.width * 0.12, y: y)); context.addLine(to: CGPoint(x: bounds.width * 0.88, y: y)) }
+                    for y in [top + 2, top + rowHeight - 2] {
+                        context.move(to: CGPoint(x: bounds.width * 0.12, y: y));
+                        context.addLine(to: CGPoint(x: bounds.width * 0.88, y: y))
+                    }
                     context.strokePath()
                 }
                 continue
@@ -208,10 +264,12 @@ private final class QuranCoachTextView: UIView {
                 row.words.enumerated().map { index, word in
                     let glyphs = word.printedGlyphs ?? ""
                     let color = shown[index] ? (word.index == nil && !blurredWordsOnly ? sealInk : ink) : .clear
-                    let text = NSMutableAttributedString(string: glyphs, attributes: [.font: printedFont.withSize(size), .foregroundColor: color])
+                    let text = NSMutableAttributedString(
+                        string: glyphs, attributes: [.font: printedFont.withSize(size), .foregroundColor: color])
                     // QCF contains presentation glyphs only. Spaces explicitly use the verified Unicode font.
                     for (offset, character) in glyphs.utf16.enumerated() where character == 32 {
-                        text.addAttribute(.font, value: unicodeFont.withSize(size), range: NSRange(location: offset, length: 1))
+                        text.addAttribute(
+                            .font, value: unicodeFont.withSize(size), range: NSRange(location: offset, length: 1))
                     }
                     return CTLineCreateWithAttributedString(text)
                 }
@@ -219,7 +277,8 @@ private final class QuranCoachTextView: UIView {
             var size = pageSize, wordLines = lines(size: pageSize)
             func lineWidths(_ wordLines: [CTLine], size: CGFloat) -> [CGFloat] {
                 wordLines.enumerated().map { index, line in
-                    medinaStyle && row.words[index].ayahNumberLabel != nil ? size * 1.08 : CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+                    medinaStyle && row.words[index].ayahNumberLabel != nil
+                        ? size * 1.08 : CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
                 }
             }
             var widths = lineWidths(wordLines, size: pageSize)
@@ -229,7 +288,9 @@ private final class QuranCoachTextView: UIView {
                 size *= max(0.1, (bounds.width - minimumGap * gapCount) / total)
                 wordLines = lines(size: size); widths = lineWidths(wordLines, size: size)
             }
-            let gap = row.centered || gapCount == 0 ? minimumGap : max(minimumGap, (bounds.width - widths.reduce(0, +)) / gapCount)
+            let gap =
+                row.centered || gapCount == 0
+                ? minimumGap : max(minimumGap, (bounds.width - widths.reduce(0, +)) / gapCount)
             let lineWidth = widths.reduce(0, +) + gap * gapCount
             var right = row.centered ? (bounds.width + lineWidth) / 2 : bounds.width
             var ascent: CGFloat = 0, descent: CGFloat = 0
@@ -239,12 +300,16 @@ private final class QuranCoachTextView: UIView {
             }
             let baseline = top + (rowHeight - ascent - descent) / 2 + ascent
             var frames: [CGRect] = []
-            for width in widths { frames.append(CGRect(x: right - width, y: top, width: width, height: rowHeight)); right -= width + gap }
+            for width in widths {
+                frames.append(CGRect(x: right - width, y: top, width: width, height: rowHeight)); right -= width + gap
+            }
             var highlight: CGRect?
             for (index, word) in row.words.enumerated() {
                 let active = coach.bridge ? coach.plannedAyahs.contains(word.ayahID) : word.ayahID == coach.activeAyahID
                 if active && shown[index] && stage == .repetition && coach.method == "coach" {
-                    let box = CGRect(x: frames[index].minX - gap / 2, y: baseline - ascent, width: frames[index].width + gap, height: ascent + descent)
+                    let box = CGRect(
+                        x: frames[index].minX - gap / 2, y: baseline - ascent, width: frames[index].width + gap,
+                        height: ascent + descent)
                     highlight = highlight.map { $0.union(box) } ?? box
                 }
             }
@@ -252,19 +317,31 @@ private final class QuranCoachTextView: UIView {
             for (index, word) in row.words.enumerated() {
                 if medinaStyle, let number = word.ayahNumberLabel, shown[index] {
                     let diameter = min(rowHeight - 3, widths[index] - 1)
-                    drawAyahSeal(number, center: CGPoint(x: frames[index].midX, y: top + rowHeight / 2), diameter: diameter, context: context)
+                    drawAyahSeal(
+                        number, center: CGPoint(x: frames[index].midX, y: top + rowHeight / 2), diameter: diameter,
+                        context: context)
                     hits.append((frames[index], word.ayahID, word.index))
                     continue
                 }
                 if shown[index] && word.index == nil && !blurredWordsOnly {
                     let image = CTLineGetImageBounds(wordLines[index], nil)
-                    let box = CGRect(x: frames[index].minX + image.minX, y: baseline - image.maxY, width: image.width, height: image.height)
+                    let box = CGRect(
+                        x: frames[index].minX + image.minX, y: baseline - image.maxY, width: image.width,
+                        height: image.height)
                     let diameter = min(box.width, box.height) * 0.5
-                    sealTint.setFill(); UIBezierPath(ovalIn: CGRect(x: box.midX - diameter / 2, y: box.midY - diameter / 2, width: diameter, height: diameter)).fill()
+                    sealTint.setFill();
+                    UIBezierPath(
+                        ovalIn: CGRect(
+                            x: box.midX - diameter / 2, y: box.midY - diameter / 2, width: diameter, height: diameter)
+                    ).fill()
                 }
                 draw(wordLines[index], at: CGPoint(x: frames[index].minX, y: baseline), context: context)
-                if let wordIndex = word.index, coach.flaggedWords.contains(QuranUICoach.wordKey(word.ayahID, wordIndex)) {
-                    mark.setFill(); UIBezierPath(ovalIn: CGRect(x: frames[index].midX - 2.5, y: baseline + descent * 0.4, width: 5, height: 5)).fill()
+                if let wordIndex = word.index, coach.flaggedWords.contains(QuranUICoach.wordKey(word.ayahID, wordIndex))
+                {
+                    mark.setFill();
+                    UIBezierPath(
+                        ovalIn: CGRect(x: frames[index].midX - 2.5, y: baseline + descent * 0.4, width: 5, height: 5)
+                    ).fill()
                 }
                 hits.append((frames[index].insetBy(dx: -gap / 2, dy: 0), word.ayahID, word.index))
             }
@@ -277,8 +354,9 @@ private final class QuranCoachTextView: UIView {
             bandInk = sealInk; bandGold = gold
             bandImage = QuranSurahArtwork.image(ink: sealInk, gold: gold)
         }
-        if let bandImage { bandImage.draw(in: box) }
-        else {
+        if let bandImage {
+            bandImage.draw(in: box)
+        } else {
             sealInk.setStroke()
             let frame = UIBezierPath(rect: box.insetBy(dx: 0.5, dy: 0.5)); frame.lineWidth = 0.7; frame.stroke()
         }
@@ -294,14 +372,18 @@ private final class QuranCoachTextView: UIView {
             if point == 0 { rosette.move(to: p) } else { rosette.addLine(to: p) }
         }
         rosette.close(); gold.setFill(); sealInk.setStroke(); rosette.lineWidth = 0.65; rosette.fill(); rosette.stroke()
-        let ring = UIBezierPath(ovalIn: CGRect(x: center.x - radius * 0.72, y: center.y - radius * 0.72, width: radius * 1.44, height: radius * 1.44))
+        let ring = UIBezierPath(
+            ovalIn: CGRect(
+                x: center.x - radius * 0.72, y: center.y - radius * 0.72, width: radius * 1.44, height: radius * 1.44))
         paper.setFill(); ring.lineWidth = 0.7; ring.fill(); ring.stroke()
         for angle: CGFloat in [0, .pi / 2, .pi, .pi * 1.5] {
             let dot = CGPoint(x: center.x + cos(angle) * radius * 0.85, y: center.y + sin(angle) * radius * 0.85)
-            sealInk.setFill(); UIBezierPath(ovalIn: CGRect(x: dot.x - 0.65, y: dot.y - 0.65, width: 1.3, height: 1.3)).fill()
+            sealInk.setFill();
+            UIBezierPath(ovalIn: CGRect(x: dot.x - 0.65, y: dot.y - 0.65, width: 1.3, height: 1.3)).fill()
         }
         let font = UIFont(name: "Amiri-Bold", size: max(11, diameter * 0.51)) ?? .systemFont(ofSize: 11)
-        let line = CTLineCreateWithAttributedString(NSAttributedString(string: number, attributes: [.font: font, .foregroundColor: ink]))
+        let line = CTLineCreateWithAttributedString(
+            NSAttributedString(string: number, attributes: [.font: font, .foregroundColor: ink]))
         let image = CTLineGetImageBounds(line, nil)
         draw(line, at: CGPoint(x: center.x - image.midX, y: center.y + image.midY), context: context)
     }
@@ -327,25 +409,31 @@ private final class QuranCoachTextView: UIView {
         let move = gesture.translation(in: self)
         if gesture.state == .ended {
             guard dragRevealed.isEmpty, abs(move.x) > 50, abs(move.x) > abs(move.y) * 1.5,
-                  let next = coach.plannedAyahs.subtracting(coach.revealedAyahs).min() else { return }
+                let next = coach.plannedAyahs.subtracting(coach.revealedAyahs).min()
+            else { return }
             UISelectionFeedbackGenerator().selectionChanged()
             reveal?(next)
             return
         }
         guard gesture.state == .changed, abs(move.y) >= abs(move.x) else { return }
         let point = gesture.location(in: self)
-        guard let id = hits.first(where: { $0.0.insetBy(dx: 0, dy: -6).contains(point) })?.1, coach.plannedAyahs.contains(id),
-              !coach.revealedAyahs.contains(id), !dragRevealed.contains(id) else { return }
+        guard let id = hits.first(where: { $0.0.insetBy(dx: 0, dy: -6).contains(point) })?.1,
+            coach.plannedAyahs.contains(id),
+            !coach.revealedAyahs.contains(id), !dragRevealed.contains(id)
+        else { return }
         dragRevealed.insert(id)
         UISelectionFeedbackGenerator().selectionChanged()
         reveal?(id)
     }
     /// Only while the words are hidden from the reciter: blind recitation, or the covered one-step review.
     @objc private func press(_ gesture: UILongPressGestureRecognizer) {
-        guard gesture.state == .began, let coach, !coach.bridge, stage == .covered || (coach.review && stage == .review) else { return }
+        guard gesture.state == .began, let coach, !coach.bridge, stage == .covered || (coach.review && stage == .review)
+        else { return }
         let point = gesture.location(in: self)
-        guard let hit = hits.first(where: { $0.0.contains(point) }), let word = hit.2, coach.plannedAyahs.contains(hit.1),
-              !coach.revealedAyahs.contains(hit.1) else { return }
+        guard let hit = hits.first(where: { $0.0.contains(point) }), let word = hit.2,
+            coach.plannedAyahs.contains(hit.1),
+            !coach.revealedAyahs.contains(hit.1)
+        else { return }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         markWord?(hit.1, word)
         UIAccessibility.post(notification: .announcement, argument: "سُجّل التعثر في هذه الكلمة")
@@ -357,16 +445,22 @@ private final class QuranCoachTextView: UIView {
 private enum QuranSurahArtwork {
     static let source: UIImage? = {
         guard let manifest = try? QuranResourceManifest.bundled(),
-              let data = try? manifest.ornament(named: "surah-opening"),
-              let svg = String(data: data, encoding: .utf8),
-              let expression = try? NSRegularExpression(pattern: #"<image x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)" href="data:image/png;base64,([^"]+)""#) else { return nil }
+            let data = try? manifest.ornament(named: "surah-opening"),
+            let svg = String(data: data, encoding: .utf8),
+            let expression = try? NSRegularExpression(
+                pattern:
+                    #"<image x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)" href="data:image/png;base64,([^"]+)""#
+            )
+        else { return nil }
         let text = svg as NSString
         let matches = expression.matches(in: svg, range: NSRange(location: 0, length: text.length))
         guard matches.count == 4 else { return nil }
         let format = UIGraphicsImageRendererFormat(); format.scale = 2
         return UIGraphicsImageRenderer(size: CGSize(width: 541, height: 66), format: format).image { _ in
             for match in matches {
-                guard let bytes = Data(base64Encoded: text.substring(with: match.range(at: 5))), let image = UIImage(data: bytes) else { continue }
+                guard let bytes = Data(base64Encoded: text.substring(with: match.range(at: 5))),
+                    let image = UIImage(data: bytes)
+                else { continue }
                 let values = (1...4).map { Double(text.substring(with: match.range(at: $0))) ?? 0 }
                 image.draw(in: CGRect(x: values[0], y: values[1], width: values[2], height: values[3]))
             }
@@ -381,13 +475,18 @@ private enum QuranSurahArtwork {
         ink.getRed(&dark.0, green: &dark.1, blue: &dark.2, alpha: &dark.3)
         gold.getRed(&light.0, green: &light.1, blue: &light.2, alpha: &light.3)
         return pixels.withUnsafeMutableBytes { bytes -> UIImage? in
-            guard let context = CGContext(data: bytes.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+            guard
+                let context = CGContext(
+                    data: bytes.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue)
+            else { return nil }
             context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
             let values = bytes.bindMemory(to: UInt8.self)
             for offset in stride(from: 0, to: values.count, by: 4) {
                 guard values[offset + 3] > 0 else { continue }
-                let r = CGFloat(values[offset]) / 255, g = CGFloat(values[offset + 1]) / 255, b = CGFloat(values[offset + 2]) / 255
+                let r = CGFloat(values[offset]) / 255, g = CGFloat(values[offset + 1]) / 255,
+                    b = CGFloat(values[offset + 2]) / 255
                 let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
                 let alpha = min(1, max(0, (0.82 - luminance) * 5)) * CGFloat(values[offset + 3]) / 255
                 let tint = luminance < 0.4 || g > r ? dark : light
