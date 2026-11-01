@@ -77,6 +77,7 @@ final class QuranWirdReferenceIntegrationTests: XCTestCase {
             ("ibn-kathir-2-188", 2, 188, .tafsir, "أي: تعلمون بطلان ما تدعونه وتروجونه في كلامكم…", "٢/ ٧٩", "https://shamela.ws/book/1503/784"),
             ("saadi-2-189", 2, 189, .context, "فلو كان الحساب بالسنة الشمسية، لم يعرفه إلا النادر من الناس", "ص ٨٨", "https://shamela.ws/book/42/127"),
             ("ibn-ashur-2-189-context", 2, 189, .context, "لأن الآيات خطاب للمسلمين وهم الذين سألوا عن الأهلة، والنسيء من أحوال أهل الجاهلية", "٢/ ١٩٩", "https://shamela.ws/book/9776/966"),
+            ("saadi-2-190", 2, 190, .tafsir, "والنهي عن الاعتداء، يشمل أنواع الاعتداء كلها", "ص ٨٩", "https://shamela.ws/book/42/128"),
             ("ibn-kathir-2-255", 2, 255, .tafsir, "هذه آية الكرسي، ولها شأن عظيم", "٢/ ٢٣٩", "https://shamela.ws/book/1503/944"),
             ("ibn-ashur-2-255-context", 2, 255, .context, "وَجُعِلَتْ هَذِهِ الْآيَةُ ابْتِدَاءً لِآيَاتِ تَقْرِيرِ الْوَحْدَانِيَّةِ وَالْبَعْثِ", "٣/ ١٧", "https://shamela.ws/book/9776/1273"),
             ("saadi-2-286", 2, 286, .tafsir, "بل هي غذاء للأرواح ودواء للأبدان", "ص ١٢٠", "https://shamela.ws/book/42/195"),

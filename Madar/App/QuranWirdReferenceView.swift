@@ -431,6 +431,17 @@ struct QuranWirdReferenceExcerpt: Identifiable, Sendable {
             citation: "٢/ ١٩٩",
             sourceURL: URL(string: "https://shamela.ws/book/9776/966")!,
             sourceNote: "يردّ ابن عاشور تأويل الآية بأنها مثلٌ للنسيء، ويصفه بالبعد؛ هذا سياق تفسيري لا تقرير لسبب النزول."
+        ),
+        .init(
+            id: "saadi-2-190",
+            ayahID: 197,
+            kind: .tafsir,
+            text: "والنهي عن الاعتداء، يشمل أنواع الاعتداء كلها",
+            book: "تفسير السعدي = تيسير الكريم الرحمن",
+            author: "عبد الرحمن السعدي",
+            citation: "ص ٨٩",
+            sourceURL: URL(string: "https://shamela.ws/book/42/128")!,
+            sourceNote: nil
         )
     ]
 }

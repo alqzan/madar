@@ -9,7 +9,7 @@ import MadarQuran
 extension AppSession {
     func prepareQuranHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview", "historyRoute", "reference", "referencePartial", "referenceBoundary", "referenceFatiha", "referenceFatihaOpening", "referenceKursi", "referenceSadi183", "referenceAalImran", "referenceBaqara178186", "referenceBaqara189"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview", "historyRoute", "reference", "referencePartial", "referenceBoundary", "referenceFatiha", "referenceFatihaOpening", "referenceKursi", "referenceSadi183", "referenceAalImran", "referenceBaqara178186", "referenceBaqara189", "referenceBaqara190"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let context = ModelContext(container)
         selectedTab = "quran"
@@ -48,6 +48,9 @@ extension AppSession {
             plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 9; plan.rhythm = "light"; plan.activeFrom = now
         } else if variant == "referenceBaqara189" {
             let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 189 }!
+            plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "referenceBaqara190" {
+            let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 190 }!
             plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
         } else if variant == "reference" {
             let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 187 }!
