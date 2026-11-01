@@ -114,6 +114,7 @@ final class AppSession {
     @ObservationIgnored private var failFirstMoneyVisitMark = false
     @ObservationIgnored private var remainingMihbaraLocatorFailures = 0
     @ObservationIgnored private var failMihbaraLocatorOnReaderClose = false
+    @ObservationIgnored private var failFirstMihbaraSessionSave = false
     @ObservationIgnored private var quranLevelWriteHoldMilliseconds: Int?
     @ObservationIgnored private var quranLevelWriteHoldUsed = false
     #endif
@@ -189,6 +190,7 @@ final class AppSession {
         if notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent,
            group.deletingLastPathComponent().lastPathComponent == "UITestStores" {
             failMihbaraLocatorOnReaderClose = notebookTest["MADAR_UI_MIHBARA_LOCATOR_FAIL_ON_CLOSE"] == "1"
+            failFirstMihbaraSessionSave = notebookTest["MADAR_UI_MIHBARA_SESSION_SAVE_FAIL_ONCE"] == "1"
         }
         if notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent,
            group.deletingLastPathComponent().lastPathComponent == "UITestStores",
@@ -1093,6 +1095,10 @@ final class AppSession {
         if failFirstGoodreadsImport && name == "book.importGoodreads" {
             failFirstGoodreadsImport = false
             throw DataError.invalidValue("تعذّرت إضافة كتب Goodreads إلى المحبرة. حاول مرة أخرى.")
+        }
+        if failFirstMihbaraSessionSave && name == "reading.saveSession" {
+            failFirstMihbaraSessionSave = false
+            throw DataError.invalidValue("mihbara UI reading-session write failure")
         }
         if name == "book.setLocator" {
             if remainingMihbaraLocatorFailures > 0 {
