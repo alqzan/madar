@@ -180,6 +180,7 @@ import XCTest
         let mihbara = app.tabBars.buttons["المحبرة"].firstMatch
         XCTAssertTrue(mihbara.waitForExistence(timeout: 20)); mihbara.tap(); Thread.sleep(forTimeInterval: 2)
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 20), "The Mihbara home must actually open")
+        XCTAssertFalse(app.alerts["لم تكتمل العملية"].waitForExistence(timeout: 1), "Leaving the money home must not turn expected plan-task cancellation into a failure alert")
         shot(app, "TRIAL-mihbara-home-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-mihbara-home-s1-L")
 
         // The lobby with every room's data.

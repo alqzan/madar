@@ -139,7 +139,9 @@ struct MoneyHomeView: View {
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task {
             await app.seedMoneyDefaults()
-            do { try await app.executeMoneyCommand("money.accruePlans") } catch { app.errorMessage = "تعذّر تحديث الخطط اليوم: " + madarUserMessage(error) }
+            do { try await app.executeMoneyCommand("money.accruePlans") }
+            catch is CancellationError { return }
+            catch { app.errorMessage = "تعذّر تحديث الخطط اليوم: " + madarUserMessage(error) }
             load()
             if app.moneyOpensMessages { app.moneyOpensMessages = false; messagesOpen = true; return }
             // §7.5 «بعد غياب»: «منذ آخر زيارة» opens first; otherwise this visit is the new mark.
