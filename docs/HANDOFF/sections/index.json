@@ -32,7 +32,7 @@
   {
     "sectionID": "flex",
     "path": "sections/06-flex.md",
-    "sha256": "2d3a349235128df9430ff859c430a4c8febc6c9a57ea488b6a1459d27dea4fae"
+    "sha256": "80e955efdabf5706ce12d5c54d1fad522dd8b7e6667e69791942eef86818a5d3"
   },
   {
     "sectionID": "rooms",
@@ -52,7 +52,7 @@
   {
     "sectionID": "r-notes",
     "path": "sections/10-r-notes.md",
-    "sha256": "0d33820cfc08036e50e3160a66e5247b9a55d03bd8644ddee8413fa3e8a6cfbc"
+    "sha256": "f8dbe6b4b910e36b0caed998c6b230057bdf46c61e45bcc6b66162234433c9d0"
   },
   {
     "sectionID": "r-quran",
@@ -72,7 +72,7 @@
   {
     "sectionID": "shared",
     "path": "sections/14-shared.md",
-    "sha256": "13e6cbbcbff3b1d9c0fc66916844a79b1cea36b74a29c7af3256cb447f77f179"
+    "sha256": "e7adb4fe688a830f91db0ccce3a43ca38dd43b5a04e6fe9ae2578e001b533ea5"
   },
   {
     "sectionID": "outside",
