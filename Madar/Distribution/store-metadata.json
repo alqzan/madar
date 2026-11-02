@@ -7,6 +7,7 @@
   "keywords": "صلاة,قرآن,حفظ,مراجعة,مذكرات,عادات,ميزانية,مصاريف,كتب,قراءة,هجري",
   "primaryCategory": "LIFESTYLE",
   "secondaryCategory": "PRODUCTIVITY",
+  "supportEmail": "alqazan.u@gmail.com",
   "supportURL": null,
   "privacyPolicyURL": null,
   "reviewNotes": "The current v1 build is local-only; no Madar account, developer-operated records backend, or CloudKit sync is included. On first launch, choose a city and complete onboarding. Face ID is an optional app-level gate; the device passcode opens Madar only when Face ID is unavailable (permission off, no enrolled face, or lockout). Widgets and Controls read app-written snapshots; extensions do not open the SwiftData store. HealthKit is optional and read-only for walking totals. Bank messages arrive only via user-initiated paste or a configured Shortcut; the app does not read the Messages database. Metal prices and exchange rates are manual. The Zakat screen labels results as approximate, asks for the nisab/debt method and shows source links. On-device Vision OCR operates on PDF image pages without modifying the original file; OCR text exists only while its search sheet is open. Downloaded Turath books read locally after import. Optional Apple server speech recognition requires separate in-app consent; on-device routes are preferred. Only after a user taps the Quran source-search link, up to the first 12 normalized Arabic words of that ayah go directly to shamela.ws; no Madar server receives the query and Shamela retention is unknown. Spotlight is optional, off by default, and indexes book titles only. Optional «اسأل يومياتك» / «اسأل عن مالك» answers a typed question with Apple's on-device Foundation Models; the selected text is translated Arabic↔English with Apple's Translation framework on the device (language assets may download once). Money figures are computed by Madar from the user's records, not generated. Nothing is sent to a Madar server, and the entry point is hidden when Apple Intelligence or the languages are unavailable. No advertising, tracking SDK or developer analytics is integrated. Madar and its widgets require iOS 27.0 or later; supported features target that release.",
@@ -21,6 +22,14 @@
       "book files and on-device OCR text",
       "location used to calculate prayer times"
     ],
+    "healthKitRead": {
+      "optional": true,
+      "permission": "Read-only, requested when the user chooses a walking habit sourced from Health",
+      "types": ["step count", "Apple Exercise Time"],
+      "storage": "Live value remains in memory; closed-day totals use the local HabitLog",
+      "developerCollection": false,
+      "labelAssessment": "Review against the exact build in App Store Connect; no HealthKit value is sent to a Madar server."
+    },
     "appleServerSpeechAfterConsent": {
       "typesToDisclose": [
         "Audio Data",
@@ -47,6 +56,11 @@
       "productionActivation": "Not authorized."
     },
     "appPrivacyLabelStatus": "Pending review for the exact local-only release build; assess optional Apple server speech, Turath download networking, user-initiated Shamela verse searches and HealthKit separately. Do not declare persistent CloudKit data."
+  },
+  "exportCompliancePreparation": {
+    "implementedBackupEncryption": "PBKDF2-HMAC-SHA256 (600,000 iterations) and AES-256-GCM via CommonCrypto and CryptoKit",
+    "currentITSAppUsesNonExemptEncryption": false,
+    "status": "Needs determination in App Store Connect for this exact build. Apple requires an export-compliance determination for standard encryption too; do not treat the current false value as confirmed until the questionnaire establishes that the use is exempt."
   },
   "publicationInputsStillRequired": [
     "A public HTTPS URL for privacy.html and a real support destination; no address or domain has been invented.",
