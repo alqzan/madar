@@ -155,7 +155,7 @@ public enum MoneyCommandPayload {
             // M5-V17: the sheet may split the charge over an envelope and «يومك» (F02); rows as in confirmTransaction.
             return Set(p.keys).isSubset(of: ["amountMinor", "currency", "merchant", "method", "categoryID", "fromAccountID", "cardID", "eventAt", "rateAtTime", "showInDiary", "allocations", "categorySource"])
                 && (p["allocations"] == nil || allocationRows(p["allocations"]))
-                && (p["categorySource"] == nil || choices("categorySource", ["manual", "learned"]))
+                && (p["categorySource"] == nil || (choices("categorySource", ["manual", "learned"]) && id("categoryID")))
                 && positive("amountMinor") && text("currency", max: 3) && optionalText("merchant")
                 && (p["method"] == nil || choices("method", ["cash", "card", "transfer"]))
                 && ["categoryID", "fromAccountID", "cardID"].allSatisfy(optionalID)

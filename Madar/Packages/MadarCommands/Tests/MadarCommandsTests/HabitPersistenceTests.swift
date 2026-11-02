@@ -94,6 +94,26 @@ import MadarData
         let kept = try #require(try HabitRepository(context:ModelContext(container)).readings(at:later).first { $0.id == gift })
         #expect(kept.times.map(\.day.description) == ["2026-10-17","2026-10-15"]); #expect(kept.summary.current?.met == true)
     }
+    @Test func pastDayBeforeWeeklyHabitStartIsRejectedInsideItsFirstPeriod() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitPastWeeklyStart-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let bus = CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 }))
+        let later = now.addingTimeInterval(2 * 86400), start = try GregorianDay("2026-10-15"), prior = try GregorianDay("2026-10-14")
+        func run(_ name: String, _ p: [String: MadarCore.JSONValue], at date: Date) async throws -> CommandOutcome {
+            try await bus.execute(.init(name: name, payload: .object(p), issuedAt: date), now: date)
+        }
+        let habit = UUID(); var rule = HabitRule(effectiveFrom: start); rule.frequency = .weekly
+        #expect(try await run("habit.save", payload(habit, rule), at: now).status == .applied)
+        let reading = try #require(HabitRepository(context: ModelContext(container)).readings(at: later).first)
+        let firstPeriod = try #require(reading.summary.periods.first)
+        #expect(firstPeriod.start < start && firstPeriod.target > 0)
+        #expect(reading.firstEffectiveFrom == start)
+        #expect(try await run("habit.complete", ["id": .string(habit.uuidString), "day": .string(prior.description)], at: later).status == .rejected)
+        let persisted = try ModelContext(container).fetch(FetchDescriptor<HabitEvent>())
+        #expect(!persisted.contains { $0.dayKey == prior.description })
+        #expect(persisted.filter { $0.delta != 0 }.isEmpty)
+    }
     @Test func pauseResumeAndPolicyEditsAreDatedAndUndoable() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitPause-\(UUID())"); defer { try? FileManager.default.removeItem(at:root) }
         let container = try MadarContainerFactory.makeLocal(at:root), bus = CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))

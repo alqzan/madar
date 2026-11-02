@@ -78,7 +78,9 @@ import CryptoKit
         account.name = "اسم حساب محلي"; account.balanceMinor = 12345; account.balanceAt = Date()
         let card = try XCTUnwrap(context.fetch(FetchDescriptor<Card>()).first); card.name = "اسم بطاقة محلي"
         let rule = try XCTUnwrap(context.fetch(FetchDescriptor<MerchantRule>()).first); rule.ignore = true; rule.categoryID = nil
-        let movement = try XCTUnwrap(context.fetch(FetchDescriptor<MoneyTransaction>()).first); movement.amountMinor = 4567
+        let movement = try XCTUnwrap(context.fetch(FetchDescriptor<MoneyTransaction>()).first)
+        XCTAssertEqual(movement.categorySource, "rule", "Legacy-moved categories use rule provenance.")
+        movement.amountMinor = 4567
         try context.save()
         func fingerprint(_ container: ModelContainer) throws -> String {
             let rows = try RecordBridge.all(ModelContext(container)).sorted { ($0.model, $0.id.uuidString) < ($1.model, $1.id.uuidString) }

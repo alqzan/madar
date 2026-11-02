@@ -37,6 +37,14 @@ extension AppSession {
             trip.createdAt = prayerNow(); trip.updatedAt = prayerNow(); context.insert(trip)
             try context.save(); return
         }
+        if variant == "pastZeroTarget" {
+            let today = GregorianDay.containing(prayerNow(), in: activePlace.timeZone)
+            let start = today.adding(days: -7)
+            let habit = Habit(); habit.name = "مشي يومي"; habit.startDate = start.date(in: activePlace.timeZone); context.insert(habit)
+            let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = start.description
+            policy.frequency = "daily"; policy.measure = "once"; policy.target = 1; policy.restWeekdays = ["wed"]
+            context.insert(policy); try context.save(); return
+        }
         if variant == "pausedLater" || variant == "pausedLaterMixed" {
             let today = GregorianDay.containing(prayerNow(), in: activePlace.timeZone)
             for (index, frequency) in ["daily", "weekly", "monthly"].enumerated() {

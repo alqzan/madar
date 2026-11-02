@@ -42,6 +42,9 @@ struct DiaryDayView: View {
     @State private var sealedHere = 0
     @State private var projectLinks: [String: String] = [:]
     @State private var projectSuggestions: [String: DiaryProjectCard] = [:]
+#if DEBUG
+    @State private var injectedReadFailures: Set<String> = []
+#endif
     /// Travel days wear the air-mail paper everywhere on the page and in its sheets (§7.3).
     private var theme: RoomTheme { travel == nil ? roomTheme : RoomTheme(room: "notes.travel", dark: roomTheme.dark) }
     private var friday: Bool { appearance?.friday == true && travel == nil }
@@ -261,8 +264,9 @@ struct DiaryDayView: View {
                                 }
                                 if let failure {
                                     VStack(alignment: .leading, spacing: 10) {
-                                        Text(failure).font(MadarTypography.body());
+                                        Text(failure).font(MadarTypography.body()).accessibilityIdentifier("diary-day-read-error")
                                         Button("حاول مرة أخرى") { retry += 1 }.frame(minHeight: 44)
+                                            .accessibilityIdentifier("diary-day-read-retry")
                                     }.padding(20)
                                 }
                 if canReadDiary, (!analysisText.isEmpty || !intentions.isEmpty),
@@ -494,11 +498,28 @@ struct DiaryDayView: View {
             travelReturn = travel == nil ? try service.travelReturn(shownDay) : nil
             if shownDay == today { try? await service.refreshLetters() }
             guard !Task.isCancelled, canReadDiary else { page = nil; aiComposerOpen = false; return }
-            let letters = (try? service.letters()) ?? []
-            waitingLetter = letters.first { $0.state == .eligible }
-            sealedHere = letters.filter { $0.writtenDay == shownDay && $0.state != .opened }.count
-            (projectLinks, projectSuggestions) =
-                (try? service.projectNotes(shownDay)) ?? (projectLinks, projectSuggestions)
+            do {
+#if DEBUG
+                try injectReadFailureOnce("letters")
+#endif
+                let letters = try service.letters()
+                waitingLetter = letters.first { $0.state == .eligible }
+                sealedHere = letters.filter { $0.writtenDay == shownDay && $0.state != .opened }.count
+            } catch {
+                waitingLetter = nil; sealedHere = 0
+                failure = madarUserMessage(error)
+                return
+            }
+            do {
+#if DEBUG
+                try injectReadFailureOnce("projects")
+#endif
+                (projectLinks, projectSuggestions) = try service.projectNotes(shownDay)
+            } catch {
+                projectLinks = [:]; projectSuggestions = [:]
+                failure = madarUserMessage(error)
+                return
+            }
             failure = nil
         } catch is CancellationError {
             return
@@ -507,6 +528,17 @@ struct DiaryDayView: View {
             failure = madarUserMessage(error)
         }
     }
+#if DEBUG
+    private func injectReadFailureOnce(_ key: String) throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard !injectedReadFailures.contains(key),
+              environment["MADAR_UI_DIARY_DAY_READ_FAILURE_ONCE"] == key,
+              environment["MADAR_UI_DIARY_FIXTURE"] == "letters",
+              environment["MADAR_UI_STORE_ID"] != nil else { return }
+        injectedReadFailures.insert(key)
+        throw CocoaError(.fileReadUnknown)
+    }
+#endif
     /// OR-15: after Isha the morning's intention comes back on the page itself and asks how it went.
     private func eveningIntention(_ row: DiaryIntention) -> some View {
         VStack(alignment: .leading, spacing: 10) {

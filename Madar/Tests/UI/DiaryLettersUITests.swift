@@ -45,6 +45,33 @@ import XCTest
         app.buttons["diary-project-retry"].tap()
         XCTAssertTrue(app.buttons["diary-project-row"].waitForExistence(timeout: 10), app.debugDescription)
     }
+    func testDayPageKeepsItsContentAndRetriesWhenLetterReadFails() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_DIARY_DAY_READ_FAILURE_ONCE": "letters"]
+        app.launch()
+        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 25), app.debugDescription); app.buttons["diary-today"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["diary-day-line"].waitForExistence(timeout: 10), app.debugDescription)
+        let error = app.staticTexts["diary-day-read-error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 10), app.debugDescription)
+        app.buttons["diary-day-read-retry"].tap()
+        XCTAssertTrue(app.buttons["diary-letter-waiting"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(error.waitForNonExistence(timeout: 5), app.debugDescription)
+    }
+    func testDayPageRetriesWhenProjectContextReadFails() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_DIARY_DAY_READ_FAILURE_ONCE": "projects"]
+        app.launch()
+        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 25), app.debugDescription); app.buttons["diary-today"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["diary-day-line"].waitForExistence(timeout: 10), app.debugDescription)
+        let error = app.staticTexts["diary-day-read-error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["diary-line-project-suggest"].exists, app.debugDescription)
+        app.buttons["diary-day-read-retry"].tap()
+        XCTAssertTrue(app.buttons["diary-line-project-suggest"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(error.waitForNonExistence(timeout: 5), app.debugDescription)
+    }
     func testUnsavedProjectReflectionIsKeptWhenCloseIsCancelled() {
         continueAfterFailure = false
         let app = XCUIApplication()

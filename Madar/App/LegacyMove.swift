@@ -250,6 +250,10 @@ extension AppSession {
                 if let merchant { p["merchant"] = .string(merchant) }
                 if let sourceCategory { p["categoryID"] = .string(category(sourceCategory).uuidString) }
                 _ = await run("money.logExpense", p, command, "earlier")
+                if let sourceCategory {
+                    _ = await run("money.categorize", ["id": .string(command.uuidString), "categoryID": .string(category(sourceCategory).uuidString), "categorySource": .string("rule")],
+                                  StableIdentity.uuid(for: "LegacyCategorize:" + command.uuidString), "categorize")
+                }
                 // Owner, 22 Oct: these rows came from an automatic source, never typed by hand. The shipped command
                 // can only write «manual», so the move marks the row automatic, without message text.
                 let fresh = ModelContext(container)

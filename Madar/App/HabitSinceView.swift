@@ -130,10 +130,12 @@ struct HabitPastDaySheet:View {
     @State private var busy = false
     private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
     private var today:GregorianDay { AppBahwService(session:session).today }
-    private var first:GregorianDay { reading.summary.periods.first?.start ?? today }
+    private var first:GregorianDay { reading.firstEffectiveFrom }
     private var defaultDay:GregorianDay { max(first,today.adding(days:-1)) }
     private var day:GregorianDay { GregorianDay.containing(date,in:.gmt) }
-    private var selectedRule: HabitRule? { reading.summary.periods.last { $0.start <= day && day < $0.end }?.rule }
+    private var selectedPeriod: HabitPeriodResult? { reading.summary.periods.last { $0.start <= day && day < $0.end } }
+    private var selectedRule: HabitRule? { selectedPeriod?.rule }
+    private var hasSelectedTarget: Bool { day >= reading.firstEffectiveFrom && (selectedPeriod?.target ?? 0) > 0 }
     private var delta: Int { selectedRule?.measure == .duration ? 15 : 1 }
     private var saveTitle: String {
         guard let rule = selectedRule, rule.measure != .once else { return "سجّلها في يومها" }
@@ -158,6 +160,10 @@ struct HabitPastDaySheet:View {
                     DatePicker("اليوم",selection:$date,in:gmt(first)...gmt(today.adding(days:-1)),displayedComponents:.date)
                         .datePickerStyle(.graphical).environment(\.timeZone,.gmt).padding(8).background(theme.surface,in:.rect(cornerRadius:20)).accessibilityIdentifier("habit-past-date")
                     MadarDateLabel(session.dateLabels(day,weekday:true))
+                    if !hasSelectedTarget {
+                        Text("لا يوجد هدف لهذه العادة في هذا اليوم.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            .accessibilityIdentifier("habit-past-unavailable")
+                    }
                     let lines = dayLines
                     if !lines.isEmpty {
                         VStack(alignment:.leading,spacing:8) {
@@ -174,7 +180,7 @@ struct HabitPastDaySheet:View {
                         }
                     }
                     Button { log() } label: { Text(saveTitle).font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
-                        .buttonStyle(.madarPlain).disabled(busy).accessibilityIdentifier("habit-past-save")
+                        .buttonStyle(.madarPlain).disabled(busy || !hasSelectedTarget).accessibilityIdentifier("habit-past-save")
                 } else {
                     Text("بدأت العادة اليوم؛ لا يوم قبله في سجلها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }

@@ -541,6 +541,11 @@ import MadarInbox
             let row = try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.merchant == "مقهى " + source })
             #expect(row.categoryID == cafe.id && row.categorySource == source)
         }
+        let withoutCategory: [String: MadarCore.JSONValue] = ["amountMinor": .string("900"), "currency": .string("SAR"), "categorySource": .string("manual")]
+        #expect(!MoneyCommandPayload.validate(name: "money.logExpense", payload: withoutCategory))
+        let beforeOrphan = try ModelContext(f.container).fetchCount(FetchDescriptor<MoneyTransaction>())
+        #expect(try await f.run("money.logExpense", withoutCategory).status == .rejected)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<MoneyTransaction>()) == beforeOrphan)
         #expect(!MoneyCommandPayload.validate(name: "money.logExpense", payload: ["amountMinor": .string("900"), "currency": .string("SAR"), "categorySource": .string("rule")]))
         #expect(try await f.run("money.saveMerchantRule", ["merchant": .string("coffee corner"), "categoryID": .string(grocery.id.uuidString), "ignore": .bool(false)]).status == .applied)
         func purchase(_ amount: Int, _ minute: Int) async throws -> MoneyTransaction {

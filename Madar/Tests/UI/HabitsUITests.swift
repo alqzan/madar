@@ -289,6 +289,20 @@ import UIKit
         XCTAssertTrue(yearly.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "هدف شهري مرن")).firstMatch.exists, app.debugDescription)
     }
+    func testPastDaySaveDisabledWhenSelectedPeriodHasZeroTarget() throws {
+        continueAfterFailure = false
+        let app = app("pastZeroTarget"); open(app)
+        let daily = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "مشي يومي")).firstMatch
+        XCTAssertTrue(daily.waitForExistence(timeout: 5), app.debugDescription); daily.tap()
+        XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout: 5), app.debugDescription)
+        let past = app.buttons["habit-past-day"]
+        for _ in 0..<8 where !past.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(past.isHittable, app.debugDescription); past.tap()
+        let save = app.buttons["habit-past-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(save.isEnabled, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["habit-past-unavailable"].exists, app.debugDescription)
+    }
     func testFixedMonthlyAndYearlyHabitsStayHiddenBeforeTheirDates() {
         continueAfterFailure = false
         let app = app("scheduledEarly", now: "2026-12-25T20:00:00+03:00"); open(app)
