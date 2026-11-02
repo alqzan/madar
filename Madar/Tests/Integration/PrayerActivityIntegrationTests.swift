@@ -53,6 +53,18 @@ import MadarPrayer
             .first { $0.id == "salah.2026-03-20.dhuhr" })
         XCTAssertEqual(candidate.dueAt, dhuhrWindow.end)
     }
+    func testSanctityWindowsRemainThirtyMinutesAndMaghribTwentyOnIOS27() throws {
+        let friday = try XCTUnwrap(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
+        let ramadan = try XCTUnwrap(PrayerTimesEngine.calculate(day: GregorianDay("2027-02-10"), place: .riyadh))
+        XCTAssertEqual(ramadan.hijriDate?.month, 9)
+        for day in [friday, ramadan] {
+            for prayer in Prayer.allCases {
+                let duration: TimeInterval = prayer == .maghrib ? 20 * 60 : 30 * 60
+                XCTAssertEqual(day.sanctityWindows.first { $0.prayer == prayer }?.end,
+                               day.time(for: prayer).addingTimeInterval(duration), "\(prayer) on \(day.day)")
+            }
+        }
+    }
     func testDefaultOffAndSettingsRepublishDisableExternalStarts() async throws {
         let (app, _) = try fixture()
         let today = GregorianDay.containing(Date(), in: ActivePlace.riyadh.timeZone)
