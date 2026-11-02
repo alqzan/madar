@@ -191,6 +191,23 @@ Six read-only Sonnet audits compared canonical screens with the newest screensho
 
 OR-03 current source and proof are in the live row above. The earlier widgetScope, smartPresence and X3 behavior gaps were implemented and verified on 27 Oct; do not treat the old placeholder-control note as current. The actual OS gallery/action and iOS 27 runtime checks remain open.
 
+## قبل TestFlight — 2 نوفمبر 2026 (Claude لكوديكس؛ المالك: «فرق بين الشغل الي تحتاجني فيه وبين الشغل الي يسوي الاي اي»)
+
+Codex takes these first, in order, before any other queue. Feature freeze until the first TestFlight build: no new features, no refactors or file splits, no new AI scope, no data-model change without a tested migration, no new visual-acceptance rounds (the owner will judge on TestFlight). None of TF-01…TF-07 waits on Apple. Haiku helpers hunt while each run goes; the main agent verifies and fixes.
+
+| Card | Work | Done when | Status |
+|---|---|---|---|
+| TF-01 | Full UI + integration suites on iPhone 18 Pro / iOS 27.0 (most long runs so far were iOS 26.5). | Every failure fixed or its cause recorded; counts and xcresult names in the row. | ready |
+| TF-02 | Owner real-data trial again on iOS 27: import a copy of the old-app data into a separate simulator test store; walk every room (prayer, Quran, diary, habits, money, Mihbara). | No crash, no wrong number, no dead end; each mismatch fixed or recorded. Never the owner's real store, never off the Mac. | ready |
+| TF-03 | Backup round trip: encrypted backup → delete app → reinstall → restore; photos and book files included; automatic backup actually scheduled and written. | UI/integration test covers it and passes; restored counts equal the originals. | ready |
+| TF-04 | Migration to V14 from older stores (V12, V13 fixtures with records in every room). | Tests prove no record is lost or changed; from TestFlight on, every model change ships with such a test. | ready |
+| TF-05 | Release gate: Release build on iOS 27, `check-shipping-sources.py`, `check-review-contracts.py`, prayer sanctity window on iOS 27 (nothing from adhan to +30 min, Maghrib +20), widgets read snapshots on iOS 27. | Command output in the row; `docs/reports/M7.md` gate table filled. | ready |
+| TF-06 | Haiku bug hunt per room on everything changed since 25 Oct, especially new payload keys a command validator does not allow yet (the 2 Nov `money.logExpense`/`categorySource` bug) and silent save rejections. | Verified findings fixed with tests. | ready |
+| TF-07 | Store prep without Apple: privacy label answers, encryption export-compliance answer (backup uses standard encryption), App Review notes current, `privacy.html`/`support.html` ready to publish. | Text ready in `Madar/Distribution/`; hosting waits on the owner's choice. | ready |
+| TF-08 | After Apple approves and the owner signs in to Xcode: app and widget profiles with `group.com.alqzan.madar2`, CloudKit entitlement empty, signed archive from a clean `main` commit, upload to App Store Connect, internal TestFlight. | Build processed in App Store Connect; build number and commit in the row. | blocked: Apple developer account review |
+
+**Owner only (no agent can do these):** (1) wait for Apple's account approval; (2) accept the App Store Connect agreements; (3) sign in to Xcode with the Apple ID on this Mac once; (4) create the «مدار» app record in App Store Connect, or approve agent-prepared fields; (5) update the iPhone to iOS 27 and turn on Apple Intelligence; (6) install TestFlight and accept the invite; (7) export current old-app data when the move should happen; (8) make the first encrypted backup on the phone and keep its passphrase; (9) choose where the privacy and support pages are hosted and the support email (needed only for external testing and the store); (10) answer «Waiting on the owner» when free. Items 5, 7, 9 and 10 do not wait on Apple.
+
 ## ملاحظات Claude لكوديكس — 1 نوفمبر 2026 (المالك: «اكتب ملاحظاتك لكوديكس عشان الجلسه الثانيه يعدلها»)
 
 Codex takes these before the Next work queue. Each row is one change; mark it done here in the same commit.
