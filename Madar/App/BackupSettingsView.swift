@@ -101,12 +101,15 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     private var operationID: UUID?
     private var protectedOperation = false
     private var revocationObserver: UUID?
+    private var retainedPlainExportURL: URL?
     init(service: any BackupUIService) { self.service = service; observePrivacy() }
     private func observePrivacy() {
         guard revocationObserver == nil else { return }
         revocationObserver = service.observeExportRevocation { [weak self] cancel in
             guard let self else { return }
-            exportedURL = nil; discardPlain(); exportPassphrase = ""; exportConfirmation = ""; resultMessage = nil
+            exportedURL = nil
+            if cancel { discardPlain() } else { plainExportedURL = nil }
+            exportPassphrase = ""; exportConfirmation = ""; restorePassphrase = ""; resultMessage = nil
             if cancel && protectedOperation {
                 operation?.cancel(); operationID = nil; busy = false; progress = nil; operation = nil; protectedOperation = false
             }
@@ -157,17 +160,18 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     }
     func exportPlain() {
         guard !busy else { return }
+        discardPlain()
         run(initial: "يجهّز ملف التصدير…", protected: true) { [self] report, id in
             let file = try await service.exportPlain(progress: report)
             try checkRequest(id); try service.validateExport(file: file)
-            plainExportedURL = file
+            plainExportedURL = file; retainedPlainExportURL = file
             resultMessage = "التصدير جاهز للحفظ أو المشاركة. الملف غير مشفّر."
         }
     }
-    /// The plain export is never kept on the device after this screen lets it go.
+    /// Inactive scenes hide the action but retain the artifact until background or close.
     private func discardPlain() {
-        if let file = plainExportedURL { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
-        plainExportedURL = nil
+        if let file = retainedPlainExportURL ?? plainExportedURL { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        retainedPlainExportURL = nil; plainExportedURL = nil
     }
     func sharePlain() { if let file = plainExportedURL { share(file) } }
     func shareEncrypted() { if let file = exportedURL { share(file) } }

@@ -10,6 +10,7 @@ import WidgetKit
     weak var backgroundTasks: AppBackupBackgroundTasks?
     let coordinator: BackupCoordinator
     private let scheduledProgress: @Sendable (BackupProgress) -> Void
+    private let didCreatePlainExport: @MainActor (URL) async -> Void
     private var previews: [UUID: RestorePreview] = [:]
     private var previewPasswords: [UUID: String] = [:]
     private var cancellation = BackupCancellation()
@@ -31,11 +32,13 @@ import WidgetKit
     init(session: AppSession, store: ManagedDataStore, backupDirectory: URL, keyStore: any BackupKeyStore = KeychainBackupKeyStore(service: "com.alqzan.madar2.backup"),
          scheduledProgress: @escaping @Sendable (BackupProgress) -> Void = { _ in },
          sharePresentation: (@MainActor (URL, PrivacyAuthorization) throws -> Void)? = nil,
+         didCreatePlainExport: @escaping @MainActor (URL) async -> Void = { _ in },
          deriveCredential: @escaping @Sendable (String) async throws -> BackupCredential = { passphrase in
              try await Task.detached(priority: .userInitiated) { try BackupCredential.derive(passphrase: passphrase) }.value
          }) {
         self.session = session
         self.scheduledProgress = scheduledProgress
+        self.didCreatePlainExport = didCreatePlainExport
         presentShare = sharePresentation ?? { [weak session] file, ticket in
             guard let presenter = session?.privacyPresenter else { throw PrivacyAuthorizationError.stale }
             try presenter.present(file: file, authorization: ticket)
@@ -111,19 +114,25 @@ import WidgetKit
                   (try? validate(ticket, controller: controller, operation: id)) != nil else { return }
             progress(update)
         }
+        var uncommittedPlainExport: URL?
         do {
             let file: URL
             if let passphrase {
                 file = try await coordinator.export(kind: .manual, passphrase: passphrase, progress: reporter(guardedProgress), cancellation: token, authorization: authorization).fileURL
             } else {
                 file = try await coordinator.exportPlain(progress: reporter(guardedProgress), cancellation: token, authorization: authorization)
+                uncommittedPlainExport = file
+                await didCreatePlainExport(file)
             }
             if passphrase != nil { try? await retryFolderDelivery(); await refreshBackgroundSchedule() }
             guard let ticket = granted else { throw PrivacyAuthorizationError.stale }
             try validate(ticket, controller: controller, operation: id)
             artifactTickets[file] = ticket; artifactFeatures[file] = ticket.features
             return file
-        } catch { token.cancel(); throw error }
+        } catch {
+            if let uncommittedPlainExport { try? FileManager.default.removeItem(at: uncommittedPlainExport.deletingLastPathComponent()) }
+            token.cancel(); throw error
+        }
     }
     private func containsPrivateExportRows() throws -> Bool {
         let context = ModelContext(coordinator.store.container)

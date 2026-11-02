@@ -64,9 +64,22 @@ import MadarData
         let keys: Keys
         let backup: AppBackupService
         let presented: PresentationProbe
+        let plainExportGate: PlainExportGate
     }
     private final class PresentationProbe { var files: [URL] = [] }
+    @MainActor private final class PlainExportGate {
+        var pauseOnReturn = false
+        var fileURL: URL?
+        var continuation: CheckedContinuation<Void, Never>?
+        func didCreate(_ file: URL) async {
+            fileURL = file
+            guard pauseOnReturn else { return }
+            await withCheckedContinuation { continuation = $0 }
+        }
+        func resume() { continuation?.resume(); continuation = nil; pauseOnReturn = false }
+    }
     private func fixture(scope: MadarLockScope = .app, privateRow: Bool = false, tombstone: Bool = false,
+                         plainExportGate: PlainExportGate = PlainExportGate(),
                          deriveCredential: @escaping @Sendable (String) async throws -> BackupCredential = { passphrase in
                              try await Task.detached { try BackupCredential.derive(passphrase: passphrase) }.value
                          }) throws -> Fixture {
@@ -82,8 +95,10 @@ import MadarData
         let auth = Auth(), privacy = Privacy(), keys = Keys(), presented = PresentationProbe()
         let lock = MadarLockController(scope: scope, service: privacy, authenticator: { auth }); session.lockController = lock
         let backup = AppBackupService(session: session, store: store, backupDirectory: root.appending(path: "Backups"), keyStore: keys,
-            sharePresentation: { file, ticket in try lock.validate(ticket); presented.files.append(file) }, deriveCredential: deriveCredential)
-        return Fixture(root: root, store: store, session: session, auth: auth, privacy: privacy, lock: lock, keys: keys, backup: backup, presented: presented)
+            sharePresentation: { file, ticket in try lock.validate(ticket); presented.files.append(file) },
+            didCreatePlainExport: { file in await plainExportGate.didCreate(file) }, deriveCredential: deriveCredential)
+        return Fixture(root: root, store: store, session: session, auth: auth, privacy: privacy, lock: lock, keys: keys, backup: backup, presented: presented,
+            plainExportGate: plainExportGate)
     }
     private enum ProbeError: Error { case timeout }
     private func waitUntil(_ predicate: @MainActor () -> Bool) async throws {
@@ -274,17 +289,47 @@ import MadarData
         XCTAssertTrue(fixture.presented.files.isEmpty); XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
     }
 
-    func test_M0P1b_modelRevokesCachedURLsAndPassphrasesAndDeletesCompletedExport() async throws {
+    func test_M0P1b_inactiveHidesExportSecretsAndRetainsFileUntilBackground() async throws {
         let fixture = try fixture(scope: .none)
         let model = BackupSettingsModel(service: fixture.backup)
         model.exportPlain(); try await waitUntil { model.plainExportedURL != nil && !model.busy }
         let file = try XCTUnwrap(model.plainExportedURL)
         XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
         model.exportPassphrase = "test-only-passphrase"; model.exportConfirmation = model.exportPassphrase
+        model.restorePassphrase = "restore-only-passphrase"
         fixture.lock.sceneChanged(.inactive)
         XCTAssertNil(model.plainExportedURL); XCTAssertNil(model.exportedURL)
-        XCTAssertEqual(model.exportPassphrase, ""); XCTAssertEqual(model.exportConfirmation, "")
+        XCTAssertEqual(model.exportPassphrase, ""); XCTAssertEqual(model.exportConfirmation, ""); XCTAssertEqual(model.restorePassphrase, "")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+        model.sharePlain(); XCTAssertTrue(fixture.presented.files.isEmpty)
+        fixture.lock.sceneChanged(.background)
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
-        model.sharePlain(); XCTAssertTrue(fixture.presented.files.isEmpty); model.close()
+        model.close()
+    }
+
+    func test_M0P1b_inactiveDuringPlainExportCleansUncommittedArtifact() async throws {
+        let gate = PlainExportGate(); gate.pauseOnReturn = true
+        let fixture = try fixture(scope: .none, plainExportGate: gate)
+        let model = BackupSettingsModel(service: fixture.backup)
+        model.exportPlain()
+        try await waitUntil { gate.continuation != nil && gate.fileURL != nil }
+        let file = try XCTUnwrap(gate.fileURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+        fixture.lock.sceneChanged(.inactive)
+        gate.resume()
+        try await waitUntil { !model.busy && !FileManager.default.fileExists(atPath: file.path) }
+        XCTAssertNil(model.plainExportedURL)
+        model.close()
+    }
+
+    func test_M0P1b_closingScreenDeletesInactiveHiddenPlainExport() async throws {
+        let fixture = try fixture(scope: .none)
+        let model = BackupSettingsModel(service: fixture.backup)
+        model.exportPlain(); try await waitUntil { model.plainExportedURL != nil && !model.busy }
+        let file = try XCTUnwrap(model.plainExportedURL)
+        fixture.lock.sceneChanged(.inactive)
+        XCTAssertNil(model.plainExportedURL); XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+        model.close()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
     }
 }
