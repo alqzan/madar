@@ -578,6 +578,25 @@ import Testing
                 shape.createdAt = stamp; shape.updatedAt = stamp; shape.writerID = row.writerID
                 var record = try shape.record(); record.fields.removeValue(forKey: "journeyID"); before.append(record)
             }
+            let movement = MadarFrozenMoneyTransactionV13.MoneyTransaction()
+            movement.id = UUID(); movement.createdAt = stamp; movement.updatedAt = stamp; movement.writerID = "synthetic-v12"
+            movement.dayKey = "2026-10-30"; movement.eventAt = stamp; movement.tzID = "Asia/Riyadh"; movement.dayPolicy = "fajr@1"
+            movement.kind = "expense"; movement.amountMinor = 2_100; movement.currency = "SAR"
+            movement.homeAmountMinor = 2_100; movement.homeCurrency = "SAR"; movement.merchant = "synthetic migration purchase"
+            movement.method = "cash"; movement.source = "manual"; movement.reviewState = "ok"
+            old.mainContext.insert(movement)
+            let projectedMovement = MoneyTransaction()
+            projectedMovement.id = movement.id; projectedMovement.createdAt = stamp; projectedMovement.updatedAt = stamp
+            projectedMovement.writerID = movement.writerID; projectedMovement.dayKey = movement.dayKey
+            projectedMovement.eventAt = movement.eventAt; projectedMovement.tzID = movement.tzID; projectedMovement.dayPolicy = movement.dayPolicy
+            projectedMovement.kind = movement.kind; projectedMovement.amountMinor = movement.amountMinor
+            projectedMovement.currency = movement.currency; projectedMovement.homeAmountMinor = movement.homeAmountMinor
+            projectedMovement.homeCurrency = movement.homeCurrency; projectedMovement.merchant = movement.merchant
+            projectedMovement.method = movement.method; projectedMovement.source = movement.source
+            projectedMovement.reviewState = movement.reviewState
+            var movementRecord = try projectedMovement.record(); movementRecord.fields.removeValue(forKey: "categorySource")
+            before.append(movementRecord)
+            before.append(contentsOf: try seedAllRoomMigrationRecords(in: old.mainContext, stamp: stamp))
             try old.mainContext.save()
         }
         try DurableFiles.encode(12, to: generation.appendingPathComponent("SchemaVersion.json"))
@@ -585,6 +604,7 @@ import Testing
         try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: stamp), to: generation.appendingPathComponent("GenerationReady.json"))
         try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
         let sourceHash = try stableGenerationHashes(generation)
+        do {
         let upgraded = try ManagedDataStore(root: root)
         #expect(upgraded.binding.generationID != oldID)
         #expect(try stableGenerationHashes(generation) == sourceHash)
@@ -593,9 +613,12 @@ import Testing
         #expect(rows.count == 2 && rows.allSatisfy { $0.journeyID == nil && $0.fxRateToHome == "0.1" && $0.homeKm == 2_100 })
         #expect(rows.first { $0.id == openID }?.end == nil && rows.first { $0.id == closedID }?.currency == "EGP")
         let expected = try SchemaCompatibility.currentRecords(before, from: 12)
-        #expect(try RecordFingerprint.hash(RecordBridge.all(upgraded.container.mainContext)) == RecordFingerprint.hash(expected))
+        try RecordValidator.validate(expected)
+        #expect(Set(before.map(\.model)).isSuperset(of: ["PrayerLog", "HifzSession", "Entry", "Habit", "HabitLog", "Account", "Category", "MoneyTransaction", "Book", "ReadingSession", "Setting", "WidgetConfig", "DeviceSetting", "PageSchedule", "Trip"]))
+        #expect(try RecordFingerprint.hash(RecordBridge.all(upgraded.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expected))
         let reopened = try ManagedDataStore(root: root)
         #expect(reopened.binding.generationID == upgraded.binding.generationID)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(reopened.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expected))
         let leg = try #require(reopened.container.mainContext.fetch(FetchDescriptor<Trip>()).first { $0.id == openID })
         leg.journeyID = closedID; try reopened.container.mainContext.save()
         let sealed = try BackupCodec.export(records: RecordBridge.all(reopened.container.mainContext), passphrase: "synthetic journey password")
@@ -603,6 +626,7 @@ import Testing
         #expect(checked.records.first { $0.id == openID }?.fields["journeyID"] == .string(closedID.uuidString))
         #expect(checked.records.first { $0.id == closedID }?.fields["journeyID"] == .null)
         #expect(try stableGenerationHashes(generation) == sourceHash)
+        }
     }
     /// V14 adds optional category provenance; a V13 category survives unchanged and remains ineligible for learning.
     @Test func schemaV13UpgradePreservesPurchaseAndLeavesOldCategorySourceNil() throws {
@@ -618,12 +642,15 @@ import Testing
         source.kind = "expense"; source.amountMinor = 4_200; source.currency = "SAR"; source.homeAmountMinor = 4_200
         source.homeCurrency = "SAR"; source.merchant = "مقهى تجريبي"; source.categoryID = categoryID
         source.reviewState = "ok"; source.source = "bank"
+        var before: [DataRecord] = []
         do {
             let oldContainer = try ModelContainer(for: MadarSchemaV13.schema, configurations: [
                 ModelConfiguration("synced", schema: Schema(MadarSchemaV13.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
                 ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV13.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
             oldContainer.mainContext.autosaveEnabled = false
-            oldContainer.mainContext.insert(source); try oldContainer.mainContext.save()
+            oldContainer.mainContext.insert(source)
+            before.append(contentsOf: try seedAllRoomMigrationRecords(in: oldContainer.mainContext, stamp: stamp))
+            try oldContainer.mainContext.save()
         }
 
         let projected = MoneyTransaction(); projected.id = rowID; projected.createdAt = stamp; projected.updatedAt = stamp
@@ -632,8 +659,9 @@ import Testing
         projected.amountMinor = 4_200; projected.currency = "SAR"; projected.homeAmountMinor = 4_200
         projected.homeCurrency = "SAR"; projected.merchant = "مقهى تجريبي"; projected.categoryID = categoryID
         projected.reviewState = "ok"; projected.source = "bank"
-        var before = try projected.record(); before.fields.removeValue(forKey: "categorySource")
-        let records = [before]
+        var projectedRecord = try projected.record(); projectedRecord.fields.removeValue(forKey: "categorySource")
+        before.append(projectedRecord)
+        let records = before
         try DurableFiles.encode(13, to: generation.appendingPathComponent("SchemaVersion.json"))
         try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
         try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID,
@@ -641,13 +669,21 @@ import Testing
         try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil,
             accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
         let sourceHash = try stableGenerationHashes(generation)
+        do {
         let upgraded = try ManagedDataStore(root: root)
         #expect(try stableGenerationHashes(generation) == sourceHash)
         let movement = try #require(upgraded.container.mainContext.fetch(FetchDescriptor<MoneyTransaction>()).first { $0.id == rowID })
         #expect(movement.amountMinor == 4_200 && movement.categoryID == categoryID && movement.categorySource == nil)
         let expected = try SchemaCompatibility.currentRecords(records, from: 13)
-        #expect(expected.first?.fields["categorySource"] == .null)
-        #expect(try RecordFingerprint.hash(RecordBridge.all(upgraded.container.mainContext)) == RecordFingerprint.hash(expected))
+        #expect(expected.first { $0.model == "MoneyTransaction" }?.fields["categorySource"] == .null)
+        try RecordValidator.validate(expected)
+        #expect(Set(records.map(\.model)).isSuperset(of: ["PrayerLog", "HifzSession", "Entry", "Habit", "HabitLog", "Account", "Category", "MoneyTransaction", "Book", "ReadingSession", "Setting", "WidgetConfig", "DeviceSetting", "PageSchedule"]))
+        #expect(try RecordFingerprint.hash(RecordBridge.all(upgraded.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expected))
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(reopened.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expected))
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        }
     }
 
     @Test func schemaV11UpgradeKeepsHabitTimesWithoutADiaryLinkAndReopen() throws {
@@ -802,6 +838,79 @@ import Testing
             }
         }
         return result
+    }
+    private func seedAllRoomMigrationRecords(in context: ModelContext, stamp: Date) throws -> [DataRecord] {
+        var records: [DataRecord] = []
+        func save(_ row: any MadarRecordModel) throws {
+            context.insert(row)
+            records.append(try row.record())
+        }
+
+        let prayer = PrayerLog()
+        prayer.dayKey = "2026-10-30"; prayer.prayer = "dhuhr"; prayer.status = "alone"
+        prayer.eventAt = stamp; prayer.tzID = "Asia/Riyadh"; prayer.dayPolicy = "prayerDay@1"
+        prayer.loggedAt = stamp; prayer.writerID = "synthetic-room-fixture"
+        try save(prayer)
+
+        let quran = HifzSession()
+        quran.dayKey = "2026-10-30"; quran.endedAt = stamp; quran.tzID = "Asia/Riyadh"; quran.dayPolicy = "fajr@1"
+        quran.kind = "hifz"; quran.fromAyah = 4; quran.toAyah = 6; quran.pages = [42]; quran.mistakes = 1
+        quran.method = "coach"; quran.writerID = "synthetic-room-fixture"
+        try save(quran)
+
+        let entry = Entry()
+        entry.dayKey = "2026-10-30"; entry.eventAt = stamp; entry.tzID = "Asia/Riyadh"; entry.dayPolicy = "fajr@1"
+        entry.text = "synthetic migration diary entry"; entry.writerID = "synthetic-room-fixture"
+        try save(entry)
+
+        let habit = Habit()
+        habit.name = "synthetic migration habit"; habit.kind = "custom"; habit.writerID = "synthetic-room-fixture"
+        try save(habit)
+        let habitLog = HabitLog()
+        habitLog.habitID = habit.id; habitLog.periodKey = "2026-10-30"; habitLog.value = 2
+        habitLog.eventAt = stamp; habitLog.tzID = "Asia/Riyadh"; habitLog.dayPolicy = "fajr@1"
+        habitLog.writerID = "synthetic-room-fixture"
+        try save(habitLog)
+
+        let account = Account()
+        account.name = "synthetic migration account"; account.kind = "savings"; account.currency = "SAR"
+        account.balanceMinor = 125_000; account.writerID = "synthetic-room-fixture"
+        try save(account)
+        let category = Category()
+        category.name = "synthetic migration category"; category.icon = "cup.and.saucer"; category.color = "clay"
+        category.order = 3; category.writerID = "synthetic-room-fixture"
+        try save(category)
+
+        let book = Book()
+        book.title = "synthetic migration book"; book.author = "fixture"; book.kind = "paper"; book.shelf = "reading"
+        book.pages = 120; book.currentPage = 37; book.readCount = 1; book.writerID = "synthetic-room-fixture"
+        try save(book)
+        let reading = ReadingSession()
+        reading.bookID = book.id; reading.start = stamp.addingTimeInterval(-900); reading.end = stamp
+        reading.activeSeconds = 900; reading.fromPage = 34; reading.toPage = 37; reading.pagesCounted = 3
+        reading.startProgression = 0.27; reading.endProgression = 0.31; reading.dayKey = "2026-10-30"
+        reading.tzID = "Asia/Riyadh"; reading.dayPolicy = "fajr@1"; reading.writerID = "synthetic-room-fixture"
+        try save(reading)
+
+        let setting = Setting()
+        setting.key = "core.firstCalendar"; setting.valueJSON = Data("\"hijri\"".utf8)
+        setting.writerID = "synthetic-room-fixture"
+        try save(setting)
+        let widget = WidgetConfig()
+        widget.name = "synthetic migration widget"; widget.familyID = "small"; widget.items = ["prayer.today"]
+        widget.styleJSON = Data("{}".utf8); widget.writerID = "synthetic-room-fixture"
+        try save(widget)
+
+        let deviceSetting = DeviceSetting()
+        deviceSetting.key = "synthetic.migration.fixture"; deviceSetting.valueJSON = Data("true".utf8)
+        deviceSetting.writerID = "synthetic-room-fixture"
+        try save(deviceSetting)
+        let schedule = PageSchedule()
+        schedule.page = 77; schedule.stage = 4; schedule.ease = 1.2; schedule.nextDue = "2026-11-02"
+        schedule.lastReviewedAt = stamp; schedule.lastGrade = "good"; schedule.scheduleVersion = 1
+        schedule.writerID = "synthetic-room-fixture"
+        try save(schedule)
+        return records
     }
     private func stableGenerationHashes(_ directory: URL) throws -> [String:String] {
         let files = try #require(FileManager.default.enumerator(atPath: directory.path))
