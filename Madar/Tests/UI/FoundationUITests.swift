@@ -1324,9 +1324,9 @@ import XCTest
         finishOnboarding(app)
         let settings = app.buttons["tab-customize"]
         XCTAssertTrue(settings.waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertTrue(app.tabBars.buttons["الصلاة"].exists, "The M1 prayer screen is the first built room.")
-        XCTAssertTrue(app.tabBars.buttons["القرآن"].exists, "M2 Quran home is now built.")
-        let mihbara = app.tabBars.buttons["المحبرة"]
+        XCTAssertTrue(app.buttons["الصلاة"].exists, "The M1 prayer screen is the first built room.")
+        XCTAssertTrue(app.buttons["القرآن"].exists, "M2 Quran home is now built.")
+        let mihbara = app.buttons["المحبرة"]
         XCTAssertTrue(mihbara.waitForExistence(timeout: 8), app.debugDescription)
         attachScreenshot(app, named: "M0-native-glass-room-shortcuts-L")
         mihbara.tap()
@@ -1344,7 +1344,7 @@ import XCTest
         app.launch(); finishOnboarding(app)
 
         func openPrayer(_ target: XCUIApplication) {
-            let tab = target.tabBars.buttons["الصلاة"]
+            let tab = target.buttons["الصلاة"]
             XCTAssertTrue(tab.waitForExistence(timeout: 10), target.debugDescription)
             tab.tap()
             XCTAssertTrue(target.staticTexts["الصلاة"].waitForExistence(timeout: 10), target.debugDescription)

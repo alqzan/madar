@@ -274,16 +274,17 @@ import MadarData
         XCTAssertTrue(fixture.presented.files.isEmpty); XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
     }
 
-    func test_M0P1b_modelRevokesCachedURLsAndPassphrasesWithoutDeletingCompletedExport() async throws {
+    func test_M0P1b_modelRevokesCachedURLsAndPassphrasesAndDeletesCompletedExport() async throws {
         let fixture = try fixture(scope: .none)
         let model = BackupSettingsModel(service: fixture.backup)
         model.exportPlain(); try await waitUntil { model.plainExportedURL != nil && !model.busy }
         let file = try XCTUnwrap(model.plainExportedURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
         model.exportPassphrase = "test-only-passphrase"; model.exportConfirmation = model.exportPassphrase
         fixture.lock.sceneChanged(.inactive)
         XCTAssertNil(model.plainExportedURL); XCTAssertNil(model.exportedURL)
         XCTAssertEqual(model.exportPassphrase, ""); XCTAssertEqual(model.exportConfirmation, "")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
         model.sharePlain(); XCTAssertTrue(fixture.presented.files.isEmpty); model.close()
     }
 }
