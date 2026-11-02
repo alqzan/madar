@@ -1,5 +1,7 @@
 # Current milestone
 
+As of 2 Nov 2026: the goal is the first internal TestFlight build; Codex works the «قبل TestFlight» cards. The paragraph below is the 27 Oct state.
+
 As of 27 Oct 2026: M0–M6 software is integrated on main (M5 has its bounded gate report) and M7 final integration is open. The owner reviewed 105 screens on 26 Oct (51 «موافق», 54 change requests) → rows OR-01…OR-32 in «Owner review page — 26 Oct» below, the current queue.
 Owner-iPhone acceptance is NOT done yet (device signing needs the paid Apple Developer account); everything is verified on the simulator only. M7 software already has guarded prayer/letter/travel Activities, the availability-gated iOS 27 widget, title-only opt-in Spotlight, privacy manifests, local PDF OCR/search, Zakat sources and store/privacy text in Madar/Distribution; direct @als stays optional and deferred.
 M7 is NOT complete: manual source/render trace, owner-device/system and iOS 27 runtime proof, resource release evidence, real-device performance and signed distribution/public store details remain.
@@ -7,7 +9,7 @@ CloudKit: owner clarified 31 Oct that v1 stays local-only under RA1. Keep CloudK
 
 # How to use this board
 
-- Take the first `ready` row. «Owner review page — 26 Oct» (OR-01…OR-32) is the current queue and comes first; «Next work» is the older numbered queue (list items, not table rows): go down it for anything still `in progress` or `ready`.
+- **Now (owner, 2 Nov): «قبل TestFlight» (TF-01…TF-08) is the only queue, in order, under a feature freeze.** Take its first `ready` card; when TF-01…TF-07 are done, wait for TF-08 (Apple). Other sections (Owner review page OR-…, Next work, CN-…) are history or wait until after the first TestFlight build; do not start them now. CN-05 (signed local run on the owner's iPhone) is folded into TF-08.
 - Status values and the visual-acceptance rule are under «# Board»; only the owner sets `approved`. Owner decisions and conflicts: `docs/DECISIONS.md`; open questions: «Waiting on the owner» and «Ideas».
 - Finished sections (every row approved, done or deferred) live in `docs/archive/PROGRESS-2026-10-27-finished-sections.md`; the index «Finished sections (archived 27 Oct)» below lists their card IDs.
 - Older «Last checked» lines are in `docs/archive/progress-last-checked.md`; older handovers in `docs/archive/handovers-2026-10-26.md`.
@@ -30,6 +32,23 @@ CloudKit: owner clarified 31 Oct that v1 stays local-only under RA1. Keep CloudK
 Status values: `ready` · `in progress` · `blocked: <reason>` · `matched — awaiting owner` · `approved` (owner only) · `done` (engines and flows without a screen).
 
 Every screen card follows protocol §2: canonical files → default-size screenshots → `python3 Madar/scripts/compare-screens.py <board> <shots>` → fix → `matched — awaiting owner` (default text size only; no enlarged-text testing, owner 13 October 2026). Spec for every prayer card: §7.2 `docs/HANDOFF/sections/09-r-salah.md` (the part for that screen), §5 shapes `05-ds.md`, and the fixes listed.
+
+## قبل TestFlight — 2 نوفمبر 2026 (Claude لكوديكس؛ المالك: «فرق بين الشغل الي تحتاجني فيه وبين الشغل الي يسوي الاي اي»)
+
+Codex takes these first, in order, before any other queue. Feature freeze until the first TestFlight build: no new features, no refactors or file splits, no new AI scope, no data-model change without a tested migration, no new visual-acceptance rounds (the owner will judge on TestFlight). None of TF-01…TF-07 waits on Apple. Haiku helpers hunt while each run goes; the main agent verifies and fixes.
+
+| Card | Work | Done when | Status |
+|---|---|---|---|
+| TF-01 | Full UI + integration suites on iPhone 18 Pro / iOS 27.0 (most long runs so far were iOS 26.5). Owner 2 Nov: his iPhone runs iOS 27.2 or newer; also run the suites on the newest iOS 27.x simulator runtime Xcode offers (download allowed). | Every failure fixed or its cause recorded; counts and xcresult names in the row. | ready |
+| TF-02 | Owner real-data trial again on iOS 27 (owner, 2 Nov: «ابي نجرب عليها» — use the old-app export he sent around 22 Oct, already on this Mac and used in Next work 19 / `Madar/Artifacts/owner-data`; no new export needed): import a copy into a separate simulator test store; walk every room (prayer, Quran, diary, habits, money, Mihbara). | No crash, no wrong number, no dead end; each mismatch fixed or recorded. Never the owner's real store, never off the Mac. | ready |
+| TF-03 | Backup round trip: encrypted backup → delete app → reinstall → restore; photos and book files included; automatic backup actually scheduled and written. | UI/integration test covers it and passes; restored counts equal the originals. | ready |
+| TF-04 | Migration to V14 from older stores (V12, V13 fixtures with records in every room). | Tests prove no record is lost or changed; from TestFlight on, every model change ships with such a test. | ready |
+| TF-05 | Release gate: Release build on iOS 27, `check-shipping-sources.py`, `check-review-contracts.py`, prayer sanctity window on iOS 27 (nothing from adhan to +30 min, Maghrib +20), widgets read snapshots on iOS 27. | Command output in the row; `docs/reports/M7.md` gate table filled. | ready |
+| TF-06 | Haiku bug hunt per room on everything changed since 25 Oct, especially new payload keys a command validator does not allow yet (the 2 Nov `money.logExpense`/`categorySource` bug) and silent save rejections. | Verified findings fixed with tests. | ready |
+| TF-07 | Store prep without Apple: privacy label answers, encryption export-compliance answer (backup uses standard encryption), App Review notes current, `privacy.html`/`support.html` ready to publish. Owner 2 Nov: host both pages on GitHub Pages (owner creates or approves the repository/account step); support email `alqazan.u@gmail.com` in `support.html`, `privacy.html` and `store-metadata.json` (`supportURL`, `privacyPolicyURL` once the Pages URLs exist). | Text ready in `Madar/Distribution/`; Pages URLs filled after publishing (publishing is outward-facing: confirm with the owner first). | ready |
+| TF-08 | After Apple approves and the owner signs in to Xcode: app and widget profiles with `group.com.alqzan.madar2`, CloudKit entitlement empty, signed archive from a clean `main` commit, upload to App Store Connect, internal TestFlight. | Build processed in App Store Connect; build number and commit in the row. | blocked: Apple developer account review |
+
+**Owner only (no agent can do these):** (1) wait for Apple's account approval; (2) accept the App Store Connect agreements; (3) sign in to Xcode with the Apple ID on this Mac once; (4) create the «مدار» app record in App Store Connect, or approve agent-prepared fields; (5) done 2 Nov: iPhone on iOS 27.2+, Apple Intelligence on; (6) install TestFlight and accept the invite; (7) old-app data already sent ~22 Oct (owner, 2 Nov); a fresh export only for the final move to the phone; (8) make the first encrypted backup on the phone and keep its passphrase; (9) done 2 Nov: GitHub Pages, support email `alqazan.u@gmail.com`; (10) «Waiting on the owner» answered 2 Nov. Items 5 and 7 do not wait on Apple.
 
 ## Owner follow-up — 1 Nov 2026
 
@@ -190,23 +209,6 @@ Six read-only Sonnet audits compared canonical screens with the newest screensho
 | AU-97 | قفل واحد لكل ورقة أثناء الحفظ (ملاحظة Claude للمالك ١ نوفمبر، المالك: «نعم، وحّده») | `madarSheetLock(saving:draft:)` و`madarWaitsForSave()` في `Madar/App/MadarSheetLock.swift`؛ القفل يقرأ أيضًا `AppSession.userWriteInProgress` (يُعدّ في `beginWrite`/`endWrite` فقط، بلا تفريغ الصندوق ولا الإشعارات). ٣٦ قفلًا حُوّلت بالقيمة المنطقية نفسها، ٨ أزرار إغلاق صارت محمية. خطافات الانتظار في الاختبار في `holdWriteForUITest`. بناء المحاكي نجح؛ ٥/٥ اختبارات واجهة (إعدادات المال، الهدف، الزكاة، الراتب، يوم العادة الماضي) على iPhone 17 Pro / iOS 26.5. | done (Claude) |
 
 OR-03 current source and proof are in the live row above. The earlier widgetScope, smartPresence and X3 behavior gaps were implemented and verified on 27 Oct; do not treat the old placeholder-control note as current. The actual OS gallery/action and iOS 27 runtime checks remain open.
-
-## قبل TestFlight — 2 نوفمبر 2026 (Claude لكوديكس؛ المالك: «فرق بين الشغل الي تحتاجني فيه وبين الشغل الي يسوي الاي اي»)
-
-Codex takes these first, in order, before any other queue. Feature freeze until the first TestFlight build: no new features, no refactors or file splits, no new AI scope, no data-model change without a tested migration, no new visual-acceptance rounds (the owner will judge on TestFlight). None of TF-01…TF-07 waits on Apple. Haiku helpers hunt while each run goes; the main agent verifies and fixes.
-
-| Card | Work | Done when | Status |
-|---|---|---|---|
-| TF-01 | Full UI + integration suites on iPhone 18 Pro / iOS 27.0 (most long runs so far were iOS 26.5). Owner 2 Nov: his iPhone runs iOS 27.2 or newer; also run the suites on the newest iOS 27.x simulator runtime Xcode offers (download allowed). | Every failure fixed or its cause recorded; counts and xcresult names in the row. | ready |
-| TF-02 | Owner real-data trial again on iOS 27 (owner, 2 Nov: «ابي نجرب عليها» — use the old-app export he sent around 22 Oct, already on this Mac and used in Next work 19 / `Madar/Artifacts/owner-data`; no new export needed): import a copy into a separate simulator test store; walk every room (prayer, Quran, diary, habits, money, Mihbara). | No crash, no wrong number, no dead end; each mismatch fixed or recorded. Never the owner's real store, never off the Mac. | ready |
-| TF-03 | Backup round trip: encrypted backup → delete app → reinstall → restore; photos and book files included; automatic backup actually scheduled and written. | UI/integration test covers it and passes; restored counts equal the originals. | ready |
-| TF-04 | Migration to V14 from older stores (V12, V13 fixtures with records in every room). | Tests prove no record is lost or changed; from TestFlight on, every model change ships with such a test. | ready |
-| TF-05 | Release gate: Release build on iOS 27, `check-shipping-sources.py`, `check-review-contracts.py`, prayer sanctity window on iOS 27 (nothing from adhan to +30 min, Maghrib +20), widgets read snapshots on iOS 27. | Command output in the row; `docs/reports/M7.md` gate table filled. | ready |
-| TF-06 | Haiku bug hunt per room on everything changed since 25 Oct, especially new payload keys a command validator does not allow yet (the 2 Nov `money.logExpense`/`categorySource` bug) and silent save rejections. | Verified findings fixed with tests. | ready |
-| TF-07 | Store prep without Apple: privacy label answers, encryption export-compliance answer (backup uses standard encryption), App Review notes current, `privacy.html`/`support.html` ready to publish. Owner 2 Nov: host both pages on GitHub Pages (owner creates or approves the repository/account step); support email `alqazan.u@gmail.com` in `support.html`, `privacy.html` and `store-metadata.json` (`supportURL`, `privacyPolicyURL` once the Pages URLs exist). | Text ready in `Madar/Distribution/`; Pages URLs filled after publishing (publishing is outward-facing: confirm with the owner first). | ready |
-| TF-08 | After Apple approves and the owner signs in to Xcode: app and widget profiles with `group.com.alqzan.madar2`, CloudKit entitlement empty, signed archive from a clean `main` commit, upload to App Store Connect, internal TestFlight. | Build processed in App Store Connect; build number and commit in the row. | blocked: Apple developer account review |
-
-**Owner only (no agent can do these):** (1) wait for Apple's account approval; (2) accept the App Store Connect agreements; (3) sign in to Xcode with the Apple ID on this Mac once; (4) create the «مدار» app record in App Store Connect, or approve agent-prepared fields; (5) done 2 Nov: iPhone on iOS 27.2+, Apple Intelligence on; (6) install TestFlight and accept the invite; (7) old-app data already sent ~22 Oct (owner, 2 Nov); a fresh export only for the final move to the phone; (8) make the first encrypted backup on the phone and keep its passphrase; (9) done 2 Nov: GitHub Pages, support email `alqazan.u@gmail.com`; (10) «Waiting on the owner» answered 2 Nov. Items 5 and 7 do not wait on Apple.
 
 ## ملاحظات Claude لكوديكس — 1 نوفمبر 2026 (المالك: «اكتب ملاحظاتك لكوديكس عشان الجلسه الثانيه يعدلها»)
 
