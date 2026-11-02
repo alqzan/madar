@@ -104,6 +104,7 @@ Do not load the whole handoff into context. Each task card in `docs/PROGRESS.md`
 ## Build machine
 
 - The owner's Mac is Apple silicon. Building, the simulator and on-device runs all happen there.
+- Use exactly one simulator: iPhone 15 Pro Max named `Madar 15 Pro Max` on iOS 27.0, with UDID `390840AD-4FF0-476F-8E1D-E0C521A58E45`. Never create or use another simulator device or iOS simulator runtime.
 - A session without macOS (Codex cloud, a Claude Code cloud session) writes code and pure-Swift tests only. It never claims a build or run it could not perform.
 
 ## Milestones
