@@ -524,7 +524,6 @@ final class PrayerNotificationCoordinator {
 
     private func reconcilePrayerActivity(prayerSlots: [PrayerNotificationSlot], sanctityWindows: [SanctityWindow], repository: PrayerRepository,
                                          now: Date, session: AppSession) async throws {
-        guard #available(iOS 26.0, *) else { return }
         let activities = Activity<PrayerCountdownAttributes>.activities.filter {
             $0.activityState == .active || $0.activityState == .pending || $0.activityState == .stale
         }
@@ -611,7 +610,7 @@ final class PrayerNotificationCoordinator {
     /// Context surfaces have no alert configuration, but RL5 still budgets every start and gates its window.
     private func reconcileContextActivities(prayerDays: [PrayerDay], prayerSlots: [PrayerNotificationSlot], sanctityWindows: [SanctityWindow],
                                             repository: PrayerRepository, now: Date, session: AppSession) async throws {
-        guard #available(iOS 26.0, *), UIApplication.shared.applicationState == .active else { return }
+        guard UIApplication.shared.applicationState == .active else { return }
 
         let eligibleLetterAt: Date?
         if session.lockController?.canPresent(.notes) ?? session.protectedDataAuthorized {

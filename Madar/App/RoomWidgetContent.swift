@@ -18,7 +18,7 @@ struct RoomWidgetContent:View {
     @Environment(\.widgetRenderingMode) private var rendering
     private var theme:RoomTheme{.init(room:room == .mihbara ? "mihbara" : "bahw",dark:scheme == .dark)}
     private var accent:Color{rendering == .fullColor ? theme.accent : .primary}
-    private var extraLargePortrait:Bool {if #available(iOS 27.0, *) {family == .systemExtraLargePortrait} else {false}}
+    private var extraLargePortrait: Bool { family == .systemExtraLargePortrait }
     private var largeHome:Bool {family == .systemLarge || extraLargePortrait}
     private var capacity:Int {let n=template == "coming" && family == .systemSmall ? 1 : extraLargePortrait ? 7 : largeHome ? 5 : family == .systemMedium ? (room == .upcoming ? 4 : 3) : room == .habits ? 3 : 2;return type.isAccessibilitySize ? (n+1)/2 : n}
     private var rows:[RoomWidgetSnapshot.Row] {
@@ -186,7 +186,7 @@ private struct MihbaraRoomWidgetContent:View {
     @Environment(\.colorScheme) private var scheme
     private var theme:RoomTheme{.init(room:"mihbara",dark:scheme == .dark)}
     private var digits:MadarNumberFormatter{.init(style:numerals == "western" ? .western : .hindi)}
-    private var extraLargePortrait:Bool {if #available(iOS 27.0, *) {family == .systemExtraLargePortrait} else {false}}
+    private var extraLargePortrait: Bool { family == .systemExtraLargePortrait }
     private var largeHome:Bool {family == .systemLarge || extraLargePortrait}
     private var bookTitle:String?{snapshot?.currentBook?.title.trimmingCharacters(in:.whitespacesAndNewlines).nonEmpty}
     private var fallbackTitle:String?{bookTitle ?? snapshot?.hadithToday?.title}

@@ -10,7 +10,7 @@ struct MoneyWidgetContent: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var type
     @Environment(\.widgetRenderingMode) private var rendering
-    private var extraLargePortrait: Bool { if #available(iOS 27.0, *) { family == .systemExtraLargePortrait } else { false } }
+    private var extraLargePortrait: Bool { family == .systemExtraLargePortrait }
     private var largeHome: Bool { family == .systemLarge || extraLargePortrait }
     private var accessory: Bool { [.accessoryInline, .accessoryCircular, .accessoryRectangular].contains(family) }
     private func color(_ key: String) -> Color { if rendering != .fullColor { return .primary }; return MadarToken.colors["widgetIdentity.room.mal.\(scheme == .dark ? "dark" : "light").\(key)"] ?? .primary }

@@ -5,10 +5,8 @@ import MadarSnapshots
 
 enum MadarWidgetFamilies {
     static var homeAndAccessories: [WidgetFamily] {
-        var families: [WidgetFamily] = [.systemSmall, .systemMedium, .systemLarge]
-        if #available(iOS 27.0, *) { families.append(.systemExtraLargePortrait) }
-        families += [.accessoryCircular, .accessoryRectangular, .accessoryInline]
-        return families
+        [.systemSmall, .systemMedium, .systemLarge, .systemExtraLargePortrait,
+         .accessoryCircular, .accessoryRectangular, .accessoryInline]
     }
 }
 
@@ -75,7 +73,7 @@ struct NextPrayerView: View {
     @Environment(\.widgetFamily) private var environmentFamily
     var previewFamily:WidgetFamily? = nil
     private var family:WidgetFamily {previewFamily ?? environmentFamily}
-    private var extraLargePortrait:Bool {if #available(iOS 27.0, *) {family == .systemExtraLargePortrait} else {false}}
+    private var extraLargePortrait: Bool { family == .systemExtraLargePortrait }
     @Environment(\.widgetRenderingMode) private var rendering
 
     private var state: PrayerNextSnapshot.State? { entry.snapshot?.state(at: entry.date) }

@@ -20,7 +20,7 @@ struct WidgetMakerContent: View {
     private var style: WidgetMakerStyle { config.flatMap { try? JSONDecoder().decode(WidgetMakerStyle.self, from: $0.styleJSON) } ?? .init() }
     private var accessory: Bool { [.accessoryCircular, .accessoryRectangular, .accessoryInline].contains(family) }
     private var capacity: Int {
-        if #available(iOS 27, *), family == .systemExtraLargePortrait { return WidgetMakerStyle.capacity(for: "extraLargePortrait") }
+        if family == .systemExtraLargePortrait { return WidgetMakerStyle.capacity(for: "extraLargePortrait") }
         switch family { case .systemSmall: return WidgetMakerStyle.capacity(for: "small"); case .systemMedium: return WidgetMakerStyle.capacity(for: "medium"); case .systemLarge: return WidgetMakerStyle.capacity(for: "large"); case .accessoryRectangular: return WidgetMakerStyle.capacity(for: "accessoryRectangular"); default: return 1 }
     }
     private var theme: RoomTheme { Self.theme(style, dark: colorScheme == .dark) }
@@ -128,11 +128,7 @@ struct WidgetMakerAppSurface: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     func body(content: Content) -> some View {
         if style.family == "glass" && style.surface != "lock" && !reduceTransparency {
-            if #available(iOS 26, *) {
-                content.glassEffect(.regular.interactive(interactive), in: .rect(cornerRadius: cornerRadius))
-            } else {
-                content.background(.regularMaterial, in: .rect(cornerRadius: cornerRadius))
-            }
+            content.glassEffect(.regular.interactive(interactive), in: .rect(cornerRadius: cornerRadius))
         } else {
             content.background(WidgetMakerContent.background(style, dark: dark), in: .rect(cornerRadius: cornerRadius))
         }
@@ -142,7 +138,6 @@ struct WidgetMakerAppSurface: ViewModifier {
 struct WidgetMakerGlassGroup<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {
-        if #available(iOS 26, *) { GlassEffectContainer(spacing: 6) { content } }
-        else { content }
+        GlassEffectContainer(spacing: 6) { content }
     }
 }

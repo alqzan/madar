@@ -156,19 +156,10 @@ private struct QuranKhatmaMomentSheet: View {
     }
 
     @ViewBuilder private var doneButton: some View {
-        if #available(iOS 26.0, *) {
-            Button("تمّ", action: close)
-                .font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .body))
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .buttonStyle(.glass)
-                .accessibilityIdentifier("quran-khatma-moment-dismiss")
-        } else {
-            Button("تمّ", action: close)
-                .font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .body))
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .foregroundStyle(theme.onAccent)
-                .background(theme.accent, in: Capsule())
-                .accessibilityIdentifier("quran-khatma-moment-dismiss")
-        }
+        Button("تمّ", action: close)
+            .font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .body))
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .buttonStyle(.glass)
+            .accessibilityIdentifier("quran-khatma-moment-dismiss")
     }
 }

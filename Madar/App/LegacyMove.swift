@@ -282,7 +282,7 @@ extension AppSession {
                 // A possible duplicate is never confirmed for the owner; it waits in review like any other.
                 guard row.reviewState != "ok", row.reviewState != "possibleDuplicate" else { continue }
                 if let sourceCategory, row.categoryID != category(sourceCategory) {
-                    _ = await run("money.categorize", ["id": .string(transaction.uuidString), "categoryID": .string(category(sourceCategory).uuidString), "remember": .bool(false)],
+                    _ = await run("money.categorize", ["id": .string(transaction.uuidString), "categoryID": .string(category(sourceCategory).uuidString), "categorySource": .string("rule")],
                                   StableIdentity.uuid(for: "LegacyCategorize:" + transaction.uuidString), "categorize")
                 }
                 _ = await run("money.confirmTransaction", ["id": .string(transaction.uuidString)], StableIdentity.uuid(for: "LegacyConfirm:" + transaction.uuidString), "confirm")

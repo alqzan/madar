@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import MapKit
 
 /// Owner, 30 Oct 2026: «استخدم موقعي» fills the city form once. The position is read one time, turned into a city name,
 /// time zone and country by the system geocoder, and thrown away: only the city the reader confirms is saved.
@@ -48,8 +49,16 @@ import Foundation
             guard self.working else { return }
             self.working = false; self.timeout?.cancel()
             do {
-                guard let place = try await CLGeocoder().reverseGeocodeLocation(location).first, let code = place.isoCountryCode, let zone = place.timeZone else { self.fail("لم أعرف مدينة هذا الموقع؛ اختر مدينتك من القائمة."); return }
-                let name = place.locality ?? place.administrativeArea ?? place.name ?? ""
+                guard let request = MKReverseGeocodingRequest(location: location) else {
+                    self.fail("لم أعرف مدينة هذا الموقع؛ اختر مدينتك من القائمة."); return
+                }
+                let items = try await request.mapItems
+                guard let place = items.first,
+                      let code = place.addressRepresentations?.region?.identifier,
+                      let zone = place.timeZone else {
+                    self.fail("لم أعرف مدينة هذا الموقع؛ اختر مدينتك من القائمة."); return
+                }
+                let name = place.addressRepresentations?.cityName ?? place.name ?? ""
                 let currency = Locale(identifier: "en_" + code).currency?.identifier ?? ""
                 let found = Found(name: name, lat: location.coordinate.latitude, lon: location.coordinate.longitude, tz: zone.identifier, country: code, currency: currency)
                 self.onFound?(found); self.onFound = nil

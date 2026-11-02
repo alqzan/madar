@@ -189,6 +189,65 @@ struct DiaryHomeSnapshot {
             editable: Set(entries.filter { $0.mediaID == nil && $0.source != "autoPinned" && ["normal", "late", "ghad"].contains($0.ink) }.map(\.id.uuidString)),
             deletable: deletable)
     }
+
+    /// Authored text for a user-requested, temporary AI analysis.
+    /// Sealed letters, photos, generated lines, and deleted/replaced revisions are excluded.
+    func analysisRecords(from start: GregorianDay? = nil, through end: GregorianDay? = nil) throws -> [MadarAIDiaryRecord] {
+        try authorizeRead()
+        let context = ModelContext(app.container)
+        let allEntries = try context.fetch(FetchDescriptor<Entry>(
+            predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil },
+            sortBy: [SortDescriptor(\.eventAt)]
+        ))
+        let entries = Self.visible(allEntries).filter { row in
+            guard row.source != "autoPinned", ["normal", "late", "ghad"].contains(row.ink),
+                  !row.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let day = try? GregorianDay(row.dayKey) else { return false }
+            return (start.map { day >= $0 } ?? true) && (end.map { day <= $0 } ?? true)
+        }
+        var records = entries.compactMap { row -> MadarAIDiaryRecord? in
+            guard let day = try? GregorianDay(row.dayKey) else { return nil }
+            let text = row.textFormat == "markdown" ? DayOneMarkdown.plain(row.text) : row.text
+            return .init(id: row.id.uuidString, dayKey: day.description, kind: "كتابة", text: text)
+        }
+
+        let intentions = try context.fetch(FetchDescriptor<Niyya>(
+            predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }
+        )).filter { row in
+            guard let day = try? GregorianDay(row.dayKey) else { return false }
+            return (start.map { day >= $0 } ?? true) && (end.map { day <= $0 } ?? true)
+                && !row.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        records += intentions.map {
+            .init(id: "intention." + $0.id.uuidString, dayKey: $0.dayKey, kind: "نيّة", text: $0.text)
+        }
+
+        func inAnalysisRange(_ key: String) -> GregorianDay? {
+            guard let day = try? GregorianDay(key), (start.map { day >= $0 } ?? true),
+                  (end.map { day <= $0 } ?? true) else { return nil }
+            return day
+        }
+        let margins = try context.fetch(FetchDescriptor<MarginNote>(
+            predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }
+        )).compactMap { row -> MadarAIDiaryRecord? in
+            guard !row.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            let written = inAnalysisRange(row.writtenDayKey)
+            let target = inAnalysisRange(row.targetDayKey)
+            guard written != nil || target != nil,
+                  let writtenDate = try? GregorianDay(row.writtenDayKey),
+                  let targetDate = try? GregorianDay(row.targetDayKey) else { return nil }
+            // A margin is visible on both its writing day and its target page; include it once per selected scope.
+            let displayDay = written ?? target ?? writtenDate
+            let prefix = targetDate == writtenDate
+                ? "هامش: "
+                : "هامش على \(bothDates(targetDate, calendar: .gregorian))، كُتب في \(bothDates(writtenDate, calendar: .gregorian)): "
+            return .init(id: "margin." + row.id.uuidString, dayKey: displayDay.description, kind: "هامش", text: prefix + row.text)
+        }
+        records += margins
+
+        return records.sorted { $0.dayKey == $1.dayKey ? $0.id < $1.id : $0.dayKey < $1.dayKey }
+    }
+
     func dateTitle(_ day: GregorianDay, calendar: FirstCalendar) -> String {
         let labels = dateLabels(day, first: calendar)
         let suffix = calendar == .hijri ? " هـ" : " م"

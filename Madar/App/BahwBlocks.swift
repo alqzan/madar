@@ -56,7 +56,6 @@ struct BahwBlockView: View {
         case .year: year
         case .upcoming: upcoming
         case .mihbara: mihbara
-        default: EmptyView()
         }
     }
     private var mihbara: some View {

@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "MadarQuran",
-    platforms: [.iOS(.v26), .macOS(.v26)],
+    platforms: [.iOS("27.0"), .macOS(.v26)],
     products: [.library(name: "MadarQuran", targets: ["MadarQuran"])],
     dependencies: [.package(path: "../MadarCore")],
     targets: [

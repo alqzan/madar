@@ -198,7 +198,7 @@ struct DiaryHomeView: View {
         if pendingDiaryRootRequestID != nil {
             queuedDiaryRoute = nil
             applyPendingDiaryRootIfReady()
-        } else if let route = queuedDiaryRoute {
+        } else if queuedDiaryRoute != nil {
             applyQueuedDiaryRouteIfReady()
         } else {
             applyPendingDiaryRootIfReady()

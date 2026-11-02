@@ -32,7 +32,7 @@ private struct QuranWidgetView: View {
     let entry: QuranWidgetEntry
     @Environment(\.widgetFamily) private var family
     @Environment(\.colorScheme) private var scheme
-    private var extraLargePortrait: Bool { if #available(iOS 27.0, *) { family == .systemExtraLargePortrait } else { false } }
+    private var extraLargePortrait: Bool { family == .systemExtraLargePortrait }
     var body: some View {
         Group {
             if family == .accessoryInline { Text("القرآن، " + (entry.value?.nextDetail ?? "افتح مدار")) }

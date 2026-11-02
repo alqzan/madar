@@ -94,7 +94,7 @@
     },
     {
       "path": "Madar/App/MihbaraPDFReaderView.swift",
-      "anchor": "private struct MihbaraPDFSearchView",
+      "anchor": "MihbaraPDFSearchView(app: app, book: book)",
       "availability": "v1 owner 19 Oct",
       "flow": "Ephemeral on-device PDF OCR/search; source-page jump and cancellation; no original-file rewrite."
     },

@@ -407,7 +407,7 @@ struct QuranTafsirLibraryView: View {
             Text(book.title).font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
             Text(book.author).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             HStack {
-                Text("نحو \(digits.string((book.sizeBytes + 524_288) / 1_048_576)) م.ب · \(digits.string(book.pageCount)) صفحة")
+                Text("نحو \(digits.string((book.sizeBytes + 524_288) / 1_048_576)) م.ب، \(digits.string(book.pageCount)) صفحة")
                     .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 Spacer()
                 if library.books.contains(where: { $0.id == book.id }) {

@@ -32,7 +32,7 @@ struct QuranSessionLogView: View {
             VStack(alignment: .leading, spacing: 12) {
                 QuranScreenHeader(title: "السجلّ", close: close); QuranLogTabs(selection: $selection)
                 if let value {
-                    if let routeUnavailableID {
+                    if routeUnavailableID != nil {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("هذه الجلسة لم تعد موجودة في السجلّ.").font(quranFont(14)).accessibilityIdentifier("quran-history-route-unavailable")
                             Button("اعرض السجل الكامل") { self.routeUnavailableID = nil; filter = "all" }

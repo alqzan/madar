@@ -167,11 +167,10 @@ struct PaperIndexDocumentScanner: UIViewControllerRepresentable {
 
         private static func recognizeArabicIndex(in image: CGImage) -> OCRResult {
             do {
-                let revision = VNRecognizeTextRequest.currentRevision
-                let languages = try VNRecognizeTextRequest.supportedRecognitionLanguages(for: .accurate, revision: revision)
-                guard let arabic = languages.first(where: { $0 == "ar" || $0.hasPrefix("ar-") }) else { return .arabicUnavailable }
                 let request = VNRecognizeTextRequest()
                 request.recognitionLevel = .accurate
+                let languages = try request.supportedRecognitionLanguages()
+                guard let arabic = languages.first(where: { $0 == "ar" || $0.hasPrefix("ar-") }) else { return .arabicUnavailable }
                 request.recognitionLanguages = [arabic]
                 request.usesLanguageCorrection = true
                 try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])

@@ -34,8 +34,7 @@ struct WidgetMakerView: View {
     private var dirty: Bool { baseline.map { draft != $0 } ?? (!draft.name.isEmpty || !draft.items.isEmpty || draft.style != WidgetMakerStyle()) }
     private var family: WidgetFamily {
         if draft.familyID == "extraLargePortrait" {
-            if #available(iOS 27, *) { return .systemExtraLargePortrait }
-            return .systemLarge
+            return .systemExtraLargePortrait
         }
         return switch draft.familyID { case "small": .systemSmall; case "large": .systemLarge; case "accessoryCircular": .accessoryCircular; case "accessoryRectangular": .accessoryRectangular; case "accessoryInline": .accessoryInline; default: .systemMedium }
     }
@@ -163,9 +162,7 @@ struct WidgetMakerView: View {
         }.padding(14).frame(maxWidth: .infinity).background(LinearGradient(colors: [theme.color("lapis").opacity(0.3), theme.color("amber").opacity(0.3)], startPoint: .top, endPoint: .bottom), in: .rect(cornerRadius: 28))
     }
     private var previewFamilies: [(String, String)] {
-        var families = [("small", "صغيرة"), ("medium", "متوسطة"), ("large", "كبيرة")]
-        if #available(iOS 27, *) { families.append(("extraLargePortrait", "ضخمة")) }
-        return families
+        [("small", "صغيرة"), ("medium", "متوسطة"), ("large", "كبيرة"), ("extraLargePortrait", "ضخمة")]
     }
     private var contentChoices: some View {
         VStack(alignment: .leading, spacing: 10) {

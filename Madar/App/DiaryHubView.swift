@@ -30,8 +30,11 @@ struct DiaryHubView: View {
     #endif
     @State private var injectedArchiveReadFailure = false
     @State private var initialRouteApplied = false
+    @State private var aiComposerOpen = false
+    @State private var aiAvailability: MadarAIAvailability = .checking
     private var service: AppDiaryService { .init(app: app) }
     private var grid: DiaryCalendarGrid { service.diaryCalendar }
+    private var canReadDiary: Bool { app.lockController?.canPresent(.notes) ?? app.protectedDataAuthorized }
     private var selectedYear: Int {
         year ?? archive.map { grid.parts($0.today).year ?? $0.today.year } ?? grid.parts(
             GregorianDay.containing(.now, in: app.activePlace.timeZone)
@@ -125,7 +128,18 @@ struct DiaryHubView: View {
                 .fullScreenCover(isPresented: $bookOpen) { DiaryYearbookView(app: app).environment(\.roomTheme, theme) }
                 .fullScreenCover(isPresented: $exportOpen) { DiaryExportView(app: app).environment(\.roomTheme, theme) }
                 .fullScreenCover(isPresented: $searchOpen) { DiarySearchView(app: app).environment(\.roomTheme, theme) }
+                .sheet(isPresented: $aiComposerOpen) {
+                    MadarAIAnalysisSheet(app: app, kind: .diary, initialScope: .all)
+                        .environment(\.roomTheme, theme)
+                }
                 .toolbar {
+                    if canReadDiary, aiAvailability == .ready || aiAvailability == .needsDownload {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button { aiComposerOpen = true } label: { Image(systemName: "sparkles") }
+                                .accessibilityLabel("اسأل يومياتك")
+                                .accessibilityIdentifier("diary-hub-ai")
+                        }
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             searchOpen = true
@@ -142,6 +156,13 @@ struct DiaryHubView: View {
                     }
                 }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
+                .task(id: "\(app.prayerRevision)-\(canReadDiary)") {
+                    guard canReadDiary else { aiAvailability = .checking; aiComposerOpen = false; return }
+                    aiAvailability = await MadarAIAvailabilityChecker.check()
+                }
+                .onChange(of: canReadDiary) { _, canRead in
+                    if !canRead { aiComposerOpen = false; aiAvailability = .checking }
+                }
                 .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) {
                     if let reader {
                         DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme).madarSheetErrorAlert(app)

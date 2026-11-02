@@ -2,7 +2,7 @@ name: Madar
 options:
   bundleIdPrefix: com.alqzan.madar2
   deploymentTarget:
-    iOS: '26.0'
+    iOS: '27.0'
   developmentLanguage: ar
   createIntermediateGroups: true
 settings:
@@ -103,7 +103,9 @@ targets:
             UTTypeConformsTo: [com.apple.package]
             UTTypeTagSpecification:
               public.filename-extension: [madarbackupset]
-        UIBackgroundModes: [processing, remote-notification]
+        UIBackgroundModes: [processing]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        "UISupportedInterfaceOrientations~ipad": [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         MadarCloudKitContainer: $(MADAR_CLOUDKIT_CONTAINER)
         UIAppFonts:
           - thmanyahsans-Light.otf

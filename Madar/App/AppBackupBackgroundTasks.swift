@@ -99,8 +99,7 @@ import MadarData
         request.earliestBeginDate = earliest
         request.requiresNetworkConnectivity = false
         request.requiresExternalPower = false
-        if #available(iOS 27, *) { try await BGTaskScheduler.shared.submitTaskRequest(request) }
-        else { try BGTaskScheduler.shared.submit(request) }
+        try await BGTaskScheduler.shared.submitTaskRequest(request)
     }
     func cancel() { BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: AppBackupBackgroundTasks.identifier) }
 }

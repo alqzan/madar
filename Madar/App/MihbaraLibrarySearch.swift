@@ -42,7 +42,6 @@ struct MihbaraTextHit: Identifiable {
         guard let publication = try? await MihbaraEPUBLoader.open(at: file) else { return [] }
         defer { publication.close() }
         guard case .success(let iterator) = await publication.search(query: needle, options: SearchOptions(caseSensitive: false, diacriticSensitive: false)) else { return [] }
-        defer { iterator.close() }
         var hits: [MihbaraTextHit] = []
         while hits.count < perBook, !Task.isCancelled, case .success(let page?) = await iterator.next() {
             for locator in page.locators where hits.count < perBook {
@@ -124,7 +123,7 @@ struct MihbaraTextSearchSection: View {
                         Button { open(hit) } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(hit.pdfPage.map { hit.title + "، صفحة " + service.digits.string($0 + 1) } ?? hit.title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                                (Text(hit.before) + Text(hit.match).bold().foregroundColor(theme.accent) + Text(hit.after))
+                                Text("\(Text(hit.before))\(Text(hit.match).bold().foregroundColor(theme.accent))\(Text(hit.after))")
                                     .font(.custom("Amiri-Regular", size: 16, relativeTo: .body)).lineLimit(3).multilineTextAlignment(.leading)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading).padding(14).background(theme.surface, in: .rect(cornerRadius: 14))

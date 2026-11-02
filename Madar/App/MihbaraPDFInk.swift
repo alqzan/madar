@@ -17,9 +17,9 @@ enum MihbaraInkTool: String, CaseIterable, Identifiable {
     var symbol: String { switch self { case .pen: "pencil"; case .marker: "highlighter"; case .eraser: "eraser" } }
     var tool: PKTool {
         switch self {
-        // Fixed colours: the PDF page itself is always white paper, in light and dark mode alike.
-        case .pen: PKInkingTool(.pen, color: UIColor(red: 0.12, green: 0.16, blue: 0.27, alpha: 1), width: 2)
-        case .marker: PKInkingTool(.marker, color: UIColor(red: 0.98, green: 0.82, blue: 0.25, alpha: 1), width: 14)
+        // These tokens stay fixed because PDF pages are white paper in both app appearances.
+        case .pen: PKInkingTool(.pen, color: UIColor(MadarToken.colors["rooms.notes.pdf.pen"]!), width: 2)
+        case .marker: PKInkingTool(.marker, color: UIColor(MadarToken.colors["rooms.notes.pdf.marker"]!), width: 14)
         case .eraser: PKEraserTool(.vector)
         }
     }

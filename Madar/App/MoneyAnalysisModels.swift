@@ -58,6 +58,370 @@ struct MoneyAnalysisReading {
     var categoriesTotalMinor: Int { categories.reduce(0) { $0 + $1.spentMinor } }
 }
 
+struct MadarAIMoneyMetric: Identifiable, Sendable {
+    enum Kind: Sendable { case category, merchant }
+    let id: String
+    let name: String
+    let amountMinor: Int
+    let kind: Kind
+}
+
+struct MadarAIMoneyFact: Identifiable, Sendable {
+    let id: String
+    let title: String
+    let amountMinor: Int
+}
+
+struct MadarAIMoneyCategoryMerchant: Identifiable, Sendable {
+    let id: String
+    let categoryID: String
+    let categoryName: String
+    let merchantID: String
+    let merchantName: String
+    let amountMinor: Int
+}
+
+struct MadarAIMoneySnapshot: Sendable {
+    let firstDayKey: String
+    let lastDayKey: String
+    let rangeTitle: String
+    let confirmedCount: Int
+    let pendingCount: Int
+    let totalMinor: Int
+    let categories: [MadarAIMoneyMetric]
+    let merchants: [MadarAIMoneyMetric]
+    let previousTotalMinor: Int?
+    let previousCategories: [MadarAIMoneyMetric]?
+    let previousMerchants: [MadarAIMoneyMetric]?
+    let categoryMerchants: [MadarAIMoneyCategoryMerchant]
+    let previousCategoryMerchants: [MadarAIMoneyCategoryMerchant]?
+
+    /// The model receives labels and already-computed trends only. Amounts stay in the UI's deterministic reading.
+    var modelContextArabic: String {
+        var lines = ["النطاق: \(rangeTitle)."]
+        let leadingCategories = categories.filter { $0.amountMinor > 0 }.prefix(8).map(\.name)
+        if !leadingCategories.isEmpty { lines.append("أعلى التصنيفات المسجلة: " + leadingCategories.joined(separator: "، ") + ".") }
+        let leadingMerchants = merchants.filter { $0.amountMinor > 0 }.prefix(5).map(\.name)
+        if !leadingMerchants.isEmpty { lines.append("أبرز الجهات المسجلة: " + leadingMerchants.joined(separator: "، ") + ".") }
+        else { lines.append("لا توجد حركات مؤكدة مرتبطة بجهة مسجلة في هذا النطاق.") }
+        for category in categories.filter({ $0.amountMinor > 0 }).prefix(8) {
+            if let merchant = categoryMerchants.first(where: { $0.categoryID == category.id && $0.amountMinor > 0 }) {
+                lines.append("أبرز جهة في تصنيف \(category.name): \(merchant.merchantName).")
+            }
+        }
+        if let previousTotalMinor {
+            lines.append("صافي المصروف " + Self.comparisonDirection(current: totalMinor, previous: previousTotalMinor) + ".")
+        }
+        for category in categories.filter({ $0.amountMinor > 0 }).prefix(8) {
+            if let previous = previousCategories?.first(where: { $0.id == category.id }) {
+                lines.append("صافي تصنيف \(category.name) " + Self.comparisonDirection(current: category.amountMinor, previous: previous.amountMinor) + ".")
+            }
+        }
+        for merchant in merchants.filter({ $0.amountMinor > 0 }).prefix(5) {
+            if let previous = previousMerchants?.first(where: { $0.id == merchant.id }) {
+                lines.append("صافي المصروف لدى \(merchant.name) " + Self.comparisonDirection(current: merchant.amountMinor, previous: previous.amountMinor) + ".")
+            }
+        }
+        if pendingCount > 0 { lines.append("توجد حركات تنتظر قرار المستخدم، ولم تدخل المصروف المؤكد.") }
+        if confirmedCount == 0 { lines.append("لا توجد حركات مؤكدة في النطاق المحدد.") }
+        return lines.joined(separator: "\n")
+    }
+
+    /// Exact amounts are selected and formatted by the app, never generated or totalled by the model.
+    func answerFacts(for question: String) -> [MadarAIMoneyFact] {
+        let q = Self.normalized(question)
+        let asksComparison = ["مقارن", "تغير", "السابق", "قبل", "ارتفع", "انخفض"].contains { q.contains(Self.normalized($0)) }
+        let merchantChoices = Dictionary((merchants + (previousMerchants ?? [])).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }).values
+        let matchedMerchant = merchantChoices
+            .filter { q.contains(Self.normalized($0.name)) }
+            .max { Self.normalized($0.name).count < Self.normalized($1.name).count }
+        let scopedCategories = categories.filter { Self.questionScopesCategory(q, name: $0.name, merchantName: matchedMerchant?.name) }
+        guard scopedCategories.count <= 1 else { return [] }
+        let matchedCategory = scopedCategories.first ?? categories.first { Self.question(q, matches: $0.name) }
+        let explicitlyScopedCategory = !scopedCategories.isEmpty
+        if let matchedCategory, explicitlyScopedCategory, !Self.asksTopCategory(q),
+           Self.asksMerchant(q) || matchedMerchant != nil {
+            if Self.asksTopMerchant(q) {
+                guard let largest = categoryMerchants.first(where: { $0.categoryID == matchedCategory.id && $0.amountMinor > 0 }) else { return [] }
+                if asksComparison {
+                    guard previousTotalMinor != nil else { return [] }
+                    let previous = previousCategoryMerchants?.first { $0.id == largest.id }?.amountMinor ?? 0
+                    return comparisonFacts(
+                        id: largest.id,
+                        subject: "صافي المصروف لدى \(largest.merchantName) في تصنيف \(largest.categoryName)",
+                        currentTitle: "أعلى جهة في تصنيف \(largest.categoryName): \(largest.merchantName) في \(rangeTitle)", current: largest.amountMinor,
+                        previousTitle: "صافي \(largest.merchantName) في تصنيف \(largest.categoryName) خلال الفترة المقارنة", previous: previous
+                    )
+                }
+                return [.init(id: largest.id, title: "أعلى جهة في تصنيف \(largest.categoryName): \(largest.merchantName)", amountMinor: largest.amountMinor)]
+            }
+            guard let matchedMerchant else { return [] }
+            let id = matchedCategory.id + "|" + matchedMerchant.id
+            let current = categoryMerchants.first { $0.id == id }?.amountMinor ?? 0
+            if asksComparison {
+                guard previousTotalMinor != nil else { return [] }
+                let previous = previousCategoryMerchants?.first { $0.id == id }?.amountMinor ?? 0
+                return comparisonFacts(
+                    id: id,
+                    subject: "صافي المصروف لدى \(matchedMerchant.name) في تصنيف \(matchedCategory.name)",
+                    currentTitle: "صافي \(matchedMerchant.name) في تصنيف \(matchedCategory.name) خلال \(rangeTitle)", current: current,
+                    previousTitle: "صافي \(matchedMerchant.name) في تصنيف \(matchedCategory.name) خلال الفترة المقارنة", previous: previous
+                )
+            }
+            return [.init(id: id, title: "صافي \(matchedMerchant.name) في تصنيف \(matchedCategory.name)", amountMinor: current)]
+        }
+        if !Self.asksTopCategory(q), let matchedMerchant {
+            let current = merchants.first { $0.id == matchedMerchant.id }?.amountMinor ?? 0
+            if asksComparison {
+                guard previousTotalMinor != nil else { return [] }
+                let previous = previousMerchants?.first { $0.id == matchedMerchant.id }?.amountMinor ?? 0
+                return comparisonFacts(
+                    id: matchedMerchant.id,
+                    subject: "صافي المصروف لدى \(matchedMerchant.name)",
+                    currentTitle: "صافي المصروف لدى \(matchedMerchant.name) في \(rangeTitle)", current: current,
+                    previousTitle: "صافي المصروف لدى \(matchedMerchant.name) في الفترة المقارنة", previous: previous
+                )
+            }
+            return [.init(id: matchedMerchant.id, title: "صافي المصروف لدى \(matchedMerchant.name)", amountMinor: current)]
+        }
+        if let matchedCategory {
+            if asksComparison {
+                guard previousTotalMinor != nil else { return [] }
+                let previous = previousCategories?.first { $0.id == matchedCategory.id }?.amountMinor ?? 0
+                return comparisonFacts(
+                    id: matchedCategory.id,
+                    subject: "صافي المصروف في تصنيف \(matchedCategory.name)",
+                    currentTitle: "صافي تصنيف \(matchedCategory.name) في \(rangeTitle)", current: matchedCategory.amountMinor,
+                    previousTitle: "صافي تصنيف \(matchedCategory.name) في الفترة المقارنة", previous: previous
+                )
+            }
+            return [.init(id: matchedCategory.id, title: "صافي المصروف في تصنيف \(matchedCategory.name)", amountMinor: matchedCategory.amountMinor)]
+        }
+
+        if Self.asksTopMerchant(q), let largest = merchants.first(where: { $0.amountMinor > 0 }) {
+            if asksComparison {
+                guard previousTotalMinor != nil else { return [] }
+                let previous = previousMerchants?.first { $0.id == largest.id }?.amountMinor ?? 0
+                return comparisonFacts(
+                    id: largest.id,
+                    subject: "صافي المصروف لدى \(largest.name)",
+                    currentTitle: "أعلى جهة صرفًا: \(largest.name) في \(rangeTitle)", current: largest.amountMinor,
+                    previousTitle: "صافي المصروف لدى \(largest.name) في الفترة المقارنة", previous: previous
+                )
+            }
+            return [.init(id: largest.id, title: "أعلى جهة صرفًا: \(largest.name)", amountMinor: largest.amountMinor)]
+        }
+
+        let asksNamedBreakdown = ["تصنيف", "فئه", "لدى", "عند", "في"].contains { q.contains(Self.normalized($0)) }
+        if asksComparison, asksNamedBreakdown { return [] }
+        if asksComparison, let previousTotalMinor {
+            return comparisonFacts(
+                id: "total", subject: "صافي المصروف",
+                currentTitle: "صافي المصروف في \(rangeTitle)", current: totalMinor,
+                previousTitle: "صافي المصروف في الفترة السابقة", previous: previousTotalMinor
+            )
+        }
+
+        let asksLargest = ["اكثر", "أكثر", "اكبر", "أكبر", "اعلى", "أعلى", "اين ذهب", "أين ذهب", "وين راح"].contains { q.contains(Self.normalized($0)) }
+        if asksLargest, let largest = categories.first(where: { $0.amountMinor > 0 }) {
+            return [.init(id: largest.id, title: "أعلى تصنيف في هذا النطاق: \(largest.name)", amountMinor: largest.amountMinor)]
+        }
+
+        let asksOverall = ["اجمالي", "إجمالي", "المجموع", "كامل", "كل المصروف", "صافي المصروف"].contains { q.contains(Self.normalized($0)) }
+        if asksOverall {
+            return [.init(id: "total", title: "صافي المصروف المسجل في هذا النطاق", amountMinor: totalMinor)]
+        }
+        return []
+    }
+
+    private func comparisonFacts(id: String, subject: String,
+                                 currentTitle: String, current: Int,
+                                 previousTitle: String, previous: Int) -> [MadarAIMoneyFact] {
+        let values = [
+            MadarAIMoneyFact(id: id, title: currentTitle, amountMinor: current),
+            MadarAIMoneyFact(id: id + ".previous", title: previousTitle, amountMinor: previous),
+        ]
+        let (difference, overflow) = current.subtractingReportingOverflow(previous)
+        guard !overflow, let magnitude = Int(exactly: difference.magnitude) else { return values }
+        let title: String
+        if difference > 0 { title = "زاد \(subject) عن الفترة السابقة" }
+        else if difference < 0 { title = "انخفض \(subject) عن الفترة السابقة" }
+        else { title = "لم يتغيّر \(subject) عن الفترة السابقة" }
+        return values + [.init(id: id + ".change", title: title, amountMinor: magnitude)]
+    }
+
+    private static func comparisonDirection(current: Int, previous: Int) -> String {
+        if current > previous { "أعلى من الفترة المقارنة" }
+        else if current < previous { "أقل من الفترة المقارنة" }
+        else { "مماثل للفترة المقارنة" }
+    }
+
+    func questionNeedsFigure(_ question: String) -> Bool {
+        let q = Self.normalized(question)
+        return ["كم", "مبلغ", "اجمالي", "المجموع", "كم صرف", "قيمة"]
+            .contains { q.contains(Self.normalized($0)) }
+    }
+
+    func questionAsksComparison(_ question: String) -> Bool {
+        let q = Self.normalized(question)
+        return ["مقارن", "تغير", "السابق", "قبل", "ارتفع", "انخفض"].contains { q.contains(Self.normalized($0)) }
+    }
+
+    func questionAsksTopMerchant(_ question: String) -> Bool {
+        Self.asksTopMerchant(Self.normalized(question))
+    }
+
+    func questionMentionsCategory(_ question: String) -> Bool {
+        let q = Self.normalized(question)
+        return categories.contains { Self.question(q, matches: $0.name) }
+    }
+
+    private static func asksTopMerchant(_ question: String) -> Bool {
+        let asksLargest = ["اكثر", "اكبر", "اعلى", "الاعلى"].contains { question.contains(Self.normalized($0)) }
+        return asksLargest && asksMerchant(question)
+    }
+
+    private static func asksTopCategory(_ question: String) -> Bool {
+        let asksLargest = ["اكثر", "اكبر", "اعلى", "الاعلى"].contains { question.contains(Self.normalized($0)) }
+        return asksLargest && ["تصنيف", "فئه"].contains { question.contains(Self.normalized($0)) }
+    }
+
+    private static func asksMerchant(_ question: String) -> Bool {
+        ["جهه", "جهات", "تاجر", "متجر", "عند", "لدى"].contains { question.contains(Self.normalized($0)) }
+    }
+
+    private static func questionScopesCategory(_ question: String, name: String, merchantName: String?) -> Bool {
+        let category = normalized(name)
+        guard !category.isEmpty else { return false }
+        let words = question.split(whereSeparator: \.isWhitespace).map(String.init)
+        let explicitLabels = Set(["تصنيف", "فئه"])
+        let scopeWords = explicitLabels.union(["في", "ضمن", "داخل"])
+        for (index, word) in words.enumerated() where scopeWords.contains(word) {
+            let scopedName = words.dropFirst(index + 1).joined(separator: " ")
+            guard Self.question(scopedName, matches: name) else { continue }
+            let namesMerchantInsideScope = merchantName.map { scopedName.contains(normalized($0)) } ?? false
+            if namesMerchantInsideScope && !explicitLabels.contains(word) { continue }
+            return true
+        }
+        return words.contains("ب" + category) || category.split(whereSeparator: \.isWhitespace)
+            .filter { $0.count >= 3 }.contains { token in
+                words.contains(where: { $0.hasPrefix("ب") && String($0.dropFirst()) == token })
+            }
+    }
+
+    private static func question(_ question: String, matches name: String) -> Bool {
+        let normalizedName = normalized(name)
+        guard !normalizedName.isEmpty else { return false }
+        if question.contains(normalizedName) { return true }
+        return normalizedName.split(whereSeparator: { $0.isWhitespace }).contains { token in
+            token.count >= 3 && question.contains(token)
+        }
+    }
+
+    private static func normalized(_ text: String) -> String {
+        text.lowercased()
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "ar"))
+            .replacingOccurrences(of: "أ", with: "ا")
+            .replacingOccurrences(of: "إ", with: "ا")
+            .replacingOccurrences(of: "آ", with: "ا")
+            .replacingOccurrences(of: "ى", with: "ي")
+            .replacingOccurrences(of: "ة", with: "ه")
+            .replacingOccurrences(of: "ـ", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+extension AppMoneyService {
+    /// A read-only summary using the same confirmed spend/refund allocations as M5-V14.
+    /// Refunds stay on their original purchase day, matching the existing report.
+    func aiSnapshot(from first: GregorianDay?, through requestedLast: GregorianDay?, title: String,
+                    comparing comparison: (GregorianDay, GregorianDay)? = nil) throws -> MadarAIMoneySnapshot? {
+        let ledger = try moneyLedger(at: app.prayerNow())
+        let byID = Dictionary(ledger.transactions.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        func effectiveDay(_ row: MoneyTransaction) -> GregorianDay? {
+            let key = row.kind == "refund" ? row.relatedTransactionID.flatMap { byID[$0]?.dayKey } ?? row.dayKey : row.dayKey
+            return try? GregorianDay(key)
+        }
+        let last = requestedLast ?? ledger.today
+        let historyDays = ledger.transactions.compactMap(effectiveDay).filter { $0 <= last }
+        guard let first = first ?? historyDays.min() else { return nil }
+        func inRange(_ row: MoneyTransaction, _ range: (GregorianDay, GregorianDay)) -> Bool {
+            guard let day = effectiveDay(row) else { return false }
+            return day >= range.0 && day <= range.1
+        }
+        let rangeRows = ledger.transactions.filter { inRange($0, (first, last)) }
+        let confirmed = rangeRows.filter { $0.reviewState == "ok" }
+        let activeCategories = Dictionary(ledger.categories.filter { $0.mergedInto == nil }.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+        typealias CategoryTotals = [String: (name: String, total: Int)]
+        typealias CategoryMerchantTotals = [String: (categoryID: String, categoryName: String, merchantID: String, merchantName: String, total: Int)]
+        typealias Aggregates = (total: Int, categories: CategoryTotals, merchants: [String: Int], categoryMerchants: CategoryMerchantTotals)
+        func aggregate(_ rows: [MoneyTransaction]) -> Aggregates {
+            let rowIDs = Set(rows.map(\.id))
+            var parts: [UUID: [Allocation]] = [:]
+            for allocation in ledger.allocations where ["spend", "refund"].contains(allocation.kind) {
+                guard let id = allocation.transactionID, rowIDs.contains(id) else { continue }
+                parts[id, default: []].append(allocation)
+            }
+            var categoryTotals: CategoryTotals = [:]
+            for (id, name) in activeCategories {
+                categoryTotals["category." + id.uuidString] = (name, 0)
+            }
+            categoryTotals["category.uncategorized"] = ("بلا تصنيف", 0)
+            var merchantTotals: [String: Int] = [:]
+            var categoryMerchantTotals: CategoryMerchantTotals = [:]
+            var total = 0
+            for row in rows {
+                let value = -(parts[row.id] ?? []).reduce(0) { $0 + $1.amountMinor }
+                total += value
+                let categoryID = row.categoryID.flatMap { activeCategories[$0] == nil ? nil : $0 }
+                let key = categoryID.map { "category." + $0.uuidString } ?? "category.uncategorized"
+                let name = categoryID.flatMap { activeCategories[$0] } ?? "بلا تصنيف"
+                categoryTotals[key, default: (name, 0)].total += value
+                if let merchant = row.merchant ?? row.counterparty, !merchant.isEmpty {
+                    merchantTotals[merchant, default: 0] += value
+                    let merchantID = "merchant." + merchant
+                    let pairID = key + "|" + merchantID
+                    categoryMerchantTotals[pairID, default: (key, name, merchantID, merchant, 0)].total += value
+                }
+            }
+            return (total, categoryTotals, merchantTotals, categoryMerchantTotals)
+        }
+        func categoryMetrics(_ totals: CategoryTotals) -> [MadarAIMoneyMetric] {
+            totals.map { id, value in
+                MadarAIMoneyMetric(id: id, name: value.name, amountMinor: value.total, kind: .category)
+            }.sorted { $0.amountMinor == $1.amountMinor ? $0.name < $1.name : $0.amountMinor > $1.amountMinor }
+        }
+        func merchantMetrics(_ totals: [String: Int]) -> [MadarAIMoneyMetric] {
+            totals.map { name, value in
+                MadarAIMoneyMetric(id: "merchant." + name, name: name, amountMinor: value, kind: .merchant)
+            }.sorted { $0.amountMinor == $1.amountMinor ? $0.name < $1.name : $0.amountMinor > $1.amountMinor }
+        }
+        func categoryMerchantMetrics(_ totals: CategoryMerchantTotals) -> [MadarAIMoneyCategoryMerchant] {
+            totals.map { id, value in
+                MadarAIMoneyCategoryMerchant(id: id, categoryID: value.categoryID, categoryName: value.categoryName,
+                                             merchantID: value.merchantID, merchantName: value.merchantName,
+                                             amountMinor: value.total)
+            }.sorted { $0.amountMinor == $1.amountMinor ? $0.merchantName < $1.merchantName : $0.amountMinor > $1.amountMinor }
+        }
+        let current = aggregate(confirmed)
+        let categories = categoryMetrics(current.categories)
+        let previous: Aggregates? = comparison.map { range in
+            aggregate(ledger.transactions.filter { inRange($0, range) && $0.reviewState == "ok" })
+        }
+        let merchants = merchantMetrics(current.merchants)
+        let previousCategories = previous.map { categoryMetrics($0.categories) }
+        let previousMerchants = previous.map { merchantMetrics($0.merchants) }
+        let categoryMerchants = categoryMerchantMetrics(current.categoryMerchants)
+        let previousCategoryMerchants = previous.map { categoryMerchantMetrics($0.categoryMerchants) }
+        return .init(firstDayKey: first.description, lastDayKey: last.description, rangeTitle: title,
+                     confirmedCount: confirmed.count, pendingCount: rangeRows.count - confirmed.count,
+                     totalMinor: current.total, categories: categories, merchants: merchants,
+                     previousTotalMinor: previous?.total, previousCategories: previousCategories,
+                     previousMerchants: previousMerchants, categoryMerchants: categoryMerchants,
+                     previousCategoryMerchants: previousCategoryMerchants)
+    }
+}
+
 extension AppMoneyService {
     var analysisFirstWeekday: Int { app.string("core.weekStart") == "sunday" ? 1 : 7 }
     func analysisWeekStart(_ day: GregorianDay) -> GregorianDay {

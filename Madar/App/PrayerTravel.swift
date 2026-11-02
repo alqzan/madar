@@ -1,4 +1,5 @@
 import CoreLocation
+import MapKit
 import MadarCore
 import MadarDesign
 import MadarPrayer
@@ -16,7 +17,6 @@ struct TravelFix: Equatable {
 final class TravelLocator: NSObject, CLLocationManagerDelegate {
     private(set) var fix: TravelFix?
     private let manager = CLLocationManager()
-    private let geocoder = CLGeocoder()
 
     override init() {
         super.init()
@@ -55,10 +55,12 @@ final class TravelLocator: NSObject, CLLocationManagerDelegate {
     }
 
     private func resolve(_ location: CLLocation) async {
-        guard let mark = try? await geocoder.reverseGeocodeLocation(location).first,
-              let zone = mark.timeZone?.identifier, let country = mark.isoCountryCode,
+        guard let request = MKReverseGeocodingRequest(location: location),
+              let mark = try? await request.mapItems.first,
+              let zone = mark.timeZone?.identifier,
+              let country = mark.addressRepresentations?.region?.identifier,
               let place = try? ActivePlace(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude, timeZoneID: zone) else { return }
-        fix = TravelFix(place: place, city: mark.locality ?? mark.administrativeArea ?? mark.name ?? country, country: country)
+        fix = TravelFix(place: place, city: mark.addressRepresentations?.cityName ?? mark.name ?? country, country: country)
     }
 }
 

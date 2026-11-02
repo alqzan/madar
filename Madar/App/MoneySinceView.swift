@@ -102,11 +102,11 @@ struct MoneySinceView: View {
         let text: Text, spoken: String
         if r.salaryMinor > 0 {
             spoken = "نزل الراتب " + amount(r.salaryMinor) + (r.envelopesMinor > 0 ? "، وتعبّأت مظاريفك بـ" + amount(r.envelopesMinor) : "")
-            text = Text("نزل الراتب ") + Text(figure: amount(r.salaryMinor)).foregroundStyle(theme.color("surplusText")) + Text(r.envelopesMinor > 0 ? "، وتعبّأت مظاريفك بـ" : "") + Text(figure: r.envelopesMinor > 0 ? amount(r.envelopesMinor) : "").foregroundStyle(theme.color("accent"))
+            text = Text("نزل الراتب \(Text(figure: amount(r.salaryMinor)).foregroundStyle(theme.color("surplusText")))\(r.envelopesMinor > 0 ? "، وتعبّأت مظاريفك بـ" : "")\(Text(figure: r.envelopesMinor > 0 ? amount(r.envelopesMinor) : "").foregroundStyle(theme.color("accent")))")
         } else if r.allowanceMinor > 0 {
             let saved = r.allowanceMinor - r.spentMinor
             spoken = "صرفت " + amount(r.spentMinor) + " من يومك في " + service.days(r.days.filter { $0.allowanceMinor != nil }.count) + (saved >= 0 ? "، وبقي منه " : "، وتجاوزته بـ") + amount(abs(saved))
-            text = Text("صرفت ") + Text(figure: amount(r.spentMinor)).foregroundStyle(theme.color("accent")) + Text(" من يومك في " + service.days(r.days.filter { $0.allowanceMinor != nil }.count)) + Text(saved >= 0 ? "، وبقي منه " : "، وتجاوزته بـ") + Text(figure: amount(abs(saved))).foregroundStyle(saved >= 0 ? theme.color("surplusText") : theme.color("dueText"))
+            text = Text("صرفت \(Text(figure: amount(r.spentMinor)).foregroundStyle(theme.color("accent"))) من يومك في \(service.days(r.days.filter { $0.allowanceMinor != nil }.count))\(saved >= 0 ? "، وبقي منه " : "، وتجاوزته بـ")\(Text(figure: amount(abs(saved))).foregroundStyle(saved >= 0 ? theme.color("surplusText") : theme.color("dueText")))")
         } else {
             spoken = "مرّت " + service.days(r.days.count) + " منذ زيارتك الأخيرة"; text = Text(spoken)
         }

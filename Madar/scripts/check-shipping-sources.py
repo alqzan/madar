@@ -16,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DIGIT_DOT = re.compile(r"[0-9٠-٩۰-۹][\s\u2066-\u2069]*·|·[\s\u2066-\u2069]*[0-9٠-٩۰-۹]")
 SWIFT_STRING = re.compile(r'"(?:\\.|[^"\\])*"')
+SWIFT_RAW_OPEN = re.compile(r'(#+)("""|")')
 PLURALS = {"zero", "one", "two", "few", "many", "other"}
 REMOTE_PRODUCTS = {
     "https://github.com/readium/swift-toolkit.git": {
@@ -43,6 +44,29 @@ def resolved_pins(root):
 def uncomment(text):
     """Preserve line numbers and quoted contents; erase Swift // and /* */ comments."""
     out, i, block = [], 0, 0
+
+    def quoted_end(start, quote, hashes):
+        terminator = quote + hashes
+        i = start + len(hashes) + len(quote)
+        while i < len(text):
+            if text.startswith(terminator, i):
+                escape = "\\" + hashes
+                if hashes and text[i-len(escape):i] == escape:
+                    i += len(terminator)
+                    continue
+                if not hashes:
+                    backslashes = 0
+                    cursor = i - 1
+                    while cursor >= start and text[cursor] == "\\":
+                        backslashes += 1
+                        cursor -= 1
+                    if backslashes % 2:
+                        i += len(terminator)
+                        continue
+                return i + len(terminator)
+            i += 1
+        raise ValueError('unclosed Swift string')
+
     while i < len(text):
         if block:
             if text[i:i+2] == '/*': block += 1; out.extend('  '); i += 2
@@ -53,6 +77,15 @@ def uncomment(text):
             if end < 0: end = len(text)
             out.extend(' ' * (end-i)); i = end
         elif text[i:i+2] == '/*': block = 1; out.extend('  '); i += 2
+        elif raw_open := SWIFT_RAW_OPEN.match(text, i):
+            end = quoted_end(i, raw_open[2], raw_open[1])
+            out.extend(text[i:end]); i = end
+        elif text[i:i+3] == '"""':
+            # Preserve multiline strings as one token so quotes and comment markers in
+            # Foundation Models prompts cannot confuse the source inventory scanner.
+            start = i
+            i = quoted_end(start, '"""', '')
+            out.extend(text[start:i])
         elif text[i] == '"':
             # Interpolated nested quotes are conservatively inventoried later.
             match = SWIFT_STRING.match(text, i)
@@ -337,8 +370,12 @@ def catalog_checks(catalog):
 
 def scan_source(text, path, definitions):
     failures, inventory, keys = [], [], set()
-    clean = uncomment(text)
-    for number, line in enumerate(clean.splitlines(), 1):
+    try:
+        clean = uncomment(text)
+    except ValueError as error:
+        raise ValueError(f'{path}: {error}') from error
+    source_lines = clean.splitlines()
+    for number, line in enumerate(source_lines, 1):
         if not line.strip(): continue
         spot = f'{path}:{number}'
         decoded = re.sub(r'\\u\{([0-9a-fA-F]+)\}', lambda m: chr(int(m[1], 16)), line)
@@ -349,17 +386,20 @@ def scan_source(text, path, definitions):
             failures.append(f'{spot}: formatted number beside middle dot; use MadarInlineText or a comma')
         if re.search(r'\\\((?:arabicNumber|digits|session\.digits)\([^\n]*?سجلًّا', line):
             failures.append(f'{spot}: RU3 hand-built record count phrase requires catalog plurals')
-        if re.search(r'\b(?:Color|UIColor|CGColor)\s*\(\s*(?:red:|white:|displayP3Red:|#["\w])', line):
+        color_component_literal = r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?'
+        if re.search(r'\b(?:Color|UIColor|CGColor)\s*\(\s*(?:(?:red|white|displayP3Red):\s*' + color_component_literal + r'|#["\w])', line):
             failures.append(f'{spot}: handwritten colour constructor')
-        if re.search(r'\bColor\(\.sRGB,\s*red:|\.(?:foregroundStyle|foregroundColor|background|tint)\(\.(?:red|green|blue|white|black|yellow|orange|pink|purple|gray)\b', line):
+        if re.search(r'\bColor\(\.sRGB,\s*red:\s*' + color_component_literal + r'|\.(?:foregroundStyle|foregroundColor|background|tint)\(\.(?:red|green|blue|white|black|yellow|orange|pink|purple|gray)\b', line):
             failures.append(f'{spot}: handwritten colour value')
         if re.search(r'\b(?:Color|UIColor)\(\s*\.(?:systemRed|systemGreen|systemBlue|systemYellow|systemOrange|systemPink|systemPurple|systemTeal|systemIndigo|systemMint|systemBrown|systemCyan)\b', line):
             failures.append(f'{spot}: system hue bypasses room tokens')
         for match in re.finditer(r'\b(?:Font\.)?(?:system|custom)\([^\n]*?size:\s*(\d+(?:\.\d+)?)', line):
             # SF Symbols are drawings, not sub-11 pt text. Keep the text rule intact.
             symbol_font = re.search(r'Image\([^)]*\)\.font\(\.$', line[:match.start()])
+            if not symbol_font and line.lstrip().startswith('.font(') and number > 1:
+                symbol_font = re.match(r'\s*Image\(', source_lines[number - 2])
             if float(match[1]) < 11 and not symbol_font: failures.append(f'{spot}: explicit font size below 11')
-        for match in re.finditer(r'\b(?:(?:session|app)\.)?(string|bool|number)\(\s*"([\w.]+)"\)', line):
+        for match in re.finditer(r'(?<![\w.])(?:(?:session|app)\.)?(string|bool|number)\(\s*"([\w.]+)"\)', line):
             kind, key = match.groups()
             # Only app/session or unqualified AppSession convenience reads are settings.
             if not re.match(r'(?:session|app)\.', match[0]) and not path.endswith('/AppSession.swift'): continue
@@ -443,7 +483,7 @@ def run(root):
     customization = (app/'App/CustomizeMadar.swift').read_text()
     if 'guard AppSession.supportedKeys.contains(definition.key)' not in customization:
         failures.append('reachable settings no longer guarded by supportedKeys')
-    route_proof = re.search(r'settingsKeys: Set\(Self.supportedKeys\), availability: \.init\(builtRooms: \[(.*?)\]\)', session)
+    route_proof = re.search(r'settingsKeys: Set\(Self.supportedKeys\),(?:\s*unavailableSettings: [^,]+,)?\s*availability: \.init\(builtRooms: \[(.*?)\]\)', session)
     built_rooms = set(re.findall(r'\.(\w+)', route_proof[1])) if route_proof else set()
     # Milestone boundary: each built room is explicit; update only when the app route is built.
     if built_rooms != {'core', 'salah', 'quran', 'notes', 'bahw', 'year', 'habits', 'mal', 'mihbara'}:

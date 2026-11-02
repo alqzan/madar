@@ -650,6 +650,12 @@
     "autoInkText": "#B6A48C",
     "ink3Text": "#918675"
    },
+   "pdf": {
+    "paper": "#FFFFFF",
+    "pen": "#1F2945",
+    "marker": "#FAD140",
+    "note": "Fixed white-page PDF annotation palette; identical in light and dark app appearance."
+   },
    "travel": {
     "light": {
      "bg": "#F4EFE3",
@@ -1672,7 +1678,9 @@
   {"fg": "rooms.mihbara.dark.goldUnderstandText", "bg": "rooms.bahw.dark.surface", "use": "small", "ratio": 8.92, "min": 4.5, "ctx": "calmPaper dark"},
   {"fg": "rooms.quran.dark.hifzText", "bg": "rooms.quran.dark.hifzTint@rooms.bahw.dark.surface", "use": "small", "ratio": 7.65, "min": 4.5, "ctx": "calmPaper dark quran state on tint"},
   {"fg": "rooms.quran.dark.reviewText", "bg": "rooms.quran.dark.reviewTint@rooms.bahw.dark.surface", "use": "small", "ratio": 6.03, "min": 4.5, "ctx": "calmPaper dark quran state on tint"},
-  {"fg": "rooms.quran.dark.dueText", "bg": "rooms.quran.dark.dueTint@rooms.bahw.dark.surface", "use": "small", "ratio": 5.86, "min": 4.5, "ctx": "calmPaper dark quran state on tint"}
+  {"fg": "rooms.quran.dark.dueText", "bg": "rooms.quran.dark.dueTint@rooms.bahw.dark.surface", "use": "small", "ratio": 5.86, "min": 4.5, "ctx": "calmPaper dark quran state on tint"},
+  {"fg": "rooms.notes.pdf.pen", "bg": "rooms.notes.pdf.paper", "use": "small", "ratio": 14.37, "min": 4.5, "ctx": "fixed white PDF pen"},
+  {"fg": "rooms.notes.light.ink", "bg": "rooms.notes.pdf.marker", "use": "small", "ratio": 10.42, "min": 4.5, "ctx": "text over fixed PDF marker"}
   ]
  }
 }

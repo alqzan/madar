@@ -272,12 +272,12 @@ periodStart: Date?; dueDate: Date?; statementMinor = 0; minimumDueMinor = 0; mes
 // a second statement within 5 days of an estimated close → possible-duplicate review, not a second row
 @Model CashbackEntry { cardID: UUID?; eventAt = Date(); amountMinor = 0; kind = "earned" /*earned|redeemed*/;
 transactionID: UUID? }
-@Model Transaction { dayKey = ""; eventAt = Date(); tzID = ""; dayPolicy = "";
+@Model MoneyTransaction { dayKey = ""; eventAt = Date(); tzID = ""; dayPolicy = "";
 kind = "expense" /*expense|income|salary|cardPayment|transfer|refund|cashback|withdrawal|repayment|adjustment*/;
 amountMinor = 0 /*always positive; kind gives the direction*/; currency = "SAR"; homeAmountMinor = 0;
 homeCurrency = "SAR"; rateAtTime: String? /*nil when same currency*/;
 rateSource: String? /*message|trip|manual*/; merchant: String?; counterparty: String?;
-categoryID: UUID?; method = "cash" /*cash|card|bnpl|transfer*/; fromAccountID: UUID?;
+categoryID: UUID?; categorySource: String? /*manual|learned|rule; prior rows without provenance nil*/; method = "cash" /*cash|card|bnpl|transfer*/; fromAccountID: UUID?;
 toAccountID: UUID?; cardID: UUID?;
 relatedTransactionID: UUID? /*refund → original, adjustment → reconciliation*/; obligationID: UUID?;
 installmentID: UUID?; cycleID: UUID?; ignoredFromBudget = false; source = "bank" /*bank|manual*/;

@@ -194,25 +194,14 @@ struct MihbaraQuoteCardSheet: View {
     }
 
     @ViewBuilder private var closeButton: some View {
-        if #available(iOS 26.0, *) {
-            Button { dismiss() } label: { closeLabel }
-                .buttonStyle(.glass).buttonBorderShape(.circle)
-                .accessibilityLabel("إغلاق").accessibilityIdentifier("mihbara-quote-card-close")
-        } else {
-            Button { dismiss() } label: { closeLabel }
-                .buttonStyle(.bordered)
-                .accessibilityLabel("إغلاق").accessibilityIdentifier("mihbara-quote-card-close")
-        }
+        Button { dismiss() } label: { closeLabel }
+            .buttonStyle(.glass).buttonBorderShape(.circle)
+            .accessibilityLabel("إغلاق").accessibilityIdentifier("mihbara-quote-card-close")
     }
 
     @ViewBuilder private var shareButton: some View {
-        if #available(iOS 26.0, *) {
-            Button(action: shareCard) { shareLabel }
-                .buttonStyle(.glass)
-        } else {
-            Button(action: shareCard) { shareLabel }
-                .buttonStyle(.bordered)
-        }
+        Button(action: shareCard) { shareLabel }
+            .buttonStyle(.glass)
     }
 
     /// The image is drawn from the card exactly as it stands when the reader taps share.

@@ -151,9 +151,7 @@ struct MoneyZakatView: View {
         .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(theme.color("reserveText").opacity(0.7), lineWidth: 1) }
     }
     @ViewBuilder private var reminderChips: some View {
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 0) { reminderChipRow }
-        } else { reminderChipRow }
+        GlassEffectContainer(spacing: 0) { reminderChipRow }
     }
     private var reminderChipRow: some View {
         HStack(spacing: 7) {
@@ -178,15 +176,9 @@ struct MoneyZakatView: View {
         let content = Text(title).font(MadarTypography.caption()).fontWeight(selected ? .semibold : .regular).foregroundStyle(theme.ink)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(theme.surface.opacity(0.28), in: shape)
-        if #available(iOS 26.0, *) {
-            content
-                .glassEffect(.regular.tint(theme.color("reserve").opacity(selected ? 0.24 : 0.08)).interactive(), in: shape)
-                .overlay { shape.stroke(selected ? theme.color("reserveText") : theme.line, lineWidth: selected ? 1.5 : 1) }
-        } else {
-            content
-                .background(.ultraThinMaterial, in: shape)
-                .overlay { shape.stroke(selected ? theme.color("reserveText") : theme.line, lineWidth: selected ? 1.5 : 1) }
-        }
+        content
+            .glassEffect(.regular.tint(theme.color("reserve").opacity(selected ? 0.24 : 0.08)).interactive(), in: shape)
+            .overlay { shape.stroke(selected ? theme.color("reserveText") : theme.line, lineWidth: selected ? 1.5 : 1) }
     }
     private func reminderTitle(_ value: String) -> String {
         switch value { case "1day": "قبل يوم"; case "1week": "قبل أسبوع"; case "1month": "قبل شهر"; default: "بلا تذكير" }

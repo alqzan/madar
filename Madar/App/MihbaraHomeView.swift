@@ -89,7 +89,9 @@ struct MihbaraHomeView: View {
             }
         }
         .task {
+            #if DEBUG
             injectRouteForUITestIfNeeded()
+            #endif
             load()
             MihbaraConversions.shared.onFinished = { load() }
         }
@@ -114,37 +116,7 @@ struct MihbaraHomeView: View {
             onDismiss: finishLibraryAction,
             deleteBook: deleteBook, removeBookFile: removeBookFile
         ))
-        .sheet(item: $sheet, onDismiss: sheetDismissed) { target in
-            NavigationStack {
-                if let r = reading {
-                    switch target {
-                    case .library: library(r)
-                    case .book(let id): if let b = r.book(id) {
-                        let fileUnavailable = !service.hasLocalFile(for: b)
-                        if b.kind == "file", ["pdf", "pdfScanned"].contains(b.format ?? "") {
-                            MihbaraImportedPDFSummary(book: b, fileUnavailable: fileUnavailable, onRestoreFile: requestBookFileRestore)
-                        }
-                        else {
-                            MihbaraBookCard(
-                                app: app,
-                                book: b,
-                                books: r.books,
-                                fileUnavailable: fileUnavailable,
-                                onTable: { setStand(id); sheet = nil },
-                                onRestoreFile: requestBookFileRestore,
-                                onPaperIndexSaved: { load() },
-                                shape: shapes[id]
-                            )
-                        }
-                    }
-                    case .hadith(let n): hadithRouteView(n, reading: r)
-                    case .opening: MihbaraRahlOpeningView(app: app).presentationDetents([.large])
-                    case .notebook: MihbaraNotebookContent(app: app, initialNoteID: notebookRouteID)
-                    case .motivation: MihbaraMotivationCard(cues: motivationCues, action: performMotivation)
-                    }
-                }
-            }.environment(\.roomTheme, theme).presentationDragIndicator(.visible).madarSheetErrorAlert(app)
-        }
+        .sheet(item: $sheet, onDismiss: sheetDismissed) { target in routeSheet(target) }
         .sheet(item: $goalEditor, onDismiss: { load() }) { target in
             HabitEditorView(session: app, reading: target.reading, id: target.id, initialSource: "reading").madarSheetErrorAlert(app)
         }
@@ -180,6 +152,45 @@ struct MihbaraHomeView: View {
                 Color.clear.onAppear { showingAddBook = false }
             }
         }
+    }
+    @ViewBuilder private func routeSheet(_ target: MihbaraSheet) -> some View {
+        NavigationStack {
+            if let r = reading {
+                switch target {
+                case .library:
+                    library(r)
+                case .book(let id):
+                    if let b = r.book(id) {
+                        let fileUnavailable = !service.hasLocalFile(for: b)
+                        if b.kind == "file", ["pdf", "pdfScanned"].contains(b.format ?? "") {
+                            MihbaraImportedPDFSummary(book: b, fileUnavailable: fileUnavailable, onRestoreFile: requestBookFileRestore)
+                        } else {
+                            MihbaraBookCard(
+                                app: app,
+                                book: b,
+                                books: r.books,
+                                fileUnavailable: fileUnavailable,
+                                onTable: { setStand(id); sheet = nil },
+                                onRestoreFile: requestBookFileRestore,
+                                onPaperIndexSaved: { load() },
+                                shape: shapes[id]
+                            )
+                        }
+                    }
+                case .hadith(let number):
+                    hadithRouteView(number, reading: r)
+                case .opening:
+                    MihbaraRahlOpeningView(app: app).presentationDetents([.large])
+                case .notebook:
+                    MihbaraNotebookContent(app: app, initialNoteID: notebookRouteID)
+                case .motivation:
+                    MihbaraMotivationCard(cues: motivationCues, action: performMotivation)
+                }
+            }
+        }
+        .environment(\.roomTheme, theme)
+        .presentationDragIndicator(.visible)
+        .madarSheetErrorAlert(app)
     }
     private var timelineContent: some View {
         TimelineView(.periodic(from: Date(timeIntervalSince1970: 0), by: 60)) { tick in

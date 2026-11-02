@@ -110,14 +110,13 @@ public enum LegacyQuranImport {
         }()
         let frontier = frontierValue ?? 0
         if rawFrontier != nil && frontierValue == nil { count("skipped.frontier") }
-        var planID: UUID?
         if let plan = hifz["plan"] as? [String: Any] {
             let unit = plan["unit"] as? String, intensity = (plan["intensity"] as? String) ?? "balanced"
             let start = (plan["startId"] as? NSNumber)?.intValue, amount = (plan["amount"] as? NSNumber)?.doubleValue
             if let unit, ["ayah", "quarter", "half", "page"].contains(unit), ["light", "balanced", "intense"].contains(intensity),
                let start, (1...6236).contains(start), let amount, amount >= 1, let from = at(plan["createdAt"], hour: 8) {
                 let source = (hifz["planId"] as? String) ?? "plan"
-                let id = uuid("myDream:HifzPlan:\(source)"); planID = id
+                let id = uuid("myDream:HifzPlan:\(source)")
                 result.plan = PlanRow(id: id, sourceID: source, startAyah: start, unit: unit, amount: amount, rhythm: intensity,
                     frontierAyah: frontier > 0 ? frontier : nil, activeFrom: from, updatedAt: millis(hifz["planUpdatedAt"]) ?? from)
                 count("plan.imported")

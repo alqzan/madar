@@ -400,15 +400,10 @@ struct MoneyObligationsView: View {
         .accessibilityLabel("اشتراك محتمل من مدفوعاتك، \(suggestion.name)، \(amount(suggestion.amountMinor))، راجع التفاصيل")
         .accessibilityIdentifier("money-subscription-suggestion")
 
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 8) {
-                card.glassEffect(.regular.tint(theme.color("reserve").opacity(0.12)).interactive(), in: .rect(cornerRadius: 18, style: .continuous))
-            }.overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(theme.color("reserveText").opacity(0.65), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-            }
-        } else {
-            card.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(theme.color("reserveText").opacity(0.65), style: StrokeStyle(lineWidth: 1, dash: [4, 3])) }
+        GlassEffectContainer(spacing: 8) {
+            card.glassEffect(.regular.tint(theme.color("reserve").opacity(0.12)).interactive(), in: .rect(cornerRadius: 18, style: .continuous))
+        }.overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(theme.color("reserveText").opacity(0.65), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
         }
     }
 

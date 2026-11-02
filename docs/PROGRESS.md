@@ -269,7 +269,9 @@ Agents take the first unfinished step and continue down the list in the same ses
 
 ## Waiting on the owner
 
-Owner, 1 Nov: «شريت حق المطورين بس باقي يقول تحت المراجعه من أبل». The paid developer account is bought and awaits Apple review. When it is accepted and the app/widget profiles contain `group.com.alqzan.madar2`, the next agent prepares the first local-only build on the owner's iPhone using `App/Madar.entitlements` and the owner's team, per CN-05 and RA1. The cloud-device Make target enables the deferred CloudKit path and is not the current device-run route. Local signing check, 1 Nov: no installed `.mobileprovision` in either standard user profile folder; no device installation was attempted.
+Owner, 1 Nov: «شريت حق المطورين بس باقي يقول تحت المراجعه من أبل». The paid developer account is bought and awaits Apple review. Owner, 2 Nov: Apple requested identity documentation and the owner submitted it; approval is pending Apple's verification. When it is accepted and the app/widget profiles contain `group.com.alqzan.madar2`, the next agent prepares the first local-only build on the owner's iPhone using `App/Madar.entitlements` and the owner's team, per CN-05 and RA1. The cloud-device Make target enables the deferred CloudKit path and is not the current device-run route. Local signing check, 1 Nov: no installed `.mobileprovision` in either standard user profile folder; no device installation was attempted.
+
+Owner, 2 Nov: iOS 27 simulator use is authorized, superseding the historical 21 Oct note below. Clarification: the owner does not want another local acceptance-screenshot round; he will try the app himself through TestFlight once Apple's developer-account review is approved and then provide full feedback. One preview was captured at `Madar/Artifacts/madar-ios27-preview.png`; iPhone 18 Pro on iOS 27.0 booted and Madar launched, but the image shows the system device-passcode gate because Simulator Face ID is unavailable. Do not ask the owner to run screenshot comparisons; continue app work and prepare TestFlight when Apple's approval and signing setup allow it.
 
 Answered by the owner, 1 Nov (CN-03): مرجع الورد يعرض **تفسير السعدي كاملًا لكل آية**؛ المالك اعتمد الترخيص لنصه (داخل التطبيق أو عبر تراث). المقتطفات اليدوية تتوقف.
 
@@ -289,6 +291,8 @@ Answered by the owner, 21 Oct (details in DECISIONS):
 3. Quran day (item 13): agent does one final check; the owner tries it later in the full app trial.
 4. Mihbara v2 desks: unchanged (v2 under RA8).
 5. iOS 27 simulator and enlarged-text runs: never; do not download, test or plan them.
+
+Owner, 2 Nov 2026: this overrides item 5 above for the operating-system target and simulator. All new app work and validation use iOS 27; the iOS 27.1 simulator runtime may be downloaded and used. Enlarged-text runs remain excluded.
 
 Answered by the owner, 18 Oct (details in DECISIONS):
 1. Turath: personal reading is fine; the books are waqf for Muslims. New request: nice quoting from Turath books (a quote card with book, author, volume/page and source).
@@ -321,6 +325,7 @@ Bigger improvement ideas from Claude or Codex (new features, rule or data-model 
 
 | Idea | What and why | From | Owner |
 |---|---|---|---|
+| Apple Intelligence for Diary and Money, with Arabic output | On-demand Arabic questions across a selected diary day, one whole memo, month, custom range, or all diary entries; and a money week, month, cycle, custom range, or complete history. Results show their coverage and AI origin; follow-ups stay temporary in that scope. Apple Translation bridges Arabic and the on-device Foundation Model. Money amounts and comparisons are computed by the app, never the model. | Owner request, 2 Nov 2026 | **Approved and implemented on iOS 27.0; generic simulator build exits 0. Simulator UI and device/model validation remain open.** |
 | Grade-less mistakes in a free Quran session | The free-session flow lets a reader enter slips without a page grade, but saving rejects that session, so the slips are not kept. Decide whether a slips-only partial may be saved or whether the app should require a grade before the slips can be recorded; this changes the session-recording rule. | Claude handover, 29 Oct | Awaiting owner |
 | تفسير الورد وسياق آياته | مع كل ورد يقرؤه المستخدم، يعرض تفسير الآيات المرتبطة به، وسبب النزول إن ورد بمصدر موثوق، والقصة أو السياق التاريخي إن أثبته المصدر. تُذكر إحالة واضحة للكتاب والمؤلف والجزء/الصفحة ورابط المصدر من تراث حيث يتوفر. لا يُخترع سبب نزول أو قصة؛ وإذا لم يوجد توثيق معتبر يقال ذلك بوضوح. قبل البناء تُحسم قائمة المصادر وتراخيص عرض النصوص وربط كل شرح بآيات الورد. | طلب المالك، 31 Oct | **Approved by owner, 31 Oct; add to Quran work.** |
 | Continue counting after a personal date | Add optional `UpcomingDay.countUpAfter` (false by default), keeping the occurrence and showing «مضى … يومًا» afterwards. Needed to faithfully migrate one source event; its whole raw row is currently archived, with no native countdown silently losing the requested behavior. Requires additive schema, date math and migration/replay tests before installation. | Owner-data trial, 25 Oct | Approved by owner, 25 Oct: «نعم، أضف الخيار». Built 25 Oct (Claude): V11, editor toggle, lobby/year/widget «مضى …», import mapping; see DECISIONS. |
@@ -508,6 +513,24 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
+## Handover — حفظ عمل كوديكس المعلّق قبل TestFlight — 2026-11-02 — Claude
+- **Works now:** عمل كوديكس غير المحفوظ (١٠٨ ملفات) صار في commitين: تصنيف كل عملية مع نسخة البيانات V14، ثم iOS 27 وذكاء المذكرات والمال وتجهيز الإصدار. أصلحتُ عطلًا وجده مساعد Haiku: `money.logExpense` كان يرفض `categorySource` فلا يُحفظ مصروف يدوي له تصنيف؛ والتصنيف المختار يدويًا لم يعد يُمسح عند كتابة اسم المتجر. أُعيد تنسيق قاموس البيانات (٢ مسافة) فصار الفرق الحقيقي ~٣١ سطرًا بدل ١٢ ألفًا. صحّحت نص قفل Face ID (رمز iPhone عند التعذّر، قرار ١ نوفمبر) في `AGENTS.md`/`CLAUDE.md` وملاحظات المراجعة وصفحة الدعم، وأضفت ميزة الذكاء لملاحظات المراجعة وصفحة الخصوصية.
+- **Verified:** MadarMoney ‏207/207؛ MadarData ‏109/109؛ MadarCommands ‏256/257 (الفاشل الوحيد `PDFBookTextReaderTests` بخطأ محرك عصبي e5rt على الماك، تكرر في جولتين). محاكي iPhone 18 Pro / iOS 27.0: ذكاء المال ١٠/١٠ وواجهات التصنيف ٢/٢ (`claude-pending-commit-20261102-r1`)؛ بعد الإصلاح: حفظ مصروف بتصنيف وبطاقة مفضلة وإعدادات المال ٦/٦ (`-r2`). `generate_models.py` يعيد نفس الملفات. `git diff --check` نظيف.
+- **Differences left:** لا فرق بصري جديد؛ M5-V07 بلا مقارنة canonical بعد التعديل.
+- **Not verified:** لم يُبنَ أرشيف موقّع من هذا الـcommit؛ لا تجربة جهاز لـFoundation Models/Translation؛ لم تُشغّل حزمة الواجهات كاملة.
+- **Next:** بعد قبول Apple: ملفات التوقيع للتطبيق والودجة، أرشيف موقّع من `main` نفسه، رفع TestFlight داخلي، ثم نسخة أمان مشفرة واسترجاع قبل إدخال بيانات المالك. تجميد الميزات حتى أول نسخة. `supportURL`/`privacyPolicyURL` لازمة قبل الاختبار الخارجي فقط.
+- **Model/effort:** Claude Opus 5.5؛ الجهد غير مكشوف؛ مساعد Haiku واحد للقراءة.
+- **Usage:** غير مكشوف.
+
+## Handover — تجهيز TestFlight وتنظيف تحذيرات Release — 2026-11-02 — Codex
+- **Works now:** سؤال عربي للمذكرات والمال، تصنيف المصروف واقتراحات التاجر؛ نظّفت واجهات API المهجورة وحافظت على تنسيق سطر المذكرة. ألوان القلم والمظلّل صارت قيم تصميم مولدة كما كانت، وحدّثت تعريف الاتجاهات لـiPhone وiPad. الأرشيف المحلي `Madar/Artifacts/TestFlightPrep/Madar-0.1.0-1-cleanup-r6.xcarchive`.
+- **Verified:** `xcodegen generate --spec project.yml` و`xcodebuild archive ... CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO` → `ARCHIVE SUCCEEDED` بلا أخطاء أو تحذيرات؛ زال تحذير الاتجاهات. 0.1.0 (1)، التطبيق والودجة بمعرّفاتهما الصحيحة، الحد الأدنى iOS 27.0، وCloudKit فارغ. `plutil -lint`, تزامن ملفات tokens الثلاثة، و`git diff --check` نجحت.
+- **Differences left:** الأرشيف غير موقّع؛ لا provisioning profiles محلية. `supportURL` و`privacyPolicyURL` ما زالا فارغين لعدم وجود نطاق أو جهة دعم مؤكدة. لم أعد تشغيل `check-shipping-sources.py` خارج بوابة المرحلة، والتتبع اليدوي للمصادر لم يكتمل.
+- **Not verified:** لا رفع إلى TestFlight أو تجربة iPhone؛ لا تجربة Foundation Models/Translation على جهاز؛ لم تُشغّل حزم اختبارات في هذه الجولة.
+- **Next:** بعد اعتماد Apple وتفعيل فريق App Store Connect، أنشئ ملفات التوقيع للتطبيق والودجة مع `group.com.alqzan.madar2` ثم أرشف وارفع النسخة. يلزم قبل الإرسال للنشر نطاق الخصوصية والدعم، جهة المراجعة وملصق الخصوصية؛ وتبقى أدلة الجهاز وRelease ضمن بوابة M7.
+- **Model/effort:** Codex GPT-6؛ الجهد غير مكشوف.
+- **Usage:** غير مكشوف في متابعة تجهيز TestFlight هذه.
+
 ## Handover — مطابقة M2-V10 واستكمال خريطة المصحف — 2026-11-02 — Codex
 - **Works now:** اعتمد المالك M2-V10 بصريًا؛ رحلة الحفظ تعرض توقعًا هادئًا، ستة أرقام مع تعريفاتها، وخريطة ٦٠٤ وجه موزعة على الأجزاء الحقيقية؛ لمس الوجه يفتح تفاصيله.
 - **Verified:** تكامل `QuranWeekIntegrationTests/testRollingWeekRestDayDedupedReviewsAndWidgetHaveOneDefinition` ‏1/1؛ `QuranJourneyUITests/testJourneyTotalsForecastAndPageHistory` ‏1/1 (`codex-m2-v10-continued-20261102-r10`); بناء المحاكي و`git diff --check` نظيفان. لقطات L/light top/map/page في `Madar/Artifacts/codex-m2-v10-continued-20261102-r10-shots/`؛ مقارنة `R18-Sijil-All.html` أُعيد توليدها وفُحصت الصور مباشرة.
@@ -516,21 +539,3 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Next:** يراجع المالك M2-V10؛ ثم نتابع أول بطاقة `ready` على اللوحة.
 - **Model/effort:** Codex GPT-6؛ الجهد غير مكشوف؛ Luna bug hunt وSol High استشارتان للقراءة فقط.
 - **Usage:** غير مكشوف.
-
-## Handover — اعتماد ٥١ واجهة وبدء مطابقة M2-V10 — 2026-11-01 — Codex
-- **Works now:** موافقة المالك البصرية محفوظة لـ٥١ من ٥٢ حالة في المعرض، واستثناء M2-V10 صريح؛ نُقلت البطاقة من الأرشيف إلى أول متابعة نشطة. بدأت لمسة بطاقات الإحصاءات بثلاث درجات لونية وعنوان «أرقامك كلها».
-- **Verified:** `xcodebuild test -only-testing:MadarUITests/QuranJourneyUITests/testJourneyTotalsForecastAndPageHistory` اجتاز 1/1؛ الحزمة `Madar/Artifacts/codex-m2-v10-palette-20261101-r1.xcresult`، ولقطات L/light في `-shots`؛ مقارنة R18-Sijil-All محدثة. `git diff --check` نظيف.
-- **Differences left:** M2-V10 غير مكتملة: تركيب بطاقة الرحلة وتاريخ البداية/جملة التوقع، وضوح دليل الأرباع، تفاصيل الخريطة وفهرس الصفوف وتدرج التاريخ؛ الإحصاءات الحالية لا تطابق معاني النموذج الستة حرفيًا فلا تُبدّل التسميات بلا تعريف صحيح.
-- **Not verified:** قبول المالك بعد تعديل M2-V10؛ تجربة الجوال والاستخدام الجاد لاحقًا، بعد Apple والتوقيع المحلي، ولا اعتماد جهازي من الموافقة البصرية.
-- **Next:** أكمل M2-V10 وحدها وفق `screens/quran/12-R18-Sijil-All.jpg` و§7.4؛ بقية الـ٥١ معتمدة بصريًا. لا تنسخ أرقام النموذج ولا تغيّر قواعد الوتيرة أو حقول البيانات.
-- **Model/effort:** Codex GPT-6؛ الجهد غير مكشوف؛ المساعد قراءة فقط.
-- **Usage:** آخر قراءة ٩٣٪ مستخدم (٧٪ متبقٍ)؛ توقف بدء العمل، والحفظ والتسليم من الاحتياطي امتثالًا لحد ٥٪.
-
-## Handover — إنهاء التنظيف وتحسين القيام وتسليم الدفعة — 2026-11-01 — Codex
-- **Works now:** فُصلت معاينة Goodreads ودفتر المحبرة وبحث PDF؛ انتهى تنسيق الملفات التي بدأت في المال واليوميات والقرآن بلا تغيير بنيتها. شاشة القيام أقرب إلى المعتمد: عنوان متمركز ورجوع دائري وخيارات محددة وكتابة داكنة على الذهب. صُحّح توجيه تشغيل الجوال إلى المحلي تحت RA1؛ أُزيل scratch الجلسة واستُثني كاش البناء من Git.
-- **Verified:** `xcodebuild test` على محاكي العمل المنفصل iOS 26.5: Goodreads ‏2/2، notebook ‏3/3، PDF/qiyam ‏3/3؛ money-r1 ‏6/7 ثم الحالة المعادة 1/1 في money-qiyam-r2 (والقيام 1/1)؛ diary-quran-r1 ‏8/8 بلا runtimeWarnings. السجلات `Madar/Artifacts/codex-cn04-*-20261101-*.log`؛ 23 حالة فريدة لها اجتياز، وإخفاق توقيت واحد أصلح بانتظار اختفاء تأكيد الهدف. `git diff --check` و`cmp` لزوجَي تعليمات الوكلاء نظيفة.
-- **Differences left:** لا canonical لـGoodreads والدفتر وبحث PDF؛ مقارنات الشاشات الملموسة محدثة ومفتوحة. بقي محتوى الاختبار والتواريخ الثنائية ومسافات النظام المختلفة عن النموذج؛ لا اعتماد بصري جديد من المالك.
-- **Not verified:** جوال المالك والتوقيع والتوزيع؛ القبول البصري؛ روابط المصادر الخارجية end-to-end. لا ملفات توقيع محلية تثبت App Group؛ لم تُجرَ محاولة تثبيت على جواله.
-- **Next:** CN-05: بعد اكتمال التوقيع للتطبيق والودجت مع `group.com.alqzan.madar2`، تشغيل محلي باستخدام `App/Madar.entitlements` ثم ملاحظات الاستخدام الفعلي. بقية لفّ الأسطر صيانة اختيارية؛ لا تبدأ جولة جديدة لمجرد طول السطر. M7 وقبول الجهاز ما زالا مفتوحين.
-- **Model/effort:** Codex GPT-6؛ الجهد غير مكشوف؛ المساعدون قراءة فقط.
-- **Usage:** آخر قراءة عند التسليم: 81٪ مستخدم من نافذة الخمس ساعات (19٪ متبقٍ)، و60٪ أسبوعيًا؛ أُنهيت الدفعة بطلب المالك الأخير دون بدء عمل جديد.

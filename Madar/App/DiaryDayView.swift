@@ -31,6 +31,8 @@ struct DiaryDayView: View {
     @State private var travel: DiaryTravelPage?
     @State private var travelReturn: DiaryTravelReturn?
     @Environment(\.scenePhase) private var scenePhase
+    @State private var aiComposerOpen = false
+    @State private var aiAvailability: MadarAIAvailability = .checking
     @State private var stampsOpen = false
     @State private var editing: DiaryLineEdit?
     @State private var deleteConfirmation: UUID?
@@ -63,6 +65,19 @@ struct DiaryDayView: View {
         }
     }
     private var service: AppDiaryService { AppDiaryService(app: app) }
+    private var canReadDiary: Bool { app.lockController?.canPresent(.notes) ?? app.protectedDataAuthorized }
+    private var pageReloadID: String {
+        [shownDay.description, String(app.prayerRevision), String(retry), canReadDiary ? "open" : "closed"].joined(separator: ":")
+    }
+    private var aiAvailabilityID: String { [page?.id ?? "loading", String(retry), String(intentions.count)].joined(separator: ":") }
+    private var analysisText: String {
+        guard let page else { return "" }
+        return page.lines
+            .filter { ["normal", "late", "ghad", "margin"].contains($0.kind) }
+            .map { $0.markdown == true ? DayOneMarkdown.plain($0.text) : $0.text }
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: "\n\n")
+    }
     private var today: GregorianDay { (try? service.currentDay()) ?? day }
     private var first: FirstCalendar { FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri }
     private var eveningPrimary: Bool { shownDay == today && !intentions.isEmpty && service.intentionEvening(shownDay) }
@@ -250,6 +265,24 @@ struct DiaryDayView: View {
                                         Button("حاول مرة أخرى") { retry += 1 }.frame(minHeight: 44)
                                     }.padding(20)
                                 }
+                if canReadDiary, (!analysisText.isEmpty || !intentions.isEmpty),
+                                   (aiAvailability == .ready || aiAvailability == .needsDownload) {
+                                    Button {
+                        aiComposerOpen = true
+                                    } label: {
+                                        Label(
+                            aiAvailability == .ready ? "اسأل عن هذا اليوم" : "جهّز الترجمة على الجهاز",
+                                            systemImage: "sparkles"
+                                        )
+                                            .font(DiaryType.label).foregroundStyle(theme.accent)
+                                            .padding(.horizontal, 18).padding(.vertical, 12)
+                                            .background(theme.surface.opacity(0.82), in: Capsule())
+                                            .overlay { Capsule().stroke(theme.line, lineWidth: 0.8) }
+                                    }
+                                    .buttonStyle(.madarPlain)
+                                    .padding(.horizontal, 18).padding(.top, 8)
+                                    .accessibilityIdentifier("diary-ai-analysis")
+                                }
                                 Spacer(minLength: 70)
                             }.padding(.vertical, 14).frame(maxWidth: .infinity, alignment: .leading).frame(
                                 minHeight: geometry.size.height, alignment: .topLeading
@@ -388,6 +421,10 @@ struct DiaryDayView: View {
             .sheet(item: $openingLetter, onDismiss: { retry += 1 }) { letter in
                 DiaryLetterMoment(app: app, letter: letter).environment(\.roomTheme, theme)
             }
+            .sheet(isPresented: $aiComposerOpen) {
+                MadarAIAnalysisSheet(app: app, kind: .diary, initialScope: .day, initialDay: shownDay)
+                    .environment(\.roomTheme, theme)
+            }
             .sheet(item: $editing) { edit in
                 DiaryLineEditSheet(app: app, edit: edit) { niyyaSaved = true }.environment(\.roomTheme, theme)
                     .diaryRootDraftBlocking(app)
@@ -409,7 +446,21 @@ struct DiaryDayView: View {
                     .madarSheetErrorAlert(app)
             }
             // N04: letters are checked when the diary is open and the app comes to the foreground.
-            .onChange(of: scenePhase) { _, phase in if phase == .active { retry += 1 } }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { aiAvailability = .checking; retry += 1 }
+                else { aiComposerOpen = false }
+            }
+            .onChange(of: canReadDiary) { _, canRead in
+                if canRead {
+                    aiAvailability = .checking
+                    retry += 1
+                } else {
+                    aiComposerOpen = false
+                    aiAvailability = .checking
+                    page = nil
+                    retry += 1
+                }
+            }
             .task {
                 while !Task.isCancelled {
                     do {
@@ -418,22 +469,42 @@ struct DiaryDayView: View {
                     } catch { break }
                 }
             }
-            .task(id: shownDay.description + ":" + String(app.prayerRevision) + ":" + String(retry)) {
-                do {
-                    try await service.prepareClosedDay(shownDay); page = try service.day(shownDay);
-                    intentions = try service.intentions(shownDay); arc = service.dayArc(shownDay);
-                    appearance = try service.appearance(shownDay); displayNow = service.clock();
-                    returnDay = try service.returnAfterAbsence(shownDay); travel = try service.travel(shownDay);
-                    travelReturn = travel == nil ? try service.travelReturn(shownDay) : nil
-                    if shownDay == today { try? await service.refreshLetters() }
-                    let letters = (try? service.letters()) ?? [];
-                    waitingLetter = letters.first { $0.state == .eligible };
-                    sealedHere = letters.filter { $0.writtenDay == shownDay && $0.state != .opened }.count
-                    (projectLinks, projectSuggestions) =
-                        (try? service.projectNotes(shownDay)) ?? (projectLinks, projectSuggestions);
-                    failure = nil
-                } catch { page = nil; failure = madarUserMessage(error) }
+            .task(id: pageReloadID) { await loadDiaryPage() }
+            .task(id: aiAvailabilityID) {
+                guard page != nil, (!analysisText.isEmpty || !intentions.isEmpty) else { aiAvailability = .checking; return }
+                aiAvailability = .checking
+                aiAvailability = await MadarAIAvailabilityChecker.check()
             }
+        }
+    }
+
+    @MainActor private func loadDiaryPage() async {
+        do {
+            guard canReadDiary else { page = nil; aiComposerOpen = false; return }
+            if page?.day != shownDay { page = nil; aiComposerOpen = false; aiAvailability = .checking }
+            try await service.prepareClosedDay(shownDay)
+            guard !Task.isCancelled, canReadDiary else { page = nil; aiComposerOpen = false; return }
+            page = try service.day(shownDay)
+            intentions = try service.intentions(shownDay)
+            arc = service.dayArc(shownDay)
+            appearance = try service.appearance(shownDay)
+            displayNow = service.clock()
+            returnDay = try service.returnAfterAbsence(shownDay)
+            travel = try service.travel(shownDay)
+            travelReturn = travel == nil ? try service.travelReturn(shownDay) : nil
+            if shownDay == today { try? await service.refreshLetters() }
+            guard !Task.isCancelled, canReadDiary else { page = nil; aiComposerOpen = false; return }
+            let letters = (try? service.letters()) ?? []
+            waitingLetter = letters.first { $0.state == .eligible }
+            sealedHere = letters.filter { $0.writtenDay == shownDay && $0.state != .opened }.count
+            (projectLinks, projectSuggestions) =
+                (try? service.projectNotes(shownDay)) ?? (projectLinks, projectSuggestions)
+            failure = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            page = nil
+            failure = madarUserMessage(error)
         }
     }
     /// OR-15: after Isha the morning's intention comes back on the page itself and asks how it went.
@@ -538,6 +609,19 @@ struct DiaryDayView: View {
             joined = MadarInlineText.joined([text, Self.rooms[line.kind] ?? ""])
         return String(joined.dropFirst(text.count))
     }
+    private func styledLine(_ line: DiaryDisplayLine, auto: Bool) -> AttributedString {
+        var content = line.markdown == true
+            ? ((try? AttributedString(
+                markdown: line.text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+                ?? AttributedString(line.text))
+            : AttributedString(line.text)
+        if auto {
+            var suffix = AttributedString(roomSuffix(line))
+            suffix.font = .custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)
+            content.append(suffix)
+        }
+        return content
+    }
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
         let auto = ["salah", "quran", "mihbara", "mal", "habits"].contains(line.kind)
         return HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -547,13 +631,7 @@ struct DiaryDayView: View {
                 "diary-day-line-time")
             VStack(alignment: .leading, spacing: 5) {
                 // OR-12: the room's name follows its line, small and in the same light ink («· الصلاة»), as the canonical.
-                (Text(
-                    line.markdown == true
-                        ? ((try? AttributedString(
-                            markdown: line.text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-                            ?? AttributedString(line.text)) : AttributedString(line.text))
-                    + Text(auto ? roomSuffix(line) : "").font(
-                        .custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)))
+                Text(styledLine(line, auto: auto))
                     .font(.custom("thmanyahseriftext-Regular", size: auto ? 17 : 19, relativeTo: .body)).lineSpacing(11)
                     .italic(auto || line.kind == "margin")
                     .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier(

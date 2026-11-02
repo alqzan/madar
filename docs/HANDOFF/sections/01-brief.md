@@ -74,13 +74,13 @@ Stack (decided)
 
 AreaChoiceNotes
 
-UISwiftUI, iOS 27 SDK, deployment target iOS 26.0Liquid Glass tab bar (TabView + .tabBarMinimizeBehavior(.onScrollDown)). Use system materials; custom identity per room on top. Version policy: iOS 27-only features are wrapped in #available with an iOS 26 fallback (e.g. the 4×6 widget falls back to systemLarge).
+UI: SwiftUI, iOS 27 SDK, deployment target iOS 27.0. Liquid Glass tab bar (TabView + .tabBarMinimizeBehavior(.onScrollDown)). Use system materials; custom identity per room on top. Version policy: iOS 27.0 is the minimum supported version; use iOS 27 APIs directly without iOS 26 compatibility paths.
 
 StateObservation (@Observable), unidirectional per roomEngines are pure Swift, UI-free, and tested for behaviour against golden fixtures (§13 test plan).
 
 PersistenceSwiftData with CloudKit private DBCloudKit rules: no @Attribute(.unique), all properties optional or defaulted, all relationships optional (§11 “Common fields” + “Natural keys and reconciliation”). One container, two configurations: one ModelContainer factory in MadarData builds synced (CloudKit private DB) and deviceOnly (cloudKitDatabase: .none) stores in the App Group container, used by the app and by App Intents; widget views read JSON snapshots only. Device-only settings live in DeviceSetting in the deviceOnly configuration (never synced); UserDefaults is not used for settings. Money amounts are Int minor units (halalas).
 
-WidgetsWidgetKit + App Intents (interactive), ControlWidget (Control Center/Action button); ActivityKit only under the narrow rules in §9One widget extension; App Group shared container for read-only JSON snapshots. The next-prayer countdown is a WidgetKit timeline (Text(timerInterval:)), not a Live Activity. Activity.request(…start:) is in the iOS 26 SDK (Apple documentation); how reliably a scheduled start is shown is verify on device at the M1 gate. The countdown never depends on it.
+WidgetsWidgetKit + App Intents (interactive), ControlWidget (Control Center/Action button); ActivityKit only under the narrow rules in §9One widget extension; App Group shared container for read-only JSON snapshots. The next-prayer countdown is a WidgetKit timeline (Text(timerInterval:)), not a Live Activity. Activity.request(…start:) is in the iOS 26 SDK (Apple documentation); how reliably a scheduled start is shown is verified on an iOS 27 device at the M1 gate. The countdown never depends on it.
 
 Prayer timesadhan-swift (Batoul Apps, MIT) or an equivalent audited implementationUmm al-Qura method default; Asr standard; manual minute offsets. Isha = Maghrib + 90 min, and + 120 min in Ramadan (Hijri month 9) — implemented in our engine, not taken from the library. Acceptance: the golden times table in §7.2 (tolerance ≤ 1 minute). verify library Umm al-Qura output against that table.
 

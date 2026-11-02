@@ -38,7 +38,7 @@ struct MoneyEnvelopeDetailView: View {
                     if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44) }
                     if reading.savingMinor > 0 || (visible && reading.savingPlanID != nil) {
                         HStack(spacing: 10) {
-                            Label { Text("تدّخر ") + Text(figure: amount(reading.savingMinor)).font(MadarTypography.cardTitle()) + Text(" من كل راتب") } icon: { Image(systemName: "diamond.fill").foregroundStyle(theme.color("reserveText")) }.font(MadarTypography.body()).accessibilityLabel("تدّخر " + amount(reading.savingMinor) + " من كل راتب").accessibilityIdentifier("money-envelope-saving-value")
+                            Label { Text("تدّخر \(Text(figure: amount(reading.savingMinor)).font(MadarTypography.cardTitle())) من كل راتب") } icon: { Image(systemName: "diamond.fill").foregroundStyle(theme.color("reserveText")) }.font(MadarTypography.body()).accessibilityLabel("تدّخر " + amount(reading.savingMinor) + " من كل راتب").accessibilityIdentifier("money-envelope-saving-value")
                             Spacer(minLength: 0)
                             if visible && reading.savingPlanID != nil {
                                 Button { savingAdd = false; savingOpen = true } label: { Image(systemName: "minus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("قلّل ادخار المظروف").buttonStyle(.madarPlain)

@@ -7,7 +7,7 @@
   {
     "sectionID": "brief",
     "path": "sections/01-brief.md",
-    "sha256": "e6160e5b212744746a7efdf2c249d41783b9f8ece797aac11804a3959c15585d"
+    "sha256": "4ea97989676c0ddd678ca8b63719b383622ba3396f3806e8fd0a4b2eb7a94e9a"
   },
   {
     "sectionID": "vision",
@@ -32,7 +32,7 @@
   {
     "sectionID": "flex",
     "path": "sections/06-flex.md",
-    "sha256": "5c309994cfa34530fe678aa8f911e6b3f4041233cbd29c10e8bc73e9169eb535"
+    "sha256": "2d3a349235128df9430ff859c430a4c8febc6c9a57ea488b6a1459d27dea4fae"
   },
   {
     "sectionID": "rooms",
@@ -42,17 +42,17 @@
   {
     "sectionID": "r-bahw",
     "path": "sections/08-r-bahw.md",
-    "sha256": "83503b33a60e0f623e98309d26e5d35b04d50d006e4e42ff2cc676ca820cfdc9"
+    "sha256": "f2090543112f3cdadce9ad44abfc8d6a014c0b1c4b19857d0060080a6c26dd71"
   },
   {
     "sectionID": "r-salah",
     "path": "sections/09-r-salah.md",
-    "sha256": "3efb69eeab5e76f18b1ab8ca220c6494e32cd4d852ebbcbcf632d40dcf507d33"
+    "sha256": "0ee4e1bf165107689f2695fc5e9000ab83ab5829e761946591dd0df4f9307223"
   },
   {
     "sectionID": "r-notes",
     "path": "sections/10-r-notes.md",
-    "sha256": "d34d70959a5170d862d93f82e02b44e10fa35888093fd0a664e42f1f2a1b2fb1"
+    "sha256": "0d33820cfc08036e50e3160a66e5247b9a55d03bd8644ddee8413fa3e8a6cfbc"
   },
   {
     "sectionID": "r-quran",
@@ -77,22 +77,22 @@
   {
     "sectionID": "outside",
     "path": "sections/15-outside.md",
-    "sha256": "bfee395ed529a898ec0e245719f832e30206db9806f2fd6ad977b5511cf3dd42"
+    "sha256": "fd447fe286fe8cd98859f76d123c68eb2dda0966a7bf5debb2297d320ac9b0bb"
   },
   {
     "sectionID": "tech",
     "path": "sections/16-tech.md",
-    "sha256": "b96afae68f20dd97fe87a1062ab56d8efc9e6a16532558c3e19316c1e50c09fe"
+    "sha256": "08721fcc11f7e1e238b75e68c6729670e6d0b796918df12d552ddf945d9c0e81"
   },
   {
     "sectionID": "data",
     "path": "sections/17-data.md",
-    "sha256": "12512e33bb2cdf35dcd64c12065f84c302a558cd65e3e669343e8bb5fab10355"
+    "sha256": "a30586383c9b783cb727a6e9688bb598446dcd73f43547a9af6d8bc8995288b0"
   },
   {
     "sectionID": "plan",
     "path": "sections/18-plan.md",
-    "sha256": "15359035d622c6b910bf490a6394420e84e2b1b71d9333e3bf4fd1450366d928"
+    "sha256": "30ce1c4d12c72a9d6456a2ae09350ec00c52ac371d497bf96dddd1f37fed369f"
   },
   {
     "sectionID": "qa",
@@ -102,7 +102,7 @@
   {
     "sectionID": "risks",
     "path": "sections/20-risks.md",
-    "sha256": "7646be9b03400c655faf6806faceaf3474a1f1cdf816786dd03cdbc2d8038a9d"
+    "sha256": "45eb4493d1ec497265bb5af32dbbade467c0dbae7cac871d3d125e4fc64dbec3"
   },
   {
     "sectionID": "open",
@@ -122,6 +122,6 @@
   {
     "sectionID": "closure",
     "path": "sections/24-closure.md",
-    "sha256": "08113264a5709f9d66dd6bc645e9a1d30ca4f6da98faebda2ceca9ac48d7e371"
+    "sha256": "388618a9ccd22c5bc2f1c1dd3f0797ba6cd00dea53934f208c96407d0d36dc55"
   }
 ]

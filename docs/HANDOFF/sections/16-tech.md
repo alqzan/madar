@@ -106,13 +106,13 @@ NotificationLedger (device-only, not CloudKit) records each request with request
 
 Background: BGAppRefreshTask to refresh prayer times, reschedule notifications and update widget snapshots; BGProcessingTask for the scheduled backup. It never starts a Live Activity.
 
-Countdown & Live Activities: the next-prayer countdown on the Lock Screen/Home Screen is a WidgetKit timeline (one entry per prayer time, Text(timerInterval:)); no push needed. A Live Activity may be started only from the foreground, from a LiveActivityIntent (Control/Shortcut/button), or scheduled with Activity.request(…start:) (iOS 26) at the end of the sanctity window — never at adhan. Max ~8h active (+4h on the Lock Screen). verify the iOS 26 scheduled start.
+Countdown & Live Activities: the next-prayer countdown on the Lock Screen/Home Screen is a WidgetKit timeline (one entry per prayer time, Text(timerInterval:)); no push needed. A Live Activity may be started only from the foreground, from a LiveActivityIntent (Control/Shortcut/button), or scheduled with Activity.request(…start:) (iOS 26) at the end of the sanctity window — never at adhan. Max ~8h active (+4h on the Lock Screen). verify the scheduled start on iOS 27.
 
 Location: default When-In-Use. Travel distance is checked on foreground launch (requestLocation()) and when widgets refresh. An optional “Always” upgrade enables automatic detection (significant location changes) and is explained in the permission text. Without Always, travel mode behaves as “ask me” on the next open. Widgets never request location (no widget location permission); they read the prayer snapshot (7 days of times + place + tz + accuracy flag). Prayer times use the IANA tz of the active place, never the device tz. Manual cities come from a bundled list (name, country, lat, lon, IANA tz) whose source and licence are recorded in provenance.json.
 
 Widgets: no hard-coded point sizes — layouts read WidgetFamily and GeometryReader. Guard the 4×6 family with #available and fall back to systemLarge. Support fullColor, accented and vibrant rendering (widgetAccentable()); timers follow .environment(\.locale).
 
-Version policy: deployment target iOS 26.0; iOS 27-only features sit behind #available with an iOS 26 fallback.
+Version policy: deployment target iOS 27.0; use iOS 27 APIs directly without iOS 26 compatibility paths.
 
 HealthKit: read-only stepCount (default) and appleExerciseTime for the walking habit (optional permission; exercise minutes are labelled as all exercise).
 

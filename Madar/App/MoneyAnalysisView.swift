@@ -13,6 +13,7 @@ struct MoneyAnalysisView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @State private var period: MoneyAnalysisPeriod?
     @State private var offset = 0
     @State private var reading: MoneyAnalysisReading?
@@ -20,9 +21,12 @@ struct MoneyAnalysisView: View {
     @State private var failure: String?
     @State private var selected: GregorianDay?
     @State private var grown = false
+    @State private var aiComposerOpen = false
+    @State private var aiAvailability: MadarAIAvailability = .checking
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
+    private var canReadMoney: Bool { app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized }
     private func amount(_ n: Int) -> String { visible ? service.amount(n) : "•••" }
     /// Averages and «نحو» projections read in whole currency units; the halalas would claim a precision they lack.
     private func approx(_ n: Int) -> String {
@@ -45,6 +49,23 @@ struct MoneyAnalysisView: View {
                 if let reading {
                     summary(reading)
                     if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-analysis-reveal") }
+                    if visible, canReadMoney,
+                       (aiAvailability == .ready || aiAvailability == .needsDownload) {
+                        Button {
+                            aiComposerOpen = true
+                        } label: {
+                            Label(
+                                aiAvailability == .ready ? "اسأل عن مالك" : "جهّز الترجمة على الجهاز",
+                                systemImage: "sparkles"
+                            )
+                                .font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText"))
+                                .frame(maxWidth: .infinity, minHeight: 46)
+                                .background(theme.surface, in: Capsule())
+                                .overlay { Capsule().stroke(theme.line, lineWidth: 0.8) }
+                        }
+                        .buttonStyle(.madarPlain)
+                        .accessibilityIdentifier("money-analysis-ai")
+                    }
                     chart(reading)
                     DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.8).frame(height: 3).padding(.vertical, 4)
                     categories(reading)
@@ -55,7 +76,38 @@ struct MoneyAnalysisView: View {
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
-            .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .sheet(isPresented: $aiComposerOpen, onDismiss: {
+                if scenePhase == .active {
+                    Task { aiAvailability = await MadarAIAvailabilityChecker.check() }
+                }
+            }) {
+                let initialScope: MadarAIAnalysisScope = current == .week ? .week : ((reading?.offset ?? 0) < 0 ? .custom : .cycle)
+                let range = initialScope == .custom ? reading.map { MadarAIDateRange(first: $0.first, last: min($0.last, $0.today)) } : nil
+                MadarAIAnalysisSheet(app: app, kind: .money, initialScope: initialScope,
+                                     initialDay: reading?.first, initialRange: range)
+                    .environment(\.roomTheme, theme)
+            }
+            .task {
+                load()
+                aiAvailability = await MadarAIAvailabilityChecker.check()
+            }
+            .onChange(of: app.prayerRevision) {
+                load()
+                aiAvailability = .checking
+                Task { aiAvailability = await MadarAIAvailabilityChecker.check() }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { aiComposerOpen = false }
+                else {
+                    aiAvailability = .checking
+                    Task { aiAvailability = await MadarAIAvailabilityChecker.check() }
+                }
+            }
+            .onChange(of: visible) { _, isVisible in if !isVisible { aiComposerOpen = false } }
+            .onChange(of: canReadMoney) { _, canRead in
+                if !canRead { aiComposerOpen = false }
+                else { Task { aiAvailability = await MadarAIAvailabilityChecker.check() } }
+            }
             .accessibilityIdentifier("money-analysis")
     }
 
@@ -403,6 +455,7 @@ struct MoneyAnalysisView: View {
     }
 
     private func load() {
+        aiComposerOpen = false
         do {
             let next = try service.loadAnalysis(period: current, offset: offset)
             reading = next; empty = next == nil; failure = nil

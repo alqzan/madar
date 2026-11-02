@@ -26,14 +26,9 @@ struct TabShell<Content: View>: View {
         accessorized.tint(theme.accent)
     }
 
-    /// A focused flow that hides the tab bar (`hidesRoomAccessory`) also hides the accessory, which otherwise
-    /// floats over its bottom action (the expense «سجّل»). iOS 26.0 has no switch; those flows pad their bottom instead.
+    /// A focused flow can hide the accessory that would otherwise float over its bottom action (the expense «سجّل»).
     @ViewBuilder private var accessorized: some View {
-        if #available(iOS 26.1, *) {
-            baseTabView.tabViewBottomAccessory(isEnabled: session.accessoryHiders.isEmpty) { shortcuts }
-        } else {
-            baseTabView.tabViewBottomAccessory { shortcuts }
-        }
+        baseTabView.tabViewBottomAccessory(isEnabled: session.accessoryHiders.isEmpty) { shortcuts }
     }
 
     private var shortcuts: some View {
@@ -86,9 +81,7 @@ private struct RoomAccessoryHider: ViewModifier {
     let session: AppSession
     let id: String
     func body(content: Content) -> some View {
-        Group {
-            if #available(iOS 26.1, *) { content } else { content.safeAreaPadding(.bottom, 72) }
-        }
+        content
         .onAppear { session.accessoryHiders.insert(id) }
         .onDisappear { session.accessoryHiders.remove(id) }
     }

@@ -239,7 +239,7 @@ struct PrayerTodayView: View {
                     rootDraftChanged: reportRootDraft) { kind, done in
                     session.makeUpPrayer(item.reference, fridayKind: kind, completion: done)
                 }
-            case .recovery(let references, let fridayReferences, let timeZone):
+            case .recovery(let references, let fridayReferences, _):
                 PrayerGapResolutionSheet(references: references, fridayReferences: fridayReferences, dateLabel: qadaDate, digits: digits, rootDraftChanged: reportRootDraft) { resolutions, done in
                     session.resolvePrayerGap(resolutions, completion: done)
                 }
