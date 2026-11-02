@@ -47,6 +47,13 @@ import MadarCommands
         XCTAssertNil(journey.forecastDay) // Fewer than five hifz days.
         XCTAssertEqual(journey.shades[1], 1)
         XCTAssertLessThan(journey.shades[2]!, journey.shades[1]!)
+        XCTAssertEqual(journey.mapRows.count, 30)
+        let mappedPages = journey.mapRows.flatMap(\.pages).map(\.firstPage)
+        XCTAssertEqual(mappedPages.count, 604)
+        XCTAssertEqual(Set(mappedPages), Set(1...604))
+        XCTAssertEqual(journey.stats.first { $0.id == "work" }?.value, service.dayCount(2))
+        XCTAssertEqual(journey.stats.first { $0.id == "work" }?.detail, service.numerals.percent(33) + " من أيام الحفظ المتاحة")
+        XCTAssertEqual(journey.stats.first { $0.id == "recited" }?.value, service.faceCount(4))
         _ = root // An isolated temporary store, never the owner's data.
     }
 }

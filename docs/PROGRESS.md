@@ -37,7 +37,7 @@ Owner approved the other 51 states from the pending gallery; real-device/use acc
 
 | Card | Result / canonical | Status | Notes |
 |---|---|---|---|
-| M2-V10 | All-time log — `screens/quran/12-R18-Sijil-All.jpg` | in progress — owner requested canonical match, 1 Nov 2026 | `QuranJourneyView`: actual coverage journey, planned-scope and whole-Quran pace forecasts, six derived statistics, 604 cells shaded by completion date with status shapes; page history opens the original Mushaf. Uses the engine’s 28-day pace, five-day/50-ayah eligibility and rest-day rule; no invented finish date. Final focused data 1/1 + UI 1/1 passed (`M2-V10-final`); app builds; L/light top/map/page shots `Artifacts/m2-v10-final/`; comparison `R18-Sijil-All.html`. Differences: owner green/1405 palette, native safe area, actual dates/values, longer explanatory copy and accessible page selector; no moon, no scrolled canonical. 1 Nov follow-up: owner approved the other 51 gallery states and reopened this card. Partial canonical pass: three semantic tile background families and «أرقامك كلها» header; no numbers/rules changed. QuranJourneyUITests/testJourneyTotalsForecastAndPageHistory passed 1/1 (`codex-m2-v10-palette-20261101-r1`), screenshots in `-shots`, comparison regenerated. Not matched yet: compact journey/date/forecast hierarchy, visible plot guides, map labels/date legend and six-stat meaning alignment (use real defined data; no sample values). |
+| M2-V10 | All-time log — `screens/quran/12-R18-Sijil-All.jpg` | matched — awaiting owner, 2 Nov 2026 | `QuranJourneyView`: actual-coverage journey and forecast, dual-calendar dates, six defined statistics, 604 dated faces in 30 real Juz rows, and direct cell tap to face details/Mushaf. Keeps the existing 28-day pace, five-day/50-ayah gate and rest-day rule. Row widths now follow each Juz’s true page count (the spec’s first Juz has 21 faces and the last has 23); no placeholder faces. Removes redundant page Stepper/detail row and softens forecast weight. Focused integration 1/1 (`codex-m2-v10-continued-20261102-r5`), final UI 1/1 (`...-r10`), app build, `git diff --check` clean. Default L/light top/map/page captures in `Artifacts/codex-m2-v10-continued-20261102-r10-shots/`; `R18-Sijil-All.html` regenerated and screenshots inspected directly. Differences left: actual fixture dates/counts and native safe-area/scroll viewport; owner visual acceptance pending. No canonical sample values copied. 1 Nov: owner approved the other 51 gallery states and reopened M2-V10. |
 
 ## Owner review page — 26 Oct (do these first; Claude and Codex split by room)
 Source: `~/Downloads/madar-review-notes.md` (owner verdicts on 105 screens: 51 «موافق», 54 «يحتاج تعديل»). All-«موافق» cards were set to approved. Owner answers to follow-up questions are in the last column. «التصميم أحلى» = build the canonical screen as drawn, then improve. Unclear look-and-feel items: make 2–3 mockups first and let the owner pick (owner rule: mockups before design guesses).
@@ -508,6 +508,15 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
+## Handover — مطابقة M2-V10 واستكمال خريطة المصحف — 2026-11-02 — Codex
+- **Works now:** رحلة الحفظ تعرض توقعًا هادئًا، ستة أرقام مع تعريفاتها، وخريطة ٦٠٤ وجه موزعة على الأجزاء الحقيقية؛ لمس الوجه يفتح تفاصيله، من دون صف تحكم زائد.
+- **Verified:** تكامل `QuranWeekIntegrationTests/testRollingWeekRestDayDedupedReviewsAndWidgetHaveOneDefinition` ‏1/1؛ `QuranJourneyUITests/testJourneyTotalsForecastAndPageHistory` ‏1/1 (`codex-m2-v10-continued-20261102-r10`); بناء المحاكي و`git diff --check` نظيفان. لقطات L/light top/map/page في `Madar/Artifacts/codex-m2-v10-continued-20261102-r10-shots/`؛ مقارنة `R18-Sijil-All.html` أُعيد توليدها وفُحصت الصور مباشرة.
+- **Differences left:** أرقام وتواريخ بيانات الاختبار الفعلية، وإطارات النظام/موضع التمرير؛ لا قيم نموذجية من التصميم. موافقة المالك البصرية على M2-V10 معلّقة.
+- **Not verified:** اعتماد المالك، تجربة جواله والاستخدام الفعلي. لم تُجرَ لقطات أو اختبارات أحجام الوصول وفق قرار المالك.
+- **Next:** يراجع المالك M2-V10؛ ثم نتابع أول بطاقة `ready` على اللوحة.
+- **Model/effort:** Codex GPT-6؛ الجهد غير مكشوف؛ Luna bug hunt وSol High استشارتان للقراءة فقط.
+- **Usage:** غير مكشوف.
+
 ## Handover — اعتماد ٥١ واجهة وبدء مطابقة M2-V10 — 2026-11-01 — Codex
 - **Works now:** موافقة المالك البصرية محفوظة لـ٥١ من ٥٢ حالة في المعرض، واستثناء M2-V10 صريح؛ نُقلت البطاقة من الأرشيف إلى أول متابعة نشطة. بدأت لمسة بطاقات الإحصاءات بثلاث درجات لونية وعنوان «أرقامك كلها».
 - **Verified:** `xcodebuild test -only-testing:MadarUITests/QuranJourneyUITests/testJourneyTotalsForecastAndPageHistory` اجتاز 1/1؛ الحزمة `Madar/Artifacts/codex-m2-v10-palette-20261101-r1.xcresult`، ولقطات L/light في `-shots`؛ مقارنة R18-Sijil-All محدثة. `git diff --check` نظيف.
@@ -525,12 +534,3 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Next:** CN-05: بعد اكتمال التوقيع للتطبيق والودجت مع `group.com.alqzan.madar2`، تشغيل محلي باستخدام `App/Madar.entitlements` ثم ملاحظات الاستخدام الفعلي. بقية لفّ الأسطر صيانة اختيارية؛ لا تبدأ جولة جديدة لمجرد طول السطر. M7 وقبول الجهاز ما زالا مفتوحين.
 - **Model/effort:** Codex GPT-6؛ الجهد غير مكشوف؛ المساعدون قراءة فقط.
 - **Usage:** آخر قراءة عند التسليم: 81٪ مستخدم من نافذة الخمس ساعات (19٪ متبقٍ)، و60٪ أسبوعيًا؛ أُنهيت الدفعة بطلب المالك الأخير دون بدء عمل جديد.
-
-## Handover — تدقيق مرجع الورد وثمانية عشر مقطع تنظيف — 2026-11-01 — Codex
-- **Works now:** CN-03 اكتملت؛ ثلاثة مقتطفات صارت جملًا تامة بعد مطابقتها مع الشاملة. في CN-04 فُصلت قائمة الفوائت وسؤال القلب والقضاء والتنبيه وأثر قيام الليل وحاجز إعادة قراءة البيانات وملاحظة الصفحة وحاشية القارئ وفهرس المحبرة ورسم بطاقة الاقتباس وتخطيط شرائحها ونمط زر الوتر وورقة الترجمة وسبكة الصلاة وبطاقة الورق وبطاقة الكلمة وورقة بطاقة الاقتباس وأقواس الصلاة وانعكاس الماء إلى ملفات مستقلة.
-- **Verified:** مرجع الورد: التكامل 1/1 وواجهة 3/3، ثم 2/2 بعد إصلاح الاقتباس؛ الصلاة: الفوائت 2/2 والقلب 1/1 والقضاء والاستعادة 2/2 وأثر القيام 1/1 واختبار واجهة الليل 1/1 وتعافي قراءة الصلاة 1/1 والصفحة الرئيسية 1/1 و`test_M1V07_QiyamSheetMatchesCanonical` ‏1/1، واختبارا `test_M1V01_HomeMatchesCanonical` و`test_M1T02_MissedMakeUpUndoAndRelaunch` ‏2/2 لسبكة الصلاة، ثم `test_M1V01_HomeMatchesCanonical` و`test_M1V08_NightHomeMatchesCanonical` ‏2/2 للأقواس وانعكاس الماء؛ المحبرة: فهرس Turath 1/1 وملاحظة الصفحة وحاجز الجذر 1/1 والحاشية 1/1، واختبار `testReaderWordCardHighlightsParagraphUndoesNotesAndCopies` و`testMihbaraReaderQuoteDraftWaitsForRoomLinkUntilClosed` ‏2/2 بعد فصل ورقة بطاقة الاقتباس؛ واختبارا بطاقة الكلمة 2/2. تعذّر اختبار الترجمة الأول لأن الملف الجديد افتقد `Translation`; بعد إضافة الوحدة اجتاز البناء والاختبار، لكن المحاكي لم يعرض خيار الترجمة أو التنزيل فلم يفتح الورقة نفسها. `git diff --check` نظيف.
-- **Differences left:** فُتحت مقارنتا `S1-Home` و`S7-Night`؛ يظهر في التراكب فرق رأسي بين محتوى الصفحة وبداية أقواس الصلاة. لا تغيير مقصود في التخطيط من هذا الفصل، والمطابقة البصرية وقبول المالك ما زالا معلّقين.
-- **Not verified:** جوال المالك وفتح الروابط الخارجية end-to-end؛ حساب المطوّر ما زال تحت مراجعة Apple. ترجمة فقرة فعلية على جهاز/محاكي يوفّر حزمة اللغات. تكرر تحذير QoS في جولات من اختبارات المحبرة.
-- **Next:** لا توجد الآن قطعة CN-04 مستقلة عالية القيمة جاهزة؛ بقيت الأسطر الطويلة موزعة على ملفات كثيرة. بعد قبول Apple وتجهيز ملفات التوقيع التي تشمل App Group نتابع CN-05 على جوالك. قبولك البصري وتجربة التطبيق ومعلومات الدعم/الخصوصية تبقى لك لاحقًا.
-- **Model/effort:** Codex GPT-6؛ الجهد غير مكشوف.
-- **Usage:** غير مكشوف.
