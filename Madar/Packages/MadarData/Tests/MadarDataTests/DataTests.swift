@@ -149,7 +149,7 @@ import Testing
     }
     @Test func settingsDefaultsPersistenceAndInvalidRejection() throws {
         let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext)
-        #expect(store.schema.settings.count == 145); // owner 29 Oct: + notif.quietUntil
+        #expect(store.schema.settings.count == 148); // includes owner-approved mal.merchantLearnAfter setting
          #expect(try store.value(for:"core.firstCalendar") == .string("gregorian")) // owner, 22 Oct 2026
         #expect(throws:DataError.invalidValue("core.hijriOffset")) { try store.set(.number(9),for:"core.hijriOffset") }
         let undo = try store.set(.number(1),for:"core.hijriOffset"); #expect(try store.value(for:"core.hijriOffset") == .number(1)); try store.undo(undo); #expect(try store.value(for:"core.hijriOffset") == .number(0))

@@ -26,9 +26,10 @@ struct MoneyPaymentChoice: Identifiable, Equatable {
 struct MoneyExpenseMerchant: Identifiable, Equatable {
     var id: String { name }
     var name: String
-    /// The rule's category, else the category this merchant was filed under most.
+    /// A category suggested from repeated manual choices; every purchase can choose another.
     var categoryID: UUID?
-    var fromRule: Bool
+    var categorySource: String?
+    var hasMultipleLearnedCategories: Bool
     /// The way this merchant was paid last time.
     var methodID: String?
 }
@@ -66,6 +67,12 @@ struct MoneyExpenseReading {
     var tripCurrency: String? = nil
     var tripRate: String? = nil
     var tripEnvelopeID: UUID? = nil
+    var merchantLearningIndex: MerchantCategoryLearning.Index = .empty
+    var merchantLearningThreshold: Int = 3
+
+    func merchantLearning(for name: String) -> MerchantCategoryLearning.Result {
+        merchantLearningIndex.result(for: name, threshold: merchantLearningThreshold)
+    }
 }
 
 extension AppMoneyService {
@@ -80,6 +87,18 @@ extension AppMoneyService {
         let cardReadings = try loadCards(at: now).cards
         let confirmed = try repo.confirmedTransactions()
         let used = confirmed.filter { $0.kind == "expense" }.sorted { $0.eventAt > $1.eventAt }
+        let settingStore = try SettingsStore(context: context)
+        let learningThreshold = Int(try settingStore.value(for: "mal.merchantLearnAfter").number ?? 3)
+        let liveCategories = try context.fetch(FetchDescriptor<MadarData.Category>())
+            .filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            .sorted { $0.order == $1.order ? $0.name < $1.name : $0.order < $1.order }
+        let liveCategoryIDs = Set(liveCategories.map(\.id))
+        let learningSamples = confirmed.map { row in
+            MerchantCategoryLearning.Sample(transactionID: row.id, merchant: row.merchant ?? row.counterparty,
+                categoryID: row.categoryID, categorySource: row.categorySource, kind: row.kind,
+                reviewState: row.reviewState, isDeleted: row.deletedAt != nil, isMerged: row.mergedInto != nil)
+        }
+        let learningIndex = MerchantCategoryLearning.makeIndex(samples: learningSamples, liveCategoryIDs: liveCategoryIDs)
         func methodID(_ row: MoneyTransaction) -> String? {
             if let card = row.cardID { return "card:" + card.uuidString }
             if let accountID = row.fromAccountID, let account = accounts.first(where: { $0.id == accountID }) {
@@ -111,22 +130,23 @@ extension AppMoneyService {
         // The way of paying used most recently comes first among equals; otherwise the order above.
         let recentMethod = used.lazy.compactMap(methodID).first { id in methods.contains { $0.id == id } }
         let since = now.addingTimeInterval(-90 * 86_400)
-        var tally: [String: (count: Int, last: Date, categories: [UUID: Int], method: String?)] = [:]
+        var tally: [String: (count: Int, last: Date, method: String?)] = [:]
         for row in used where row.eventAt >= since {
             guard let name = (row.merchant ?? row.counterparty)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else { continue }
-            var entry = tally[name] ?? (0, row.eventAt, [:], methodID(row))
+            var entry = tally[name] ?? (0, row.eventAt, methodID(row))
             entry.count += 1
-            if let category = row.categoryID { entry.categories[category, default: 0] += 1 }
             tally[name] = entry
         }
         let merchants = try tally.sorted { $0.value.count == $1.value.count ? $0.value.last > $1.value.last : $0.value.count > $1.value.count }.prefix(10).compactMap { name, entry -> MoneyExpenseMerchant? in
             let rule = try repo.merchantRule(for: name)
             if rule?.ignore == true { return nil }
-            let filed = entry.categories.max { $0.value == $1.value ? $0.key.uuidString > $1.key.uuidString : $0.value < $1.value }?.key
-            return .init(name: name, categoryID: rule?.categoryID ?? filed, fromRule: rule?.categoryID != nil, methodID: entry.method.flatMap { id in methods.contains { $0.id == id } ? id : nil })
+            let learning = learningIndex.result(for: name, threshold: learningThreshold)
+            return .init(name: name, categoryID: learning.suggestedCategoryID,
+                categorySource: learning.suggestedCategoryID == nil ? nil : "learned",
+                hasMultipleLearnedCategories: learning.hasMultipleQualifiedCategories,
+                methodID: entry.method.flatMap { id in methods.contains { $0.id == id } ? id : nil })
         }
-        let categories = try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.sorted { $0.order == $1.order ? $0.name < $1.name : $0.order < $1.order }
-            .map { category in
+        let categories = liveCategories.map { category in
                 let limit = home.limits.first { $0.id == category.id }
                 let preferred = category.preferredCardID.flatMap { id in cards.first { $0.id == id && $0.kind == "credit" } }
                 return MoneyExpenseCategory(id: category.id, name: category.name, spentMinor: limit?.spentMinor, limitMinor: limit?.limitMinor,
@@ -135,11 +155,11 @@ extension AppMoneyService {
         let start = home.cycle?.startDay.date(in: zone) ?? now.addingTimeInterval(-60 * 86_400)
         let nearby = try context.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && ["expense", "fee"].contains($0.kind) && abs($0.eventAt.timeIntervalSince(now)) < 2 * 86_400 }
             .map { MoneyExpenseNearby(methodID: methodID($0), amountMinor: $0.amountMinor, currency: $0.currency, at: $0.eventAt, merchant: $0.merchant ?? $0.counterparty, fromMessage: $0.messageID != nil) }
-        let settings = try SettingsStore(context: context)
         return .init(currency: home.currency, cycle: home.cycle, today: today, earliest: start, methods: methods,
             defaultMethodID: recentMethod ?? methods.first(where: { $0.kind != .cash })?.id ?? methods.first?.id,
             merchants: merchants, categories: categories, envelopes: home.envelopes,
-            cashCountedAtWithdrawal: try settings.value(for: "mal.cashWithdrawalAsSpend") == .bool(true),
-            diaryOn: app.values["notes.autoLines"]?.object?["mal"] != .bool(false), nearby: nearby, tripCurrency: trip?.currency, tripRate: trip?.fxRateToHome, tripEnvelopeID: trip?.journeyKey)
+            cashCountedAtWithdrawal: try settingStore.value(for: "mal.cashWithdrawalAsSpend") == .bool(true),
+            diaryOn: app.values["notes.autoLines"]?.object?["mal"] != .bool(false), nearby: nearby, tripCurrency: trip?.currency, tripRate: trip?.fxRateToHome, tripEnvelopeID: trip?.journeyKey,
+            merchantLearningIndex: learningIndex, merchantLearningThreshold: learningThreshold)
     }
 }

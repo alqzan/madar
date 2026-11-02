@@ -262,7 +262,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 13)
+        #expect(MadarSchema.version == 14)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -285,7 +285,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 13)
+        #expect(MadarSchema.version == 14)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
@@ -604,6 +604,52 @@ import Testing
         #expect(checked.records.first { $0.id == closedID }?.fields["journeyID"] == .null)
         #expect(try stableGenerationHashes(generation) == sourceHash)
     }
+    /// V14 adds optional category provenance; a V13 category survives unchanged and remains ineligible for learning.
+    @Test func schemaV13UpgradePreservesPurchaseAndLeavesOldCategorySourceNil() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV14-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let rowID = UUID(), categoryID = UUID(), stamp = Date(timeIntervalSince1970: 1_797_000_000)
+        let dayKey = "2026-11-01", tzID = "Asia/Riyadh", dayPolicy = "fajr@1"
+        let source = MadarFrozenMoneyTransactionV13.MoneyTransaction()
+        source.id = rowID; source.createdAt = stamp; source.updatedAt = stamp; source.writerID = "synthetic-v13"
+        source.dayKey = dayKey; source.eventAt = stamp; source.tzID = tzID; source.dayPolicy = dayPolicy
+        source.kind = "expense"; source.amountMinor = 4_200; source.currency = "SAR"; source.homeAmountMinor = 4_200
+        source.homeCurrency = "SAR"; source.merchant = "مقهى تجريبي"; source.categoryID = categoryID
+        source.reviewState = "ok"; source.source = "bank"
+        do {
+            let oldContainer = try ModelContainer(for: MadarSchemaV13.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV13.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV13.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            oldContainer.mainContext.autosaveEnabled = false
+            oldContainer.mainContext.insert(source); try oldContainer.mainContext.save()
+        }
+
+        let projected = MoneyTransaction(); projected.id = rowID; projected.createdAt = stamp; projected.updatedAt = stamp
+        projected.writerID = "synthetic-v13"; projected.dayKey = dayKey; projected.eventAt = stamp
+        projected.tzID = tzID; projected.dayPolicy = dayPolicy; projected.kind = "expense"
+        projected.amountMinor = 4_200; projected.currency = "SAR"; projected.homeAmountMinor = 4_200
+        projected.homeCurrency = "SAR"; projected.merchant = "مقهى تجريبي"; projected.categoryID = categoryID
+        projected.reviewState = "ok"; projected.source = "bank"
+        var before = try projected.record(); before.fields.removeValue(forKey: "categorySource")
+        let records = [before]
+        try DurableFiles.encode(13, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID,
+            recordsHash: try RecordFingerprint.hash(records), createdAt: stamp), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil,
+            accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        let movement = try #require(upgraded.container.mainContext.fetch(FetchDescriptor<MoneyTransaction>()).first { $0.id == rowID })
+        #expect(movement.amountMinor == 4_200 && movement.categoryID == categoryID && movement.categorySource == nil)
+        let expected = try SchemaCompatibility.currentRecords(records, from: 13)
+        #expect(expected.first?.fields["categorySource"] == .null)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(upgraded.container.mainContext)) == RecordFingerprint.hash(expected))
+    }
+
     @Test func schemaV11UpgradeKeepsHabitTimesWithoutADiaryLinkAndReopen() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV12-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

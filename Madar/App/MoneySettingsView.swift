@@ -401,6 +401,14 @@ struct MoneySettingsView: View {
     private var messagesPage: some View {
         VStack(alignment: .leading, spacing: 14) {
             note("مدار يستقبل ما تمرّره له أتمتة «الاختصارات»، ولا يقرأ صندوق رسائلك.")
+            Stepper(value: stepping("mal.merchantLearnAfter"), in: 0...10) {
+                Text(shownInt("mal.merchantLearnAfter") == 0
+                     ? "اقتراح تصنيف التاجر متوقف"
+                     : "اقتراح التصنيف بعد " + service.counted(shownInt("mal.merchantLearnAfter"), ("اختيار واحد مؤكد", "اختيارين مؤكدين", "اختيارات مؤكدة", "اختيارًا مؤكدًا")))
+                    .font(MadarTypography.body())
+            }
+            .accessibilityIdentifier("money-settings-merchant-learn-after")
+            note("كل عملية تحتفظ بتصنيفها. يقتصر الاقتراح على مصروفات مؤكدة اخترت تصنيفها يدويًا، ويمكنك تغييره كل مرة.")
             toggle("تنبيه حدود التصنيف", "mal.alert80")
             toggle("افتح منذ آخر زيارة بعد الغياب", "mal.sinceLastVisit")
             Picker("تذكير سداد البطاقة", selection: stringBinding("mal.cardDue")) {
@@ -586,7 +594,7 @@ struct MoneySettingsView: View {
         case .daily: ["mal.dailyAllowance"];
         case .cycle: ["mal.salaryDay", "mal.cycleCalendar", "mal.salarySchedule"];
         case .deficit: ["mal.autoOffset", "mal.offsetCapDailies", "mal.salaryRemainder", "mal.cashWithdrawalAsSpend"];
-        case .messages: ["mal.alert80", "mal.sinceLastVisit", "mal.cardDue", "mal.zakatReminder"];
+        case .messages: ["mal.merchantLearnAfter", "mal.alert80", "mal.sinceLastVisit", "mal.cardDue", "mal.zakatReminder"];
         case .travel: ["mal.travelPausesDaily"];
         case .room:
             [

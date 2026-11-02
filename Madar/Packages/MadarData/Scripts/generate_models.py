@@ -7,7 +7,7 @@ p = json.loads(spec.read_text())
 for f in ['data-dictionary.json', 'settings-schema.json']:
     (base / 'Sources/MadarData/Resources' / f).write_bytes((spec.parent / f).read_bytes())
 # Fields added after rows already exist (undo receipts, backups) decode when the key is missing.
-tolerantOptional = {('Trip', 'journeyID'), ('HabitEvent', 'entryID'), ('PrayerLog', 'fridayKind'), ('Account', 'last4'), ('EnvelopePlan', 'startDayKey'), ('ZakatProfile', 'silverPricePerGramMinor'), ('ZakatProfile', 'silverPriceSetAt'), ('EnvelopePlan', 'repaymentTotalMinor'), ('EnvelopePlan', 'repaymentPaychecks'), ('Obligation', 'repeatEvery'), ('Obligation', 'repeatUnit'), ('Obligation', 'firstDueDayKey'), ('MoneyTransaction', 'budgetIgnoreReason'), ('Entry', 'tags'), ('Reconciliation', 'obligationID'), ('Category', 'preferredCardID')}
+tolerantOptional = {('Trip', 'journeyID'), ('HabitEvent', 'entryID'), ('PrayerLog', 'fridayKind'), ('Account', 'last4'), ('EnvelopePlan', 'startDayKey'), ('ZakatProfile', 'silverPricePerGramMinor'), ('ZakatProfile', 'silverPriceSetAt'), ('EnvelopePlan', 'repaymentTotalMinor'), ('EnvelopePlan', 'repaymentPaychecks'), ('Obligation', 'repeatEvery'), ('Obligation', 'repeatUnit'), ('Obligation', 'firstDueDayKey'), ('MoneyTransaction', 'budgetIgnoreReason'), ('MoneyTransaction', 'categorySource'), ('Entry', 'tags'), ('Reconciliation', 'obligationID'), ('Category', 'preferredCardID')}
 tolerantDefaulted = {('UpcomingDay', 'countUpAfter'), ('Account', 'tracked'), ('Card', 'kind'), ('EnvelopePlan', 'period'), ('ZakatProfile', 'nisabBasis'), ('ZakatProfile', 'nisabSilverMg')}
 def default(f):
  t=f['type'];d=f.get('default')

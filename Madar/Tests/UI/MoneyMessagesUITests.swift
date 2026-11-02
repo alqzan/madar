@@ -30,7 +30,7 @@ import UIKit
         return selected
     }
 
-    func testCategorizationFailureKeepsSheetAndRememberChoiceForRetry() throws {
+    func testCategorizationFailureKeepsPerPurchaseChoiceForRetry() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "messages",
@@ -46,20 +46,17 @@ import UIKit
         XCTAssertTrue(chip.waitForExistence(timeout: 10), app.debugDescription)
         for _ in 0..<7 where !chip.isHittable { app.swipeUp(velocity: .slow) }
         chip.tap()
-        let remember = app.switches["money-categorize-remember"]
-        XCTAssertTrue(remember.waitForExistence(timeout: 5))
-        XCTAssertEqual(remember.value as? String, "1")
+        let perPurchase = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لهذه العملية فقط")).firstMatch
+        XCTAssertTrue(perPurchase.waitForExistence(timeout: 5))
         shot(app, "M5-category-choice-L")
         let grocery = app.buttons["money-categorize-بقالة"]
         XCTAssertTrue(grocery.waitForExistence(timeout: 5)); grocery.tap()
         let error = app.staticTexts["money-categorize-error"]
         XCTAssertTrue(error.waitForExistence(timeout: 8), "A failed save must leave the sheet open for retry")
-        XCTAssertEqual(remember.value as? String, "1")
         XCTAssertTrue(grocery.isEnabled)
         XCTAssertTrue(grocery.label.contains("حاول مرة أخرى"), grocery.label)
         shot(app, "M5-category-failure-L")
         grocery.tap()
-        XCTAssertTrue(remember.waitForNonExistence(timeout: 10))
         XCTAssertTrue(chip.waitForExistence(timeout: 5))
         XCTAssertTrue(chip.label.contains("بقالة"), chip.label)
         XCTAssertTrue(app.descendants(matching: .any)["money-messages-review"].label.contains("٦"), "Choosing a category never confirms the message")

@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-// Generated from Specification/data-dictionary.json (schema V13). UUID foreign keys intentionally avoid ownership relationships.
+// Generated from Specification/data-dictionary.json (schema V14). UUID foreign keys intentionally avoid ownership relationships.
 @MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
 @Model public final class Setting {
     public var id: UUID = UUID()
@@ -1744,6 +1744,7 @@ extension CashbackEntry: MadarRecordModel {
     public var merchant: String? = nil
     public var counterparty: String? = nil
     public var categoryID: UUID? = nil
+    public var categorySource: String? = nil
     public var method: String = "cash"
     public var fromAccountID: UUID? = nil
     public var toAccountID: UUID? = nil
@@ -1786,6 +1787,7 @@ extension MoneyTransaction: MadarRecordModel {
             "merchant": JSONValue.encode(merchant),
             "counterparty": JSONValue.encode(counterparty),
             "categoryID": JSONValue.encode(categoryID),
+            "categorySource": JSONValue.encode(categorySource),
             "method": JSONValue.encode(method),
             "fromAccountID": JSONValue.encode(fromAccountID),
             "toAccountID": JSONValue.encode(toAccountID),
@@ -1826,6 +1828,7 @@ extension MoneyTransaction: MadarRecordModel {
         merchant = try record.decode("merchant", as: String?.self)
         counterparty = try record.decode("counterparty", as: String?.self)
         categoryID = try record.decode("categoryID", as: UUID?.self)
+        categorySource = try record.fields["categorySource"]?.decode(String?.self)
         method = try record.decode("method", as: String.self)
         fromAccountID = try record.decode("fromAccountID", as: UUID?.self)
         toAccountID = try record.decode("toAccountID", as: UUID?.self)

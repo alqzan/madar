@@ -10,6 +10,11 @@ struct MoneySettingContractTests {
         for value in ["off", "1day", "1week", "1month"] { try s.validate(.string(value), for: "mal.zakatReminder") }
         #expect(throws: DataError.self) { try s.validate(.string("everyday"), for: "mal.zakatReminder") }
         #expect(try s.definition(for: "mal.cashbackDestination").defaultValue == .string(""))
+        #expect(try s.definition(for: "mal.merchantLearnAfter").defaultValue == .number(3))
+        try s.validate(.number(0), for: "mal.merchantLearnAfter")
+        try s.validate(.number(10), for: "mal.merchantLearnAfter")
+        #expect(throws: DataError.self) { try s.validate(.number(-1), for: "mal.merchantLearnAfter") }
+        #expect(throws: DataError.self) { try s.validate(.number(11), for: "mal.merchantLearnAfter") }
         try s.validate(.string(""), for: "mal.cashbackDestination")
         try s.validate(.string("57F4B8D3-A5C8-4D8F-8F49-FE54E923C428"), for: "mal.cashbackDestination")
         #expect(throws: DataError.self) { try s.validate(.string("not-an-envelope"), for: "mal.cashbackDestination") }

@@ -19,7 +19,6 @@ struct MoneyMessagesView: View {
     @State private var deleteFailureID: UUID?
     @State private var injectedDeleteFailure = false
     @State private var categorizing: MoneyMessageDraft?
-    @State private var rulesOpen = false
     @State private var guideOpen = false
     @State private var budgetOpen = false
     @State private var salary: SalaryRoute?
@@ -64,7 +63,6 @@ struct MoneyMessagesView: View {
             .sheet(item: $categorizing) { MoneyCategorizeSheet(app: app, draft: $0).environment(\.roomTheme, theme) }
             .fullScreenCover(item: $bigExpense) { route in MoneyBigExpenseView(app: app, route: route, revealed: $revealed) { bigExpense = nil; load() } }
             .navigationDestination(isPresented: $guideOpen) { MoneyShortcutGuideView(app: app) }
-            .navigationDestination(isPresented: $rulesOpen) { MoneyRulesView(app: app) }
         .navigationDestination(isPresented: $budgetOpen) { MoneyBudgetView(app: app, revealed: $revealed) }
             .navigationDestination(item: $salary) { MoneySalaryView(app: app, salaryID: $0.id) }
             .accessibilityIdentifier("money-messages")
@@ -226,7 +224,7 @@ struct MoneyMessagesView: View {
                     Text("قد يكون مكرّرًا").font(MadarTypography.fine()).foregroundStyle(theme.color("dueText")).padding(.horizontal, 6).padding(.vertical, 2)
                         .overlay { Rectangle().stroke(theme.color("dueText"), style: .init(lineWidth: 1, dash: [3, 2])) }.accessibilityIdentifier("money-draft-duplicate")
                 }
-                (Text(d.kindLabel).bold().foregroundStyle(theme.color("accent")) + Text(d.payment.map { (d.kindLabel.last?.isNumber == true || $0.first?.isNumber == true ? "، " : " · ") + $0 } ?? "").foregroundStyle(theme.secondaryInk))
+                Text("\(Text(d.kindLabel).bold().foregroundStyle(theme.color("accent")))\(Text(d.payment.map { (d.kindLabel.last?.isNumber == true || $0.first?.isNumber == true ? "، " : " · ") + $0 } ?? "").foregroundStyle(theme.secondaryInk))")
                     .font(MadarTypography.caption())
                 if d.canCategorize {
                     Button { categorizing = d } label: {
@@ -323,8 +321,8 @@ struct MoneyMessagesView: View {
             }.labelStyle(.titleAndIcon).tint(theme.color("reserveText")).frame(minHeight: 44).accessibilityIdentifier("money-messages-paste")
             Button { budgetOpen = true } label: { Label("تجاهله من الميزانيات", systemImage: "seal").font(MadarTypography.caption()).frame(minHeight: 44) }
                 .buttonStyle(.madarPlain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-budget-open")
-            Button { rulesOpen = true } label: { Label("قواعد التاجر", systemImage: "lamp.table").font(MadarTypography.caption()).frame(minHeight: 44) }
-                .buttonStyle(.madarPlain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-rules-open")
+            Text("لكل عملية تصنيفها. يقترح مدار الفئة بعد تكرار اختياراتك المؤكدة، ويمكنك تغييرها في كل مرة.")
+                .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)
             Text("الصق رسائل البنك إن لم تصل عبر الاختصار؛ تُفصل الرسائل بسطر فارغ.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)
         }.padding(.top, 8)
     }

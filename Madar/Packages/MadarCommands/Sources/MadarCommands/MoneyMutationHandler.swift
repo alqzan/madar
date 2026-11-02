@@ -254,6 +254,9 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             row.homeCurrency = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
             row.merchant = optionalText(p, "merchant"); row.method = optionalText(p, "method") ?? "cash"
             row.fromAccountID = uuid(p, "fromAccountID"); row.cardID = uuid(p, "cardID"); row.categoryID = uuid(p, "categoryID")
+            let categorySource = optionalText(p, "categorySource")
+            guard categorySource == nil || ["manual", "learned"].contains(categorySource!) else { throw MoneyCommandError.invalidReference }
+            row.categorySource = row.categoryID == nil ? nil : categorySource
             row.rateAtTime = optionalText(p, "rateAtTime"); row.rateSource = row.rateAtTime == nil ? nil : "manual"
             row.showInDiary = p["showInDiary"] != .bool(false)
             try stampDay(row, at: MoneyCommandPayload.date(p["eventAt"]) ?? issuedAt, context: context, now: now)
@@ -330,11 +333,9 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         case "money.categorize":
             let row = try transaction(uuid(p, "id"), context), category = uuid(p, "categoryID")
             if let category, !(try context.fetch(FetchDescriptor<MadarData.Category>())).contains(where: { $0.id == category && live($0) }) { throw MoneyCommandError.invalidReference }
-            row.categoryID = category; try touch(row, now, writer)
-            if p["remember"] == .bool(true) {
-                guard let merchant = row.merchant ?? row.counterparty, !merchant.isEmpty else { throw MoneyCommandError.invalidReference }
-                try saveRule(merchant: merchant, category: category, ignore: false, context: context, now: now, writer: writer)
-            }
+            let categorySource = optionalText(p, "categorySource") ?? "manual"
+            guard ["manual", "rule"].contains(categorySource) else { throw MoneyCommandError.invalidReference }
+            row.categoryID = category; row.categorySource = category == nil ? nil : categorySource; try touch(row, now, writer)
         case "money.saveMerchantRule":
             let category = uuid(p, "categoryID")
             if let category, !(try context.fetch(FetchDescriptor<MadarData.Category>())).contains(where: { $0.id == category && live($0) }) { throw MoneyCommandError.invalidReference }
@@ -513,6 +514,14 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
         let placements = batch == nil ? items.map { BankDedupe.live($0.3, at: $0.2.eventAt ?? $0.1, existing: existing) }
             : BankDedupe.bulk(items.map { .init(fingerprint: $0.3, hasOwnTime: $0.2.eventAt != nil, at: $0.2.eventAt ?? $0.1) }, existing: existing)
+        let learningThreshold = Int(try SettingsStore(context: context).value(for: "mal.merchantLearnAfter").number ?? 3)
+        let learningSamples = try transactions(context).map { row in
+            MerchantCategoryLearning.Sample(transactionID: row.id, merchant: row.merchant ?? row.counterparty,
+                categoryID: row.categoryID, categorySource: row.categorySource, kind: row.kind,
+                reviewState: row.reviewState, isDeleted: row.deletedAt != nil, isMerged: row.mergedInto != nil)
+        }
+        let liveCategoryIDs = Set(try context.fetch(FetchDescriptor<MadarData.Category>()).filter { live($0) }.map(\.id))
+        let learningIndex = MerchantCategoryLearning.makeIndex(samples: learningSamples, liveCategoryIDs: liveCategoryIDs)
         for (index, pair) in zip(items, placements).enumerated() {
             let (input, placement) = pair, (p, received, parsed, fingerprint) = input
             let occurrence: Int, possibleDuplicate: Bool
@@ -545,9 +554,16 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 row.rateAtTime = rate; row.rateSource = "trip"
                 row.homeAmountMinor = try FX.homeAmount(amountMinor: row.amountMinor, currency: row.currency, rate: rate, home: row.homeCurrency)
             }
-            // A known merchant brings its category (or its «خارج الميزانية»); the draft still waits for the user.
+            // Historical category rules stay stored but never force the next purchase into that category.
+            // Budget exclusion remains independent; a unique learned category is only a changeable draft suggestion.
             if let rule = try rule(for: row.merchant ?? row.counterparty, in: context) {
-                if rule.ignore { row.ignoredFromBudget = true } else { row.categoryID = rule.categoryID }
+                if rule.ignore { row.ignoredFromBudget = true }
+            }
+            if row.kind == "expense", !row.ignoredFromBudget,
+               let merchant = row.merchant ?? row.counterparty,
+               let suggestion = learningIndex.result(for: merchant, threshold: learningThreshold).suggestedCategoryID {
+                row.categoryID = suggestion
+                row.categorySource = "learned"
             }
             let accounts = try context.fetch(FetchDescriptor<Account>())
             let referenced = row.fromAccountID ?? row.toAccountID

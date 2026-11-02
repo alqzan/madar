@@ -34,7 +34,7 @@ struct MoneyRulesView: View {
                         Text(reading.rules.count == 1 ? "تاجر يعرفه مدار" : "تجار يعرفهم مدار").font(MadarTypography.cardTitle())
                         Spacer()
                         if reading.applied > 0 {
-                            (Text("طُبّقت ") + Text(service.counted(reading.applied, ("مرة واحدة", "مرتان", "مرات", "مرةً"))).bold().foregroundStyle(theme.color("surplusText")) + Text(" بدلًا منك"))
+                            Text("طُبّقت \(Text(service.counted(reading.applied, ("مرة واحدة", "مرتان", "مرات", "مرةً"))).bold().foregroundStyle(theme.color("surplusText"))) بدلًا منك")
                                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         }
                     }.accessibilityElement(children: .combine).accessibilityIdentifier("money-rules-count")
@@ -202,7 +202,6 @@ struct MoneyCategorizeSheet: View {
     let draft: MoneyMessageDraft
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
-    @State private var remember = true
     @State private var loading = true
     @State private var categories: [MoneyRuleCategory] = []
     @State private var loadFailure: String?
@@ -210,7 +209,6 @@ struct MoneyCategorizeSheet: View {
     @State private var rootBlockerID = UUID()
     @State private var saving = false
     @State private var pendingCategoryID: UUID?
-    @State private var pendingRemember = true
     @State private var commandID = UUID()
     @State private var injectedFailure = false
     private var service: AppMoneyService { .init(app: app) }
@@ -225,10 +223,7 @@ struct MoneyCategorizeSheet: View {
                 }
                 Text(draft.title).font(MadarTypography.cardTitle()).foregroundStyle(theme.secondaryInk)
                 VStack(alignment: .leading, spacing: 6) {
-                    Toggle("تذكّر لهذا التاجر", isOn: $remember).disabled(saving)
-                        .tint(theme.color("surplusText").mix(with: theme.ink, by: 0.35))
-                        .accessibilityIdentifier("money-categorize-remember")
-                    Text("يصل «" + draft.title + "» بعدها بهذا التصنيف، وتبقى الموافقة لك.")
+                    Text("هذا التصنيف لهذه العملية فقط. يقترح مدار فئة مستقبلية بعد تكرار اختيارك يدويًا، دون تثبيت تصنيف للتاجر.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(14).background(theme.surface, in: .rect(cornerRadius: 16))
@@ -295,11 +290,10 @@ struct MoneyCategorizeSheet: View {
 
     private func save(_ category: MoneyRuleCategory) {
         guard !saving else { return }
-        if pendingCategoryID != category.id || pendingRemember != remember {
-            pendingCategoryID = category.id; pendingRemember = remember; commandID = UUID()
+        if pendingCategoryID != category.id {
+            pendingCategoryID = category.id; commandID = UUID()
         }
         let commandID = commandID
-        let remember = remember
         saving = true; failure = nil
         Task { @MainActor in
             do {
@@ -312,7 +306,7 @@ struct MoneyCategorizeSheet: View {
                 }
                 #endif
                 try await app.executeMoneyCommand("money.categorize", payload: [
-                    "id": .string(draft.id.uuidString), "categoryID": .string(category.id.uuidString), "remember": .bool(remember)
+                    "id": .string(draft.id.uuidString), "categoryID": .string(category.id.uuidString)
                 ], id: commandID)
                 dismiss()
             } catch {

@@ -1,0 +1,56 @@
+import Foundation
+import SwiftData
+
+/// Exact V13 transaction shape, frozen before optional categorySource was added in V14.
+public enum MadarFrozenMoneyTransactionV13 {
+    @Model public final class MoneyTransaction {
+        public var id: UUID = UUID()
+        public var createdAt: Date = Date()
+        public var updatedAt: Date = Date()
+        public var deletedAt: Date? = nil
+        public var writerID: String = ""
+        public var mergedInto: UUID? = nil
+        public var deletionBarrierAt: Date? = nil
+        public var restoredAt: Date? = nil
+        public var dayKey: String = ""
+        public var eventAt: Date = Date()
+        public var tzID: String = ""
+        public var dayPolicy: String = ""
+        public var kind: String = "expense"
+        public var amountMinor: Int = 0
+        public var currency: String = "SAR"
+        public var homeAmountMinor: Int = 0
+        public var homeCurrency: String = "SAR"
+        public var rateAtTime: String? = nil
+        public var rateSource: String? = nil
+        public var merchant: String? = nil
+        public var counterparty: String? = nil
+        public var categoryID: UUID? = nil
+        public var method: String = "cash"
+        public var fromAccountID: UUID? = nil
+        public var toAccountID: UUID? = nil
+        public var cardID: UUID? = nil
+        public var relatedTransactionID: UUID? = nil
+        public var obligationID: UUID? = nil
+        public var installmentID: UUID? = nil
+        public var cycleID: UUID? = nil
+        public var ignoredFromBudget: Bool = false
+        public var source: String = "bank"
+        public var messageID: UUID? = nil
+        public var tripID: UUID? = nil
+        public var showInDiary: Bool = true
+        public var reviewState: String = "ok"
+        public var budgetIgnoreReason: String? = nil
+        public init() {}
+    }
+}
+
+public enum MadarSchemaV13: VersionedSchema {
+    public static let versionIdentifier = Schema.Version(13, 0, 0)
+    public static var models: [any PersistentModel.Type] { syncedTypes + deviceTypes }
+    public static let version = 13
+    public static let syncedTypes: [any PersistentModel.Type] = [Setting.self, LayoutState.self, Preset.self, Trip.self, UpcomingDay.self, ImportBatch.self, ImportLink.self, PrayerLog.self, QadaItem.self, QiyamNight.self, HifzPlan.self, HifzSession.self, PageGrade.self, MistakeSpot.self, MistakeEvent.self, QuranDayState.self, QuranAllotment.self, RecoveryPlan.self, DayPage.self, Niyya.self, Entry.self, HiddenAutoLine.self, MarginNote.self, Letter.self, Project.self, Media.self, Account.self, Card.self, Statement.self, CashbackEntry.self, MadarFrozenMoneyTransactionV13.MoneyTransaction.self, Allocation.self, Reconciliation.self, BankMessage.self, Cycle.self, CyclePolicy.self, Envelope.self, EnvelopePlan.self, Obligation.self, InstallmentItem.self, Category.self, CategoryLimit.self, MerchantRule.self, ZakatProfile.self, Book.self, ReadingSession.self, Highlight.self, NotebookNote.self, HadithProgress.self, UserWord.self, Habit.self, HabitPolicy.self, HabitPause.self, HabitLog.self, HabitEvent.self, WidgetConfig.self]
+    public static let deviceTypes: [any PersistentModel.Type] = [DeviceSetting.self, NotificationLedger.self, CommandReceipt.self, PageSchedule.self, SessionDraft.self, ProcessingJob.self]
+    public static let syncedNames: [String] = ["Setting", "LayoutState", "Preset", "Trip", "UpcomingDay", "ImportBatch", "ImportLink", "PrayerLog", "QadaItem", "QiyamNight", "HifzPlan", "HifzSession", "PageGrade", "MistakeSpot", "MistakeEvent", "QuranDayState", "QuranAllotment", "RecoveryPlan", "DayPage", "Niyya", "Entry", "HiddenAutoLine", "MarginNote", "Letter", "Project", "Media", "Account", "Card", "Statement", "CashbackEntry", "MoneyTransaction", "Allocation", "Reconciliation", "BankMessage", "Cycle", "CyclePolicy", "Envelope", "EnvelopePlan", "Obligation", "InstallmentItem", "Category", "CategoryLimit", "MerchantRule", "ZakatProfile", "Book", "ReadingSession", "Highlight", "NotebookNote", "HadithProgress", "UserWord", "Habit", "HabitPolicy", "HabitPause", "HabitLog", "HabitEvent", "WidgetConfig"]
+    public static var schema: Schema { Schema(versionedSchema: Self.self) }
+}

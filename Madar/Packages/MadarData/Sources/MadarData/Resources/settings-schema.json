@@ -1,6 +1,6 @@
 {
- "version": 4,
- "date": "2026-10-19",
+ "version": 5,
+ "date": "2026-11-02",
  "note": "default = المتفق عليه. scope sync = يُزامَن (Setting)، device = لهذا الجهاز (DeviceSetting في تكوين deviceOnly). preset = يدخل في الأنماط المحفوظة (§٦). layout entries are {blocks, pinned, hidden, sizes}; pinned blocks cannot be hidden. availability v2 = hidden in v1. Money values are Int minor units (halalas).",
  "constants": {
   "sanctityMinutes": {
@@ -2091,6 +2091,22 @@
    "default": true,
    "scope": "sync",
    "note": "إن أُطفئ: السحب محايد ومصروف النقد اليدوي يُخصم",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mal.merchantLearnAfter",
+   "owner": "mal",
+   "section": "الرسائل",
+   "title": "مرات اختيار التصنيف قبل اقتراحه",
+   "type": "int",
+   "default": 3,
+   "scope": "sync",
+   "range": [
+    0,
+    10
+   ],
+   "note": "يُحتسب من مصروف مؤكد اخترت تصنيفه يدويًا لهذا التاجر؛ ٠ يوقف الاقتراح. يبقى تصنيف كل عملية قابلًا للتغيير.",
    "storage": "Setting (synced)",
    "preset": false
   },

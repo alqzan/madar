@@ -349,11 +349,11 @@
      "unit": "km"
     },
     {
-      "name": "journeyID",
-      "type": "UUID?",
-      "optional": true,
-      "default": null,
-      "note": "Owner-approved 26 Oct 2026 (OR-09, multi-country trips): a later leg of one trip points to the first leg's id; nil on the first or only leg. Journey key = journeyID ?? id. Never backfilled."
+     "name": "journeyID",
+     "type": "UUID?",
+     "optional": true,
+     "default": null,
+     "note": "Owner-approved 26 Oct 2026 (OR-09, multi-country trips): a later leg of one trip points to the first leg's id; nil on the first or only leg. Journey key = journeyID ?? id. Never backfilled."
     }
    ]
   },
@@ -2641,6 +2641,17 @@
      "fk": "Category"
     },
     {
+     "name": "categorySource",
+     "type": "String?",
+     "optional": true,
+     "enum": [
+      "manual",
+      "learned",
+      "rule"
+     ],
+     "note": "Origin of this purchase category; only confirmed explicit manual choices train merchant suggestions. Prior rows without provenance remain nil; categories assigned automatically during legacy movement use rule."
+    },
+    {
      "name": "method",
      "type": "String",
      "optional": false,
@@ -3626,7 +3637,9 @@
    "config": "synced",
    "naturalKey": "id",
    "deletePolicy": "softRestrict",
-   "invariants": ["preferredCardID is nil or references a live credit card; it only guides future purchases and never changes historical cardID."],
+   "invariants": [
+    "preferredCardID is nil or references a live credit card; it only guides future purchases and never changes historical cardID."
+   ],
    "merge": "row LWW (§11 merge)",
    "seed": "default categories = UUIDv5(seedNS, \"Category:<slug>\")",
    "note": "M5-V16: the preferred card is an optional UUID foreign key; historical transactions remain unchanged.",
@@ -3660,13 +3673,13 @@
      "optional": false,
      "default": 0
     },
-     {
-       "name": "preferredCardID",
-       "type": "UUID?",
-       "optional": true,
-       "default": null,
-       "unit": "Card.id (foreign key; no relationship)"
-     }
+    {
+     "name": "preferredCardID",
+     "type": "UUID?",
+     "optional": true,
+     "default": null,
+     "unit": "Card.id (foreign key; no relationship)"
+    }
    ]
   },
   {
@@ -5578,8 +5591,8 @@
     "emptyTitle": "String",
     "locked": "Bool",
     "rows": "[Row] {id, title, value, detail, secondDate, share, route, done}",
-        "periods": "[Row] four habit frequency summaries",
-        "upcomingHabits": "[Row]? up to 5 upcoming weekly/monthly/yearly habit occurrences with relative due and last-completion hints; optional for older snapshots"
+    "periods": "[Row] four habit frequency summaries",
+    "upcomingHabits": "[Row]? up to 5 upcoming weekly/monthly/yearly habit occurrences with relative due and last-completion hints; optional for older snapshots"
    },
    "contract": "App-only construction; extension JSON-only. No diary text, photos, intentions or sealed-letter contents in diaryWrite. Protected habits/upcoming payloads omit personal rows. Expires at the earlier of next configured Madar day boundary or one hour. One template parameter per fixed room widget; WidgetKit selects family; capacities 2/3/5 (halve, rounded up, at accessibility sizes)."
   }
@@ -5963,5 +5976,5 @@
    "execution": "Immediately on press, within undo window"
   }
  },
- "storeSchemaVersion": 13
+ "storeSchemaVersion": 14
 }

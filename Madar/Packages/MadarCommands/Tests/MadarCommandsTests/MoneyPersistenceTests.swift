@@ -523,35 +523,57 @@ import MadarInbox
         #expect(try await f.run("system.undo", ["undoToken": .string(ignore.uuidString)]).status == .applied)
         #expect(try message().first { $0.id == unknown.id }?.status == "needsLook")
     }
-    /// M5-V07: «تذكّر لهذا التاجر» writes one rule per normalized merchant; the next message from it arrives
-    /// with the category; moving and forgetting change only future drafts; undo removes the rule it created.
-    @Test func merchantRuleLearnsAppliesMovesAndForgets() async throws {
+    /// Each purchase keeps its own manual category. Old category rules remain stored but do not prefill new purchases;
+    /// three confirmed manual choices produce a changeable learned suggestion.
+    @Test func merchantCategoriesStayPerPurchaseAndLearnAfterThreeConfirmedChoices() async throws {
         let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
         let c = ModelContext(f.container), cafe = MadarData.Category(), grocery = MadarData.Category()
         cafe.name = "مطاعم"; grocery.name = "بقالة"; c.insert(cafe); c.insert(grocery); try c.save()
-        _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n42.00 SAR\nلدى: Coffee  Corner\n2026-10-16 09:05")
-        let first = try f.transaction(); #expect(first.categoryID == nil)
-        let learn = UUID()
-        #expect(try await f.run("money.categorize", ["id": .string(first.id.uuidString), "categoryID": .string(cafe.id.uuidString), "remember": .bool(true)], id: learn).status == .applied)
-        var rules = try ModelContext(f.container).fetch(FetchDescriptor<MerchantRule>()).filter { $0.deletedAt == nil }
-        #expect(rules.count == 1); #expect(rules.first?.pattern == "coffee corner"); #expect(rules.first?.categoryID == cafe.id)
-        _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n18.00 SAR\nلدى: COFFEE CORNER\n2026-10-16 11:30")
-        let second = try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.amountMinor == 1800 })
-        #expect(second.categoryID == cafe.id); #expect(second.reviewState == "needsLook", "A rule fills the draft; the user still decides")
+        #expect(MoneyCommandPayload.validate(name: "money.categorize", payload: ["id": .string(UUID().uuidString), "categoryID": .string(cafe.id.uuidString)]))
+        #expect(MoneyCommandPayload.validate(name: "money.categorize", payload: ["id": .string(UUID().uuidString), "categoryID": .string(cafe.id.uuidString), "categorySource": .string("rule")]))
+        #expect(MoneyCommandPayload.validate(name: "money.categorize", payload: ["id": .string(UUID().uuidString), "categoryID": .string(cafe.id.uuidString), "remember": .bool(true)]))
+        #expect(!MoneyCommandPayload.validate(name: "money.categorize", payload: ["id": .string(UUID().uuidString), "categoryID": .string(cafe.id.uuidString), "categorySource": .string("other")]))
+        // The expense sheet sends the category's origin with a hand-logged purchase.
+        for source in ["manual", "learned"] {
+            let logged = try await f.run("money.logExpense", ["amountMinor": .string("900"), "currency": .string("SAR"), "fromAccountID": .string(f.cash.uuidString),
+                "merchant": .string("مقهى " + source), "categoryID": .string(cafe.id.uuidString), "categorySource": .string(source)])
+            #expect(logged.status == .applied, "Unexpected expense result: \(logged.reason ?? "no reason")")
+            let row = try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.merchant == "مقهى " + source })
+            #expect(row.categoryID == cafe.id && row.categorySource == source)
+        }
+        #expect(!MoneyCommandPayload.validate(name: "money.logExpense", payload: ["amountMinor": .string("900"), "currency": .string("SAR"), "categorySource": .string("rule")]))
         #expect(try await f.run("money.saveMerchantRule", ["merchant": .string("coffee corner"), "categoryID": .string(grocery.id.uuidString), "ignore": .bool(false)]).status == .applied)
-        rules = try ModelContext(f.container).fetch(FetchDescriptor<MerchantRule>()).filter { $0.deletedAt == nil }
-        #expect(rules.count == 1); #expect(rules.first?.categoryID == grocery.id)
-        #expect(try f.transaction(second.id).categoryID == cafe.id, "Moving a rule never rewrites past movements")
-        #expect(try await f.run("money.forgetMerchantRule", ["id": .string(try #require(rules.first).id.uuidString)]).status == .applied)
-        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MerchantRule>()).filter { $0.deletedAt == nil }.isEmpty)
-        #expect(try await f.run("money.saveMerchantRule", ["merchant": .string("x"), "categoryID": .null, "ignore": .bool(false)]).status == .rejected)
-        // Undo of a learning step restores the draft's category and removes the rule it created.
-        let again = UUID()
-        #expect(try await f.run("money.categorize", ["id": .string(second.id.uuidString), "categoryID": .string(grocery.id.uuidString), "remember": .bool(true)], id: again).status == .applied)
-        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MerchantRule>()).filter { $0.deletedAt == nil }.count == 1)
-        #expect(try await f.run("system.undo", ["undoToken": .string(again.uuidString)]).status == .applied)
-        #expect(try f.transaction(second.id).categoryID == cafe.id)
-        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MerchantRule>()).filter { $0.deletedAt == nil }.isEmpty)
+        func purchase(_ amount: Int, _ minute: Int) async throws -> MoneyTransaction {
+            let clock = String(format: "09:%02d", minute)
+            _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n\(amount).00 SAR\nلدى: Coffee  Corner\n2026-10-16 \(clock)")
+            return try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.amountMinor == amount * 100 })
+        }
+        for minute in 1...3 {
+            let row = try await purchase(20 + minute, minute)
+            #expect(row.categoryID == nil, "A stored merchant category does not force a different purchase")
+            let categoryChoice = try await f.run("money.categorize", ["id": .string(row.id.uuidString), "categoryID": .string(cafe.id.uuidString)])
+            #expect(categoryChoice.status == .applied, "Unexpected categorization result: \(categoryChoice.reason ?? "no reason")")
+            #expect(try f.transaction(row.id).categorySource == "manual")
+            #expect(try await f.run("money.confirmTransaction", ["id": .string(row.id.uuidString)]).status == .applied)
+        }
+        let suggested = try await purchase(30, 10)
+        #expect(suggested.categoryID == cafe.id && suggested.categorySource == "learned")
+        #expect(suggested.reviewState == "needsLook", "A learned category remains an editable draft")
+        #expect(try await f.run("money.categorize", ["id": .string(suggested.id.uuidString), "categoryID": .string(grocery.id.uuidString)]).status == .applied)
+        #expect(try f.transaction(suggested.id).categoryID == grocery.id)
+        #expect(try f.transaction(suggested.id).categorySource == "manual")
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MerchantRule>()).filter { $0.deletedAt == nil }.count == 1,
+                "Existing merchant data stays stored")
+
+        _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n17.00 SAR\nلدى: Old Cafe\n2026-10-16 10:00")
+        let migrated = try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.merchant == "Old Cafe" })
+        #expect(try await f.run("money.categorize", ["id": .string(migrated.id.uuidString),
+            "categoryID": .string(cafe.id.uuidString), "categorySource": .string("rule")]).status == .applied)
+        #expect(try f.transaction(migrated.id).categorySource == "rule")
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(migrated.id.uuidString)]).status == .applied)
+        _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n18.00 SAR\nلدى: Old Cafe\n2026-10-16 10:01")
+        let nextOldCafe = try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.merchant == "Old Cafe" && $0.amountMinor == 1_800 })
+        #expect(nextOldCafe.categoryID == nil, "An automatic migration choice must not train a future suggestion")
     }
     /// M5-V08 «نزل الراتب»: one command closes the cycle (L02 offset), opens the next with a frozen policy, moves the
     /// salary day's movement, fills the surplus to its cap then the reserve, and undo stands only until the new cycle is used.

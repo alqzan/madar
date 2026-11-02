@@ -17,6 +17,7 @@ struct MoneyExpenseView: View {
     @State private var merchant = ""
     @State private var methodID = ""
     @State private var categoryID: UUID?
+    @State private var categorySource: String?
     @State private var envelopeID: UUID?
     @State private var share = ExpenseEntry.Share.daily
     @State private var showInDiary = true
@@ -35,6 +36,22 @@ struct MoneyExpenseView: View {
     private var inputCurrency: String { foreign ? reading?.tripCurrency ?? reading?.currency ?? "SAR" : reading?.currency ?? "SAR" }
     private var homeMinor: Int { guard let r = reading else { return minor }; return (try? FX.homeAmount(amountMinor: minor, currency: inputCurrency, rate: r.tripRate ?? "1", home: r.currency)) ?? 0 }
     private var method: MoneyPaymentChoice? { reading?.methods.first { $0.id == methodID } }
+    private var merchantInput: Binding<String> {
+        Binding(get: { merchant }, set: { value in
+            guard value != merchant else { return }
+            merchant = value
+            // A category the user picked for this purchase stays; only a suggestion follows the merchant.
+            guard categorySource != "manual" else { return }
+            categoryID = nil; categorySource = nil
+            if let learning = reading?.merchantLearning(for: value), let suggested = learning.suggestedCategoryID {
+                categoryID = suggested; categorySource = "learned"
+            }
+        })
+    }
+    private var currentMerchantLearning: MerchantCategoryLearning.Result? {
+        guard let reading, !merchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return reading.merchantLearning(for: merchant)
+    }
     private var hasUnsavedInput: Bool {
         !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !merchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -138,7 +155,7 @@ struct MoneyExpenseView: View {
         ScrollView(.horizontal) {
             HStack(spacing: 6) {
                 ForEach(r.merchants) { item in
-                    Button { merchant = item.name; categoryID = item.categoryID; if let id = item.methodID { methodID = id } } label: { chip(item.name, selected: merchant == item.name) }.accessibilityIdentifier("money-expense-merchant-" + item.name)
+                    Button { chooseMerchant(item) } label: { chip(item.name, selected: merchant == item.name) }.accessibilityIdentifier("money-expense-merchant-" + item.name)
                 }
                 Button { details = true } label: { chip(merchant.isEmpty ? "اسم المتجر" : merchant, selected: false) }.accessibilityIdentifier("money-expense-merchant-edit")
             }
@@ -148,13 +165,30 @@ struct MoneyExpenseView: View {
         Text(text).font(.custom("thmanyahseriftext-Regular", size: 15, relativeTo: .body)).padding(.horizontal, 13).frame(minHeight: 40).background(selected ? theme.ink : .clear).foregroundStyle(selected ? theme.background : theme.ink).clipShape(.capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
     }
     private func categorySuggestion(_ r: MoneyExpenseReading) -> some View {
-        HStack {
-            Image(systemName: "square.fill").font(.system(size: 8)).foregroundStyle(theme.color("accentText"))
-            Text("التصنيف").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-            Menu { ForEach(r.categories) { c in Button(c.name) { categoryID = c.id } }; Button("بلا تصنيف") { categoryID = nil } } label: { Text(r.categories.first { $0.id == categoryID }?.name ?? "اختر تصنيفًا").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)) }
-                .accessibilityIdentifier("money-expense-category")
-            Spacer()
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Image(systemName: "square.fill").font(.system(size: 8)).foregroundStyle(theme.color("accentText"))
+                Text("التصنيف").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                Menu { ForEach(r.categories) { c in Button(c.name) { categoryID = c.id; categorySource = "manual" } }; Button("بلا تصنيف") { categoryID = nil; categorySource = nil } } label: { Text(r.categories.first { $0.id == categoryID }?.name ?? "اختر تصنيفًا").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)) }
+                    .accessibilityIdentifier("money-expense-category")
+                Spacer()
+            }
+            if categorySource == "learned" {
+                Text("اقتراح من اختياراتك السابقة؛ تقدر تغيّره لهذه العملية.").font(MadarTypography.fine()).foregroundStyle(theme.color("surplusText"))
+            }
+            if currentMerchantLearning?.hasMultipleQualifiedCategories == true {
+                Text("سبق أن اخترت لهذا المتجر أكثر من تصنيف؛ اختر ما يناسب هذه العملية.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            }
         }.padding(11).frame(minHeight: 44).overlay { Rectangle().stroke(theme.color("reserveText"), style: StrokeStyle(lineWidth: 1, dash: [3, 2])) }
+    }
+    private func chooseMerchant(_ item: MoneyExpenseMerchant) {
+        let sameMerchant = BankDedupe.normalize(merchant) == BankDedupe.normalize(item.name)
+        merchant = item.name
+        if !sameMerchant || categorySource != "manual" {
+            categoryID = item.categoryID
+            categorySource = item.categorySource
+        }
+        if let id = item.methodID { methodID = id }
     }
     @ViewBuilder private func preferredCardSuggestion(_ r: MoneyExpenseReading) -> some View {
         if let category = r.categories.first(where: { $0.id == categoryID }),
@@ -247,7 +281,7 @@ struct MoneyExpenseView: View {
     }
     private func extraDetails(_ r: MoneyExpenseReading) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            TextField("اسم المتجر، إن أردت", text: $merchant).textInputAutocapitalization(.never).focused($editing).font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-expense-merchant-field")
+            TextField("اسم المتجر، إن أردت", text: merchantInput).textInputAutocapitalization(.never).focused($editing).font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-expense-merchant-field")
             TextField("المبلغ، مع الكسور إن احتجت", text: $raw).keyboardType(.decimalPad).focused($editing).font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-expense-precise-amount")
             DatePicker("وقت المصروف", selection: $date, in: r.earliest...app.prayerNow(), displayedComponents: [.date, .hourAndMinute]).font(MadarTypography.caption())
             MadarDateLabel(app.dateLabels(.containing(date, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
@@ -269,6 +303,7 @@ struct MoneyExpenseView: View {
         var p: [String: MadarCore.JSONValue] = ["amountMinor": .string(String(minor)), "currency": .string(inputCurrency), "merchant": .string(merchant), "method": .string(m.kind == .cash ? "cash" : m.cardID == nil ? "transfer" : "card"), "eventAt": .string(ISO8601DateFormatter().string(from: date)), "showInDiary": .bool(showInDiary)]
         if let id = m.cardID { p["cardID"] = .string(id.uuidString) } else if let id = m.accountID { p["fromAccountID"] = .string(id.uuidString) }
         if let id = categoryID { p["categoryID"] = .string(id.uuidString) }
+        if categoryID != nil, let categorySource { p["categorySource"] = .string(categorySource) }
         if r.tripEnvelopeID == nil, share != .daily, let id = envelopeID {
             p["allocations"] = .array(ExpenseEntry.sources(split, envelopeID: id.uuidString).map { target, amount in
                 var row: [String: MadarCore.JSONValue] = ["target": .string("daily"), "amountMinor": .string(String(amount))]

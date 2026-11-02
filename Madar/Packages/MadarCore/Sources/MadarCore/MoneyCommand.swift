@@ -98,7 +98,13 @@ public enum MoneyCommandPayload {
             return ids.count == rows.count && Set(ids).count == ids.count
         case "money.accruePlans", "money.markVisit", "money.seedCategories": return p.isEmpty
         case "money.categorize":
-            return Set(p.keys) == ["id", "categoryID", "remember"] && id("id") && optionalID("categoryID") && (p["remember"] == .bool(true) || p["remember"] == .bool(false))
+            let keys = Set(p.keys)
+            let hasRequiredKeys: Set<String> = ["id", "categoryID"]
+            let allowedKeys: Set<String> = ["id", "categoryID", "remember", "categorySource"]
+            let validLegacyRemember = p["remember"] == nil || p["remember"] == .bool(true) || p["remember"] == .bool(false)
+            let validSource = p["categorySource"] == nil || choices("categorySource", ["manual", "rule"])
+            // `remember` remains accepted while already-queued v1 commands drain; it no longer creates a merchant rule.
+            return hasRequiredKeys.isSubset(of: keys) && keys.isSubset(of: allowedKeys) && id("id") && optionalID("categoryID") && validLegacyRemember && validSource
         case "money.saveMerchantRule":
             return Set(p.keys) == ["merchant", "categoryID", "ignore"] && text("merchant") && optionalID("categoryID") && (p["ignore"] == .bool(true) || p["ignore"] == .bool(false))
         case "money.setCategoryLimit":
@@ -147,8 +153,9 @@ public enum MoneyCommandPayload {
             return validate(name: "money.logExpense", payload: expense)
         case "money.logExpense":
             // M5-V17: the sheet may split the charge over an envelope and «يومك» (F02); rows as in confirmTransaction.
-            return Set(p.keys).isSubset(of: ["amountMinor", "currency", "merchant", "method", "categoryID", "fromAccountID", "cardID", "eventAt", "rateAtTime", "showInDiary", "allocations"])
+            return Set(p.keys).isSubset(of: ["amountMinor", "currency", "merchant", "method", "categoryID", "fromAccountID", "cardID", "eventAt", "rateAtTime", "showInDiary", "allocations", "categorySource"])
                 && (p["allocations"] == nil || allocationRows(p["allocations"]))
+                && (p["categorySource"] == nil || choices("categorySource", ["manual", "learned"]))
                 && positive("amountMinor") && text("currency", max: 3) && optionalText("merchant")
                 && (p["method"] == nil || choices("method", ["cash", "card", "transfer"]))
                 && ["categoryID", "fromAccountID", "cardID"].allSatisfy(optionalID)
