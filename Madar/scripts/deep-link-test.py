@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-device = os.environ.get('SIMULATOR', '412F4437-7BD7-44D1-AA3D-2B7158090E14')
+device = os.environ.get('SIMULATOR', '3F0CCA86-E9BF-4199-B6B2-1825F0F43CB8')
 result = root / f'Artifacts/M0-deep-link-{int(time.time())}.xcresult'
 log = root / 'Artifacts/deep-link-test.log'
 command = ['xcodebuild', '-project', 'Madar.xcodeproj', '-scheme', 'Madar', '-destination', f'platform=iOS Simulator,id={device}', '-derivedDataPath', 'DerivedData', '-resultBundlePath', str(result), '-only-testing:MadarUITests/FoundationUITests/testColdSettingsLinkOpenedByOS', 'CODE_SIGN_IDENTITY=-', 'CODE_SIGNING_ALLOWED=YES', 'test']
