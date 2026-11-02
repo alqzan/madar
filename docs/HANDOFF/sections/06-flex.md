@@ -156,8 +156,8 @@ core.travelModeتلقائي / اسألني / يدويًاتلقائي autosync
 مدار كلهمدينتك والسفريتفعّل بعد (كم)
 core.travelKm80…1000300sync
 
-مدار كلهالخصوصيةالقفل بالوجه
-core.faceIDLockمدار كله / المذكرات / بلاالمذكرات notesOnlydevice
+مدار كله — الخصوصية — قفل التطبيق الاختياري
+core.faceIDLock — الخيارات: مدار كله، بلا — الافتراضي: بلا (`none`) — device
 
 مدار كلهالخصوصيةأخفِ المال خارج التطبيق
 core.hideMoneyOutsideboolمفعّلsync

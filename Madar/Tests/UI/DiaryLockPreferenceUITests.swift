@@ -2,14 +2,14 @@ import XCTest
 import notify
 
 @MainActor final class DiaryLockPreferenceUITests: XCTestCase {
-    func testFreshInstallStartsAtTheSingleAppFaceIDGate() throws {
+    func testExplicitlyEnabledAppLockStartsAtTheSingleGate() throws {
         continueAfterFailure = false
-        // Unenrolled, the gate stays on its own branded screen instead of the system prompt.
+        // This fixture opts in explicitly; it does not represent the fresh-install default.
         setFaceIDEnrolled(false)
         let app = XCUIApplication()
         app.launchEnvironment = [
             "MADAR_UI_STORE_ID": UUID().uuidString,
-            "MADAR_UI_PRESERVE_FACE_ID_DEFAULT": "1",
+            "MADAR_UI_FACE_ID_LOCK": "app",
             "MADAR_UI_SIZE": "L",
             "MADAR_UI_THEME": "light"
         ]
@@ -55,7 +55,7 @@ import notify
         let app = XCUIApplication()
         app.launchEnvironment = [
             "MADAR_UI_STORE_ID": UUID().uuidString,
-            "MADAR_UI_PRESERVE_FACE_ID_DEFAULT": "1",
+            "MADAR_UI_FACE_ID_LOCK": "app",
             "MADAR_UI_SIZE": "L",
             "MADAR_UI_THEME": "light"
         ]

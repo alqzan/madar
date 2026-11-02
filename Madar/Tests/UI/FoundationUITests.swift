@@ -1292,7 +1292,7 @@ import XCTest
         XCTAssertFalse(app.buttons["tab-customize"].exists)
         app.terminate()
         // Keep the saved scope: ordinary UI launches otherwise explicitly stage none.
-        app.launchEnvironment["MADAR_UI_PRESERVE_FACE_ID_DEFAULT"] = "1"
+        app.launchEnvironment["MADAR_UI_FACE_ID_LOCK"] = "app"
         app.launch()
         XCTAssertTrue(gate.waitForExistence(timeout: 10) || cover.exists, app.debugDescription)
         XCTAssertFalse(app.buttons["tab-customize"].exists)

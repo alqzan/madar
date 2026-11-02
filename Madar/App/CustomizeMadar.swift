@@ -337,7 +337,7 @@ struct SettingControl: View {
             default: EmptyView()
             }
             // AU-43: the switches that change what reaches the user say what they do.
-            if let caption = ["core.faceIDLock": "مدار كله: يطلب Face ID عند فتح مدار، ويخفي تفاصيل الودجات والإشعارات. بلا: يُفتح مباشرة.",
+            if let caption = ["core.faceIDLock": "مدار كله (اختياري): يطلب Face ID عند فتح مدار، ورمز iPhone إذا تعذّر، ويخفي تفاصيل الودجات والإشعارات. بلا (الافتراضي): يُفتح مباشرة.",
                               "notif.thisDeviceReminders": "إيقافه يوقف كل تذكيرات مدار على هذا الجهاز، وتبقى مواعيدك وسجلّك كما هي.",
                               "notif.quietAfterIsha": "لا تصلك تذكيرات الغرف من بدء الصمت حتى نهايته التي تختارها: الفجر أو الشروق أو منتصف الليل."][definition.key] {
                 Text(caption).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)

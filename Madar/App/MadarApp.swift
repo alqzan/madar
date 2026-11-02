@@ -163,12 +163,12 @@ private struct MadarSceneContent: View {
             } else { managed = try ManagedDataStore(root: root, commandLockURL: lockURL) }
             let opened = try AppSession(container: managed.container, managedStore: managed, groupDirectory: group)
 #if DEBUG
-            if isolatedUITestID != nil,
-               ProcessInfo.processInfo.environment["MADAR_UI_PRESERVE_FACE_ID_DEFAULT"] != "1" {
-                // UI stores are isolated from owner data. Ordinary screen tests need
-                // an unlocked session; the dedicated Face ID test opts into the real
-                // fresh-install default with MADAR_UI_PRESERVE_FACE_ID_DEFAULT.
-                try await opened.applySettingsAndWait(["core.faceIDLock": .string("none")])
+            if isolatedUITestID != nil {
+                // UI stores are isolated from owner data. Lock-flow UI tests opt in
+                // explicitly; all other UI tests launch without an app lock.
+                let requestedScope = ProcessInfo.processInfo.environment["MADAR_UI_FACE_ID_LOCK"]
+                let scope = requestedScope == "app" ? "app" : "none"
+                try await opened.applySettingsAndWait(["core.faceIDLock": .string(scope)])
             }
 #endif
             opened.lockController = MadarLockController(scope: MadarLockScope(rawValue: opened.string("core.faceIDLock")) ?? .app, service: AppPrivacyService(session: opened))

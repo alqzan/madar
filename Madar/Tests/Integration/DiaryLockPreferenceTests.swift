@@ -25,16 +25,11 @@ import MadarData
         XCTAssertFalse(wholeApp.canPresent(.privateNote))
     }
 
-    func testWholeAppFaceIDIsTheFreshInstallDefault() throws {
+    func testWholeAppFaceIDLockIsOptInByDefault() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "DiaryLockDefault-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
         let store = try SettingsStore(context: context)
-        XCTAssertEqual(try store.value(for: "core.faceIDLock"), .string("app"))
-        let app = try AppSession(container: container, groupDirectory: root)
-        let lock = MadarLockController(scope: MadarLockScope(rawValue: app.string("core.faceIDLock")) ?? .none,
-                                       service: AppPrivacyService(session: app))
-        XCTAssertFalse(lock.canPresent(.app))
-        XCTAssertFalse(lock.canPresent(.privateNote))
+        XCTAssertEqual(try store.value(for: "core.faceIDLock"), .string("none"))
     }
 }
