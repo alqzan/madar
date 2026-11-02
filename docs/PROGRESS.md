@@ -37,7 +37,7 @@ Owner approved the other 51 states from the pending gallery; real-device/use acc
 
 | Card | Result / canonical | Status | Notes |
 |---|---|---|---|
-| M2-V10 | All-time log — `screens/quran/12-R18-Sijil-All.jpg` | matched — awaiting owner, 2 Nov 2026 | `QuranJourneyView`: actual-coverage journey and forecast, dual-calendar dates, six defined statistics, 604 dated faces in 30 real Juz rows, and direct cell tap to face details/Mushaf. Keeps the existing 28-day pace, five-day/50-ayah gate and rest-day rule. Row widths now follow each Juz’s true page count (the spec’s first Juz has 21 faces and the last has 23); no placeholder faces. Removes redundant page Stepper/detail row and softens forecast weight. Focused integration 1/1 (`codex-m2-v10-continued-20261102-r5`), final UI 1/1 (`...-r10`), app build, `git diff --check` clean. Default L/light top/map/page captures in `Artifacts/codex-m2-v10-continued-20261102-r10-shots/`; `R18-Sijil-All.html` regenerated and screenshots inspected directly. Differences left: actual fixture dates/counts and native safe-area/scroll viewport; owner visual acceptance pending. No canonical sample values copied. 1 Nov: owner approved the other 51 gallery states and reopened M2-V10. |
+| M2-V10 | All-time log — `screens/quran/12-R18-Sijil-All.jpg` | approved (owner, 2 Nov 2026; visual only) | `QuranJourneyView`: actual-coverage journey and forecast, dual-calendar dates, six defined statistics, 604 dated faces in 30 real Juz rows, and direct cell tap to face details/Mushaf. Keeps the existing 28-day pace, five-day/50-ayah gate and rest-day rule. Row widths follow each Juz’s true page count; no placeholder faces. Removes redundant page Stepper/detail row and softens forecast weight. Focused integration 1/1 (`codex-m2-v10-continued-20261102-r5`), final UI 1/1 (`...-r10`), app build, `git diff --check` clean. Default L/light top/map/page captures in `Artifacts/codex-m2-v10-continued-20261102-r10-shots/`; `R18-Sijil-All.html` regenerated and screenshots inspected directly. Owner accepted the visual result; actual fixture dates/counts and native safe-area/scroll viewport remain device-context differences. No canonical sample values copied. 1 Nov: owner approved the other 51 gallery states and reopened M2-V10. |
 
 ## Owner review page — 26 Oct (do these first; Claude and Codex split by room)
 Source: `~/Downloads/madar-review-notes.md` (owner verdicts on 105 screens: 51 «موافق», 54 «يحتاج تعديل»). All-«موافق» cards were set to approved. Owner answers to follow-up questions are in the last column. «التصميم أحلى» = build the canonical screen as drawn, then improve. Unclear look-and-feel items: make 2–3 mockups first and let the owner pick (owner rule: mockups before design guesses).
@@ -509,10 +509,10 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 # Handovers
 
 ## Handover — مطابقة M2-V10 واستكمال خريطة المصحف — 2026-11-02 — Codex
-- **Works now:** رحلة الحفظ تعرض توقعًا هادئًا، ستة أرقام مع تعريفاتها، وخريطة ٦٠٤ وجه موزعة على الأجزاء الحقيقية؛ لمس الوجه يفتح تفاصيله، من دون صف تحكم زائد.
+- **Works now:** اعتمد المالك M2-V10 بصريًا؛ رحلة الحفظ تعرض توقعًا هادئًا، ستة أرقام مع تعريفاتها، وخريطة ٦٠٤ وجه موزعة على الأجزاء الحقيقية؛ لمس الوجه يفتح تفاصيله.
 - **Verified:** تكامل `QuranWeekIntegrationTests/testRollingWeekRestDayDedupedReviewsAndWidgetHaveOneDefinition` ‏1/1؛ `QuranJourneyUITests/testJourneyTotalsForecastAndPageHistory` ‏1/1 (`codex-m2-v10-continued-20261102-r10`); بناء المحاكي و`git diff --check` نظيفان. لقطات L/light top/map/page في `Madar/Artifacts/codex-m2-v10-continued-20261102-r10-shots/`؛ مقارنة `R18-Sijil-All.html` أُعيد توليدها وفُحصت الصور مباشرة.
-- **Differences left:** أرقام وتواريخ بيانات الاختبار الفعلية، وإطارات النظام/موضع التمرير؛ لا قيم نموذجية من التصميم. موافقة المالك البصرية على M2-V10 معلّقة.
-- **Not verified:** اعتماد المالك، تجربة جواله والاستخدام الفعلي. لم تُجرَ لقطات أو اختبارات أحجام الوصول وفق قرار المالك.
+- **Differences left:** لا فرق بصري مفتوح في البطاقة؛ بقيت بيانات الاختبار الفعلية وإطارات النظام/موضع التمرير خاصة بالمحاكي. لا قيم نموذجية من التصميم.
+- **Not verified:** تجربة جوال المالك والاستخدام الفعلي. لم تُجرَ لقطات أو اختبارات أحجام الوصول وفق قرار المالك.
 - **Next:** يراجع المالك M2-V10؛ ثم نتابع أول بطاقة `ready` على اللوحة.
 - **Model/effort:** Codex GPT-6؛ الجهد غير مكشوف؛ Luna bug hunt وSol High استشارتان للقراءة فقط.
 - **Usage:** غير مكشوف.
