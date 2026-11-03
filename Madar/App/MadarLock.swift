@@ -325,9 +325,9 @@ struct MadarLockGate<Content: View>: View {
                 // The unprotected shell stays mounted across system prompts and app switching.
                 // Protected child gates still remove their content and the adapter purges its rows.
                 content()
-                    .allowsHitTesting(!controller.covered)
-                    .accessibilityHidden(controller.covered)
-                    .overlay { if controller.covered && controller.redactionFailed { privacyCover } }
+                    // Without an app lock nothing is covered: «covered» only blocks touches while the lock is on.
+                    .allowsHitTesting(!controller.covered || !controller.requiresProtection(.app))
+                    .accessibilityHidden(controller.covered && controller.requiresProtection(.app))
             } else if controller.canPresent(feature) { content() }
             else { lockedContent }
         }

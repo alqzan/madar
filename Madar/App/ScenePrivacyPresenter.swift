@@ -97,8 +97,8 @@ import UIKit
         synchronize()
     }
     private func coverNow() {
-        // No app lock (the default): going inactive or to the background never draws a lock screen.
-        if !controller.requiresProtection(.app), !controller.isSceneActive, !controller.redactionFailed { return }
+        // Owner, 3 Nov 2026: no app lock means no lock screen, ever («محتوى مدار محمي» appeared on every return and on failed redaction).
+        guard controller.requiresProtection(.app) else { return }
         guard let scene, let coverWindow else { return }
         for window in scene.windows where window !== coverWindow {
             if !hiddenAccessibility.contains(where: { $0.0 === window }) { hiddenAccessibility.append((window, window.accessibilityElementsHidden)) }
@@ -114,12 +114,14 @@ import UIKit
         // protected route with its safe unlock screen. Keep that branded screen
         // visible; reserve the system-window cover for inactive or failed-redaction states.
         let safeAppGate = controller.isSceneActive && controller.requiresProtection(.app) && !controller.covered
-        if retiringActivityID != nil || controller.covered || (!controller.canPresent(.app) && !safeAppGate) { coverNow() }
-        else {
-            coverWindow?.isHidden = true
-            for (window, previous) in hiddenAccessibility { window.accessibilityElementsHidden = previous }
-            hiddenAccessibility.removeAll()
-        }
+        if !controller.requiresProtection(.app) { uncover() }
+        else if retiringActivityID != nil || controller.covered || (!controller.canPresent(.app) && !safeAppGate) { coverNow() }
+        else { uncover() }
+    }
+    private func uncover() {
+        coverWindow?.isHidden = true
+        for (window, previous) in hiddenAccessibility { window.accessibilityElementsHidden = previous }
+        hiddenAccessibility.removeAll()
     }
     func present(file: URL, authorization: PrivacyAuthorization) throws {
         try present(items: [file], authorization: authorization)
