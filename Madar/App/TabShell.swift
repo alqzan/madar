@@ -48,7 +48,7 @@ struct TabShell<Content: View>: View {
                     VStack(spacing: 3) {
                         Group {
                             if tab.symbol.hasPrefix("Madar") { Image(tab.symbol + (selected ? "Selected" : "")).renderingMode(.template) }
-                            else { Image(systemName: tab.symbol) }
+                            else { Image(systemName: selected ? tab.symbol + ".fill" : tab.symbol).font(.system(size: 23, weight: .light)) }
                         }.frame(width: 26, height: 26)
                         Text(tab.title).font(MadarTypography.fine())
                     }

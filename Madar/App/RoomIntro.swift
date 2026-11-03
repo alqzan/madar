@@ -11,7 +11,7 @@ extension AppSession {
     static let roomTabs: [(block: BahwBlock, tab: String)] = [(.salah, "prayer"), (.quran, "quran"), (.notes, "notes"), (.mal, "money"), (.mihbara, "mihbara")]
     static let tabInfo: [String: FoundationTab] = [
         "prayer": .init(id: "prayer", title: "الصلاة", symbol: "MadarPrayer"), "quran": .init(id: "quran", title: "القرآن", symbol: "MadarQuran"),
-        "notes": .init(id: "notes", title: "المذكرات", symbol: "MadarDiary"), "money": .init(id: "money", title: "المال", symbol: "banknote"),
+        "notes": .init(id: "notes", title: "المذكرات", symbol: "MadarDiary"), "money": .init(id: "money", title: "المال", symbol: "wallet.bifold"),
         "mihbara": .init(id: "mihbara", title: "المحبرة", symbol: "books.vertical")]
 
     var lobbyLayout: BahwLayoutValue { BahwLayoutValue(values["bahw.layout"]) }
