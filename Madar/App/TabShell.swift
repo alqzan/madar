@@ -27,17 +27,14 @@ struct TabShell<Content: View>: View {
     /// Owner, 3 Nov 2026: «اختفاء الأقسام خلف المزيد، مهب زين، ابيه ثابت الي تحت». The system bar lists at most five tabs and
     /// folds the rest into «المزيد», so it is hidden and Madar draws one fixed bar with every room the user turned on.
     /// «خصّص» stays a tab so the lobby can open it, but it is not in the bar.
+    /// Owner, 3 Nov 2026 (TestFlight 4): the hidden `TabView` kept every room alive and made the app hang on each switch. Only the
+    /// room on screen is built now; the bar below is Madar's own floating glass capsule.
     private var baseTabView: some View {
-        TabView(selection: $selection) {
-            ForEach(tabs) { tab in
-                Tab(tab.title, systemImage: "circle", value: tab.id) {
-                    content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : tab.id + "-tab")
-                        .toolbarVisibility(.hidden, for: .tabBar)
-                }
-            }
-        }
-        .toolbarVisibility(.hidden, for: .tabBar)
-        .safeAreaInset(edge: .bottom, spacing: 0) { if session.accessoryHiders.isEmpty { fixedBar } }
+        content(selection)
+            .id(selection)
+            .accessibilityIdentifier(selection == "customize" ? "settings-tab" : selection + "-tab")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaInset(edge: .bottom, spacing: 0) { if session.accessoryHiders.isEmpty { fixedBar } }
     }
 
     private var fixedBar: some View {
@@ -53,8 +50,8 @@ struct TabShell<Content: View>: View {
                         Text(tab.title).font(MadarTypography.fine())
                     }
                     .foregroundStyle(selected ? theme.accent : theme.secondaryInk)
-                    .frame(maxWidth: .infinity, minHeight: 56)
-                    .background { if selected { Capsule().fill(theme.accent.opacity(0.12)).padding(.vertical, 4) } }
+                    .frame(maxWidth: .infinity, minHeight: 54)
+                    .background { if selected { Capsule().fill(theme.accent.opacity(0.14)).padding(.vertical, 3) } }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.madarPlain).accessibilityIdentifier("tab-" + tab.id)
@@ -72,8 +69,7 @@ struct TabShell<Content: View>: View {
         }
         #endif
         .glassEffect(.regular, in: .capsule)
-        .padding(.horizontal, 12).padding(.vertical, 4)
-        .background(.bar)
+        .padding(.horizontal, 12).padding(.top, 4).padding(.bottom, 2)
         .ignoresSafeArea(.keyboard)
     }
 
