@@ -348,7 +348,7 @@ struct MoneyMessagesView: View {
                     note = nil
                 }
                 else if name == "money.applyStatement" { note = "المبلغ يختلف عن كشف قريب لهذه البطاقة؛ راجع البطاقة أو تجاهل الرسالة" }
-                else { note = "لم يُحفظ: الحركة تحتاج اختيارًا قبل اعتمادها" }
+                else { note = "لم يُحفظ: " + madarUserMessage(error) }
             }
             load()
         }

@@ -1250,7 +1250,7 @@
    "key": "salah.pendingDays",
    "owner": "salah",
    "section": "التسجيل",
-   "title": "غير المسجّلة تُحسب فائتة بعد (أيام)",
+   "title": "غير المسجّلة تبقى معلّقة بعد (أيام)",
    "type": "int",
    "default": 7,
    "scope": "sync",

@@ -24,7 +24,7 @@ struct MoneyCategoryShelf: Identifiable, Equatable {
     var books: [MoneyShelfBook]
     /// «المفروض اليوم»: the limit spread evenly over the cycle, through today.
     var expectedTodayMinor: Int?
-    var percentUsed: Int? { limitMinor.flatMap { $0 > 0 ? (spentMinor * 100) / $0 : nil } }
+    var percentUsed: Int? { limitMinor.flatMap { $0 > 0 ? max(0, spentMinor) * 100 / $0 : nil } }
 }
 
 struct MoneyCategoriesReading: Equatable {

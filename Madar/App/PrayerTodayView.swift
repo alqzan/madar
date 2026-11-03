@@ -586,7 +586,8 @@ struct PrayerTodayView: View {
         let historical = gap.filter { $0.day < snapshot.today.day && $0.day >= snapshot.tracking.day }
         let fridays = snapshot.unconfirmedFridayNoon.union(closed.filter { $0.isFriday && $0.reference.prayer == .dhuhr }.map(\.reference))
         return AnyView(PrayerNoticeRow(
-            title: historical.isEmpty ? PrayerCopy.pending(gap.count, digits: digits) : PrayerCopy.unconfirmed(historical.count, digits: digits),
+            title: gap.count > 10 ? "فترة لم تُسجَّل فيها صلواتك: " + PrayerCopy.days(Set(gap.map(\.day)).count, digits: digits)
+                    : historical.isEmpty ? PrayerCopy.pending(gap.count, digits: digits) : PrayerCopy.unconfirmed(historical.count, digits: digits),
             detail: gap.count > 10 ? "لا يلزمك تسجيلها واحدة واحدة: اختر «لم أسجّل هذه الفترة» وتبدأ من اليوم، ولا يُحسب عليك شيء." : "لا تُحسب فائتة إلا باختيارك.",
             action: gap.count > 10 ? "ابدأ من اليوم" : "سجِّلها", identifier: historical.isEmpty ? "prayer-pending-review" : "prayer-recovery") {
                 selectedSheet = .recovery(gap, fridays, session.activePlace.timeZone)
@@ -1065,7 +1066,7 @@ private struct PrayerTodayLogSheet: View {
         case .jamaah: ("في جماعة", "مع الناس")
         case .alone: ("وحدي", "في وقتها")
         case .qada: ("قضاءً", "بعد وقتها")
-        default: ("فاتتني", "تُعدّ عليك")
+        default: ("فاتتني", "تبقى لقضائها")
         }
         return Button {
             guard !isSaving else { return }
@@ -1233,7 +1234,7 @@ private struct PrayerGapResolutionSheet: View {
                 Button("إغلاق") { dismiss() }.font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
                     .frame(minHeight: 44)
             }
-            Text(PrayerCopy.unconfirmed(references.count, digits: digits))
+            Text(references.count > 10 ? "فترة لم تُسجَّل فيها صلواتك: " + PrayerCopy.days(Set(references.map(\.day)).count, digits: digits) : PrayerCopy.unconfirmed(references.count, digits: digits))
                 .font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
             if !rangeText.isEmpty {
                 Text(rangeText).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
