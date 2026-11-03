@@ -171,6 +171,10 @@ private struct MadarSceneContent: View {
                 try await opened.applySettingsAndWait(["core.faceIDLock": .string(scope)])
             }
 #endif
+#if !DEBUG
+            // Owner, 3 Nov 2026: the app lock is removed from Madar. A device that had it on is returned to "none" on open.
+            if opened.string("core.faceIDLock") != "none" { try await opened.applySettingsAndWait(["core.faceIDLock": .string("none")]) }
+#endif
             opened.lockController = MadarLockController(scope: MadarLockScope(rawValue: opened.string("core.faceIDLock")) ?? .app, service: AppPrivacyService(session: opened))
             await opened.attachPrayerNotifications(prayerNotifications)
             let backup = AppBackupService(session: opened, store: managed, backupDirectory: group.appending(path: "Backups", directoryHint: .isDirectory), keyStore: KeychainBackupKeyStore(service: backupKeyService))
