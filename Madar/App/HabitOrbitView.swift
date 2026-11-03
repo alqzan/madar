@@ -41,6 +41,14 @@ struct HabitOrbitView:View {
                             }.frame(width:86,height:44)
                         }.buttonStyle(.madarPlain).accessibilityLabel(row.name+"، "+row.statusTitle).accessibilityIdentifier("habit-orbit-"+row.id.uuidString).position(x:centre.x+cos(angle)*radius,y:centre.y+sin(angle)*radius)
                     }
+                    // The ring draws three beads; the rest are in the list below, so say how many are not drawn here.
+                    if rows.count > 3 {
+                        let angle=(Double(3)*100+30+Double(index)*35)*Double.pi/180
+                        Text("+" + digits.string(rows.count - 3)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            .padding(.horizontal,6).frame(minHeight:22).background(theme.background.opacity(0.92),in:.capsule)
+                            .position(x:centre.x+cos(angle)*radius,y:centre.y+sin(angle)*radius)
+                            .accessibilityLabel("وعادات أخرى في القائمة: " + digits.string(rows.count - 3))
+                    }
                     if let phase = nowPositions[f] {
                         let angle = (phase * 360 - 90) * Double.pi / 180
                         Circle().fill(theme.ink).frame(width: 6, height: 6)

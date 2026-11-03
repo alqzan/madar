@@ -43,18 +43,35 @@ struct MakerWidgetProvider: AppIntentTimelineProvider {
         let expiry = store?.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: now)?.validUntil ?? now.addingTimeInterval(900)
         var dates = [now]
         var next = Date(timeIntervalSince1970: (floor(now.timeIntervalSince1970 / 60) + 1) * 60)
-        while next < expiry { dates.append(next); next = next.addingTimeInterval(60) }
-        var entries = dates.map { load(configuration, at: $0) }
-        entries.append(load(configuration, at: expiry.addingTimeInterval(1)))
-        return .init(entries: entries, policy: .after(expiry))
+        // At most three hours of minute entries; the policy below asks the system for a fresh timeline right after them.
+        let horizon = min(expiry, now.addingTimeInterval(3 * 3600))
+        while next < horizon { dates.append(next); next = next.addingTimeInterval(60) }
+        // The three snapshots are read once for all the minute entries, not once per minute.
+        let sources = Sources(store: store, now: now)
+        var entries = dates.map { load(configuration, at: $0, sources: sources) }
+        if horizon >= expiry { entries.append(load(configuration, at: expiry.addingTimeInterval(1))) }
+        return .init(entries: entries, policy: .after(horizon))
+    }
+    private struct Sources {
+        let metadata: SnapshotEnvelope<WidgetCatalogSnapshot>?
+        let values: SnapshotEnvelope<WidgetCatalogSnapshot>?
+        let prayer: PrayerNextSnapshot?
+        let timeZoneID: String?
+        init(store: SnapshotStore?, now: Date) {
+            metadata = store?.read(WidgetCatalogSnapshot.name, as: WidgetCatalogSnapshot.self, now: now)
+            values = store?.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: now)
+            prayer = store?.read("prayerNext", as: PrayerNextSnapshot.self, now: now)?.payload
+            timeZoneID = values?.tzID ?? metadata?.tzID
+        }
     }
     private func load(_ configuration: MakerWidgetIntent, at date: Date) -> MakerWidgetEntry {
-        let store = try? SnapshotStore.appGroup("group.com.alqzan.madar2")
-        let metadata = store?.read(WidgetCatalogSnapshot.name, as: WidgetCatalogSnapshot.self, now: date)
-        let values = store?.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: date)
+        load(configuration, at: date, sources: Sources(store: try? SnapshotStore.appGroup("group.com.alqzan.madar2"), now: date))
+    }
+    private func load(_ configuration: MakerWidgetIntent, at date: Date, sources: Sources) -> MakerWidgetEntry {
+        let metadata = sources.metadata, values = sources.values
         let chosen = configuration.preset.map { preset in metadata?.payload.configs.first { $0.id == preset.id } } ?? metadata?.payload.configs.first
         var config = chosen.flatMap { selected in values?.payload.configs.first { $0.id == selected.id } }
-        let prayer = store?.read("prayerNext", as: PrayerNextSnapshot.self, now: date)?.payload
+        let prayer = sources.prayer
         if var value = config {
             value.rows = value.rows.compactMap { row in
                 var row = row
@@ -70,7 +87,7 @@ struct MakerWidgetProvider: AppIntentTimelineProvider {
             config = value
         }
         return .init(date: date, config: config ?? chosen, locked: metadata?.payload.locked == true,
-                     stale: chosen != nil && values == nil, timeZoneID: values?.tzID ?? metadata?.tzID ?? "Asia/Riyadh")
+                     stale: chosen != nil && values == nil, timeZoneID: sources.timeZoneID ?? "Asia/Riyadh")
     }
 }
 private struct MakerWidgetView: View {

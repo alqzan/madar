@@ -283,6 +283,10 @@ struct MadarRootView: View {
         .onChange(of: session.string("core.backup")) { _, _ in
             Task { await (session.backupService as? AppBackupService)?.refreshBackgroundSchedule() }
         }
+        // A new time zone moves every prayer time: plan the reminders again while the app is open (on return it already does).
+        .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in
+            Task { await session.refreshPrayerNotifications() }
+        }
         .onChange(of: scenePhase) { _, phase in
             // The crash log from the owner's iPhone (3 Nov, termination 0xDEAD10CC) shows the app suspended while a SwiftData read
             // held the store's file lock. Asking the system for a few seconds when the app leaves the screen lets that work finish first.

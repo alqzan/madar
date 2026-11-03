@@ -1624,6 +1624,7 @@ private struct PrayerOldMissedSheet: View {
     @State private var fridayKind: FridayPrayerKind? = nil
     @State private var confirmRestore = false
     @State private var rootBlockerID = UUID()
+    @Environment(\.roomTheme) private var theme
     private var hasUnsavedInput: Bool {
         GregorianDay.containing(date, in: session.activePlace.timeZone) != trackingStart.adding(days: -1)
             || prayer != .fajr || fridayKind != nil
@@ -1672,6 +1673,7 @@ private struct PrayerOldMissedSheet: View {
                     }
                 }.disabled(session.prayerWriteInProgress || (fridayNoon && fridayKind == nil))
             }
+            .scrollContentBackground(.hidden).background(theme.background)
             .navigationTitle("فائتة قديمة").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إغلاق") { finished() } } }
             .confirmationDialog("أعد تسجيل هذه الفائتة؟", isPresented: $confirmRestore, titleVisibility: .visible) {

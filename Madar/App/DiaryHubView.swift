@@ -1,4 +1,5 @@
 import SwiftUI
+import ImageIO
 import MadarCore
 import MadarDesign
 
@@ -422,12 +423,12 @@ struct DiaryHubView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
                 ForEach(days) { day in
                     ForEach(day.photoIDs, id: \.self) { id in
-                        if let data = try? service.archivePhoto(id), let image = UIImage(data: data) {
+                        DiaryArchiveThumbnail(service: service, id: id) { photo in
                             Button {
                                 reader = day.day
                             } label: {
                                 VStack(spacing: 8) {
-                                    Image(uiImage: image).resizable().scaledToFill().frame(height: 135).clipped();
+                                    photo.resizable().scaledToFill().frame(height: 135).clipped();
                                     MadarDateLabel(service.dateLabels(day.day, first: grid.first))
                                 }.padding(7).background(theme.surface).rotationEffect(.degrees(-1))
                             }.buttonStyle(.madarPlain).accessibilityLabel(
@@ -493,5 +494,26 @@ struct DiaryHubView: View {
         let end = service.dateLabels(last, first: grid.first).secondary.split(separator: " ").suffix(2).joined(
             separator: " ")
         return start == end ? start : start + " – " + end
+    }
+}
+
+
+/// A photo of the archive grid: the file is read when its cell appears and shrunk off the main thread, so scrolling never decodes a full-size photo in `body`.
+private struct DiaryArchiveThumbnail<Content: View>: View {
+    let service: AppDiaryService
+    let id: UUID
+    @ViewBuilder let content: (Image) -> Content
+    @State private var image: UIImage?
+    var body: some View {
+        Group {
+            if let image { content(Image(uiImage: image)) } else { Color.clear.frame(height: 150) }
+        }.task(id: id) {
+            guard image == nil, let data = try? service.archivePhoto(id) else { return }
+            image = await Task.detached(priority: .utility) { () -> UIImage? in
+                let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: 600]
+                guard let source = CGImageSourceCreateWithData(data as CFData, nil), let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return UIImage(data: data) }
+                return UIImage(cgImage: cg)
+            }.value
+        }
     }
 }
