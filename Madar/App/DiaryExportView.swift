@@ -59,7 +59,7 @@ struct DiaryExportView:View {
     private func yearOption(_ year:Int)->some View {
         let labels=app.yearLabels(year)
         let primary=Text(labels.primary).font(DiaryType.label)
-        let secondary=Text(labels.secondary).font(MadarTypography.fine()).foregroundColor(theme.secondaryInk)
+        let secondary=Text(labels.secondary).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         return Text("\(primary)\n\(secondary)")
             .accessibilityLabel(labels.combined)
     }

@@ -18,6 +18,7 @@ struct TabShell<Content: View>: View {
     @ViewBuilder let content: (String) -> Content
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @State private var barHeight: CGFloat = 0
 
     var body: some View {
         baseTabView.tint(theme.accent)
@@ -34,8 +35,14 @@ struct TabShell<Content: View>: View {
             .id(selection)
             .accessibilityIdentifier(selection == "customize" ? "settings-tab" : selection + "-tab")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .safeAreaInset(edge: .bottom, spacing: 0) { if session.accessoryHiders.isEmpty { fixedBar } }
+            // A `safeAreaInset` outside the navigation stack never reached the rooms' own layouts (the diary welcome buttons sat under the bar),
+            // so the bar is an overlay and its measured height is added to the safe area of everything inside.
+            .safeAreaPadding(.bottom, barShown ? barHeight : 0)
+            .overlay(alignment: .bottom) {
+                if barShown { fixedBar.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { barHeight = $0 } }
+            }
     }
+    private var barShown: Bool { session.accessoryHiders.isEmpty }
 
     private var fixedBar: some View {
         HStack(spacing: 0) {

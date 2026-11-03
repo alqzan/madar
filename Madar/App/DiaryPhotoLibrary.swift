@@ -23,19 +23,19 @@ enum DiaryPhotoLibrary {
         return CGImageDestinationFinalize(target) ? out as Data : nil
     }
     static var canRead: Bool { [.authorized, .limited].contains(PHPhotoLibrary.authorizationStatus(for: .readWrite)) }
-    /// Photos taken on this Gregorian day in the place's time zone, newest last, at most 30.
+    /// Photos taken on this Gregorian day in the place's time zone: the newest 30, oldest first.
     static func assets(on day: GregorianDay, timeZone: TimeZone) -> [PHAsset] {
         guard canRead else { return [] }
         let start = day.date(in: timeZone), end = day.adding(days: 1).date(in: timeZone)
         let options = PHFetchOptions()
         options.predicate = NSPredicate(format: "mediaType == %d AND creationDate >= %@ AND creationDate < %@", PHAssetMediaType.image.rawValue, start as NSDate, end as NSDate)
-        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]; options.fetchLimit = 30
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]; options.fetchLimit = 30
         let result = PHAsset.fetchAssets(with: options)
-        return (0..<result.count).map { result.object(at: $0) }
+        return (0..<result.count).map { result.object(at: $0) }.reversed()
     }
     static func asset(_ id: String) -> PHAsset? { canRead ? PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject : nil }
     static func image(_ asset: PHAsset, side: CGFloat) async -> UIImage? {
-        let options = PHImageRequestOptions(); options.deliveryMode = .highQualityFormat; options.isNetworkAccessAllowed = true; options.resizeMode = .fast
+        let options = PHImageRequestOptions(); options.deliveryMode = .opportunistic; options.isNetworkAccessAllowed = false; options.resizeMode = .fast
         return await withCheckedContinuation { done in
             PHImageManager.default().requestImage(for: asset, targetSize: CGSize(width: side, height: side), contentMode: .aspectFill, options: options) { image, _ in done.resume(returning: image) }
         }

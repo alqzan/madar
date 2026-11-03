@@ -94,8 +94,8 @@ struct DiaryTextEditor: View {
                         Button { focused = false; choosingFile = true } label: { Label("مرفق", systemImage: "doc").font(MadarTypography.caption()).frame(minHeight: 44) }.labelStyle(.iconOnly).accessibilityIdentifier("diary-editor-file")
                         if let voice, focused { recordButton(voice, large: false) }
                         Spacer(minLength: 0)
-                        Button { text += "\n" + AppDiaryService(app: app).time(app.prayerNow()) + " " } label: { Image(systemName: "clock").frame(width: 44, height: 44) }.accessibilityLabel("أدرج الوقت")
-                        Button { text += "\n• " } label: { Image(systemName: "list.bullet").frame(width: 44, height: 44) }.accessibilityLabel("سطر في قائمة")
+                        Button { insertAtCursor(AppDiaryService(app: app).time(app.prayerNow()) + " ") } label: { Image(systemName: "clock").frame(width: 44, height: 44) }.accessibilityLabel("أدرج الوقت")
+                        Button { insertAtCursor("• ") } label: { Image(systemName: "list.bullet").frame(width: 44, height: 44) }.accessibilityLabel("سطر في قائمة")
                         // OR-13: writing tools; the line is stored as Markdown only when one of them is used.
                         Button { heading() } label: { Image(systemName: "textformat.size").frame(width: 44, height: 44) }.accessibilityLabel("عنوان").accessibilityIdentifier("diary-editor-heading")
                         Button { wrap("**") } label: { Image(systemName: "bold").frame(width: 44, height: 44) }.accessibilityLabel("خط عريض").accessibilityIdentifier("diary-editor-bold")
@@ -219,6 +219,14 @@ struct DiaryTextEditor: View {
         text.replaceSubrange(lower..<upper, with: mark + inner + mark)
         let start = text.index(text.startIndex, offsetBy: r.lowerBound + mark.count), end = text.index(start, offsetBy: inner.count)
         selection = TextSelection(range: start..<end); focused = true
+    }
+    /// Text goes where the cursor is, on its own line; an empty page or a line already empty takes no extra line break.
+    private func insertAtCursor(_ piece: String) {
+        let offset = min(text.count, selectedOffsets.upperBound)
+        let at = text.index(text.startIndex, offsetBy: offset)
+        let lead = (at == text.startIndex || text[..<at].last == "\n") ? "" : "\n"
+        text.insert(contentsOf: lead + piece, at: at)
+        selection = TextSelection(insertionPoint: text.index(text.startIndex, offsetBy: offset + lead.count + piece.count)); focused = true
     }
     /// The cursor's line becomes a heading, or stops being one.
     private func heading() {
