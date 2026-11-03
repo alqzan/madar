@@ -246,7 +246,10 @@ public struct DayOneReceipt: Equatable, Sendable {
             let allEntries = try context.fetch(FetchDescriptor<Entry>())
             let entriesByID = Dictionary(allEntries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             var days = Set<String>(), latest = now
+            var written = 0
             for entry in writing {
+                // A large journal is thousands of rows on this actor; let the screen breathe between batches.
+                written += 1; if written % 200 == 0 { await Task.yield() }
                 let action = preview.actions[entry.sourceID]!
                 let resolved = env.key(entry)
                 func fill(_ row: Entry) {

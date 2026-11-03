@@ -656,7 +656,7 @@ import XCTest
             app.terminate(); app.launch(); finishOnboarding(app); app.buttons["tab-customize"].tap()
             let reset = app.buttons["reset-settings"]
             scrollTo(reset, in: app); reset.tap()
-            app.buttons["أعِد الافتراضي"].firstMatch.tap()
+            app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "أعِد الافتراضي", "reset-settings")).firstMatch.tap()
             let undo = app.buttons["undo-button"]
             XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
             scrollTo(search, in: app); search.tap(); search.typeText("salah.offsets\n")
@@ -1045,14 +1045,13 @@ import XCTest
             app.buttons["tab-customize"].tap()
             let changes = app.staticTexts["customization-changes"]
             XCTAssertTrue(changes.waitForExistence(timeout: 10))
-            // Ordinary UI stores explicitly set the app lock to none; that is
-            // one saved change from the owner's biometric-default setting.
-            XCTAssertEqual(changes.label, "تعديل واحد عن المتفق عليه")
+            // The app lock is off by default now, so a fresh store has no saved change.
+            XCTAssertEqual(changes.label, "كما اتفقنا")
             attachScreenshot(app, named: "M0-RU3-fixture-baseline-\(size)")
             let edits = [
-                ("core.theme", "light", "تعديلان عن المتفق عليه"),
-                ("core.firstCalendar", "hijri", "\u{2068}٣\u{2069} تعديلات عن المتفق عليه"),
-                ("core.numerals", "western", "\u{2068}4\u{2069} تعديلات عن المتفق عليه")
+                ("core.theme", "light", "تعديل واحد عن المتفق عليه"),
+                ("core.firstCalendar", "hijri", "تعديلان عن المتفق عليه"),
+                ("core.numerals", "western", "\u{2068}3\u{2069} تعديلات عن المتفق عليه")
             ]
             for (key, value, expected) in edits {
                 let search = app.textFields["settings-search"]
@@ -1495,7 +1494,7 @@ import XCTest
         let fajr = app.buttons["prayer-gap-status-2026-10-01-fajr"]
         XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription)
         fajr.tap()
-        let choice = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "وحدي")).firstMatch
+        let choice = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND NOT (label CONTAINS %@)", "وحدي", "صلّيتها كلها")).firstMatch
         XCTAssertTrue(choice.waitForExistence(timeout: 5), app.debugDescription); choice.tap()
         XCTAssertTrue(app.buttons["prayer-gap-save"].isEnabled, app.debugDescription)
         XCTAssertTrue(fajr.label.contains("وحدي"), fajr.label)
@@ -1530,7 +1529,7 @@ import XCTest
         scrollTo(recovery, in: app); recovery.tap()
         let fajr = app.buttons["prayer-gap-status-2026-10-01-fajr"]
         XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription); fajr.tap()
-        let choice = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "وحدي")).firstMatch
+        let choice = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND NOT (label CONTAINS %@)", "وحدي", "صلّيتها كلها")).firstMatch
         XCTAssertTrue(choice.waitForExistence(timeout: 5), app.debugDescription); choice.tap()
         XCTAssertTrue(app.buttons["prayer-gap-save"].isEnabled, app.debugDescription)
 
@@ -1643,7 +1642,7 @@ import XCTest
         app.buttons["settings-clear-search"].tap()
         let resetSettings = app.buttons["reset-settings"]
         scrollTo(resetSettings, in: app); resetSettings.tap()
-        app.buttons["أعِد الافتراضي"].firstMatch.tap()
+        app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "أعِد الافتراضي", "reset-settings")).firstMatch.tap()
         XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 10))
         scrollTo(newSearch, in: app); newSearch.tap(); newSearch.typeText("core.theme\n")
         XCTAssertTrue(app.buttons["option-core.theme-auto"].isSelected)
@@ -1710,7 +1709,7 @@ import XCTest
         app.buttons["settings-clear-search"].tap()
         let resetSettings = app.buttons["reset-settings"]
         scrollTo(resetSettings, in: app); resetSettings.tap()
-        let reset = app.buttons["أعِد الافتراضي"].firstMatch
+        let reset = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "أعِد الافتراضي", "reset-settings")).firstMatch
         XCTAssertTrue(reset.waitForExistence(timeout: 10), app.debugDescription)
         reset.tap()
         filterSettings("core.numerals")

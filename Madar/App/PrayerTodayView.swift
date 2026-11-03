@@ -578,7 +578,9 @@ struct PrayerTodayView: View {
         if gap.count == 1, let first = closed.first {
             return AnyView(PrayerNoticeRow(
                 title: "مضى وقت \(self.title(first.reference.prayer))\(dayWord(first.reference.day, today: snapshot.today.day)) ولم تُسجِّلها.",
-                detail: "تبقى معلّقة حتى تختار حالها.",
+                detail: first.reference.day == snapshot.tracking.firstRun
+                    ? "إن صلّيتها قبل أن تفتح مدار فسجِّلها متى شئت؛ لا يُحسب عليك شيء."
+                    : "تبقى معلّقة حتى تختار حالها.",
                 action: "سجِّلها", identifier: "prayer-pending-review") { choose(first) })
         }
         let historical = gap.filter { $0.day < snapshot.today.day && $0.day >= snapshot.tracking.day }

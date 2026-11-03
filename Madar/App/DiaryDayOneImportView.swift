@@ -163,7 +163,7 @@ struct DiaryDayOneImportView: View {
             }
             if let importing {
                 VStack(spacing: 8) {
-                    ProgressView(value: Double(importing.0), total: Double(max(importing.1, 1))).tint(theme.accent)
+                    if importing.1 > 0 { ProgressView(value: Double(importing.0), total: Double(importing.1)).tint(theme.accent) } else { ProgressView().tint(theme.accent) }
                     Text("ينقل صفحاتك إلى دفترك…").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }.padding(.vertical, 8).accessibilityIdentifier("dayone-importing")
             } else if p.writes > 0 {
@@ -275,7 +275,7 @@ struct DiaryDayOneImportView: View {
         }
     }
     private func commit(_ draft: DayOneImportDraft) {
-        importing = (0, max(1, preview?.mediaFound.values.reduce(0, +) ?? 1)); failure = nil
+        importing = (0, preview?.mediaFound.values.reduce(0, +) ?? 0); failure = nil
         Task { @MainActor in
             defer { importing = nil }
             do { receipt = try await service.commit(draft, choice: choice) { done, total in importing = (done, total) }; service.discard(draft); self.draft = nil; preview = nil }

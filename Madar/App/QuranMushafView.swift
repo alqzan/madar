@@ -11,6 +11,8 @@ struct QuranMushafView: View {
     @State private var page: QuranUIPage?
     @State private var error: String?
     @State private var tools = false
+    /// The page fills the screen with no chrome, so the first reading says once how to bring the controls back.
+    @State private var hint = !UserDefaults.standard.bool(forKey: "quran.mushaf.toolsHintSeen")
     @State private var verses = false
     @State private var zoom: CGFloat = 1
     @GestureState private var magnification: CGFloat = 1
@@ -41,10 +43,16 @@ struct QuranMushafView: View {
                 } else { ProgressView() }
                 // AU-18: while the page loads there is no page to tap, so the close stays visible.
                 if tools || (page == nil && error == nil) { controls }
+                if hint && !tools && page != nil {
+                    VStack { Spacer(); Text("المس الصفحة لإظهار الأدوات وزر الإغلاق").font(MadarTypography.caption()).padding(.horizontal, 16).padding(.vertical, 10).background(.ultraThinMaterial, in: .capsule).padding(.bottom, 28) }
+                        .allowsHitTesting(false).transition(.opacity).accessibilityHidden(true)
+                }
             }
         }
         .foregroundStyle(theme.ink).background(theme.color("mushafPaper").ignoresSafeArea())
         .statusBarHidden(!tools).interactiveDismissDisabled()
+        .onChange(of: tools) { _, shown in if shown { hint = false; UserDefaults.standard.set(true, forKey: "quran.mushaf.toolsHintSeen") } }
+        .task(id: page != nil) { guard hint, page != nil else { return }; try? await Task.sleep(for: .seconds(5)); withAnimation { hint = false } }
         .task { number = min(604, max(1, initialPage)); await load() }
         .task(id: number) { await load() }
         .sheet(isPresented: $verses) {

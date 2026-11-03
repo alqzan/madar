@@ -39,7 +39,7 @@ final class TravelLocator: NSObject, CLLocationManagerDelegate {
         }
         #endif
         switch manager.authorizationStatus {
-        case .notDetermined: manager.requestWhenInUseAuthorization()
+        // The OS question is never raised from the prayer screen itself: it comes with «استخدم موقعي» in the city form, where its reason is clear.
         case .authorizedWhenInUse, .authorizedAlways: manager.requestLocation()
         default: break
         }
