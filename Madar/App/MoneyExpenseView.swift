@@ -69,7 +69,7 @@ struct MoneyExpenseView: View {
         ScrollView {
             VStack(spacing: 12) {
                 HStack {
-                    Button { if hasUnsavedInput { editing = false; confirmDiscard = true } else { dismiss() } } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.madarWaitsForSave()
+                    Button { if hasUnsavedInput { editing = false; confirmDiscard = true } else { dismiss() } } label: { Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.madarWaitsForSave()
                         .disabled(saving).accessibilityLabel("إغلاق").accessibilityIdentifier("money-expense-close")
                     Text("سجّل مصروفًا").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer()
                     Button { details.toggle() } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44) }.accessibilityLabel("تفاصيل المصروف").accessibilityIdentifier("money-expense-details")
@@ -162,7 +162,7 @@ struct MoneyExpenseView: View {
         }.scrollIndicators(.hidden)
     }
     private func chip(_ text: String, selected: Bool) -> some View {
-        Text(text).font(.custom("thmanyahseriftext-Regular", size: 15, relativeTo: .body)).padding(.horizontal, 13).frame(minHeight: 40).background(selected ? theme.ink : .clear).foregroundStyle(selected ? theme.background : theme.ink).clipShape(.capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+        Text(text).font(.custom("thmanyahseriftext-Regular", size: 15, relativeTo: .body)).padding(.horizontal, 13).frame(minHeight: 40).background(selected ? theme.ink : .clear).foregroundStyle(selected ? theme.background : theme.ink).clipShape(.capsule).glassEffect(.regular.interactive(), in: .capsule)
     }
     private func categorySuggestion(_ r: MoneyExpenseReading) -> some View {
         VStack(alignment: .leading, spacing: 5) {

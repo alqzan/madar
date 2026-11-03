@@ -217,7 +217,8 @@ struct MadarRootView: View {
         let readingSaveCoordinator = MihbaraReadingSaveCoordinator.forSession(session)
         let dark = forcedColorScheme == .dark || (forcedColorScheme == nil && colorScheme == .dark)
         let theme = RoomTheme(dark: dark, calmPaper: false)
-        let enabledTabs = AppSession.roomTabs.filter { session.roomEnabled($0.block) }.map(\.tab)
+        // Owner, 3 Nov 2026: every room sits in the bottom bar from the start; opening one for the first time turns it on and shows its short intro.
+        let enabledTabs = AppSession.roomTabs.map(\.tab)
         let allTabs: [FoundationTab] = ([FoundationTab(id: "foundation", title: "البهو", symbol: "MadarOrbit")]
             + enabledTabs.compactMap { id in AppSession.tabInfo[id] } + [FoundationTab(id: "customize", title: "خصّص", symbol: "MadarCustomize")])
         TabShell(session: session, selection: $session.selectedTab, tabs: allTabs) { tab in
@@ -394,7 +395,6 @@ private struct AnchoredUndo: View {
                 }
                 .buttonStyle(.madarPlain)
                 .glassEffect(.regular.interactive(), in: .capsule)
-                .overlay { Capsule().stroke(theme.accent.opacity(0.5), lineWidth: 0.8) }
                 .position(x: x, y: y)
                 .transition(reduceMotion ? .opacity : .scale(scale: 0.85).combined(with: .opacity))
                 .accessibilityIdentifier("undo-button")

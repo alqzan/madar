@@ -131,7 +131,7 @@ struct BahwYearView: View {
         HStack {
             Button { dismiss() } label: {
                 Label("البهو", systemImage: "chevron.backward").labelStyle(.titleAndIcon).font(MadarTypography.section()).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(minHeight: 48)
-                    .overlay { Capsule().stroke(lobby.line) }
+                    .glassEffect(.regular.interactive(), in: .capsule)
             }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-year-back")
             Spacer()
             if which == "both" {
@@ -270,7 +270,7 @@ struct BahwYearView: View {
                 Text(service.daysPhrase(all.count) + "، الأقرب أولًا").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
                 Spacer()
                 Button { editing = .init(service: service) } label: {
-                    Label("يوم يهمّك", systemImage: "plus").font(MadarTypography.section()).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(minHeight: 46).overlay { Capsule().stroke(lobby.line) }
+                    Label("يوم يهمّك", systemImage: "plus").font(MadarTypography.section()).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(minHeight: 46).glassEffect(.regular.interactive(), in: .capsule)
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-add-day")
             }.padding(.top, 10)
             Picker("التصفية", selection: $filter) { Text("الكل").tag(0); Text("المواسم").tag(1); Text("أيامي").tag(2) }

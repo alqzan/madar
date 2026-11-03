@@ -52,7 +52,7 @@ struct DiarySearchView: View {
                                 Text("جرّب كلمة أقصر، أو احذف أحد الفلاتر لتوسيع البحث.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text"))
                                 Button { query = ""; chips = []; focused = true } label: {
                                     Label("ابدأ بحثًا جديدًا", systemImage: "arrow.counterclockwise").font(DiaryType.label).padding(.horizontal, 16).frame(minHeight: 44)
-                                        .background(theme.surface, in: Capsule()).overlay { Capsule().stroke(theme.line) }
+                                        .background(theme.surface, in: Capsule()).glassEffect(.regular.interactive(), in: .capsule)
                                 }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-search-restart")
                             }.padding(.vertical, 24)
                         }

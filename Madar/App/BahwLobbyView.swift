@@ -94,14 +94,13 @@ struct BahwLobbyView: View {
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if !arranging {
-                        if !layout.hiddenBuilt.isEmpty { AddRoomCard(session: session, blocks: layout.hiddenBuilt, theme: theme) }
                         SavedLobbyWidgets(session: session)
                         BahwSuggestionsView(session: session)
                     }
                     if arranging {
                         Button { drawerOpen = true } label: {
                             Label(layout.hiddenBuilt.isEmpty ? "لا ودجات مخفية" : "المخفية: " + WidgetCopy.agree(layout.hiddenBuilt.count, service.digits, one: "ودجة واحدة", two: "ودجتان", few: "ودجات", many: "ودجة"), systemImage: "plus")
-                                .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 46).overlay { Capsule().stroke(theme.line) }
+                                .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule)
                         }.buttonStyle(.madarPlain).disabled(layout.hiddenBuilt.isEmpty).accessibilityIdentifier("bahw-drawer")
                     }
                 }.padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
@@ -182,7 +181,7 @@ struct BahwLobbyView: View {
             .rotationEffect(.degrees(wiggle ? 0.7 : 0)).animation(wiggle ? .easeInOut(duration: 0.14).repeatForever(autoreverses: true) : .default, value: wiggle)
             .overlay(alignment: .topLeading) {
                 if arranging {
-                    Button { update { $0.hidden.append(block.rawValue) } } label: { Image(systemName: "minus").font(.body.bold()).frame(width: 30, height: 30).background(theme.surface, in: .circle).overlay { Circle().stroke(theme.line) } }
+                    Button { update { $0.hidden.append(block.rawValue) } } label: { Image(systemName: "minus").font(.body.bold()).frame(width: 30, height: 30).background(theme.surface, in: .circle).glassEffect(.regular.interactive(), in: .circle) }
                         .buttonStyle(.madarPlain).frame(width: 44, height: 44).offset(x: -10, y: -10).accessibilityLabel("أخفِ " + block.title).accessibilityIdentifier("bahw-hide-" + block.rawValue)
                 }
             }

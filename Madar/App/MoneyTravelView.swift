@@ -133,7 +133,7 @@ struct MoneyTravelView: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             if !isTabRoot {
-                Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("stampText"), lineWidth: 1) } }.accessibilityLabel("إغلاق").accessibilityIdentifier("money-travel-close")
+                Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.accessibilityLabel("إغلاق").accessibilityIdentifier("money-travel-close")
             }
             Text("المال، " + (reading?.city ?? "السفر")).font(.custom("thmanyahserifdisplay-Bold", size: 23, relativeTo: .title2)); Spacer(minLength: 0)
             if !visible { Button { revealed = true } label: { Image(systemName: "eye").frame(width: 44, height: 44) }.accessibilityLabel("أظهر الأرقام").accessibilityIdentifier("money-travel-reveal") }

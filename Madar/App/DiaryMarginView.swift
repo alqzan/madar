@@ -27,7 +27,7 @@ struct DiaryMarginView: View {
                 }
                 Spacer(minLength: 0)
                 if let another {
-                    Button(action: another) { Label("ذكرى أخرى", systemImage: "shuffle").font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).overlay { Capsule().stroke(theme.line) } }
+                    Button(action: another) { Label("ذكرى أخرى", systemImage: "shuffle").font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule) }
                         .buttonStyle(.madarPlain).accessibilityIdentifier("diary-another-memory")
                 }
             }

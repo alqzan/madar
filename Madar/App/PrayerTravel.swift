@@ -107,7 +107,7 @@ struct PrayerTravelPill: View {
             .foregroundStyle(theme.color("accentText"))
             .padding(.horizontal, 22).frame(minHeight: 44)
             .background(theme.color("goldSoft"), in: .capsule)
-            .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+            .glassEffect(.regular.interactive(), in: .capsule)
             .contentShape(Capsule())
         }
         .buttonStyle(.madarPlain)
@@ -137,7 +137,7 @@ private struct TravelSecondaryButton: View {
     var body: some View {
         Button(action: action) {
             Text(title).font(PrayerHomeType.strong)
-                .frame(maxWidth: .infinity, minHeight: 52).overlay { Capsule().stroke(theme.ink.opacity(0.18), lineWidth: 1) }
+                .frame(maxWidth: .infinity, minHeight: 52).glassEffect(.regular.interactive(), in: .capsule)
         }
         .buttonStyle(.madarPlain).accessibilityIdentifier(id)
     }

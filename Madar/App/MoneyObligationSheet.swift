@@ -198,7 +198,7 @@ struct MoneyObligationSheet: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(upcoming.enumerated()), id: \.element) { index, day in
                     HStack(alignment: .center, spacing: 12) {
-                        Circle().fill(index == 0 ? theme.color("reserve") : Color.clear).overlay { Circle().stroke(theme.color("reserve"), lineWidth: 1.2) }
+                        Circle().fill(index == 0 ? theme.color("reserve") : Color.clear).glassEffect(.regular.interactive(), in: .circle)
                             .frame(width: 10, height: 10)
                         MadarDateLabel(app.dateLabels(day), primaryFont: .custom("thmanyahsans-Bold", size: 16, relativeTo: .body), secondaryFont: MadarTypography.fine())
                         Spacer(minLength: 8)

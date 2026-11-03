@@ -37,7 +37,7 @@ struct MoneyCategoriesView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
+                        Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).glassEffect(.regular.interactive(), in: .circle)
                     }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-categories-close")
                     Text("التصنيفات والحدود").font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer()
@@ -72,7 +72,7 @@ struct MoneyCategoriesView: View {
             Spacer(minLength: 6)
             if r.autoCategorized > 0 {
                 Label(service.digits.string(r.autoCategorized) + " تصنّفت وحدها", systemImage: "checkmark").font(MadarTypography.fine()).foregroundStyle(theme.color("surplusText"))
-                    .padding(.horizontal, 10).padding(.vertical, 6).overlay { Capsule().stroke(theme.line, lineWidth: 1) }.accessibilityIdentifier("money-categories-auto")
+                    .padding(.horizontal, 10).padding(.vertical, 6).glassEffect(.regular.interactive(), in: .capsule).accessibilityIdentifier("money-categories-auto")
             }
         }
     }
@@ -142,7 +142,7 @@ struct MoneyCategoriesView: View {
                 HStack(spacing: 0) {
                     modeButton(homeCurrencyName, !percentMode, id: "amount") { percentMode = false; draftMinor = limit }
                     if r.incomeMinor > 0 { modeButton("٪ راتب", percentMode, id: "percent") { percentMode = true; draftBase = "income"; draftBp = r.incomeMinor > 0 ? min(10_000, max(1, (draftMinor * 10_000) / r.incomeMinor)) : 0 } }
-                }.overlay { Capsule().stroke(theme.color("reserve"), lineWidth: 1) }.clipShape(Capsule())
+                }.glassEffect(.regular.interactive(), in: .capsule).clipShape(Capsule())
             }
             HStack {
                 step("minus") { if percentMode { draftBp = max(100, draftBp - 100) } else { draftMinor = max(0, draftMinor - 10_000) } }
@@ -160,7 +160,7 @@ struct MoneyCategoriesView: View {
             HStack(spacing: 10) {
                 if s.limitMinor != nil {
                     Button { save(s, none: true) } label: {
-                        Text("بلا حد").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 54).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+                        Text("بلا حد").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 54).glassEffect(.regular.interactive(), in: .capsule)
                     }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-limit-none")
                 }
                 Button { save(s, none: false) } label: {
@@ -183,7 +183,7 @@ struct MoneyCategoriesView: View {
     }
     private func step(_ symbol: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.title3).frame(width: 64, height: 64).background(theme.surface, in: Circle()).overlay { Circle().stroke(theme.color("reserve"), lineWidth: 1) }
+            Image(systemName: symbol).font(.title3).frame(width: 64, height: 64).background(theme.surface, in: Circle()).glassEffect(.regular.interactive(), in: .circle)
         }.buttonStyle(.madarPlain).accessibilityLabel(symbol == "plus" ? "زد الحد" : "أنقص الحد").accessibilityIdentifier("money-limit-" + symbol)
     }
 

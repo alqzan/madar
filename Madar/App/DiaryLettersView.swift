@@ -43,7 +43,7 @@ struct DiaryLettersPanel: View {
                     MadarDateLabel("كتبتها في " + service.bothDates(letter.writtenDay) + ". لا تُفتح وحدها.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     HStack(spacing: 8) {
                         Button { opening = letter } label: { Text("افتحها الآن").frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }.accessibilityIdentifier("diary-letter-orphan-open")
-                        Button { rescheduling = letter } label: { Text("اختر موعدًا").frame(maxWidth: .infinity, minHeight: 44).overlay { Capsule().stroke(theme.line) } }.accessibilityIdentifier("diary-letter-orphan-date")
+                        Button { rescheduling = letter } label: { Text("اختر موعدًا").frame(maxWidth: .infinity, minHeight: 44).glassEffect(.regular.interactive(), in: .capsule) }.accessibilityIdentifier("diary-letter-orphan-date")
                     }.font(DiaryType.label).buttonStyle(.madarPlain)
                 }.padding(16).background(theme.surface, in: .rect(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.line) }
             }

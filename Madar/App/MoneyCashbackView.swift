@@ -69,7 +69,7 @@ struct MoneyCashbackView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Button { dismiss() } label: { Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) } }
+            Button { dismiss() } label: { Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).glassEffect(.regular.interactive(), in: .circle) }
                 .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-cashback-close")
             Text("الاسترداد النقدي").font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)).accessibilityAddTraits(.isHeader)
             Spacer()
@@ -146,7 +146,7 @@ struct MoneyCashbackView: View {
                     Text(whole(earned)).font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title2)).foregroundStyle(ink(c.tint)).lineLimit(1).minimumScaleFactor(0.6)
                 } else {
                     Text("أدخلها").font(MadarTypography.caption()).foregroundStyle(theme.color("accent")).padding(.horizontal, 10).frame(minHeight: 32)
-                        .overlay { Capsule().stroke(theme.color("accent"), lineWidth: 1) }
+                        .glassEffect(.regular.interactive(), in: .capsule)
                 }
             }.frame(minHeight: 44).contentShape(Rectangle())
         }.buttonStyle(.madarPlain)
@@ -521,7 +521,7 @@ struct MoneyCashbackRateSheet: View {
                         Button { bp = value } label: {
                             Text(service.percent(value)).font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
                                 .background(bp == value ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(bp == value ? theme.background : theme.ink)
-                                .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+                                .glassEffect(.regular.interactive(), in: .capsule)
                         }.buttonStyle(.madarPlain).accessibilityAddTraits(bp == value ? .isSelected : []).accessibilityIdentifier("money-cashback-rate-chip-" + String(value))
                     }
                 }
@@ -545,7 +545,7 @@ struct MoneyCashbackRateSheet: View {
             .accessibilityIdentifier("money-cashback-rate-sheet")
     }
     private func stepButton(_ symbol: String, label: String, id: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: symbol).font(.title3).frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
+        Button(action: action) { Image(systemName: symbol).font(.title3).frame(width: 48, height: 48).glassEffect(.regular.interactive(), in: .circle) }
             .buttonStyle(.madarPlain).accessibilityLabel(label).accessibilityIdentifier(id)
     }
     private func save(_ value: Int?) {

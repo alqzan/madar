@@ -122,7 +122,7 @@ struct QuranDrillView: View {
                 Text("نجاحان متتاليان يُغلقانه").font(font(13)).foregroundStyle(theme.secondaryInk)
                 ForEach(0..<card.mastery, id: \.self) { index in
                     Circle().fill(index < card.successStreak ? theme.accent : .clear)
-                        .overlay { Circle().stroke(theme.accent, lineWidth: 1.5) }.frame(width: 16, height: 16)
+                        .glassEffect(.regular.interactive(), in: .circle).frame(width: 16, height: 16)
                 }
             }
             .padding(.top, 14)

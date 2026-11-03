@@ -152,7 +152,7 @@ struct MoneyEnvelopesView: View {
                             .font(MadarTypography.fine()).padding(.horizontal, 10).padding(.vertical, 7)
                             .foregroundStyle(value == previewMinor ? theme.background : theme.ink)
                             .background(value == previewMinor ? theme.ink : .clear, in: .capsule)
-                            .overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) }
+                            .glassEffect(.regular.interactive(), in: .capsule)
                             .frame(minHeight: 44)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("money-reserve-preview-" + String(value))
                 }
@@ -178,7 +178,7 @@ struct MoneyEnvelopesView: View {
                 Task { do { try await app.executeMoneyCommand("money.setReserveGoal", payload: ["targetMinor": .null]); load() } catch { failure = "لم يُحفظ التغيير." } }
             }
             mode("بهدف", selected: reading.reserveTargetMinor != nil, id: "goal") { targetOpen = true }
-        }.overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) }.fixedSize()
+        }.glassEffect(.regular.interactive(), in: .capsule).fixedSize()
     }
     private func mode(_ text: String, selected: Bool, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Text(text).font(MadarTypography.fine()).padding(.horizontal, 13).padding(.vertical, 8).foregroundStyle(selected ? theme.background : theme.ink).background(selected ? theme.ink : .clear, in: .capsule).frame(minHeight: 44) }

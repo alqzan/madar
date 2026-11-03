@@ -17,7 +17,7 @@ struct MoneyShortcutGuideView: View {
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 18) {
-            HStack { Text("رسائل البنك إلى مدار").font(MadarTypography.title()); Spacer(); Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText")) } }.accessibilityIdentifier("money-guide-close") }
+            HStack { Text("رسائل البنك إلى مدار").font(MadarTypography.title()); Spacer(); Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.accessibilityIdentifier("money-guide-close") }
             Text("تُعدّها مرة لكل بنك").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("reserveText"))
             Text("مدار لا يقرأ صندوق رسائلك. أنت تختار الرسائل التي تمرّرها من تطبيق الاختصارات.").font(MadarTypography.body())
             step(1, "افتح أتمتة الرسائل", icon: "bolt.badge.clock", chips: ["الاختصارات", "أتمتة", "الرسالة"], detail: "أنشئ تحكمًا تلقائيًا شخصيًا جديدًا واختر وصول رسالة.")
@@ -44,7 +44,7 @@ struct MoneyShortcutGuideView: View {
     }
     private func step(_ n: Int, _ title: String, icon: String, chips: [String], detail: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack { Text(app.digits(n)).font(MadarTypography.cardTitle()).frame(width: 38, height: 38).overlay { Circle().stroke(theme.color("reserveText")) }; Text(title).font(MadarTypography.section()); Spacer(); Image(systemName: icon).font(.title2).foregroundStyle(theme.color("reserveText")) }
+            HStack { Text(app.digits(n)).font(MadarTypography.cardTitle()).frame(width: 38, height: 38).glassEffect(.regular.interactive(), in: .circle); Text(title).font(MadarTypography.section()); Spacer(); Image(systemName: icon).font(.title2).foregroundStyle(theme.color("reserveText")) }
             ForEach(chips, id: \.self) { text in HStack { Image(systemName: "chevron.down").font(.caption); Text(text).font(MadarTypography.body()); Spacer() }.padding(10).background(theme.background, in: RoundedRectangle(cornerRadius: 8)) }
             Text(detail).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         }.padding(16).background(theme.surface, in: RoundedRectangle(cornerRadius: 16))

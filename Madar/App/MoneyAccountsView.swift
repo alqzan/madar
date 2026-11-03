@@ -27,7 +27,7 @@ struct MoneyAccountsView: View {
         ScrollView {
             VStack(spacing: 12) {
                 HStack {
-                    Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("إغلاق").accessibilityIdentifier("money-accounts-close")
+                    Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.accessibilityLabel("إغلاق").accessibilityIdentifier("money-accounts-close")
                     Text("الحسابات").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer()
                     Button(action: addAccount) { Image(systemName: "plus").frame(width: 44, height: 44) }.accessibilityLabel("أضف حسابًا").accessibilityIdentifier("money-accounts-add")
                 }
@@ -66,7 +66,7 @@ struct MoneyAccountsView: View {
                         Label(r.shortcutAt == nil ? "لم تصل رسالة عبر الاختصار بعد" : "رسائل عبر الاختصار", systemImage: r.shortcutAt == nil ? "tray" : "checkmark.circle").font(MadarTypography.caption())
                         Spacer(minLength: 0)
                         if r.shortcutCount > 0 { Text(service.counted(r.shortcutCount, ("وصلت رسالة واحدة", "وصلت رسالتان", "رسائل وصلت", "رسالةً وصلت"))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
-                    }.padding(14).frame(maxWidth: .infinity).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+                    }.padding(14).frame(maxWidth: .infinity).glassEffect(.regular.interactive(), in: .capsule)
                 } else if let errorMessage {
                     Text(errorMessage).accessibilityIdentifier("money-accounts-read-error")
                     Button("أعِد المحاولة", action: load).accessibilityIdentifier("money-accounts-retry")

@@ -22,7 +22,7 @@ struct DiaryProjectsPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) { Text("المشاريع").font(DiaryType.heading); Text("ما تبنيه على مهل، وسطورك عنه").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
-            Button { creating = true } label: { Label("مشروع جديد", systemImage: "plus").font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 46).overlay { Capsule().stroke(theme.line) } }
+            Button { creating = true } label: { Label("مشروع جديد", systemImage: "plus").font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule) }
                 .buttonStyle(.madarPlain).accessibilityIdentifier("diary-project-new")
             if let failure {
                 Text(failure).font(MadarTypography.body()).accessibilityIdentifier("diary-project-read-error")
@@ -190,7 +190,7 @@ struct DiaryProjectDetail: View {
                                 Text("أنهِ المشروع").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
                             }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("diary-project-finish-confirm")
                         } else {
-                            Button { finishing = true } label: { Text("أنهِ المشروع").font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 46).overlay { Capsule().stroke(theme.line) } }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-project-finish")
+                            Button { finishing = true } label: { Text("أنهِ المشروع").font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-project-finish")
                         }
                     }
                     Button(role: .destructive) { guard !saving else { return }; confirmDelete = true } label: { Text("احذف المشروع").font(DiaryType.label).frame(minHeight: 44) }.disabled(saving).accessibilityIdentifier("diary-project-delete")

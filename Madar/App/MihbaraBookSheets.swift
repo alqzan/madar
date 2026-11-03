@@ -219,7 +219,7 @@ struct MihbaraAddBookView: View {
                                 .font(MadarTypography.fine())
                                 .padding(.horizontal, 11).padding(.vertical, 8)
                                 .background(theme.surface, in: .capsule)
-                                .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+                                .glassEffect(.regular.interactive(), in: .capsule)
                         }
                     }
                     Text("كل كتاب يبقى على جهازك ويُقرأ بلا إنترنت؛ البحث في تراث وحده يحتاج الاتصال. راجع معاينته قبل إضافته إلى رفّك.")

@@ -63,11 +63,11 @@ struct HabitsRoomView: View {
     var body: some View {
         VStack(spacing:0) {
             HStack {
-                Button { dismiss() } label: { Label("البهو",systemImage:"chevron.right").font(MadarTypography.section()).padding(12).overlay { Capsule().stroke(theme.line) } }.buttonStyle(.madarPlain)
+                Button { dismiss() } label: { Label("البهو",systemImage:"chevron.right").font(MadarTypography.section()).padding(12).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain)
                 Spacer()
                 VStack(spacing:2) { Text("العادات").font(.custom("thmanyahserifdisplay-Bold",size:26,relativeTo:.title)).accessibilityIdentifier("habits-title"); MadarDateLabel(session.dateLabels(today,weekday:true),primaryFont:MadarTypography.fine(),secondaryFont:MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                 Spacer()
-                Button { editor = .init(id:UUID()) } label: { Image(systemName:"plus").frame(width:44,height:44).overlay { Circle().stroke(theme.line) } }.buttonStyle(.madarPlain).accessibilityLabel("عادة جديدة").accessibilityIdentifier("habit-add")
+                Button { editor = .init(id:UUID()) } label: { Image(systemName:"plus").frame(width:44,height:44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("عادة جديدة").accessibilityIdentifier("habit-add")
             }.padding(.horizontal,14).padding(.vertical,8)
             ScrollView {
                 VStack(alignment:.leading,spacing:8) {

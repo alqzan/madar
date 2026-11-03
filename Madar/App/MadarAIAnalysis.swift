@@ -587,7 +587,7 @@ struct MadarAIAnalysisSheet: View {
                 ForEach(suggestions, id: \.self) { suggestion in
                     Button(suggestion) { question = suggestion }
                         .font(MadarTypography.fine()).padding(.horizontal, 12).frame(minHeight: 38)
-                        .background(themeSurface, in: Capsule()).overlay { Capsule().stroke(theme.line) }
+                        .background(themeSurface, in: Capsule()).glassEffect(.regular.interactive(), in: .capsule)
                         .buttonStyle(.plain)
                 }
             }.padding(.vertical, 2)

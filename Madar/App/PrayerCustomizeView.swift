@@ -208,7 +208,7 @@ struct PrayerCustomizeView: View {
                 .submitLabel(.search).accessibilityIdentifier("prayer-customize-search")
         }
         .padding(.horizontal, 18).frame(minHeight: 52)
-        .overlay { Capsule().stroke(theme.ink.opacity(0.12), lineWidth: 1) }
+        .glassEffect(.regular.interactive(), in: .capsule)
     }
 
     private func card<Body: View>(_ id: String, title: String, subtitle: String, symbol: String, highlighted: Bool = false, @ViewBuilder body: () -> Body) -> some View {

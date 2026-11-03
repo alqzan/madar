@@ -237,7 +237,7 @@ struct DiaryHubView: View {
                     }
                 }
                 .padding(2)
-                .overlay { Capsule().stroke(theme.line) }
+                .glassEffect(.regular.interactive(), in: .capsule)
             }.buttonStyle(.madarPlain)
             if let month {
                 monthPage(archive, month: month)

@@ -46,7 +46,7 @@ struct BahwCustomizePreview: View {
                     Text("افتح البهو").font(MadarTypography.section()).padding(.horizontal, 20).frame(minHeight: 48).foregroundStyle(lobby.onAccent).background(lobby.ink, in: .capsule)
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-custom-open-lobby")
                 Button { reset() } label: {
-                    Text("أعِد الافتراضي").font(MadarTypography.section()).padding(.horizontal, 18).frame(minHeight: 48).overlay { Capsule().stroke(lobby.line) }
+                    Text("أعِد الافتراضي").font(MadarTypography.section()).padding(.horizontal, 18).frame(minHeight: 48).glassEffect(.regular.interactive(), in: .capsule)
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("reset-settings")
                 Spacer(minLength: 0)
             }

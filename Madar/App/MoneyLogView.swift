@@ -35,10 +35,10 @@ struct MoneyLogView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 12) {
-                    Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-log-close")
+                    Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-log-close")
                     Text("السجل").font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer()
-                    Button { calendarMode.toggle() } label: { Image(systemName: calendarMode ? "book.pages" : "calendar").frame(width: 44, height: 44).background(calendarMode ? theme.ink : Color.clear, in: Circle()).foregroundStyle(calendarMode ? theme.background : theme.ink).overlay { Circle().stroke(theme.line, lineWidth: 1) } }.buttonStyle(.madarPlain).accessibilityLabel(calendarMode ? "رواق الأيام" : "الشهر أقواسًا").accessibilityIdentifier("money-log-mode")
+                    Button { calendarMode.toggle() } label: { Image(systemName: calendarMode ? "book.pages" : "calendar").frame(width: 44, height: 44).background(calendarMode ? theme.ink : Color.clear, in: Circle()).foregroundStyle(calendarMode ? theme.background : theme.ink).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel(calendarMode ? "رواق الأيام" : "الشهر أقواسًا").accessibilityIdentifier("money-log-mode")
                 }.padding(.top, 8)
                 if let reading {
                     if initialRouteMissing {
@@ -59,12 +59,12 @@ struct MoneyLogView: View {
                         }
                     }.scrollIndicators(.hidden)
                     if searching || !query.isEmpty {
-                        HStack(spacing: 8) { Image(systemName: "magnifyingglass"); TextField("التاجر أو المبلغ", text: $query).font(MadarTypography.body()).focused($searchFocused).submitLabel(.search).onSubmit { searchFocused = false }.autocorrectionDisabled().accessibilityIdentifier("money-log-search"); Button { query = ""; searching = false; searchFocused = false } label: { Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("مسح البحث") }.padding(.horizontal, 12).frame(minHeight: 44).background(theme.surface, in: Capsule()).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+                        HStack(spacing: 8) { Image(systemName: "magnifyingglass"); TextField("التاجر أو المبلغ", text: $query).font(MadarTypography.body()).focused($searchFocused).submitLabel(.search).onSubmit { searchFocused = false }.autocorrectionDisabled().accessibilityIdentifier("money-log-search"); Button { query = ""; searching = false; searchFocused = false } label: { Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("مسح البحث") }.padding(.horizontal, 12).frame(minHeight: 44).background(theme.surface, in: Capsule()).glassEffect(.regular.interactive(), in: .capsule)
                     }
                     HStack(spacing: 7) {
-                        Button { searching = true; searchFocused = true } label: { Label("بحث", systemImage: "magnifyingglass").font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.madarPlain).accessibilityIdentifier("money-log-search-open")
+                        Button { searching = true; searchFocused = true } label: { Label("بحث", systemImage: "magnifyingglass").font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-log-search-open")
                         ScrollView(.horizontal) {
-                            HStack(spacing: 7) { ForEach(reading.filters) { f in Button { filter = f.id } label: { Text(f.title).font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).background(filter == f.id ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(filter == f.id ? theme.background : theme.ink).overlay { Capsule().stroke(theme.line, lineWidth: 1) } }.buttonStyle(.madarPlain).accessibilityIdentifier("money-log-filter-" + f.id) } }
+                            HStack(spacing: 7) { ForEach(reading.filters) { f in Button { filter = f.id } label: { Text(f.title).font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).background(filter == f.id ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(filter == f.id ? theme.background : theme.ink).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-log-filter-" + f.id) } }
                         }.scrollIndicators(.hidden)
                     }
                     if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-log-reveal") }

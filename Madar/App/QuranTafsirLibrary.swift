@@ -392,7 +392,7 @@ struct QuranTafsirLibraryView: View {
             }
         }
         .padding(.horizontal, 16).background(theme.surface, in: Capsule())
-        .overlay { Capsule().stroke(theme.line) }
+        .glassEffect(.regular.interactive(), in: .capsule)
     }
 
     private var remoteBooks: some View {

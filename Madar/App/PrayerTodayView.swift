@@ -426,7 +426,7 @@ struct PrayerTodayView: View {
             NavigationLink { PrayerCustomizeView(session: session) } label: {
                 Image(systemName: "slider.horizontal.3").font(.system(size: 17))
                     .frame(width: 48, height: 48)
-                    .overlay { Circle().stroke(theme.ink.opacity(0.14), lineWidth: 1) }
+                    .glassEffect(.regular.interactive(), in: .circle)
                     .contentShape(Circle())
             }
             .buttonStyle(.madarPlain).accessibilityLabel("خصّص الصلاة").accessibilityIdentifier("prayer-customize")
@@ -449,7 +449,7 @@ struct PrayerTodayView: View {
             .foregroundStyle(theme.color("accentText"))
             .padding(.horizontal, 22).frame(minHeight: 44)
             .background(theme.color("goldSoft"), in: .capsule)
-            .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+            .glassEffect(.regular.interactive(), in: .capsule)
         }
         .buttonStyle(.madarPlain)
         .accessibilityLabel("جمعة مباركة، افتح سورة الكهف")
@@ -995,7 +995,7 @@ private struct PrayerTodayLogSheet: View {
             if routePrefilled, !recorded, let selected, selected != .missed {
                 Button("احفظ التسجيل") { record(selected, kind: cell.isFriday ? (selected == .alone ? .dhuhr : fridayKind) : nil) }
                     .buttonStyle(.madarPlain).frame(maxWidth: .infinity, minHeight: 48)
-                    .overlay { Capsule().stroke(theme.accent, lineWidth: 1) }
+                    .glassEffect(.regular.interactive(), in: .capsule)
                     .padding(.top, 10).accessibilityIdentifier("prayer-log-prefill-save")
             }
             if selected == .missed { missedPanel.padding(.top, 14) }
@@ -1498,7 +1498,7 @@ private struct PrayerNightLoggingSheet: View {
                             Image(systemName: "chevron.forward").font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.secondaryInk)
                         }
                         .padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: 50)
-                        .overlay { Capsule().stroke(theme.ink.opacity(0.14), lineWidth: 1) }.contentShape(.capsule)
+                        .glassEffect(.regular.interactive(), in: .capsule).contentShape(.capsule)
                     }
                     .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-quran-qiyam")
                 }
@@ -1568,7 +1568,7 @@ private struct PrayerNightLoggingSheet: View {
     private func stepButton(_ symbol: String, id: String, disabled: Bool, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 17, weight: .medium)).frame(width: 52, height: 52)
-                .overlay { Circle().stroke(theme.ink.opacity(0.14), lineWidth: 1) }.contentShape(Circle())
+                .glassEffect(.regular.interactive(), in: .circle).contentShape(Circle())
         }
         .buttonStyle(.madarPlain).opacity(disabled ? 0.35 : 1).disabled(disabled)
         .accessibilityLabel(label).accessibilityIdentifier(id)

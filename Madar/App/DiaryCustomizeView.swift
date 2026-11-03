@@ -73,7 +73,7 @@ struct DiaryCustomizeView: View {
                 HStack {
                     Image(systemName: "magnifyingglass")
                     TextField("ابحث: الهجري، الهامش، الصورة…", text: $query).font(MadarTypography.body()).accessibilityIdentifier("diary-customize-search")
-                }.padding(16).background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line) }
+                }.padding(16).background(theme.surface, in: .capsule).glassEffect(.regular.interactive(), in: .capsule)
                 if matches("الرئيسية ترتيب الواجهة النافذة الأصداء الهامش") { homeCard }
                 ForEach(groups, id: \.0) { group in
                     let definitions = app.schema.settings.filter { group.3.contains($0.key) && matches(group.1 + " " + $0.title) }
@@ -166,7 +166,7 @@ struct DiaryCustomizeView: View {
     }
     @ViewBuilder private var previewButtons: some View {
         Button { dismiss() } label: { Text("افتح المذكرات").font(MadarTypography.caption()).padding(.horizontal, 13).frame(minHeight: 44).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-customize-open")
-        Button { confirmReset = true } label: { Text("أعِد الافتراضي").font(MadarTypography.caption()).padding(.horizontal, 10).frame(minHeight: 44).overlay { Capsule().stroke(theme.line) } }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-customize-reset")
+        Button { confirmReset = true } label: { Text("أعِد الافتراضي").font(MadarTypography.caption()).padding(.horizontal, 10).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-customize-reset")
     }
     private var visiblePartsText: String { let n = visibleOrder.count; return n == 1 ? "جزء واحد ظاهر" : n == 2 ? "جزءان ظاهران" : app.digits(n) + ((3...10).contains(n % 100) ? " أجزاء ظاهرة" : " جزءًا ظاهرًا") }
     private func previewLine(_ title: String, _ value: String) -> some View { HStack { Text(title).foregroundStyle(theme.color("ink3Text")); Spacer(minLength: 5); Text(value) }.font(DiaryType.label) }

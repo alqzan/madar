@@ -37,7 +37,7 @@ struct MoneyBigExpenseView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
-                        Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.madarWaitsForSave().accessibilityLabel("إغلاق").accessibilityIdentifier("money-big-close")
+                        Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.madarWaitsForSave().accessibilityLabel("إغلاق").accessibilityIdentifier("money-big-close")
                         Text("مصروف كبير").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer()
                     }
                     if let r = reading {
@@ -98,7 +98,7 @@ struct MoneyBigExpenseView: View {
     }
     private func title(_ m: BigExpense.Mode) -> String { switch m { case .mixed: "المزيج"; case .installments: "كله على دورات"; case .daily: "كله من يومي الآن"; case .reserve: "من الاحتياطي" } }
     private func envelopeChip(_ text: String, selected: Bool) -> some View {
-        Text(text).font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 40).background(selected ? theme.ink : .clear).foregroundStyle(selected ? theme.background : theme.ink).clipShape(.capsule).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) }
+        Text(text).font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 40).background(selected ? theme.ink : .clear).foregroundStyle(selected ? theme.background : theme.ink).clipShape(.capsule).glassEffect(.regular.interactive(), in: .capsule)
     }
     private func distribution(_ p: BigExpense.Plan, amount total: Int) -> some View {
         let parts: [(String, Int, Color)] = [("من رصيد دورتك", p.dailyMinor, theme.color("surplus")), ("من الفائض", p.surplusMinor, theme.color("reserve")), (envelopeID == nil ? "من يومك القادم" : "من المظروف", p.futureMinor, theme.color("accent")), ("من الاحتياطي", p.reserveMinor, theme.color("reserve"))].filter { $0.1 > 0 }

@@ -281,7 +281,7 @@ struct DiaryDayView: View {
                                             .font(DiaryType.label).foregroundStyle(theme.accent)
                                             .padding(.horizontal, 18).padding(.vertical, 12)
                                             .background(theme.surface.opacity(0.82), in: Capsule())
-                                            .overlay { Capsule().stroke(theme.line, lineWidth: 0.8) }
+                                            .glassEffect(.regular.interactive(), in: .capsule)
                                     }
                                     .buttonStyle(.madarPlain)
                                     .padding(.horizontal, 18).padding(.top, 8)
@@ -365,7 +365,7 @@ struct DiaryDayView: View {
                                 stampsOpen = true
                             } label: {
                                 Text("الأختام").font(DiaryType.label).frame(minHeight: 54).padding(.horizontal, 18)
-                                    .overlay { Capsule().stroke(theme.line) }
+                                    .glassEffect(.regular.interactive(), in: .capsule)
                             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-stamps-open")
                         }
                     }.padding(.horizontal, 18).padding(.vertical, 8).background(theme.background)
@@ -573,7 +573,7 @@ struct DiaryDayView: View {
                             row.result == value ? theme.background : theme.ink
                         ).background(
                             row.result == value ? (theme.dark ? theme.accent : theme.ink) : .clear, in: .capsule
-                        ).overlay { Capsule().stroke(theme.line) }
+                        ).glassEffect(.regular.interactive(), in: .capsule)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-niyya-inline-" + value)
                         .accessibilityAddTraits(row.result == value ? .isSelected : [])
                 }
@@ -681,7 +681,7 @@ struct DiaryDayView: View {
                     } label: {
                         Text("يتعلّق بـ«" + project.name + "»؟").font(DiaryType.label).padding(.horizontal, 10).frame(
                             minHeight: 30
-                        ).overlay { Capsule().stroke(theme.line) }
+                        ).glassEffect(.regular.interactive(), in: .capsule)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-line-project-suggest")
                 }
                 if let first = page.originals[line.id] {

@@ -75,7 +75,7 @@ struct MoneyMessagesView: View {
                 #endif
             Button { dismiss() } label: {
                 Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52)
-                    .overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
+                    .glassEffect(.regular.interactive(), in: .circle)
             }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-messages-close")
             Spacer()
         }.padding(.top, 8)
@@ -116,7 +116,7 @@ struct MoneyMessagesView: View {
         let palette = ["reserveText", "bills", "surplusText", "accent"]
         let tint = theme.color(palette[abs(sender.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }) % palette.count])
         return Text(letter).font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .headline)).foregroundStyle(tint)
-            .frame(width: 40, height: 40).background(tint.opacity(0.1), in: .circle).overlay { Circle().stroke(tint, lineWidth: 1.2) }
+            .frame(width: 40, height: 40).background(tint.opacity(0.1), in: .circle).glassEffect(.regular.interactive(), in: .circle)
             .accessibilityHidden(true)
     }
     /// RU1: «·» never touches a digit.
@@ -253,7 +253,7 @@ struct MoneyMessagesView: View {
                             .buttonStyle(.madarPlain).accessibilityLabel("اعتمد " + d.title).accessibilityIdentifier("money-draft-confirm")
                     }
                     Button { run("money.deleteTransaction", ["id": .string(d.id.uuidString)]) } label: {
-                        Image(systemName: "xmark").font(.body).foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44).overlay { Circle().stroke(theme.line, lineWidth: 1.2) }
+                        Image(systemName: "xmark").font(.body).foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
                     }.buttonStyle(.madarPlain).accessibilityLabel("احذف " + d.title).accessibilityIdentifier("money-draft-delete")
                 }.environment(\.layoutDirection, .leftToRight)
                 if deleteFailureID == d.id {
@@ -280,7 +280,7 @@ struct MoneyMessagesView: View {
                     }
                     Spacer(minLength: 6)
                     Button { run("money.ignoreMessage", ["id": .string(item.id.uuidString)]) } label: {
-                        Text("تجاهل").font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+                        Text("تجاهل").font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("money-look-ignore")
                 }.padding(12).background(theme.surface.opacity(0.6))
             }

@@ -37,11 +37,11 @@ struct MoneyCardsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
-                    Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
+                    Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                         .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-cards-close")
                     Text("البطاقات").font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer()
-                    Button { adding = true } label: { Image(systemName: "plus").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
+                    Button { adding = true } label: { Image(systemName: "plus").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                         .buttonStyle(.madarPlain).accessibilityLabel("أضف بطاقة").accessibilityIdentifier("money-cards-add")
                 }.padding(.top, 8)
                 if routeTargetUnavailable {
@@ -90,7 +90,7 @@ struct MoneyCardsView: View {
                         .background(tab == name ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(tab == name ? theme.background : theme.ink)
                 }.buttonStyle(.madarPlain).accessibilityAddTraits(tab == name ? .isSelected : []).accessibilityIdentifier("money-cards-tab-" + name)
             }
-        }.padding(3).background(theme.surface, in: Capsule()).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+        }.padding(3).background(theme.surface, in: Capsule()).glassEffect(.regular.interactive(), in: .capsule)
     }
     private func miniature(_ c: MoneyCardReading) -> some View {
         let active = card?.id == c.id
@@ -160,7 +160,7 @@ struct MoneyCardsView: View {
                         Button { minimum = option } label: { Text(option ? "الحد الأدنى" : "كامل").font(MadarTypography.caption()).bold().padding(.horizontal, 16).frame(minHeight: 44).background(minimum == option ? theme.ink : Color.clear).foregroundStyle(minimum == option ? theme.background : theme.ink).contentShape(Rectangle()) }
                             .buttonStyle(.madarPlain).accessibilityAddTraits(minimum == option ? .isSelected : [])
                     }
-                }.clipShape(Capsule()).overlay { Capsule().stroke(theme.ink, lineWidth: 1) }.accessibilityElement(children: .contain).accessibilityLabel("كيف تسدّد").accessibilityIdentifier("money-card-payment-choice") }
+                }.clipShape(Capsule()).glassEffect(.regular.interactive(), in: .capsule).accessibilityElement(children: .contain).accessibilityLabel("كيف تسدّد").accessibilityIdentifier("money-card-payment-choice") }
                 if minimum {
                     let unpaid = max(0, c.billedMinor - (c.minimumMinor ?? 0))
                     Text("يبقى عليك " + amount(unpaid)).font(MadarTypography.body())
@@ -180,7 +180,7 @@ struct MoneyCardsView: View {
             if c.purchases.isEmpty { Text("لا حركات مؤكّدة في هذه الفترة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
             ForEach(c.purchases) { movement($0) }
             if let best = reading?.cards.filter({ $0.kind == "credit" && $0.graceDays != nil }).max(by: { ($0.graceDays ?? 0) < ($1.graceDays ?? 0) }), let grace = best.graceDays {
-                Button { tab = "متى يخرج النقد" } label: { HStack { Text("للشراء اليوم: " + best.name); Spacer(); Text("مهلة " + service.days(grace) + " تقريبًا") }.font(MadarTypography.caption()).padding(16).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) }.contentShape(.rect) }.buttonStyle(.madarPlain)
+                Button { tab = "متى يخرج النقد" } label: { HStack { Text("للشراء اليوم: " + best.name); Spacer(); Text("مهلة " + service.days(grace) + " تقريبًا") }.font(MadarTypography.caption()).padding(16).glassEffect(.regular.interactive(), in: .capsule).contentShape(.rect) }.buttonStyle(.madarPlain)
             }
         }
     }
@@ -255,7 +255,7 @@ struct MoneyCardsView: View {
             HStack {
                 Text("مبلغ الشراء").font(MadarTypography.caption()); Spacer()
                 ForEach([50_000, 200_000, 800_000], id: \.self) { value in
-                    Button { purchaseMinor = value } label: { Text(figure: amount(value)).font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).background(purchaseMinor == value ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(purchaseMinor == value ? theme.background : theme.ink).overlay { Capsule().stroke(theme.line, lineWidth: 1) } }.buttonStyle(.madarPlain)
+                    Button { purchaseMinor = value } label: { Text(figure: amount(value)).font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).background(purchaseMinor == value ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(purchaseMinor == value ? theme.background : theme.ink).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain)
                 }
             }
             let best = r.cards.filter { $0.kind == "credit" && $0.graceDays != nil }.max { ($0.graceDays ?? 0) < ($1.graceDays ?? 0) }?.id

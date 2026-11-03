@@ -259,7 +259,7 @@ struct DiaryHomeView: View {
             }.frame(maxWidth: .infinity, alignment: .leading)
             Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
             Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("أيامك").accessibilityIdentifier("diary-days")
-            Button { customizing = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).overlay { Circle().stroke(theme.line) } }
+            Button { customizing = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                 .buttonStyle(.madarPlain).accessibilityLabel("خصّص المذكرات").accessibilityIdentifier("diary-customize")
         }.padding(.vertical, 4)
     }
@@ -352,7 +352,7 @@ struct DiaryHomeView: View {
                 HStack(alignment: .top, spacing: 12) {
                     // The thread that ties the years: a bead per year, the line running on to the next card.
                     VStack(spacing: 0) {
-                        Circle().fill(index == 0 ? theme.accent : theme.surface).overlay { Circle().stroke(theme.accent, lineWidth: 1.5) }.frame(width: 11, height: 11).padding(.top, 22)
+                        Circle().fill(index == 0 ? theme.accent : theme.surface).glassEffect(.regular.interactive(), in: .circle).frame(width: 11, height: 11).padding(.top, 22)
                         if index < pages.count - 1 { Rectangle().fill(theme.line).frame(width: 1.5).frame(maxHeight: .infinity) }
                     }.frame(width: 12).accessibilityHidden(true)
                     yearCard(page, snapshot: snapshot).padding(.bottom, 12)
@@ -472,9 +472,9 @@ struct DiaryHomeView: View {
                     VStack(alignment: .leading, spacing: 3) { Text("صفحة اليوم").font(MadarTypography.section()); Text(day.excerpt).font(DiaryType.label).lineLimit(1) }
                         .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-today")
-                Button { editor = .init(margin: nil) } label: { Image(systemName: "plus").frame(width: 44, height: 44).overlay { Circle().stroke(theme.line) } }
+                Button { editor = .init(margin: nil) } label: { Image(systemName: "plus").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                     .buttonStyle(.madarPlain).accessibilityLabel("اكتب في صفحة اليوم").accessibilityIdentifier("diary-write")
-            }.padding(.horizontal, 12).background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line) }
+            }.padding(.horizontal, 12).background(theme.surface, in: .capsule).glassEffect(.regular.interactive(), in: .capsule)
             Button { editor = .init(margin: target) } label: {
                 Label("اكتب في هامشها", systemImage: "pencil").font(MadarTypography.caption()).padding(.horizontal, 15).frame(minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-add-margin")
@@ -485,7 +485,7 @@ struct DiaryHomeView: View {
             Button { reader = day.day } label: {
                 VStack(alignment: .leading, spacing: 2) { Text("صفحة اليوم").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)); Text(day.lines.isEmpty ? "اكتب سطرك الأول" : "آخرها " + service.time(day.lines.last!.at)).font(DiaryType.label) }
                     .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading).padding(.horizontal, 18)
-                    .background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+                    .background(theme.surface, in: .capsule).glassEffect(.regular.interactive(), in: .capsule)
             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-today")
             Button { editor = .init(margin: nil) } label: { Label("اكتب", systemImage: "pencil").font(MadarTypography.section()).padding(.horizontal, 22).frame(minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }
                 .buttonStyle(.madarPlain).accessibilityIdentifier("diary-write")

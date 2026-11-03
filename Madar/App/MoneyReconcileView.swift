@@ -88,7 +88,7 @@ struct MoneyReconcileView: View {
 
     private var header: some View {
         HStack(spacing: 14) {
-            Button { dismiss() } label: { Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) } }.madarWaitsForSave()
+            Button { dismiss() } label: { Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).glassEffect(.regular.interactive(), in: .circle) }.madarWaitsForSave()
                 .buttonStyle(.madarPlain).glassEffect(.regular.interactive(), in: Circle())
                 .disabled(saving).accessibilityLabel("إغلاق").accessibilityIdentifier("money-reconcile-close")
             Text("المطابقة مع البنك").font(.custom("thmanyahserifdisplay-Bold", size: 27, relativeTo: .title)).accessibilityAddTraits(.isHeader)
@@ -140,7 +140,7 @@ struct MoneyReconcileView: View {
         } label: {
             HStack(spacing: 10) {
                 Text(String(r.name.prefix(1))).font(.custom("thmanyahserifdisplay-Bold", size: 15, relativeTo: .body)).foregroundStyle(theme.color("accentText"))
-                    .frame(width: 32, height: 32).overlay { Circle().stroke(theme.color("accent"), lineWidth: 1.2) }
+                    .frame(width: 32, height: 32).glassEffect(.regular.interactive(), in: .circle)
                 Text(r.name).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.7)
                 Spacer(minLength: 6)
                 Text(r.side == .account ? "حساب، يقارن النقد" : r.side == .creditCard ? "بطاقة، تقارن الدين" : "تقسيط، يقارن رصيد المزود")

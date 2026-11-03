@@ -309,7 +309,7 @@ private struct FlowChips: View {
             ForEach(items, id: \.self) { item in
                 Button { action(item) } label: {
                     Text(item).font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 40)
-                        .background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+                        .background(theme.surface, in: .capsule).glassEffect(.regular.interactive(), in: .capsule)
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-turath-suggestion-\(item)")
             }
         }

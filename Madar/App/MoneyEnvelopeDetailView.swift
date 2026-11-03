@@ -41,8 +41,8 @@ struct MoneyEnvelopeDetailView: View {
                             Label { Text("تدّخر \(Text(figure: amount(reading.savingMinor)).font(MadarTypography.cardTitle())) من كل راتب") } icon: { Image(systemName: "diamond.fill").foregroundStyle(theme.color("reserveText")) }.font(MadarTypography.body()).accessibilityLabel("تدّخر " + amount(reading.savingMinor) + " من كل راتب").accessibilityIdentifier("money-envelope-saving-value")
                             Spacer(minLength: 0)
                             if visible && reading.savingPlanID != nil {
-                                Button { savingAdd = false; savingOpen = true } label: { Image(systemName: "minus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("قلّل ادخار المظروف").buttonStyle(.madarPlain)
-                                Button { savingAdd = true; savingOpen = true } label: { Image(systemName: "plus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("زد ادخار المظروف").accessibilityIdentifier("money-envelope-saving-add").buttonStyle(.madarPlain)
+                                Button { savingAdd = false; savingOpen = true } label: { Image(systemName: "minus").frame(width: 48, height: 48).glassEffect(.regular.interactive(), in: .circle) }.accessibilityLabel("قلّل ادخار المظروف").buttonStyle(.madarPlain)
+                                Button { savingAdd = true; savingOpen = true } label: { Image(systemName: "plus").frame(width: 48, height: 48).glassEffect(.regular.interactive(), in: .circle) }.accessibilityLabel("زد ادخار المظروف").accessibilityIdentifier("money-envelope-saving-add").buttonStyle(.madarPlain)
                             }
                         }
                     }
@@ -89,7 +89,7 @@ struct MoneyEnvelopeDetailView: View {
             }.font(MadarTypography.body()).foregroundStyle(theme.color("debt")).accessibilityIdentifier("money-detail-debt")
             Spacer(minLength: 8)
             Button(reading.repayment?.nextMinor != nil ? "غيّر الخطة" : "سدّه على " + salariesText(suggestedSalaries(reading))) { repayOpen = true }
-                .font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44).overlay { Capsule().stroke(theme.color("debt"), lineWidth: 1.2) }.foregroundStyle(theme.color("debt")).accessibilityIdentifier("money-repay-open")
+                .font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule).foregroundStyle(theme.color("debt")).accessibilityIdentifier("money-repay-open")
         }
     }
     /// The salaries that land before the envelope's due date (1…6); with no date, three.
@@ -170,7 +170,7 @@ struct MoneyRepaymentView: View {
                         Button { salaries = count } label: {
                             Text(service.digits.string(count)).font(MadarTypography.cardTitle()).frame(width: 40, height: 40)
                                 .foregroundStyle(salaries == count ? theme.background : theme.ink).background(salaries == count ? theme.ink : .clear, in: .circle)
-                                .overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) }.frame(maxWidth: .infinity)
+                                .glassEffect(.regular.interactive(), in: .circle).frame(maxWidth: .infinity)
                         }.buttonStyle(.madarPlain).accessibilityIdentifier("money-repay-count-\(count)").accessibilityAddTraits(salaries == count ? .isSelected : [])
                     }
                 }

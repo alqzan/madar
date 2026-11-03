@@ -45,7 +45,7 @@ struct MoneyObligationsView: View {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
+                        Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).glassEffect(.regular.interactive(), in: .circle)
                     }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-obligations-close")
                     Text("الالتزامات").font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer()

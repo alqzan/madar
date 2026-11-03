@@ -29,7 +29,7 @@ struct MoneySinceView: View {
                 HStack(spacing: 12) {
                     Text("منذ آخر زيارة").font(MadarTypography.cardTitle()).accessibilityIdentifier("money-since-title")
                     Button(action: { finish() }) {
-                        Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
+                        Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).glassEffect(.regular.interactive(), in: .circle)
                     }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-since-close").disabled(finishing)
                     Spacer()
                 }.padding(.top, 8)

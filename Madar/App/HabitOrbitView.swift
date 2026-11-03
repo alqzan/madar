@@ -52,7 +52,7 @@ struct HabitOrbitView:View {
                     if let phase = nowPositions[f] {
                         let angle = (phase * 360 - 90) * Double.pi / 180
                         Circle().fill(theme.ink).frame(width: 6, height: 6)
-                            .overlay { Circle().stroke(theme.surface, lineWidth: 1) }
+                            .glassEffect(.regular.interactive(), in: .circle)
                             .position(x: centre.x + cos(angle) * radius, y: centre.y + sin(angle) * radius)
                             .accessibilityHidden(true)
                     }

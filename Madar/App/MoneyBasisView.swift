@@ -92,7 +92,7 @@ struct MoneyPageHeader: View {
         HStack {
             Text(title).font(MadarTypography.title())
             Spacer()
-            Button(action: close) { Image(systemName: "xmark").font(.body).frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
+            Button(action: close) { Image(systemName: "xmark").font(.body).frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                 .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-page-close").disabled(closeDisabled)
         }.frame(minHeight: 48)
     }

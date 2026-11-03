@@ -62,7 +62,7 @@ struct HabitSinceSection:View {
                     // Today sits above the same date axis. Even a time logged today remains a separate filled mark.
                     Capsule().fill(theme.accent.opacity(0.5)).frame(width:1,height:17).offset(x:w-6,y:8)
                     Circle().fill(theme.surface).frame(width:14,height:14)
-                        .overlay { Circle().stroke(theme.accent,lineWidth:1.5) }.offset(x:w-13,y:0)
+                        .glassEffect(.regular.interactive(), in: .circle).offset(x:w-13,y:0)
                 }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading).environment(\.layoutDirection,.leftToRight).scaleEffect(x:-1)
             }.frame(height:34)
             HStack {

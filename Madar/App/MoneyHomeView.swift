@@ -65,7 +65,7 @@ struct MoneyHomeView: View {
 #endif
         } label: {
             Image(systemName: "plus").font(.system(size: 20, weight: .medium)).foregroundStyle(theme.ink)
-                .frame(width: 46, height: 46).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }.contentShape(Circle())
+                .frame(width: 46, height: 46).glassEffect(.regular.interactive(), in: .circle).contentShape(Circle())
         }.buttonStyle(.madarPlain).accessibilityLabel("سجّل مصروفًا").accessibilityIdentifier("money-expense-open")
     }
     /// The room's other doors as drawers of one desk, two to a row, most used first; settings close the desk.

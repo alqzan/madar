@@ -239,7 +239,7 @@ struct DiaryTextEditor: View {
             .accessibilityLabel(voice.recording ? "أوقف التسجيل واحفظه" : "سجّل صوتًا").accessibilityIdentifier("diary-editor-record")
     }
     private func choice(_ value: String, _ label: String) -> some View {
-        Button { day = value; writingDay = (try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()).map { value == "yesterday" ? $0.adding(days: -1) : $0 } } label: { Text(label).font(MadarTypography.caption()).padding(.horizontal, 16).frame(minHeight: 42).foregroundStyle(day == value ? theme.background : theme.ink).background(day == value ? theme.ink : theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) } }
+        Button { day = value; writingDay = (try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()).map { value == "yesterday" ? $0.adding(days: -1) : $0 } } label: { Text(label).font(MadarTypography.caption()).padding(.horizontal, 16).frame(minHeight: 42).foregroundStyle(day == value ? theme.background : theme.ink).background(day == value ? theme.ink : theme.surface, in: .capsule).glassEffect(.regular.interactive(), in: .capsule) }
             .buttonStyle(.madarPlain).disabled(saving || importing || voice?.recording == true).accessibilityIdentifier("diary-editor-" + value).accessibilityAddTraits(day == value ? .isSelected : [])
     }
     private func scheduleDraft() {

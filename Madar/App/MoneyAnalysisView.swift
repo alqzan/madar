@@ -61,7 +61,7 @@ struct MoneyAnalysisView: View {
                                 .font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText"))
                                 .frame(maxWidth: .infinity, minHeight: 46)
                                 .background(theme.surface, in: Capsule())
-                                .overlay { Capsule().stroke(theme.line, lineWidth: 0.8) }
+                                .glassEffect(.regular.interactive(), in: .capsule)
                         }
                         .buttonStyle(.madarPlain)
                         .accessibilityIdentifier("money-analysis-ai")
@@ -115,7 +115,7 @@ struct MoneyAnalysisView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Button { dismiss() } label: { Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) } }
+            Button { dismiss() } label: { Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).glassEffect(.regular.interactive(), in: .circle) }
                 .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-analysis-close")
             Text("التحليل").font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)).accessibilityAddTraits(.isHeader)
             Spacer()

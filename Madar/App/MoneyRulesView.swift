@@ -24,7 +24,7 @@ struct MoneyRulesView: View {
                 HStack(spacing: 12) {
                     Text("قواعد التاجر").font(MadarTypography.cardTitle()).accessibilityIdentifier("money-rules-title")
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
+                        Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).glassEffect(.regular.interactive(), in: .circle)
                     }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-rules-close")
                     Spacer()
                 }.padding(.top, 8)
