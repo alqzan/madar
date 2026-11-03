@@ -375,8 +375,16 @@ final class AppSession {
     }
     func prayerSnapshot(at now: Date) throws -> PrayerSnapshot {
         _ = prayerRevision // Observation invalidates the derived view after a committed write.
-        return try PrayerRepository(context: ModelContext(container)).snapshot(now: now)
+        // Several lobby tiles and notification plans ask for the same instant: compute it once per 5 seconds, and drop everything on any committed write or settings reload (both bump the revision).
+        let bucket = Int(now.timeIntervalSince1970 / 5)
+        if prayerSnapshotCache.revision != prayerRevision { prayerSnapshotCache = (prayerRevision, [:]) }
+        if let cached = prayerSnapshotCache.rows[bucket] { return cached }
+        let snapshot = try PrayerRepository(context: ModelContext(container)).snapshot(now: now)
+        if prayerSnapshotCache.rows.count >= 8 { prayerSnapshotCache.rows.removeAll() }
+        prayerSnapshotCache.rows[bucket] = snapshot
+        return snapshot
     }
+    @ObservationIgnored private var prayerSnapshotCache: (revision: Int, rows: [Int: PrayerSnapshot]) = (-1, [:])
     func prayerNow(_ fallback: Date = .now) -> Date {
 #if DEBUG
         if let diaryBoundaryUITestClockOverride { return diaryBoundaryUITestClockOverride }

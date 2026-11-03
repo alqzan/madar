@@ -363,12 +363,15 @@ final class PrayerNotificationCoordinator {
         let requestID = request.identifier.hasSuffix(".snooze")
             ? String(request.identifier.dropLast(".snooze".count))
             : request.identifier
+        // «ذكّرني بعد ساعة» obeys the same quiet hours as every other reminder.
+        let quietParts = session.string("notif.quietFrom").split(separator: ":").compactMap { Int($0) }
+        let snoozeQuietMinutes: Int? = session.bool("notif.quietAfterIsha") ? (quietParts.count == 2 ? quietParts[0] * 60 + quietParts[1] : 0) : nil
         let candidate = NotificationCandidate(id: requestID + ".snooze", room: .salah, kind: .prayerAsk,
                                                dueAt: tapTime.addingTimeInterval(60 * 60), dayKey: dayKey)
         let occupiedCount = existing.count - (existing.contains(where: { $0.identifier == candidate.id }) ? 1 : 0)
         let plan = NotificationArbiter.plan(candidates: [candidate], prayerDays: days, now: tapTime,
                                              timeZone: repository.place(at: tapTime).timeZone,
-                                             policy: .init(thisDeviceRemindersEnabled: true, staleNudgeEnabled: false),
+                                             policy: .init(quietFromMinutes: snoozeQuietMinutes, quietUntil: quietEnd, thisDeviceRemindersEnabled: true, staleNudgeEnabled: false),
                                              existingPendingCount: occupiedCount, sanctityWindows: sanctityWindows)
         guard let scheduled = plan.scheduled.first(where: { $0.id == candidate.id }) else {
             try updateLedger(requestID: candidate.id, dayKey: dayKey, prayer: prayer, dueAt: candidate.dueAt,

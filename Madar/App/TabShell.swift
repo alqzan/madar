@@ -61,6 +61,15 @@ struct TabShell<Content: View>: View {
             }
         }
         .padding(.horizontal, 6)
+        #if DEBUG
+        // UI tests reach «خصّص» from any room; the bar no longer lists it, so tests get a tiny invisible handle at the top-centre of the bar (never in a release build).
+        .overlay(alignment: .top) {
+            if ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil {
+                Button { selection = "customize" } label: { Rectangle().fill(.black.opacity(0.02)).frame(width: 14, height: 14) }
+                    .accessibilityIdentifier("tab-customize").accessibilityLabel("خصّص")
+            }
+        }
+        #endif
         .glassEffect(.regular, in: .capsule)
         .padding(.horizontal, 12).padding(.vertical, 4)
         .background(.bar)

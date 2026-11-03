@@ -50,14 +50,16 @@ extension AppMoneyService {
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.sorted { ($0.ownership == "mine" ? 0 : 1, $0.name) < ($1.ownership == "mine" ? 0 : 1, $1.name) }
         let messages = try context.fetch(FetchDescriptor<BankMessage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let reconciliations = try context.fetch(FetchDescriptor<Reconciliation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.resolution != "leave" }
+        // Each message is decoded once, not once per account and per card.
+        let decoded = Dictionary(messages.compactMap { m in m.parsedJSON.flatMap { try? JSONDecoder().decode(MoneyParsedFields.self, from: $0) }.map { (m.id, $0) } }, uniquingKeysWith: { first, _ in first })
         var rows: [MoneyAccountRow] = []
         for a in accounts {
             let matching = messages.filter { m in
-                guard let data = m.parsedJSON, let parsed = try? JSONDecoder().decode(MoneyParsedFields.self, from: data) else { return false }
+                guard let parsed = decoded[m.id] else { return false }
                 return MoneyAccountRules.matches(a, sender: m.sender, last4: parsed.last4)
             }
             let latest = matching.compactMap { m -> (Date, Int)? in
-                guard let data = m.parsedJSON, let p = try? JSONDecoder().decode(MoneyParsedFields.self, from: data), p.cardKind != "credit", p.cardKind != "prepaid", let balance = p.balanceMinor, p.currency == a.currency else { return nil }
+                guard let p = decoded[m.id], p.cardKind != "credit", p.cardKind != "prepaid", let balance = p.balanceMinor, p.currency == a.currency else { return nil }
                 return (p.eventAt ?? m.receivedAt, balance)
             }.max { $0.0 < $1.0 }
             let evidence = latest.flatMap { pair -> (at: Date, printedMinor: Int, bookMinor: Int)? in
@@ -76,7 +78,7 @@ extension AppMoneyService {
         for debt in debts {
             let card = cards.first { $0.id == debt.cardID }
             rows.append(.init(id: "card:" + debt.cardID.uuidString, name: debt.cardName, subtitle: "ائتماني", amountMinor: debt.totalMinor, currency: app.string("core.currency"), side: .creditCard, counted: true,
-                messageCount: messages.filter { m in guard let bytes = m.parsedJSON, let p = try? JSONDecoder().decode(MoneyParsedFields.self, from: bytes) else { return false }; return p.last4 == card?.last4 && (BankDedupe.normalize(m.sender) == BankDedupe.normalize(card?.bank ?? "") || card?.aliases.map(BankDedupe.normalize).contains(BankDedupe.normalize(m.sender)) == true) }.count))
+                messageCount: messages.filter { m in guard let p = decoded[m.id] else { return false }; return p.last4 == card?.last4 && (BankDedupe.normalize(m.sender) == BankDedupe.normalize(card?.bank ?? "") || card?.aliases.map(BankDedupe.normalize).contains(BankDedupe.normalize(m.sender)) == true) }.count))
         }
         let obligations = try context.fetch(FetchDescriptor<Obligation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.kind == "installment" }
         let items = try context.fetch(FetchDescriptor<InstallmentItem>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }

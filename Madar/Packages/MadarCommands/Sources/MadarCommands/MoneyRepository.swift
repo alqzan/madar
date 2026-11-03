@@ -83,9 +83,12 @@ import MadarPrayer
         try context.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.reviewState != "ok" }
     }
     public func accountBalance(_ account: Account, at now: Date = .now) throws -> Int {
+        try accountBalance(account, at: now, transactions: try confirmedTransactions(), cards: try context.fetch(FetchDescriptor<Card>()))
+    }
+    /// Same balance from rows already read, so a list of accounts scans the tables once instead of once per account.
+    private func accountBalance(_ account: Account, at now: Date, transactions: [MoneyTransaction], cards: [Card]) throws -> Int {
         var deltas: [Int] = []
-        let cards = try context.fetch(FetchDescriptor<Card>())
-        for row in try confirmedTransactions() where row.eventAt > (account.balanceAt ?? .distantPast) && row.eventAt <= now {
+        for row in transactions where row.eventAt > (account.balanceAt ?? .distantPast) && row.eventAt <= now {
             guard row.fromAccountID == account.id || row.toAccountID == account.id else { continue }
             let amount: Int
             if account.currency == row.currency { amount = row.amountMinor }
@@ -103,8 +106,9 @@ import MadarPrayer
     public func homeAccountBalances(at now: Date = .now, rates: [String: String] = [:]) throws -> [(account: Account, homeMinor: Int)] {
         let home = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
         let rates = try manualRates(at: now).merging(rates) { _, explicit in explicit }
+        let transactions = try confirmedTransactions(), cards = try context.fetch(FetchDescriptor<Card>())
         return try liveAccounts().filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt != nil }.map { account in
-            let amount = try accountBalance(account, at: now)
+            let amount = try accountBalance(account, at: now, transactions: transactions, cards: cards)
             if account.currency == home { return (account, amount) }
             guard let rate = rates[account.currency] else { throw MoneyCommandError.missingRate }
             return (account, try FX.homeAmount(amountMinor: amount, currency: account.currency, rate: rate, home: home))
