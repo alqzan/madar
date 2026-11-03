@@ -14,10 +14,10 @@ private struct DictionarySpec: Decodable { let models: [ModelDefinition]; let re
             let instances = try RecordBridge.instances(context)
             let original = try instances.map { try $0.record() }
             let result = try Self.reconciled(original)
-            let changes = result.filter { row in !original.contains(row) }
-            for index in result.indices where result[index] != original[index] { try instances[index].apply(result[index]) }
-            if !changes.isEmpty { try context.save() }
-            return changes.count
+            let changed = result.indices.filter { result[$0] != original[$0] }
+            for index in changed { try instances[index].apply(result[index]) }
+            if !changed.isEmpty { try context.save() }
+            return changed.count
         } catch { context.rollback(); throw error }
     }
     public func restore(model: String, id: UUID, now: Date = Date(), writerID: String = "") throws {
@@ -75,11 +75,21 @@ private struct DictionarySpec: Decodable { let models: [ModelDefinition]; let re
                 let candidates = rows.indices.filter { rows[$0].model == name && rows[$0].fields["mergedInto"] == .null }
                 var groups: [[Int]] = []
                 // Union applicable natural keys and id. Includes tombstones.
+                // Keys are encoded once per row; `owners` maps a key to the group ids holding it, so a candidate finds its
+                // groups without re-encoding every member's keys (the JSON encoding was the cost; the scan over group ids stays but is integer-only).
+                var groupIDs: [Int] = []   // parallel to `groups`
+                var owners: [String: Set<Int>] = [:]
+                var nextGroupID = 0
                 for index in candidates {
                     let keys = try logicalKeys(rows[index], definition: definition)
-                    let matching = groups.indices.filter { g in groups[g].contains { i in !((try? logicalKeys(rows[i], definition: definition)) ?? []).isDisjoint(with: keys) } }
-                    if matching.isEmpty { groups.append([index]) }
-                    else { var joined = [index]; for g in matching.reversed() { joined += groups.remove(at: g) }; groups.append(joined) }
+                    let touched = keys.reduce(into: Set<Int>()) { $0.formUnion(owners[$1] ?? []) }
+                    let matching = groups.indices.filter { touched.contains(groupIDs[$0]) }
+                    var joined = [index], joinedKeys = keys
+                    for g in matching.reversed() { joined += groups.remove(at: g); groupIDs.remove(at: g) }
+                    for i in joined where i != index { joinedKeys.formUnion((try? logicalKeys(rows[i], definition: definition)) ?? []) }
+                    let gid = nextGroupID; nextGroupID += 1
+                    for key in joinedKeys { owners[key] = (owners[key] ?? []).subtracting(touched).union([gid]) }
+                    groups.append(joined); groupIDs.append(gid)
                 }
                 for group in groups where group.count > 1 {
                     let ordered = group.sorted { newer(rows[$0], than: rows[$1]) }; let winnerIndex = ordered[0]

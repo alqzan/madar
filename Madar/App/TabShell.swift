@@ -159,11 +159,19 @@ private struct PrayerAccessoryStatus: View {
     let ink: Color
     let secondaryInk: Color
     let accent: Color
+    /// The whole prayer history is recomputed to find the next prayer, so it is done once per minute and per
+    /// committed prayer write, not on every parent redraw.
+    private final class Cache { var key: [Int] = []; var model: BahwPrayerModel? }
+    @State private var cache = Cache()
 
     var body: some View {
         TimelineView(.everyMinute) { timeline in
             let instant = session.prayerNow(timeline.date)
-            let prayer = AppBahwService(session: session, evaluationDate: instant).prayer()
+            let key = [Int(instant.timeIntervalSince1970 / 60), session.prayerRevision]
+            let prayer: BahwPrayerModel? = {
+                if cache.key != key { cache.model = AppBahwService(session: session, evaluationDate: instant).prayer(); cache.key = key }
+                return cache.model
+            }()
             HStack(spacing: 8) {
                 MadarGlyph("MadarPrayer", size: 20).foregroundStyle(accent)
                 VStack(alignment: .leading, spacing: 2) {

@@ -67,6 +67,24 @@ import Testing
         try JSONEncoder().encode(99).write(to:url.appendingPathComponent("SchemaVersion.json"))
         #expect(throws:DataError.newerStore) { try MadarContainerFactory.makeLocal(at:url) }
     }
+    @Test func manyDuplicatesPerDayCollapseToOneLiveRowEachAndRerunIsStable() throws {
+        let container = try MadarContainerFactory.makeInMemory(); let context = container.mainContext
+        // 40 days x 3 copies of the same prayer day (same natural key), newest edit must win; 40 other days stay single.
+        for day in 1...40 {
+            for copy in 0..<3 {
+                let log = PrayerLog(); log.dayKey = String(format: "2026-09-%02d", (day % 28) + 1) + "-d\(day)"; log.updatedAt = Date(timeIntervalSince1970: Double(100 + copy)); context.insert(log)
+            }
+        }
+        for day in 41...80 { let log = PrayerLog(); log.dayKey = "2026-08-d\(day)"; log.updatedAt = Date(timeIntervalSince1970: 50); context.insert(log) }
+        try context.save()
+        let merger = RowMerger(context: context)
+        #expect(try merger.run() == 80)  // 40 groups x 2 losers
+        let live = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.mergedInto == nil }
+        #expect(live.count == 80)
+        #expect(Set(live.map(\.dayKey)).count == 80)
+        #expect(live.filter { $0.dayKey.hasPrefix("2026-09") }.allSatisfy { $0.updatedAt == Date(timeIntervalSince1970: 102) })
+        #expect(try merger.run() == 0)
+    }
     @Test func stickyDeletionAndExplicitRestore() throws {
         let c = try MadarContainerFactory.makeInMemory(); let context = c.mainContext
         let deleted = PrayerLog(); deleted.dayKey = "2026-10-10"; deleted.deletedAt = Date(timeIntervalSince1970:100); deleted.updatedAt = Date(timeIntervalSince1970:100)

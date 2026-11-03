@@ -124,6 +124,13 @@ extension AppSession {
         return counts
     }
 
+    /// One row by id. The move touches thousands of rows, so each lookup must not decode the whole table.
+    private static func moneyRow(_ id: UUID) -> FetchDescriptor<MoneyTransaction> {
+        var descriptor = FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.id == id }); descriptor.fetchLimit = 1; return descriptor
+    }
+    private static func cardRow(_ id: UUID) -> FetchDescriptor<Card> {
+        var descriptor = FetchDescriptor<Card>(predicate: #Predicate { $0.id == id }); descriptor.fetchLimit = 1; return descriptor
+    }
     /// Money goes through the command bus, so intake, review and duplicate detection behave as for a new message.
     func importLegacyMoney(_ backup: Data, now: Date, progress: @escaping @MainActor (Int, Int) -> Void = { _, _ in }) async throws -> [String: Int] {
         var counts: [String: Int] = [:]
@@ -257,15 +264,15 @@ extension AppSession {
                 // Owner, 22 Oct: these rows came from an automatic source, never typed by hand. The shipped command
                 // can only write «manual», so the move marks the row automatic, without message text.
                 let fresh = ModelContext(container)
-                if let row = try fresh.fetch(FetchDescriptor<MoneyTransaction>()).first(where: { $0.id == command }), row.source == "manual" {
+                if let row = try fresh.fetch(Self.moneyRow(command)).first, row.source == "manual" {
                     row.source = "bank"; row.updatedAt = now; try fresh.save(); count("earlier.automatic")
                 }
                 // The old rows have no card digits. Only an unambiguous merchant match supplies a card.
                 if let planned = plan.earlierCards[command] {
                     let cardID = RowMerger.resolve(id: cardMap[planned] ?? planned, model: "Card", rows: identityRows)
                     let patch = ModelContext(container)
-                    if let row = try patch.fetch(FetchDescriptor<MoneyTransaction>()).first(where: { $0.id == command }),
-                       let card = try patch.fetch(FetchDescriptor<Card>()).first(where: { $0.id == cardID }), card.kind == "credit" || card.accountID != nil {
+                    if let row = try patch.fetch(Self.moneyRow(command)).first,
+                       let card = try patch.fetch(Self.cardRow(cardID)).first, card.kind == "credit" || card.accountID != nil {
                         let linked = card.kind == "credit" ? nil : card.accountID
                         if row.cardID != card.id || row.method != "card" || row.fromAccountID != linked {
                             row.cardID = card.id; row.method = "card"; row.fromAccountID = linked
@@ -281,7 +288,7 @@ extension AppSession {
                 }
                 _ = await run(MoneyCommandPayload.intakeName, ["text": .string(text), "sender": .string(sender), "receivedAt": .string(ISO8601DateFormatter().string(from: at))], command, "message")
                 let fresh = ModelContext(container)
-                guard let row = try fresh.fetch(FetchDescriptor<MoneyTransaction>()).first(where: { $0.id == transaction }) else { count("message.noMovement"); continue }
+                guard let row = try fresh.fetch(Self.moneyRow(transaction)).first else { count("message.noMovement"); continue }
                 count("message.state." + row.reviewState)
                 // A possible duplicate is never confirmed for the owner; it waits in review like any other.
                 guard row.reviewState != "ok", row.reviewState != "possibleDuplicate" else { continue }
