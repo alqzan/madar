@@ -233,21 +233,21 @@ extension AppBahwService {
         }
         let readings = (try? HabitRepository(context: ModelContext(session.container)).readings(at: now)) ?? []
         let due = readings.filter { !$0.paused && $0.summary.current?.met != true && ($0.summary.current?.target ?? 0) > 0 && $0.summary.current?.dueDays.contains(today) == true }
-        if let habit = due.first(where: \.isNow) ?? (includesToday ? due.first : nil) {
+        if session.roomEnabled(.habits), let habit = due.first(where: \.isNow) ?? (includesToday ? due.first : nil) {
             result.append(.init(id: "habit", title: habit.name, detail: habit.isNow ? "وقتها الآن" : "خطوة صغيرة مما تبقّى اليوم", symbol: "MadarHabits", destination: .habit(habit.id)))
         }
-        if includesToday, let quran = try? AppQuranService(session: session).widgetSnapshot().payload,
+        if includesToday, session.roomEnabled(.quran), let quran = try? AppQuranService(session: session).widgetSnapshot().payload,
            quran.done < quran.total {
             result.append(.init(id: "quran", title: quran.nextTitle, detail: quran.nextDetail, symbol: "MadarQuran", destination: .quran))
         }
         if level == "present" {
-            if let diary = diary(), diary.count == 0 {
+            if session.roomEnabled(.notes), let diary = diary(), diary.count == 0 {
                 result.append(.init(id: "notes", title: "سطر من يومك", detail: "ما الذي تحب أن يبقى من هذا اليوم؟", symbol: "MadarDiary", destination: .diary))
             }
-            if let money = try? AppMoneyService(app: session).load(at: now), money.pendingCount > 0 {
+            if session.roomEnabled(.mal), let money = try? AppMoneyService(app: session).load(at: now), money.pendingCount > 0 {
                 result.append(.init(id: "money", title: "راجع رسائلك البنكية", detail: "رسائل تنتظر قرارك قبل أن تصبح حركات", symbol: "banknote", destination: .money))
             }
-            if let book = session.mihbaraWidgetSnapshot(locked: false, at: now).currentBook {
+            if session.roomEnabled(.mihbara), let book = session.mihbaraWidgetSnapshot(locked: false, at: now).currentBook {
                 result.append(.init(id: "mihbara", title: "أكمل «" + book.title + "»", detail: book.currentPage.map { "موضعك محفوظ عند الصفحة " + digits.string($0) } ?? "ابدأ القراءة من رحل المحبرة", symbol: "books.vertical", destination: .mihbara(book: book.id)))
             }
         }

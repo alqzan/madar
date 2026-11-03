@@ -1251,7 +1251,7 @@ final class AppSession {
         switch notificationAuthorization {
         case "authorized", "provisional", "ephemeral": "إذن الإشعارات مفعّل لهذا الجهاز."
         case "denied": "إشعارات الصلاة مطفأة في إعدادات النظام."
-        case "notDetermined": "اسمح بالإشعارات لتصلك أسئلة الصلاة بعد نهاية الحرمة."
+        case "notDetermined": "اسمح بالإشعارات لتصلك أسئلة الصلاة بعد انتهاء وقتها."
         default: "تُقرأ حالة إذن الإشعارات من النظام."
         }
     }

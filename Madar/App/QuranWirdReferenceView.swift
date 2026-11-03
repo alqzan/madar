@@ -100,7 +100,7 @@ struct QuranWirdReferenceView: View {
                     }
                     filterPicker
                     tafsirPicker
-                    if loading {
+                    if loading || library.isLoadingLocal {
                         ProgressView().frame(maxWidth: .infinity, minHeight: 120)
                     } else if failed {
                         failureState

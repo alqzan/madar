@@ -103,15 +103,21 @@ struct RoomIntroSheet: View {
                     }
                 }
                 if let reminder = block.reminderLine, session.canRequestNotificationPermission {
-                    Button("اسمح بالتذكيرات") { session.requestPrayerNotificationPermission() }
-                        .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("intro-notifications")
                     Text(reminder).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Button { session.requestPrayerNotificationPermission() } label: {
+                        Label("اسمح بالتذكيرات", systemImage: "bell").font(MadarTypography.body().bold()).foregroundStyle(theme.accent)
+                            .frame(maxWidth: .infinity, minHeight: 48).contentShape(Capsule())
+                            .overlay { Capsule().stroke(theme.accent.opacity(0.6), lineWidth: 1) }
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("intro-notifications")
                 }
                 Button("ابدأ") {
                     session.markIntroSeen(block); session.pendingIntro = nil
                     if let tab = block.tab, session.selectedTab == tab { return }
                     session.openRoom(block)
                 }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("intro-start")
+                Button("ليس الآن") { session.markIntroSeen(block); session.pendingIntro = nil }
+                    .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                    .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("intro-later")
             }.padding(24).frame(maxWidth: 560).frame(maxWidth: .infinity)
         }
         .background(theme.background).foregroundStyle(theme.ink).font(MadarTypography.body())
@@ -133,7 +139,7 @@ struct AddRoomCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("أضف قسمًا").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
-            ForEach(ordered, id: \.self) { block in
+            ForEach(Array(ordered.prefix(2)), id: \.self) { block in
                 Button { session.enableRoom(block); session.requestOpen(block) } label: {
                     HStack(spacing: 12) {
                         MadarGlyph(block.symbol, size: 26).foregroundStyle(theme.accent)
@@ -146,7 +152,10 @@ struct AddRoomCard: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-add-" + block.rawValue)
-                if block != ordered.last { Divider().overlay(theme.line) }
+                if block != ordered.prefix(2).last { Divider().overlay(theme.line) }
+            }
+            if ordered.count > 2 {
+                Text("وبقيت أقسام أخرى تجدها في إعدادات مدار ← أقسامك والبهو.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
@@ -164,7 +173,7 @@ extension BahwBlock {
     /// What a reminder from this room says it will do, shown beside the one permission button.
     var reminderLine: String? {
         switch self {
-        case .salah: "ينبّهك مدار عند دخول الوقت، ولا يصلك شيء أثناء الصلاة نفسها."
+        case .salah: "يسألك مدار عن صلاتك بعد الأذان بنحو نصف ساعة، ولا يصلك شيء وقت الصلاة نفسها."
         case .quran: "يذكّرك بوردك بلطف في الوقت الذي تختاره، ولا يزعجك إن قرأته."
         case .habits: "يذكّرك بعادتك في وقتها بكلمة خفيفة تشجّعك."
         case .notes: "يسألك عن نيّة يومك، ويذكّرك بذكرى من مثل هذا اليوم."

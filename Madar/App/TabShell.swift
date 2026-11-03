@@ -15,48 +15,56 @@ struct TabShell<Content: View>: View {
     let session: AppSession
     @Binding var selection: String
     let tabs: [FoundationTab]
-    /// Rooms that do not fit in the bar (and «خصّص») render in the highlighted room's place.
-    let shortcutIDs: Set<String>
     @ViewBuilder let content: (String) -> Content
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
-    @AppStorage("Madar.TabViewCustomization.v2") private var tabCustomization = TabViewCustomization()
-    /// Owner, 3 Nov 2026: the glass accessory (next prayer plus two shortcuts) is gone: «الصلاة القادمة» followed him
-    /// into every screen and the bar did not list the rooms. The bar now holds the rooms he turned on.
-    private var bottomShortcuts: Set<String> { shortcutIDs }
 
     var body: some View {
         baseTabView.tint(theme.accent)
     }
 
-    /// The room under the bar's highlight while the diary or «خصّص» is open from the accessory.
-    @State private var lastRoom = "foundation"
-    private var showingShortcut: Bool { bottomShortcuts.contains(selection) }
 
+    /// Owner, 3 Nov 2026: «اختفاء الأقسام خلف المزيد، مهب زين، ابيه ثابت الي تحت». The system bar lists at most five tabs and
+    /// folds the rest into «المزيد», so it is hidden and Madar draws one fixed bar with every room the user turned on.
+    /// «خصّص» stays a tab so the lobby can open it, but it is not in the bar.
     private var baseTabView: some View {
-        // Only the five rooms are tabs: any further Tab, even hidden or sidebar-only, makes iPhone add «المزيد».
-        // A shortcut room renders in the highlighted room's place; tapping any tab (even that one) returns to it.
-        TabView(selection: Binding(get: { showingShortcut ? lastRoom : selection }, set: { selection = $0; lastRoom = $0 })) {
-            ForEach(tabs.filter { !bottomShortcuts.contains($0.id) }) { tab in
-                let shown = showingShortcut && tab.id == lastRoom ? selection : tab.id
-                if tab.symbol.hasPrefix("Madar") {
-                    Tab(tab.title, image: tab.symbol + (selection == tab.id ? "Selected" : ""), value: tab.id) {
-                        content(shown).accessibilityIdentifier(shown == "customize" ? "settings-tab" : shown + "-tab")
-                    }
-                    .customizationID("com.madar.tab.\(tab.id)")
-                } else {
-                    Tab(tab.title, systemImage: tab.symbol, value: tab.id) {
-                        content(shown).accessibilityIdentifier(shown == "customize" ? "settings-tab" : shown + "-tab")
-                    }
-                    .customizationID("com.madar.tab.\(tab.id)")
+        TabView(selection: $selection) {
+            ForEach(tabs) { tab in
+                Tab(tab.title, systemImage: "circle", value: tab.id) {
+                    content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : tab.id + "-tab")
+                        .toolbarVisibility(.hidden, for: .tabBar)
                 }
             }
         }
-        .onChange(of: selection) { _, value in if !bottomShortcuts.contains(value) { lastRoom = value } }
-        .tabViewStyle(.sidebarAdaptable)
-        .tabViewCustomization($tabCustomization)
-        .defaultAdaptableTabBarPlacement(.tabBar)
-        .tabBarMinimizeBehavior(.onScrollDown)
+        .toolbarVisibility(.hidden, for: .tabBar)
+        .safeAreaInset(edge: .bottom, spacing: 0) { if session.accessoryHiders.isEmpty { fixedBar } }
+    }
+
+    private var fixedBar: some View {
+        HStack(spacing: 0) {
+            ForEach(tabs.filter { $0.id != "customize" }) { tab in
+                let selected = selection == tab.id
+                Button { selection = tab.id } label: {
+                    VStack(spacing: 3) {
+                        Group {
+                            if tab.symbol.hasPrefix("Madar") { Image(tab.symbol + (selected ? "Selected" : "")).renderingMode(.template) }
+                            else { Image(systemName: tab.symbol) }
+                        }.frame(width: 26, height: 26)
+                        Text(tab.title).font(MadarTypography.fine())
+                    }
+                    .foregroundStyle(selected ? theme.accent : theme.secondaryInk)
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .background { if selected { Capsule().fill(theme.accent.opacity(0.12)).padding(.vertical, 4) } }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.madarPlain).accessibilityIdentifier("tab-" + tab.id)
+            }
+        }
+        .padding(.horizontal, 6)
+        .glassEffect(.regular, in: .capsule)
+        .padding(.horizontal, 12).padding(.vertical, 4)
+        .background(.bar)
+        .ignoresSafeArea(.keyboard)
     }
 
 }
@@ -202,8 +210,7 @@ struct MadarRootView: View {
         let enabledTabs = AppSession.roomTabs.filter { session.roomEnabled($0.block) }.map(\.tab)
         let allTabs: [FoundationTab] = ([FoundationTab(id: "foundation", title: "البهو", symbol: "MadarOrbit")]
             + enabledTabs.compactMap { id in AppSession.tabInfo[id] } + [FoundationTab(id: "customize", title: "خصّص", symbol: "MadarCustomize")])
-        TabShell(session: session, selection: $session.selectedTab, tabs: allTabs,
-                 shortcutIDs: Set(enabledTabs.dropFirst(4)).union(["customize"])) { tab in
+        TabShell(session: session, selection: $session.selectedTab, tabs: allTabs) { tab in
             NavigationStack {
                 Group {
                     if tab == "customize" { CustomizeMadar(session: session) }
@@ -249,9 +256,8 @@ struct MadarRootView: View {
             catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
             await session.refreshPrayerNotifications()
         }
-        .overlay(alignment: .bottom) {
-            if session.undoToastVisible { UndoToast(message: session.undoMessage, undo: session.undo, dismiss: session.hideUndoToast).padding(.bottom, 86) }
-        }
+        .overlay { AnchoredUndo(session: session) }
+        .task { MadarTouchTracker.install() }
         .fullScreenCover(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in })) { FirstRunView(session: session).environment(\.roomTheme, theme).madarSheetErrorAlert(session) }
         .alert("لم تكتمل العملية", isPresented: Binding(get: {
             session.errorMessage != nil && !(session.mihbaraOpen && readingSaveCoordinator.canRetryPendingWriteErrorNow)
@@ -332,5 +338,56 @@ extension View {
             }
             Button("حسنًا") { session.errorMessage = nil }
         } message: { Text(session.errorMessage ?? "") }
+    }
+}
+
+/// Owner, 3 Nov 2026 (option B, «التراجع بشكل عام»): undo is a small «تراجع» chip beside the spot the user just touched, in every room,
+/// instead of a bar above the tab bar. A passive window-level recognizer only remembers where the last touch began.
+final class MadarTouchTracker: UIGestureRecognizer, UIGestureRecognizerDelegate {
+    nonisolated(unsafe) static var last = CGPoint(x: 200, y: 400)
+    nonisolated(unsafe) private static var installed = false
+    @MainActor static func install() {
+        guard !installed,
+              let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap(\.windows).first(where: \.isKeyWindow) else { return }
+        installed = true
+        window.addGestureRecognizer(MadarTouchTracker(target: nil, action: nil))
+    }
+    override init(target: Any?, action: Selector?) {
+        super.init(target: target, action: action)
+        cancelsTouchesInView = false; delaysTouchesBegan = false; delaysTouchesEnded = false; delegate = self
+    }
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        if let touch = touches.first { Self.last = touch.location(in: nil) }
+        state = .failed
+    }
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+}
+
+private struct AnchoredUndo: View {
+    let session: AppSession
+    @Environment(\.roomTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Where the chip sits is fixed when it appears, so it never drifts while the user keeps tapping.
+    @State private var anchor = CGPoint(x: 200, y: 400)
+    var body: some View {
+        GeometryReader { proxy in
+            if session.undoToastVisible {
+                let x = min(max(anchor.x, 70), proxy.size.width - 70)
+                let y = min(max(anchor.y - 52, proxy.safeAreaInsets.top + 36), proxy.size.height - proxy.safeAreaInsets.bottom - 110)
+                Button { session.undo() } label: {
+                    Label("تراجع", systemImage: "arrow.uturn.backward").font(MadarTypography.body().bold()).foregroundStyle(theme.accent)
+                        .padding(.horizontal, 16).frame(minHeight: 44).contentShape(Capsule())
+                }
+                .buttonStyle(.madarPlain)
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .overlay { Capsule().stroke(theme.accent.opacity(0.5), lineWidth: 0.8) }
+                .position(x: x, y: y)
+                .transition(reduceMotion ? .opacity : .scale(scale: 0.85).combined(with: .opacity))
+                .accessibilityIdentifier("undo-button")
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(session.undoToastVisible)
+        .onChange(of: session.undoToastVisible) { _, visible in if visible { anchor = MadarTouchTracker.last } }
     }
 }

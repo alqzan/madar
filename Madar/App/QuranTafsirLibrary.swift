@@ -251,7 +251,7 @@ struct QuranTafsirLibraryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
-                Text("وأنت تقرأ وردك، المس أي آية لترى تفسيرها. تفسير السعدي موجود دائمًا بلا تنزيل، وإن أحببت تفسيرًا آخر فأضفه من الأسفل.")
+                Text("تجد التفسير في زر «تفسير الورد» داخل وردك. تفسير السعدي موجود دائمًا بلا تنزيل، وإن أحببت تفسيرًا آخر فأضفه من الأسفل.")
                     .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
                 currentTafsir
