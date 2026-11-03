@@ -1209,7 +1209,7 @@ private struct PrayerGapResolutionSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            LazyVStack(alignment: .leading, spacing: 18) {
                 header
                 quickActions
                 ForEach(days, id: \.self) { day in dayCard(day) }

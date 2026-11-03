@@ -114,6 +114,35 @@ private struct UndoChange: Codable { let key: String; let before: JSONValue; let
         if d.type == "layout" { data = try context.fetch(FetchDescriptor<LayoutState>()).filter { $0.room == d.owner && $0.deletedAt == nil && $0.mergedInto == nil }.max { $0.updatedAt < $1.updatedAt }?.blocksJSON }
         else if d.scope == "device" { data = try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil })).max { $0.updatedAt < $1.updatedAt }?.valueJSON }
         else { data = try context.fetch(FetchDescriptor<Setting>(predicate: #Predicate { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil })).max { $0.updatedAt < $1.updatedAt }?.valueJSON }
+        return decoded(data, for: d)
+    }
+    /// Every setting in the schema with three fetches in all (one per table) instead of one fetch per setting. The latest live row
+    /// wins, ties keep the first row, exactly as `value(for:)` does.
+    public func allValues() throws -> [String: JSONValue] {
+        var settingRows: [String: Data] = [:], settingTimes: [String: Date] = [:]
+        for row in try context.fetch(FetchDescriptor<Setting>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })) {
+            if let seen = settingTimes[row.key], seen >= row.updatedAt { continue }
+            settingTimes[row.key] = row.updatedAt; settingRows[row.key] = row.valueJSON
+        }
+        var deviceRows: [String: Data] = [:], deviceTimes: [String: Date] = [:]
+        for row in try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })) {
+            if let seen = deviceTimes[row.key], seen >= row.updatedAt { continue }
+            deviceTimes[row.key] = row.updatedAt; deviceRows[row.key] = row.valueJSON
+        }
+        var layoutRows: [String: Data] = [:], layoutTimes: [String: Date] = [:]
+        for row in try context.fetch(FetchDescriptor<LayoutState>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })) {
+            if let seen = layoutTimes[row.room], seen >= row.updatedAt { continue }
+            layoutTimes[row.room] = row.updatedAt; layoutRows[row.room] = row.blocksJSON
+        }
+        var result: [String: JSONValue] = [:]
+        for d in schema.settings {
+            let data = d.type == "layout" ? layoutRows[d.owner] : d.scope == "device" ? deviceRows[d.key] : settingRows[d.key]
+            result[d.key] = decoded(data, for: d)
+        }
+        return result
+    }
+    private func decoded(_ data: Data?, for d: SettingDefinition) -> JSONValue {
+        let key = d.key
         guard let data else { return d.defaultValue }
         // Compatibility read only; preserve the stored bytes and all owner records.
         if key == "core.faceIDLock", (try? JSONDecoder().decode(JSONValue.self, from: data)) == .string("notesOnly") { return .string("none") }

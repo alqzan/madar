@@ -111,6 +111,16 @@ final class AppSession {
     /// Focused full-screen flows (the expense keypad, the year) that hide the tab bar also hide the glass accessory.
     var accessoryHiders: Set<String> = []
     private(set) var prayerRevision = 0
+    /// The lobby asks for habit readings from several tiles every minute; the answer only changes after a write (a new revision)
+    /// or when the five-minute bucket turns over, so it is read once per such change.
+    @ObservationIgnored private var habitReadingsCache: (revision: Int, bucket: Int, rows: [HabitReading])?
+    func habitReadings(at now: Date) -> [HabitReading] {
+        let bucket = Int(now.timeIntervalSince1970 / 300)
+        if let cache = habitReadingsCache, cache.revision == prayerRevision, cache.bucket == bucket { return cache.rows }
+        let rows = (try? HabitRepository(context: ModelContext(container)).readings(at: now)) ?? []
+        habitReadingsCache = (prayerRevision, bucket, rows)
+        return rows
+    }
     private(set) var prayerWriteInProgress = false
     #if DEBUG
     @ObservationIgnored var failFirstNotebookSave = false
@@ -229,9 +239,8 @@ final class AppSession {
     func reload() throws {
         if let managedStore { try managedStore.refreshIfNeeded(); container = managedStore.container }
         store = SettingsStore(context: ModelContext(container), schema: schema)
-        var current: [String: JSONValue] = [:]
-        for item in schema.settings { current[item.key] = try store.value(for: item.key) }
-        values = current
+        // One read per table, not one per setting: this runs after every write and every return to the app.
+        values = try store.allValues()
         prayerRevision &+= 1
     }
     /// Records an authorized app visit. The state lives in a local DeviceSetting and is never sent to CloudKit.

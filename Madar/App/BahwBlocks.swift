@@ -277,7 +277,7 @@ struct BahwBlockView: View {
     }
 
     @ViewBuilder private var habits: some View {
-        let rows = (try? HabitRepository(context: ModelContext(service.session.container)).readings(at:service.now)) ?? []
+        let rows = service.session.habitReadings(at: service.now)
         let daily = rows.filter { !$0.paused && $0.summary.current?.rule.frequency == .daily && ($0.summary.current?.target ?? 0) > 0 }
         let met = daily.filter { $0.summary.current?.met == true }.count
         if size == .icon {

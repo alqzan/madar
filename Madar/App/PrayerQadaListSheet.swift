@@ -53,7 +53,7 @@ struct PrayerQadaListSheet: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 120)
                 } else {
-                    VStack(spacing: 0) {
+                    LazyVStack(spacing: 0) {
                         // Prayers missed on the same day share one date: it is written once, on the
                         // group's first row, and the group has no divider inside it.
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in

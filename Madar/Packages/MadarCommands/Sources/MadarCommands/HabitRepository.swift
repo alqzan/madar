@@ -74,11 +74,23 @@ public struct HabitTime: Equatable, Sendable {
         let legacy = try context.fetch(FetchDescriptor<HabitLog>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let trips = try context.fetch(FetchDescriptor<Trip>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.start != nil }
         let habits = try context.fetch(FetchDescriptor<Habit>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && (includeArchived || $0.archivedAt == nil) }.sorted { $0.order == $1.order ? $0.id.uuidString < $1.id.uuidString : $0.order < $1.order }
+        // Group the rows once: each habit then reads its own rows instead of scanning every row three or four times.
+        let policiesByHabit = Dictionary(grouping: policies, by: \.habitID)
+        let eventsByHabit = Dictionary(grouping: events, by: \.habitID)
+        let pausesByHabit = Dictionary(grouping: pauses, by: \.habitID)
+        let legacyByHabit = Dictionary(grouping: legacy, by: \.habitID)
+        let weekHistory = try HabitWeekHistory.load(context)
+        // Linked sources do not depend on the habit, so each is read once per call.
+        var jamaahCache: (facts: [HabitFact], streak: Int)?
+        var reviewCache: (facts: [HabitFact], streak: Int)?
+        var readingCache: [HabitFact]?
+        var diaryCache: [HabitFact]?
         var result: [HabitReading] = []
         for habit in habits {
-            let rules = try policies.filter { $0.habitID == habit.id }.map(Self.rule)
-            let epochs=events.filter{$0.habitID==habit.id && $0.calendarSource != nil}.sorted { $0.dayKey == $1.dayKey ? $0.updatedAt < $1.updatedAt : $0.dayKey < $1.dayKey }
-            var breaks = try pauses.filter { $0.habitID == habit.id }.map { p -> HabitBreak in
+            let habitEvents = eventsByHabit[habit.id] ?? []
+            let rules = try (policiesByHabit[habit.id] ?? []).map(Self.rule)
+            let epochs=habitEvents.filter{$0.calendarSource != nil}.sorted { $0.dayKey == $1.dayKey ? $0.updatedAt < $1.updatedAt : $0.dayKey < $1.dayKey }
+            var breaks = try (pausesByHabit[habit.id] ?? []).map { p -> HabitBreak in
                 var until = try p.toDayKey.map(GregorianDay.init)
                 if let tripID = p.tripID, let trip = trips.first(where: { $0.id == tripID }),
                    let end = trip.end,
@@ -94,8 +106,8 @@ public struct HabitTime: Equatable, Sendable {
                     return Self.travelBreak(start: start, end: trip.end, place: tripPlace, boundary: boundary, options: prayers.tripOptions)
                 }
             }
-            var facts = try events.filter { $0.habitID == habit.id && $0.delta != 0 }.map { HabitFact(id: $0.id, day: try GregorianDay($0.dayKey), periodKey: $0.periodKey, delta: $0.delta, unit: $0.unit) }
-            facts += legacy.filter { $0.habitID == habit.id }.map { .init(id: $0.id, day: (try? GregorianDay($0.periodKey)) ?? GregorianDay.containing($0.eventAt, in: TimeZone(identifier: $0.tzID) ?? place.timeZone), periodKey: $0.periodKey, delta: $0.value) }
+            var facts = try habitEvents.filter { $0.delta != 0 }.map { HabitFact(id: $0.id, day: try GregorianDay($0.dayKey), periodKey: $0.periodKey, delta: $0.delta, unit: $0.unit) }
+            facts += (legacyByHabit[habit.id] ?? []).map { .init(id: $0.id, day: (try? GregorianDay($0.periodKey)) ?? GregorianDay.containing($0.eventAt, in: TimeZone(identifier: $0.tzID) ?? place.timeZone), periodKey: $0.periodKey, delta: $0.value) }
             var ownerStreak: Int? = nil
             if let source = habit.linkedSource {
                 if source != "walking" { facts = [] }
@@ -108,22 +120,29 @@ public struct HabitTime: Equatable, Sendable {
                     if let value=liveHealth[habit.id],let rule=rules.max(by:{$0.effectiveFrom<$1.effectiveFrom}) {facts.append(.init(id:StableIdentity.uuid(for:"live-health:\(habit.id):\(today)"),day:today,periodKey:"",delta:value,unit:rule.unit))}
 
                 case "jamaah":
-                    facts = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.status == "jamaah" }.map { .init(id: $0.id, day: try GregorianDay($0.dayKey), periodKey: "", delta: 1) }
-                    ownerStreak = try prayers.snapshot(now: now).statistics.congregationStreak
-                case "review":
-                    let snapshot = try QuranRepository(context: context, catalog: QuranResources.catalog()).snapshot(at: now)
-                    var seen = Set<String>()
-                    facts = snapshot.sessions.filter { [.review, .free, .qiyam].contains($0.kind) }.flatMap { session in
-                        session.grades.compactMap { grade in
-                            guard seen.insert(session.dayKey.description + ":" + String(grade.page)).inserted else { return nil }
-                            return HabitFact(id: StableIdentity.uuid(for: "habit-review:\(session.dayKey):\(grade.page)"), day: session.dayKey, periodKey: "", delta: 1)
-                        }
+                    if jamaahCache == nil {
+                        jamaahCache = (try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.status == "jamaah" }.map { .init(id: $0.id, day: try GregorianDay($0.dayKey), periodKey: "", delta: 1) },
+                                       try prayers.snapshot(now: now).statistics.congregationStreak)
                     }
-                    ownerStreak = QuranProgressEngine.streak(activities: snapshot.activities, through: today, restDay: snapshot.restDay).days
+                    facts = jamaahCache!.facts; ownerStreak = jamaahCache!.streak
+                case "review":
+                    if reviewCache == nil {
+                        let snapshot = try QuranRepository(context: context, catalog: QuranResources.catalog()).snapshot(at: now)
+                        var seen = Set<String>()
+                        let reviewFacts: [HabitFact] = snapshot.sessions.filter { [.review, .free, .qiyam].contains($0.kind) }.flatMap { session in
+                            session.grades.compactMap { grade -> HabitFact? in
+                                guard seen.insert(session.dayKey.description + ":" + String(grade.page)).inserted else { return nil }
+                                return HabitFact(id: StableIdentity.uuid(for: "habit-review:\(session.dayKey):\(grade.page)"), day: session.dayKey, periodKey: "", delta: 1)
+                            }
+                        }
+                        reviewCache = (reviewFacts, QuranProgressEngine.streak(activities: snapshot.activities, through: today, restDay: snapshot.restDay).days)
+                    }
+                    facts = reviewCache!.facts; ownerStreak = reviewCache!.streak
                 case "reading":
                     // §7.6: a session under 60 active seconds keeps its place but never counts for the habit.
                     // Both units are offered per day; the engine keeps the one the period's rule measures.
                     // Owner, 30 Oct: «فصول» is the third unit, counted from the pages read and the book's outline (a book with no outline adds none).
+                    if let cached = readingCache { facts = cached; break }
                     var seconds: [String: Int] = [:], pages: [String: Int] = [:], chapters: [String: Double] = [:]
                     let outlines = Dictionary(try context.fetch(FetchDescriptor<Book>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.map { ($0.id, ($0.pages, ReadingChapters.chapterCount(tocJSON: $0.tocJSON))) }, uniquingKeysWith: { first, _ in first })
                     for row in try context.fetch(FetchDescriptor<ReadingSession>()) where row.deletedAt == nil && row.mergedInto == nil && row.activeSeconds >= 60 && !row.dayKey.isEmpty {
@@ -136,15 +155,18 @@ public struct HabitTime: Equatable, Sendable {
                                 HabitFact(id: StableIdentity.uuid(for: "habit-reading:\(key):pages"), day: day, periodKey: "", delta: pages[key, default: 0], unit: "pages"),
                                 HabitFact(id: StableIdentity.uuid(for: "habit-reading:\(key):chapters"), day: day, periodKey: "", delta: Int(chapters[key, default: 0].rounded(.down)), unit: "chapters")]
                     }
+                    readingCache = facts
                 case "diaryLine":
+                    if let cached = diaryCache { facts = cached; break }
                     let entries = try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source != "autoPinned" && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
                     let chains = DiaryRevisionChains(entries.map { .init(id: $0.id, replaces: $0.source == "revision" ? $0.sourceID.flatMap(UUID.init(uuidString:)) : nil) })
                     facts = try entries.filter { chains.heads.contains($0.id) }.map { .init(id: $0.id, day: try GregorianDay($0.dayKey), periodKey: "", delta: 1) }
+                    diaryCache = facts
                     // Diary has no independent streak counter; no second competing definition is exposed.
                 default: continue
                 }
             }
-            let weekHistory = try HabitWeekHistory.load(context), firstDay = rules.map(\.effectiveFrom).min() ?? today
+            let firstDay = rules.map(\.effectiveFrom).min() ?? today
             let fallbackWeek = try settings.value(for: "core.weekStart").string ?? "saturday"
             let initialWeek = weekHistory.flatMap { h in h.changes.last(where: { $0.day < firstDay.description })?.start ?? h.initial } ?? fallbackWeek
             let legacyWeekChanges = try (weekHistory?.changes ?? []).filter { $0.day >= firstDay.description }.map { HabitWeekChange(day: try GregorianDay($0.day), start: MadarWeekStart(rawValue: $0.start) ?? .saturday) }
@@ -168,7 +190,7 @@ public struct HabitTime: Equatable, Sendable {
                 }.first { now >= $0.start && now < $0.end }
             }
             // A day counts as done when its logged times net above zero (an undo writes the inverse event).
-            let links = Dictionary(events.filter { $0.habitID == habit.id && $0.delta > 0 && $0.entryID != nil }.sorted { $0.updatedAt < $1.updatedAt }.map { ($0.dayKey, $0.entryID!) }, uniquingKeysWith: { _, b in b })
+            let links = Dictionary(habitEvents.filter { $0.delta > 0 && $0.entryID != nil }.sorted { $0.updatedAt < $1.updatedAt }.map { ($0.dayKey, $0.entryID!) }, uniquingKeysWith: { _, b in b })
             let net = Dictionary(facts.map { ($0.day, $0.delta) }, uniquingKeysWith: +)
             let times = net.filter { $0.value > 0 && $0.key <= today }.keys.sorted(by: >).map { HabitTime(day: $0, entryID: links[$0.description]) }
             result.append(.init(id: habit.id, name: habit.name, source: habit.linkedSource, archived: habit.archivedAt != nil, homeOnly: habit.homeOnly, reminder: habit.reminder, summary: summary, firstEffectiveFrom: firstDay, paused: breaks.contains { $0.contains(today) }, isNow: summary.current.map { HabitEngine.isNow($0, today: today, instant: now, window: window, pauses: breaks) } ?? false, times: times))

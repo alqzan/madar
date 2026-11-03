@@ -231,7 +231,7 @@ extension AppBahwService {
            snapshot.today.cells.contains(where: { snapshot.pending.contains($0.reference) && $0.canLog }) {
             result.append(.init(id: "prayer", title: "كيف صلّيت؟", detail: "صلاة تنتظر تسجيلك، متى كنت مستعدًا", symbol: "MadarPrayer", destination: .prayer))
         }
-        let readings = (try? HabitRepository(context: ModelContext(session.container)).readings(at: now)) ?? []
+        let readings = session.habitReadings(at: now)
         let due = readings.filter { !$0.paused && $0.summary.current?.met != true && ($0.summary.current?.target ?? 0) > 0 && $0.summary.current?.dueDays.contains(today) == true }
         if session.roomEnabled(.habits), let habit = due.first(where: \.isNow) ?? (includesToday ? due.first : nil) {
             result.append(.init(id: "habit", title: habit.name, detail: habit.isNow ? "وقتها الآن" : "خطوة صغيرة مما تبقّى اليوم", symbol: "MadarHabits", destination: .habit(habit.id)))
