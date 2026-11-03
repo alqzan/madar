@@ -84,7 +84,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             }
             return .init(inverse: nil, duplicate: false)
         }
-        let before = try records(context)
+        // Only the rows this command touches are read before and after (a legacy move runs thousands of commands).
         switch name {
         case "money.prepareGoal":
             let reading = try MoneyRepository(context: context).goalPreparation(at: now)
@@ -372,11 +372,12 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         default: throw MoneyCommandError.invalidReference
         }
         try rebuildEnvelopes(context, now, writer)
-        let after = try records(context), old = Dictionary(uniqueKeysWithValues: before.map { (recordKey($0), $0) })
-        let changed = after.filter { old[recordKey($0)] != $0 }
+        let touched = try touchedRecords(context), old = touched.before
+        let changed = touched.after.filter { old[recordKey($0)] != $0 }
+        let before = changed.compactMap { old[recordKey($0)] }
         guard !changed.isEmpty else { return .init(inverse: nil, duplicate: true) }
         try RecordValidator.validate(changed)
-        return .init(inverse: name == "money.accruePlans" ? nil : try JSONEncoder().encode(MoneyInverse(before: before.filter { oldRow in changed.contains { recordKey($0) == recordKey(oldRow) } }, after: changed, reserveGoalID: name == "money.setReserveGoal" ? changed.first(where: { $0.model == "Envelope" && $0.fields["role"]?.string == "reserve" })?.id : nil)), duplicate: false)
+        return .init(inverse: name == "money.accruePlans" ? nil : try JSONEncoder().encode(MoneyInverse(before: before, after: changed, reserveGoalID: name == "money.setReserveGoal" ? changed.first(where: { $0.model == "Envelope" && $0.fields["role"]?.string == "reserve" })?.id : nil)), duplicate: false)
     }
 
     private static func saveAccount(_ p: [String: MadarCore.JSONValue], _ context: ModelContext, _ now: Date, _ writer: String) throws {
@@ -1143,6 +1144,52 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             .init(groupID: key, target: role == "reserve" ? .reserve : .surplus, amountMinor: -amount, kind: .fund, idempotencyKey: key + ":from"),
             .init(groupID: key, target: .envelope(envelope.id.uuidString), amountMinor: amount, kind: .fund, idempotencyKey: key + ":to")
         ], context: context, now: now, writer: writer)
+    }
+    /// The money rows this command inserted or changed, in the same model order `records` uses, with the committed
+    /// version of each changed row. Every mutation goes through a model property, so an untouched row cannot differ.
+    private static func touchedRecords(_ context: ModelContext) throws -> (after: [DataRecord], before: [String: DataRecord]) {
+        func rank(_ model: any PersistentModel) -> Int? {
+            switch model {
+            case is Account: 0
+            case is Trip: 1
+            case is ZakatProfile: 2
+            case is Card: 3
+            case is CashbackEntry: 4
+            case is MoneyTransaction: 5
+            case is Allocation: 6
+            case is BankMessage: 7
+            case let batch as ImportBatch: batch.kind == "bankBulk" ? 8 : nil
+            case is Envelope: 9
+            case is EnvelopePlan: 10
+            case is InstallmentItem: 11
+            case is Statement: 12
+            case is MerchantRule: 13
+            case is Obligation: 14
+            case is MadarData.Category: 15
+            case is CategoryLimit: 16
+            case is Cycle: 17
+            case is CyclePolicy: 18
+            case is Reconciliation: 19
+            default: nil
+            }
+        }
+        let inserted = Set(context.insertedModelsArray.map(\.persistentModelID))
+        var seen = Set<PersistentIdentifier>(), rows: [(rank: Int, record: DataRecord)] = [], before: [String: DataRecord] = [:]
+        let committed = ModelContext(context.container); committed.autosaveEnabled = false
+        for model in context.insertedModelsArray + context.changedModelsArray {
+            guard seen.insert(model.persistentModelID).inserted, let rank = rank(model), let row = model as? any MadarRecordModel else { continue }
+            let record = try row.record()
+            rows.append((rank, record))
+            if !inserted.contains(model.persistentModelID), let old = committed.model(for: model.persistentModelID) as? any MadarRecordModel {
+                before[recordKey(record)] = try old.record()
+            }
+        }
+        let ordered = rows.sorted {
+            if $0.rank != $1.rank { return $0.rank < $1.rank }
+            let l = $0.record.date("createdAt") ?? .distantPast, r = $1.record.date("createdAt") ?? .distantPast
+            return l == r ? $0.record.id.uuidString < $1.record.id.uuidString : l < r
+        }
+        return (ordered.map(\.record), before)
     }
     private static func records(_ context: ModelContext) throws -> [DataRecord] {
         var rows = try context.fetch(FetchDescriptor<Account>()).map { try $0.record() }

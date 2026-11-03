@@ -350,9 +350,9 @@ import UIKit
         let line=app.buttons["habit-past-line"];XCTAssertTrue(line.waitForExistence(timeout:5));line.tap();XCTAssertTrue(line.isSelected)
         shot(app,"I26-past-day-line-L");app.buttons["habit-past-save"].tap()
         XCTAssertTrue(app.buttons["habit-past-save"].waitForNonExistence(timeout:10))
-        let again=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","إهداء من تحب")).firstMatch
-        XCTAssertTrue(again.waitForExistence(timeout:10));again.tap()
-        XCTAssertTrue(since.waitForExistence(timeout:5));XCTAssertEqual(since.label,"منذ ٣ أيام")
+        let again=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@","habit-row-","إهداء من تحب")).firstMatch
+        XCTAssertTrue(again.waitForExistence(timeout:10));for _ in 0..<4 where !again.isHittable { app.swipeUp(velocity:.slow) };again.tap()
+        XCTAssertTrue(since.waitForExistence(timeout:10));XCTAssertEqual(since.label,"منذ ٣ أيام")
         XCTAssertTrue(app.staticTexts["مشيت مع أخي بعد العصر."].exists);shot(app,"I26-since-after-L")
         // A forgotten day is a long-press away from the room's row.
         app.buttons["تمّ"].tap()

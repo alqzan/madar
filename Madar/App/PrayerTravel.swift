@@ -24,6 +24,10 @@ final class TravelLocator: NSObject, CLLocationManagerDelegate {
         manager.desiredAccuracy = kCLLocationAccuracyKilometer
     }
 
+    /// True until the user has answered the OS question once; the prayer screen never raises it by itself.
+    var canAskForLocation: Bool { manager.authorizationStatus == .notDetermined }
+    func askForLocation() { manager.requestWhenInUseAuthorization() }
+
     func refresh() {
         #if DEBUG
         // UI stores use a deterministic place instead of raising an OS permission

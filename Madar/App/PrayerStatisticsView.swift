@@ -189,10 +189,18 @@ struct PrayerStatisticsView: View {
 
     private var monthCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(monthTitle).font(serif(26)).lineLimit(1).minimumScaleFactor(0.7).layoutPriority(1).accessibilityIdentifier("prayer-history-month")
-                Spacer(minLength: 8)
-                Text(monthSpan).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(2).multilineTextAlignment(.trailing).accessibilityIdentifier("prayer-history-month-span")
+            if session.string("core.firstCalendar") == "gregorian" {
+                // The month is still the Hijri one the statistics group by; the Gregorian span leads when it is the first calendar.
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(monthSpan).font(serif(22)).lineLimit(1).minimumScaleFactor(0.6).accessibilityIdentifier("prayer-history-month-span")
+                    Text(monthTitle).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(1).accessibilityIdentifier("prayer-history-month")
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(monthTitle).font(serif(26)).lineLimit(1).minimumScaleFactor(0.7).layoutPriority(1).accessibilityIdentifier("prayer-history-month")
+                    Spacer(minLength: 8)
+                    Text(monthSpan).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(2).multilineTextAlignment(.trailing).accessibilityIdentifier("prayer-history-month-span")
+                }
             }
             if typeSize.isAccessibilitySize {
                 ForEach(snapshot.history.filter { hijri($0.day).month == month.month && hijri($0.day).year == month.year }, id: \.day) { day in

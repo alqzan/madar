@@ -62,6 +62,8 @@ struct PrayerCustomizeView: View {
     @State private var query = ""
     @State private var expanded: Set<String> = ["layout"]
     @State private var confirmReset = false
+    @State private var travelLocator = TravelLocator()
+    @State private var askedLocation = false
     @State private var editingStart = false
     @State private var confirmStart = false
     @State private var startDate = Date()
@@ -328,6 +330,12 @@ struct PrayerCustomizeView: View {
                     SettingControl(definition: definition, session: session)
                 }
                 if group.id == "log", query.isEmpty { Divider().overlay(theme.ink.opacity(0.1)); trackingStartBlock }
+                if group.id == "times" && query.isEmpty && session.bool("salah.travelShortenCombine") && session.string("core.travelMode") != "manual" && !askedLocation && travelLocator.canAskForLocation {
+                    Divider().overlay(theme.ink.opacity(0.1))
+                    Text("يقارن مدار موقعك بمدينتك مرة واحدة عند فتح الصلاة ليعرف أنك سافرت، دون أن يحفظه أو يرسله. وإن لم تسمح فوضع السفر اليدوي يبقى متاحًا.").font(PrayerHomeType.body)
+                    Button("اسمح بالموقع لكشف السفر") { askedLocation = true; travelLocator.askForLocation() }
+                        .frame(minHeight: 44).accessibilityIdentifier("prayer-travel-location-request")
+                }
                 if group.id == "remind" && session.bool("salah.askReminder") && !session.notificationsAuthorized {
                     Divider().overlay(theme.ink.opacity(0.1))
                     Text(session.notificationPermissionTitle).font(PrayerHomeType.body)
