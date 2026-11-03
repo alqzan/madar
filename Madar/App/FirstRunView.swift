@@ -36,6 +36,10 @@ struct FirstRunView: View {
                     Text(page.text).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                     if let message = locator.message, step == 1 {
                         Text(message).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        if locator.needsSettings {
+                            Button("افتح إعدادات الآيفون") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
+                                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("first-run-open-settings")
+                        }
                     }
                     actions
                 }.padding(24).padding(.top, 64).frame(maxWidth: 560).frame(maxWidth: .infinity)

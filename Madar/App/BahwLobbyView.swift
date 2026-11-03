@@ -35,7 +35,12 @@ struct BahwLayoutValue: Equatable {
     }
     func size(_ block: BahwBlock) -> BahwBlockSize { sizes[block.rawValue].flatMap(BahwBlockSize.init(rawValue:)) ?? .small }
     var visible: [BahwBlock] { blocks.compactMap(BahwBlock.init(rawValue:)).filter { BahwBlock.built.contains($0) && !hidden.contains($0.rawValue) } }
-    var hiddenBuilt: [BahwBlock] { blocks.compactMap(BahwBlock.init(rawValue:)).filter { BahwBlock.built.contains($0) && hidden.contains($0.rawValue) } }
+    /// Hidden rooms, plus any built room the saved list does not mention yet (a room added in a later version can always be turned on).
+    var hiddenBuilt: [BahwBlock] {
+        let listed = blocks.compactMap(BahwBlock.init(rawValue:)).filter { BahwBlock.built.contains($0) && hidden.contains($0.rawValue) }
+        let unlisted = BahwBlock.built.filter { !blocks.contains($0.rawValue) }.sorted { $0.rawValue < $1.rawValue }
+        return listed + unlisted
+    }
 }
 
 struct BahwGridLayout: Layout {

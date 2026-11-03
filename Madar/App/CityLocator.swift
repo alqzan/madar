@@ -8,6 +8,8 @@ import MapKit
     struct Found { let name: String; let lat: Double; let lon: Double; let tz: String; let country: String; let currency: String }
     @Published var working = false
     @Published var message: String?
+    /// True when the only way forward is the iPhone's Settings (location refused for Madar).
+    @Published var needsSettings = false
     private let manager = CLLocationManager()
     private var onFound: ((Found) -> Void)?
     private var requested = false
@@ -16,24 +18,29 @@ import MapKit
 
     func start(_ onFound: @escaping (Found) -> Void) {
         guard !working else { return }
-        self.onFound = onFound; message = nil; working = true; requested = false
-        // A position that never comes (indoors, no signal) ends with a sentence, not a button stuck on «أبحث».
-        timeout = Task { try? await Task.sleep(nanoseconds: 20_000_000_000); if !Task.isCancelled, self.working { self.fail("لم أصل إلى موقعك؛ اختر مدينتك من القائمة.") } }
+        self.onFound = onFound; message = nil; needsSettings = false; working = true; requested = false
         manager.delegate = self
         switch manager.authorizationStatus {
         case .notDetermined: manager.requestWhenInUseAuthorization()
         case .denied, .restricted: fail(Self.deniedText)
-        default: requested = true; manager.requestLocation()
+        default: requested = true; armTimeout(); manager.requestLocation()
         }
     }
 
-    private func fail(_ text: String) { working = false; message = text; onFound = nil; timeout?.cancel() }
+    /// A position that never comes (indoors, no signal) ends with a sentence, not a button stuck on «أبحث». The clock starts when
+    /// the system is asked for the position, not while the person is still reading the permission prompt.
+    private func armTimeout() {
+        timeout?.cancel()
+        timeout = Task { try? await Task.sleep(nanoseconds: 20_000_000_000); if !Task.isCancelled, self.working { self.fail("لم أصل إلى موقعك؛ اختر مدينتك من القائمة.") } }
+    }
+
+    private func fail(_ text: String) { working = false; message = text; needsSettings = (text == Self.deniedText); onFound = nil; timeout?.cancel() }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         Task { @MainActor in
             guard self.working, !self.requested else { return }
-            if status == .authorizedWhenInUse || status == .authorizedAlways { self.requested = true; self.manager.requestLocation() }
+            if status == .authorizedWhenInUse || status == .authorizedAlways { self.requested = true; self.armTimeout(); self.manager.requestLocation() }
             else if status == .denied || status == .restricted { self.fail(Self.deniedText) }
         }
     }

@@ -114,7 +114,7 @@ struct HabitsRoomView: View {
         .task { do {liveHealth=try await HabitHealthStore.refresh(session:session);reload()} catch {session.errorMessage="لم تتجدد قراءة الصحة؛ سجلك السابق محفوظ."} }
         .task {
             while !Task.isCancelled {
-                do {liveHealth=try await HabitHealthStore.refresh(session:session,closedDays:false);reload()}catch{}
+                do { let fresh=try await HabitHealthStore.refresh(session:session,closedDays:false); if fresh != liveHealth { liveHealth=fresh;reload() } }catch{}
                 try? await Task.sleep(for:.seconds(60))
             }
         }
