@@ -50,6 +50,18 @@ Codex takes these first, in order, before any other queue. Feature freeze until 
 
 **Owner only (no agent can do these):** (1) wait for Apple's account approval; (2) accept the App Store Connect agreements; (3) sign in to Xcode with the Apple ID on this Mac once; (4) create the «مدار» app record in App Store Connect, or approve agent-prepared fields; (5) done 2 Nov: iPhone prepared and Apple Intelligence on; (6) install TestFlight and accept the invite; (7) old-app data already sent ~22 Oct (owner, 2 Nov); a fresh export only for the final move to the phone; (8) make the first encrypted backup on the phone and keep its passphrase; (9) done 2 Nov: GitHub Pages, support email `alqazan.u@gmail.com`; (10) «Waiting on the owner» answered 2 Nov. Items 5 and 7 do not wait on Apple.
 
+## ملاحظات المالك من TestFlight — 3 نوفمبر 2026 (البناء 0.1.0 (1)، iPhone 15 Pro Max؛ قرأها Claude من App Store Connect ← TestFlight ← Screenshots؛ الكراشات: لا شيء)
+
+المالك: «عندك الاكسس ادخل من هناك وشف الملاحظات وسجلها». هذه أول تجربة حقيقية على الجوال، وهي أولى من بقية الطابور. كل صف نصّ المالك كما كُتب ثم المطلوب. التجميد على الميزات الجديدة لا يمنع إصلاح هذه العيوب.
+
+| ID | ملاحظة المالك | المطلوب | الحالة |
+|---|---|---|---|
+| FB-01 | «ياخي شف الحوسه مليان كلام والي تحت تراجع سيئه وحوسه ماعرفت استعمله» | افتح الشاشة الرئيسية (اللوبي) على الجوال وقارنها بتصميمها المعتمد: قلّل الكلام والتكرار، ورتّب ما تحت الشاشة بحيث يُستعمل من أول نظرة. | ready |
+| FB-02 | «الصلاه القادمه في كل مكان تلحقني والي تحت ماصف كل الاقسام وفيه قسمين ورا بعض حايس الامور» | شريط «الصلاة القادمة» يظهر في كل الشاشات ويغطي المحتوى؛ والشريط السفلي لا يصف كل الأقسام ويظهر فيه قسمان متجاوران بشكل يخلط الأمور. أصلح موضعه وعرض الأقسام كلها. (متصل بشريط الصلاة المضاف 3 نوفمبر.) | ready |
+| FB-03 | «اذا ضغطت الزر مايضغط الا اذا ضغطت على الي فيه احرف» | منطقة اللمس للأزرار لا تشمل كامل الزر: يلزم الضغط على النص فقط. اجعل كل زر يستجيب على كامل شكله (contentShape للمستطيل كله). ابحث أولًا في أي زر وفي أي شاشة، ولا تفترض. | ready؛ ينقص تحديد الشاشة |
+| FB-04 | «مزعجه هذي مره احذف كل القفل وهذا كله من التطبيق» | يطلب حذف القفل بالكامل من التطبيق (مصدق Face ID وكلمة السر). تعارض مع القرار السابق (3 نوفمبر: القفل اختياري ومغلق افتراضيًا). يحتاج جوابًا: هل المقصود شاشة قفل ظهرت له، أم يريد إزالة خيار القفل من الإعدادات؟ لا يُنفَّذ قبل التأكد. | سؤال للمالك |
+| FB-05 | «التطبيق يعلق اذا جيت انتقل بين الاقسام» | تعليق عند التنقل بين الأقسام (غالبًا بعد أول فتح بالبيانات الحقيقية). افحص أول فتح كل غرفة على جهاز حقيقي: أعمال على الخيط الرئيسي، مسح كامل لجداول، بناء snapshots. ابدأ بالتحقق من الكود بمساعدي Haiku ثم أصلح ما يثبت. | ready |
+
 ## Owner follow-up — 1 Nov 2026
 
 Owner approved the other 51 states from the pending gallery; real-device/use acceptance remains separate. M2-V10 alone is reopened to match its canonical design, including its crafted details. Spec: §7.4 Quran log in `docs/HANDOFF/sections/11-r-quran.md`, shared shapes §5, existing Quran fixes; no new data or scheduling rule.
