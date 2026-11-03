@@ -136,10 +136,16 @@ import MadarPrayer
         let draft = snapshot.drafts.sorted { $0.startedAt > $1.startedAt }.first.map { QuranUIDraft(id: $0.id, title: "تابع جلستك", isPastDay: $0.storedDay.date != today) }
         var missedDay: GregorianDay?
         if let plan = snapshot.plan {
-            var previous = today.adding(days: -1)
-            while snapshot.restDay.contains(previous) { previous = previous.adding(days: -1) }
+            // Days away: look back over the last 14 days since the plan began and settle the oldest unresolved one first; the next load takes the next.
             let firstDay = snapshot.planStartDay ?? today
-            if previous >= firstDay && !snapshot.sessions.contains(where: { $0.dayKey == previous && $0.kind == .hifz }) && !snapshot.allotments.contains(where: { $0.origin == .missPolicy && $0.originDayKey == previous }) { missedDay = previous }
+            for offset in 1...14 {
+                let day = today.adding(days: -offset)
+                guard day >= firstDay else { break }
+                if snapshot.restDay.contains(day) { continue }
+                if snapshot.sessions.contains(where: { $0.dayKey == day && $0.kind == .hifz }) { continue }
+                if snapshot.allotments.contains(where: { $0.origin == .missPolicy && $0.originDayKey == day }) { continue }
+                missedDay = day
+            }
             // «لو فاتك يوم» chosen in the plan (وزّعه/ضاعف/تجاوزه) is applied once, without asking; only «اسألني» shows the card.
             if let day = missedDay, plan.missPolicy != "ask", autoResolvedMissedDay != day {
                 autoResolvedMissedDay = day

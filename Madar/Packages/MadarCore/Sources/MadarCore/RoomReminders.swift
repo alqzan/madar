@@ -64,6 +64,18 @@ public enum RoomReminders {
         return .init(id: "mal.\(daysBefore == 0 ? "cardCash" : "cardDue").\(cardID.uuidString).\(dueDay)", room: .mal, dueAt: due, dayKey: reminder.description)
     }
 
+    /// A bill or subscription falling due: noon, `daysBefore` days ahead (0 = the due day itself), through the same sanctity guard.
+    public static func billDue(billID: UUID, dueDay: GregorianDay, daysBefore: Int, timeZone: TimeZone,
+                               prayerDays: [PrayerDay], now: Date) -> NotificationCandidate? {
+        guard [0, 1, 3].contains(daysBefore) else { return nil }
+        let reminder = dueDay.adding(days: -daysBefore)
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+        guard let proposed = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: reminder.date(in: timeZone)) else { return nil }
+        let due = SanctityGuard(prayerDays: prayerDays).clamp(proposed)
+        guard due > now, due <= now.addingTimeInterval(48 * 3600) else { return nil }
+        return .init(id: "mal.billDue.\(billID.uuidString).\(dueDay).\(daysBefore)", room: .mal, dueAt: due, dayKey: reminder.description)
+    }
+
     /// M5-V22: an amount-free annual reminder before the hawl date chosen by the user. The
     /// candidate is long-range by design; NotificationArbiter grants this kind its bounded horizon.
     public static func zakat(anniversary: GregorianDay, lead: String, timeZone: TimeZone,
@@ -106,6 +118,7 @@ public enum RoomReminders {
         if id.hasPrefix("habits.") { return "عادة" }
         if id.hasPrefix("mal.alert80.") { return "حدود الصرف" }
         if id.hasPrefix("mal.card") { return "سداد البطاقة" }
+        if id.hasPrefix("mal.billDue.") { return "موعد فاتورة" }
         if id.hasPrefix("mal.zakat.") { return "الزكاة" }
         if id.hasPrefix("mal.reconcile.") { return "مطابقة الرصيد" }
         if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "النيّة" : id.hasSuffix(".letter") ? "رسالة" : "ذكرى" }

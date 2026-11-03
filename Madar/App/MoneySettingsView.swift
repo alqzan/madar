@@ -411,7 +411,7 @@ struct MoneySettingsView: View {
             note("كل عملية تحتفظ بتصنيفها. يقتصر الاقتراح على مصروفات مؤكدة اخترت تصنيفها يدويًا، ويمكنك تغييره كل مرة.")
             toggle("تنبيه حدود التصنيف", "mal.alert80")
             toggle("افتح منذ آخر زيارة بعد الغياب", "mal.sinceLastVisit")
-            Picker("تذكير سداد البطاقة", selection: stringBinding("mal.cardDue")) {
+            Picker("تذكير سداد البطاقة والفواتير", selection: stringBinding("mal.cardDue")) {
                 Text("قبل ثلاثة أيام").tag("3days"); Text("قبل يوم").tag("1day"); Text("بلا تذكير").tag("off")
             }
             Picker("تذكير موعد الزكاة", selection: stringBinding("mal.zakatReminder")) {

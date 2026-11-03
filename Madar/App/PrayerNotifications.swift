@@ -189,6 +189,7 @@ final class PrayerNotificationCoordinator {
         try session.reload()
         let now = suppliedNow ?? session.prayerNow()
         try session.publishNotificationBudget(at: now)
+        pruneLedgerOncePerDay(now: now)
         let repository = try PrayerRepository(context: ModelContext(session.container))
         let days = prayerDays(repository: repository, now: now)
         let prayerSlots = try PrayerNotificationSchedule.slots(repository: repository, days: days, now: now)
@@ -763,6 +764,23 @@ final class PrayerNotificationCoordinator {
         guard parts.count == 2, let hour = Int(parts[0]), let minute = Int(parts[1]),
               (0...23).contains(hour), (0...59).contains(minute) else { return true }
         return NotificationArbiter.quietWindowContains(date, timeZone: timeZone, fromMinutes: hour * 60 + minute, until: until, prayerDays: prayerDays)
+    }
+
+    /// The ledger only needs today's budget and recent history; rows older than 45 days that are no longer pending are tombstoned (once a day).
+    private func pruneLedgerOncePerDay(now: Date) {
+        guard let session else { return }
+        let key = "Madar.ledgerPrunedOn"
+        let today = Int(now.timeIntervalSince1970 / 86_400)
+        guard UserDefaults.standard.integer(forKey: key) != today else { return }
+        do {
+            let container = try session.managedStore?.containerForTransaction() ?? session.container
+            let context = ModelContext(container)
+            let cutoff = now.addingTimeInterval(-45 * 86_400)
+            let old = try context.fetch(FetchDescriptor<NotificationLedger>(predicate: #Predicate { $0.scheduledFor < cutoff }))
+            for row in old where row.deletedAt == nil && row.state != "submitted" { row.deletedAt = now; row.updatedAt = now }
+            if context.hasChanges { try context.save() }
+            UserDefaults.standard.set(today, forKey: key)
+        } catch { }
     }
 
     private func updateLedger(requestID: String, dayKey: String? = nil, prayer: Prayer? = nil, dueAt: Date? = nil,

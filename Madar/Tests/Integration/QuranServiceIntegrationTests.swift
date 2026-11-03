@@ -88,7 +88,7 @@ import MadarCommands
         XCTAssertEqual(page.lines.count, 15); XCTAssertFalse(page.postScriptName.isEmpty); XCTAssertFalse(page.lines[0].glyphs.isEmpty)
         XCTAssertNotNil(app.undoToken)
     }
-    /// §7.4 «لو فاتك يوم»: a plan policy of «وزّعه» is applied without asking (+⅓ face over three days, RQ6); «اسألني» shows the card.
+    /// §7.4 «لو فاتك يوم» (every missed day since the plan began, up to 14, not only yesterday): a plan policy of «وزّعه» is applied without asking (+⅓ face over three days, RQ6); «اسألني» shows the card.
     func testMissedDayPolicyIsAppliedOnceWithoutAsking() async throws {
         for policy in ["spread", "ask"] {
             let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
@@ -100,10 +100,10 @@ import MadarCommands
             let missed = try ModelContext(app.container).fetch(FetchDescriptor<QuranAllotment>()).filter { $0.origin == "missPolicy" && $0.deletedAt == nil }
             if policy == "spread" {
                 XCTAssertNil(state.missedDayKey)
-                XCTAssertEqual(missed.count, 3)
+                XCTAssertEqual(missed.count, 9, "three missed days, a third of a face over three days each")
                 for row in missed { XCTAssertEqual(row.amount, 1.0 / 3, accuracy: 0.0001) }
                 _ = try await service.load()
-                XCTAssertEqual(try ModelContext(app.container).fetch(FetchDescriptor<QuranAllotment>()).filter { $0.origin == "missPolicy" }.count, 3, "applied once")
+                XCTAssertEqual(try ModelContext(app.container).fetch(FetchDescriptor<QuranAllotment>()).filter { $0.origin == "missPolicy" }.count, 9, "applied once")
             } else {
                 XCTAssertNotNil(state.missedDayKey); XCTAssertTrue(missed.isEmpty)
             }

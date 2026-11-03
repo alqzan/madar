@@ -25,6 +25,19 @@ import Testing
         #expect(RoomReminders.digestKinds(memberIDs: [reminder.id, cash!.id]) == ["سداد البطاقة"])
     }
 
+    @Test func billDueRemindsAheadAndOnTheDueDayThroughTheSanctityGuard() throws {
+        let bill = UUID(), due = try GregorianDay("2026-10-12"), zone = ActivePlace.riyadh.timeZone
+        let ahead = try #require(RoomReminders.billDue(billID: bill, dueDay: due, daysBefore: 3, timeZone: zone, prayerDays: [day], now: dawn))
+        #expect(ahead.id == "mal.billDue.\(bill.uuidString).2026-10-12.3")
+        #expect(ahead.dayKey == "2026-10-09")
+        #expect(SanctityGuard(prayerDays: [day]).clamp(ahead.dueAt) == ahead.dueAt)
+        let sameDay = try #require(RoomReminders.billDue(billID: bill, dueDay: day.day, daysBefore: 0, timeZone: zone, prayerDays: [day], now: dawn))
+        #expect(sameDay.id.hasSuffix("2026-10-09.0"))
+        #expect(RoomReminders.billDue(billID: bill, dueDay: due, daysBefore: 2, timeZone: zone, prayerDays: [day], now: dawn) == nil)
+        #expect(RoomReminders.billDue(billID: bill, dueDay: due, daysBefore: 3, timeZone: zone, prayerDays: [day], now: ahead.dueAt) == nil)
+        #expect(RoomReminders.digestKinds(memberIDs: [ahead.id, sameDay.id]) == ["موعد فاتورة"])
+    }
+
     @Test func reconciliationReminderUsesFreeLastCheckDateAndWaitsForSanctity() throws {
         let id = UUID(), zone = ActivePlace.riyadh.timeZone
         let dueToday = RoomReminders.reconciliation(lineID: id, since: day.day.adding(days: -90), everyDays: 90,

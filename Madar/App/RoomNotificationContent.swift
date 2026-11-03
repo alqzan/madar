@@ -10,7 +10,7 @@ import MadarPrayer
 /// M3-V12 adds the diary kinds (morning intention, «في مثل هذا اليوم», a letter whose day came) with fixed copy
 /// that never carries diary text, so they stand outside the lock cleanup of `madar.notes.` requests (owner, 15 Oct).
 @MainActor enum RoomNotificationContent {
-    static let roomPrefixes = ["quran.", "digest.", "qada.", "habits.", "notes.", "nudge.", "mal.alert80.", "mal.cardDue.", "mal.cardCash.", "mal.reconcile.", "mal.zakat."]
+    static let roomPrefixes = ["quran.", "digest.", "qada.", "habits.", "notes.", "nudge.", "mal.alert80.", "mal.cardDue.", "mal.cardCash.", "mal.billDue.", "mal.reconcile.", "mal.zakat."]
     static func isRoomRequest(_ id: String) -> Bool { roomPrefixes.contains { id.hasPrefix($0) } }
 
     /// Qada while something is owed, and each push habit's window start today (custom, due, unmet, not paused).
@@ -30,7 +30,7 @@ import MadarPrayer
                 result.append(candidate)
             }
         }
-        return result + (try diaryCandidates(session: session, prayerDays: prayerDays, now: now)) + limitCandidates(session: session, prayerDays: prayerDays, now: now) + cardCandidates(session: session, prayerDays: prayerDays, now: now) + reconciliationCandidates(session: session, prayerDays: prayerDays, now: now) + zakatCandidates(session: session, now: now)
+        return result + (try diaryCandidates(session: session, prayerDays: prayerDays, now: now)) + limitCandidates(session: session, prayerDays: prayerDays, now: now) + cardCandidates(session: session, prayerDays: prayerDays, now: now) + billCandidates(session: session, prayerDays: prayerDays, now: now) + reconciliationCandidates(session: session, prayerDays: prayerDays, now: now) + zakatCandidates(session: session, now: now)
     }
 
     /// Builds two upcoming amount-free requests from the saved hawl preference. Each has its own
@@ -112,6 +112,20 @@ import MadarPrayer
             [lead, due.cashAfterMinor < 0 ? 0 : nil].compactMap { before -> NotificationCandidate? in
                 guard let before, let card = due.cardID,
                       let candidate = RoomReminders.cardDue(cardID: card, dueDay: due.day, amountMinor: due.amountMinor, daysBefore: before, timeZone: session.activePlace.timeZone, prayerDays: prayerDays, now: now),
+                      let key = try? DiaryLineRenderer.today(context: ModelContext(session.container), now: candidate.dueAt).description else { return nil }
+                return .init(id: candidate.id, room: .mal, dueAt: candidate.dueAt, dayKey: key)
+            }
+        }
+    }
+
+    /// Bills and subscriptions: a reminder at the lead set in «تذكير سداد البطاقة» and another on the due day, amount-free.
+    static func billCandidates(session: AppSession, prayerDays: [PrayerDay], now: Date) -> [NotificationCandidate] {
+        guard session.string("mal.cardDue") != "off", let reading = try? AppMoneyService(app: session).loadObligations() else { return [] }
+        let lead = session.string("mal.cardDue") == "1day" ? 1 : 3
+        return (reading.bills + reading.subscriptions).filter { $0.obligationID != nil }.flatMap { due -> [NotificationCandidate] in
+            [lead, 0].compactMap { before -> NotificationCandidate? in
+                guard let id = due.obligationID,
+                      let candidate = RoomReminders.billDue(billID: id, dueDay: due.due, daysBefore: before, timeZone: session.activePlace.timeZone, prayerDays: prayerDays, now: now),
                       let key = try? DiaryLineRenderer.today(context: ModelContext(session.container), now: candidate.dueAt).description else { return nil }
                 return .init(id: candidate.id, room: .mal, dueAt: candidate.dueAt, dayKey: key)
             }
@@ -245,6 +259,10 @@ import MadarPrayer
             content.title = protected ? "مدار" : "سداد البطاقة"
             content.body = protected ? "لديك تنبيه في مدار" : id.hasPrefix("mal.cardCash.") ? "راجع سداد بطاقتك اليوم؛ النقد الحالي لا يغطي الالتزامات المعروفة" : "موعد سداد بطاقتك " + (session.string("mal.cardDue") == "1day" ? "غدًا" : "بعد ثلاثة أيام") + "؛ راجع الكشف والنقد المتاح"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
+        } else if id.hasPrefix("mal.billDue.") {
+            content.title = protected ? "مدار" : "موعد فاتورة"
+            content.body = protected ? "لديك تنبيه في مدار" : id.hasSuffix(".0") ? "عندك فاتورة أو اشتراك يستحق اليوم" : "عندك فاتورة أو اشتراك يستحق قريبًا"
+            content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.alert80.") {
             // RU2: notifications stay amount-free even when amounts are visible inside the app.
             // Owner, 26 Oct: name the category and the 80% line, never an amount.
@@ -281,6 +299,7 @@ import MadarPrayer
         if id.hasPrefix("habits.") { return "habit" }
         if id.hasPrefix("mal.alert80.") { return "alert80" }
         if id.hasPrefix("mal.card") { return id.hasPrefix("mal.cardCash.") ? "cardCash" : "cardDue" }
+        if id.hasPrefix("mal.billDue.") { return "billDue" }
         if id.hasPrefix("mal.zakat.") { return "zakat" }
         if id.hasPrefix("mal.reconcile.") { return "reconciliation" }
         if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "niyya" : id.hasSuffix(".letter") ? "letter" : "onThisDay" }
@@ -317,6 +336,12 @@ import MadarPrayer
                   let reading = try? AppMoneyService(app: session).loadCards(at: now),
                   let due = reading.dues.first(where: { $0.cardID == cardID && $0.day.description == id.split(separator: ".").last.map(String.init) }) else { return false }
             return due.amountMinor > 0 && (!id.hasPrefix("mal.cardCash.") || due.cashAfterMinor < 0)
+        }
+        if id.hasPrefix("mal.billDue.") {
+            let parts = id.split(separator: ".")
+            guard session.string("mal.cardDue") != "off", parts.count == 5, let billID = UUID(uuidString: String(parts[2])),
+                  let reading = try? AppMoneyService(app: session).loadObligations() else { return false }
+            return (reading.bills + reading.subscriptions).contains { $0.obligationID == billID && $0.due.description == String(parts[3]) }
         }
         if id.hasPrefix("mal.reconcile.") {
             let repository = try PrayerRepository(context: ModelContext(session.container))
@@ -367,6 +392,7 @@ import MadarPrayer
                 session.open(URL(string: "madar://mal/card/\(cardID.uuidString)?tab=\(tab)")!)
             } else { session.selectedTab = "money" }
         }
+        else if id.hasPrefix("mal.billDue.") { session.selectedTab = "money" }
         else if id.hasPrefix("mal.alert80.") { session.open(URL(string: "madar://mal/categories")!) }
         else if id.hasPrefix("mal.reconcile.") { session.open(URL(string: "madar://mal/reconcile")!) }
         else if id.hasPrefix("mal.zakat.") { session.open(URL(string: "madar://mal/zakat")!) }
