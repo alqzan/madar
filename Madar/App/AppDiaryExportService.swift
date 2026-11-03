@@ -114,7 +114,7 @@ extension AppDiaryService {
             }
             lines=lines.filter{!$0.text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty}
             guard !lines.isEmpty || !media.isEmpty else{return nil}
-            return .init(day:date,title:bothDates(date,calendar:FirstCalendar(rawValue:app.string("core.firstCalendar")) ?? .hijri),lines:lines.sorted{$0.at == $1.at ? $0.id<$1.id : $0.at<$1.at},media:media)
+            return .init(day:date,title:bothDates(date,calendar:app.diaryFirstCalendar),lines:lines.sorted{$0.at == $1.at ? $0.id<$1.id : $0.at<$1.at},media:media)
         }
     }
     func exportDiary(_ options:DiaryExportOptions) throws -> DiaryExportArtifact {

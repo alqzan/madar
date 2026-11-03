@@ -12,7 +12,7 @@ enum BahwBlock: String, CaseIterable {
         switch self { case .habits: "عاداتك"; case .salah: "الصلاة"; case .quran: "القرآن"; case .mal: "المال"; case .year: "السنة"; case .upcoming: "الأيام القادمة"; case .notes: "المذكرات"; case .mihbara: "المحبرة" }
     }
     var symbol: String {
-        switch self { case .habits: "MadarHabits"; case .salah: "MadarPrayer"; case .quran: "MadarQuran"; case .year: "MadarYear"; case .upcoming: "MadarUpcoming"; case .notes: "MadarDiary"; case .mihbara: "books.vertical"; default: "circle" }
+        switch self { case .habits: "MadarHabits"; case .salah: "MadarPrayer"; case .quran: "MadarQuran"; case .year: "MadarYear"; case .upcoming: "MadarUpcoming"; case .notes: "MadarDiary"; case .mihbara: "books.vertical"; case .mal: "banknote"; default: "circle" }
     }
     var tab: String? { switch self { case .salah: "prayer"; case .quran: "quran"; case .notes: "notes"; default: nil } }
 }

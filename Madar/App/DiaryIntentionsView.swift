@@ -26,7 +26,7 @@ struct DiaryIntentionsView:View {
             ScrollView {
                 VStack(alignment:.leading,spacing:18){
                     Text(evening ? "حصيلة النيّات" : "نيّة اليوم").font(DiaryType.title)
-                    MadarDateLabel(service.bothDates(day,calendar:FirstCalendar(rawValue:app.string("core.firstCalendar")) ?? .hijri)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    MadarDateLabel(service.bothDates(day,calendar:app.diaryFirstCalendar)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     if evening {Text("كيف مضت نيّتك؟ اختر ما يصف يومك.").font(DiaryType.writing)}
                     ForEach(rows){row in
                         VStack(alignment:.leading,spacing:10){

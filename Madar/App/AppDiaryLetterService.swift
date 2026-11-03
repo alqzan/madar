@@ -51,7 +51,7 @@ extension AppDiaryService {
     }
     func waitingFor(_ trigger: DiaryLetterTrigger, value: String?, target: String?) -> String {
         switch trigger {
-        case .date: return value.flatMap { try? GregorianDay($0) }.map { "تُفتح في " + bothDates($0, calendar: FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri) } ?? "تُفتح في يومها"
+        case .date: return value.flatMap { try? GregorianDay($0) }.map { "تُفتح في " + bothDates($0, calendar: app.diaryFirstCalendar) } ?? "تُفتح في يومها"
         case .hijriDate:
             // Both calendars (owner, 15 Oct): the Hijri day leads, its Gregorian day beneath it.
             guard let value else { return "تُفتح في يومها" }

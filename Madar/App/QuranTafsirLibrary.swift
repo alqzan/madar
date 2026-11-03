@@ -339,7 +339,7 @@ struct QuranTafsirLibraryView: View {
                 }
             }
             HStack(spacing: 12) {
-                Text(book.isBundled ? "مضمّن · كامل القرآن" : "\(digits.string(book.pageCount)) صفحة مفهرسة · \(sizeLabel(book.sizeBytes ?? 0))")
+                Text(book.isBundled ? "مضمّن · كامل القرآن" : "\(digits.string(book.pageCount)) صفحة مفهرسة، \(sizeLabel(book.sizeBytes ?? 0))")
                     .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 Spacer(minLength: 0)
                 if selectedDefault != book.id {

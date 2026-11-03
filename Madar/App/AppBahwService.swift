@@ -245,7 +245,7 @@ extension AppBahwService {
                 result.append(.init(id: "notes", title: "سطر من يومك", detail: "ما الذي تحب أن يبقى من هذا اليوم؟", symbol: "MadarDiary", destination: .diary))
             }
             if let money = try? AppMoneyService(app: session).load(at: now), money.pendingCount > 0 {
-                result.append(.init(id: "money", title: "راجع رسائلك البنكية", detail: "رسائل تنتظر قرارك قبل أن تصبح حركات", symbol: "MadarMoney", destination: .money))
+                result.append(.init(id: "money", title: "راجع رسائلك البنكية", detail: "رسائل تنتظر قرارك قبل أن تصبح حركات", symbol: "banknote", destination: .money))
             }
             if let book = session.mihbaraWidgetSnapshot(locked: false, at: now).currentBook {
                 result.append(.init(id: "mihbara", title: "أكمل «" + book.title + "»", detail: book.currentPage.map { "موضعك محفوظ عند الصفحة " + digits.string($0) } ?? "ابدأ القراءة من رحل المحبرة", symbol: "books.vertical", destination: .mihbara(book: book.id)))

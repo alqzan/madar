@@ -82,7 +82,7 @@ struct DiaryDayView: View {
             .joined(separator: "\n\n")
     }
     private var today: GregorianDay { (try? service.currentDay()) ?? day }
-    private var first: FirstCalendar { FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri }
+    private var first: FirstCalendar { app.diaryFirstCalendar }
     private var eveningPrimary: Bool { shownDay == today && !intentions.isEmpty && service.intentionEvening(shownDay) }
     private var secondInk: Color {
         switch app.string("notes.secondInk") {

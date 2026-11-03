@@ -1302,6 +1302,8 @@ final class AppSession {
     }
     var homeCity: [String: JSONValue] { if case .object(let place) = values["core.homeCity"] { place } else { [:] } }
     var cityName: String { if case .string(let name) = homeCity["name"] { name } else { "" } }
+    /// The diary has its own calendar order (`notes.calendarFirst`, Gregorian by default); every other room follows `core.firstCalendar`.
+    var diaryFirstCalendar: FirstCalendar { FirstCalendar(rawValue: string("notes.calendarFirst")) ?? .gregorian }
     var activePlace: ActivePlace {
         let city = homeCity
         guard case .number(let lat) = city["lat"], case .number(let lon) = city["lon"], case .string(let zone) = city["tz"], let place = try? ActivePlace(latitude: lat, longitude: lon, timeZoneID: zone) else { return .riyadh }

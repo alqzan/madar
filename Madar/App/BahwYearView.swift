@@ -419,7 +419,7 @@ struct BahwDaySheet: View {
                         Toggle(isOn: $draft.countUpAfter) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("واصل العدّ بعد الموعد").font(MadarTypography.body())
-                                Text(draft.countUpAfter ? "يبقى بعد يومه ويعدّ: مضى كذا يومًا" : "يختفي بعد يومه").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
+                                Text(draft.countUpAfter ? "يبقى بعد يومه ويعدّ الأيام التي مضت" : "يختفي بعد يومه").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
                             }
                         }.padding(14).background(lobby.surface, in: .rect(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(lobby.line) }
                             .accessibilityIdentifier("bahw-day-count-up")

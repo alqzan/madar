@@ -166,7 +166,7 @@ struct MoneyCategoriesView: View {
                 Button { save(s, none: false) } label: {
                     Text("احفظ الحد").font(.custom("thmanyahsans-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.background)
                         .frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: Capsule())
-                }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-limit-save").layoutPriority(1)
+                }.buttonStyle(.madarPlain).disabled(saving || (!percentMode && draftMinor <= 0)).accessibilityIdentifier("money-limit-save").layoutPriority(1)
             }
             if let saveFailure { Text(saveFailure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-limit-failure") }
         }.padding(.top, 6)

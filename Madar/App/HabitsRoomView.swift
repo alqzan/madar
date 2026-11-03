@@ -137,7 +137,7 @@ struct HabitsRoomView: View {
         session.habitsOpen = false
     }
     private var empty: some View {
-        VStack(spacing:16) { HabitRingGlyph(share:0.25,done:false,symbol:nil,lineWidth:5).frame(width:60,height:60); Text("القليل الذي تدوم عليه").font(MadarTypography.title()); Text("اختر عادة صغيرة تبدأ بها، أو اربطها بما تسجّله في غرف مدار.").font(MadarTypography.body()).multilineTextAlignment(.center).foregroundStyle(theme.secondaryInk); Button { editor = .init(id:UUID()) } label: { Text("أضف أول عادة").font(MadarTypography.section()).padding(.horizontal,22).frame(minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-first") }.padding(28).frame(maxWidth:.infinity).background(theme.surface,in:.rect(cornerRadius:24)).padding(.top,25)
+        VStack(spacing:16) { HabitRingGlyph(share:0,done:false,symbol:nil,lineWidth:5).frame(width:60,height:60); Text("القليل الذي تدوم عليه").font(MadarTypography.title()); Text("اختر عادة صغيرة تبدأ بها، أو اربطها بما تسجّله في غرف مدار.").font(MadarTypography.body()).multilineTextAlignment(.center).foregroundStyle(theme.secondaryInk); Button { editor = .init(id:UUID()) } label: { Text("أضف أول عادة").font(MadarTypography.section()).padding(.horizontal,22).frame(minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-first") }.padding(28).frame(maxWidth:.infinity).background(theme.surface,in:.rect(cornerRadius:24)).padding(.top,25)
     }
 
     // MARK: What «اليوم» holds

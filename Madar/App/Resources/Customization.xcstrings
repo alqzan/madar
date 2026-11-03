@@ -117,6 +117,18 @@
         }
       }
     },
+    "backup.restoreSummaryClean" : {
+      "comment" : "Restore completion when no record was skipped; only the restored-count sentence follows the heading.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اكتملت الاستعادة. %@"
+          }
+        }
+      }
+    },
     "backup.restoreSummary" : {
       "comment" : "Restore completion; two complete localized count sentences follow the heading.",
       "extractionState" : "manual",

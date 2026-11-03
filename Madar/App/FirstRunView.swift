@@ -5,6 +5,7 @@ import MadarDesign
 struct FirstRunView: View {
     @Bindable var session: AppSession
     @State private var step = 0
+    @State private var cityChosen = false
     @Environment(\.roomTheme) private var theme
     var body: some View {
         NavigationStack {
@@ -19,10 +20,20 @@ struct FirstRunView: View {
                     if step == 1 {
                         MadarCard {
                             VStack(alignment: .leading, spacing: 16) {
-                                Text(session.cityName.isEmpty ? "الرياض، حتى تختار مدينتك" : session.cityName).font(MadarTypography.section())
+                                Text(cityChosen || session.cityName.isEmpty ? session.cityName : session.cityName + "، حتى تختار مدينتك").font(MadarTypography.section())
                                 Text("المواقيت بطريقة أم القرى").foregroundStyle(theme.secondaryInk)
-                                NavigationLink("اختر مدينة") { CityEditor(session: session) }
+                                NavigationLink("اختر مدينة") { CityEditor(session: session).onDisappear { cityChosen = true } }
                                     .frame(minHeight: 44).accessibilityIdentifier("first-run-city")
+                            }
+                        }
+                    }
+                    if step == 1 && session.bool("salah.askReminder") && session.canRequestNotificationPermission {
+                        MadarCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("تنبيهات الصلاة").font(MadarTypography.section())
+                                Text("ينبّهك مدار عند دخول الوقت، ولا يصلك شيء أثناء الصلاة نفسها. يمكنك تغيير ذلك من خصّص.").foregroundStyle(theme.secondaryInk)
+                                Button("اسمح بالتنبيهات") { session.requestPrayerNotificationPermission() }
+                                    .frame(minHeight: 44).accessibilityIdentifier("first-run-notifications")
                             }
                         }
                     }

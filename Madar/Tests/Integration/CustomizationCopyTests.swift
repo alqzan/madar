@@ -53,6 +53,10 @@ final class CustomizationCopyTests: XCTestCase {
                 .filter { $0 != "\u{2068}" && $0 != "\u{2069}" }
             XCTAssertEqual(actual, text)
         }
+        // Nothing skipped: the summary names only what was restored.
+        let clean = BackupCopy.restoreSummary(BackupRestoreResult(restoredCount: 3, skippedCount: 0, warnings: []), numerals: .hindi)
+            .filter { $0 != "\u{2068}" && $0 != "\u{2069}" }
+        XCTAssertEqual(clean, "اكتملت الاستعادة. استُعيدت ٣ سجلات.")
         XCTAssertEqual(result.restoredCount, 3)
         XCTAssertEqual(result.skippedCount, 11)
         XCTAssertEqual(result.warnings, ["تنبيه 123"], "Appearance must not relocalize warning payloads.")

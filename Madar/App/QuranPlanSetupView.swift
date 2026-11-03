@@ -61,10 +61,10 @@ struct QuranPlanSetupView: View {
                     ForEach(0..<4) { n in
                         Capsule().fill(n <= step ? theme.color("hifz") : theme.color("track")).frame(height: 4)
                     }
-                }.padding(16).accessibilityLabel("الخطوة " + service.numerals.string(min(step + 1, 4)) + " من أربع")
+                }.padding(16).accessibilityLabel("الخطوة " + service.numerals.string(min(step + 1, 4)) + " من ٤")
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text(step < 4 ? "الخطوة " + service.numerals.string(step + 1) + " من أربع" : "الملخّص").font(
+                        Text(step < 4 ? "الخطوة " + service.numerals.string(step + 1) + " من " + service.numerals.string(4) : "الملخّص").font(
                             quranFont(12)
                         ).foregroundStyle(theme.secondaryInk)
                         Text(titles[step]).font(quranSerif(33)).accessibilityIdentifier("quran-setup-title")
@@ -175,7 +175,7 @@ struct QuranPlanSetupView: View {
                     Text("الوحدة").font(quranFont(15, bold: true))
                     ForEach(QuranUIUnit.allCases) { unit in
                         Button {
-                            input?.unit = unit; input?.amount = 1
+                            if input?.unit != unit { input?.unit = unit; input?.amount = 1 }
                         } label: {
                             HStack {
                                 Text(unit.title); Spacer();

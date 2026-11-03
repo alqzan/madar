@@ -90,7 +90,7 @@ struct HabitDetailView:View {
             if reading.paused { Button { perform("habit.resume",["id":.string(reading.id.uuidString)]) } label: { outline(Label("فكّ التجميد",systemImage:"play")) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-resume") }
             else {
                 Menu {
-                    Button("أسبوعًا"){freeze(week:true)};Button("حتى أفكّه"){freeze(week:false)};Button("من أمس حتى أفكّه"){freeze(week:false,yesterday:true)}
+                    Button("جمّد أسبوعًا"){freeze(week:true)};Button("جمّد حتى أفكّه"){freeze(week:false)};Button("جمّد من أمس حتى أفكّه"){freeze(week:false,yesterday:true)}
                     if (try? PrayerRepository(context:ModelContext(session.container)).activeTrip(at:session.prayerNow())) != nil { Button("حتى أعود من السفر"){freeze(week:false,trip:true)} }
                 } label: { outline(Label("جمّد",systemImage:"snowflake")) }.accessibilityIdentifier("habit-freeze")
             }

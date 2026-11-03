@@ -41,8 +41,11 @@ enum BackupCopy {
         let formatter = MadarNumberFormatter(style: numerals)
         let restored = restored(count: result.restoredCount, formattedCount: formatter.string(result.restoredCount))
         let skipped = skipped(count: result.skippedCount, formattedCount: formatter.string(result.skippedCount))
-        let summary = String(localized: "backup.restoreSummary", defaultValue: "اكتملت الاستعادة. \(restored) \(skipped)",
-                             table: "Customization", locale: Locale(identifier: "ar"))
+        // Nothing skipped is the normal case; a sentence of negations about it only confuses.
+        let summary = result.skippedCount == 0
+            ? String(localized: "backup.restoreSummaryClean", defaultValue: "اكتملت الاستعادة. \(restored)", table: "Customization", locale: Locale(identifier: "ar"))
+            : String(localized: "backup.restoreSummary", defaultValue: "اكتملت الاستعادة. \(restored) \(skipped)",
+                     table: "Customization", locale: Locale(identifier: "ar"))
         return ([summary] + result.warnings).joined(separator: "\n")
     }
 }

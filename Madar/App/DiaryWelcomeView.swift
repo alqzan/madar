@@ -53,7 +53,7 @@ struct DiaryWelcomeView: View {
     private let titles = ["دفتر يكتب معك", "ما تعيشه، بأسلوب المذكرات", "للذكرى أكثر من تقويم", "سطر واحد يكفي للبداية"]
     var body: some View {
         VStack(spacing: 20) {
-            HStack(spacing: 6) { ForEach(0..<4) { index in Capsule().fill(index == step ? theme.accent : theme.line).frame(width: index == step ? 20 : 6, height: 6) } }.padding(.top, 22).accessibilityLabel("الخطوة " + app.digits(step+1) + " من أربع")
+            HStack(spacing: 6) { ForEach(0..<4) { index in Capsule().fill(index == step ? theme.accent : theme.line).frame(width: index == step ? 20 : 6, height: 6) } }.padding(.top, 22).accessibilityLabel("الخطوة " + app.digits(step+1) + " من " + app.digits(4))
             ScrollView {
                 VStack(spacing: 24) {
                     if step == 0 {

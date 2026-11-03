@@ -99,6 +99,7 @@ extension AppMoneyService {
             if statement == nil { sources["statement"]?.valueText = "لم يصل كشف" }
             sources["minimum"] = .init(id: "minimum-" + card.id.uuidString, title: "الحد الأدنى", amountMinor: statement?.minimumDueMinor ?? 0,
                 explanation: statement == nil ? "لم يصل كشف يذكر الحد الأدنى." : "الحد الأدنى من آخر كشف محفوظ؛ ما دفعته منذ القفل يُحتسب منه. لا يعني إعفاء الباقي من الفائدة.", message: sourceMessage, date: closeDay)
+            if statement == nil { sources["minimum"]?.valueText = "لم يصل كشف" }
             let fields = (try? JSONSerialization.jsonObject(with: card.fieldSourcesJSON)) as? [String: Any] ?? [:]
             for (key, value, title) in [("limitMinor", card.limitMinor, "حد البطاقة"), ("cashbackBp", card.cashbackBp, "نسبة الاسترداد"), ("aprBp", card.aprBp, "نسبة الفائدة السنوية")] {
                 let field = fields[key] as? [String: Any], source = field?["source"] as? String ?? fields[key] as? String

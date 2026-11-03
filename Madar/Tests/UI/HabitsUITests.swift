@@ -185,7 +185,7 @@ import UIKit
         // One tap from the room, as from the lobby: the row's own button completes a once-a-day habit and then leaves.
         let quick=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","habit-quick-")).firstMatch
         XCTAssertTrue(quick.waitForExistence(timeout:5),app.debugDescription);shot(app,"GD-habits-quick-L");quick.tap();XCTAssertTrue(quick.waitForNonExistence(timeout:5))
-        row().tap();XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["habit-progress"].label.contains("١ من ١"));app.buttons["habit-freeze"].tap();app.buttons["حتى أفكّه"].tap();XCTAssertTrue(app.buttons["habit-freeze"].waitForNonExistence(timeout:5))
+        row().tap();XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["habit-progress"].label.contains("١ من ١"));app.buttons["habit-freeze"].tap();app.buttons["جمّد حتى أفكّه"].tap();XCTAssertTrue(app.buttons["habit-freeze"].waitForNonExistence(timeout:5))
         row().tap();XCTAssertTrue(app.buttons["habit-resume"].waitForExistence(timeout:5));shot(app,"M4-V02-frozen-L");app.buttons["habit-resume"].tap();XCTAssertTrue(app.buttons["habit-resume"].waitForNonExistence(timeout:5))
         row().tap();app.buttons["habit-delete"].tap();XCTAssertTrue(app.buttons["habit-first"].waitForExistence(timeout:5));app.buttons["habit-archived"].tap();app.buttons["استعدها"].tap();XCTAssertTrue(row().waitForExistence(timeout:5))
         app.terminate();app.launch();open(app);XCTAssertTrue(row().waitForExistence(timeout:10));shot(app,"M4-V02-accessory-after-L");XCTAssertTrue(row().isHittable)

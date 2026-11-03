@@ -10,7 +10,14 @@ public enum MoneyAmountInput {
             if c == "٫" { return "." }
             return String(c)
         }.joined()
-        let parts = normalized.split(separator: ".", omittingEmptySubsequences: false)
+        var parts = normalized.split(separator: ".", omittingEmptySubsequences: false)
+        // «١٬٥٠٠» and «1,500» are thousands groups. They are accepted only as proper groups of three, so «1,5» is
+        // refused instead of silently becoming 15.
+        if let head = parts.first, head.contains(where: { ",٬،".contains($0) }) {
+            let groups = head.split(omittingEmptySubsequences: false, whereSeparator: { ",٬،".contains($0) })
+            guard let first = groups.first, (1...3).contains(first.count), groups.dropFirst().allSatisfy({ $0.count == 3 }) else { return nil }
+            parts[0] = Substring(groups.joined())
+        }
         guard (1...2).contains(parts.count), !parts[0].isEmpty,
               parts.allSatisfy({ $0.allSatisfy { ("0"..."9").contains($0) } }),
               let whole = Int(parts[0]) else { return nil }

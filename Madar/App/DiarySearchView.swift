@@ -57,7 +57,7 @@ struct DiarySearchView: View {
                             }.padding(.vertical, 24)
                         }
                         ForEach(found) { row in Button { open(row) } label: {
-                            VStack(alignment:.leading,spacing:8) {Text(row.text).font(DiaryType.writing).lineLimit(4).multilineTextAlignment(.leading);Text(source(row.kind)+"، "+service.bothDates(row.day,calendar:FirstCalendar(rawValue:app.string("core.firstCalendar")) ?? .hijri)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.padding(16).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:14)).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}
+                            VStack(alignment:.leading,spacing:8) {Text(row.text).font(DiaryType.writing).lineLimit(4).multilineTextAlignment(.leading);Text(source(row.kind)+"، "+service.bothDates(row.day,calendar:app.diaryFirstCalendar)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.padding(16).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:14)).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}
                         }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-search-result-"+row.id) }
                     } else if let index {
                         ForEach(["العام الماضي","صور","هوامش"],id:\.self) { example in Button {query=example;focused=false} label:{Text(example).font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).padding(16).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}}.buttonStyle(.madarPlain) }

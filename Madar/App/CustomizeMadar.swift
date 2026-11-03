@@ -72,7 +72,7 @@ struct CustomizeMadar: View {
                     Button {widgetGallery=true} label:{Label("ودجات الشاشة الرئيسية",systemImage:"square.grid.2x2").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:50).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widgets-gallery")
                 }
                 if showsRoomLayouts { RoomHomeLayoutSection(session: session, searching: !query.isEmpty) }
-                if filtered.isEmpty && !showsRoomLayouts && !(query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query))) && !(query.isEmpty || normalized("المال").contains(normalized(query)) || normalized("المحبرة").contains(normalized(query)) || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) || normalized("القرآن التفسير مكتبة التفاسير مرجع الورد").contains(normalized(query))) {
+                if filtered.isEmpty && !showsRoomLayouts && !(query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query))) && !(query.isEmpty || normalized("المال").contains(normalized(query)) || normalized("المحبرة").contains(normalized(query)) || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) || normalized("القرآن التفسير مكتبة التفاسير مرجع الورد").contains(normalized(query))) && !normalized("النسخ والاستعادة نسخة احتياطية انقل من مدار القديم استيراد المزامنة iCloud").contains(normalized(query)) {
                     ContentUnavailableView.search(text: query)
                 } else {
                     ForEach(sections, id: \.self) { section in
@@ -93,8 +93,9 @@ struct CustomizeMadar: View {
                         }
                     }
                 }
-                if query.isEmpty {
-                    if let backup = session.backupService {
+                // The data links are searchable too: «نسخ» or «انقل» used to land on an empty result.
+                if query.isEmpty || normalized("النسخ والاستعادة نسخة احتياطية انقل من مدار القديم المزامنة").contains(normalized(query)) {
+                    if let backup = session.backupService, query.isEmpty || normalized("النسخ والاستعادة نسخة احتياطية").contains(normalized(query)) {
                         NavigationLink("النسخ والاستعادة") {
                             BackupSettingsView(service: backup, numerals: session.string("core.numerals") == "western" ? .western : .hindi,
                                 dates: { session.dateLabels(GregorianDay.containing($0, in: session.activePlace.timeZone)) },
@@ -102,14 +103,16 @@ struct CustomizeMadar: View {
                         }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("backup-settings-link")
                     }
                     // Only a build signed for iCloud shows sync (no entry point to an unconfigured feature).
-                    if AppSyncService.isProvisioned, let sync = session.syncService {
+                    if AppSyncService.isProvisioned, let sync = session.syncService, query.isEmpty || normalized("المزامنة iCloud").contains(normalized(query)) {
                         NavigationLink("المزامنة عبر iCloud") {
                             SyncSettingsView(service: sync, dates: { session.dateLabels(GregorianDay.containing($0, in: session.activePlace.timeZone)) }, time: { session.backupTime($0) })
                         }
                             .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("sync-settings-link")
                     }
-                    NavigationLink("انقل من مدار القديم") { LegacyMoveView(app: session) }
-                        .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("legacy-move-link")
+                    if query.isEmpty || normalized("انقل من مدار القديم استيراد").contains(normalized(query)) {
+                        NavigationLink("انقل من مدار القديم") { LegacyMoveView(app: session) }
+                            .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("legacy-move-link")
+                    }
                 }
             }
         }

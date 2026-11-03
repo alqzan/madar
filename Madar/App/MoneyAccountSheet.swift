@@ -2,6 +2,7 @@ import SwiftUI
 import MadarCore
 import MadarDesign
 import MadarMoney
+import MadarCommands
 
 struct MoneyAccountSheet: View {
     let app: AppSession
@@ -173,6 +174,6 @@ struct MoneyAccountSheet: View {
         var payload: [String: MadarCore.JSONValue] = ["id": .string(draft.id.uuidString), "name": .string(draft.name.trimmingCharacters(in: .whitespacesAndNewlines)), "bank": .string(draft.bank.trimmingCharacters(in: .whitespacesAndNewlines)), "last4": .string(last4), "kind": .string(draft.kind), "ownership": .string(draft.ownership), "currency": .string(draft.currency), "balanceMinor": .string(String(balanceMinor)), "balanceAt": .string(ISO8601DateFormatter().string(from: draft.openingAt)), "senderIDs": .array(aliases.map { .string($0) }), "tracked": .bool(draft.tracked), "zakatInclude": .bool(draft.zakatInclude)]
         if !draft.openingKnown { payload["establishBalance"] = .bool(true) }
         saving = true
-        Task { do { try await app.executeMoneyCommand("money.saveAccount", payload: payload); dismiss() } catch { saving = false; failure = "لم يُحفظ الحساب. راجع آخر أربعة أرقام واسم البنك؛ يجب أن يميّزا حسابًا واحدًا." } }
+        Task { do { try await app.executeMoneyCommand("money.saveAccount", payload: payload); dismiss() } catch { saving = false; failure = "لم يُحفظ الحساب. " + ((error as? MoneyCommandError) == .invalidReference ? "راجع آخر أربعة أرقام واسم البنك؛ يجب أن يميّزا حسابًا واحدًا." : madarUserDetail(error)) } }
     }
 }

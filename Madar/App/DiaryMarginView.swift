@@ -86,8 +86,8 @@ struct DiaryMarginView: View {
     private var dates: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(service.distance(page.day, snapshot.today)).font(MadarTypography.caption()).foregroundStyle(theme.accent)
-            Text(service.dateTitle(page.day, calendar: FirstCalendar(rawValue: service.app.string("core.firstCalendar")) ?? .hijri)).font(DiaryType.title)
-            Text(service.weekday(page.day) + "، " + service.dateTitle(page.day, calendar: service.app.string("core.firstCalendar") == "gregorian" ? .hijri : .gregorian))
+            Text(service.dateTitle(page.day, calendar: service.app.diaryFirstCalendar)).font(DiaryType.title)
+            Text(service.weekday(page.day) + "، " + service.dateTitle(page.day, calendar: service.app.diaryFirstCalendar == .gregorian ? .hijri : .gregorian))
                 .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
         }.frame(maxWidth: .infinity, alignment: .leading)
     }

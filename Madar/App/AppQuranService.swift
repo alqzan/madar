@@ -34,7 +34,7 @@ import MadarPrayer
         case 1: return singular
         case 2: return dual
         default:
-            let counted = !(3...10).contains(value % 100) ? ["أجزاء": "جزءًا", "أوجه": "وجهًا", "أيام": "يومًا", "آيات": "آيةً", "مواضع": "موضعًا", "مرات": "مرةً"][plural] ?? plural : plural
+            let counted = value != 0 && !(3...10).contains(value % 100) ? ["أجزاء": "جزءًا", "أوجه": "وجهًا", "أيام": "يومًا", "آيات": "آيةً", "مواضع": "موضعًا", "مرات": "مرةً"][plural] ?? plural : plural
             return "\(numerals.string(value)) \(counted)"
         }
     }
