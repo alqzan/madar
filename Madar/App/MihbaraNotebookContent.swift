@@ -25,29 +25,73 @@ struct MihbaraNotebookContent: View {
         self.initialNoteID = initialNoteID
     }
 
+    @State private var query = ""
+    @State private var missingNote = false
+
+    private var shown: [Note] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return notes }
+        return notes.filter { $0.text.localizedStandardContains(needle) || ($0.bookTitle?.localizedStandardContains(needle) ?? false) }
+    }
+
+    /// The first line reads as the note's title; the rest is a short preview.
+    private func parts(_ text: String) -> (title: String, rest: String) {
+        let lines = text.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: true)
+        guard let first = lines.first else { return ("", "") }
+        return (String(first), lines.count > 1 ? lines[1].trimmingCharacters(in: .whitespacesAndNewlines) : "")
+    }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack { Text("ملاحظاتك الخاصة").font(MadarTypography.title()); Spacer(); Button { editor = .init(id: UUID(), text: "") } label: { Label("ملاحظة جديدة", systemImage: "plus") }.accessibilityIdentifier("mihbara-note-add") }
+            LazyVStack(alignment: .leading, spacing: 12) {
+                Button { editor = .init(id: UUID(), text: "") } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "square.and.pencil").foregroundStyle(theme.accent)
+                        Text("اكتب فكرة أو اقتباسًا أو سؤالًا…").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).padding(.horizontal, 16)
+                    .background(theme.surface, in: .rect(cornerRadius: 14)).contentShape(Rectangle())
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-note-add")
+                if notes.count > 5 {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(theme.secondaryInk)
+                        TextField("ابحث في ملاحظاتك", text: $query).font(MadarTypography.body())
+                    }.padding(.horizontal, 14).frame(minHeight: 44).background(theme.surface, in: .rect(cornerRadius: 12))
+                }
+                if missingNote {
+                    Text("هذه الملاحظة لم تعد موجودة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                }
                 if let failure {
                     Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         .accessibilityIdentifier("mihbara-notebook-read-error")
                     Button("أعِد المحاولة") { load() }.font(MadarTypography.body()).frame(minHeight: 44)
                         .accessibilityIdentifier("mihbara-notebook-retry")
                 } else if notes.isEmpty {
-                    Text("ابدأ بملاحظة صغيرة؛ ستجدها هنا حين تعود.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
+                    VStack(spacing: 8) {
+                        Image(systemName: "text.book.closed").font(.system(size: 34)).foregroundStyle(theme.accent)
+                        Text("دفترك فارغ").font(MadarTypography.section())
+                        Text("اكتب هنا ما يخطر لك وأنت تقرأ: فكرة، سؤال، أو سطر أعجبك. وستجده كله في مكان واحد.")
+                            .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)
+                    }.frame(maxWidth: .infinity).padding(.vertical, 36).padding(.horizontal, 12)
+                } else if shown.isEmpty {
+                    Text("لا ملاحظة تحتوي «\(query)».").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity).padding(.vertical, 24)
                 } else {
-                    ForEach(notes) { note in
+                    ForEach(shown) { note in
+                        let split = parts(note.text)
                         Button { editor = .init(id: note.id, text: note.text) } label: {
-                            VStack(alignment: .leading, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 if note.isBookNote {
                                     Label(note.bookTitle.map { "من كتاب «\($0)»" } ?? "ملاحظة مرتبطة بكتاب", systemImage: "book.closed")
                                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2)
                                 }
-                                Text(note.text).font(MadarTypography.body()).lineLimit(5).multilineTextAlignment(.leading)
+                                Text(split.title).font(MadarTypography.section()).lineLimit(2).multilineTextAlignment(.leading)
+                                if !split.rest.isEmpty {
+                                    Text(split.rest).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).lineLimit(3).multilineTextAlignment(.leading)
+                                }
                                 MadarDateLabel(app.dateLabels(GregorianDay.containing(note.updatedAt, in: app.activePlace.timeZone))).foregroundStyle(theme.secondaryInk)
                             }
-                                .frame(maxWidth: .infinity, alignment: .leading).padding(16).background(theme.surface, in: .rect(cornerRadius: 14))
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(16).background(theme.surface, in: .rect(cornerRadius: 14)).contentShape(Rectangle())
                         }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-note-" + note.id.uuidString)
                     }
                 }
@@ -59,7 +103,7 @@ struct MihbaraNotebookContent: View {
                 .environment(\.roomTheme, theme).presentationDragIndicator(.visible)
         }
         .toolbar {
-            ToolbarItem(placement: .principal) { Text("دفتر المحبرة").font(MadarTypography.section()) }
+            ToolbarItem(placement: .principal) { Text("الدفتر").font(MadarTypography.section()) }
             ToolbarItem(placement: .topBarTrailing) { Button("تمّ") { dismiss() }.accessibilityIdentifier("mihbara-notebook-close") }
         }
         .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: { app.undo(); load() }, dismiss: app.hideUndoToast).accessibilityIdentifier("mihbara-undo") } }
@@ -98,11 +142,8 @@ struct MihbaraNotebookContent: View {
             if !initialNoteHandled {
                 initialNoteHandled = true
                 if let initialNoteID {
-                    guard let note = loadedNotes.first(where: { $0.id == initialNoteID }) else {
-                        failure = "فكرة الدفتر لم تعد موجودة."
-                        return
-                    }
-                    editor = .init(id: note.id, text: note.text)
+                    if let note = loadedNotes.first(where: { $0.id == initialNoteID }) { editor = .init(id: note.id, text: note.text) }
+                    else { missingNote = true }
                 }
             }
         } catch { notes.removeAll(); failure = "تعذّر فتح الملاحظات المحفوظة." }
@@ -130,6 +171,7 @@ private struct MihbaraNotebookEditor: View {
     @State private var isSaving = false
     @State private var rootBlockerID = UUID()
     @State private var prompt: Prompt?
+    @FocusState private var focused: Bool
     private enum Prompt {
         case delete, discard, saveFailed, deleteFailed
         var title: String {
@@ -142,7 +184,7 @@ private struct MihbaraNotebookEditor: View {
         }
         var message: String {
             switch self {
-            case .delete: "يمكنك التراجع عن الحذف من دفتر المحبرة."
+            case .delete: "يمكنك التراجع فور الحذف من زر «تراجع»."
             case .discard: "لن يُحفظ ما كتبته منذ فتح الملاحظة."
             case .saveFailed: "بقي نصك هنا. حاول الحفظ مرة أخرى أو أكمل الكتابة."
             case .deleteFailed: "ما زالت الملاحظة محفوظة. حاول مرة أخرى أو أبقها."
@@ -155,9 +197,10 @@ private struct MihbaraNotebookEditor: View {
     var body: some View {
         NavigationStack {
             TextEditor(text: $text).font(MadarTypography.body()).scrollContentBackground(.hidden).padding(12).background(theme.background)
+                .focused($focused).task { if note.text.isEmpty { focused = true } }
                 .accessibilityIdentifier("mihbara-note-text")
                 .toolbar {
-                    ToolbarItem(placement: .principal) { Text("ملاحظة خاصة").font(MadarTypography.section()) }
+                    ToolbarItem(placement: .principal) { Text("ملاحظة").font(MadarTypography.section()) }
                     ToolbarItemGroup(placement: .topBarLeading) {
                         Button("إلغاء") { if text != note.text { prompt = .discard } else { dismiss() } }.madarWaitsForSave()
                             .accessibilityIdentifier("mihbara-note-cancel")

@@ -416,7 +416,7 @@ struct DiaryDayView: View {
                     }
                 }.accessibilityIdentifier("diary-line-delete-confirm")
             } message: {
-                Text("تبقى الهوامش في يوم كتابتها، ويمكنك التراجع عن الحذف خلال عشر دقائق.")
+                Text("تبقى الهوامش في يوم كتابتها، ويمكنك التراجع فور الحذف من زر «تراجع».")
             }
             .fullScreenCover(isPresented: $searchOpen) { DiarySearchView(app: app).environment(\.roomTheme, theme) }
             .fullScreenCover(isPresented: $archiveOpen) {

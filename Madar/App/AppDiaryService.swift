@@ -96,12 +96,17 @@ struct DiaryHomeSnapshot {
         photoDescriptor.propertiesToFetch = [\.id]
         let photos = Set(try context.fetch(photoDescriptor).map(\.id))
         let niyyas=try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil}))
-        let keys = Set(pages.map(\.dayKey) + entries.map(\.dayKey)+niyyas.map(\.dayKey))
+        // One pass per table: grouping by day key keeps this linear in the rows (it ran O(days × rows) before).
+        var latestPage: [String: DayPage] = [:]
+        for page in pages where (latestPage[page.dayKey]?.updatedAt ?? .distantPast) <= page.updatedAt { latestPage[page.dayKey] = page }
+        let writtenByDay = Dictionary(grouping: entries, by: \.dayKey)
+        let niyyaDays = Set(niyyas.map(\.dayKey))
+        let keys = Set(latestPage.keys).union(writtenByDay.keys).union(niyyaDays)
         return keys.compactMap { key -> DiaryMemoryDay? in
             guard let day = try? GregorianDay(key) else { return nil }
-            let page = pages.filter { $0.dayKey == key }.max { $0.updatedAt < $1.updatedAt }
-            let written = entries.filter { $0.dayKey == key }
-            return .init(day: day, hasWriting: niyyas.contains{$0.dayKey==key} || written.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty },
+            let page = latestPage[key]
+            let written = writtenByDay[key] ?? []
+            return .init(day: day, hasWriting: niyyaDays.contains(key) || written.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty },
                 hasPhoto: page?.photoMediaID.map { photos.contains($0) } == true || written.contains { !photos.isDisjoint(with: $0.attachmentMediaIDs) }, dayOne: page?.origin == "dayOne", hidden: page?.hiddenFromMemories ?? false)
         }
     }
