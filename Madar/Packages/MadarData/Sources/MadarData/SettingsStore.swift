@@ -146,8 +146,23 @@ private struct UndoChange: Codable { let key: String; let before: JSONValue; let
         guard let data else { return d.defaultValue }
         // Compatibility read only; preserve the stored bytes and all owner records.
         if key == "core.faceIDLock", (try? JSONDecoder().decode(JSONValue.self, from: data)) == .string("notesOnly") { return .string("none") }
-        guard let value = try? JSONDecoder().decode(JSONValue.self,from:data), value == d.defaultValue || (try? schema.validate(value,for:key)) != nil else { if invalidReads.insert(key).inserted { logger.error("Invalid stored setting; using default for \(key,privacy:.public)") }; return d.defaultValue }
+        guard let value = try? JSONDecoder().decode(JSONValue.self,from:data), value == d.defaultValue || (try? schema.validate(value,for:key)) != nil else {
+            // The schema promises unknown block ids are dropped on read: a removed or renamed room must not reset the whole lobby layout.
+            if key == "bahw.layout", let stored = try? JSONDecoder().decode(JSONValue.self, from: data),
+               let ids = d.contract?["blockIds"]?.array?.compactMap(\.string), let cleaned = Self.droppingUnknownBlocks(stored, known: Set(ids)),
+               (try? schema.validate(cleaned, for: key)) != nil { return cleaned }
+            if invalidReads.insert(key).inserted { logger.error("Invalid stored setting; using default for \(key,privacy:.public)") }; return d.defaultValue }
         return value
+    }
+    private static func droppingUnknownBlocks(_ value: JSONValue, known: Set<String>) -> JSONValue? {
+        guard var o = value.object else { return nil }
+        func kept(_ key: String) -> JSONValue? { o[key]?.array.map { .array($0.filter { $0.string.map(known.contains) ?? false }) } }
+        guard let blocks = kept("blocks"), let hidden = kept("hidden"), let pinned = kept("pinned") else { return nil }
+        o["blocks"] = blocks; o["hidden"] = hidden
+        let shown = Set(blocks.array?.compactMap(\.string) ?? [])
+        o["pinned"] = .array((pinned.array ?? []).filter { $0.string.map(shown.contains) ?? false })
+        if let sizes = o["sizes"]?.object { o["sizes"] = .object(sizes.filter { known.contains($0.key) }) }
+        return .object(o)
     }
     /// Creates the per-install identity only as part of an actual write transaction; never saves.
     /// Reading settings or initializing this facade does not create system rows.

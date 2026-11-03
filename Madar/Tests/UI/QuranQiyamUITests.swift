@@ -19,7 +19,7 @@ import XCTest
         app.buttons["quran-day-close-home"].tap()
         app.terminate(); app.launch()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 25))
-        app.tabBars.buttons["الصلاة"].tap()
+        app.buttons["tab-prayer"].tap()
         let prayerNight = app.buttons["prayer-qiyam"]
         for _ in 0..<8 where !prayerNight.isHittable { app.swipeUp() }
         prayerNight.tap()
@@ -31,7 +31,7 @@ import XCTest
     }
     func testPrayerEntryOpensBuiltQuranNightPreview() throws {
         continueAfterFailure=false
-        let app=launch();XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout:25));app.tabBars.buttons["الصلاة"].tap()
+        let app=launch();XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout:25));app.buttons["tab-prayer"].tap()
         for _ in 0..<8 {if app.buttons["prayer-qiyam"].isHittable {break};app.swipeUp()};app.buttons["prayer-qiyam"].tap()
         XCTAssertTrue(app.buttons["prayer-quran-qiyam"].waitForExistence(timeout:10))
         // OR-08: the sheet says what tonight's reading gives the wird before it hands over to the Quran room.
@@ -46,7 +46,7 @@ import XCTest
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 10), app.debugDescription)
         app.terminate(); app.launch()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 25), app.debugDescription)
-        let prayerTab = app.tabBars.buttons["الصلاة"]
+        let prayerTab = app.buttons["tab-prayer"]
         XCTAssertTrue(prayerTab.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(prayerTab.isHittable, app.debugDescription)
         prayerTab.tap()

@@ -177,7 +177,7 @@ import UIKit
         app.launchEnvironment["MADAR_UI_MIHBARA_ROUTE"] = "madar://mihbara/hadith/today"
         app.launchEnvironment["MADAR_UI_MIHBARA_HOME_READ_FAILURE_ONCE"] = "1"
         app.launch()
-        app.tabBars.buttons["المحبرة"].tap()
+        app.buttons["tab-mihbara"].tap()
         let retry = app.buttons["mihbara-home-retry"]
         XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
         shot(app, "M6-route-read-failure-L")
@@ -193,7 +193,7 @@ import UIKit
         app.launchEnvironment["MADAR_UI_MIHBARA_ROUTE"] = "madar://mihbara/hadith/today"
         app.launchEnvironment["MADAR_UI_MIHBARA_ROUTE_OPEN_FAILURE_ONCE"] = "1"
         app.launch()
-        app.tabBars.buttons["المحبرة"].tap()
+        app.buttons["tab-mihbara"].tap()
         let retry = app.buttons["mihbara-home-retry"]
         XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
         shot(app, "M6-route-open-failure-L")
@@ -208,7 +208,7 @@ import UIKit
         let app = app("home")
         app.launchEnvironment["MADAR_UI_MIHBARA_ROUTE"] = "madar://mihbara/hadith/today"
         app.launch()
-        app.tabBars.buttons["المحبرة"].tap()
+        app.buttons["tab-mihbara"].tap()
         XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 15), app.debugDescription)
         app.open(URL(string: "madar://mihbara")!)
         let gone = NSPredicate(format: "exists == false")
@@ -700,7 +700,7 @@ import UIKit
         let app = app("home")
         app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
         app.launch()
-        app.tabBars.buttons["المحبرة"].tap()
+        app.buttons["tab-mihbara"].tap()
         let notebook = app.buttons["mihbara-notebook"]
         XCTAssertTrue(notebook.waitForExistence(timeout: 15), app.debugDescription)
         reach(app, notebook); notebook.tap()
@@ -727,7 +727,7 @@ import UIKit
         app.launchEnvironment["MADAR_UI_MIHBARA_MULTIPLE_NOTES"] = "1"
         app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
         app.launch()
-        app.tabBars.buttons["المحبرة"].tap()
+        app.buttons["tab-mihbara"].tap()
         let notebook = app.buttons["mihbara-notebook"]
         XCTAssertTrue(notebook.waitForExistence(timeout: 15), app.debugDescription); reach(app, notebook); notebook.tap()
         let note = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "mihbara-note-", "سر لا يظهر قبل المصادقة")).firstMatch
@@ -900,7 +900,7 @@ import UIKit
         app.launchEnvironment["MADAR_UI_MIHBARA_PDF_READY"] = "1"
         app.launchEnvironment["MADAR_UI_MIHBARA_ROUTE"] = "madar://mihbara/continue"
         app.launch()
-        app.tabBars.buttons["المحبرة"].tap()
+        app.buttons["tab-mihbara"].tap()
         XCTAssertTrue(app.buttons["mihbara-pdf-ink"].waitForExistence(timeout: 20), app.debugDescription)
         shot(app, "M6-SIRI-continue-L")
     }
@@ -1146,7 +1146,7 @@ import UIKit
         XCTAssertTrue(continueBook.waitForExistence(timeout: 8), app.debugDescription)
         shot(app, "AU-87-file-near-end-L")
         let library = app.buttons["mihbara-library"]
-        let bottomBar = app.tabBars.firstMatch
+        let bottomBar = app.otherElements["fixed-tab-bar"]
         let clearOfBottomBar = bottomBar.frame.minY - 16
         for _ in 0..<5 where library.frame.maxY > clearOfBottomBar { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(library.isHittable, app.debugDescription)

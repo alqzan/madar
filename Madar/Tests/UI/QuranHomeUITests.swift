@@ -332,7 +332,7 @@ import XCTest
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
         if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
-        let tabBar = app.tabBars.firstMatch
+        let tabBar = app.otherElements["fixed-tab-bar"]
         XCTAssertTrue(tabBar.waitForExistence(timeout: 10), app.debugDescription)
         for title in ["البهو", "الصلاة", "القرآن", "المال", "المحبرة"] {
             XCTAssertTrue(tabBar.buttons[title].waitForExistence(timeout: 5), "Missing native destination: \(title)\n\(app.debugDescription)")
@@ -342,10 +342,10 @@ import XCTest
         let tabsShot = XCTAttachment(screenshot: app.screenshot()); tabsShot.name = "M0-native-glass-room-shortcuts-L"; tabsShot.lifetime = .keepAlways; add(tabsShot)
         notes.tap()
         XCTAssertTrue(app.descendants(matching: .any)["notes-tab"].waitForExistence(timeout: 8), app.debugDescription)
-        app.tabBars.buttons["المال"].tap()
+        app.buttons["tab-money"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-home"].waitForExistence(timeout: 10), app.debugDescription)
         let moneyShot = XCTAttachment(screenshot: app.screenshot()); moneyShot.name = "M0-native-glass-money-active-L"; moneyShot.lifetime = .keepAlways; add(moneyShot)
-        app.tabBars.buttons["المحبرة"].tap()
+        app.buttons["tab-mihbara"].tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
         tabBar.buttons["القرآن"].tap()
         XCTAssertTrue(app.buttons["quran-start-plan"].waitForExistence(timeout: 15), app.debugDescription)

@@ -26,6 +26,8 @@ struct DiaryHubView: View {
     @State private var failure: String?
     @State private var loadAttempt = 0
     @State private var memoryReadFailurePending = false
+    /// The memories read runs once per data change, not once per redraw of the open tab (a plain box: filling it must not redraw).
+    @State private var memoryCache = MemoryReadBox()
     #if DEBUG
         @State private var injectedMemoryReadFailure = false
     #endif
@@ -444,7 +446,12 @@ struct DiaryHubView: View {
         if memoryReadFailurePending {
             loaded = .failure(CocoaError(.fileReadUnknown))
         } else {
-            loaded = Result { try service.home() }
+            let key = "\(app.prayerRevision)-\(loadAttempt)"
+            if memoryCache.key == key, let cached = memoryCache.result { loaded = cached }
+            else {
+                loaded = Result { try service.home() }
+                if case .success = loaded { memoryCache.key = key; memoryCache.result = loaded }
+            }
         }
         let home = try? loaded.get()
         return VStack(alignment: .leading, spacing: 14) {
@@ -516,4 +523,9 @@ private struct DiaryArchiveThumbnail<Content: View>: View {
             }.value
         }
     }
+}
+
+@MainActor private final class MemoryReadBox {
+    var key = ""
+    var result: Result<DiaryHomeSnapshot, Error>?
 }

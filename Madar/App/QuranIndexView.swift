@@ -137,9 +137,9 @@ struct QuranIndexView: View {
             }
     }
     private var filtered: [QuranUIIndexItem] {
-        query.isEmpty
-            ? items
-            : items.filter { $0.title.contains(query) || $0.searchText.contains(QuranIndexSearch.normalize(query)) }
+        if query.isEmpty { return items }
+        let needle = QuranIndexSearch.normalize(query)
+        return items.filter { $0.title.contains(query) || $0.searchText.contains(needle) }
     }
     private func status(_ i: QuranUIIndexItem) -> String {
         (i.memorized ? "محفوظ" : i.fraction > 0 ? "حفظ جزئي" : "لم تحفظه") + (i.reviewed ? "، راجعته" : "")

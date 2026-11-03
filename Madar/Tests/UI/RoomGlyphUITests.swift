@@ -8,11 +8,11 @@ import XCTest
         app.launch(); XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 20))
         capture(app, "UX-13-diary-L")
         for (tab,id,name) in [("البهو","bahw-block-salah","lobby"),("الصلاة","prayer-today-header","prayer"),("القرآن","quran-coverage-title","quran"),("المال","money-home","money"),("المحبرة","mihbara-add-paper","mihbara")] {
-            app.tabBars.buttons[tab].tap()
+            app.otherElements["fixed-tab-bar"].buttons[tab].tap()
             XCTAssertTrue(app.descendants(matching: .any).matching(identifier: id).firstMatch.waitForExistence(timeout: 10), tab)
             capture(app, "UX-13-" + name + "-L")
         }
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         let year = app.descendants(matching: .any).matching(identifier: "bahw-block-year").firstMatch
         if !year.isHittable { app.swipeUp(velocity: .slow) }
         year.tap(); XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "bahw-year-hero").firstMatch.waitForExistence(timeout: 10)); capture(app, "UX-13-year-L")

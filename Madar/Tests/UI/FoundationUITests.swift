@@ -9,7 +9,7 @@ import XCTest
             app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
                 "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
                 "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
-            app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
             let header = app.descendants(matching: .any).matching(identifier: "prayer-today-header").firstMatch
             XCTAssertTrue(header.waitForExistence(timeout: 10), app.debugDescription)
             XCTAssertTrue(header.label.contains("الأربعاء") && header.label.contains("ربيع الآخر") && header.label.contains("أكتوبر"), header.label)
@@ -41,7 +41,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "dark"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let header = app.descendants(matching: .any).matching(identifier: "prayer-today-header").firstMatch
         XCTAssertTrue(header.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "prayer-arch-maghrib").firstMatch.exists)
@@ -58,7 +58,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "homeShowcaseFriday", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let header = app.descendants(matching: .any).matching(identifier: "prayer-today-header").firstMatch
         XCTAssertTrue(header.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(header.label.contains("الجمعة"), header.label)
@@ -84,7 +84,7 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-10", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let open = app.buttons["prayer-customize"]
         XCTAssertTrue(open.waitForExistence(timeout: 10), app.debugDescription)
         open.tap()
@@ -117,7 +117,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-07T16:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_THEME": "light",
             "MADAR_UI_TRAVEL_FIX": "51.5074,-0.1278,لندن,GB,Europe/London"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let pill = app.buttons["prayer-travel-pill"]
         XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(pill.label.contains("خارج مدينتك"), pill.label)
@@ -157,7 +157,7 @@ import XCTest
             "MADAR_UI_NOW": "2026-10-07T16:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_THEME": "light",
             "MADAR_UI_TRAVEL_FIX": "51.5074,-0.1278,لندن,GB,Europe/London", "MADAR_UI_PRAYER_ROOT_ROUTE_HARNESS": "1",
             "MADAR_UI_TRIP_METHOD_WRITE_HOLD_MS": "4500"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let pill = app.buttons["prayer-travel-pill"]
         XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription); pill.tap()
         let yes = app.buttons["prayer-travel-yes"]
@@ -179,7 +179,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-07T16:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_THEME": "light",
             "MADAR_UI_TRAVEL_FIX": "51.5074,-0.1278,لندن,GB,Europe/London"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let pill = app.buttons["prayer-travel-pill"]
         XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription); pill.tap()
         let yes = app.buttons["prayer-travel-yes"]
@@ -203,13 +203,13 @@ import XCTest
                 "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_THEME": "light", "MADAR_UI_TRAVEL_FIX": fix]
             app.launch()
         }
-        launch("51.5074,-0.1278,لندن,GB,Europe/London"); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        launch("51.5074,-0.1278,لندن,GB,Europe/London"); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let pill = app.buttons["prayer-travel-pill"]
         XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription); pill.tap()
         let yes = app.buttons["prayer-travel-yes"]; XCTAssertTrue(yes.waitForExistence(timeout: 8)); yes.tap()
         XCTAssertTrue(NSPredicate(format: "label CONTAINS 'لندن'").evaluate(with: pill) || pill.waitForExistence(timeout: 10))
         app.terminate()
-        launch("48.8566,2.3522,باريس,FR,Europe/Paris"); app.tabBars.buttons["الصلاة"].tap()
+        launch("48.8566,2.3522,باريس,FR,Europe/Paris"); app.buttons["tab-prayer"].tap()
         XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(pill.label.contains("وصلت إلى باريس"), pill.label)
         attachScreenshot(app, named: "OR-09-arrived-L")
@@ -236,7 +236,7 @@ import XCTest
                 "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_THEME": "light", "MADAR_UI_TRAVEL_FIX": fix]
             app.launch()
         }
-        launch("51.5074,-0.1278,لندن,GB,Europe/London"); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        launch("51.5074,-0.1278,لندن,GB,Europe/London"); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let pill = app.buttons["prayer-travel-pill"]
         XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription); pill.tap()
         let yes = app.buttons["prayer-travel-yes"]
@@ -244,7 +244,7 @@ import XCTest
         XCTAssertTrue(yes.waitForNonExistence(timeout: 8), app.debugDescription)
         app.terminate()
 
-        launch("42.9849,-81.2453,لندن,CA,America/Toronto"); app.tabBars.buttons["الصلاة"].tap()
+        launch("42.9849,-81.2453,لندن,CA,America/Toronto"); app.buttons["tab-prayer"].tap()
         XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription); pill.tap()
         let add = app.buttons["prayer-trip-continue"]
         XCTAssertTrue(add.waitForExistence(timeout: 8), app.debugDescription)
@@ -269,7 +269,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let open = app.buttons["prayer-customize"]
         XCTAssertTrue(open.waitForExistence(timeout: 10), app.debugDescription)
         let any = { (id: String) in app.descendants(matching: .any).matching(identifier: id).firstMatch }
@@ -304,7 +304,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let asr = app.descendants(matching: .any).matching(identifier: "prayer-arch-asr").firstMatch
         XCTAssertTrue(asr.waitForExistence(timeout: 10), app.debugDescription)
         asr.tap()
@@ -345,7 +345,7 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let fajr = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "الفجر")).firstMatch
         XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription)
         fajr.tap()
@@ -370,7 +370,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         openHali(app)
         XCTAssertTrue(app.staticTexts["prayer-stat-percentage"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.staticTexts["prayer-stat-percentage"].label.contains("٪"), "The room uses the Arabic percent sign.")
@@ -401,7 +401,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-08T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "streakShowcase", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let streaks = app.buttons["prayer-streaks"]
         scrollTo(streaks, in: app); app.swipeUp()
         // Hand-worked week (PrayerStreakTests): congregation 2, on time 3, completion 6.
@@ -429,7 +429,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-08T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-09-12",
             "MADAR_UI_PRAYER_FIXTURE": "streakShowcaseMonth", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let streaks = app.buttons["prayer-streaks"]
         scrollTo(streaks, in: app); app.swipeUp()
         let label = streaks.label.filter { $0 != "\u{2068}" && $0 != "\u{2069}" }
@@ -447,7 +447,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "dark"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         XCTAssertTrue(app.buttons["prayer-streaks"].waitForExistence(timeout: 10), app.debugDescription)
         attachScreenshot(app, named: "M1-V01-home-dark")
         let streaks = app.buttons["prayer-streaks"]; scrollTo(streaks, in: app); app.swipeUp()
@@ -462,7 +462,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         openHali(app)
         let day = app.buttons["prayer-history-day-2026-10-06"]
         scrollTo(day, in: app); day.tap()
@@ -481,7 +481,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
         XCTAssertTrue(app.staticTexts["prayer-qada-title"].waitForExistence(timeout: 10), app.debugDescription)
         let isha = app.buttons["prayer-qada-row-2026-10-06-isha"]
@@ -509,7 +509,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-08T02:10:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07",
             "MADAR_UI_THEME": "light", "MADAR_UI_PRAYER_READ_FAILURE_ONCE": "1"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let qiyam = app.buttons["prayer-qiyam"]; scrollTo(qiyam, in: app); qiyam.tap()
         let retry = app.buttons["prayer-snapshot-retry"]
         XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
@@ -533,7 +533,7 @@ import XCTest
             "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light",
             "MADAR_UI_PRAYER_READ_FAILURE_ONCE": "1", "MADAR_UI_PRAYER_OPEN_REQUEST": "asr"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let retry = app.alerts.buttons["أعد المحاولة"]
         XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
         attachScreenshot(app, named: "M1-request-read-failure-L")
@@ -554,7 +554,7 @@ import XCTest
             "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light",
             "MADAR_UI_PRAYER_READ_FAILURE_ONCE": "1", "MADAR_UI_PRAYER_ROUTE": "madar://salah/log?prayer=asr"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let retry = app.alerts.buttons["أعد المحاولة"]
         XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
         retry.tap()
@@ -571,7 +571,7 @@ import XCTest
             "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light",
             "MADAR_UI_PRAYER_READ_FAILURE_ONCE": "1"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
         let retry = app.buttons["prayer-qada-retry"]
         XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
@@ -587,7 +587,7 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-08T02:10:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let qiyam = app.buttons["prayer-qiyam"]; scrollTo(qiyam, in: app); qiyam.tap()
         XCTAssertTrue(app.buttons["prayer-qiyam-plus"].waitForExistence(timeout: 10), app.debugDescription)
         let nightPicker = app.buttons["prayer-qiyam-night"]
@@ -606,7 +606,7 @@ import XCTest
             let app = XCUIApplication()
             app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
                 "MADAR_UI_NOW": "2026-10-08T09:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-03", "MADAR_UI_THEME": "light"]
-            app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
             let add = app.buttons["prayer-old-missed"]; scrollTo(add, in: app); add.tap()
             let save = app.buttons["prayer-old-save"]; scrollTo(save, in: app)
             attachScreenshot(app, named: "M1-T09-old-missed-\(size)"); save.tap()
@@ -615,7 +615,7 @@ import XCTest
             let restore = app.buttons["prayer-old-restore"]; scrollTo(restore, in: app)
             XCTAssertFalse(save.exists); restore.tap(); app.buttons["أعد التسجيل"].firstMatch.tap()
             XCTAssertTrue(undo.waitForExistence(timeout: 15))
-            app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            app.terminate(); app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
             let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
             let row = app.descendants(matching: .any).matching(identifier: "prayer-qada-row-2026-10-02-fajr").firstMatch
             XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
@@ -650,7 +650,7 @@ import XCTest
             app.terminate(); app.launch(); finishOnboarding(app)
             let clock = app.descendants(matching: .any).matching(identifier: "foundation-prayer-time-isha").firstMatch
             scrollTo(clock, in: app); XCTAssertTrue(clock.label.contains("١٩:٠٩"), clock.label)
-            app.swipeDown(); app.tabBars.buttons["الصلاة"].tap()
+            app.swipeDown(); app.buttons["tab-prayer"].tap()
             let isha = app.descendants(matching: .any).matching(identifier: "prayer-arch-isha").firstMatch
             scrollTo(isha, in: app); XCTAssertTrue(isha.label.contains("٧:٠٩"), isha.label)
             app.terminate(); app.launch(); finishOnboarding(app); app.buttons["tab-customize"].tap()
@@ -671,7 +671,7 @@ import XCTest
             let app = XCUIApplication()
             app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
                 "MADAR_UI_NOW": "2026-10-08T02:10:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07", "MADAR_UI_THEME": "light"]
-            app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
             let qiyam = app.buttons["prayer-qiyam"]
             scrollTo(qiyam, in: app); qiyam.tap()
             let plus = app.buttons["prayer-qiyam-plus"]
@@ -694,7 +694,7 @@ import XCTest
             scrollTo(witr, in: app); witr.tap()
             scrollTo(restore, in: app); restore.tap(); app.buttons["أعد التسجيل"].tap()
             XCTAssertTrue(undo.waitForExistence(timeout: 15))
-            app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            app.terminate(); app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
             scrollTo(qiyam, in: app); qiyam.tap()
             XCTAssertTrue(count.waitForExistence(timeout: 10)); XCTAssertEqual(count.label, "٨")
             XCTAssertEqual(witr.value as? String, "1")
@@ -712,7 +712,7 @@ import XCTest
                 "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
                 "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
             app.launch(); finishOnboarding(app)
-            app.tabBars.buttons["الصلاة"].tap()
+            app.buttons["tab-prayer"].tap()
             // Owner 26 Oct: the heart question defaults to on; the toggle below confirms it.
             app.terminate(); app.launch(); finishOnboarding(app)
             app.buttons["tab-customize"].tap()
@@ -720,7 +720,7 @@ import XCTest
             scrollTo(search, in: app); search.tap(); search.typeText("salah.askHeart\n")
             let toggle = app.switches["setting-salah.askHeart"]
             scrollTo(toggle, in: app); XCTAssertEqual(toggle.value as? String, "1")
-            app.swipeDown(); app.tabBars.buttons["الصلاة"].tap()
+            app.swipeDown(); app.buttons["tab-prayer"].tap()
             let review = app.buttons["prayer-heart-review"]
             // Returning from the sheet can leave this row above the viewport. Scroll toward it,
             // rather than the shared one-way helper moving it farther offscreen after «أمرّ».
@@ -755,7 +755,7 @@ import XCTest
             XCTAssertTrue(skip.waitForNonExistence(timeout: 10))
             openHeartReview()
             scrollTo(present, in: app); present.tap(); scrollTo(save, in: app); save.tap()
-            app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            app.terminate(); app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
             openHali(app)
             let day = app.buttons["prayer-history-day-2026-10-06"]
             scrollTo(day, in: app); day.tap()
@@ -780,7 +780,7 @@ import XCTest
                 "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
                 "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
             app.launch(); finishOnboarding(app)
-            app.tabBars.buttons["الصلاة"].tap()
+            app.buttons["tab-prayer"].tap()
             openHali(app)
             let ratio = app.staticTexts["prayer-stat-percentage"]
             XCTAssertTrue(ratio.waitForExistence(timeout: 10), app.debugDescription)
@@ -807,7 +807,7 @@ import XCTest
             undo.tap()
             openHali(app)
             XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٨٧٪")
-            app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            app.terminate(); app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
             openHali(app)
             XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٨٧٪")
             app.terminate()
@@ -1398,7 +1398,7 @@ import XCTest
         func fajrArch(_ target: XCUIApplication) -> XCUIElement {
             target.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "الفجر" )).firstMatch
         }
-        let prayerTab = app.tabBars.buttons["الصلاة"]
+        let prayerTab = app.buttons["tab-prayer"]
         XCTAssertTrue(prayerTab.waitForExistence(timeout: 10), app.debugDescription)
         prayerTab.tap()
         let fajr = fajrArch(app)
@@ -1413,7 +1413,7 @@ import XCTest
         attachScreenshot(app, named: "M1-T02-missed-explicit-L")
 
         app.terminate(); app.launch(); finishOnboarding(app)
-        let reopenedTab = app.tabBars.buttons["الصلاة"]
+        let reopenedTab = app.buttons["tab-prayer"]
         XCTAssertTrue(reopenedTab.waitForExistence(timeout: 10), app.debugDescription)
         reopenedTab.tap()
         let reopenedFajr = fajrArch(app)
@@ -1439,7 +1439,7 @@ import XCTest
         attachScreenshot(app, named: "M1-T02-makeup-undo-restores-missed-L")
 
         app.terminate(); app.launch(); finishOnboarding(app)
-        app.tabBars.buttons["الصلاة"].tap()
+        app.buttons["tab-prayer"].tap()
         let afterRelaunch = fajrArch(app)
         XCTAssertTrue(afterRelaunch.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(afterRelaunch.label.contains("فاتتني"), afterRelaunch.label)
@@ -1456,7 +1456,7 @@ import XCTest
             "MADAR_UI_TRACKING_START": "2026-10-01"
         ]
         app.launch(); finishOnboarding(app)
-        let prayerTab = app.tabBars.buttons["الصلاة"]
+        let prayerTab = app.buttons["tab-prayer"]
         XCTAssertTrue(prayerTab.waitForExistence(timeout: 10), app.debugDescription)
         prayerTab.tap()
         let recovery = app.buttons["prayer-recovery"]
@@ -1488,7 +1488,7 @@ import XCTest
             "MADAR_UI_PRAYER_ROOT_ROUTE_HARNESS": "1"
         ]
         app.launch(); finishOnboarding(app)
-        app.tabBars.buttons["الصلاة"].tap()
+        app.buttons["tab-prayer"].tap()
         let recovery = app.buttons["prayer-recovery"]
         scrollTo(recovery, in: app); recovery.tap()
         let fajr = app.buttons["prayer-gap-status-2026-10-01-fajr"]
@@ -1524,7 +1524,7 @@ import XCTest
             "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_ROOT_ROUTE_HARNESS": "1"
         ]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let recovery = app.buttons["prayer-recovery"]
         scrollTo(recovery, in: app); recovery.tap()
         let fajr = app.buttons["prayer-gap-status-2026-10-01-fajr"]
@@ -1551,7 +1551,7 @@ import XCTest
             "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_ROUTE_DISMISSAL_RACE": "1"
         ]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let recovery = app.buttons["prayer-recovery"]
         scrollTo(recovery, in: app); recovery.tap()
         let trigger = app.buttons["prayer-test-route-during-dismissal"]
@@ -1576,7 +1576,7 @@ import XCTest
             "MADAR_UI_PRAYER_FIXTURE": "ratio26of30",
             "MADAR_UI_PRAYER_ROOT_ROUTE_HARNESS": "1"
         ]
-        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let places = app.buttons["prayer-qada-places"]
         scrollTo(places, in: app); places.tap()
         let isha = app.buttons["prayer-qada-row-2026-10-06-isha"]

@@ -17,7 +17,7 @@ import XCTest
     func testBasisSheetStillOpensAfterEveryDrawerPage() throws {
         continueAfterFailure = true
         let app = app("showcase")
-        let tab = app.tabBars.buttons["المال"].firstMatch
+        let tab = app.buttons["tab-money"].firstMatch
         if tab.waitForExistence(timeout: 15) { tab.tap() }
         if !app.buttons["money-expense-open"].waitForExistence(timeout: 8) { open(app) }
         func top() { for _ in 0..<6 { app.swipeDown(velocity: .fast) } }

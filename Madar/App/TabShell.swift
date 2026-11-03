@@ -61,6 +61,7 @@ struct TabShell<Content: View>: View {
             }
         }
         .padding(.horizontal, 6)
+        .accessibilityElement(children: .contain).accessibilityAddTraits(.isTabBar).accessibilityIdentifier("fixed-tab-bar")
         #if DEBUG
         // UI tests reach «خصّص» from any room; the bar no longer lists it, so tests get a tiny invisible handle at the top-centre of the bar (never in a release build).
         .overlay(alignment: .top) {

@@ -4,7 +4,7 @@ import XCTest
     func testLobbyHiddenWidgetAndExpenseControlShareTheBuiltMoneyRoom() {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_MONEY_FIXTURE":"expense","MADAR_UI_HABIT_FIXTURE":"showcase","MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
-        app.launch(); let lobby = app.tabBars.buttons["البهو"]; XCTAssertTrue(lobby.waitForExistence(timeout:20)); lobby.tap()
+        app.launch(); let lobby = app.buttons["tab-foundation"]; XCTAssertTrue(lobby.waitForExistence(timeout:20)); lobby.tap()
         let money = app.otherElements["bahw-block-mal"]; XCTAssertTrue(money.waitForExistence(timeout:10)); shot(app,"M5-X01-lobby-L")
         for _ in 0..<4 where !money.isHittable { app.swipeUp(velocity:.slow) }; for _ in 0..<3 where money.frame.maxY > app.frame.height - 100 { app.swipeUp(velocity: .slow) }; shot(app,"M5-X01-lobby-s1-L"); money.tap()
         XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout:10))
@@ -20,7 +20,7 @@ import XCTest
     func testLargeMoneyBlockShowsOwnedEnvelopesLimitsAndReserve() {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_MONEY_FIXTURE":"expense","MADAR_UI_MONEY_BLOCK_SIZE":"4x4","MADAR_UI_HABIT_FIXTURE":"showcase","MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
-        app.launch(); let lobby = app.tabBars.buttons["البهو"]; XCTAssertTrue(lobby.waitForExistence(timeout:20)); lobby.tap()
+        app.launch(); let lobby = app.buttons["tab-foundation"]; XCTAssertTrue(lobby.waitForExistence(timeout:20)); lobby.tap()
         let money = app.otherElements["bahw-block-mal"]; XCTAssertTrue(money.waitForExistence(timeout:10))
         for _ in 0..<5 where money.frame.maxY > app.frame.height - 90 { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(money.staticTexts["الاحتياطي"].exists); XCTAssertTrue(money.staticTexts["الإيجار"].exists); XCTAssertTrue(money.staticTexts["المحجوز"].exists)

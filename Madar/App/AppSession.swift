@@ -841,6 +841,8 @@ final class AppSession {
             do {
                 let result = try await bus.execute(CommandEnvelope(name: "core.completeOnboarding", payload: .object([:])))
                 guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue("onboarding") }
+                // Only a person who has just finished the first run gets the one-room start; an update never hides rooms (see applyProgressiveRoomsOnce).
+                UserDefaults.standard.set(true, forKey: "Madar.progressiveRooms.pending")
                 onboardingComplete = true
             } catch { errorMessage = "لم تُحفظ البداية. \(madarUserMessage(error))" }
         }

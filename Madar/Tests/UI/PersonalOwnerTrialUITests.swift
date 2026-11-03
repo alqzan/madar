@@ -34,7 +34,7 @@ import XCTest
         XCTAssertFalse(app.staticTexts["diary-letter-text"].exists)
         shot(app, "TRIAL-personal-sealed-mailbox-L")
         app.buttons["diary-hub-close"].tap()
-        let bahw = app.tabBars.buttons["البهو"].firstMatch; XCTAssertTrue(bahw.waitForExistence(timeout: 10)); bahw.tap()
+        let bahw = app.buttons["tab-foundation"].firstMatch; XCTAssertTrue(bahw.waitForExistence(timeout: 10)); bahw.tap()
         let year = app.descendants(matching: .any)["bahw-block-year"]
         for _ in 0..<8 where !year.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(year.isHittable); year.tap()

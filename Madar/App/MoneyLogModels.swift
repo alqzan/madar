@@ -142,13 +142,14 @@ extension AppMoneyService {
         var spent: [String: Int] = [:], other: [String: Int] = [:], cashOut: [String: Int] = [:], unknownCash: Set<String> = [], pending: [String: Int] = [:]
         var movements: [MoneyLogMovement] = [], kept: [MoneyTransaction] = []
         let owned = Set(accounts.filter { $0.ownership == "mine" && $0.tracked }.map(\.id))
+        let effects = try repo.effectContext()
         for row in tx {
             if let card = cards.first(where: { $0.id == row.cardID }), let account = card.accountID, !owned.contains(account) { continue }
             let linked = [row.fromAccountID, row.toAccountID].compactMap { $0 }
             if !linked.isEmpty && !linked.contains(where: owned.contains) { continue }
             guard let day = try? GregorianDay(row.dayKey) else { continue }
             kept.append(row)
-            let confirmed = row.reviewState == "ok", effect = try? repo.effect(of: row)
+            let confirmed = row.reviewState == "ok", effect = try? repo.effect(of: row, in: effects)
             let original = row.kind == "refund" ? row.relatedTransactionID.flatMap { byID[$0] } : nil
             let budgetDay = original?.dayKey ?? row.dayKey
             let ownParts = parts[row.id] ?? []
@@ -157,7 +158,7 @@ extension AppMoneyService {
                 spent[budgetDay, default: 0] -= budgetParts.filter { $0.target == "daily" }.reduce(0) { $0 + $1.amountMinor }
                 other[budgetDay, default: 0] -= budgetParts.filter { $0.target != "daily" }.reduce(0) { $0 + $1.amountMinor }
                 if row.ignoredFromBudget {
-                    let charge = (try? repo.effect(of: row, includingExcluded: true))?.budgetChargeMinor ?? 0
+                    let charge = (try? repo.effect(of: row, includingExcluded: true, in: effects))?.budgetChargeMinor ?? 0
                     other[budgetDay, default: 0] += charge
                 }
                 if let effect { cashOut[row.dayKey, default: 0] += max(0, -effect.cashMinor) }

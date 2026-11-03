@@ -91,7 +91,7 @@ import XCTest
     /// A tab tap can leave the lobby in front, so trust only the money-home marker and fall back to the
     /// customise search route that MoneyHomeUITests uses.
     private func openMoney(_ app: XCUIApplication) {
-        let mal = app.tabBars.buttons["المال"].firstMatch
+        let mal = app.buttons["tab-money"].firstMatch
         if mal.waitForExistence(timeout: 20) { mal.tap() }
         if !app.buttons["money-expense-open"].waitForExistence(timeout: 10) {
             let more = app.buttons["tab-customize"]; XCTAssertTrue(more.waitForExistence(timeout: 60), app.debugDescription); more.tap()
@@ -177,19 +177,19 @@ import XCTest
         }
 
         // Mihbara (the old backup holds no books, reading logs or benefits).
-        let mihbara = app.tabBars.buttons["المحبرة"].firstMatch
+        let mihbara = app.buttons["tab-mihbara"].firstMatch
         XCTAssertTrue(mihbara.waitForExistence(timeout: 20)); mihbara.tap(); Thread.sleep(forTimeInterval: 2)
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 20), "The Mihbara home must actually open")
         XCTAssertFalse(app.alerts["لم تكتمل العملية"].waitForExistence(timeout: 1), "Leaving the money home must not turn expected plan-task cancellation into a failure alert")
         shot(app, "TRIAL-mihbara-home-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-mihbara-home-s1-L")
 
         // The lobby with every room's data.
-        let bahwTab = app.tabBars.buttons["البهو"].firstMatch, bahw = bahwTab.waitForExistence(timeout: 5) ? bahwTab : app.buttons["البهو"].firstMatch
+        let bahwTab = app.buttons["tab-foundation"].firstMatch, bahw = bahwTab.waitForExistence(timeout: 5) ? bahwTab : app.buttons["البهو"].firstMatch
         XCTAssertTrue(bahw.waitForExistence(timeout: 10), "The lobby is a required room")
         if bahw.exists { bahw.tap(); Thread.sleep(forTimeInterval: 2); shot(app, "TRIAL-bahw-L"); for i in 1...3 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-bahw-s\(i)-L") } }
         // Prayer and Quran homes, then the habits room from the lobby (Claude, 24 Oct tour).
         for (tab, name) in [("الصلاة", "prayer"), ("القرآن", "quran")] {
-            let button = app.tabBars.buttons[tab].firstMatch
+            let button = app.otherElements["fixed-tab-bar"].buttons[tab].firstMatch
             guard button.waitForExistence(timeout: 10) else { XCTFail("Required room tab missing: " + tab); continue }
             button.tap(); Thread.sleep(forTimeInterval: 2); clearAlert(app, name)
             let marker = app.descendants(matching: .any).matching(identifier: name == "prayer" ? "prayer-today-header" : "quran-coverage-title").firstMatch

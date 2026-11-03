@@ -20,7 +20,7 @@ import XCTest
         shot(app, "OR-04-quran-review-small-L")
         preview.tap()
         XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.tabBars.buttons["القرآن"].isSelected)
+        XCTAssertTrue(app.buttons["tab-quran"].isSelected)
     }
     func testDefaultRoomPreviewsAndDirectDiaryWriting() throws {
         continueAfterFailure=false;let app=openGallery();shot(app,"M4-W01-X1-Raisiya-L")
@@ -123,7 +123,7 @@ import XCTest
     func testPrayerWidgetPreviewOpensPrayerDirectly() throws {
         continueAfterFailure=false;let app=openGallery();app.buttons["room-widget-prayer"].tap()
         XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForNonExistence(timeout:5))
-        XCTAssertTrue(app.tabBars.buttons["الصلاة"].isSelected)
+        XCTAssertTrue(app.buttons["tab-prayer"].isSelected)
     }
     func testMihbaraWidgetPreviewOpensRoomDirectly() throws {
         continueAfterFailure=false;let app=openGallery(),mihbara=app.buttons["room-widget-mihbara"]

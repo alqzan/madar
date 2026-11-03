@@ -3,7 +3,7 @@ import XCTest
 @MainActor final class MoneyTravelUITests: XCTestCase {
     private func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
     private func reach(_ app: XCUIApplication, _ button: XCUIElement) {
-        let shortcut = app.tabBars.buttons["المحبرة"]
+        let shortcut = app.buttons["tab-mihbara"]
         for _ in 0..<6 {
             let bottom = shortcut.exists ? shortcut.frame.minY - 8 : app.frame.maxY - 90
             if button.isHittable && button.frame.maxY < bottom { return }

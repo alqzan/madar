@@ -772,7 +772,7 @@ final class PrayerNotificationCoordinator {
         if let store = session.managedStore { container = try store.containerForTransaction() }
         else { container = session.container }
         let context = ModelContext(container)
-        let rows = try context.fetch(FetchDescriptor<NotificationLedger>()).filter { $0.deletedAt == nil && $0.requestID == requestID }
+        let rows = try context.fetch(FetchDescriptor<NotificationLedger>(predicate: #Predicate { $0.requestID == requestID })).filter { $0.deletedAt == nil }
         if state == "submitted", let dueAt,
            let current = rows.first(where: { $0.state == "submitted" && abs($0.scheduledFor.timeIntervalSince(dueAt)) < 1 }) {
             for duplicate in rows where duplicate.state == "submitted" && duplicate.id != current.id {

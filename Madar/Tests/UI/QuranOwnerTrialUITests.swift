@@ -19,7 +19,7 @@ import XCTest
             XCTAssertTrue(cityStart.waitForExistence(timeout: 10)); cityStart.tap()
             XCTAssertTrue(start.waitForNonExistence(timeout: 60), "Onboarding must close before room navigation")
         }
-        let tab = app.tabBars.buttons["القرآن"].firstMatch
+        let tab = app.buttons["tab-quran"].firstMatch
         XCTAssertTrue(tab.waitForExistence(timeout: 30), app.debugDescription); tab.tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 30), app.debugDescription)
     }
@@ -76,7 +76,7 @@ import XCTest
             let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: prayer).deletingLastPathComponent().appendingPathComponent("prayer-import-\(stamp)-first.json"))) as? [String: Int])
             XCTAssertNil(report["failed"], report.description)
             app.terminate(); app.launch()
-            let tab = app.tabBars.buttons["الصلاة"].firstMatch
+            let tab = app.buttons["tab-prayer"].firstMatch
             XCTAssertTrue(tab.waitForExistence(timeout: 30)); tab.tap(); Thread.sleep(forTimeInterval: 2)
             shot(app, "TRIAL-prayer-home-L")
             for i in 1...5 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-prayer-home-s\(i)-L") }

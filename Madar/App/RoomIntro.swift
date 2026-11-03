@@ -25,7 +25,14 @@ extension AppSession {
     }
 
     private func introKey(_ block: BahwBlock) -> String { "Madar.introSeen." + block.rawValue }
-    func introNeeded(_ block: BahwBlock) -> Bool { !UserDefaults.standard.bool(forKey: introKey(block)) }
+    func introNeeded(_ block: BahwBlock) -> Bool {
+        #if DEBUG
+        // UI tests that are not about the intro open rooms directly; MADAR_UI_INTRO=1 brings the sheet back.
+        let environment = ProcessInfo.processInfo.environment
+        if environment["MADAR_UI_STORE_ID"] != nil, environment["MADAR_UI_INTRO"] != "1" { return false }
+        #endif
+        return !UserDefaults.standard.bool(forKey: introKey(block))
+    }
     func markIntroSeen(_ block: BahwBlock) { UserDefaults.standard.set(true, forKey: introKey(block)) }
 
     /// The lobby's door: the first visit shows the introduction, later visits open the room.
@@ -51,12 +58,20 @@ extension AppSession {
         #if DEBUG
         if ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil { UserDefaults.standard.set(true, forKey: key); return }
         #endif
+        // An update must never put rooms away: only an install that finished its first run in this build starts with one room.
+        // Anyone who already had the app keeps every room they had, with their data.
+        guard UserDefaults.standard.bool(forKey: "Madar.progressiveRooms.pending") else {
+            // The intros explain a room to someone meeting it; a person who already uses the app does not get them on every room again.
+            for block in BahwBlock.allCases { markIntroSeen(block) }
+            UserDefaults.standard.set(true, forKey: key); return
+        }
         var layout = lobbyLayout
         for block in BahwBlock.allCases where block != .salah && BahwBlock.built.contains(block) {
             if !layout.blocks.contains(block.rawValue) { layout.blocks.append(block.rawValue) }
             if !layout.hidden.contains(block.rawValue) { layout.hidden.append(block.rawValue) }
         }
-        do { try await applySettingsAndWait(["bahw.layout": layout.json]); UserDefaults.standard.set(true, forKey: key) } catch { }
+        layout.pinned.removeAll { layout.hidden.contains($0) } // a room cannot be both pinned and put away
+        do { try await applySettingsAndWait(["bahw.layout": layout.json]); UserDefaults.standard.set(true, forKey: key); UserDefaults.standard.removeObject(forKey: "Madar.progressiveRooms.pending") } catch { }
     }
 }
 

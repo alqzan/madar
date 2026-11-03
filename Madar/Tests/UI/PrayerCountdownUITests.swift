@@ -32,7 +32,7 @@ import XCTest
         app.launch()
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         if app.buttons["first-run-continue"].waitForExistence(timeout: 2) { app.buttons["first-run-continue"].tap() }
-        app.tabBars.buttons["الصلاة"].tap()
+        app.buttons["tab-prayer"].tap()
         let customize = app.buttons["prayer-customize"]
         XCTAssertTrue(customize.waitForExistence(timeout: 10)); customize.tap()
 
@@ -61,7 +61,7 @@ import XCTest
         XCTAssertFalse(app.descendants(matching: .any)["setting-salah.balanceView"].exists, "RA8 keeps the v2 balance view out of v1.")
 
         app.terminate(); app.launch()
-        app.tabBars.buttons["الصلاة"].tap()
+        app.buttons["tab-prayer"].tap()
         let reopened = app.buttons["prayer-customize"]
         XCTAssertTrue(reopened.waitForExistence(timeout: 10)); reopened.tap()
         let timesAgain = app.buttons["prayer-customize-card-times"]
@@ -72,7 +72,7 @@ import XCTest
         capture(app, "AU-95-prayer-settings-complete-L")
     }
     private func openReminders(_ app: XCUIApplication) {
-        app.tabBars.buttons["الصلاة"].tap()
+        app.buttons["tab-prayer"].tap()
         let settings = app.buttons["prayer-customize"]
         XCTAssertTrue(settings.waitForExistence(timeout: 15)); settings.tap()
         let card = app.buttons["prayer-customize-card-remind"]

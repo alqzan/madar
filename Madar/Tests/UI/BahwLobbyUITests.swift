@@ -10,7 +10,7 @@ import XCTest
                                  "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_DIARY_FIXTURE": "home", "MADAR_UI_HABIT_FIXTURE": "showcase",
                                  "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app)
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
         XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertEqual(element("bahw-greeting").label, "مساء الخير")
@@ -24,7 +24,7 @@ import XCTest
         app.buttons["bahw-arrange"].tap()
         app.buttons["bahw-customize"].tap()
         XCTAssertTrue(app.textFields["settings-search"].waitForExistence(timeout: 10), app.debugDescription)
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 10), app.debugDescription)
         app.swipeUp(); XCTAssertTrue(element("bahw-block-notes").waitForExistence(timeout: 5)); XCTAssertTrue(element("bahw-block-mihbara").exists); capture(app, "M4-V01-lobby-s1-L")
         app.swipeDown()
@@ -55,7 +55,7 @@ import XCTest
         ]
         app.launch()
         finishOnboarding(app)
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
 
         let card = app.descendants(matching: .any)["bahw-return-plan"]
         let day = app.staticTexts["bahw-return-day"]
@@ -66,14 +66,14 @@ import XCTest
 
         app.buttons["bahw-return-quran"].tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15), app.debugDescription)
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         XCTAssertTrue(card.waitForExistence(timeout: 5))
         app.buttons["bahw-return-habits"].tap()
         XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10), app.debugDescription)
 
         app.terminate()
         app.launch()
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         XCTAssertTrue(card.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertEqual(day.label, "اليوم \u{2068}١\u{2069} من \u{2068}٣\u{2069}")
         capture(app, "M4-V01-return-day1-reopened-L")
@@ -84,7 +84,7 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_MIHBARA_FIXTURE": "empty", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app)
-        let lobby = app.tabBars.buttons["البهو"]
+        let lobby = app.buttons["tab-foundation"]
         XCTAssertTrue(lobby.waitForExistence(timeout: 15), app.debugDescription); lobby.tap()
         let mihbara = app.descendants(matching: .any).matching(identifier: "bahw-block-mihbara").firstMatch
         var attempts = 0
@@ -106,7 +106,7 @@ import XCTest
         XCTAssertTrue(present.waitForExistence(timeout: 10), app.debugDescription); present.tap()
         let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: present)
         XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, app.debugDescription)
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         let suggestion = app.buttons["bahw-suggestion-money"]
         for _ in 0..<8 where !suggestion.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), app.debugDescription)
@@ -338,29 +338,27 @@ import XCTest
         ]
         app.launch()
         XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 20), app.debugDescription)
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         XCTAssertTrue(app.staticTexts["bahw-greeting"].waitForExistence(timeout: 10))
         capture(app, "UX-10-glass-shortcuts-expanded-L")
-        let nextPrayer = app.descendants(matching: .any).matching(identifier: "tab-accessory-next-prayer").firstMatch
-        XCTAssertTrue(nextPrayer.waitForExistence(timeout: 5), "Expanded accessory should show the next prayer.\n\(app.debugDescription)")
-        // Owner, 21 Oct 2026: المال and المحبرة are tabs; the diary and «خصّص» ride the expanded accessory.
-        for title in ["البهو", "الصلاة", "القرآن", "المال", "المحبرة"] {
-            XCTAssertTrue(app.tabBars.buttons[title].exists, "Missing tab: \(title)\n\(app.debugDescription)")
+        // Owner, 3 Nov 2026: one fixed bar with every enabled room, no «المزيد» and no accessory; «خصّص» opens from the lobby.
+        for title in ["البهو", "الصلاة", "القرآن", "المذكرات", "المال", "المحبرة"] {
+            XCTAssertTrue(app.otherElements["fixed-tab-bar"].buttons[title].exists, "Missing tab: \(title)\n\(app.debugDescription)")
         }
-        for room in ["notes", "customize"] {
+        for room in ["foundation", "prayer", "quran", "notes", "money", "mihbara"] {
             let shortcut = app.buttons["tab-\(room)"]
-            XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing expanded room shortcut: \(room)\n\(app.debugDescription)")
-            XCTAssertTrue(shortcut.isHittable, "Expanded room shortcut is not tappable: \(room)")
-            XCTAssertGreaterThanOrEqual(shortcut.frame.width, 44, "Expanded room target is too narrow: \(room)")
-            XCTAssertGreaterThanOrEqual(shortcut.frame.height, 44, "Expanded room target is too short: \(room)")
+            XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing room tab: \(room)\n\(app.debugDescription)")
+            XCTAssertTrue(shortcut.isHittable, "Room tab is not tappable: \(room)")
+            XCTAssertGreaterThanOrEqual(shortcut.frame.width, 44, "Room tab is too narrow: \(room)")
+            XCTAssertGreaterThanOrEqual(shortcut.frame.height, 44, "Room tab is too short: \(room)")
         }
         app.buttons["tab-notes"].tap()
         XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         XCTAssertTrue(app.staticTexts["bahw-greeting"].waitForExistence(timeout: 10))
         app.swipeUp(velocity: .slow)
         capture(app, "UX-10-glass-shortcuts-inline-L")
-        for room in ["prayer", "quran", "customize", "notes", "money", "mihbara"] {
+        for room in ["prayer", "quran", "notes", "money", "mihbara"] {
             let shortcut = app.buttons["tab-\(room)"]
             XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing one-tap room shortcut: \(room)\n\(app.debugDescription)")
             XCTAssertTrue(shortcut.isHittable, "Room shortcut is not tappable: \(room)")
@@ -370,7 +368,6 @@ import XCTest
         for (room, destination) in [
             ("quran", "quran-coverage-title"),
             ("prayer", "prayer-today-header"),
-            ("customize", "settings-search"),
             ("notes", "diary-home-title"),
             ("money", "money-home"),
             ("mihbara", "mihbara-add-paper"),

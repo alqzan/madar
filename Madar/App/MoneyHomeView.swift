@@ -439,7 +439,7 @@ struct MoneyHomeView: View {
             failure = nil
             if let route = app.moneyRoute { openMoneyRoute(route) }
         }
-        catch MoneyCommandError.missingRate { failure = "يلزم سعر تحويل يدوي لجمع أرصدتك بعملة البيت."; reading = nil }
+        catch MoneyCommandError.missingRate { failure = "عندك حساب بعملة غير عملة البيت بلا سعر تحويل، ومدار لا يخمّن الأرقام. افتح «الحسابات» وصحّح عملة الحساب إن كانت خطأ، أو أدخل سعر الصرف من «السفر»."; reading = nil }
         catch { failure = "تعذّرت قراءة البيانات الآن. أعد المحاولة."; reading = nil }
     }
     private func closeForMoneyRootIfSafe() {

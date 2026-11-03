@@ -55,7 +55,7 @@ import XCTest
             let searchButton = app.keyboards.buttons.matching(identifier: "Search").firstMatch
             if searchButton.exists { searchButton.tap() }
 
-            let lobby = app.tabBars.buttons["البهو"]
+            let lobby = app.buttons["tab-foundation"]
             XCTAssertTrue(lobby.waitForExistence(timeout: 8), app.debugDescription)
             lobby.tap()
             let yearBlock = app.descendants(matching: .any)["bahw-block-year"]

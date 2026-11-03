@@ -106,8 +106,9 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
                                                         tzID: latest.tzID.isEmpty ? nil : latest.tzID))
         }
         let money = MoneyRepository(context: context)
+        let effects = try money.effectContext()
         for row in try money.confirmedTransactions() where days.contains(row.dayKey) && row.showInDiary && visible("mal", row.id) {
-            let charge = try money.effect(of: row, includingExcluded: true).budgetChargeMinor
+            let charge = try money.effect(of: row, includingExcluded: true, in: effects).budgetChargeMinor
             guard charge != 0, let exponent = CurrencyExponents.specified.exponent(row.homeCurrency) else { continue }
             let amount = digits.amount(minorUnits: Int64(abs(charge)), fractionDigits: exponent, signed: false)
             let currency = row.homeCurrency == "SAR" ? "ر.س" : row.homeCurrency

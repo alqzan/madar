@@ -313,6 +313,19 @@ import Testing
         let original = try write(); let container = try MadarContainerFactory.makeLocal(at:url); let store = try SettingsStore(context:container.mainContext)
         #expect(try store.writerIDForWrite() == original); #expect(!container.mainContext.hasChanges)
     }
+    /// settings-schema.json, bahw.layout: «unknownIds: dropped on read». A removed room must not reset the whole lobby.
+    @Test func layoutWithAnUnknownRoomKeepsTheOtherRoomsOnRead() throws {
+        let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext)
+        var layout = try store.schema.definition(for:"bahw.layout").defaultValue.object!
+        layout["blocks"] = .array([.string("salah"), .string("removedRoom"), .string("quran")])
+        layout["hidden"] = .array([.string("quran"), .string("removedRoom")])
+        layout["pinned"] = .array([.string("salah")])
+        let row = LayoutState(); row.room = "bahw"; row.blocksJSON = try JSONEncoder().encode(JSONValue.object(layout)); c.mainContext.insert(row); try c.mainContext.save()
+        let read = try #require(try store.value(for:"bahw.layout").object)
+        #expect(read["blocks"]?.array?.compactMap(\.string) == ["salah", "quran"])
+        #expect(read["hidden"]?.array?.compactMap(\.string) == ["quran"])
+        #expect(read["pinned"]?.array?.compactMap(\.string) == ["salah"])
+    }
     @Test func invalidStageAndReadsNeverCreateWriterIdentity() throws {
         let container = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:container.mainContext)
         _ = try store.value(for:"core.numerals")

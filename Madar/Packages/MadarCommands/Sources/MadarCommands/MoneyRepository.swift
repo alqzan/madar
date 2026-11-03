@@ -11,10 +11,26 @@ import MadarPrayer
     public let context: ModelContext
     public init(context: ModelContext) { self.context = context }
 
+    /// The tables an effect needs, read once. A list of movements builds one and passes it to every row instead of re-reading five tables per row.
+    public struct EffectContext {
+        let cashAsSpend: Bool
+        let accounts: [Account]
+        let cards: [Card]
+        let obligations: [Obligation]
+        let reconciliations: [Reconciliation]
+    }
+    public func effectContext() throws -> EffectContext {
+        .init(cashAsSpend: try SettingsStore(context: context).value(for: "mal.cashWithdrawalAsSpend") == .bool(true),
+              accounts: try liveAccounts(),
+              cards: try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil },
+              obligations: try context.fetch(FetchDescriptor<Obligation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil },
+              reconciliations: try context.fetch(FetchDescriptor<Reconciliation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil })
+    }
     public func effect(of row: MoneyTransaction, includingExcluded: Bool = false) throws -> MovementEffect {
-        let settings = try SettingsStore(context: context)
-        let cashAsSpend = try settings.value(for: "mal.cashWithdrawalAsSpend") == .bool(true)
-        let accounts = try liveAccounts(), cards = try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        try effect(of: row, includingExcluded: includingExcluded, in: try effectContext())
+    }
+    public func effect(of row: MoneyTransaction, includingExcluded: Bool = false, in lookup: EffectContext) throws -> MovementEffect {
+        let cashAsSpend = lookup.cashAsSpend, accounts = lookup.accounts, cards = lookup.cards
         let card = cards.first { $0.id == row.cardID }
         let from = accounts.first { $0.id == row.fromAccountID }, to = accounts.first { $0.id == row.toAccountID }
         func owned(_ account: Account?) -> Bool { account?.ownership == "mine" && account?.tracked == true }
@@ -34,13 +50,13 @@ import MadarPrayer
         case "cashback": movement = .cashbackRedeemed(card?.kind == "credit" ? .creditCard : .account)
         case "billPayment": movement = .billPayment(linkedToObligation: row.obligationID != nil)
         case "repayment":
-            let obligation = try context.fetch(FetchDescriptor<Obligation>()).first { $0.id == row.obligationID && $0.deletedAt == nil && $0.mergedInto == nil }
+            let obligation = lookup.obligations.first { $0.id == row.obligationID }
             guard let obligation else { throw MoneyCommandError.invalidReference }
             movement = obligation.kind == "loan" ? .loanInstalment : .bnplInstalment
         case "adjustment":
             // M5-V15 / F03: the reconciliation record holds the signed difference and its name; the movement is linked
             // from `Reconciliation.adjustmentTransactionID` (the dictionary's relation). Accounts also carry the sign in from/to.
-            let record = try context.fetch(FetchDescriptor<Reconciliation>()).first { $0.adjustmentTransactionID == row.id && $0.deletedAt == nil && $0.mergedInto == nil }
+            let record = lookup.reconciliations.first { $0.adjustmentTransactionID == row.id }
             let spend = record?.resolution == "unrecordedSpend"
             if row.cardID != nil {
                 movement = .cardAdjustment(unrecordedSpend: spend); amount = record?.deltaMinor ?? 0

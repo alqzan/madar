@@ -110,7 +110,8 @@ struct QuranFreeView: View {
             }
             .fullScreenCover(item: $session) { initial in QuranHomeSessionFlow(service: service, state: Binding(get: { session ?? initial }, set: { session = $0 }), close: { session = nil }) }
     }
-    private var surahs: [(Int,String)] { guard let catalog = try? QuranResources.catalog() else { return [] }; return Dictionary(grouping:catalog.ayahs,by:\.surahID).sorted { $0.key < $1.key }.map { ($0.key,$0.value[0].surahNameArabic) } }
+    private static let surahList: [(Int,String)] = { guard let catalog = try? QuranResources.catalog() else { return [] }; return Dictionary(grouping:catalog.ayahs,by:\.surahID).sorted { $0.key < $1.key }.map { ($0.key,$0.value[0].surahNameArabic) } }()
+    private var surahs: [(Int,String)] { Self.surahList }
     private func selectLastPages(_ indexed: [QuranUIIndexItem]) {
         // AU-34: with nothing memorised the preset says why it cannot pick, instead of silently choosing page 1.
         guard let last = indexed.filter(\.memorized).map(\.firstPage).max() else { error = "لا شيء في صدرك بعد؛ اختر سورة أو نطاقًا للقراءة"; return }

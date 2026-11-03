@@ -67,7 +67,7 @@ import XCTest
         capture(app, "OR-03-habit-reminder-settings-L")
         app.terminate(); app.launch(); finishOnboarding(app); openReminderSettings(); waitSelected(push)
 
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         let openHabits = app.buttons["bahw-habits-open"]
         XCTAssertTrue(openHabits.waitForExistence(timeout: 10)); openHabits.tap()
         let first = app.buttons["habit-first"]
@@ -137,44 +137,44 @@ import XCTest
         XCTAssertFalse(app.switches["room-block-quran-sadr"].exists)
         setVisible("quran", "log14", false); setVisible("quran", "tools", false)
         capture(app, "OR-03-quran-content-L")
-        app.tabBars.buttons["القرآن"].tap()
+        app.buttons["tab-quran"].tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.descendants(matching: .any)["quran-log14"].exists)
         XCTAssertFalse(app.buttons["quran-tool-qiyam"].exists)
         capture(app, "OR-03-quran-hidden-L")
         app.terminate(); app.launch(); finishOnboarding(app)
-        app.tabBars.buttons["القرآن"].tap()
+        app.buttons["tab-quran"].tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.descendants(matching: .any)["quran-log14"].exists)
         openLayout("quran"); app.buttons["room-layout-reset"].tap()
         let restored = app.switches["room-block-quran-log14"]
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: restored)], timeout: 10), .completed)
-        app.tabBars.buttons["القرآن"].tap()
+        app.buttons["tab-quran"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["quran-log14"].waitForExistence(timeout: 10))
 
         openLayout("mal"); setVisible("mal", "limits", false)
         XCTAssertFalse(app.switches["room-block-mal-now"].exists)
         capture(app, "OR-03-money-content-L")
-        app.tabBars.buttons["المال"].tap()
+        app.buttons["tab-money"].tap()
         XCTAssertTrue(app.buttons["money-obligations-open"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["money-categories-open"].exists)
-        app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["المال"].tap()
+        app.terminate(); app.launch(); finishOnboarding(app); app.buttons["tab-money"].tap()
         XCTAssertTrue(app.buttons["money-obligations-open"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["money-categories-open"].exists)
         openLayout("mal"); app.buttons["room-layout-reset"].tap()
         let limits = app.switches["room-block-mal-limits"]
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: limits)], timeout: 10), .completed)
-        app.tabBars.buttons["المال"].tap()
+        app.buttons["tab-money"].tap()
         XCTAssertTrue(app.buttons["money-categories-open"].waitForExistence(timeout: 10))
         openLayout("mihbara"); setVisible("mihbara", "notebook", false)
         capture(app, "OR-03-mihbara-content-L")
-        app.tabBars.buttons["المحبرة"].tap()
+        app.buttons["tab-mihbara"].tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["mihbara-notebook"].exists)
         openLayout("mihbara"); app.buttons["room-layout-reset"].tap()
         let notebook = app.switches["room-block-mihbara-notebook"]
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: notebook)], timeout: 10), .completed)
-        app.tabBars.buttons["المحبرة"].tap()
+        app.buttons["tab-mihbara"].tap()
         let book = app.buttons["mihbara-notebook"]
         XCTAssertTrue(book.waitForExistence(timeout: 15))
         for _ in 0..<4 { if book.isHittable { break }; app.swipeUp() }
@@ -204,12 +204,12 @@ import XCTest
             for _ in 0..<8 { if item.isHittable && item.frame.maxY < app.frame.maxY - 170 { return }; app.swipeUp(velocity: .slow) }
             XCTAssertTrue(item.isHittable, app.debugDescription)
         }
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         XCTAssertFalse(app.buttons["bahw-suggestion-quran"].exists)
         XCTAssertFalse(app.buttons["bahw-suggestion-notes"].exists)
         openSetting(); selected("calm")
         app.buttons["option-bahw.smartPresence-medium"].tap(); selected("medium")
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         let quran = app.buttons["bahw-suggestion-quran"]
         XCTAssertTrue(quran.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertFalse(app.buttons["bahw-suggestion-notes"].exists)
@@ -220,7 +220,7 @@ import XCTest
         app.buttons["option-bahw.smartPresence-present"].tap(); selected("present")
         capture(app, "OR-03-smart-settings-L")
         app.terminate(); app.launch(); finishOnboarding(app)
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         let diary = app.buttons["bahw-suggestion-notes"]
         XCTAssertTrue(diary.waitForExistence(timeout: 15), app.debugDescription)
         reveal(diary); capture(app, "OR-03-smart-present-L"); diary.tap()

@@ -36,9 +36,10 @@ extension AppMoneyService {
         let categories = try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let cards = try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let effects = try repo.effectContext()
         let rows: [MoneyBudgetRow] = try movements.filter { $0.cycleID == cycle?.id && $0.homeCurrency == app.string("core.currency") && $0.obligationID == nil && ["expense", "fee", "withdrawal", "transfer"].contains($0.kind) }.compactMap { row -> MoneyBudgetRow? in
             let excluded = row.ignoredFromBudget
-            guard try repo.effect(of: row, includingExcluded: true).budgetChargeMinor > 0 else { return nil }
+            guard try repo.effect(of: row, includingExcluded: true, in: effects).budgetChargeMinor > 0 else { return nil }
             let refunds = movements.filter { $0.kind == "refund" && $0.relatedTransactionID == row.id }
             let net = max(0, row.homeAmountMinor - refunds.reduce(0) { $0 + $1.homeAmountMinor })
             let parts = allocations.filter { $0.transactionID == row.id && $0.kind == "spend" && ($0.deletedAt == nil || excluded) }.sorted { $0.idempotencyKey < $1.idempotencyKey }

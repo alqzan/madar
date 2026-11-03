@@ -11,7 +11,7 @@ import XCTest
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
         if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
-        app.tabBars.buttons["الصلاة"].tap()
+        app.buttons["tab-prayer"].tap()
 
         let streaks = app.buttons["prayer-streaks"]
         reveal(streaks, in: app); streaks.tap()
@@ -41,7 +41,7 @@ import XCTest
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
         if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
-        app.tabBars.buttons["الصلاة"].tap()
+        app.buttons["tab-prayer"].tap()
 
         let noTimes = app.staticTexts["prayer-no-times"]
         XCTAssertTrue(noTimes.waitForExistence(timeout: 10), app.debugDescription)
@@ -114,7 +114,7 @@ import XCTest
             if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
             let start = app.buttons["first-run-continue"]
             if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
-            app.tabBars.buttons["الصلاة"].tap()
+            app.buttons["tab-prayer"].tap()
             let summary = app.staticTexts["prayer-today-summary"]
             XCTAssertTrue(summary.waitForExistence(timeout: 15))
             XCTAssertTrue(summary.label.contains("لم تُسجَّل"), summary.label)

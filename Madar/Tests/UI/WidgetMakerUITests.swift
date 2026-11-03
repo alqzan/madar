@@ -155,13 +155,13 @@ import XCTest
         app.buttons["widget-maker-save"].tap()
         XCTAssertTrue(app.staticTexts["widget-maker-status"].waitForExistence(timeout: 15))
         app.buttons["widget-maker-close"].tap()
-        app.tabBars.buttons["البهو"].tap()
+        app.buttons["tab-foundation"].tap()
         let card = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "maker-lobby-")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 15), app.debugDescription); reach(app, card)
         XCTAssertLessThan(card.frame.width, app.frame.width * 0.6)
         XCTAssertEqual(card.frame.width / card.frame.height, 1, accuracy: 0.1)
         capture(app, "OR-03-X3-lobby-small-L")
-        app.terminate(); app.launch(); app.tabBars.buttons["البهو"].tap()
+        app.terminate(); app.launch(); app.buttons["tab-foundation"].tap()
         XCTAssertTrue(card.waitForExistence(timeout: 15)); reach(app, card)
         XCTAssertLessThan(card.frame.width, app.frame.width * 0.6)
         let link = card.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "عادات اليوم")).firstMatch
@@ -190,7 +190,7 @@ import XCTest
         XCTAssertTrue(glass.isSelected)
         XCTAssertEqual(name.value as? String, "زجاج يومي")
         capture(app, "OR-03-X3-glass-reopened-L")
-        app.buttons["widget-maker-close"].tap(); app.tabBars.buttons["البهو"].tap()
+        app.buttons["widget-maker-close"].tap(); app.buttons["tab-foundation"].tap()
         let card = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "maker-lobby-")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 15)); reach(app, card)
         capture(app, "OR-03-X3-glass-lobby-L")

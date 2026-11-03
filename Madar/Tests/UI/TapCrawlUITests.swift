@@ -103,7 +103,7 @@ import XCTest
             return true
         }
         let tabTitles = ["foundation": "البهو", "prayer": "الصلاة", "quran": "القرآن", "money": "المال", "mihbara": "المحبرة", "notes": "المذكرات", "customize": "خصّص"]
-        let nativeTab = tabTitles[tab].map { app.tabBars.buttons[$0].firstMatch }
+        let nativeTab = tabTitles[tab].map { app.otherElements["fixed-tab-bar"].buttons[$0].firstMatch }
         let shortcut = app.buttons["tab-\(tab)"].firstMatch
         if let nativeTab, nativeTab.waitForExistence(timeout: 10) {
             nativeTab.tap()
