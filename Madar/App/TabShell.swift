@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import MadarDesign
 import MadarData
 
@@ -268,6 +269,13 @@ struct MadarRootView: View {
             Task { await (session.backupService as? AppBackupService)?.refreshBackgroundSchedule() }
         }
         .onChange(of: scenePhase) { _, phase in
+            // The crash log from the owner's iPhone (3 Nov, termination 0xDEAD10CC) shows the app suspended while a SwiftData read
+            // held the store's file lock. Asking the system for a few seconds when the app leaves the screen lets that work finish first.
+            if phase != .active {
+                var task = UIBackgroundTaskIdentifier.invalid
+                task = UIApplication.shared.beginBackgroundTask(withName: "madar.store.settle") { UIApplication.shared.endBackgroundTask(task) }
+                Task { try? await Task.sleep(for: .seconds(8)); UIApplication.shared.endBackgroundTask(task) }
+            }
             if phase == .active && !session.maintenanceInProgress {
                 do {
                     try session.reload()

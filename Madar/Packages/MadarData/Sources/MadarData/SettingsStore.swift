@@ -13,7 +13,12 @@ public struct SettingDefinition: Decodable, Sendable {
 }
 public struct SettingsSchema: Decodable, Sendable {
     public let settings: [SettingDefinition]
-    public static func bundled() throws -> SettingsSchema { guard let url = Bundle.module.url(forResource: "settings-schema", withExtension: "json") else { throw DataError.invalidValue("settings schema") }; return try JSONDecoder().decode(Self.self, from: Data(contentsOf: url)) }
+    /// Decoded once: every repository opens a settings store, and decoding this file each time was a large part of opening a room.
+    private static let bundledResult: Result<SettingsSchema, Error> = Result {
+        guard let url = Bundle.module.url(forResource: "settings-schema", withExtension: "json") else { throw DataError.invalidValue("settings schema") }
+        return try JSONDecoder().decode(SettingsSchema.self, from: Data(contentsOf: url))
+    }
+    public static func bundled() throws -> SettingsSchema { try bundledResult.get() }
     public func definition(for key: String) throws -> SettingDefinition { guard let d = settings.first(where: { $0.key == key }) else { throw DataError.invalidValue("unknown setting \(key)") }; return d }
     public func validate(_ value: JSONValue, for key: String) throws {
         let d = try definition(for: key)
@@ -107,8 +112,8 @@ private struct UndoChange: Codable { let key: String; let before: JSONValue; let
         let d = try schema.definition(for:key)
         let data: Data?
         if d.type == "layout" { data = try context.fetch(FetchDescriptor<LayoutState>()).filter { $0.room == d.owner && $0.deletedAt == nil && $0.mergedInto == nil }.max { $0.updatedAt < $1.updatedAt }?.blocksJSON }
-        else if d.scope == "device" { data = try context.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil }.max { $0.updatedAt < $1.updatedAt }?.valueJSON }
-        else { data = try context.fetch(FetchDescriptor<Setting>()).filter { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil }.max { $0.updatedAt < $1.updatedAt }?.valueJSON }
+        else if d.scope == "device" { data = try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil })).max { $0.updatedAt < $1.updatedAt }?.valueJSON }
+        else { data = try context.fetch(FetchDescriptor<Setting>(predicate: #Predicate { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil })).max { $0.updatedAt < $1.updatedAt }?.valueJSON }
         guard let data else { return d.defaultValue }
         // Compatibility read only; preserve the stored bytes and all owner records.
         if key == "core.faceIDLock", (try? JSONDecoder().decode(JSONValue.self, from: data)) == .string("notesOnly") { return .string("none") }

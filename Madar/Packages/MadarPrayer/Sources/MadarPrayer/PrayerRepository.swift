@@ -94,14 +94,41 @@ import MadarData
         let edits = Int(value["edits"]?.number ?? 0)
         return .init(day: start, firstRun: first, editAnchor: edits == 1 ? row.map { prayerDay(at: $0.updatedAt) } : nil, edits: edits)
     }
+    /// Set only while `snapshot` reads: lookups then use per-day indexes built once, because the snapshot asks for every
+    /// day since tracking began and a scan of all rows per cell made opening the prayer room slow with months of history.
+    /// Writers (the mutation handler) never set it, so their reads stay live against rows they change.
+    private var reading = false
+    private lazy var liveLogIndex: [String: PrayerLog] = {
+        var index: [String: PrayerLog] = [:]
+        for row in logs where row.deletedAt == nil {
+            let key = row.dayKey + "|" + row.prayer
+            if let existing = index[key], !(existing.updatedAt == row.updatedAt ? existing.id.uuidString > row.id.uuidString : existing.updatedAt < row.updatedAt) { continue }
+            index[key] = row
+        }
+        return index
+    }()
+    private lazy var liveQadaIndex: [String: QadaItem] = {
+        var index: [String: QadaItem] = [:]
+        for row in qadaRows where row.deletedAt == nil {
+            let key = row.originalDayKey + "|" + row.prayer
+            if let existing = index[key], !(existing.updatedAt < row.updatedAt) { continue }
+            index[key] = row
+        }
+        return index
+    }()
     func log(_ ref: PrayerReference, includeDeleted: Bool = false) -> PrayerLog? {
-        logs.filter { $0.dayKey == ref.day.description && $0.prayer == ref.prayer.rawValue && (includeDeleted || $0.deletedAt == nil) }.max { a, b in a.updatedAt == b.updatedAt ? a.id.uuidString > b.id.uuidString : a.updatedAt < b.updatedAt }
+        if reading && !includeDeleted { return liveLogIndex[ref.day.description + "|" + ref.prayer.rawValue] }
+        return logs.filter { $0.dayKey == ref.day.description && $0.prayer == ref.prayer.rawValue && (includeDeleted || $0.deletedAt == nil) }.max { a, b in a.updatedAt == b.updatedAt ? a.id.uuidString > b.id.uuidString : a.updatedAt < b.updatedAt }
     }
     func qada(_ ref: PrayerReference, includeDeleted: Bool = false) -> QadaItem? {
-        qadaRows.filter { $0.originalDayKey == ref.day.description && $0.prayer == ref.prayer.rawValue && (includeDeleted || $0.deletedAt == nil) }.max { $0.updatedAt < $1.updatedAt }
+        if reading && !includeDeleted { return liveQadaIndex[ref.day.description + "|" + ref.prayer.rawValue] }
+        return qadaRows.filter { $0.originalDayKey == ref.day.description && $0.prayer == ref.prayer.rawValue && (includeDeleted || $0.deletedAt == nil) }.max { $0.updatedAt < $1.updatedAt }
     }
     public func day(_ day: GregorianDay, now: Date) throws -> PrayerDaySummary {
-        let start = try tracking(at: now).day, current = prayerDay(at: now)
+        try self.day(day, now: now, start: tracking(at: now).day, current: prayerDay(at: now))
+    }
+    /// `start` and `current` are the same for every day of one snapshot, so the snapshot reads them once.
+    private func day(_ day: GregorianDay, now: Date, start: GregorianDay, current: GregorianDay) throws -> PrayerDaySummary {
         return .init(day: day, cells: Prayer.allCases.map { prayer in
             let ref = PrayerReference(day: day, prayer: prayer), occurrence = occurrence(ref), row = log(ref)
             let due = occurrence.map { $0.time <= now } ?? false
@@ -125,8 +152,9 @@ import MadarData
         return current.adding(days: -1)
     }
     public func snapshot(now: Date) throws -> PrayerSnapshot {
+        reading = true; defer { reading = false }
         let current = prayerDay(at: now), track = try tracking(at: now)
-        let today = try day(current, now: now)
+        let today = try day(current, now: now, start: track.day, current: current)
         // History includes the Hijri month plus the pending window, not fabricated rows.
         let currentHijri = HijriCalendar.date(for: current.date(in: home.timeZone).addingTimeInterval(43200), timeZone: home.timeZone, source: options.hijriSource, sightingOffset: options.sightingOffset)
         var monthStart = current
@@ -138,7 +166,7 @@ import MadarData
         var all: [PrayerDaySummary] = []; var cursor = track.day
         // Tracking is user-edit limited to 30 days before first run. Bound corrupt/future metadata safely.
         guard cursor <= current else { throw PrayerDomainError.invalidTrackingStart }
-        while cursor <= current { all.append(try day(cursor, now: now)); cursor = cursor.adding(days: 1) }
+        while cursor <= current { all.append(try day(cursor, now: now, start: track.day, current: current)); cursor = cursor.adding(days: 1) }
         let month = all.filter { $0.day >= monthStart }
         let qada = qadaRows.filter { $0.deletedAt == nil }.compactMap { row -> PrayerQada? in
             guard let day = try? GregorianDay(row.originalDayKey), let prayer = Prayer(rawValue: row.prayer) else { return nil }

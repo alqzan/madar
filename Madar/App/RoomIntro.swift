@@ -102,10 +102,10 @@ struct RoomIntroSheet: View {
                         }
                     }
                 }
-                if block == .salah && session.canRequestNotificationPermission {
-                    Button("اسمح بتنبيهات الصلاة") { session.requestPrayerNotificationPermission() }
+                if let reminder = block.reminderLine, session.canRequestNotificationPermission {
+                    Button("اسمح بالتذكيرات") { session.requestPrayerNotificationPermission() }
                         .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("intro-notifications")
-                    Text("ينبّهك مدار عند دخول الوقت، ولا يصلك شيء أثناء الصلاة نفسها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text(reminder).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }
                 Button("ابدأ") {
                     session.markIntroSeen(block); session.pendingIntro = nil
@@ -157,5 +157,18 @@ struct AddRoomCard: View {
 extension BahwBlock {
     var themeRoom: String {
         switch self { case .salah: "salah"; case .quran: "quran"; case .mal: "mal"; case .notes: "notes"; case .mihbara: "mihbara"; default: "bahw" }
+    }
+}
+
+extension BahwBlock {
+    /// What a reminder from this room says it will do, shown beside the one permission button.
+    var reminderLine: String? {
+        switch self {
+        case .salah: "ينبّهك مدار عند دخول الوقت، ولا يصلك شيء أثناء الصلاة نفسها."
+        case .quran: "يذكّرك بوردك بلطف في الوقت الذي تختاره، ولا يزعجك إن قرأته."
+        case .habits: "يذكّرك بعادتك في وقتها بكلمة خفيفة تشجّعك."
+        case .notes: "يسألك عن نيّة يومك، ويذكّرك بذكرى من مثل هذا اليوم."
+        default: nil
+        }
     }
 }

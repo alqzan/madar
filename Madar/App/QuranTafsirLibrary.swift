@@ -251,18 +251,23 @@ struct QuranTafsirLibraryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
-                Text("اختَر تفسيرك وقت الورد. السعدي متاح دائمًا، وما تختاره من تراث يُحفظ على هذا الجهاز.")
+                Text("وأنت تقرأ وردك، المس أي آية لترى تفسيرها. تفسير السعدي موجود دائمًا بلا تنزيل، وإن أحببت تفسيرًا آخر فأضفه من الأسفل.")
                     .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
-                localBooks
-                searchField
-                remoteBooks
+                currentTafsir
+                if library.books.contains(where: { $0.id != selectedDefault }) { localBooks }
+                DisclosureGroup {
+                    VStack(alignment: .leading, spacing: 12) { searchField; remoteBooks }.padding(.top, 10)
+                } label: {
+                    Text("أضف تفسيرًا آخر").font(MadarTypography.section())
+                }
+                .tint(theme.accent).accessibilityIdentifier("quran-tafsir-add-more")
                 ForEach(library.errorMessages, id: \.self) { message in
                     Text(message).font(MadarTypography.caption()).foregroundStyle(theme.color("hifzText"))
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("quran-tafsir-library-message")
                 }
-                Button("أعِد اختيار التفاسير الافتراضي") {
+                Button("أعِد تفسير السعدي") {
                     app.reset([QuranTafsirPreferences.defaultBookKey, QuranTafsirPreferences.lastBooksKey])
                 }
                 .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
@@ -293,19 +298,33 @@ struct QuranTafsirLibraryView: View {
     private var header: some View {
         HStack {
             Button { dismiss() } label: {
-                Label("تخصيص القرآن", systemImage: "chevron.backward")
+                Label("القرآن", systemImage: "chevron.backward")
                     .font(MadarTypography.caption()).frame(minHeight: 44)
             }
             .buttonStyle(.madarPlain).accessibilityIdentifier("quran-tafsir-library-back")
             Spacer()
-            Text("مكتبة التفاسير").font(MadarTypography.section())
+            Text("التفسير").font(MadarTypography.section())
         }
+    }
+
+    /// The one tafsir shown when an ayah is touched, said plainly.
+    private var currentTafsir: some View {
+        libraryCard {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("تفسيرك الآن").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                if let book = library.books.first(where: { $0.id == selectedDefault }) ?? library.books.first {
+                    Text(book.metadata.title).font(MadarTypography.section()).fixedSize(horizontal: false, vertical: true)
+                    Text(book.metadata.author).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                } else { Text("تفسير السعدي").font(MadarTypography.section()) }
+            }
+        }
+        .accessibilityIdentifier("quran-tafsir-current")
     }
 
     private var localBooks: some View {
         libraryCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("على هذا الجهاز").font(MadarTypography.section())
+                Text("تفاسير نزّلتها").font(MadarTypography.section())
                 if library.isLoadingLocal && library.books.isEmpty {
                     ProgressView().frame(maxWidth: .infinity, minHeight: 64)
                 } else if library.books.isEmpty {
@@ -315,9 +334,9 @@ struct QuranTafsirLibraryView: View {
                             .font(MadarTypography.caption()).accessibilityIdentifier("quran-tafsir-local-retry")
                     }
                 } else {
-                    ForEach(library.books) { book in
-                        if book.id != library.books.first?.id { Divider().overlay(theme.line) }
+                    ForEach(library.books.filter { $0.id != selectedDefault }) { book in
                         localBookRow(book)
+                        Divider().overlay(theme.line)
                     }
                 }
             }
@@ -334,7 +353,7 @@ struct QuranTafsirLibraryView: View {
                 }
                 Spacer(minLength: 8)
                 if selectedDefault == book.id {
-                    Text("الافتراضي").font(MadarTypography.fine()).foregroundStyle(theme.color("hifzText"))
+                    Text("تفسيرك").font(MadarTypography.fine()).foregroundStyle(theme.color("hifzText"))
                         .accessibilityIdentifier("quran-tafsir-default-\(book.id)")
                 }
             }
@@ -343,7 +362,7 @@ struct QuranTafsirLibraryView: View {
                     .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 Spacer(minLength: 0)
                 if selectedDefault != book.id {
-                    Button("اجعله الافتراضي") {
+                    Button("اجعله تفسيري") {
                         app.set(.number(Double(book.id)), key: QuranTafsirPreferences.defaultBookKey)
                         QuranTafsirPreferences.saveLastBookIDs([book.id], in: app)
                     }
@@ -381,8 +400,8 @@ struct QuranTafsirLibraryView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("تفاسير تراث").font(MadarTypography.section())
-                        Text(query.isEmpty ? "كتب مقترحة · ابحث في جميع كتب التفسير" : "نتائج البحث")
+                        Text("تفاسير للتنزيل").font(MadarTypography.section())
+                        Text(query.isEmpty ? "مقترحة لك، أو ابحث باسم التفسير" : "نتائج البحث")
                             .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     }
                     Spacer()

@@ -396,6 +396,6 @@ import MadarPrayer
 
 /// The Quran reminders' fixed copy, shared by the notification and its preview in «التذكير والودجات» so the preview never promises other words.
 enum QuranReminderCopy {
-    static let title = "القرآن، وردك", body = "تابع من الموضع الذي توقفت عنده"
-    static let lateTitle = "القرآن، المراجعة", lateBody = "راجع أوجهك المستحقة قبل أن تبعد عنك"
+    static let title = "وردك ينتظرك", body = "دقائق مع القرآن تكفي، تابع من حيث توقفت"
+    static let lateTitle = "مراجعة اليوم", lateBody = "أوجه تنتظر مراجعتك قبل أن تبعد عنك"
 }

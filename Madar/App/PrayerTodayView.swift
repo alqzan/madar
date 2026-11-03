@@ -587,8 +587,8 @@ struct PrayerTodayView: View {
         let fridays = snapshot.unconfirmedFridayNoon.union(closed.filter { $0.isFriday && $0.reference.prayer == .dhuhr }.map(\.reference))
         return AnyView(PrayerNoticeRow(
             title: historical.isEmpty ? PrayerCopy.pending(gap.count, digits: digits) : PrayerCopy.unconfirmed(historical.count, digits: digits),
-            detail: "لا تُحسب فائتة إلا باختيارك.",
-            action: "سجِّلها", identifier: historical.isEmpty ? "prayer-pending-review" : "prayer-recovery") {
+            detail: gap.count > 10 ? "لا يلزمك تسجيلها واحدة واحدة: اختر «لم أسجّل هذه الفترة» وتبدأ من اليوم، ولا يُحسب عليك شيء." : "لا تُحسب فائتة إلا باختيارك.",
+            action: gap.count > 10 ? "ابدأ من اليوم" : "سجِّلها", identifier: historical.isEmpty ? "prayer-pending-review" : "prayer-recovery") {
                 selectedSheet = .recovery(gap, fridays, session.activePlace.timeZone)
             })
     }

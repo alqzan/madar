@@ -167,6 +167,7 @@
 		4E5074808F6AD3A22973AD5F /* QuranMushafView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DCCB2BFFBEAAD13447AAF65 /* QuranMushafView.swift */; };
 		4E6288DB3DC0C7806D6E1815 /* PrayerCountdownControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD025F7EBE03A4A9D7852DB4 /* PrayerCountdownControl.swift */; };
 		4F3EF1691B6E6DF5CE28B9D2 /* MadarCommands in Frameworks */ = {isa = PBXBuildFile; productRef = BB0D9BFDBBAFC58EE2999DE7 /* MadarCommands */; };
+		51083EA6A1DC7DA15A28825E /* SettingsHome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CF2E3379E32EA600D74CFDE /* SettingsHome.swift */; };
 		515BF7C677ACA9EA442A84EC /* MadarData in Frameworks */ = {isa = PBXBuildFile; productRef = 6F1DD2A72ECE897173614EA7 /* MadarData */; };
 		51AF280129EFDF070064BF16 /* Readium-BSD-3-Clause.txt in Resources */ = {isa = PBXBuildFile; fileRef = 254F1C2DCD1E4E39D9EFEC55 /* Readium-BSD-3-Clause.txt */; };
 		51B2678A2958EEE856D3B7E2 /* HabitsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422D5DF771CC4FB56EC5F357 /* HabitsUITests.swift */; };
@@ -757,6 +758,7 @@
 		7A9F1BF70DE8302BBA45121C /* Amiri-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Amiri-Regular.ttf"; sourceTree = "<group>"; };
 		7B4924229AC465C6645BADAE /* MoneySalaryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySalaryModels.swift; sourceTree = "<group>"; };
 		7B9ACE8CD0ACA2E8F081BA36 /* MihbaraPDFReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraPDFReaderView.swift; sourceTree = "<group>"; };
+		7CF2E3379E32EA600D74CFDE /* SettingsHome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsHome.swift; sourceTree = "<group>"; };
 		7E2322CEC281AFD3E505F2BE /* CityCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityCatalogTests.swift; sourceTree = "<group>"; };
 		7E6EB1F3F05F6A4C2B4D1002 /* AppBackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackupService.swift; sourceTree = "<group>"; };
 		7E78D6FA9A7292B69D980621 /* ScenePrivacyPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenePrivacyPresenter.swift; sourceTree = "<group>"; };
@@ -1333,6 +1335,7 @@
 				D68371656FE87541BA053103 /* RoomWidgetContent.swift */,
 				8CF5E7B996A522A8D37486E4 /* RoomWidgetsGallery.swift */,
 				7E78D6FA9A7292B69D980621 /* ScenePrivacyPresenter.swift */,
+				7CF2E3379E32EA600D74CFDE /* SettingsHome.swift */,
 				0AAF9DA5CBAEE9C391B62E8A /* SyncSettingsView.swift */,
 				4C581755E2CC15BBDCFF8899 /* TabShell.swift */,
 				F2F48BFA8DC6C29854A94CBD /* WidgetMakerContent.swift */,
@@ -2279,6 +2282,7 @@
 				1C41BED09B5A80D5FE48E2D8 /* RoomWidgetContent.swift in Sources */,
 				5A0E68C5D715CF3C44A6267C /* RoomWidgetsGallery.swift in Sources */,
 				47BE2D7525651AC4D45DCA31 /* ScenePrivacyPresenter.swift in Sources */,
+				51083EA6A1DC7DA15A28825E /* SettingsHome.swift in Sources */,
 				FD4667401CF79F84F60037C7 /* StartPrayerActivityIntent.swift in Sources */,
 				F9D9A4EEA21F3C02F73E5688 /* StartQuranSessionIntent.swift in Sources */,
 				A04F5C188C09BF1D8C769F7D /* SyncSettingsView.swift in Sources */,
@@ -2388,7 +2392,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = V8YZL4R65K;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -2482,7 +2486,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = V8YZL4R65K;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

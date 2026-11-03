@@ -18,10 +18,8 @@ struct CustomizeMadar: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     var body: some View {
         ScrollViewReader { proxy in
-        CustomizationTemplate(title: "خصّص مدار", subtitle: "كل تعديل يُحفظ وحده") {
-            // M4-V04: the live model is the lobby itself (05-W4-Takhsis).
-            // While searching, results come first; the model returns when the search is cleared.
-            if query.isEmpty { BahwCustomizePreview(session: session, changes: changesLabel) { confirmReset = true } }
+        CustomizationTemplate(title: "إعدادات مدار", subtitle: "كل تعديل يُحفظ وحده") {
+            EmptyView()
         } content: {
             VStack(spacing: 16) {
                 HStack {
@@ -41,6 +39,9 @@ struct CustomizeMadar: View {
                             .accessibilityIdentifier("settings-route-missing")
                     }
                 }
+                if query.isEmpty {
+                    SettingsHome(session: session, openTafsir: { quranTafsirLibrary = true }, openMaker: { widgetMaker = true }, openGallery: { widgetGallery = true })
+                } else {
                 if query.isEmpty || normalized("المحبرة").contains(normalized(query)) {
                     Button { session.mihbaraOpen = true } label: {
                         HStack { Text("افتح المحبرة").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }.padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
@@ -113,6 +114,7 @@ struct CustomizeMadar: View {
                         NavigationLink("انقل من مدار القديم") { LegacyMoveView(app: session) }
                             .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("legacy-move-link")
                     }
+                }
                 }
             }
         }
