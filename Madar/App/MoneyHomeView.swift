@@ -288,11 +288,11 @@ struct MoneyHomeView: View {
             // adding an account is no longer offered as if the room were empty (owner data trial, 23 Oct).
             if reading.hasAccounts {
                 Button("ابدأ دورتك برسالة الراتب") { messagesOpen = true }.font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink, in: Capsule()).foregroundStyle(theme.background).accessibilityIdentifier("money-first-salary")
-                Button("إعداد استقبال رسائل البنك") { guideOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-guide-open")
+                Button("إعداد استقبال رسائل البنك") { guideOpen = true }.font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).accessibilityIdentifier("money-guide-open")
             } else {
                 Button("إعداد استقبال رسائل البنك") { guideOpen = true }.font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink, in: Capsule()).foregroundStyle(theme.background).accessibilityIdentifier("money-guide-open")
-                Button("أضف حسابك يدويًا") { accountsOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-first-account")
-                Button("ابدأ برسالة الراتب") { messagesOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-first-salary")
+                Button("أضف حسابك يدويًا") { accountsOpen = true }.font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).accessibilityIdentifier("money-first-account")
+                Button("ابدأ برسالة الراتب") { messagesOpen = true }.font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).accessibilityIdentifier("money-first-salary")
             }
             if reading.hasAccounts {
                 Button { basisOpen = true } label: {
