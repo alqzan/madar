@@ -37,6 +37,13 @@ struct DiarySearchTests {
         #expect(p.matches(document,chips:p.parse("#عائلة")))
         #expect(!p.matches(document,chips:p.parse("#بيت")))
     }
+    @Test func documentWordsAreFoundByPrefixedAndPlainForms() throws {
+        let doc = DiarySearchDocument(id: "a", day: try GregorianDay("2026-10-01"), text: "قرأت في الكتاب وبالصبر صبرت")
+        let p = try parser()
+        func hit(_ q: String) -> Bool { p.matches(doc, chips: [.init(label: q, rule: .words(q))]) }
+        #expect(hit("كتاب") && hit("والكتاب") && hit("صبر") && hit("الكتاب صبر"))
+        #expect(!hit("قلم") && !hit("كتاب قلم"))
+    }
     @Test func monthOnlyRangeRunsFromTheFirstToTheLastDay() throws {
         #expect(try parser().parse("من مايو إلى يونيو").map(\.rule)==[.range(try GregorianDay("2026-05-01"),try GregorianDay("2026-06-30"))])
         #expect(try parser().parse("من فبراير ٢٠٢٤ إلى فبراير ٢٠٢٤").map(\.rule)==[.range(try GregorianDay("2024-02-01"),try GregorianDay("2024-02-29"))])

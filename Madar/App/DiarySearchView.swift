@@ -38,14 +38,15 @@ struct DiarySearchView: View {
                                 .font(DiaryType.label).frame(minHeight:44).accessibilityIdentifier("diary-search-retry")
                         }
                     }
+                    let found = results
                     if !chips.isEmpty {
                         ScrollView(.horizontal) {HStack { ForEach(chips) { chip in HStack(spacing:8) {
                             Button(chip.label) {editing=chip;replacement=chip.label}.accessibilityIdentifier("diary-search-edit-"+chip.label)
                             Button {chips.removeAll{$0.id==chip.id}} label:{Image(systemName:"xmark")}.accessibilityLabel("حذف فلتر "+chip.label).accessibilityIdentifier("diary-search-remove-"+chip.label)
                         }.font(DiaryType.label).padding(.horizontal,12).frame(minHeight:44).background(theme.surface,in:.capsule).overlay{Capsule().stroke(theme.line)} } }}.scrollIndicators(.hidden)
                         if chips.contains(where:{if case .words=$0.rule {true}else{false}}) { Text("بحثت عن الكلمات: "+chips.compactMap{if case .words(let words)=$0.rule {words}else{nil}}.joined(separator:"، ")).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
-                        if !results.isEmpty { Text(arabicCount(results.count,["نتيجة واحدة","نتيجتان","نتائج","نتيجة"],service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
-                        if results.isEmpty {
+                        if !found.isEmpty { Text(arabicCount(found.count,["نتيجة واحدة","نتيجتان","نتائج","نتيجة"],service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
+                        if found.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("لا أيام تطابق هذا البحث").font(DiaryType.heading).accessibilityIdentifier("diary-search-empty")
                                 Text("جرّب كلمة أقصر، أو احذف أحد الفلاتر لتوسيع البحث.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text"))
@@ -55,7 +56,7 @@ struct DiarySearchView: View {
                                 }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-search-restart")
                             }.padding(.vertical, 24)
                         }
-                        ForEach(results) { row in Button { open(row) } label: {
+                        ForEach(found) { row in Button { open(row) } label: {
                             VStack(alignment:.leading,spacing:8) {Text(row.text).font(DiaryType.writing).lineLimit(4).multilineTextAlignment(.leading);Text(source(row.kind)+"، "+service.bothDates(row.day,calendar:FirstCalendar(rawValue:app.string("core.firstCalendar")) ?? .hijri)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.padding(16).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:14)).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}
                         }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-search-result-"+row.id) }
                     } else if let index {

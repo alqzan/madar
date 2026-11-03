@@ -9,7 +9,9 @@ public struct DiarySearchDocument: Sendable, Identifiable {
     public let place: String?
     public let projectID: UUID?
     public let tags: [String]
-    public init(id: String, day: GregorianDay, text: String, kind: String = "writing", kinds: Set<String>? = nil, place: String? = nil, projectID: UUID? = nil, tags: [String] = []) { self.id=id; self.day=day; self.text=text; self.kind=kind; self.kinds=kinds ?? [kind]; self.place=place; self.projectID=projectID; self.tags=tags }
+    /// Normalised words of `text` with their Arabic prefix variants, built once so a search does not re-normalise every entry per keystroke.
+    let words: [Set<String>]
+    public init(id: String, day: GregorianDay, text: String, kind: String = "writing", kinds: Set<String>? = nil, place: String? = nil, projectID: UUID? = nil, tags: [String] = []) { self.id=id; self.day=day; self.text=text; self.kind=kind; self.kinds=kinds ?? [kind]; self.place=place; self.projectID=projectID; self.tags=tags; self.words=DiarySearchParser.wordVariants(text) }
 }
 public enum DiarySearchRule: Sendable, Equatable {
     case range(GregorianDay, GregorianDay), month(Int, Int?, FirstCalendar), year(Int, FirstCalendar), weekday(Int), kind(String), place(String), project(UUID), tag(String), words(String)
@@ -118,16 +120,21 @@ public struct DiarySearchParser: Sendable {
         case .place(let place): Self.normalize(document.place ?? "")==Self.normalize(place)
         case .project(let id): document.projectID==id
         case .tag(let tag): document.tags.contains { Self.normalize($0)==Self.normalize(tag) }
-        case .words(let words): Self.contains(document.text,words:words)
+        case .words(let words): Self.contains(document.words,needles:Self.wordVariants(words))
         } }
     }
-    public static func contains(_ text:String,words:String) -> Bool {
+    static func wordVariants(_ text:String) -> [Set<String>] {
         func variants(_ token:String)->Set<String> {
             var result:Set<String>=[token]
             for _ in 0..<3 { for word in result { for prefix in ["وال","فال","بال","لل","ال","و","ف","ب","ل"] where word.hasPrefix(prefix) && word.count>prefix.count+1 { result.insert(String(word.dropFirst(prefix.count))) } } }
             return result
         }
-        let tokens=normalize(text).components(separatedBy:CharacterSet.alphanumerics.inverted).filter{!$0.isEmpty}.map(variants)
-        return normalize(words).components(separatedBy:CharacterSet.alphanumerics.inverted).filter{!$0.isEmpty}.allSatisfy { needle in let v=variants(needle);return tokens.contains{!$0.isDisjoint(with:v)} }
+        return normalize(text).components(separatedBy:CharacterSet.alphanumerics.inverted).filter{!$0.isEmpty}.map(variants)
+    }
+    static func contains(_ tokens:[Set<String>],needles:[Set<String>]) -> Bool {
+        needles.allSatisfy { v in tokens.contains{!$0.isDisjoint(with:v)} }
+    }
+    public static func contains(_ text:String,words:String) -> Bool {
+        contains(wordVariants(text),needles:wordVariants(words))
     }
 }
