@@ -336,7 +336,7 @@ struct BahwBlockView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack { ForEach(periods, id: \.self) { f in periodChoice(f, rows: rows, selected: f == period) } }
                             ForEach(Array(shown.prefix(6))) { row in habitListRow(row) }
-                            if shown.count > 6 { Button("افتح بقية العادات") { service.session.habitsOpen = true }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44) }
+                            if shown.count > 6 { Button("افتح بقية العادات") { service.session.habitsOpen = true }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
                             BahwHabitsWide(rows: service.session.habitRowsForWidgetScope(rows), digits: digits, theme: room, interactive: interactive, showsPeriods: false) { service.session.habitsOpen = true }
                         }
                     }

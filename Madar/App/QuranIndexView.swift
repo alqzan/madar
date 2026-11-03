@@ -127,7 +127,7 @@ struct QuranIndexView: View {
                     Text(item.subtitle).font(quranFont(14)); Text(status(item)).font(quranFont(14, bold: true));
                     Button("افتح في المصحف") {
                         selected = nil; reader = item.firstPage
-                    }.frame(minHeight: 44); Button("تمّ") { selected = nil }.frame(minHeight: 44)
+                    }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()); Button("تمّ") { selected = nil }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
                 }.padding(24).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface).foregroundStyle(
                     theme.ink
                 ).presentationDetents([.height(310), .large]).environment(\.layoutDirection, .rightToLeft)

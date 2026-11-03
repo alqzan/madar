@@ -237,7 +237,7 @@ struct PrayerRoom: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text(state.qada.isEmpty ? "لا قضاء مسجّل عليك" : "\(number(state.qada.count, state)) فوائت عليك").font(MadarTypography.cardTitle()).foregroundStyle(state.qada.isEmpty ? theme.ink : theme.color("missedTextOnSurface"))
                 PrayerQadaCitation()
-                Button(state.qada.isEmpty ? "القضاء · أضِف فائتة قديمة" : "اقضِ واحدة") { sheet = .qada }.frame(minHeight: 44).accessibilityIdentifier("prayer-qada")
+                Button(state.qada.isEmpty ? "القضاء · أضِف فائتة قديمة" : "اقضِ واحدة") { sheet = .qada }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("prayer-qada")
             }
         }
     }

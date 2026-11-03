@@ -178,6 +178,7 @@
 		558826CF5417CE461670FC22 /* DiaryCustomizeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2234F4C1215CD275CE96CFAD /* DiaryCustomizeView.swift */; };
 		55C8F801B2EFACD459460CB0 /* DiaryMarginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8165555D964598615489F76A /* DiaryMarginView.swift */; };
 		560BA2515095DCE353F47348 /* MoneyCardsIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4CB5FDECF30C984FC9DD666 /* MoneyCardsIntegrationTests.swift */; };
+		56C940F4000A166483C6E14A /* RoomIntro.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2FA1B34E6D896D7B94B78AE /* RoomIntro.swift */; };
 		56D09B30E80044902F44350D /* QuranCoachUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB394D0AA548ADD478457293 /* QuranCoachUITests.swift */; };
 		580859DBA08E39F40830B01F /* MoneyTravelModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E859FF2B9191FF06009B2D69 /* MoneyTravelModels.swift */; };
 		5896B12F88D3C188ABF089B8 /* DiarySeasonUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A1A46778A8E38A5339986E /* DiarySeasonUITests.swift */; };
@@ -899,6 +900,7 @@
 		CFD0349E6D712350162DA93E /* MoneyReconcileModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyReconcileModels.swift; sourceTree = "<group>"; };
 		D0D30BE8BAADE93B06014EE0 /* MadarCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarCore; path = Packages/MadarCore; sourceTree = SOURCE_ROOT; };
 		D192D1904C8C2A99A656EFAF /* QuranQiyamIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranQiyamIntegrationTests.swift; sourceTree = "<group>"; };
+		D2FA1B34E6D896D7B94B78AE /* RoomIntro.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomIntro.swift; sourceTree = "<group>"; };
 		D3146E3E67CC7456B5F8DDAD /* Madar.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Madar.entitlements; sourceTree = "<group>"; };
 		D39CF95FFB05857FA2AB9E4B /* MoneyObligationsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyObligationsModels.swift; sourceTree = "<group>"; };
 		D3F6E4B2C320BA85D0C94586 /* AppInboxLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInboxLifecycleTests.swift; sourceTree = "<group>"; };
@@ -1326,6 +1328,7 @@
 				D782FD90DCA400C2CA265B25 /* QuranWirdReferenceView.swift */,
 				B5265ABF3C9DFCE44A071263 /* QuranYearView.swift */,
 				4800B7917F177C0E65DE00F7 /* RoomHomeLayout.swift */,
+				D2FA1B34E6D896D7B94B78AE /* RoomIntro.swift */,
 				33571E9B4ECAFDDF1D66AE44 /* RoomNotificationContent.swift */,
 				D68371656FE87541BA053103 /* RoomWidgetContent.swift */,
 				8CF5E7B996A522A8D37486E4 /* RoomWidgetsGallery.swift */,
@@ -1755,19 +1758,19 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					1794520384FA61FF73B248FA = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = V8YZL4R65K;
 						ProvisioningStyle = Automatic;
 					};
 					294BF0F299CC9CF436C3102B = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = V8YZL4R65K;
 						ProvisioningStyle = Automatic;
 					};
 					4F84E8B5249B2F8770A7788F = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = V8YZL4R65K;
 						ProvisioningStyle = Automatic;
 					};
 					F6849F39C6FA1AE98F2DE761 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = V8YZL4R65K;
 						ProvisioningStyle = Automatic;
 						TestTargetID = 1794520384FA61FF73B248FA;
 					};
@@ -2271,6 +2274,7 @@
 				E0348C7CF0B10FF5C76D8C09 /* QuranWirdReferenceView.swift in Sources */,
 				DD86CCD87BD8C1FB2214433D /* QuranYearView.swift in Sources */,
 				5E90F85E5CC1D50519363A57 /* RoomHomeLayout.swift in Sources */,
+				56C940F4000A166483C6E14A /* RoomIntro.swift in Sources */,
 				F98A4A5B02A74E80E39B0A92 /* RoomNotificationContent.swift in Sources */,
 				1C41BED09B5A80D5FE48E2D8 /* RoomWidgetContent.swift in Sources */,
 				5A0E68C5D715CF3C44A6267C /* RoomWidgetsGallery.swift in Sources */,

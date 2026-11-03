@@ -14,28 +14,18 @@ struct TabShell<Content: View>: View {
     let session: AppSession
     @Binding var selection: String
     let tabs: [FoundationTab]
+    /// Rooms that do not fit in the bar (and «خصّص») render in the highlighted room's place.
+    let shortcutIDs: Set<String>
     @ViewBuilder let content: (String) -> Content
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @AppStorage("Madar.TabViewCustomization.v2") private var tabCustomization = TabViewCustomization()
-    /// Owner, 21 Oct 2026: «خصّص» and «المزيد» in the bar hid المال and المحبرة. The bar holds the five daily rooms;
-    /// the diary and «خصّص» ride the glass accessory beside the next prayer.
-    private let bottomShortcuts: Set<String> = ["notes", "customize"]
+    /// Owner, 3 Nov 2026: the glass accessory (next prayer plus two shortcuts) is gone: «الصلاة القادمة» followed him
+    /// into every screen and the bar did not list the rooms. The bar now holds the rooms he turned on.
+    private var bottomShortcuts: Set<String> { shortcutIDs }
 
     var body: some View {
-        accessorized.tint(theme.accent)
-    }
-
-    /// A focused flow can hide the accessory that would otherwise float over its bottom action (the expense «سجّل»).
-    @ViewBuilder private var accessorized: some View {
-        baseTabView.tabViewBottomAccessory(isEnabled: session.accessoryHiders.isEmpty) { shortcuts }
-    }
-
-    private var shortcuts: some View {
-        GlassRoomShortcuts(tabs: tabs, persistentShortcutIDs: bottomShortcuts,
-                           selection: $selection, session: session,
-                           ink: theme.ink, secondaryInk: theme.secondaryInk,
-                           prayerAccent: RoomTheme(room: "salah", dark: theme.dark).accent)
+        baseTabView.tint(theme.accent)
     }
 
     /// The room under the bar's highlight while the diary or «خصّص» is open from the accessory.
@@ -208,8 +198,11 @@ struct MadarRootView: View {
         let readingSaveCoordinator = MihbaraReadingSaveCoordinator.forSession(session)
         let dark = forcedColorScheme == .dark || (forcedColorScheme == nil && colorScheme == .dark)
         let theme = RoomTheme(dark: dark, calmPaper: false)
-        TabShell(session: session, selection: $session.selectedTab,
-                 tabs: [.init(id: "foundation", title: "البهو", symbol: "MadarOrbit"), .init(id: "prayer", title: "الصلاة", symbol: "MadarPrayer"), .init(id: "quran", title: "القرآن", symbol: "MadarQuran"), .init(id: "money", title: "المال", symbol: "banknote"), .init(id: "mihbara", title: "المحبرة", symbol: "books.vertical"), .init(id: "notes", title: "المذكرات", symbol: "MadarDiary"), .init(id: "customize", title: "خصّص", symbol: "MadarCustomize")]) { tab in
+        let enabledTabs = AppSession.roomTabs.filter { session.roomEnabled($0.block) }.map(\.tab)
+        let allTabs: [FoundationTab] = ([FoundationTab(id: "foundation", title: "البهو", symbol: "MadarOrbit")]
+            + enabledTabs.compactMap { id in AppSession.tabInfo[id] } + [FoundationTab(id: "customize", title: "خصّص", symbol: "MadarCustomize")])
+        TabShell(session: session, selection: $session.selectedTab, tabs: allTabs,
+                 shortcutIDs: Set(enabledTabs.dropFirst(4)).union(["customize"])) { tab in
             NavigationStack {
                 Group {
                     if tab == "customize" { CustomizeMadar(session: session) }
@@ -221,22 +214,18 @@ struct MadarRootView: View {
                     // M4-V01: the lobby replaces the M0 foundation home (kept in FoundationHome.swift, unused).
                     else { BahwLobbyView(session: session) }
                 }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    // Diary already reserves its writing bar above the native
-                    // accessory; a second spacer hid the end of the memory card.
-                    if tab != "notes" {
-                        Color.clear
-                            .frame(height: dynamicType.isAccessibilitySize ? 88 : 72)
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
-                    }
-                }
             }
         }
         // Owner, 30 Oct 2026: the «افتح المحبرة» door in «خصّص» used to hang this cover on the settings page, which is rebuilt after every write,
         // so saving a note closed the whole room. Hosted here at the root it stays up until the reader leaves.
         .fullScreenCover(isPresented: $session.mihbaraOpen) { MihbaraHomeView(app: session).environment(\.roomTheme, theme) }
         .fullScreenCover(item: $session.moneyExpenseSeed, onDismiss: { session.presentNextMoneyExpenseSeed() }) { seed in MoneyQuickExpense(app: session, seed: seed) }
+        .sheet(item: $session.pendingIntro) { block in RoomIntroSheet(session: session, block: block).environment(\.roomTheme, RoomTheme(room: block.themeRoom, dark: dark)) }
+        .onChange(of: session.selectedTab) { _, tab in
+            guard let block = AppSession.roomTabs.first(where: { $0.tab == tab })?.block else { return }
+            if !session.roomEnabled(block) { session.enableRoom(block) }
+            if session.introNeeded(block) { session.pendingIntro = block }
+        }
         .font(MadarTypography.body())
         .environment(\.roomTheme, theme)
         .dynamicTypeSize(effectiveType)
@@ -246,6 +235,7 @@ struct MadarRootView: View {
             #if DEBUG
             session.seedBahwReturnPlanFixtureIfRequested()
             #endif
+            await session.applyProgressiveRoomsOnce()
             session.recordBahwReturnVisit()
             #if DEBUG
             await session.runLegacyDiaryTrialIfRequested()

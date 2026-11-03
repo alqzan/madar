@@ -15,7 +15,7 @@ struct QuranScreenHeader: View {
     let close: () -> Void
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: close) { Image(systemName: "chevron.backward").frame(width: 44, height: 44) }.accessibilityLabel("رجوع").accessibilityIdentifier("quran-screen-close")
+            Button(action: close) { Image(systemName: "chevron.backward").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("رجوع").accessibilityIdentifier("quran-screen-close")
             Text(title).font(quranSerif(28)); Spacer()
         }.padding(.vertical, 4)
     }

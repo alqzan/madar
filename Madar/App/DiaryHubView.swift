@@ -267,7 +267,7 @@ struct DiaryHubView: View {
                         }
                     }.font(DiaryType.label).frame(minHeight: 44).padding(.horizontal, 8).overlay {
                         Capsule().stroke(grid.first == value ? theme.accent : theme.line)
-                    }.accessibilityIdentifier("diary-calendar-" + value.rawValue)
+                    }.contentShape(Capsule()).accessibilityIdentifier("diary-calendar-" + value.rawValue)
                 }
             }
         }

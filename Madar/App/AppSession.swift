@@ -106,6 +106,8 @@ final class AppSession {
     var errorMessage: String?
     var onboardingComplete = false
     var selectedTab = "foundation"
+    /// The room whose first-open introduction is showing (RoomIntro.swift).
+    var pendingIntro: BahwBlock?
     /// Focused full-screen flows (the expense keypad, the year) that hide the tab bar also hide the glass accessory.
     var accessoryHiders: Set<String> = []
     private(set) var prayerRevision = 0

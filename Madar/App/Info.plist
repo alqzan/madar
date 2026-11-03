@@ -46,7 +46,7 @@
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>لا يكتب مدار أي بيانات في تطبيق الصحة؛ يقرأ فقط الخطوات أو دقائق الحركة التي تسمح بها.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>يعرف مدار أنك خارج مدينتك ليسألك عن السفر، ويملأ مدينتك حين تضغط «استخدم موقعي». لا يحفظ مدار موقعك؛ ولمعرفة اسم المدينة يرسل النظام الموقع إلى Apple مرة واحدة عند طلبك ذلك.</string>
+	<string>يقرأ مدار موقعك مرة واحدة ليعرف مدينتك ويحسب مواقيت الصلاة بدقة، ويسألك إن كنت مسافرًا. لا يحفظ إلا اسم المدينة؛ ولمعرفة اسمها يرسل النظام الموقع إلى Apple مرة واحدة.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>سجّل صوتك واحفظه في صفحة يومك على هذا الجهاز.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

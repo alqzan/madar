@@ -18,7 +18,7 @@ struct QuranWeekView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 14) {
-                    Button(action: close) { Image(systemName: "chevron.backward").frame(width: 44, height: 44) }.accessibilityLabel("رجوع").accessibilityIdentifier("quran-week-close")
+                    Button(action: close) { Image(systemName: "chevron.backward").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("رجوع").accessibilityIdentifier("quran-week-close")
                     Text("السجلّ").font(serif(28)); Spacer()
                 }.padding(.vertical, 4)
                 if let selection { QuranLogTabs(selection: selection) }
@@ -55,7 +55,7 @@ struct QuranWeekView: View {
                         }
                         if day.partialAyahs > 0 { Text(QuranDayCloseCopy.ayahs(day.partialAyahs, digits: service.numerals) + " من وجه لم يكتمل بعد").font(font(14)) }
                         Text("الخارجية لحفظ وجه، والداخلية لمراجعة ثمانية أوجه؛ يوم الراحة لا يدخل في أيام الحفظ.").font(font(13)).foregroundStyle(theme.secondaryInk)
-                        Button("تمّ") { selected = nil }.frame(maxWidth: .infinity, minHeight: 44)
+                        Button("تمّ") { selected = nil }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
                     }.padding(24)
                 }.foregroundStyle(theme.ink).background(theme.surface).presentationDetents([.height(400), .large]).presentationDragIndicator(.visible).environment(\.layoutDirection, .rightToLeft)
             }

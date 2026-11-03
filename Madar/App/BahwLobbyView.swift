@@ -85,10 +85,11 @@ struct BahwLobbyView: View {
                     if visible.isEmpty && !arranging {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("أخفيت كل الودجات").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                            Button("أظهر الودجات المخفية") { arranging = true; drawerOpen = true }.font(MadarTypography.body().bold()).frame(minHeight: 44).accessibilityIdentifier("bahw-show-hidden")
+                            Button("أظهر الودجات المخفية") { arranging = true; drawerOpen = true }.font(MadarTypography.body().bold()).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle()).accessibilityIdentifier("bahw-show-hidden")
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if !arranging {
+                        if !layout.hiddenBuilt.isEmpty { AddRoomCard(session: session, blocks: layout.hiddenBuilt, theme: theme) }
                         SavedLobbyWidgets(session: session)
                         BahwSuggestionsView(session: session)
                     }
@@ -110,7 +111,7 @@ struct BahwLobbyView: View {
                     Spacer()
                     Button("تمّ") { withAnimation(.snappy) { arranging = false } }
                         .font(MadarTypography.section()).frame(minHeight: 44).padding(.horizontal, 20)
-                        .background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent)
+                        .background(theme.accentFill, in: .capsule).contentShape(.capsule).foregroundStyle(theme.onAccent)
                         .accessibilityIdentifier("bahw-arrange")
                 }.padding(.horizontal, 14).padding(.vertical, 6).background(theme.background)
             }
@@ -145,6 +146,7 @@ struct BahwLobbyView: View {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 17, weight: .regular))
                     .frame(width: 44, height: 44)
+                    .contentShape(Circle())
                     .overlay { Circle().stroke(theme.line) }
             }
             .buttonStyle(.madarPlain)
@@ -206,12 +208,7 @@ struct BahwLobbyView: View {
     }
     private func open(_ block: BahwBlock) {
         guard !arranging else { return }
-        if block == .habits { session.habitsOpen = true }
-        else if block == .mal { session.open(URL(string: "madar://mal")!) }
-        else if block == .mihbara { session.selectedTab = "mihbara" }
-        else if block == .notes, (service.diary()?.count ?? 0) == 0 { session.open(URL(string: "madar://notes/write")!) }
-        else if let tab = block.tab { session.selectedTab = tab }
-        else if block == .year || block == .upcoming { session.yearOpen = true }
+        session.requestOpen(block)
     }
     private func sizeTitle(_ size: BahwBlockSize) -> String {
         switch size { case .icon: "أيقونة"; case .small: "صغيرة"; case .wide: "عريضة"; case .large: "كبيرة" }

@@ -16,11 +16,11 @@ public struct UndoToast: View {
             if dynamicType.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(message).font(MadarTypography.body())
-                    Button("تراجع", action: undo).font(MadarTypography.section()).frame(minWidth: 44, minHeight: 44).accessibilityIdentifier("undo-button")
+                    Button("تراجع", action: undo).font(MadarTypography.section()).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("undo-button")
                 }
             } else { HStack(spacing: 16) {
             Text(message).font(MadarTypography.body()).frame(maxWidth: .infinity, alignment: .leading)
-            Button("تراجع", action: undo).font(MadarTypography.section()).frame(minWidth: 44, minHeight: 44)
+            Button("تراجع", action: undo).font(MadarTypography.section()).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
                 .accessibilityIdentifier("undo-button")
             } }
         }
@@ -51,12 +51,12 @@ public struct EditModeContainer<Content: View>: View {
             if dynamicType.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(isEditing ? "رتّب واجهتك" : "ترتيب الواجهة").font(MadarTypography.section())
-                    Button(isEditing ? "تم" : "رتّب") { isEditing.toggle() }.frame(minWidth: 44, minHeight: 44)
+                    Button(isEditing ? "تم" : "رتّب") { isEditing.toggle() }.frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
                 }.frame(maxWidth: .infinity, alignment: .leading)
             } else { HStack {
                 Text(isEditing ? "رتّب واجهتك" : "ترتيب الواجهة").font(MadarTypography.section())
                 Spacer()
-                Button(isEditing ? "تم" : "رتّب") { isEditing.toggle() }.frame(minWidth: 44, minHeight: 44)
+                Button(isEditing ? "تم" : "رتّب") { isEditing.toggle() }.frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
             } }
             content
                 .overlay { if isEditing { RoundedRectangle(cornerRadius: 16).stroke(theme.accent, style: StrokeStyle(lineWidth: 1, dash: [4])) } }
@@ -64,7 +64,7 @@ public struct EditModeContainer<Content: View>: View {
                 .environment(\.editMode, .constant(isEditing ? .active : .inactive))
                 #endif
             if isEditing {
-                Button("أعِد الترتيب المتفق عليه", action: reset).frame(minHeight: 44)
+                Button("أعِد الترتيب المتفق عليه", action: reset).frame(minHeight: 44).contentShape(Rectangle())
             }
         }
         .foregroundStyle(theme.ink)

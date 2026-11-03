@@ -70,7 +70,7 @@ struct QuranHomeView: View {
                             }
                         } }
                     }
-                    if state.plan == nil { Button("ابدأ خطة الحفظ") { showSetup = true }.font(bodyFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).accessibilityIdentifier("quran-start-plan") }
+                    if state.plan == nil { Button("ابدأ خطة الحفظ") { showSetup = true }.font(bodyFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).contentShape(Capsule()).accessibilityIdentifier("quran-start-plan") }
                     if state.plan != nil || !state.steps.isEmpty { path(state) }
     }
     private enum HomeDetail: Identifiable {
@@ -150,17 +150,17 @@ struct QuranHomeView: View {
                 // §7.4: mistake locations are their own session entry, not only after the review step.
                 if step.kind == .drill, step.available, state?.draft == nil {
                     Button("ابدأ التدريب") { detail = nil; run { active = try await service.start(kind: .drill, stepID: step.id, range: nil, rakaat: nil, spotID: nil) } }.disabled(busy)
-                        .font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule())
+                        .font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()).contentShape(Capsule())
                         .disabled(busy).accessibilityIdentifier("quran-drill-start")
-                    Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(theme.ink)
+                    Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).foregroundStyle(theme.ink)
                 } else if step.available, !step.completed, state?.draft == nil {
                     // Owner 20 Oct: the day's order is a suggestion, not a gate; any open step can start now.
                     Button(step.id == next?.id ? "ابدأ" : "ابدأ بها الآن") { detail = nil; run { active = try await service.start(kind: step.kind, stepID: step.id, range: step.range, rakaat: nil, spotID: nil) } }.disabled(busy)
-                        .font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule())
+                        .font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()).contentShape(Capsule())
                         .disabled(busy).accessibilityIdentifier("quran-step-start")
-                    Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(theme.ink)
+                    Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).foregroundStyle(theme.ink)
                 } else {
-                Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule())
+                Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()).contentShape(Capsule())
                 }
             }.padding(24).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface)
                 .presentationDetents([.height(step.kind == .drill || (step.available && !step.completed && state?.draft == nil) ? 300 : 260)]).presentationDragIndicator(.visible)
@@ -389,7 +389,7 @@ struct QuranHomeView: View {
             if step.id == next?.id, state?.draft == nil {
                 Button("ابدأ") { run { active = try await service.start(kind: step.kind, stepID: step.id, range: step.range, rakaat: nil, spotID: nil) } }.disabled(busy)
                     .font(bodyFont(14, bold: true)).foregroundStyle(theme.onAccent).padding(.horizontal, 20).frame(minHeight: 44)
-                    .background(theme.color("accent"), in: Capsule()).contentShape(.capsule).disabled(busy).accessibilityIdentifier("quran-begin")
+                    .background(theme.color("accent"), in: Capsule()).contentShape(Capsule()).contentShape(.capsule).disabled(busy).accessibilityIdentifier("quran-begin")
             }
             if step.kind == .hifz, let ayahRange = step.ayahRange {
                 Button { reference = QuranWirdReferenceRequest(range: ayahRange) } label: {

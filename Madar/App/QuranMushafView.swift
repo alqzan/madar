@@ -91,7 +91,7 @@ struct QuranMushafView: View {
     }
     private func icon(_ symbol: String, label: String, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: symbol).font(.system(size: 17, weight: .medium)).frame(width: 44, height: 44) }
-            .buttonStyle(.plain).accessibilityLabel(label).accessibilityIdentifier(id)
+            .buttonStyle(.madarPlain).accessibilityLabel(label).accessibilityIdentifier(id)
     }
     private func move(_ delta: Int) { let next = min(604, max(1, number + delta)); if next != number { number = next; page = nil; error = nil; zoom = 1; pan = .zero } }
     private func load() async {

@@ -56,6 +56,7 @@ public struct MadarPrimaryButton: ButtonStyle {
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(MadarTypography.section()).frame(maxWidth: .infinity).padding(.vertical, 16)
             .foregroundStyle(theme.onAccent).background(theme.accentFill, in: .rect(cornerRadius: 16))
+            .contentShape(.rect(cornerRadius: 16))
             .opacity(configuration.isPressed ? 0.8 : 1)
     }
 }

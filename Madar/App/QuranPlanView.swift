@@ -56,7 +56,7 @@ struct QuranPlanView: View {
                             line; choiceRow("جدول المراجعة", key: "quran.reviewSchedule", options: [("spaced","متباعدة"),("fixedJuzDaily","جزء يوميًا"),("fixedManzilWeekly","المنازل الأسبوعية")])
                         }
                     }
-                    Button(overview.input == nil ? "ابدأ خطة الحفظ" : "عدّل خطة الحفظ") { showSetup = true }.font(quranFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("quran-plan-edit")
+                    Button(overview.input == nil ? "ابدأ خطة الحفظ" : "عدّل خطة الحفظ") { showSetup = true }.font(quranFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("quran-plan-edit")
                     QuranPaperCard {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack { Text("موعد الختمة").font(quranFont(17, bold: true)); Spacer(); Text("تقدير لكل درجة").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
