@@ -147,7 +147,7 @@ struct MihbaraBookCover: View {
             if !book.isReadableEPUB { result[book.id] = .init(pages: book.pages, volumes: 1); continue }
             guard let hash = book.fileHash else { continue }
             if let known = cache[hash] { result[book.id] = known; continue }
-            guard let data = try? epubData(for: book) else { continue }
+            guard let data = await readableBookData(for: book) else { continue }
             let shape = await Task.detached(priority: .utility) { () -> MihbaraBookShape? in
                 let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".epub")
                 defer { try? FileManager.default.removeItem(at: file) }
