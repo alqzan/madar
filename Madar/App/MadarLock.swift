@@ -327,7 +327,7 @@ struct MadarLockGate<Content: View>: View {
                 content()
                     .allowsHitTesting(!controller.covered)
                     .accessibilityHidden(controller.covered)
-                    .overlay { if controller.covered { privacyCover } }
+                    .overlay { if controller.covered && controller.redactionFailed { privacyCover } }
             } else if controller.canPresent(feature) { content() }
             else { lockedContent }
         }

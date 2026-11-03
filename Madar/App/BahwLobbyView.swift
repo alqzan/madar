@@ -142,7 +142,7 @@ struct BahwLobbyView: View {
                     .font(.custom("thmanyahsans-Bold", size: 14, relativeTo: .caption))
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
-                    .overlay { Circle().stroke(theme.line) }
+                    .glassEffect(.regular.interactive(), in: .circle)
             }
             .buttonStyle(.madarPlain)
             .accessibilityIdentifier("bahw-arrange-start")
@@ -152,7 +152,7 @@ struct BahwLobbyView: View {
                     .font(.system(size: 17, weight: .regular))
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
-                    .overlay { Circle().stroke(theme.line) }
+                    .glassEffect(.regular.interactive(), in: .circle)
             }
             .buttonStyle(.madarPlain)
             .accessibilityLabel("خصّص مدار")

@@ -97,6 +97,8 @@ import UIKit
         synchronize()
     }
     private func coverNow() {
+        // No app lock (the default): going inactive or to the background never draws a lock screen.
+        if !controller.requiresProtection(.app), !controller.isSceneActive, !controller.redactionFailed { return }
         guard let scene, let coverWindow else { return }
         for window in scene.windows where window !== coverWindow {
             if !hiddenAccessibility.contains(where: { $0.0 === window }) { hiddenAccessibility.append((window, window.accessibilityElementsHidden)) }

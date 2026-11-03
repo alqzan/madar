@@ -1,6 +1,7 @@
 import SwiftUI
 import MadarDesign
 import MadarData
+import SwiftData
 
 extension BahwBlock: Identifiable { var id: String { rawValue } }
 
@@ -51,22 +52,31 @@ extension AppSession {
         }
     }
 
-    /// First launch of this build: every room except the prayer room is put away. Nothing is deleted; adding a room brings its data back.
+    /// A room that already holds the person's records.
+    private func roomHasData(_ block: BahwBlock, in context: ModelContext) -> Bool {
+        func any<T: PersistentModel>(_: T.Type) -> Bool { var d = FetchDescriptor<T>(); d.fetchLimit = 1; return ((try? context.fetch(d))?.isEmpty == false) }
+        switch block {
+        case .habits: return any(Habit.self)
+        case .quran: return any(HifzPlan.self) || any(HifzSession.self) || any(PageGrade.self)
+        case .notes: return any(Entry.self) || any(DayPage.self)
+        case .mal: return any(Account.self) || any(MoneyTransaction.self) || any(Obligation.self)
+        case .mihbara: return any(Book.self)
+        default: return false
+        }
+    }
+
+    /// Owner, 3 Nov: the app starts with the prayer room and adds the others one at a time. A room that already holds the
+    /// person's records is never put away by an update; only empty rooms are, once (v2: build 3 had skipped this for everyone).
     func applyProgressiveRoomsOnce() async {
-        let key = "Madar.progressiveRooms.v1"
+        let key = "Madar.progressiveRooms.v2"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         #if DEBUG
         if ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil { UserDefaults.standard.set(true, forKey: key); return }
         #endif
-        // An update must never put rooms away: only an install that finished its first run in this build starts with one room.
-        // Anyone who already had the app keeps every room they had, with their data.
-        guard UserDefaults.standard.bool(forKey: "Madar.progressiveRooms.pending") else {
-            // The intros explain a room to someone meeting it; a person who already uses the app does not get them on every room again.
-            for block in BahwBlock.allCases { markIntroSeen(block) }
-            UserDefaults.standard.set(true, forKey: key); return
-        }
+        let context = ModelContext(container)
         var layout = lobbyLayout
         for block in BahwBlock.allCases where block != .salah && BahwBlock.built.contains(block) {
+            if roomHasData(block, in: context) { markIntroSeen(block); layout.hidden.removeAll { $0 == block.rawValue }; continue }
             if !layout.blocks.contains(block.rawValue) { layout.blocks.append(block.rawValue) }
             if !layout.hidden.contains(block.rawValue) { layout.hidden.append(block.rawValue) }
         }
@@ -104,11 +114,6 @@ struct RoomIntroSheet: View {
                 MadarGlyph(block.symbol, size: 44).foregroundStyle(theme.accent).accessibilityHidden(true)
                 Text(block.title).font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
                 Text(content.sentence).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(content.steps, id: \.self) { step in
-                        Label(step, systemImage: "checkmark.circle").font(MadarTypography.body()).labelStyle(.titleAndIcon)
-                    }
-                }
                 if !content.toggles.isEmpty {
                     VStack(spacing: 0) {
                         ForEach(content.toggles, id: \.key) { item in
@@ -122,7 +127,7 @@ struct RoomIntroSheet: View {
                     Button { session.requestPrayerNotificationPermission() } label: {
                         Label("اسمح بالتذكيرات", systemImage: "bell").font(MadarTypography.body().bold()).foregroundStyle(theme.accent)
                             .frame(maxWidth: .infinity, minHeight: 48).contentShape(Capsule())
-                            .overlay { Capsule().stroke(theme.accent.opacity(0.6), lineWidth: 1) }
+                            .glassEffect(.regular.interactive(), in: .capsule)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("intro-notifications")
                 }
                 Button("ابدأ") {
@@ -158,19 +163,13 @@ struct AddRoomCard: View {
                 Button { session.enableRoom(block); session.requestOpen(block) } label: {
                     HStack(spacing: 12) {
                         MadarGlyph(block.symbol, size: 26).foregroundStyle(theme.accent)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(block.title).font(MadarTypography.body().bold())
-                            Text(block.intro.sentence).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.leading)
-                        }
+                        Text(block.title).font(MadarTypography.body().bold())
                         Spacer(minLength: 8)
                         Image(systemName: "plus.circle").font(.title3).foregroundStyle(theme.accent)
                     }
                     .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-add-" + block.rawValue)
                 if block != ordered.prefix(2).last { Divider().overlay(theme.line) }
-            }
-            if ordered.count > 2 {
-                Text("وبقيت أقسام أخرى تجدها في إعدادات مدار ← أقسامك والبهو.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
