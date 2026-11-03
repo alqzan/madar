@@ -110,6 +110,8 @@ final class AppSession {
     var pendingIntro: BahwBlock?
     /// Focused full-screen flows (the expense keypad, the year) that hide the tab bar also hide the glass accessory.
     var accessoryHiders: Set<String> = []
+    /// Height of the floating bottom bar, measured by `TabShell`; each room's navigation root adds it to its own bottom safe area.
+    var tabBarHeight: CGFloat = 0
     private(set) var prayerRevision = 0
     /// The lobby asks for habit readings from several tiles every minute; the answer only changes after a write (a new revision)
     /// or when the five-minute bucket turns over, so it is read once per such change.

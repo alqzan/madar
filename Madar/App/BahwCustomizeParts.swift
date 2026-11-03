@@ -167,8 +167,9 @@ struct BahwBlocksSection: View {
         .dropDestination(for: String.self) { items, _ in
             guard let moved = items.first, moved != block.rawValue else { return false }
             update { value in
-                guard let from = value.blocks.firstIndex(of: moved), let to = value.blocks.firstIndex(of: block.rawValue) else { return }
-                value.blocks.remove(at: from); value.blocks.insert(moved, at: to)
+                guard value.blocks.contains(moved), value.blocks.contains(block.rawValue) else { return }
+                value.blocks.removeAll { $0 == moved }
+                value.blocks.insert(moved, at: value.blocks.firstIndex(of: block.rawValue) ?? value.blocks.endIndex)
             }
             return true
         }

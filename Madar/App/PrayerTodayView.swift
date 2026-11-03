@@ -30,7 +30,7 @@ struct PrayerTodayView: View {
     private func refreshTrip() { onTrip = (try? session.prayerSnapshot(at: session.prayerNow()))?.activeTrip != nil }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { timeline in
+        TimelineView(.everyMinute) { timeline in
             let instant = session.prayerNow(timeline.date)
             ScrollView {
                 VStack(spacing: 0) {

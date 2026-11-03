@@ -123,7 +123,7 @@ struct MihbaraTextSearchSection: View {
                         Button { open(hit) } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(hit.pdfPage.map { hit.title + "، صفحة " + service.digits.string($0 + 1) } ?? hit.title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                                Text("\(Text(hit.before))\(Text(hit.match).bold().foregroundColor(theme.accent))\(Text(hit.after))")
+                                Text("\(Text(hit.before))\(Text(hit.match).bold().foregroundStyle(theme.accent))\(Text(hit.after))")
                                     .font(.custom("Amiri-Regular", size: 16, relativeTo: .body)).lineLimit(3).multilineTextAlignment(.leading)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading).padding(14).background(theme.surface, in: .rect(cornerRadius: 14))

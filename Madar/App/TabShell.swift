@@ -18,7 +18,6 @@ struct TabShell<Content: View>: View {
     @ViewBuilder let content: (String) -> Content
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
-    @State private var barHeight: CGFloat = 0
 
     var body: some View {
         baseTabView.tint(theme.accent)
@@ -37,9 +36,8 @@ struct TabShell<Content: View>: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             // A `safeAreaInset` outside the navigation stack never reached the rooms' own layouts (the diary welcome buttons sat under the bar),
             // so the bar is an overlay and its measured height is added to the safe area of everything inside.
-            .safeAreaPadding(.bottom, barShown ? barHeight : 0)
             .overlay(alignment: .bottom) {
-                if barShown { fixedBar.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { barHeight = $0 } }
+                if barShown { fixedBar.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { session.tabBarHeight = $0 } }
             }
     }
     private var barShown: Bool { session.accessoryHiders.isEmpty }
@@ -236,6 +234,7 @@ struct MadarRootView: View {
                     // M4-V01: the lobby replaces the M0 foundation home (kept in FoundationHome.swift, unused).
                     else { BahwLobbyView(session: session) }
                 }
+                .safeAreaPadding(.bottom, session.accessoryHiders.isEmpty ? session.tabBarHeight : 0)
             }
         }
         // Owner, 30 Oct 2026: the «افتح المحبرة» door in «خصّص» used to hang this cover on the settings page, which is rebuilt after every write,

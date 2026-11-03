@@ -443,7 +443,7 @@ struct QuranWirdReferenceView: View {
         let pageNumber = displayNumber(page.printedPage)
         let volume = displayNumber(page.volume)
         if volume.isEmpty { return "الصفحة " + pageNumber }
-        return "الجزء " + volume + " · الصفحة " + pageNumber
+        return "الجزء " + volume + "، الصفحة " + pageNumber
     }
 
     private func displayNumber(_ value: String) -> String {

@@ -53,7 +53,7 @@ struct QuranMushafView: View {
         .statusBarHidden(!tools).interactiveDismissDisabled()
         .onChange(of: tools) { _, shown in if shown { hint = false; UserDefaults.standard.set(true, forKey: "quran.mushaf.toolsHintSeen") } }
         .task(id: page != nil) { guard hint, page != nil else { return }; try? await Task.sleep(for: .seconds(5)); withAnimation { hint = false } }
-        .task { number = min(604, max(1, initialPage)); await load() }
+        .task { number = min(604, max(1, initialPage)) }
         .task(id: number) { await load() }
         .sheet(isPresented: $verses) {
             if let page { QuranAyahReaderSheet(page: page, close: { verses = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }

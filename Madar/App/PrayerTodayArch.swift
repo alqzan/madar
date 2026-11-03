@@ -153,8 +153,8 @@ struct PrayerTodayArch: View {
         case .missed:
             PrayerStar().stroke(theme.color("missed"), lineWidth: 1.2).frame(width: 15, height: 15)
         case .pending:
-            TimelineView(.animation(minimumInterval: 1 / 15)) { context in
-                let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2) / 2
+            TimelineView(.animation(minimumInterval: 1 / 15, paused: reduceMotion)) { context in
+                let phase = reduceMotion ? 0.25 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2) / 2
                 Capsule().fill(theme.accent).frame(width: 14, height: 2).opacity(0.35 + 0.5 * abs(1 - 2 * phase))
             }
         default:

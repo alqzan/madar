@@ -233,7 +233,8 @@ final class PrayerNotificationCoordinator {
                 notesDailyCap: Int(session.number("notes.dailyCap")),
                 dayBoundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr),
             existingPendingCount: externalPendingCount, disabledIDs: Set(consumed.map(\.requestID)), submittedBudgetByDay: counts,
-            sanctityWindows: sanctityWindows
+            // The arbiter uses only the windows it is given, so the extension days planned for room reminders (zakat, annual) carry their own windows too.
+            sanctityWindows: sanctityWindows + planningDays.flatMap(\.sanctityWindows)
         )
         try await reconcile(plan: plan, candidates: candidates,
                             current: existing.filter { $0.identifier.hasPrefix(Self.requestPrefix) },

@@ -230,7 +230,7 @@ struct MihbaraPaperIndexEditor: View {
         }
         .confirmationDialog("تتجاهل تعديلات الفهرس؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
             Button("تجاهل التعديلات", role: .destructive) { dismiss() }.accessibilityIdentifier("mihbara-paper-discard")
-            Button("أكمل الكتابة") { }.accessibilityIdentifier("mihbara-paper-continue")
+            Button("أكمل الكتابة", role: .cancel) { }.accessibilityIdentifier("mihbara-paper-continue")
         } message: { Text("الفهرس غير محفوظ.") }
         .madarSheetLock(saving: saving, draft: hasUnsavedChanges)
         .onChange(of: hasUnsavedChanges || saving, initial: true) { _, blocked in
