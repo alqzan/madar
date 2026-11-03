@@ -8,6 +8,7 @@ import MadarMoney
 import MadarCommands
 
 struct MoneyHomeView: View {
+    private static var lastAccrual = Date.distantPast
     @Bindable var app: AppSession
     var isTabRoot = false
     @Environment(\.dismiss) private var dismiss
@@ -139,9 +140,12 @@ struct MoneyHomeView: View {
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task {
             await app.seedMoneyDefaults()
-            do { try await app.executeMoneyCommand("money.accruePlans") }
-            catch is CancellationError { return }
-            catch { app.errorMessage = "تعذّر تحديث الخطط اليوم: " + madarUserMessage(error) }
+            // Opening the room must not write on every visit (hangs on tab switches): accrue at most once every 5 minutes.
+            if Date().timeIntervalSince(Self.lastAccrual) > 300 {
+                do { try await app.executeMoneyCommand("money.accruePlans"); Self.lastAccrual = Date() }
+                catch is CancellationError { return }
+                catch { app.errorMessage = "تعذّر تحديث الخطط اليوم: " + madarUserMessage(error) }
+            }
             load()
             if app.moneyOpensMessages { app.moneyOpensMessages = false; messagesOpen = true; return }
             // §7.5 «بعد غياب»: «منذ آخر زيارة» opens first; otherwise this visit is the new mark.
