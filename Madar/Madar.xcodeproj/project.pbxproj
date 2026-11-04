@@ -337,6 +337,7 @@
 		ADAA3E8FB93656DDB250C1E7 /* CompleteHabitIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66EDB55535EAFA21686E3D3E /* CompleteHabitIntent.swift */; };
 		AE416B416D39D53C03743ED2 /* OpenQuickRoomIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C92B7A356AA41F0E88F770 /* OpenQuickRoomIntent.swift */; };
 		AE4E3CECAA310E299D275D2C /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D5244CCC79BF2B66C486F51 /* AppSession.swift */; };
+		B099652587C1885A807C6EDC /* BahwAttentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DEA3BA58F06FAAC274081E2 /* BahwAttentionTests.swift */; };
 		B11E82DD4DCE28EC375542B2 /* DiaryExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693A9339530A3EDDA16FBF05 /* DiaryExportView.swift */; };
 		B1E0883905AB8A0BC6C0DF24 /* MadarGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA770813B3F76287BD061E21 /* MadarGlyph.swift */; };
 		B3AF3C9022728286FD29F935 /* LegacyMoveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4577E38D00C17B617BE270F3 /* LegacyMoveView.swift */; };
@@ -356,6 +357,7 @@
 		BAD375F78F641EF7AE27A7C1 /* thmanyahsans-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = 1A25447FB94716ACAAEB7433 /* thmanyahsans-Regular.otf */; };
 		BB6BCE8F7D71255076789321 /* DiaryEditorIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E1F17572CD54A4B855DD164 /* DiaryEditorIntegrationTests.swift */; };
 		BBD0F49C9D51AB65F406BE73 /* MihbaraPDFReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B9ACE8CD0ACA2E8F081BA36 /* MihbaraPDFReaderView.swift */; };
+		BBF5F5D650D9A377144EBC9E /* BahwAttention.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD4FD4C8BCCEBE52773FEF9E /* BahwAttention.swift */; };
 		BD5C4F57A3F671523F4B0969 /* MihbaraBookCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFEBA17862D0A1AC37BFE4D3 /* MihbaraBookCover.swift */; };
 		BE02C00CD8F58BFD8E1448E0 /* MadarCore in Frameworks */ = {isa = PBXBuildFile; productRef = C0F01EF9460620030E8156F6 /* MadarCore */; };
 		BEED6CC8E57DA6E7D0C33937 /* Quran.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 36D212F344657400F67CA5EB /* Quran.xcstrings */; };
@@ -697,6 +699,7 @@
 		5D8AA2CC8F87F5E866D814E7 /* MoneyQuickExpense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyQuickExpense.swift; sourceTree = "<group>"; };
 		5D97EA0A97206A62947BE14C /* QuranServiceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranServiceIntegrationTests.swift; sourceTree = "<group>"; };
 		5DB5BB7EBFA282B3EB4AA780 /* PrayerFirstDayUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerFirstDayUITests.swift; sourceTree = "<group>"; };
+		5DEA3BA58F06FAAC274081E2 /* BahwAttentionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BahwAttentionTests.swift; sourceTree = "<group>"; };
 		5DFE82C4D216FC9A003ED7A2 /* thmanyahsans-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahsans-Medium.otf"; sourceTree = "<group>"; };
 		5E6D8632065B521B685FADB6 /* thmanyahsans-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahsans-Bold.otf"; sourceTree = "<group>"; };
 		5FF3A5ABCDDB3153D93E2D90 /* MoneyAccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyAccountsView.swift; sourceTree = "<group>"; };
@@ -896,6 +899,7 @@
 		CC3AF33190C35B300A8B025F /* DiaryMediaCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryMediaCard.swift; sourceTree = "<group>"; };
 		CCEB9293DE2E579C487F98D6 /* DiaryVoiceControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryVoiceControls.swift; sourceTree = "<group>"; };
 		CD025F7EBE03A4A9D7852DB4 /* PrayerCountdownControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerCountdownControl.swift; sourceTree = "<group>"; };
+		CD4FD4C8BCCEBE52773FEF9E /* BahwAttention.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BahwAttention.swift; sourceTree = "<group>"; };
 		CD60978ABA4595C9E863DE61 /* MoneyEnvelopeDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyEnvelopeDetailView.swift; sourceTree = "<group>"; };
 		CE60EF51F9F4A6E699E9EB81 /* MoneyHomeDoors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyHomeDoors.swift; sourceTree = "<group>"; };
 		CEA39CA993576726C8C55B8E /* LegacyHabitTrial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyHabitTrial.swift; sourceTree = "<group>"; };
@@ -1131,6 +1135,7 @@
 				7253DB8148176A664FA3CF89 /* AppSyncService.swift */,
 				656BAFAFA45C5E94869809A7 /* AppWidgetMaker.swift */,
 				30548ADF1D2BBABB66489408 /* BackupSettingsView.swift */,
+				CD4FD4C8BCCEBE52773FEF9E /* BahwAttention.swift */,
 				9FC02C42FB7004B6F30B7052 /* BahwBlocks.swift */,
 				20304C3F7DCC7BAAB0C5632E /* BahwCustomizeParts.swift */,
 				60F1C857764292ABD2F14C47 /* BahwLobbyView.swift */,
@@ -1519,6 +1524,7 @@
 				C105008888548BF995BA7B6D /* AppServiceIntegrationTests.swift */,
 				915C4CEDCE96F7D5959C6304 /* BackgroundBackupTests.swift */,
 				69131FC804F685E615C3A0DB /* BackupFolderServiceTests.swift */,
+				5DEA3BA58F06FAAC274081E2 /* BahwAttentionTests.swift */,
 				896679F4C7AE5B3F333F22E9 /* BahwPrayerIntegrationTests.swift */,
 				980BEF9FA1185D7404A6E08E /* CaptureIntentIntegrationTests.swift */,
 				7E2322CEC281AFD3E505F2BE /* CityCatalogTests.swift */,
@@ -1883,6 +1889,7 @@
 				6E9C8889C99E331FEFFD9F6A /* AppServiceIntegrationTests.swift in Sources */,
 				7AA14EF2C412286AC89DB4EC /* BackgroundBackupTests.swift in Sources */,
 				1874253CCE5D1CFB70106FE0 /* BackupFolderServiceTests.swift in Sources */,
+				B099652587C1885A807C6EDC /* BahwAttentionTests.swift in Sources */,
 				38441C6214CA9DD82E2B16F0 /* BahwPrayerIntegrationTests.swift in Sources */,
 				C8273836B4F26F3C228F43D4 /* CaptureIntentIntegrationTests.swift in Sources */,
 				391CC1AEE5A16E9388322C95 /* CityCatalogTests.swift in Sources */,
@@ -2072,6 +2079,7 @@
 				847CAFBC8C0A856177DA1BD1 /* AppSyncService.swift in Sources */,
 				D80DFFED3C4C3DC05E263906 /* AppWidgetMaker.swift in Sources */,
 				2708B599D4DE94431189E7AA /* BackupSettingsView.swift in Sources */,
+				BBF5F5D650D9A377144EBC9E /* BahwAttention.swift in Sources */,
 				6C20B5F11059503EA5B4876E /* BahwBlocks.swift in Sources */,
 				FF96CFADCF4C0757B4085CC0 /* BahwCustomizeParts.swift in Sources */,
 				69E3D00BAA054BFFC4E07EE5 /* BahwLobbyView.swift in Sources */,

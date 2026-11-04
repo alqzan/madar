@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import MadarCore
 import MadarDesign
+import MadarPrayer
 
 /// M4-V01 · `bahw/02-W1-Bahw.jpg`: the flexible lobby (RL1 labelled blocks first).
 /// A room enters the lobby after its milestone builds its block; RL9 still excludes deferred options.
@@ -68,6 +69,8 @@ struct BahwLobbyView: View {
     @State private var arranging = false
     @State private var drawerOpen = false
     @State private var wiggle = false
+    @State private var attention: BahwAttention?
+    @Environment(\.scenePhase) private var scenePhase
     private var theme: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var service: AppBahwService { .init(session: session) }
     private var layout: BahwLayoutValue { BahwLayoutValue(session.values["bahw.layout"]) }
@@ -127,6 +130,33 @@ struct BahwLobbyView: View {
         .navigationDestination(isPresented: $session.yearOpen) { BahwYearView(session: session) }
         .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]).madarSheetErrorAlert(session) }
         .onChange(of: arranging) { _, on in wiggle = on && !reduceMotion }
+        .sheet(item: $attention) { value in
+            BahwAttentionSheet(session: session, attention: value).madarSheetErrorAlert(session)
+        }
+        // On opening, after the splash has settled: what waits (unlogged prayers, unsorted messages) appears once, never as a notification.
+        .task { try? await Task.sleep(for: .seconds(1.4)); presentAttention(force: false) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { try? await Task.sleep(for: .seconds(0.9)); presentAttention(force: false) } }
+        }
+        .onChange(of: session.attentionRequest) { _, _ in presentAttention(force: true) }
+    }
+
+    private func presentAttention(force: Bool) {
+        guard !arranging, !drawerOpen, attention == nil, session.selectedTab == "foundation" else { return }
+        var value = service.attention()
+        #if DEBUG
+        // Screenshot sample for the simulator only (`SIMCTL_CHILD_MADAR_UI_ATTENTION_SAMPLE=1`); never reads or writes real data.
+        if ProcessInfo.processInfo.environment["MADAR_UI_ATTENTION_SAMPLE"] == "1" {
+            let today = service.today
+            func item(_ day: GregorianDay, _ prayer: Prayer, _ name: String, _ word: String, friday: Bool = false) -> BahwAttention.PrayerItem {
+                .init(reference: .init(day: day, prayer: prayer), name: name, dayWord: word, fridayNoon: friday)
+            }
+            value = BahwAttention(prayers: [item(today.adding(days: -1), .dhuhr, "الجمعة", "أمس", friday: true), item(today.adding(days: -1), .asr, "العصر", "أمس"),
+                                            item(today, .fajr, "الفجر", "اليوم")], moneyCount: 3)
+        }
+        #endif
+        guard !value.isEmpty, force || BahwAttentionMemory.isNew(value) else { return }
+        attention = value
     }
 
     private var header: some View {
@@ -349,12 +379,15 @@ private struct BahwSuggestionsView: View {
     }
     private func open(_ destination: BahwSuggestion.Destination) {
         switch destination {
-        case .prayer: session.selectedTab = "prayer"
+        // Unlogged prayers and unsorted messages are settled in the pop-up over the lobby; the room is for details.
+        case .prayer:
+            if AppBahwService(session: session).attention().prayers.isEmpty { session.selectedTab = "prayer" } else { session.attentionRequest += 1 }
         case .habit(let id): session.habitRouteID = id; session.habitsOpen = true
         case .quran: session.selectedTab = "quran"
         case .diary:
             if let url = URL(string: "madar://notes/write") { session.open(url) }
-        case .money: session.open(URL(string: "madar://mal/messages")!)
+        case .money:
+            if AppBahwService(session: session).attention().moneyCount > 0 { session.attentionRequest += 1 } else { session.open(URL(string: "madar://mal/messages")!) }
         // The suggestion names a book, so it opens that book (a stale id falls back to the room's own alert).
         case .mihbara(let book): if let book { session.openSpotlightBook(book) } else { session.selectedTab = "mihbara" }
         }

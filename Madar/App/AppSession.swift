@@ -112,6 +112,8 @@ final class AppSession {
     var accessoryHiders: Set<String> = []
     /// Height of the floating bottom bar, measured by `TabShell`; each room's navigation root adds it to its own bottom safe area.
     var tabBarHeight: CGFloat = 0
+    /// Raised by a lobby suggestion to open the «شيء ينتظرك» sheet instead of a room.
+    var attentionRequest = 0
     private(set) var prayerRevision = 0
     /// The lobby asks for habit readings from several tiles every minute; the answer only changes after a write (a new revision)
     /// or when the five-minute bucket turns over, so it is read once per such change.
