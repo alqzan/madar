@@ -336,10 +336,10 @@ struct DiaryHomeSnapshot {
 
 extension AppDiaryService {
     /// RD1 single choke point: every diary reader shows only the newest row of an edited line.
-    static func revisionChains(_ entries: [Entry]) -> DiaryRevisionChains {
+    nonisolated static func revisionChains(_ entries: [Entry]) -> DiaryRevisionChains {
         DiaryRevisionChains(entries.map { .init(id: $0.id, replaces: $0.source == "revision" ? $0.sourceID.flatMap(UUID.init(uuidString:)) : nil) })
     }
-    static func visible(_ entries: [Entry]) -> [Entry] { let chains = revisionChains(entries); return entries.filter { chains.heads.contains($0.id) } }
+    nonisolated static func visible(_ entries: [Entry]) -> [Entry] { let chains = revisionChains(entries); return entries.filter { chains.heads.contains($0.id) } }
     func edit(_ line: String, text: String) async throws {
         try await app.executeDiaryCommand("diary.editEntry", payload: ["entryID": .string(line), "revisionID": .string(UUID().uuidString), "text": .string(text)])
     }

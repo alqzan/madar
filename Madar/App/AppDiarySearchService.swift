@@ -18,7 +18,16 @@ struct DiarySearchIndex {
 extension AppDiaryService {
     func searchIndex() throws -> DiarySearchIndex {
         try authorizeRead()
-        let context=ModelContext(app.container)
+        return try Self.buildSearchIndex(container:app.container,zone:app.activePlace.timeZone,grid:diaryCalendar,today:currentDay())
+    }
+    /// The same index built in the background: every entry, margin note and letter is read, so a long diary must not freeze the screen.
+    func searchIndexOffMain() async throws -> DiarySearchIndex {
+        try authorizeRead()
+        let container=app.container,zone=app.activePlace.timeZone,grid=diaryCalendar,today=try currentDay()
+        return try await Task.detached(priority:.userInitiated) { try Self.buildSearchIndex(container:container,zone:zone,grid:grid,today:today) }.value
+    }
+    nonisolated private static func buildSearchIndex(container:ModelContainer,zone:TimeZone,grid:DiaryCalendarGrid,today:GregorianDay) throws -> DiarySearchIndex {
+        let context=ModelContext(container)
         let entries=Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil })))
         let trips=try context.fetch(FetchDescriptor<Trip>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil && !$0.dismissed }))
         var mediaDescriptor=FetchDescriptor<Media>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil }); mediaDescriptor.propertiesToFetch=[\.id,\.kind]
@@ -46,11 +55,10 @@ extension AppDiaryService {
             if let id=row.photoMediaID,media[id]=="photo",!entries.contains(where:{$0.dayKey==row.dayKey && $0.attachmentMediaIDs.contains(id)}) { documents.append(.init(id:row.id.uuidString+"photo",day:day,text:"صورة من يومك",kind:"photo")) }
         }
         for row in try context.fetch(FetchDescriptor<Letter>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.state == "opened" })) {
-            documents.append(.init(id:row.id.uuidString,day:GregorianDay.containing(row.openedAt ?? row.createdAt,in:app.activePlace.timeZone),text:row.text,kind:"letter"))
+            documents.append(.init(id:row.id.uuidString,day:GregorianDay.containing(row.openedAt ?? row.createdAt,in:zone),text:row.text,kind:"letter"))
         }
         var projects:[String:UUID]=[:]
         for row in try context.fetch(FetchDescriptor<Project>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil },sortBy:[SortDescriptor(\.createdAt)])) where !row.name.isEmpty { projects[row.name]=row.id }
-        let grid=diaryCalendar
-        return try .init(documents:documents.sorted{$0.day > $1.day},parser:.init(today:currentDay(),zone:app.activePlace.timeZone,weekStart:grid.weekStart,sightingOffset:grid.offset,places:Set(documents.compactMap(\.place)).sorted(),projects:projects,tags:Set(documents.flatMap(\.tags)).sorted()))
+        return try .init(documents:documents.sorted{$0.day > $1.day},parser:.init(today:today,zone:zone,weekStart:grid.weekStart,sightingOffset:grid.offset,places:Set(documents.compactMap(\.place)).sorted(),projects:projects,tags:Set(documents.flatMap(\.tags)).sorted()))
     }
 }

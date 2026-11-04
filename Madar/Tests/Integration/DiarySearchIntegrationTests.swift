@@ -4,7 +4,7 @@ import MadarCore
 import MadarData
 @testable import Madar
 @MainActor final class DiarySearchIntegrationTests:XCTestCase {
-    func testLocalIndexGateSealedExclusionAndSources() throws {
+    func testLocalIndexGateSealedExclusionAndSources() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"DiarySearch-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),app=try AppSession(container:container,groupDirectory:root),service=AppDiaryService(app:app)
         XCTAssertThrowsError(try service.searchIndex());app.authorizeProtectedData()
@@ -20,5 +20,9 @@ import MadarData
         XCTAssertTrue(index.terms.contains { $0.0 == "#عائلة" && $0.1 == "#عائلة" && $0.2 == 1 })
         XCTAssertEqual(index.documents.filter{index.parser.matches($0,chips:index.parser.parse("لِغد"))}.map(\.id),[entry.id.uuidString])
         XCTAssertEqual(index.documents.first{$0.kind=="margin"}?.day.description,"2026-10-15")
+        // The background build gives the same index as the synchronous one.
+        let background=try await service.searchIndexOffMain()
+        XCTAssertEqual(background.documents.map(\.id),index.documents.map(\.id))
+        XCTAssertEqual(background.terms.map(\.0),index.terms.map(\.0))
     }
 }

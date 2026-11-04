@@ -62,7 +62,8 @@ import MadarPrayer
         guard let first = catalog.ayah(id: portion.first), let last = catalog.ayah(id: portion.last) else { return "" }
         return first.surahNameArabic + " " + numerals.string(first.ayahNumber) + "–" + (first.surahID == last.surahID ? "" : last.surahNameArabic + " ") + numerals.string(last.ayahNumber)
     }
-    func load() async throws -> QuranRoomState {
+    func load() async throws -> QuranRoomState { try await loadState(deferHifzAmounts: false) }
+    func loadState(deferHifzAmounts: Bool) async throws -> QuranRoomState {
         let evaluatedAt = clock()
         let snapshot = try repository().snapshot(at: evaluatedAt), catalog = try QuranResources.catalog(), today = snapshot.day.date
         let coverage = snapshot.coverage, completed = coverage.completedPages.count
@@ -170,8 +171,9 @@ import MadarPrayer
         let errors = open.map { value in QuranUIErrorSpot(id: Self.spotID(value.key),
             title: catalog.ayah(id: value.key.ayahID).map { $0.surahNameArabic + " " + numerals.string($0.ayahNumber) } ?? "",
             detail: value.key.wordIndex == nil ? "الآية كاملة" : "موضع كلمة", isToday: todayKeys.contains(value.key), closed: !value.isOpen, canDrill: true) }
-        // The four level previews each rebuild a whole snapshot; they fill in after the first paint (`hifzAmounts(for:)`).
-        let amounts: [String: String] = [:]
+        // The four level previews each rebuild a whole snapshot; the home asks to fill them in after its first paint (`hifzAmounts(for:)`).
+        var amounts: [String: String] = [:]
+        if !deferHifzAmounts, let plan = snapshot.plan { amounts = try hifzAmounts(for: plan.plan.unit) }
         return QuranRoomState(coverageTitle: coverageTitle, coverageFraction: Double(completed) / 604,
             percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), hifzAmounts: amounts, streakDays: streak.days, balanceTitle: balance,
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: (QuranUILevel(rawValue: snapshot.hifzLevel.rawValue) ?? .simple),
@@ -200,6 +202,9 @@ import MadarPrayer
     /// What each day level asks for today, in the plan's own unit; one preview snapshot per level.
     func hifzAmounts(for unit: QuranUIUnit) throws -> [String: String] {
         guard let hifzUnit = QuranHifzUnit(rawValue: unit.rawValue) else { return [:] }
+        return try hifzAmounts(for: hifzUnit)
+    }
+    func hifzAmounts(for hifzUnit: QuranHifzUnit) throws -> [String: String] {
         let evaluatedAt = clock(), reader = try repository(), catalog = try QuranResources.catalog()
         var amounts: [String: String] = [:]
         for level in QuranDayLevel.allCases {

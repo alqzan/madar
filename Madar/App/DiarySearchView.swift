@@ -78,9 +78,9 @@ struct DiarySearchView: View {
 #endif
                 }
                 .toolbarBackground(theme.background,for:.navigationBar).tint(theme.accent)
-                .task(id: loadAttempt) { loadIndex() }
+                .task(id: loadAttempt) { await loadIndex() }
                 .onChange(of: initialQueryRequestID, initial: true) { _, _ in applyInitialQuery() }
-                .onChange(of: app.prayerRevision) { _, _ in if failure == nil { loadIndex() } }
+                .onChange(of: app.prayerRevision) { _, _ in if failure == nil { Task { await loadIndex() } } }
                 .task(id:query) {
                     // Typing waits a moment so a long diary is filtered once per word, not once per key.
                     if !query.isEmpty { try? await Task.sleep(for:.milliseconds(220)); guard !Task.isCancelled else {return} }
@@ -93,7 +93,7 @@ struct DiarySearchView: View {
                 }
         }
     }
-    private func loadIndex() {
+    private func loadIndex() async {
         do {
             #if DEBUG
             let environment=ProcessInfo.processInfo.environment
@@ -103,7 +103,7 @@ struct DiarySearchView: View {
                 throw CocoaError(.fileReadUnknown)
             }
             #endif
-            index=try service.searchIndex()
+            index=try await service.searchIndexOffMain()
             chips=index?.parser.parse(query) ?? []
             failure=nil
         } catch { index=nil; chips=[]; failure="تعذّر فتح فهرس المذكرات. أعد المحاولة." }

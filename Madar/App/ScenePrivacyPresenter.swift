@@ -97,11 +97,8 @@ import UIKit
         synchronize()
     }
     private func coverNow() {
-#if !DEBUG
-        // Owner, 4 Nov 2026: the app lock is removed from the shipped app, so the system-window cover never appears (a lock-flow test build still can).
-        return
-#else
-        // Owner, 3 Nov 2026: no app lock means no lock screen, ever («محتوى مدار محمي» appeared on every return and on failed redaction).
+        // Owner, 3-4 Nov 2026: no app lock means no cover, ever («محتوى مدار محمي»). A private share is still pulled on revocation
+        // (`dismissActivity()` runs regardless); only the cover window needs an app lock.
         guard controller.requiresProtection(.app) else { return }
         guard let scene, let coverWindow else { return }
         for window in scene.windows where window !== coverWindow {
@@ -109,7 +106,6 @@ import UIKit
             window.accessibilityElementsHidden = true
         }
         coverWindow.isHidden = false
-#endif
     }
     private func synchronize() {
         if let ticket = activityAuthorization, (try? controller.validate(ticket)) == nil {

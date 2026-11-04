@@ -360,6 +360,7 @@ import UIKit
         let window = UIWindow(windowScene: scene), root = UIViewController()
         window.rootViewController = root; window.makeKeyAndVisible(); root.loadViewIfNeeded()
         let service = Service(), auth = Authenticator(), probe = ActivityProbe()
+        let coverShown = scope == .app
         service.persistedScope = scope
         let lock = MadarLockController(scope: scope, service: service, authenticator: { auth })
         let presenter = ScenePrivacyPresenter(controller: lock, activationState: { _ in .foregroundActive },
@@ -380,19 +381,19 @@ import UIKit
             try await waitUntil { service.scopeContinuation != nil }
             // Owning-controller revocation occurs before persistence suspends.
             XCTAssertFalse(presenter.hasActivityRequest); XCTAssertEqual(probe.retirements, 1)
-            XCTAssertEqual(presenter.coverWindow?.isHidden, false)
+            XCTAssertEqual(presenter.coverWindow?.isHidden, !coverShown, "Owner, 4 Nov 2026: the cover needs an app lock; the share is retired either way")
             service.scopeContinuation?.resume(); service.scopeContinuation = nil
             try await change.value
         } else {
             lock.lock()
             // No Task/settle is needed to retire the active presentation request.
             XCTAssertFalse(presenter.hasActivityRequest); XCTAssertEqual(probe.retirements, 1)
-            XCTAssertEqual(presenter.coverWindow?.isHidden, false)
+            XCTAssertEqual(presenter.coverWindow?.isHidden, !coverShown)
         }
         XCTAssertThrowsError(try lock.validate(ticket))
         _ = try await lock.authorize([.app])
         XCTAssertEqual(probe.presentations, 1); XCTAssertFalse(presenter.hasActivityRequest)
-        XCTAssertEqual(presenter.coverWindow?.isHidden, false, "Cover must outlive native dismissal")
+        XCTAssertEqual(presenter.coverWindow?.isHidden, !(coverShown && !scopeChange), "Cover must outlive native dismissal when an app lock is on")
         probe.finishRetirement()
         XCTAssertEqual(presenter.coverWindow?.isHidden, true)
         XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
@@ -418,7 +419,7 @@ import UIKit
         window.rootViewController = root; window.makeKeyAndVisible()
         let modal = UIViewController()
         root.present(modal, animated: false)
-        let lock = MadarLockController(scope: .none, service: Service())
+        let lock = MadarLockController(scope: .app, service: Service())
         let presenter = ScenePrivacyPresenter(controller: lock); presenter.attach(to: window)
         defer {
             presenter.detach(); root.dismiss(animated: false); window.isHidden = true
@@ -430,5 +431,22 @@ import UIKit
         XCTAssertTrue(window.isKeyWindow); XCTAssertGreaterThan(cover.windowLevel, window.windowLevel)
         XCTAssertTrue(window.accessibilityElementsHidden); XCTAssertTrue(lock.covered)
         XCTAssertTrue(root.presentedViewController === modal)
+    }
+
+    /// Owner, 4 Nov 2026: with no app lock nothing covers the app when it leaves or returns («محتوى مدار محمي» is gone).
+    func testNoAppLockNeverCoversTheScene() async throws {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+            throw XCTSkip("Requires an app-host UIWindowScene")
+        }
+        let oldKey = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene), root = UIViewController()
+        window.rootViewController = root; window.makeKeyAndVisible()
+        let lock = MadarLockController(scope: .none, service: Service())
+        let presenter = ScenePrivacyPresenter(controller: lock); presenter.attach(to: window)
+        defer { presenter.detach(); window.isHidden = true; oldKey?.makeKeyAndVisible() }
+        NotificationCenter.default.post(name: UIWindowScene.willDeactivateNotification, object: scene)
+        NotificationCenter.default.post(name: UIScene.didEnterBackgroundNotification, object: scene)
+        XCTAssertEqual(presenter.coverWindow?.isHidden, true)
+        XCTAssertFalse(window.accessibilityElementsHidden)
     }
 }

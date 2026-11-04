@@ -455,7 +455,7 @@ struct QuranHomeView: View {
     }
     private func refresh() async throws {
         let previous = state?.hifzAmounts ?? [:]
-        var loaded = try await service.load()
+        var loaded = try await service.loadState(deferHifzAmounts: true)
         loaded.hifzAmounts = previous
         state = loaded
         // Level amounts follow the first paint; the previous ones stay on screen meanwhile.

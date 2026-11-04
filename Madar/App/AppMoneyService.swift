@@ -102,7 +102,10 @@ struct MoneyHomeReading {
         let allocations = try context.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let envelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let plans = try context.fetch(FetchDescriptor<EnvelopePlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        func envelopeBalance(_ id: UUID) -> Int { allocations.filter { $0.targetID == id }.reduce(0) { $0 + $1.amountMinor } }
+        // One pass over the allocations instead of one per envelope, goal and role.
+        var balanceByTarget: [UUID: Int] = [:]
+        for allocation in allocations { if let id = allocation.targetID { balanceByTarget[id, default: 0] += allocation.amountMinor } }
+        func envelopeBalance(_ id: UUID) -> Int { balanceByTarget[id] ?? 0 }
         func roleBalance(_ role: String) -> Int {
             let ids = Set(envelopes.filter { $0.role == role }.map(\.id))
             return allocations.filter { ($0.target == role && $0.targetID == nil) || $0.targetID.map(ids.contains) == true }.reduce(0) { $0 + $1.amountMinor }
@@ -122,7 +125,8 @@ struct MoneyHomeReading {
         }
         var limits: [MoneyHomeLimit] = []
         let categories = try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        let movements = try repo.confirmedTransactions().filter { $0.cycleID == cycle?.id }
+        let confirmed = try repo.confirmedTransactions()
+        let movements = confirmed.filter { $0.cycleID == cycle?.id }
         let cycleRow = try context.fetch(FetchDescriptor<Cycle>()).first { $0.id == cycle?.id }
         for limit in try context.fetch(FetchDescriptor<CategoryLimit>()) where limit.deletedAt == nil && limit.mergedInto == nil {
             guard let category = categories.first(where: { $0.id == limit.categoryID }), limit.mode != "none" else { continue }
@@ -141,7 +145,7 @@ struct MoneyHomeReading {
             due.append(.init(id: item.id, name: obligation.name, amountMinor: item.amountMinor - item.paidMinor, due: .containing(item.dueDate, in: zone)))
         }
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
-        let linked = try repo.confirmedTransactions().filter { $0.obligationID != nil }
+        let linked = confirmed.filter { $0.obligationID != nil }
         var flexibleExtraMinor = 0
         for bill in obligations where bill.isRecurring && bill.currency == currency {
             // M5-X00: a free schedule shows its next unpaid due day (from this cycle's start), the same rule as the obligations room.
