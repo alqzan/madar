@@ -80,7 +80,7 @@ struct PrayerCustomizeView: View {
         .init(id: "riwaq", title: "الرواق والميزان", symbol: "paintpalette", keys: ["salah.pool", "salah.fridayTallArch", "salah.showMosqueStreak"]),
         .init(id: "log", title: "التسجيل", symbol: "checkmark", keys: ["salah.askHeart", "salah.pendingDays"]),
         .init(id: "times", title: "المواقيت", symbol: "clock", keys: ["salah.method", "salah.tripMethod", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "salah.travelShortenCombine"]),
-        .init(id: "remind", title: "التذكير", symbol: "bell", keys: ["salah.askReminder", "salah.askAfterAdhanMin", "salah.qadaReminder", "salah.liveActivity"]),
+        .init(id: "remind", title: "التذكير", symbol: "bell", keys: ["salah.beforeReminder", "salah.beforeAdhanMin", "salah.askReminder", "salah.askAfterAdhanMin", "salah.qadaReminder", "salah.liveActivity"]),
     ]
     private func definitions(_ group: CustomizeGroup) -> [SettingDefinition] {
         group.keys.compactMap { key in AppSession.supportedKeys.contains(key) ? session.schema.settings.first { $0.key == key } : nil }
@@ -94,7 +94,10 @@ struct PrayerCustomizeView: View {
         case "riwaq": return session.bool("salah.showMosqueStreak") ? "سلسلة الجماعة ظاهرة" : "سلسلة الجماعة مخفية"
         case "log": return session.bool("salah.askHeart") ? "اسألني عن القلب" : "بلا سؤال القلب"
         case "times": return label("salah.method") + " · " + label("salah.asr")
-        default: return session.bool("salah.askReminder") ? "بعد الأذان بـ " + PrayerCopy.minutes(Int(session.number("salah.askAfterAdhanMin")), digits: .init(style: session.string("core.numerals") == "western" ? .western : .hindi)) : "بلا تذكير"
+        default:
+            let digits = MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)
+            if session.bool("salah.beforeReminder") { return "قبل الأذان بـ " + PrayerCopy.minutes(Int(session.number("salah.beforeAdhanMin")), digits: digits) }
+            return session.bool("salah.askReminder") ? "بعد الأذان بـ " + PrayerCopy.minutes(Int(session.number("salah.askAfterAdhanMin")), digits: digits) : "بلا تذكير"
         }
     }
     private var changedCount: Int {
@@ -336,7 +339,7 @@ struct PrayerCustomizeView: View {
                     Button("اسمح بالموقع لكشف السفر") { askedLocation = true; travelLocator.askForLocation() }
                         .frame(minHeight: 44).accessibilityIdentifier("prayer-travel-location-request")
                 }
-                if group.id == "remind" && session.bool("salah.askReminder") && !session.notificationsAuthorized {
+                if group.id == "remind" && (session.bool("salah.askReminder") || session.bool("salah.beforeReminder")) && !session.notificationsAuthorized {
                     Divider().overlay(theme.ink.opacity(0.1))
                     Text(session.notificationPermissionTitle).font(PrayerHomeType.body)
                     if session.canRequestNotificationPermission {

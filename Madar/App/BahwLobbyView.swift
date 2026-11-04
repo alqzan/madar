@@ -145,6 +145,9 @@ struct BahwLobbyView: View {
         guard !arranging, !drawerOpen, attention == nil, session.selectedTab == "foundation" else { return }
         var value = service.attention()
         #if DEBUG
+        // UI tests drive the lobby behind a fixed clock and a fresh store; the sheet is opened there only on request (`MADAR_UI_ATTENTION=1`).
+        let environment = ProcessInfo.processInfo.environment
+        if !force, environment["MADAR_UI_STORE_ID"] != nil && environment["MADAR_UI_ATTENTION"] != "1" && environment["MADAR_UI_ATTENTION_SAMPLE"] != "1" { return }
         // Screenshot sample for the simulator only (`SIMCTL_CHILD_MADAR_UI_ATTENTION_SAMPLE=1`); never reads or writes real data.
         if ProcessInfo.processInfo.environment["MADAR_UI_ATTENTION_SAMPLE"] == "1" {
             let today = service.today

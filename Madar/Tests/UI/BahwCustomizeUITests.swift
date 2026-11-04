@@ -51,7 +51,7 @@ import XCTest
             let customize = app.buttons["tab-customize"]
             XCTAssertTrue(customize.waitForExistence(timeout: 15), app.debugDescription); customize.tap()
             let search = app.textFields["settings-search"]
-            XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("bahw.reminder\n")
+            XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription); search.tap(); search.typeText("bahw.reminder\n")
         }
         func waitSelected(_ element: XCUIElement) {
             let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: element)
@@ -59,10 +59,11 @@ import XCTest
         }
         openReminderSettings()
         let dot = app.buttons["option-bahw.reminder-dot"], push = app.buttons["option-bahw.reminder-push"]
-        XCTAssertTrue(dot.waitForExistence(timeout: 10), app.debugDescription); XCTAssertTrue(dot.isSelected)
-        push.tap(); waitSelected(push)
+        XCTAssertTrue(dot.waitForExistence(timeout: 10), app.debugDescription); XCTAssertTrue(push.isSelected, "a new habit's reminder starts as a gentle notification (owner, 4 Nov 2026)")
+        dot.tap(); waitSelected(dot)
         let undo = app.buttons["undo-button"]
-        XCTAssertTrue(undo.waitForExistence(timeout: 10)); undo.tap(); waitSelected(dot)
+        XCTAssertTrue(undo.waitForExistence(timeout: 10)); undo.tap(); waitSelected(push)
+        dot.tap(); waitSelected(dot)
         push.tap(); waitSelected(push)
         capture(app, "OR-03-habit-reminder-settings-L")
         app.terminate(); app.launch(); finishOnboarding(app); openReminderSettings(); waitSelected(push)

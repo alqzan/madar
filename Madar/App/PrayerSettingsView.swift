@@ -108,7 +108,7 @@ struct PrayerSettingsView: View {
         case "الرواق والميزان": keys = ["salah.pool", "salah.balanceView", "salah.fridayTallArch", "salah.showMosqueStreak"]
         case "التسجيل": keys = ["salah.askHeart", "salah.pendingDays"]
         case "المواقيت": keys = ["salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "salah.travelShortenCombine"]
-        default: keys = ["salah.askAfterAdhanMin", "salah.askReminder", "salah.qadaReminder", "salah.liveActivity"]
+        default: keys = ["salah.beforeReminder", "salah.beforeAdhanMin", "salah.askAfterAdhanMin", "salah.askReminder", "salah.qadaReminder", "salah.liveActivity"]
         }
         return keys.compactMap { key in state.supportedKeys.contains(key) ? state.definitions.first(where: { $0.key == key }) : nil }
     }

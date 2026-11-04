@@ -363,7 +363,7 @@ import MadarCore
             let letter = Letter(); letter.text = secret; letter.triggerKind = "date"; letter.triggerValue = "2026-10-15"; context.insert(letter)
             try context.save(); try app.reload()
             let candidates = try RoomNotificationContent.candidates(session: app, prayerDays: [day], now: now).filter { $0.id.hasPrefix("notes.") }
-            XCTAssertEqual(Set(candidates.map(\.id)), ["notes.2026-10-15.niyya", "notes.2026-10-15.letter", "notes.2026-10-15.onThisDay"], lock)
+            XCTAssertEqual(Set(candidates.map(\.id)), ["notes.2026-10-15.niyya", "notes.2026-10-15.letter", "notes.2026-10-15.onThisDay", "notes.2026-10-15.line"], lock)
             XCTAssertEqual(candidates.first { $0.id.hasSuffix(".niyya") }?.dueAt, day.fajr.addingTimeInterval(1800))
             XCTAssertEqual(candidates.first { $0.id.hasSuffix(".onThisDay") }?.dueAt, day.isha.addingTimeInterval(1800))
             let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
@@ -375,15 +375,27 @@ import MadarCore
             }
             if lock == "none" {
                 XCTAssertEqual(candidates.map { RoomNotificationContent.content(for: $0, plan: plan, session: app, habitNames: [:]).body }.sorted(),
-                               ["عندك ذكرى من هذا اليوم", "ما نيّتك لهذا اليوم؟ سطر واحد يكفي", "وصلتك رسالة من ماضيك"].sorted())
+                               ["عندك ذكرى من هذا اليوم", "ما نيّتك لهذا اليوم؟ سطر واحد يكفي", "وصلتك رسالة من ماضيك", "كيف كان يومك؟ سطر واحد يكفي"].sorted())
             }
         }
+    }
+
+    func testTheEveningLineReminderWaitsForNothingWrittenAndStopsWhenALineArrives() throws {
+        let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight")])
+        let line = try XCTUnwrap(try RoomNotificationContent.candidates(session: app, prayerDays: [day], now: now).first { $0.id == "notes.2026-10-15.line" }, "nothing is written for today")
+        XCTAssertEqual(line.dueAt, day.isha.addingTimeInterval(1800), "after Isha's sanctity window ends")
+        XCTAssertTrue(try RoomNotificationContent.stillRelevant(line.id, session: app, now: now))
+        let context = ModelContext(app.container)
+        let entry = Entry(); entry.dayKey = "2026-10-15"; entry.text = "سطر"; entry.eventAt = now; context.insert(entry)
+        try context.save(); try app.reload()
+        XCTAssertFalse(try RoomNotificationContent.candidates(session: app, prayerDays: [day], now: now).contains { $0.id == "notes.2026-10-15.line" }, "a line was written")
+        XCTAssertFalse(try RoomNotificationContent.stillRelevant(line.id, session: app, now: now), "a pending reminder is dropped once the day has a line")
     }
 
     func testDiaryCapZeroAndOffSettingsScheduleNoDiaryReminder() throws {
         let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight"), "notes.dailyCap": .number(0)])
         XCTAssertFalse(try RoomNotificationContent.candidates(session: app, prayerDays: [day], now: now).contains { $0.id.hasPrefix("notes.") })
-        let (quiet, _, _, _) = try fixture(["core.dayStart": .string("midnight"), "notes.morningNiyya": .bool(false), "notes.onThisDay": .string("off")])
+        let (quiet, _, _, _) = try fixture(["core.dayStart": .string("midnight"), "notes.morningNiyya": .bool(false), "notes.eveningLine": .bool(false), "notes.onThisDay": .string("off")])
         XCTAssertFalse(try RoomNotificationContent.candidates(session: quiet, prayerDays: [day], now: now).contains { $0.id.hasPrefix("notes.") }, "no letter, no intention, no memory")
     }
 }

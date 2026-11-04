@@ -179,8 +179,13 @@ import MadarPrayer
         let letters = try context.fetch(FetchDescriptor<Letter>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.openedAt == nil }))
         var result: [NotificationCandidate] = []
         for day in prayerDays where day.day >= today {
+            let dayKey = day.day.description
             if session.bool("notes.morningNiyya"), !intentions.contains(day.day.description),
                let candidate = RoomReminders.diary(.niyya, day: day, time: .afterFajr, prayerDays: prayerDays, now: now) { result.append(candidate) }
+            // The day's line: one reminder after Isha while nothing is written for that day; it is dropped at delivery if a line arrives first.
+            if session.bool("notes.eveningLine"),
+               try context.fetchCount(FetchDescriptor<Entry>(predicate: #Predicate { $0.dayKey == dayKey && $0.deletedAt == nil && $0.mergedInto == nil })) == 0,
+               let candidate = RoomReminders.diary(.line, day: day, time: .afterIsha, prayerDays: prayerDays, now: now) { result.append(candidate) }
             let letterDue = letters.contains { letter in
                 letter.state == DiaryLetterState.eligible.rawValue ? day.day == today
                     : letter.state == DiaryLetterState.sealed.rawValue && letter.triggerKind == DiaryLetterTrigger.date.rawValue && letter.triggerValue == day.day.description
@@ -252,6 +257,7 @@ import MadarPrayer
             content.title = protected ? "مدار" : "المذكرات"
             content.body = protected ? "لديك رسالة في مدار"
                 : id.hasSuffix(".niyya") ? "ما نيّتك لهذا اليوم؟ سطر واحد يكفي"
+                : id.hasSuffix(".line") ? "كيف كان يومك؟ سطر واحد يكفي"
                 : id.hasSuffix(".letter") ? "وصلتك رسالة من ماضيك" : "عندك ذكرى من هذا اليوم"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "notes"]
         } else if id.hasPrefix("mal.card") {
@@ -302,7 +308,7 @@ import MadarPrayer
         if id.hasPrefix("mal.billDue.") { return "billDue" }
         if id.hasPrefix("mal.zakat.") { return "zakat" }
         if id.hasPrefix("mal.reconcile.") { return "reconciliation" }
-        if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "niyya" : id.hasSuffix(".letter") ? "letter" : "onThisDay" }
+        if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "niyya" : id.hasSuffix(".line") ? "line" : id.hasSuffix(".letter") ? "letter" : "onThisDay" }
         return "nudge"
     }
 
@@ -328,6 +334,10 @@ import MadarPrayer
             if id.hasSuffix(".niyya") {
                 guard session.bool("notes.morningNiyya") else { return false }
                 return try ModelContext(session.container).fetchCount(FetchDescriptor<Niyya>(predicate: #Predicate { $0.dayKey == dayKey && $0.deletedAt == nil })) == 0
+            }
+            if id.hasSuffix(".line") {
+                guard session.bool("notes.eveningLine") else { return false }
+                return try ModelContext(session.container).fetchCount(FetchDescriptor<Entry>(predicate: #Predicate { $0.dayKey == dayKey && $0.deletedAt == nil && $0.mergedInto == nil })) == 0
             }
             return id.hasSuffix(".letter") || session.string("notes.onThisDay") != "off"
         }

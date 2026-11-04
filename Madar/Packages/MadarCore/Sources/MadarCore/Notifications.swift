@@ -1,6 +1,9 @@
 import Foundation
 
-public enum NotificationKind: String, Codable, Sendable { case reminder, annualReminder, prayerAsk, digest, openApp }
+public enum NotificationKind: String, Codable, Sendable { case reminder, annualReminder, prayerAsk, prayerBefore, digest, openApp
+    /// The prayer lane: exempt from the daily budget and the digest, always placed by the single sanctity guard.
+    public var isPrayerLane: Bool { self == .prayerAsk || self == .prayerBefore }
+}
 public struct NotificationCandidate: Codable, Equatable, Sendable {
     public let id: String
     public let room: Room
@@ -32,7 +35,7 @@ public struct NotificationPolicy: Sendable {
     public let staleNudgeEnabled: Bool
     public let notesDailyCap: Int
     public let dayBoundary: DayBoundary
-    public init(dailyBudget: Int = 4, priority: [Room] = [.salah, .quran, .mal, .notes, .habits, .mihbara], quietFromMinutes: Int? = nil, quietUntil: QuietEnd = .midnight, digestEnabled: Bool = true, thisDeviceRemindersEnabled: Bool = true, staleNudgeEnabled: Bool = true, notesDailyCap: Int = 2, dayBoundary: DayBoundary = .fajr) {
+    public init(dailyBudget: Int = 4, priority: [Room] = [.quran, .habits, .notes, .salah, .mal, .mihbara], quietFromMinutes: Int? = nil, quietUntil: QuietEnd = .midnight, digestEnabled: Bool = true, thisDeviceRemindersEnabled: Bool = true, staleNudgeEnabled: Bool = true, notesDailyCap: Int = 2, dayBoundary: DayBoundary = .fajr) {
         self.dailyBudget = min(10, max(1, dailyBudget)); self.priority = priority
         self.quietFromMinutes = quietFromMinutes.map { min(1439, max(0, $0)) }; self.quietUntil = quietUntil; self.digestEnabled = digestEnabled
         self.thisDeviceRemindersEnabled = thisDeviceRemindersEnabled; self.staleNudgeEnabled = staleNudgeEnabled
@@ -112,6 +115,13 @@ public enum NotificationArbiter {
         let due = SanctityGuard(windows: sanctityWindows ?? windows).clamp(proposed)
         return .init(id: "salah.\(day.day).\(prayer.rawValue)", room: .salah, kind: .prayerAsk, dueAt: due, dayKey: day.day.description)
     }
+    /// «قبل الأذان بـ N دقيقة». From the adhan to the end of the sanctity window nothing reaches the user (RP3), so the prayer-time
+    /// alert comes before the adhan and is never moved later: a time the guard would shift (inside the previous prayer's window) is dropped.
+    public static func prayerBefore(day: PrayerDay, prayer: Prayer, minutesBefore: Int, sanctityWindows: [SanctityWindow]? = nil) -> NotificationCandidate? {
+        let due = day.time(for: prayer).addingTimeInterval(-Double(max(1, minutesBefore)) * 60)
+        guard SanctityGuard(windows: sanctityWindows ?? day.sanctityWindows).clamp(due) == due else { return nil }
+        return .init(id: "salah.\(day.day).\(prayer.rawValue).before", room: .salah, kind: .prayerBefore, dueAt: due, dayKey: day.day.description)
+    }
     public static func plan(candidates: [NotificationCandidate], prayerDays: [PrayerDay], now: Date, timeZone: TimeZone, policy: NotificationPolicy = .init(), existingPendingCount: Int = 0, deliveredCategoryCycles: Set<String> = [], disabledIDs: Set<String> = [], submittedBudgetByDay: [String: Int] = [:], submittedNotesByDay: [String: Int] = [:], sanctityWindows: [SanctityWindow]? = nil) -> NotificationPlan {
         guard policy.thisDeviceRemindersEnabled else { return .init(scheduled: [], droppedIDs: candidates.map(\.id), digestedIDs: []) }
         let windows = (sanctityWindows ?? prayerDays.flatMap(\.sanctityWindows)).sorted { $0.start < $1.start }
@@ -129,12 +139,17 @@ public enum NotificationArbiter {
         }
         for candidate in candidates.sorted(by: ordering) {
             guard ids.insert(candidate.id).inserted else { continue }
-            guard !disabledIDs.contains(candidate.id), candidate.kind == .reminder || candidate.kind == .annualReminder || candidate.kind == .prayerAsk else { dropped.append(candidate.id); continue }
-            let horizon = candidate.kind == .prayerAsk ? prayerEnd : candidate.kind == .annualReminder ? annualEnd : ordinaryEnd
+            guard !disabledIDs.contains(candidate.id), candidate.kind == .reminder || candidate.kind == .annualReminder || candidate.kind.isPrayerLane else { dropped.append(candidate.id); continue }
+            let horizon = candidate.kind.isPrayerLane ? prayerEnd : candidate.kind == .annualReminder ? annualEnd : ordinaryEnd
             guard candidate.dueAt >= now, candidate.dueAt <= horizon else { dropped.append(candidate.id); continue }
             let due = sanctityGuard.clamp(candidate.dueAt)
             guard due <= horizon else { dropped.append(candidate.id); continue }
             let shifted = NotificationCandidate(id: candidate.id, room: candidate.room, kind: candidate.kind, dueAt: due, dayKey: candidate.dayKey, categoryCycleKey: candidate.categoryCycleKey)
+            if candidate.kind == .prayerBefore {
+                // Never shifted: a guard move would carry it past its own adhan. The owner's quiet hours still win (explicit mute).
+                guard due == candidate.dueAt, !isQuiet(due, timeZone: timeZone, policy: policy, prayerDays: prayerDays) else { dropped.append(candidate.id); continue }
+                scheduled.append(shifted); continue
+            }
             if candidate.kind == .prayerAsk { scheduled.append(shifted); continue }
             guard !isQuiet(due, timeZone: timeZone, policy: policy, prayerDays: prayerDays) else { dropped.append(candidate.id); continue }
             let key = madarKey(at: due, prayerDays: prayerDays, timeZone: timeZone, boundary: policy.dayBoundary)
@@ -183,7 +198,7 @@ public enum NotificationArbiter {
         var finalBudget: [String: Int] = [:]
         var retained: [NotificationCandidate] = []
         for request in scheduled.sorted(by: ordering) {
-            if request.kind == .prayerAsk { retained.append(request); continue }
+            if request.kind.isPrayerLane { retained.append(request); continue }
             let actualKey = madarKey(at: request.dueAt, prayerDays: prayerDays, timeZone: timeZone, boundary: policy.dayBoundary)
             let available = max(0, policy.dailyBudget - max(0, submittedBudgetByDay[actualKey, default: 0]))
             guard finalBudget[actualKey, default: 0] < available else { dropped.append(request.id); continue }
@@ -193,7 +208,7 @@ public enum NotificationArbiter {
         scheduled = retained
         // J10 preserves room budget slots and removes the most distant prayer asks first.
         while scheduled.count > capacity {
-            let index = scheduled.indices.filter { scheduled[$0].kind == .prayerAsk }.max(by: { scheduled[$0].dueAt < scheduled[$1].dueAt })
+            let index = scheduled.indices.filter { scheduled[$0].kind.isPrayerLane }.max(by: { scheduled[$0].dueAt < scheduled[$1].dueAt })
                 ?? scheduled.indices.max(by: { scheduled[$0].dueAt < scheduled[$1].dueAt })!
             dropped.append(scheduled.remove(at: index).id)
         }

@@ -79,7 +79,7 @@ struct CustomizeMadar: View {
                     ForEach(sections, id: \.self) { section in
                         SettingsSection(title: section, symbol: symbols[section] ?? "slider.horizontal.3", definitions: filtered.filter { sectionFor($0.key) == section }, session: session, searching: !query.isEmpty, highlightedSettingKey: highlightedSettingKey)
                     }
-                    if sections.contains("الإشعارات") && session.bool("salah.askReminder") && !session.notificationsAuthorized {
+                    if sections.contains("الإشعارات") && (session.bool("salah.askReminder") || session.bool("salah.beforeReminder")) && !session.notificationsAuthorized {
                         MadarCard {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text(session.notificationPermissionTitle).font(MadarTypography.body())
@@ -222,7 +222,7 @@ func sectionFor(_ key: String) -> String {
     if ["salah.showMosqueStreak", "salah.askHeart"].contains(key) { return "الصلاة" }
     if key == "core.faceIDLock" { return "الخصوصية" }
     if key == "core.spotlightIndex" { return "البحث" }
-    if ["salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil"].contains(key) { return "الإشعارات" }
+    if ["salah.beforeReminder", "salah.beforeAdhanMin", "notes.eveningLine", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil"].contains(key) { return "الإشعارات" }
     return "المظهر"
 }
 func normalized(_ text: String) -> String {

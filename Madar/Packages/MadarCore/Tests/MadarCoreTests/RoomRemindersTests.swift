@@ -155,6 +155,7 @@ import Testing
 
     @Test func budgetOfFourSendsThreeAndOneDigestThatKnowsItsMembers() {
         // Five room requests on one Madar day, B = 4: the first B − 1 by priority then time, the rest in a digest.
+        // Default priority (owner, 4 Nov 2026): Quran, habits, diary, prayer, money, Mihbara — what is lost with time first, so the qada reminder waits in the digest.
         let at = { (minutes: Double) in day.dhuhr.addingTimeInterval(3600 + minutes * 60) }
         let candidates: [NotificationCandidate] = [
             RoomReminders.qada(days: [day], time: .afterFajr, owed: 2, now: dawn)[0],
@@ -165,9 +166,9 @@ import Testing
         ]
         let plan = NotificationArbiter.plan(candidates: candidates, prayerDays: [day], now: dawn, timeZone: ActivePlace.riyadh.timeZone,
                                             policy: .init(dailyBudget: 4, staleNudgeEnabled: false))
-        #expect(plan.scheduled.filter { $0.kind == .reminder }.map(\.id) == ["qada.2026-10-09", "quran.2026-10-09.wird", "quran.2026-10-09.late"])
+        #expect(plan.scheduled.filter { $0.kind == .reminder }.map(\.id) == ["quran.2026-10-09.wird", "quran.2026-10-09.late", "habits.2026-10-09.a"])
         #expect(plan.scheduled.filter { $0.kind == .digest }.map(\.id) == ["digest.2026-10-09"])
-        #expect(plan.digestMembers["digest.2026-10-09"] == ["habits.2026-10-09.a", "habits.2026-10-09.b"])
+        #expect(plan.digestMembers["digest.2026-10-09"] == ["habits.2026-10-09.b", "qada.2026-10-09"])
     }
 
     // §7.3: the intention card after Fajr, «في مثل هذا اليوم» after Isha by default; §8 item 8 ids and the notes cap of 2.

@@ -27,7 +27,7 @@ public enum RoomReminders {
 
     /// V12 diary kinds (§8 item 8 ids `notes.<dayKey>.<kind>`). Each falls when the anchor prayer's
     /// sanctity ends; the arbiter applies the shared budget and `notes.dailyCap`. The copy never carries diary text.
-    public enum DiaryKind: String, Sendable { case niyya, onThisDay, letter }
+    public enum DiaryKind: String, Sendable { case niyya, onThisDay, letter, line }
     public static func diary(_ kind: DiaryKind, day: PrayerDay, time: QadaTime, prayerDays: [PrayerDay], now: Date) -> NotificationCandidate? {
         guard time != .off else { return nil }
         let due = SanctityGuard(prayerDays: prayerDays).clamp(time == .afterIsha ? day.isha : day.fajr)

@@ -510,3 +510,57 @@ func quietCutoffFollowsTheWallClock() throws {
     let digest = try #require(plan.scheduled.first { $0.kind == .digest })
     #expect(cal.dateComponents([.hour, .minute], from: digest.dueAt) == DateComponents(hour: 21, minute: 45))
 }
+
+// Owner, 4 Nov 2026: the prayer-time alert is a reminder BEFORE the adhan (nothing may arrive from adhan to the end of the sanctity window, RP3).
+@Test("Before-adhan reminder: adhan minus N for all five, outside the budget and the digest")
+func prayerBeforeReminders() throws {
+    let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
+    let adhans: [Prayer: Date] = [.fajr: day.fajr, .dhuhr: day.dhuhr, .asr: day.asr, .maghrib: day.maghrib, .isha: day.isha]
+    let before = Prayer.allCases.compactMap { NotificationArbiter.prayerBefore(day: day, prayer: $0, minutesBefore: 10) }
+    #expect(before.count == 5)
+    for item in before {
+        let prayer = try #require(Prayer.allCases.first { item.id == "salah.2026-10-09.\($0.rawValue).before" })
+        #expect(item.dueAt == adhans[prayer]!.addingTimeInterval(-600))
+        #expect(item.kind == .prayerBefore && item.room == .salah)
+    }
+    // Four room reminders fill the whole daily budget; five before-adhan reminders are still all scheduled and nothing is digested.
+    let now = try instant(hour: 0)
+    let rooms = (0..<4).map { NotificationCandidate(id: "quran.r\($0)", room: .quran, dueAt: day.fajr.addingTimeInterval(Double($0 + 1) * 3600), dayKey: day.day.description) }
+    let plan = NotificationArbiter.plan(candidates: before + rooms, prayerDays: [day], now: now, timeZone: zone, policy: .init(dailyBudget: 4, staleNudgeEnabled: false))
+    #expect(plan.scheduled.filter { $0.kind == .prayerBefore }.count == 5)
+    #expect(plan.scheduled.filter { $0.kind == .reminder }.count == 4)
+    #expect(plan.digestedIDs.isEmpty)
+    // None of the scheduled instants lies inside a sanctity window.
+    let guardian = SanctityGuard(prayerDays: [day])
+    #expect(plan.scheduled.allSatisfy { guardian.clamp($0.dueAt) == $0.dueAt })
+}
+
+@Test("Before-adhan reminder is dropped, never moved later, when the guard would move it")
+func prayerBeforeNeverShifts() throws {
+    let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
+    // A window that ends 5 minutes before Dhuhr's adhan covers the instant 10 minutes before it.
+    let covering = SanctityWindow(prayer: .asr, adhan: day.dhuhr.addingTimeInterval(-40 * 60), durationMinutes: 35)
+    #expect(NotificationArbiter.prayerBefore(day: day, prayer: .dhuhr, minutesBefore: 10, sanctityWindows: day.sanctityWindows + [covering]) == nil)
+    let inside = NotificationCandidate(id: "salah.2026-10-09.dhuhr.before", room: .salah, kind: .prayerBefore, dueAt: day.dhuhr.addingTimeInterval(-600), dayKey: "2026-10-09")
+    let plan = NotificationArbiter.plan(candidates: [inside], prayerDays: [day], now: try instant(hour: 0), timeZone: zone, policy: .init(staleNudgeEnabled: false),
+                                        sanctityWindows: day.sanctityWindows + [covering])
+    #expect(plan.scheduled.isEmpty && plan.droppedIDs == ["salah.2026-10-09.dhuhr.before"])
+}
+
+@Test("Before-adhan reminder obeys the owner's own quiet hours")
+func prayerBeforeQuiet() throws {
+    let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
+    let fajr = try #require(NotificationArbiter.prayerBefore(day: day, prayer: .fajr, minutesBefore: 10))
+    let dhuhr = try #require(NotificationArbiter.prayerBefore(day: day, prayer: .dhuhr, minutesBefore: 10))
+    let policy = NotificationPolicy(quietFromMinutes: 21 * 60 + 30, quietUntil: .fajr, staleNudgeEnabled: false)
+    let plan = NotificationArbiter.plan(candidates: [fajr, dhuhr], prayerDays: [day], now: try instant(hour: 0), timeZone: zone, policy: policy)
+    #expect(plan.droppedIDs == [fajr.id], "quiet runs until Fajr, so the reminder before Fajr is silenced")
+    #expect(plan.scheduled.map(\.id) == [dhuhr.id])
+    let open = NotificationArbiter.plan(candidates: [fajr], prayerDays: [day], now: try instant(hour: 0), timeZone: zone, policy: .init(staleNudgeEnabled: false))
+    #expect(open.scheduled.map(\.id) == [fajr.id], "with no quiet hours (the default) the Fajr reminder is scheduled")
+}
+
+@Test("Default room priority puts what is lost with time first")
+func defaultRoomPriority() {
+    #expect(NotificationPolicy().priority == [.quran, .habits, .notes, .salah, .mal, .mihbara])
+}
