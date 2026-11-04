@@ -30,9 +30,8 @@ extension AppBahwService {
         var result = BahwAttention()
         if session.roomEnabled(.salah), let snapshot = try? session.prayerSnapshot(at: now) {
             let pending = Set(snapshot.pending)
-            // The window still open is not «missed» yet: only prayers whose time has ended are listed (RP1: nothing becomes missed by itself).
-            let open = snapshot.history.flatMap(\.cells).filter { ($0.prayerTime ?? .distantFuture) <= now }.max { ($0.prayerTime ?? .distantPast) < ($1.prayerTime ?? .distantPast) }?.reference
-            let closed = snapshot.history.flatMap(\.cells).filter { pending.contains($0.reference) && $0.canLog && $0.time != nil && $0.reference != open }
+            // Only prayers whose window has really ended are listed (`canMarkMissed`: Fajr until sunrise, the others until the next adhan; RP1/RP2: nothing becomes «missed» by itself).
+            let closed = snapshot.history.flatMap(\.cells).filter { pending.contains($0.reference) && $0.canLog && $0.canMarkMissed && $0.time != nil }
             var references = snapshot.unconfirmed
             for cell in closed where !references.contains(cell.reference) { references.append(cell.reference) }
             let fridays = snapshot.unconfirmedFridayNoon.union(closed.filter { $0.isFriday && $0.reference.prayer == .dhuhr }.map(\.reference))

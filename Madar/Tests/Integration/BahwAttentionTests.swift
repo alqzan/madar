@@ -33,6 +33,17 @@ import MadarData
         XCTAssertFalse(ids.contains("2026-10-15.asr"), "Asr has not come yet")
     }
 
+    func testFajrIsListedOnlyAfterSunriseAndNotBeforeTheNextAdhan() throws {
+        let app = try session(trackingStart: "2026-10-14")
+        let beforeSunrise = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-15T05:30:00+03:00"))
+        let morning = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-15T09:00:00+03:00"))
+        let early = Set(AppBahwService(session: app, evaluationDate: beforeSunrise).attention().prayers.map(\.id))
+        XCTAssertFalse(early.contains("2026-10-15.fajr"), "Fajr's window runs until sunrise")
+        let late = Set(AppBahwService(session: app, evaluationDate: morning).attention().prayers.map(\.id))
+        XCTAssertTrue(late.contains("2026-10-15.fajr"), "after sunrise and before Dhuhr, an unlogged Fajr has closed")
+        XCTAssertFalse(late.contains("2026-10-15.dhuhr"), "Dhuhr has not come yet")
+    }
+
     func testAShownSetIsNotShownAgainUntilItChanges() throws {
         UserDefaults.standard.removeObject(forKey: BahwAttentionMemory.key)
         defer { UserDefaults.standard.removeObject(forKey: BahwAttentionMemory.key) }
