@@ -170,14 +170,8 @@ import MadarPrayer
         let errors = open.map { value in QuranUIErrorSpot(id: Self.spotID(value.key),
             title: catalog.ayah(id: value.key.ayahID).map { $0.surahNameArabic + " " + numerals.string($0.ayahNumber) } ?? "",
             detail: value.key.wordIndex == nil ? "الآية كاملة" : "موضع كلمة", isToday: todayKeys.contains(value.key), closed: !value.isOpen, canDrill: true) }
-        var amounts: [String: String] = [:]
-        if let plan = snapshot.plan {
-            let reader = try repository()
-            for level in QuranDayLevel.allCases {
-                let preview = try reader.snapshot(at: evaluatedAt, previewHifzLevel: level)
-                amounts[level.rawValue] = try memorizationAmount(preview.hifz, unit: plan.plan.unit, catalog: catalog)
-            }
-        }
+        // The four level previews each rebuild a whole snapshot; they fill in after the first paint (`hifzAmounts(for:)`).
+        let amounts: [String: String] = [:]
         return QuranRoomState(coverageTitle: coverageTitle, coverageFraction: Double(completed) / 604,
             percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), hifzAmounts: amounts, streakDays: streak.days, balanceTitle: balance,
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: (QuranUILevel(rawValue: snapshot.hifzLevel.rawValue) ?? .simple),
@@ -202,6 +196,17 @@ import MadarPrayer
         case .cancelRecovery: try await command("quran.cancelRecovery")
         case .raisePages(let juz): try await command("quran.raisePages", ["juz": .number(Double(juz))])
         }
+    }
+    /// What each day level asks for today, in the plan's own unit; one preview snapshot per level.
+    func hifzAmounts(for unit: QuranUIUnit) throws -> [String: String] {
+        guard let hifzUnit = QuranHifzUnit(rawValue: unit.rawValue) else { return [:] }
+        let evaluatedAt = clock(), reader = try repository(), catalog = try QuranResources.catalog()
+        var amounts: [String: String] = [:]
+        for level in QuranDayLevel.allCases {
+            let preview = try reader.snapshot(at: evaluatedAt, previewHifzLevel: level)
+            amounts[level.rawValue] = try memorizationAmount(preview.hifz, unit: hifzUnit, catalog: catalog)
+        }
+        return amounts
     }
     func previewPlan(_ input: QuranUIPlanInput) async throws -> QuranUIForecast {
         try await previewPlan(input, at: nil)

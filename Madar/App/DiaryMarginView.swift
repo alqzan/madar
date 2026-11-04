@@ -92,9 +92,9 @@ struct DiaryMarginView: View {
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
     @ViewBuilder private var photo: some View {
-        if let data = page.photo, let image = UIImage(data: data) {
+        if let data = page.photo {
             VStack(spacing: 6) {
-                Image(uiImage: image).resizable().scaledToFill().frame(width: 110, height: 112).clipped()
+                DiaryDataThumbnail(data: data, maxPixel: 330) { $0.resizable().scaledToFill().frame(width: 110, height: 112).clipped() }.frame(width: 110, height: 112)
                 if let place = page.place { Text(place).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")) }
             }.padding(7).background(theme.surface).shadow(color: theme.ink.opacity(0.14), radius: 4, y: 4)
                 .rotationEffect(.degrees(5))

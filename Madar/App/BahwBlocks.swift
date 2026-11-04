@@ -17,6 +17,9 @@ struct BahwBlockView: View {
     @State private var mihbaraLocked = true
     @State private var habitPeriod: HabitFrequency?
     @State private var completionInFlight: Set<UUID> = []
+    /// The prayer history is recomputed to find the next prayer: once per minute and per committed prayer write, not per redraw.
+    private final class PrayerCache { var key: [Int] = []; var model: BahwPrayerModel? }
+    @State private var prayerCache = PrayerCache()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.roomTheme) private var lobby
@@ -393,8 +396,13 @@ struct BahwBlockView: View {
     }
 
     // MARK: prayer
+    private func cachedPrayer() -> BahwPrayerModel? {
+        let key = [Int(service.now.timeIntervalSince1970 / 60), service.session.prayerRevision]
+        if prayerCache.key != key { prayerCache.model = service.prayer(); prayerCache.key = key }
+        return prayerCache.model
+    }
     @ViewBuilder private var salah: some View {
-        if let model = service.prayer() {
+        if let model = cachedPrayer() {
             if size == .icon {
                 VStack(spacing: 2) { Text(model.nextName ?? "الصلاة").font(small).foregroundStyle(room.secondaryInk); Text(model.nextTime ?? "").font(big).minimumScaleFactor(0.6) }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

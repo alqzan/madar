@@ -1,4 +1,5 @@
 import SwiftUI
+import ImageIO
 import AVFoundation
 import Observation
 import QuickLook
@@ -169,4 +170,25 @@ private struct DiaryTranscriptEditor: View {
         }
     }
     func stop() { ticker?.cancel(); ticker = nil; player?.stop(); player = nil; playing = false; activeID = nil; position = 0 }
+}
+
+/// A small picture of stored photo data: shrunk off the main thread when the row appears, so a list never decodes a full-size photo in `body`.
+struct DiaryDataThumbnail<Content: View>: View {
+    let data: Data
+    var maxPixel: CGFloat = 400
+    @ViewBuilder let content: (Image) -> Content
+    @State private var image: UIImage?
+    var body: some View {
+        Group {
+            if let image { content(Image(uiImage: image)) } else { Color.clear }
+        }.task(id: data.count) {
+            let source = data, side = maxPixel
+            image = await Task.detached(priority: .utility) { () -> UIImage? in
+                let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: side]
+                guard let imageSource = CGImageSourceCreateWithData(source as CFData, nil),
+                      let cg = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) else { return UIImage(data: source) }
+                return UIImage(cgImage: cg)
+            }.value
+        }
+    }
 }

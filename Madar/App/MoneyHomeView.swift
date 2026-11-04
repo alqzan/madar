@@ -440,7 +440,10 @@ struct MoneyHomeView: View {
             if let route = app.moneyRoute { openMoneyRoute(route) }
         }
         catch MoneyCommandError.missingRate { failure = "عندك حساب بعملة غير عملة البيت بلا سعر تحويل، ومدار لا يخمّن الأرقام. افتح «الحسابات» وصحّح عملة الحساب إن كانت خطأ، أو أدخل سعر الصرف من «السفر»."; reading = nil }
-        catch { failure = "تعذّرت قراءة البيانات الآن. أعد المحاولة."; reading = nil }
+        catch {
+            // A passing failure (busy store, locked data) keeps the last good reading on screen; only a first load shows the failure page.
+            if reading == nil { failure = "تعذّرت قراءة البيانات الآن. أعد المحاولة." }
+        }
     }
     private func closeForMoneyRootIfSafe() {
         guard pendingRootRequest, app.moneyRootDraftBlockers.isEmpty else { return }

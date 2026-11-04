@@ -453,7 +453,19 @@ struct QuranHomeView: View {
     private func tool(_ title: String, icon: String, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { VStack(spacing: 8) { Image(systemName: icon).font(.system(size: 18)).frame(height: 24); Text(title).font(bodyFont(11, bold: true)).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, minHeight: 74, alignment: .top).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-tool-" + id)
     }
-    private func refresh() async throws { state = try await service.load() }
+    private func refresh() async throws {
+        let previous = state?.hifzAmounts ?? [:]
+        var loaded = try await service.load()
+        loaded.hifzAmounts = previous
+        state = loaded
+        // Level amounts follow the first paint; the previous ones stay on screen meanwhile.
+        if let unit = loaded.plan?.input.unit {
+            Task {
+                try? await Task.sleep(for: .milliseconds(60))
+                if let amounts = try? service.hifzAmounts(for: unit), state?.plan?.input.unit == unit { state?.hifzAmounts = amounts }
+            }
+        }
+    }
     private func clearIndexRoute() { indexInitialUnit = .surah; indexInitialItemID = nil; indexRouteRequestID = nil }
     private func clearLogRoute() { logInitialTab = .week; logInitialSessionID = nil; logRouteRequestID = nil }
     /// Keep stateful Quran flows open until the user finishes them. Read-only route covers can be

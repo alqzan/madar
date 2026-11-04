@@ -75,8 +75,10 @@ struct DiaryEchoesView: View {
     private func memoryCard(_ page: DiaryDisplayDay, distance: DiaryEchoDistance) -> some View {
         Button { open(page.day) } label: {
             VStack(alignment: .leading, spacing: 0) {
-                if let data = page.photo, let image = UIImage(data: data) {
-                    GeometryReader { geometry in Image(uiImage: image).resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped() }.frame(height: 176)
+                if let data = page.photo {
+                    DiaryDataThumbnail(data: data, maxPixel: 900) { image in
+                        GeometryReader { geometry in image.resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped() }
+                    }.frame(height: 176)
                 }
                 VStack(alignment: .leading, spacing: 12) {
                     Text(page.excerpt).font(DiaryType.writing).lineSpacing(8).lineLimit(4).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)

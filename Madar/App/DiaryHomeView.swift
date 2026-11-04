@@ -441,7 +441,7 @@ struct DiaryHomeView: View {
                                 Text(service.weekday(day.day)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text"))
                             }.frame(minWidth: 35)
                             Text(day.excerpt).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).frame(maxWidth: .infinity, alignment: .leading).multilineTextAlignment(.leading)
-                            if let data = day.photo, let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFill().frame(width: 38, height: 38).clipShape(.rect(cornerRadius: 8)) }
+                            if let data = day.photo { DiaryDataThumbnail(data: data, maxPixel: 120) { $0.resizable().scaledToFill().frame(width: 38, height: 38).clipShape(.rect(cornerRadius: 8)) }.frame(width: 38, height: 38) }
                         }.padding(16)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-recent-" + day.day.description)
                     if day.id != days.last?.id { Divider().overlay(theme.line) }
