@@ -36,7 +36,7 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_PRAYER_FIXTURE": "polarNoTimes",
             "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-06-21T12:00:00+02:00",
-            "MADAR_UI_TRACKING_START": "2026-06-20"]
+            "MADAR_UI_TRACKING_START": "2026-06-20", "MADAR_UI_STYLE_SETTINGS": "salah.askHeart=true"]
         app.launch()
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
@@ -57,7 +57,7 @@ import XCTest
         XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription)
         alone.tap()
         XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
-        // The default heart question keeps the log sheet open after the prayer is saved.
+        // With the heart question switched on, it keeps the log sheet open after the prayer is saved.
         // Finish that real flow before checking or scrolling the home behind it.
         let skipHeart = app.buttons["prayer-heart-skip"]
         XCTAssertTrue(skipHeart.waitForExistence(timeout: 10), app.debugDescription)

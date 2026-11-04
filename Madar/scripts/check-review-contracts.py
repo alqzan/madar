@@ -36,8 +36,8 @@ require((copies[1] / 'data-dictionary.json').read_bytes() == (copies[2] / 'data-
 settings = {row['key']: row for row in json.loads((handoff / 'settings-schema.json').read_text())['settings']}
 for key in ['notes.dictationFirst', 'salah.liveActivity', 'quran.tapForTafsir']:
     require(settings[key]['default'] is False, f'{key} agreed default must be false')
-# Owner, 26 Oct 2026: RP6's [DEFAULT] reverted; the heart question starts on (docs/DECISIONS.md).
-require(settings['salah.askHeart']['default'] is True, 'salah.askHeart owner default must be true')
+# Owner, 4 Nov 2026: the heart question starts off again (docs/DECISIONS.md); 26 Oct had set it on.
+require(settings['salah.askHeart']['default'] is False, 'salah.askHeart owner default must be false (owner, 4 Nov 2026)')
 require(settings['quran.tapForTafsir']['availabilityGate'] == 'M2 licence check', 'RQ8 licence gate missing')
 # Owner, 27 Oct: defined in-app smart suggestions; the calm default is retained.
 require(settings['bahw.smartPresence']['availability'] == 'v1' and settings['bahw.smartPresence']['default'] == 'calm', 'owner smart-presence contract changed')

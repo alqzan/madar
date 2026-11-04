@@ -303,7 +303,7 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
-            "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
+            "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light", "MADAR_UI_STYLE_SETTINGS": "salah.askHeart=true"]
         app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
         let asr = app.descendants(matching: .any).matching(identifier: "prayer-arch-asr").firstMatch
         XCTAssertTrue(asr.waitForExistence(timeout: 10), app.debugDescription)
@@ -312,7 +312,7 @@ import XCTest
         XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(alone.isSelected, "Asr is already logged alone")
         XCTAssertFalse(app.buttons["prayer-status-missed"].exists, "RP2: no «فاتتني» before the window ends")
-        XCTAssertTrue(app.buttons["prayer-heart-present"].exists, "Owner 26 Oct: heart question on by default")
+        XCTAssertTrue(app.buttons["prayer-heart-present"].exists, "Heart question is switched on for this flow (default is off since 4 Nov)")
         for (id, words) in [("distracted", "كنت في وادٍ آخر"), ("present", "عرفت ما أقول"), ("khashi", "وجدت لها أثرًا")] {
             let choice = app.buttons["prayer-heart-" + id]
             XCTAssertTrue(choice.exists)
@@ -320,7 +320,7 @@ import XCTest
         }
         attachScreenshot(app, named: "M1-V02-log-L")
         XCTAssertFalse(app.buttons["prayer-clear"].exists, "«امسح التسجيل» is not a v1 action")
-        // One tap records; with heart on by default the optional question remains open.
+        // One tap records; with the heart question on, the optional question remains open.
         app.buttons["prayer-status-jamaah"].tap()
         let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "جماعة"), object: asr)
         XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 15), .completed, asr.label)
@@ -713,13 +713,14 @@ import XCTest
                 "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
             app.launch(); finishOnboarding(app)
             app.buttons["tab-prayer"].tap()
-            // Owner 26 Oct: the heart question defaults to on; the toggle below confirms it.
+            // Owner 4 Nov: the heart question now defaults to off; this flow turns it on first.
             app.terminate(); app.launch(); finishOnboarding(app)
             app.buttons["tab-customize"].tap()
             let search = app.textFields["settings-search"]
             scrollTo(search, in: app); search.tap(); search.typeText("salah.askHeart\n")
             let toggle = app.switches["setting-salah.askHeart"]
-            scrollTo(toggle, in: app); XCTAssertEqual(toggle.value as? String, "1")
+            scrollTo(toggle, in: app); XCTAssertEqual(toggle.value as? String, "0")
+            toggle.tap(); XCTAssertEqual(toggle.value as? String, "1")
             app.swipeDown(); app.buttons["tab-prayer"].tap()
             let review = app.buttons["prayer-heart-review"]
             // Returning from the sheet can leave this row above the viewport. Scroll toward it,

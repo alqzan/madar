@@ -98,17 +98,20 @@ struct DiaryHubView: View {
                         } else {
                             ProgressView("تُفتح أيامك…")
                         }
-                        Button {
-                            bookOpen = true
-                        } label: {
-                            Label("كتاب السنة", systemImage: "book.closed").font(DiaryType.label).frame(minHeight: 44)
-                        }.accessibilityIdentifier("diary-yearbook")
-                        Button {
-                            exportOpen = true
-                        } label: {
-                            Label("تصدير المذكرات", systemImage: "square.and.arrow.up").font(DiaryType.label).frame(
-                                minHeight: 44)
-                        }.accessibilityIdentifier("diary-export")
+                        // Nothing to bind into a yearbook or export until a day has been written (owner, 4 Nov 2026).
+                        if archive?.days.isEmpty == false {
+                            Button {
+                                bookOpen = true
+                            } label: {
+                                Label("كتاب السنة", systemImage: "book.closed").font(DiaryType.label).frame(minHeight: 44)
+                            }.accessibilityIdentifier("diary-yearbook")
+                            Button {
+                                exportOpen = true
+                            } label: {
+                                Label("تصدير المذكرات", systemImage: "square.and.arrow.up").font(DiaryType.label).frame(
+                                    minHeight: 44)
+                            }.accessibilityIdentifier("diary-export")
+                        }
                     }.padding(18)
                 }
                 .scrollPosition($contentPosition)
@@ -456,7 +459,7 @@ struct DiaryHubView: View {
         let home = try? loaded.get()
         return VStack(alignment: .leading, spacing: 14) {
             Text("رف الذكريات").font(DiaryType.heading)
-            Text(home?.selection.match == .echo ? "أقرب صدى من كتابتك" : "من مثل هذا اليوم").font(DiaryType.label)
+            Text(home?.selection.match == .echo ? "أقرب ما كتبتَه إلى اليوم" : "من مثل هذا اليوم").font(DiaryType.label)
                 .foregroundStyle(theme.color("ink3Text"))
             // A read that failed says so; «لا ذكريات» is only for a day that truly has none.
             if case .failure(let error) = loaded {
@@ -466,7 +469,7 @@ struct DiaryHubView: View {
             } else {
                 timeline(
                     archive.days.filter { home?.selection.days.contains($0.day) == true },
-                    empty: "لا ذكريات لهذا اليوم بعد.")
+                    empty: "حين تكتب في أيام مثل هذا اليوم، تعود إليك صفحاتها هنا مع السنين.")
             }
         }
     }

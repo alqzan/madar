@@ -99,7 +99,7 @@ struct DiaryHomeView: View {
                     // A brand-new diary has no years to switch between: the first-page card below is the only thing to read (owner, 4 Nov).
                     if snapshot.days.contains(where: { $0.photo != nil || $0.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }) {
                     HStack {
-                        Text(snapshot.selection.match == .echo ? "أقرب صدى" : "هذا اليوم عبر السنين").font(DiaryType.heading).lineLimit(1).minimumScaleFactor(0.8)
+                        Text(snapshot.selection.match == .echo ? "أقرب ما كتبتَه إلى اليوم" : "هذا اليوم عبر السنين").font(DiaryType.heading).lineLimit(1).minimumScaleFactor(0.8)
                         Spacer()
                         HStack(spacing: 2) {
                             calendarButton(.gregorian, "بالميلادي")
