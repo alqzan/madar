@@ -490,12 +490,13 @@ struct HabitRingGlyph:View {
 private struct HabitHeroOrbit:View {
     let share:Double; let done:Bool; let moving:Bool; var count:String?
     @Environment(\.roomTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body:some View {
         ZStack {
             Circle().stroke(theme.line.opacity(0.6),lineWidth:1)
             Circle().stroke(theme.line,lineWidth:1).padding(9)
-            TimelineView(.animation(minimumInterval:1/20,paused:!moving)) { context in
-                let angle = moving ? context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy:40)/40*360 : 210
+            TimelineView(.animation(minimumInterval:1/12,paused:!moving || reduceMotion)) { context in
+                let angle = moving && !reduceMotion ? context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy:40)/40*360 : 210
                 Circle().fill(theme.accentFill).frame(width:7,height:7).offset(y:-44).rotationEffect(.degrees(angle))
             }
             HabitRingGlyph(share:share,done:done,symbol:nil,lineWidth:5).padding(19)

@@ -90,6 +90,9 @@ struct MoneyExpenseView: View {
                         Picker("عملة المصروف", selection: $foreign) { Text(service.currencyName(code)).tag(true); Text(service.currencyName(reading.currency)).tag(false) }.pickerStyle(.segmented).accessibilityIdentifier("money-expense-currency")
                         if foreign { Text(reading.tripRate == nil ? "أدخل سعر الرحلة أولًا" : "بعملة البيت " + service.amount(homeMinor)).font(MadarTypography.caption()) }
                     }
+                    if !raw.isEmpty, MoneyAmountInput.minor(raw, exponent: CurrencyExponents.specified.exponent(inputCurrency) ?? 2) == nil {
+                        Text("اكتب مبلغًا صحيحًا، مثل ١٢ أو ١٢٫٥").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
+                    }
                     merchantChips(reading)
                     categorySuggestion(reading)
                     preferredCardSuggestion(reading)

@@ -124,11 +124,11 @@ import MadarPrayer
         let historySessions = snapshot.sessions.reversed().map { fact in
             QuranUIHistorySession(id: fact.id, title: fact.kind == .hifz ? "حفظ" : "مراجعة", dateLabel: displayDate(fact.dayKey),
                 detail: faceCount(fact.pages.count), grades: fact.grades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page),
-                    grade: QuranUIGrade(rawValue: $0.rating.storedRaw)!, explanation: "تقييمك") }, warning: nil)
+                    grade: QuranUIGrade(rawValue: $0.rating.storedRaw) ?? .good, explanation: "تقييمك") }, warning: nil)
         }
         let plan = try snapshot.plan.map { record in
-            let input = QuranUIPlanInput(startAyah: record.plan.startAyah, unit: QuranUIUnit(rawValue: record.plan.unit.rawValue)!, amount: record.plan.amount,
-                rhythm: QuranUIRhythm(rawValue: record.plan.intensity.rawValue)!, restDay: snapshot.restDay.rawValue, missPolicy: record.missPolicy)
+            let input = QuranUIPlanInput(startAyah: record.plan.startAyah, unit: QuranUIUnit(rawValue: record.plan.unit.rawValue) ?? .page, amount: record.plan.amount,
+                rhythm: QuranUIRhythm(rawValue: record.plan.intensity.rawValue) ?? .balanced, restDay: snapshot.restDay.rawValue, missPolicy: record.missPolicy)
             return QuranUIPlan(title: "خطّتك", input: input, forecast: try forecast(input, snapshot: snapshot, at: evaluatedAt),
                 nextAyah: try coverage.frontier(from: record.plan.startAyah) ?? 6236, versionLabel: "الخطة " + numerals.string(record.version))
         }
@@ -180,8 +180,8 @@ import MadarPrayer
         }
         return QuranRoomState(coverageTitle: coverageTitle, coverageFraction: Double(completed) / 604,
             percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), hifzAmounts: amounts, streakDays: streak.days, balanceTitle: balance,
-            balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: QuranUILevel(rawValue: snapshot.hifzLevel.rawValue)!,
-            reviewLevel: QuranUILevel(rawValue: snapshot.reviewLevel.rawValue)!, steps: steps, recentDays: heat, plan: plan, surahs: surahs, draft: draft,
+            balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: (QuranUILevel(rawValue: snapshot.hifzLevel.rawValue) ?? .simple),
+            reviewLevel: (QuranUILevel(rawValue: snapshot.reviewLevel.rawValue) ?? .simple), steps: steps, recentDays: heat, plan: plan, surahs: surahs, draft: draft,
             missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "فاتك وِرد " + app.dateLabels($0, first: .hijri, compact: true, weekday: true).combined },
             summary: ["في صدرك " + coverageTitle], history: QuranUIHistory(weekSummary: [weeklySummary], yearSummary: [], allSummary: [], days: heat, coverage: [], sessions: historySessions),
             strengthTitle: "مؤشر وصفي من تقييمك ومواعيد المراجعة", strength: strength,

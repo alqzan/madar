@@ -749,7 +749,7 @@ struct MihbaraReaderView: View {
     @MainActor private func openPublication() async {
         guard publication == nil, localURL == nil, message == nil else { return }
         do {
-            let data = try AppMihbaraService(app: app).epubData(for: book)
+            let data = try await AppMihbaraService(app: app).epubDataOffMain(for: book)
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent("MadarReader", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let file = directory.appendingPathComponent(UUID().uuidString).appendingPathExtension("epub")

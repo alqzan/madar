@@ -587,7 +587,7 @@ struct PrayerTodayView: View {
         let fridays = snapshot.unconfirmedFridayNoon.union(closed.filter { $0.isFriday && $0.reference.prayer == .dhuhr }.map(\.reference))
         return AnyView(PrayerNoticeRow(
             title: gap.count > 10 ? "فترة لم تُسجَّل فيها صلواتك: " + PrayerCopy.days(Set(gap.map(\.day)).count, digits: digits)
-                    : historical.isEmpty ? PrayerCopy.pending(gap.count, digits: digits) : PrayerCopy.unconfirmed(historical.count, digits: digits),
+                    : historical.isEmpty ? PrayerCopy.pending(gap.count, digits: digits) : PrayerCopy.unconfirmed(gap.count, digits: digits),
             detail: gap.count > 10 ? "لا يلزمك تسجيلها واحدة واحدة: اختر «لم أسجّل هذه الفترة» وتبدأ من اليوم، ولا يُحسب عليك شيء." : "لا تُحسب فائتة إلا باختيارك.",
             action: gap.count > 10 ? "ابدأ من اليوم" : "سجِّلها", identifier: historical.isEmpty ? "prayer-pending-review" : "prayer-recovery") {
                 selectedSheet = .recovery(gap, fridays, session.activePlace.timeZone)
@@ -1194,6 +1194,7 @@ private struct PrayerGapResolutionSheet: View {
     @Environment(\.roomTheme) private var theme
     @State private var choices: [PrayerReference: Choice] = [:]
     @State private var rootBlockerID = UUID()
+    @State private var confirmClose = false
 
     /// One choice as the user reads it; Friday noon carries its kind explicitly (RP5).
     struct Choice: Hashable {
@@ -1231,8 +1232,12 @@ private struct PrayerGapResolutionSheet: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("صلوات بلا تسجيل").font(PrayerHomeType.cardHead).accessibilityAddTraits(.isHeader)
                 Spacer()
-                Button("إغلاق") { dismiss() }.font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+                Button("إغلاق") { if hasUnsavedInput { confirmClose = true } else { dismiss() } }.font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
                     .frame(minHeight: 44)
+                    .confirmationDialog("تترك اختياراتك؟", isPresented: $confirmClose, titleVisibility: .visible) {
+                        Button("اترك الاختيارات", role: .destructive) { dismiss() }
+                        Button("أكمل التسجيل", role: .cancel) {}
+                    }
             }
             Text(references.count > 10 ? "فترة لم تُسجَّل فيها صلواتك: " + PrayerCopy.days(Set(references.map(\.day)).count, digits: digits) : PrayerCopy.unconfirmed(references.count, digits: digits))
                 .font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)

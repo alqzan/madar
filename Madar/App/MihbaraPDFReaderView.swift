@@ -72,7 +72,7 @@ struct MihbaraPDFReaderView: View {
                             Text(error).font(MadarTypography.body()).multilineTextAlignment(.center)
                                 .accessibilityIdentifier("mihbara-pdf-error")
                             // AU-46: a passing failure (locked data, busy file) can be retried without leaving.
-                            Button("أعد المحاولة") { self.error = nil; openPDF() }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("mihbara-pdf-retry")
+                            Button("أعد المحاولة") { self.error = nil; Task { await openPDF() } }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("mihbara-pdf-retry")
                             Button("العودة إلى المحبرة", action: close).buttonStyle(MadarPrimaryButton())
                         } else { ProgressView("يفتح ملف PDF من جهازك…") }
                     }
@@ -93,7 +93,7 @@ struct MihbaraPDFReaderView: View {
                 advanceClock(to: now)
             }
         }
-        .task { openPDF() }
+        .task { await openPDF() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { resume(at: Date()) } else { pause(at: Date()) }
             if phase != .active { searching = false; flowing = false; inkLayer?.flushAll() }
@@ -203,7 +203,7 @@ struct MihbaraPDFReaderView: View {
         .overlay(alignment: .top) { Rectangle().fill(ink.opacity(0.10)).frame(height: 1) }
     }
 
-    @MainActor private func openPDF() {
+    @MainActor private func openPDF() async {
         guard document == nil, error == nil else { return }
         do {
             #if DEBUG
@@ -214,8 +214,8 @@ struct MihbaraPDFReaderView: View {
                 throw PDFReaderError.unreadable
             }
             #endif
-            let bytes = try service.pdfData(for: book)
-            guard let opened = PDFDocument(data: bytes), !opened.isLocked, opened.pageCount > 0,
+            let bytes = try await service.pdfDataOffMain(for: book)
+            guard document == nil, let opened = PDFDocument(data: bytes), !opened.isLocked, opened.pageCount > 0,
                   opened.page(at: 0) != nil else { throw PDFReaderError.unreadable }
             document = opened
             inkLayer = makeInkLayer()

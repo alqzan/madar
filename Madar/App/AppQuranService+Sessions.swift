@@ -255,7 +255,7 @@ extension AppQuranService {
         if displayGrades.isEmpty && draft.kind != .drill && canGrade {
             displayGrades = [QuranDraftGrade(page: draft.page, rating: draft.kind == .qiyam ? .good : .mastered)]
         }
-        let grades = displayGrades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: QuranUIGrade(rawValue: $0.rating.storedRaw)!, explanation: "التقييم المقترح؛ يمكنك تغييره") }
+        let grades = displayGrades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: (QuranUIGrade(rawValue: $0.rating.storedRaw) ?? .good), explanation: "التقييم المقترح؛ يمكنك تغييره") }
         let hifzComplete = draft.kind == .hifz && ids.isSubset(of: draft.blindPassedAyahs)
         var orderedSeen = Set<Int>()
         let orderedPages = try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }.filter { orderedSeen.insert($0).inserted }
@@ -349,7 +349,7 @@ extension AppQuranService {
         if draft.kind == .qiyam {
             state.qiyam = try qiyamSession(value, catalog: catalog)
             state.title = "ورد القيام"
-            state.grades = draft.grades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: QuranUIGrade(rawValue: $0.rating.storedRaw)!, explanation: "جيد مقترح؛ عدّل تقييمك") }
+            state.grades = draft.grades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: (QuranUIGrade(rawValue: $0.rating.storedRaw) ?? .good), explanation: "جيد مقترح؛ عدّل تقييمك") }
         }
         state.coach?.flaggedWords = Set(draft.mistakes.compactMap { mistake in mistake.key.wordIndex.map { QuranUICoach.wordKey(mistake.key.ayahID, $0) } })
         return state

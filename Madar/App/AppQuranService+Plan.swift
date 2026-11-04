@@ -23,8 +23,8 @@ extension AppQuranService {
     func planInput(from v: QuranDataSnapshot) -> QuranUIPlanInput {
         let row = HifzPlan()
         return QuranUIPlanInput(startAyah: v.plan?.plan.startAyah ?? row.startAyah,
-            unit: QuranUIUnit(rawValue: v.plan?.plan.unit.rawValue ?? row.unit)!, amount: v.plan?.plan.amount ?? row.amount,
-            rhythm: QuranUIRhythm(rawValue: v.plan?.plan.intensity.rawValue ?? row.rhythm)!, restDay: v.restDay.rawValue, missPolicy: v.plan?.missPolicy ?? row.missPolicy)
+            unit: (QuranUIUnit(rawValue: v.plan?.plan.unit.rawValue ?? row.unit) ?? .page), amount: v.plan?.plan.amount ?? row.amount,
+            rhythm: (QuranUIRhythm(rawValue: v.plan?.plan.intensity.rawValue ?? row.rhythm) ?? .balanced), restDay: v.restDay.rawValue, missPolicy: v.plan?.missPolicy ?? row.missPolicy)
     }
     func planOverview(at instant: Date? = nil) throws -> QuranUIPlanOverview {
         let evaluatedAt = instant ?? clock()

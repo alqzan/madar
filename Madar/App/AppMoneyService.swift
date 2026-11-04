@@ -88,10 +88,14 @@ struct MoneyHomeReading {
         }
         return ExpenseThreshold.amount(rule, dailyMinor: cycle?.headline.todayAllowanceMinor, salaryMinor: cycle?.incomeMinor)
     }
-    func load(at instant: Date? = nil) throws -> MoneyHomeReading {
+    /// The store/authentication boundary every money read crosses (the ledger used to build the whole home reading just to pass it).
+    func requireReadableStore() throws {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
         guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         _ = app.prayerRevision
+    }
+    func load(at instant: Date? = nil) throws -> MoneyHomeReading {
+        try requireReadableStore()
         let context = ModelContext(app.container), repo = MoneyRepository(context: context), now = instant ?? app.prayerNow()
         let currency = app.string("core.currency"), cycle = try repo.cycle(at: now), basis = try repo.basis(at: now)
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }

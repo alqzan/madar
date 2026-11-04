@@ -128,7 +128,7 @@ extension AppMoneyService {
         return .init(today: today, monthStart: start, days: monthDays, arcadeDays: readings, monthStarts: months.sorted(by: >), movements: movements.sorted { $0.at > $1.at }, filters: filters, neutralTransfersMinor: neutral)
     }
     func moneyLedger(at now: Date) throws -> MoneyLedger {
-        _ = try load(at: now) // same store/authentication boundary as the home
+        try requireReadableStore() // same store/authentication boundary as the home, without rebuilding the home
         let context = ModelContext(app.container), repo = MoneyRepository(context: context)
         let today = try DiaryLineRenderer.today(context: context, now: now)
         let tx = try context.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
@@ -139,12 +139,15 @@ extension AppMoneyService {
         let cards = try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let categories = try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let messages = try context.fetch(FetchDescriptor<BankMessage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let cardByID = Dictionary(cards.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let categoryByID = Dictionary(categories.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let messageByID = Dictionary(messages.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var spent: [String: Int] = [:], other: [String: Int] = [:], cashOut: [String: Int] = [:], unknownCash: Set<String> = [], pending: [String: Int] = [:]
         var movements: [MoneyLogMovement] = [], kept: [MoneyTransaction] = []
         let owned = Set(accounts.filter { $0.ownership == "mine" && $0.tracked }.map(\.id))
         let effects = try repo.effectContext()
         for row in tx {
-            if let card = cards.first(where: { $0.id == row.cardID }), let account = card.accountID, !owned.contains(account) { continue }
+            if let card = row.cardID.flatMap({ cardByID[$0] }), let account = card.accountID, !owned.contains(account) { continue }
             let linked = [row.fromAccountID, row.toAccountID].compactMap { $0 }
             if !linked.isEmpty && !linked.contains(where: owned.contains) { continue }
             guard let day = try? GregorianDay(row.dayKey) else { continue }
@@ -165,11 +168,11 @@ extension AppMoneyService {
                 else { unknownCash.insert(row.dayKey) }
             } else { pending[row.dayKey, default: 0] += 1 }
             let title = row.merchant ?? row.counterparty ?? moneyKindLabel(row.kind)
-            let category = categories.first { $0.id == row.categoryID }?.name ?? moneyKindLabel(row.kind)
-            let payment = cards.first { $0.id == row.cardID }?.name ?? accounts.first { $0.id == row.fromAccountID || $0.id == row.toAccountID }?.name ?? "طريقة الدفع غير معروفة"
+            let category = row.categoryID.flatMap { categoryByID[$0] }?.name ?? moneyKindLabel(row.kind)
+            let payment = row.cardID.flatMap { cardByID[$0] }?.name ?? accounts.first { $0.id == row.fromAccountID || $0.id == row.toAccountID }?.name ?? "طريقة الدفع غير معروفة"
             let budgetLabel = !confirmed ? "ينتظر قرارك" : row.ignoredFromBudget ? "خارج الميزانية" : row.kind == "refund" ? "عاد إلى يوم الأصل" : ["cardPayment", "repayment", "income", "salary", "cashback"].contains(row.kind) || effect?.budgetChargeMinor == 0 ? "محايد لليومية" : ownParts.contains { $0.target == "daily" } ? "من يومك" : ownParts.isEmpty ? "التخصيص غير مكتمل" : "من المظاريف"
             let explanation = !confirmed ? "هذه حركة تنتظر قرارك؛ لم تدخل الأرقام المؤكدة بعد." : "حركة مؤكّدة: " + budgetLabel + ". " + (row.kind == "cardPayment" ? "السداد تحويل ينقص النقد والدين، ولا يخصم اليومية مرة أخرى." : "التخصيصات الفعلية هي مصدر صرف اليومية والمظاريف.")
-            var detail = MoneySourceDetail(id: row.id.uuidString, title: title, amountMinor: row.homeAmountMinor, explanation: explanation, message: messages.first { $0.id == row.messageID }?.text, date: day)
+            var detail = MoneySourceDetail(id: row.id.uuidString, title: title, amountMinor: row.homeAmountMinor, explanation: explanation, message: row.messageID.flatMap { messageByID[$0] }?.text, date: day)
             if let original, let originalDay = try? GregorianDay(original.dayKey) { detail.explanation += " الرد يعود إلى يوم الأصل: " + app.dateLabels(originalDay).combined + "." }
             movements.append(.init(id: row.id, day: day, at: row.eventAt, title: title, category: category, payment: payment, kind: row.kind, cardID: row.cardID,
                 cash: accounts.contains { $0.kind == "cash" && $0.id == row.fromAccountID }, bnpl: row.method == "bnpl" || row.kind == "repayment", amountMinor: row.homeAmountMinor,

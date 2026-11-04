@@ -451,7 +451,7 @@ struct QuranHomeView: View {
         }
     }
     private func tool(_ title: String, icon: String, id: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { VStack(spacing: 8) { Image(systemName: icon).font(.system(size: 18)); Text(title).font(bodyFont(11, bold: true)).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, minHeight: 74, alignment: .top).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-tool-" + id)
+        Button(action: action) { VStack(spacing: 8) { Image(systemName: icon).font(.system(size: 18)).frame(height: 24); Text(title).font(bodyFont(11, bold: true)).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, minHeight: 74, alignment: .top).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-tool-" + id)
     }
     private func refresh() async throws { state = try await service.load() }
     private func clearIndexRoute() { indexInitialUnit = .surah; indexInitialItemID = nil; indexRouteRequestID = nil }

@@ -180,7 +180,15 @@ struct MihbaraTurathView: View {
         .environment(\.layoutDirection, .rightToLeft).toolbarVisibility(.hidden, for: .navigationBar).statusBarHidden(true)
         .task(id: catalogueAttempt) { await load() }
         .onDisappear { if !reviewing { downloadTask?.cancel() } }
-        .onChange(of: query) { _, value in results = TurathCatalogue.search(books, query: value) }
+        // The whole catalogue is normalised per search: wait for a pause in typing and keep the work off the main thread.
+        .task(id: query) {
+            let value = query, catalogue = books
+            guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { results = []; return }
+            try? await Task.sleep(for: .milliseconds(160))
+            guard !Task.isCancelled else { return }
+            let found = await Task.detached(priority: .userInitiated) { TurathCatalogue.search(catalogue, query: value) }.value
+            if !Task.isCancelled { results = found }
+        }
         // Backing out of the review leaves no downloaded copy behind; an import has already copied it.
         .onChange(of: reviewing) { _, open in
             if !open, let file = downloaded { try? FileManager.default.removeItem(at: file); downloaded = nil }

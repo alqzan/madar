@@ -33,8 +33,8 @@ extension AppQuranService {
                 let detail = word.map { location + "، كلمة «" + $0 + "»" } ?? location
                 return QuranUILogMistake(id: event.id, title: event.kind == "drillFail" ? "لم يثبت" : "موضع تعثّر", detail: detail)
             }
-            return QuranUILogRecord(id: row.id, day: displayDate(row.dayKey), relative: row.dayKey == today ? "اليوم" : row.dayKey == yesterday ? "أمس" : nil, title: title + "، " + faceCount(row.pages.count), detail: portionTitle(row.ayahs, catalog: catalog), kind: QuranUIKind(rawValue: row.kind.rawValue)!,
-                grades: row.grades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: QuranUIGrade(rawValue: $0.rating.storedRaw)!, explanation: "تقييمك") },
+            return QuranUILogRecord(id: row.id, day: displayDate(row.dayKey), relative: row.dayKey == today ? "اليوم" : row.dayKey == yesterday ? "أمس" : nil, title: title + "، " + faceCount(row.pages.count), detail: portionTitle(row.ayahs, catalog: catalog), kind: (QuranUIKind(rawValue: row.kind.rawValue) ?? .free),
+                grades: row.grades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: (QuranUIGrade(rawValue: $0.rating.storedRaw) ?? .good), explanation: "تقييمك") },
                 warning: row.kind == .hifz && row.grades.contains { $0.rating == .needsMastery } ? "يحتاج هذا الورد تثبيتًا؛ يتغيّر مسار الحفظ التالي بحسب تقييمك" : nil,
                 mistakes: mistakes)
         }

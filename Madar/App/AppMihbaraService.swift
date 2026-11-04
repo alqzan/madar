@@ -192,6 +192,21 @@ struct MihbaraMotivationCue: Identifiable {
         try Self.verifiedBookData(container: app.container, for: book, allowedFormats: ["pdf", "pdfScanned"])
     }
 
+    /// Opening a book: the checked read and the SHA-256 of a large file run off the main actor, so the tap never freezes the screen.
+    func pdfDataOffMain(for book: MihbaraBook) async throws -> Data {
+        let container = app.container
+        return try await Task.detached(priority: .userInitiated) {
+            try Self.verifiedBookData(container: container, for: book, allowedFormats: ["pdf", "pdfScanned"])
+        }.value
+    }
+
+    func epubDataOffMain(for book: MihbaraBook) async throws -> Data {
+        let container = app.container
+        return try await Task.detached(priority: .userInitiated) {
+            try Self.verifiedBookData(container: container, for: book, allowedFormats: ["epub"])
+        }.value
+    }
+
     /// The same checked read off the main actor, for a search that walks every book: reading and hashing a large file must not freeze the screen.
     func readableBookData(for book: MihbaraBook) async -> Data? {
         let container = app.container, isEPUB = book.isReadableEPUB

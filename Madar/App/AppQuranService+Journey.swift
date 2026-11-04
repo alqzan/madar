@@ -42,7 +42,7 @@ extension AppQuranService {
 
         var planned = ""
         if let plan = value.plan {
-            let forecast = try forecast(QuranUIPlanInput(startAyah: plan.plan.startAyah, unit: QuranUIUnit(rawValue: plan.plan.unit.rawValue)!, amount: plan.plan.amount, rhythm: QuranUIRhythm(rawValue: plan.plan.intensity.rawValue)!, restDay: value.restDay.rawValue, missPolicy: plan.missPolicy), snapshot: value)
+            let forecast = try forecast(QuranUIPlanInput(startAyah: plan.plan.startAyah, unit: (QuranUIUnit(rawValue: plan.plan.unit.rawValue) ?? .page), amount: plan.plan.amount, rhythm: (QuranUIRhythm(rawValue: plan.plan.intensity.rawValue) ?? .balanced), restDay: value.restDay.rawValue, missPolicy: plan.missPolicy), snapshot: value)
             planned = forecast.title
             if let other = forecast.secondaryDate { planned += "، " + other }
         }
@@ -84,12 +84,26 @@ extension AppQuranService {
         let recited = value.sessions.filter { [.hifz, .review, .free, .qiyam].contains($0.kind) }
             .reduce(0) { $0 + Set($1.grades.map(\.page)).count }
         let mushafEquivalentValue = Double(recited) / 604
-        let mushafEquivalent = numerals.localized(String(format: "%.1f", mushafEquivalentValue).replacingOccurrences(of: ".", with: "٫"))
         let coveragePercent = numerals.percent(value.coverage.percent)
         let recitedDetail: String
         if recited == 0 { recitedDetail = "لا تسميع مسجّل بعد" }
         else if (mushafEquivalentValue * 10).rounded() == 0 { recitedDetail = "أوجه سُجّل لها تقييم في جلساتك؛ وقد يتكرر الوجه" }
-        else { recitedDetail = "أوجه سُجّل لها تقييم؛ كأنك سمّعت المصحف " + mushafEquivalent + " مرات" }
+        else {
+            // An amount the reader can picture, not a multiplier: "مرة ونصف" instead of "١٫٥ مرات".
+            let quarters = Int((mushafEquivalentValue * 4).rounded()), whole = quarters / 4
+            let rest = ["", " وربع", " ونصف", " وثلاثة أرباع"][quarters % 4]
+            let equivalent: String
+            switch (whole, quarters % 4) {
+            case (0, 0): equivalent = "أقل من ربع المصحف"
+            case (0, 1): equivalent = "ربع المصحف"
+            case (0, 2): equivalent = "نصف المصحف"
+            case (0, _): equivalent = "ثلاثة أرباع المصحف"
+            case (1, _): equivalent = "المصحف كاملًا مرة" + rest
+            case (2, _): equivalent = "المصحف كاملًا مرتين" + rest
+            default: equivalent = "المصحف كاملًا " + numerals.string(whole) + " مرات" + rest
+            }
+            recitedDetail = "أوجه سُجّل لها تقييم؛ ما يعادل " + equivalent
+        }
         let stats = [
             QuranUIJourneyStat(id: "days", title: "منذ البداية", value: dayCount(first.map { max(1, $0.quranDistance(to: today) + 1) } ?? 0), detail: first.map { displayDate($0) } ?? "لا حفظ مسجّل"),
             QuranUIJourneyStat(id: "work", title: "أيام العمل", value: dayCount(workingDays), detail: workPercent.map { $0 + " من أيام الحفظ المتاحة" } ?? "لا توجد أيام حفظ متاحة"),

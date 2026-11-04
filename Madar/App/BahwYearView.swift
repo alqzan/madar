@@ -391,7 +391,12 @@ struct BahwDaySheet: View {
                     }
                     field("التقويم") {
                         Picker("التقويم", selection: $draft.hijri) { Text("هجري").tag(true); Text("ميلادي").tag(false) }.pickerStyle(.segmented)
-                            .onChange(of: draft.hijri) { _, hijri in if hijri { draft.day = min(draft.day, 30) } }
+                            .onChange(of: draft.hijri) { _, hijri in
+                                // The year follows the calendar (a Hijri 1448 is not a Gregorian year); a few days' drift is fine for a default.
+                                let converted = hijri ? Double(draft.year - 622) * 1.030684 : Double(draft.year) * 0.970229 + 621.57
+                                draft.year = hijri ? min(max(Int(converted.rounded()), 1400), 1500) : min(max(Int(converted.rounded()), 1980), 2080)
+                                draft.day = min(draft.day, hijri ? 30 : 31)
+                            }
                     }
                     field("يتكرر") {
                         Picker("يتكرر", selection: $draft.repeats) { Text("كل سنة").tag("yearly"); Text("كل شهر").tag("monthly"); Text("مرة واحدة").tag("none") }.pickerStyle(.segmented)

@@ -287,6 +287,7 @@ struct PrayerTravelPairSheet: View {
     let finished: () -> Void
     let rootDraftChanged: (UUID, Bool) -> Void
     @Environment(\.roomTheme) private var theme
+    @Environment(\.dismiss) private var dismiss
     @State private var status: PrayerStoredStatus = .jamaah
     @State private var mode: PrayerPairMode = .takhir
     @State private var shortened = true
@@ -323,6 +324,7 @@ struct PrayerTravelPairSheet: View {
                     session.logPrayerPair(day: day, pair: pair, status: status, shortened: shortened, mode: mode) { if $0 { finished() } }
                 }
                 TravelSecondaryButton(title: "سجّلها وحدها", id: "prayer-pair-single", action: alone)
+                TravelSecondaryButton(title: "ليس الآن", id: "prayer-pair-close") { dismiss() }
             }
             .padding(24)
         }
