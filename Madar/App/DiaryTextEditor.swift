@@ -9,6 +9,8 @@ struct DiaryTextEditor: View {
     @Bindable var app: AppSession
     let margin: GregorianDay?
     var initialDay = "today"
+    /// A question chosen from «أسئلة من مذكراتك»: shown quietly above the page, never saved into the text.
+    var prompt: String?
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -71,6 +73,11 @@ struct DiaryTextEditor: View {
                 if let writingDay, let today = currentMadarDay,
                    (day == "today" && writingDay < today || day == "yesterday" && writingDay < today.adding(days: -1)) {
                     Text(MadarInlineText.joined(["مسودة عن " + AppDiaryService(app: app).bothDates(writingDay), "تُحفظ في صفحتها الأصلية"])).font(MadarTypography.fine()).padding(.horizontal, 16)
+                }
+                if let prompt {
+                    Text(prompt).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).foregroundStyle(theme.color("ink3Text"))
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 22).padding(.bottom, 8)
+                        .accessibilityIdentifier("diary-editor-prompt")
                 }
                 ZStack(alignment: .topLeading) {
                     Canvas { context, size in

@@ -200,8 +200,10 @@ struct DiaryHomeSnapshot {
     func analysisRecords(from start: GregorianDay? = nil, through end: GregorianDay? = nil) throws -> [MadarAIDiaryRecord] {
         try authorizeRead()
         let context = ModelContext(app.container)
+        // Day keys sort as text, so the range is cut in the store instead of reading every line ever written.
+        let firstKey = start?.description ?? "0000-00-00", lastKey = end?.description ?? "9999-99-99"
         let allEntries = try context.fetch(FetchDescriptor<Entry>(
-            predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil },
+            predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.dayKey >= firstKey && $0.dayKey <= lastKey },
             sortBy: [SortDescriptor(\.eventAt)]
         ))
         let entries = Self.visible(allEntries).filter { row in

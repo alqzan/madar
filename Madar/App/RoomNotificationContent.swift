@@ -232,7 +232,7 @@ import MadarPrayer
         if id.hasPrefix("quran.") {
             let late = id.hasSuffix(".late")
             content.title = protected ? "مدار" : late ? QuranReminderCopy.lateTitle : QuranReminderCopy.title
-            content.body = protected ? "لديك تذكير في مدار" : late ? QuranReminderCopy.lateBody : QuranReminderCopy.body
+            content.body = protected ? "لديك تذكير في مدار" : late ? NudgeWording.body(.quranReview, dayKey: candidate.dayKey) : NudgeWording.body(.quranWird, dayKey: candidate.dayKey)
             content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
         } else if id.hasPrefix("digest.") {
             // Audit 28 Oct: under whole-app protection the digest named its kinds («القضاء، الزكاة…») on the lock screen.
@@ -250,14 +250,14 @@ import MadarPrayer
             content.title = protected ? "مدار" : habitNames[habitID] ?? "عادتك"
             // Never promise to keep a streak that does not exist: a first step starts one.
             let streak = protected ? 0 : ((try? HabitRepository(context: ModelContext(session.container)).readings(at: Date()))?.first { $0.id.uuidString == habitID }?.summary.streak ?? 0)
-            content.body = protected ? "حان وقت عادة" : streak > 0 ? "بدأ وقتها، وأقلّ القليل يحفظ سلسلتك" : "بدأ وقتها، وخطوة صغيرة اليوم تبدأ سلسلتك"
+            content.body = protected ? "حان وقت عادة" : NudgeWording.body(streak > 0 ? .habitKeepStreak : .habitFirstStep, dayKey: candidate.dayKey)
             content.userInfo = ["dayKey": candidate.dayKey, "room": "habits", "habit": habitID]
         } else if id.hasPrefix("notes.") {
             // §8 item 10 matrix copy; under the whole-app lock the owner's generic line (15 Oct). Never diary text.
             content.title = protected ? "مدار" : "المذكرات"
             content.body = protected ? "لديك رسالة في مدار"
-                : id.hasSuffix(".niyya") ? "ما نيّتك لهذا اليوم؟ سطر واحد يكفي"
-                : id.hasSuffix(".line") ? "كيف كان يومك؟ سطر واحد يكفي"
+                : id.hasSuffix(".niyya") ? NudgeWording.body(.diaryNiyya, dayKey: candidate.dayKey)
+                : id.hasSuffix(".line") ? NudgeWording.body(.diaryLine, dayKey: candidate.dayKey)
                 : id.hasSuffix(".letter") ? "وصلتك رسالة من ماضيك" : "عندك ذكرى من هذا اليوم"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "notes"]
         } else if id.hasPrefix("mal.card") {

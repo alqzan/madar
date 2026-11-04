@@ -279,8 +279,8 @@ import MadarCore
             let (app, _, now, day) = try fixture(["core.faceIDLock": .string(lock)])
             let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now,
                                                 timeZone: day.place.timeZone, policy: .init(staleNudgeEnabled: false))
-            for (suffix, title, body) in [("wird", QuranReminderCopy.title, QuranReminderCopy.body),
-                                          ("late", QuranReminderCopy.lateTitle, QuranReminderCopy.lateBody)] {
+            for (suffix, title, body) in [("wird", QuranReminderCopy.title, NudgeWording.body(.quranWird, dayKey: "2026-10-15")),
+                                          ("late", QuranReminderCopy.lateTitle, NudgeWording.body(.quranReview, dayKey: "2026-10-15"))] {
                 let candidate = NotificationCandidate(id: "quran.2026-10-15.\(suffix)", room: .quran,
                                                       dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
                 let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
@@ -338,7 +338,9 @@ import MadarCore
         let (app, _, _, day) = try fixture(["core.faceIDLock": .string("none")])
         let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
         let habit = NotificationCandidate(id: "habits.2026-10-15.\(UUID().uuidString)", room: .habits, dueAt: day.asr.addingTimeInterval(1800), dayKey: "2026-10-15")
-        XCTAssertEqual(RoomNotificationContent.content(for: habit, plan: plan, session: app, habitNames: [:]).body, "بدأ وقتها، وخطوة صغيرة اليوم تبدأ سلسلتك")
+        // No streak exists: the line is a first-step one for that day and never one that promises to keep a streak.
+        XCTAssertEqual(RoomNotificationContent.content(for: habit, plan: plan, session: app, habitNames: [:]).body, NudgeWording.body(.habitFirstStep, dayKey: "2026-10-15"))
+        XCTAssertFalse(NudgeWording.variants(.habitKeepStreak).contains(RoomNotificationContent.content(for: habit, plan: plan, session: app, habitNames: [:]).body))
         for (lead, words) in [("1day", "غدًا"), ("1week", "بعد أسبوع"), ("1month", "بعد نحو شهر")] {
             let zakat = NotificationCandidate(id: "mal.zakat.\(lead).2026-11-20", room: .mal, kind: .annualReminder, dueAt: day.asr.addingTimeInterval(1800), dayKey: "2026-10-15")
             let body = RoomNotificationContent.content(for: zakat, plan: plan, session: app, habitNames: [:]).body
@@ -375,7 +377,7 @@ import MadarCore
             }
             if lock == "none" {
                 XCTAssertEqual(candidates.map { RoomNotificationContent.content(for: $0, plan: plan, session: app, habitNames: [:]).body }.sorted(),
-                               ["عندك ذكرى من هذا اليوم", "ما نيّتك لهذا اليوم؟ سطر واحد يكفي", "وصلتك رسالة من ماضيك", "كيف كان يومك؟ سطر واحد يكفي"].sorted())
+                               ["عندك ذكرى من هذا اليوم", NudgeWording.body(.diaryNiyya, dayKey: "2026-10-15"), "وصلتك رسالة من ماضيك", NudgeWording.body(.diaryLine, dayKey: "2026-10-15")].sorted())
             }
         }
     }

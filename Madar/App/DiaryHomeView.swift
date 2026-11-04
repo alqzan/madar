@@ -25,6 +25,7 @@ private struct DiaryEditorTarget: Identifiable {
     var id: String { margin.map { "margin-\($0.description)" } ?? "write-\(day)" }
     let margin: GregorianDay?
     var day = "today"
+    var prompt: String?
 }
 private struct DiaryRootDraftBlocking: ViewModifier {
     @Bindable var app: AppSession
@@ -95,6 +96,8 @@ struct DiaryHomeView: View {
                         if !memory.dayOne, !hidden("sinceThatDay") { since(memory) }
                         if !hidden("days") { recentDays(snapshot) }
                     } else {
+                    // A brand-new diary has no years to switch between: the first-page card below is the only thing to read (owner, 4 Nov).
+                    if snapshot.days.contains(where: { $0.photo != nil || $0.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }) {
                     HStack {
                         Text(snapshot.selection.match == .echo ? "أقرب صدى" : "هذا اليوم عبر السنين").font(DiaryType.heading).lineLimit(1).minimumScaleFactor(0.8)
                         Spacer()
@@ -102,6 +105,7 @@ struct DiaryHomeView: View {
                             calendarButton(.gregorian, "بالميلادي")
                             calendarButton(.hijri, "بالهجري")
                         }.padding(3).background(theme.ink.opacity(0.06), in: .capsule)
+                    }
                     }
                     ForEach(blocks, id: \.self) { block in
                         switch block {
@@ -112,6 +116,7 @@ struct DiaryHomeView: View {
                         }
                     }
                     }
+                    DiaryQuestionsCard(app: app) { question in editor = .init(margin: nil, day: "today", prompt: question) }
                 } else if let failure {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(failure).font(DiaryType.writing)
@@ -157,7 +162,7 @@ struct DiaryHomeView: View {
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
         }
         .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() }; applyPendingDiaryRootIfReady() }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
-        .sheet(item: $editor, onDismiss: editorDidDismiss) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
+        .sheet(item: $editor, onDismiss: editorDidDismiss) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day, prompt: target.prompt).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
         .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil; readerEntryID = nil; readerEntryRouteID = nil } }), onDismiss: { applyPendingDiaryRootIfReady() }) {
             if let reader { DiaryDayView(app: app, day: reader, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
         }
@@ -258,7 +263,7 @@ struct DiaryHomeView: View {
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
             Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
-            Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("أيامك").accessibilityIdentifier("diary-days")
+            Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("التقويم").accessibilityIdentifier("diary-days")
             Button { customizing = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                 .buttonStyle(.madarPlain).accessibilityLabel("خصّص المذكرات").accessibilityIdentifier("diary-customize")
         }.padding(.vertical, 4)
@@ -416,7 +421,11 @@ struct DiaryHomeView: View {
             }
         }
     }
-    private func recentDays(_ snapshot: DiaryHomeSnapshot) -> some View {
+    /// «أيامك» appears once a past day exists; before that the bottom bar and the first-page card are the only way in.
+    @ViewBuilder private func recentDays(_ snapshot: DiaryHomeSnapshot) -> some View {
+        if snapshot.days.contains(where: { $0.day < snapshot.today }) { recentDaysList(snapshot) }
+    }
+    private func recentDaysList(_ snapshot: DiaryHomeSnapshot) -> some View {
         let days = snapshot.days.filter { $0.day < snapshot.today }.prefix(5)
         let month = service.monthLabels(snapshot.today)
         return VStack(alignment: .leading, spacing: 10) {
@@ -445,15 +454,6 @@ struct DiaryHomeView: View {
                         }.padding(16)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-recent-" + day.day.description)
                     if day.id != days.last?.id { Divider().overlay(theme.line) }
-                }
-                // Audit 28 Oct: the empty card is the way in, not a line that points at nothing.
-                if days.isEmpty {
-                    Button { editor = .init(margin: nil) } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("أيامك تبدأ من هنا.").font(DiaryType.writing)
-                            Label("اكتب سطر اليوم", systemImage: "pencil").font(DiaryType.label).foregroundStyle(theme.color("accentText"))
-                        }.frame(maxWidth: .infinity, alignment: .leading).padding(24).contentShape(.rect)
-                    }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-recent-empty-write")
                 }
             }.background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 1) }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("diary-recent-days")

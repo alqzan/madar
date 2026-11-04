@@ -258,7 +258,7 @@ enum MadarAIInsightGenerator {
         return answer
     }
 
-    private nonisolated static func safelyBounded(_ text: String) -> String {
+    nonisolated static func safelyBounded(_ text: String) -> String {
         var marker = "MADAR_USER_DATA_" + UUID().uuidString
         while text.contains(marker) { marker = "MADAR_USER_DATA_" + UUID().uuidString }
         return "\(marker)\n\(text)\n\(marker)"
