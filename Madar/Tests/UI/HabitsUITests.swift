@@ -183,7 +183,7 @@ import UIKit
         for _ in 0..<3 where !(shelf.exists && shelf.isHittable) { app.swipeUp(velocity:.slow) }
         XCTAssertTrue(shelf.waitForExistence(timeout:8),app.debugDescription)
         let diary=app.buttons["habits-room-diaryLine"]
-        XCTAssertTrue(diary.exists && app.buttons["habits-room-review"].exists && app.buttons["habits-room-reading"].exists && app.buttons["habits-room-jamaah"].exists,app.debugDescription)
+        XCTAssertTrue(diary.exists && app.buttons["habits-room-wird"].exists && app.buttons["habits-room-review"].exists && app.buttons["habits-room-reading"].exists && app.buttons["habits-room-jamaah"].exists,app.debugDescription)
         shot(app,"FB35-room-habits-L")
         diary.tap()
         let name=app.textFields["habit-name"];XCTAssertTrue(name.waitForExistence(timeout:5))

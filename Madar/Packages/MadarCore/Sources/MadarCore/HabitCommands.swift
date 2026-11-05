@@ -16,13 +16,13 @@ public enum HabitCommand: Codable, Equatable, Sendable {
             guard Set(value.keys).isSubset(of: ["id","name","source","rule","homeOnly","reminder"]), let text = value["name"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty, text.count <= 80,
                   let json = value["rule"], let data = try? json.canonicalData(), let rule = try? JSONDecoder().decode(HabitRule.self, from: data), (try? rule.validate()) != nil else { return nil }
             let source = value["source"]?.string
-            guard value["source"] == nil || source.map({ ["jamaah","review","reading","diaryLine","walking"].contains($0) }) == true else { return nil }
+            guard value["source"] == nil || source.map({ ["jamaah","review","reading","diaryLine","walking","wird"].contains($0) }) == true else { return nil }
             if source == "jamaah", rule.target > 5 { return nil }
             if source == "walking" { guard rule.measure == .health, ["steps","exerciseMinutes"].contains(rule.unit ?? "") else {return nil} }
             // §7.1 unit table: reading counts active minutes (default) or pages from the Mihbara's saved sessions.
             else if source == "reading" { guard rule.measure == .duration && rule.unit == "minutes" || rule.measure == .count && (rule.unit == "pages" || rule.unit == "chapters") else { return nil } }
             else if let source {
-                guard rule.measure == .count, rule.unit == ["jamaah":"صلاة","review":"وجه","diaryLine":"سطر"][source] else { return nil }
+                guard rule.measure == .count, rule.unit == ["jamaah":"صلاة","review":"وجه","diaryLine":"سطر","wird":"ورد"][source] else { return nil }
             }
             let reminder = value["reminder"]?.string ?? "dot"
             guard ["dot","push","none"].contains(reminder), value["homeOnly"] == nil || value["homeOnly"]?.bool != nil else { return nil }

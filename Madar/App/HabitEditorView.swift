@@ -18,7 +18,7 @@ struct HabitEditorView:View {
     /// A habit linked to a room starts with that room's own measure (the same values the source picker sets).
     static let linkedDefaults: [String: (name: String, measure: HabitMeasure, unit: String, target: Int)] = [
         "jamaah": ("الجماعة", .count, "صلاة", 5), "review": ("المراجعة", .count, "وجه", 1), "reading": ("القراءة", .duration, "minutes", 15),
-        "diaryLine": ("سطر اليوم", .count, "سطر", 1), "walking": ("المشي", .health, "steps", 6000)]
+        "diaryLine": ("سطر اليوم", .count, "سطر", 1), "wird": ("ورد الحفظ", .count, "ورد", 1), "walking": ("المشي", .health, "steps", 6000)]
     @Environment(\.colorScheme) private var colorScheme
     @Bindable var session:AppSession
     let reading:HabitReading?
@@ -69,7 +69,7 @@ struct HabitEditorView:View {
                 VStack(alignment:.leading,spacing:18) {
                     section("العادة") {
                         TextField("اسم العادة",text:$name,prompt:Text("ورد قبل النوم")).font(MadarTypography.body()).frame(minHeight:44).accessibilityIdentifier("habit-name")
-                        if reading == nil { Picker("تسجيلها",selection:$source) { Text("أسجّلها هنا").tag("custom");Text("الجماعة من الصلاة").tag("jamaah");Text("المراجعة من القرآن").tag("review");Text("القراءة من المحبرة").tag("reading");Text("سطر اليوم من المذكرات").tag("diaryLine");if HabitHealthStore.available {Text("المشي من الصحة").tag("walking")} }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-source") }
+                        if reading == nil { Picker("تسجيلها",selection:$source) { Text("أسجّلها هنا").tag("custom");Text("الجماعة من الصلاة").tag("jamaah");Text("ورد الحفظ من القرآن").tag("wird");Text("المراجعة من القرآن").tag("review");Text("القراءة من المحبرة").tag("reading");Text("سطر اليوم من المذكرات").tag("diaryLine");if HabitHealthStore.available {Text("المشي من الصحة").tag("walking")} }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-source") }
                         else if let title=reading?.sourceTitle { Text("تُقرأ من "+title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     }
                     section("التكرار") {
@@ -160,9 +160,9 @@ struct HabitEditorView:View {
         .onChange(of:source){old,value in
             if reading == nil && value != "custom" && reminder == "push" { reminder = "dot" }
             if value == "custom",reading == nil {rule.measure = .once;rule.unit=nil;rule.target=1}
-            let defaults=["jamaah":"الجماعة","review":"المراجعة","reading":"القراءة","diaryLine":"سطر اليوم","walking":"المشي"]
+            let defaults=["jamaah":"الجماعة","review":"المراجعة","reading":"القراءة","diaryLine":"سطر اليوم","walking":"المشي","wird":"ورد الحفظ"]
             if let previous=defaults[old],name==previous {name=defaults[value] ?? ""}
-            if value != "custom" && reading == nil { rule.measure = value == "walking" ? .health : value == "reading" ? .duration : .count;rule.unit=["jamaah":"صلاة","review":"وجه","reading":"minutes","diaryLine":"سطر","walking":"steps"][value];rule.target=value == "walking" ? 6000 : value == "jamaah" ? 5 : value == "reading" ? 15 : 1; if name.isEmpty {name=["jamaah":"الجماعة","review":"المراجعة","reading":"القراءة","diaryLine":"سطر اليوم","walking":"المشي"][value] ?? ""} }
+            if value != "custom" && reading == nil { rule.measure = value == "walking" ? .health : value == "reading" ? .duration : .count;rule.unit=["jamaah":"صلاة","review":"وجه","reading":"minutes","diaryLine":"سطر","walking":"steps","wird":"ورد"][value];rule.target=value == "walking" ? 6000 : value == "jamaah" ? 5 : value == "reading" ? 15 : 1; if name.isEmpty {name=["jamaah":"الجماعة","review":"المراجعة","reading":"القراءة","diaryLine":"سطر اليوم","walking":"المشي","wird":"ورد الحفظ"][value] ?? ""} }
         }
         .onChange(of:rule.measure){old,value in measureChanged(from:old,to:value)}
         .madarSheetLock(saving: busy, draft: hasUnsavedChanges)

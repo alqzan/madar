@@ -11,7 +11,7 @@ struct HabitOrbitView:View {
     private let frequencies:[HabitFrequency] = [.daily,.weekly,.monthly,.yearly]
     /// A linked habit's bead takes its room's colour (prayer, Quran, diary, Mihbara), as W2 draws them.
     private func beadColour(_ row:HabitReading)->Color {
-        let room:String? = switch row.source { case "jamaah": "salah"; case "review": "quran"; case "diaryLine": "notes"; case "reading","hadith": "mihbara"; default: nil }
+        let room:String? = switch row.source { case "jamaah": "salah"; case "review", "wird": "quran"; case "diaryLine": "notes"; case "reading","hadith": "mihbara"; default: nil }
         return room.map { RoomTheme(room:$0,dark:theme.dark).accentFill } ?? theme.accentFill
     }
     private var centreCount:String {

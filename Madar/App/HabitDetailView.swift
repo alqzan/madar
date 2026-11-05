@@ -70,7 +70,7 @@ struct HabitDetailView:View {
             Button {
                 switch source {
                 case "jamaah": session.selectedTab = "prayer"
-                case "review": session.selectedTab = "quran"
+                case "review", "wird": session.selectedTab = "quran"
                 case "diaryLine": session.selectedTab = "notes"
                 case "reading", "hadith": session.selectedTab = "mihbara"
                 default: session.errorMessage = "لا توجد غرفة مرتبطة بهذا المصدر."

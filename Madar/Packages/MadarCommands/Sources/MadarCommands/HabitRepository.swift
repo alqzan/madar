@@ -85,6 +85,7 @@ public struct HabitTime: Equatable, Sendable {
         var reviewCache: (facts: [HabitFact], streak: Int)?
         var readingCache: [HabitFact]?
         var diaryCache: [HabitFact]?
+        var wirdCache: (facts: [HabitFact], streak: Int)?
         var result: [HabitReading] = []
         for habit in habits {
             let habitEvents = eventsByHabit[habit.id] ?? []
@@ -156,6 +157,16 @@ public struct HabitTime: Equatable, Sendable {
                                 HabitFact(id: StableIdentity.uuid(for: "habit-reading:\(key):chapters"), day: day, periodKey: "", delta: Int(chapters[key, default: 0].rounded(.down)), unit: "chapters")]
                     }
                     readingCache = facts
+                case "wird":
+                    // Owner, 6 Nov 2026 («عادات التطبيق… والورد»): one time per day on which a new hifz portion was
+                    // recorded in the Quran room (a hifz session with its ayahs, not deleted), the Quran's own fact.
+                    if wirdCache == nil {
+                        let snapshot = try QuranRepository(context: context, catalog: QuranResources.catalog()).snapshot(at: now)
+                        let days = Set(snapshot.activities.filter { $0.kind == .hifz && $0.countsForStreak }.map(\.dayKey))
+                        wirdCache = (days.sorted().map { HabitFact(id: StableIdentity.uuid(for: "habit-wird:\($0)"), day: $0, periodKey: "", delta: 1) },
+                                     QuranProgressEngine.streak(activities: snapshot.activities, through: today, restDay: snapshot.restDay).days)
+                    }
+                    facts = wirdCache!.facts
                 case "diaryLine":
                     if let cached = diaryCache { facts = cached; break }
                     let entries = try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source != "autoPinned" && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

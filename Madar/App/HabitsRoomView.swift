@@ -28,8 +28,8 @@ extension HabitReading {
         if summary.atRisk { return missedPhrase(MadarNumberFormatter(style: .hindi)) + "؛ الحالية تحفظها" }
         switch summary.current?.outcome { case .complete: return "تمّت"; case .minimum: return "أقلّ القليل"; case .excluded: return "إجازتها اليوم"; case .missed: return "فترة بلا تسجيل"; default: return isNow ? "وقتها الآن" : "تنتظر" }
     }
-    var sourceTitle: String? { switch source { case "jamaah": "الصلاة"; case "review": "القرآن"; case "diaryLine": "المذكرات"; case "reading", "hadith": "المحبرة"; case "walking": "الصحة"; default: nil } }
-    var symbol: String { switch source { case "jamaah": "MadarPrayer"; case "review": "MadarQuran"; case "diaryLine": "MadarDiary"; case "reading", "hadith": "books.vertical"; case "walking": "figure.walk"; default: nameGlyph ?? "checkmark" } }
+    var sourceTitle: String? { switch source { case "jamaah": "الصلاة"; case "review", "wird": "القرآن"; case "diaryLine": "المذكرات"; case "reading", "hadith": "المحبرة"; case "walking": "الصحة"; default: nil } }
+    var symbol: String { switch source { case "jamaah": "MadarPrayer"; case "review", "wird": "MadarQuran"; case "diaryLine": "MadarDiary"; case "reading", "hadith": "books.vertical"; case "walking": "figure.walk"; default: nameGlyph ?? "checkmark" } }
     /// DA-05: a hand-made habit has no stored icon; its own words choose one for display only (nil when none fits).
     var nameGlyph: String? {
         HabitNameGlyph.symbol(for: name)
@@ -142,6 +142,7 @@ struct HabitsRoomView: View {
     /// The habits Madar already measures in its rooms wait here, each one tap from being tracked; one already kept is not offered.
     private static let roomSources: [(source: String, title: String, detail: String, symbol: String, room: String)] = [
         ("diaryLine", "سطر اليوم", "تُحسب حين تكتب في المذكرات", "MadarDiary", "notes"),
+        ("wird", "ورد الحفظ", "يُحسب يوم تسجّل وردك الجديد في القرآن", "MadarQuran", "quran"),
         ("review", "المراجعة", "تُحسب من وجوه مراجعتك في القرآن", "MadarQuran", "quran"),
         ("reading", "القراءة", "تُحسب من دقائق قراءتك في المحبرة", "books.vertical", "mihbara"),
         ("jamaah", "الجماعة", "تُحسب من صلواتك في جماعة", "MadarPrayer", "salah"),

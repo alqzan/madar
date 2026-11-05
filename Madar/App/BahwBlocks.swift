@@ -144,7 +144,7 @@ struct BahwBlockView: View {
         else if let source = row.source {
             switch source {
             case "jamaah": service.session.selectedTab = "prayer"
-            case "review": service.session.selectedTab = "quran"
+            case "review", "wird": service.session.selectedTab = "quran"
             case "diaryLine": service.session.selectedTab = "notes"
             case "reading", "hadith": service.session.selectedTab = "mihbara"
             default: service.session.errorMessage = "لا توجد غرفة مرتبطة بهذا المصدر."
@@ -172,7 +172,7 @@ struct BahwBlockView: View {
         let compactProgress = current.map { digits.string($0.value) + " من " + digits.string($0.target) } ?? progress
         let ringTheme: RoomTheme = switch row.source {
         case "jamaah": .init(room: "salah", dark: dark)
-        case "review": .init(room: "quran", dark: dark)
+        case "review", "wird": .init(room: "quran", dark: dark)
         case "diaryLine": .init(room: "notes", dark: dark)
         case "reading", "hadith": .init(room: "mihbara", dark: dark)
         default: room
@@ -220,7 +220,7 @@ struct BahwBlockView: View {
         }()
         let ringTheme: RoomTheme = switch row.source {
         case "jamaah": .init(room: "salah", dark: dark)
-        case "review": .init(room: "quran", dark: dark)
+        case "review", "wird": .init(room: "quran", dark: dark)
         case "diaryLine": .init(room: "notes", dark: dark)
         case "reading", "hadith": .init(room: "mihbara", dark: dark)
         default: room
