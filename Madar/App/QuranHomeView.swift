@@ -1,5 +1,6 @@
 import SwiftUI
 import MadarCore
+import MadarCommands
 import MadarDesign
 import MadarQuran
 import Combine
@@ -178,7 +179,7 @@ struct QuranHomeView: View {
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(item: $mushaf) { request in
-            QuranMushafView(service: service, initialPage: request.page, close: { mushaf = nil })
+            QuranMushafView(service: service, initialPage: request.page, initialAyah: request.ayah, close: { mushaf = nil })
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(item: $reference) { request in
@@ -394,7 +395,8 @@ struct QuranHomeView: View {
                     .background(theme.color("accent"), in: Capsule()).contentShape(Capsule()).contentShape(.capsule).disabled(busy).accessibilityIdentifier("quran-begin")
             }
             if step.kind == .hifz, let ayahRange = step.ayahRange {
-                Button { reference = QuranWirdReferenceRequest(range: ayahRange) } label: {
+                // FB-33: the wird's tafsir opens on the page itself, its first ayah lit and explained.
+                Button { mushaf = .init(page: (try? QuranResources.catalog().ayah(id: ayahRange.first)?.page) ?? step.range?.fromPage ?? 1, ayah: ayahRange.first) } label: {
                     Label("تفسير الورد", systemImage: "book.closed")
                         .font(bodyFont(11, bold: true)).padding(.horizontal, 10).frame(minHeight: 44)
                         .foregroundStyle(theme.color("hifzText"))
@@ -618,7 +620,7 @@ struct QuranHomeView: View {
     }
 }
 
-struct QuranMushafRequest: Identifiable { let id = UUID(); let page: Int }
+struct QuranMushafRequest: Identifiable { let id = UUID(); let page: Int; var ayah: Int? = nil }
 
 /// AU-79: the Quran screens follow the Madar day (`core.dayStart`), not only civil midnight.
 struct QuranMadarDayRefresh: ViewModifier {

@@ -1,10 +1,13 @@
 import SwiftUI
+import MadarCommands
 import MadarDesign
 
 /// R18-Mushaf, with the owner's borderless 1405 palette and the verified 1439 page glyphs.
 struct QuranMushafView: View {
     let service: AppQuranService
     let initialPage: Int
+    /// FB-33: opened on an ayah (the wird's first), its tafsir is already up.
+    var initialAyah: Int? = nil
     let close: () -> Void
     @Environment(\.roomTheme) private var theme
     @State private var number = 1
@@ -13,7 +16,8 @@ struct QuranMushafView: View {
     @State private var tools = false
     /// The page fills the screen with no chrome, so the first reading says once how to bring the controls back.
     @State private var hint = !UserDefaults.standard.bool(forKey: "quran.mushaf.toolsHintSeen")
-    @State private var verses = false
+    /// FB-33: the ayah pressed for tafsir; nil when no sheet is up.
+    @State private var selectedAyah: Int?
     @State private var zoom: CGFloat = 1
     @GestureState private var magnification: CGFloat = 1
     @State private var pan = CGSize.zero
@@ -24,7 +28,9 @@ struct QuranMushafView: View {
             ZStack {
                 theme.color("mushafPaper").ignoresSafeArea()
                 if let page {
-                    QuranCoachPage(page: page, coach: reading(page), stage: .grading, reveal: { _ in }, readingTap: { tools.toggle() }, medinaStyle: true)
+                    QuranCoachPage(page: page, coach: reading(page), stage: .grading, reveal: { _ in },
+                                   readingTap: { if selectedAyah != nil { selectedAyah = nil } else { tools.toggle() } },
+                                   medinaStyle: true, selectedAyah: selectedAyah, ayahPress: { selectedAyah = $0; tools = false })
                         .frame(width: geometry.size.width, height: min(geometry.size.height, geometry.size.width * 1.64))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .scaleEffect(scale).offset(offset(in: geometry.size))
@@ -44,7 +50,7 @@ struct QuranMushafView: View {
                 // AU-18: while the page loads there is no page to tap, so the close stays visible.
                 if tools || (page == nil && error == nil) { controls }
                 if hint && !tools && page != nil {
-                    VStack { Spacer(); Text("المس الصفحة لإظهار الأدوات وزر الإغلاق").font(MadarTypography.caption()).padding(.horizontal, 16).padding(.vertical, 10).background(.ultraThinMaterial, in: .capsule).padding(.bottom, 28) }
+                    VStack { Spacer(); Text("اضغط مطوّلًا على آية لتفسيرها، والمس الصفحة للأدوات").font(MadarTypography.caption()).padding(.horizontal, 16).padding(.vertical, 10).glassEffect(.regular, in: .capsule).padding(.bottom, 28) }
                         .allowsHitTesting(false).transition(.opacity).accessibilityHidden(true)
                 }
             }
@@ -53,10 +59,14 @@ struct QuranMushafView: View {
         .statusBarHidden(!tools).interactiveDismissDisabled()
         .onChange(of: tools) { _, shown in if shown { hint = false; UserDefaults.standard.set(true, forKey: "quran.mushaf.toolsHintSeen") } }
         .task(id: page != nil) { guard hint, page != nil else { return }; try? await Task.sleep(for: .seconds(5)); withAnimation { hint = false } }
-        .task { number = min(604, max(1, initialPage)) }
+        .task { number = min(604, max(1, initialPage)); if let initialAyah { selectedAyah = initialAyah } }
         .task(id: number) { await load() }
-        .sheet(isPresented: $verses) {
-            if let page { QuranAyahReaderSheet(page: page, close: { verses = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .task { await QuranTafsirLibrary.shared.loadLocal() }
+        .sheet(isPresented: Binding(get: { selectedAyah != nil }, set: { if !$0 { selectedAyah = nil } })) {
+            if let selectedAyah {
+                QuranAyahTafsirSheet(app: service.app, ayahID: selectedAyah, digits: service.numerals, select: open, close: { self.selectedAyah = nil })
+                    .environment(\.roomTheme, theme)
+            }
         }
     }
     private var scale: CGFloat { min(3, max(1, zoom * magnification)) }
@@ -77,23 +87,32 @@ struct QuranMushafView: View {
                 Text(page?.title ?? "المصحف").font(MadarTypography.section()).accessibilityIdentifier("quran-mushaf-number")
                 Spacer()
                 icon("chevron.down", label: "إخفاء الأدوات", id: "quran-mushaf-hide") { tools = false }
-            }.padding(8).background(theme.surface, in: Capsule())
+            }.padding(8).glassEffect(.regular, in: .capsule)
             Spacer()
             HStack(spacing: 4) {
                 icon("chevron.right", label: "الوجه السابق", id: "quran-mushaf-previous") { move(-1) }.disabled(number == 1)
                 icon("chevron.left", label: "الوجه التالي", id: "quran-mushaf-next") { move(1) }.disabled(number == 604)
                 Spacer(minLength: 0)
-                Button("آية آية") { verses = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("quran-mushaf-ayahs")
+                Button { selectedAyah = page?.semanticAyat.first?.id; tools = false } label: { Label("التفسير", systemImage: "text.book.closed") }
+                    .font(MadarTypography.caption()).frame(minHeight: 44).buttonStyle(.madarPlain).disabled(page?.semanticAyat.isEmpty ?? true)
+                    .accessibilityIdentifier("quran-mushaf-ayahs")
                 Spacer(minLength: 0)
                 icon(zoom == 1 ? "plus.magnifyingglass" : "minus.magnifyingglass", label: zoom == 1 ? "تكبير" : "الحجم الطبيعي", id: "quran-mushaf-zoom") { zoom = zoom == 1 ? 2 : 1; pan = .zero }
-            }.padding(8).background(theme.surface, in: Capsule())
+            }.padding(8).glassEffect(.regular, in: .capsule)
         }.padding(12)
     }
     private func icon(_ symbol: String, label: String, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: symbol).font(.system(size: 17, weight: .medium)).frame(width: 44, height: 44) }
             .buttonStyle(.madarPlain).accessibilityLabel(label).accessibilityIdentifier(id)
     }
-    private func move(_ delta: Int) { let next = min(604, max(1, number + delta)); if next != number { number = next; page = nil; error = nil; zoom = 1; pan = .zero } }
+    private func move(_ delta: Int) { selectedAyah = nil; go(to: number + delta) }
+    private func go(to target: Int) { let next = min(604, max(1, target)); if next != number { number = next; page = nil; error = nil; zoom = 1; pan = .zero } }
+    /// The tafsir sheet walked to another ayah: light it, and turn the page when it starts on another one.
+    private func open(_ ayahID: Int) {
+        guard let ayah = try? QuranResources.catalog().ayah(id: ayahID) else { return }
+        selectedAyah = ayahID
+        if ayah.page != number && !(page?.semanticAyat.contains { $0.id == ayahID } ?? false) { go(to: ayah.page) }
+    }
     private func load() async {
         let requested = number
         do { let loaded = try await service.page(requested); guard number == requested else { return }; page = loaded; error = nil }

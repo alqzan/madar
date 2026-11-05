@@ -15,19 +15,25 @@ struct QuranCoachPage: View {
     var readingTap: (() -> Void)? = nil
     /// Owner's MedinaOld reference: ornament only; the verified edition stays intact.
     var medinaStyle = false
+    /// FB-33: the ayah the reader pressed on, softly lit while its tafsir is open.
+    var selectedAyah: Int? = nil
+    var ayahPress: ((Int) -> Void)? = nil
     @Environment(\.roomTheme) private var theme
     var body: some View {
         VStack(spacing: 4) {
             if medinaStyle {
-                // Like a printed mushaf: the juz in words on the right, the page number in the middle, the surah on the left.
+                // FB-33, owner's printed Madinah page: the juz on the right, the surah on the left, no frame.
                 HStack(spacing: 8) {
-                    Text(page.juzTitle).font(.custom("Amiri-Bold", size: 19)).frame(
-                        maxWidth: .infinity, alignment: .leading)
-                    Text(page.numberLabel).font(.custom("Amiri-Regular", size: 17)).fixedSize()
-                    Text("سورة " + page.surahTitle).font(.custom("Amiri-Bold", size: 19)).frame(
-                        maxWidth: .infinity, alignment: .trailing)
-                }.lineLimit(1).minimumScaleFactor(0.7).foregroundStyle(theme.color("mushafInk"))
-                    .padding(.horizontal, 22).frame(height: 34)
+                    Text(page.juzTitle).frame(maxWidth: .infinity, alignment: .leading)
+                    Text("سورة " + page.surahTitle).frame(maxWidth: .infinity, alignment: .trailing)
+                }.font(.custom("Amiri-Bold", size: 17)).lineLimit(1).minimumScaleFactor(0.7)
+                    .foregroundStyle(theme.color("reviewText"))
+                    .padding(.horizontal, 16).frame(height: 30)
+                    // Owner, 5 Nov: keep the Quran's green and gold without a frame: one gold rule under the header.
+                    .overlay(alignment: .bottom) {
+                        LinearGradient(colors: [theme.color("gold").opacity(0), theme.color("gold"), theme.color("gold").opacity(0)], startPoint: .leading, endPoint: .trailing)
+                            .frame(height: 1.2).padding(.horizontal, 12)
+                    }
             } else {
                 HStack {
                     Text(page.juzTitle)
@@ -46,7 +52,7 @@ struct QuranCoachPage: View {
                         page: page, coach: coach, stage: stage, ink: UIColor(theme.color("mushafInk")), tint: .clear,
                         reveal: { _ in }, blurredWordsOnly: true, medinaStyle: medinaStyle
                     )
-                    .blur(radius: 3.5).opacity(0.28).padding(.horizontal, medinaStyle ? 24 : 8).padding(
+                    .blur(radius: 3.5).opacity(0.28).padding(.horizontal, medinaStyle ? 12 : 8).padding(
                         .vertical, medinaStyle ? 14 : 4
                     )
                     .allowsHitTesting(false).accessibilityHidden(true)
@@ -54,18 +60,13 @@ struct QuranCoachPage: View {
                 QuranCoachTextCanvas(
                     page: page, coach: coach, stage: stage, ink: UIColor(theme.color("mushafInk")),
                     tint: UIColor(theme.color("hifzTint")), reveal: reveal, markWord: markWord, readingTap: readingTap,
-                    mark: UIColor(theme.color("due")), sealInk: UIColor(theme.color("hifzText")),
+                    mark: UIColor(theme.color("due")), sealInk: UIColor(theme.color(medinaStyle ? "reviewText" : "hifzText")),
                     sealTint: UIColor(theme.color("reviewTint")), medinaStyle: medinaStyle,
-                    gold: UIColor(theme.color("gold")), paper: UIColor(theme.color("mushafPaper"))
+                    gold: UIColor(theme.color("gold")), paper: UIColor(theme.color("mushafPaper")),
+                    selectedAyah: selectedAyah, ayahPress: ayahPress
                 )
-                .padding(.horizontal, medinaStyle ? 24 : 8).padding(.vertical, medinaStyle ? 14 : 4)
+                .padding(.horizontal, medinaStyle ? 12 : 8).padding(.vertical, medinaStyle ? 8 : 4)
                 .accessibilityHidden(true)
-            }
-            .background {
-                if medinaStyle {
-                    QuranMushafFrame(gold: theme.color("gold"), green: theme.color("review")).padding(.horizontal, 6)
-                        .allowsHitTesting(false)
-                }
             }
             .accessibilityRepresentation {
                 ForEach(page.semanticAyat.filter { coach.plannedAyahs.contains($0.id) }) { ayah in
@@ -82,7 +83,10 @@ struct QuranCoachPage: View {
                     }
                 }
             }
-            if !medinaStyle {
+            if medinaStyle {
+                QuranPageNumberOval(number: page.numberLabel, gold: theme.color("gold"), ink: theme.color("onCover"), green: theme.color("cover"))
+                    .frame(height: 30).accessibilityHidden(true)
+            } else {
                 HStack {
                     Spacer(); Text(page.numberLabel).font(.custom("Amiri-Bold", size: 13))
                 }
@@ -90,6 +94,32 @@ struct QuranCoachPage: View {
             }
         }
         .background(theme.color("mushafPaper"))
+    }
+}
+
+/// The printed page number sits in a small gold oval between two fine rules ending in lozenges.
+private struct QuranPageNumberOval: View {
+    let number: String, gold: Color, ink: Color, green: Color
+    var body: some View {
+        HStack(spacing: 6) {
+            rule(flipped: false)
+            Text(number).font(.custom("Amiri-Bold", size: 15)).foregroundStyle(ink).monospacedDigit()
+                .padding(.horizontal, 14).frame(minWidth: 52, minHeight: 26)
+                .background { Ellipse().fill(green) }
+                .overlay { Ellipse().inset(by: 2.4).stroke(gold, lineWidth: 1) }
+                .overlay { Ellipse().stroke(gold.opacity(0.7), lineWidth: 0.8) }
+            rule(flipped: true)
+        }
+    }
+    /// Right to left: the first rule sits on the right, so each line fades toward the page edge.
+    private func rule(flipped: Bool) -> some View {
+        let line = Rectangle()
+            .fill(LinearGradient(colors: flipped ? [gold.opacity(0), gold.opacity(0.8)] : [gold.opacity(0.8), gold.opacity(0)], startPoint: .leading, endPoint: .trailing))
+            .frame(width: 46, height: 0.8)
+        let lozenge = Rectangle().fill(gold).frame(width: 5, height: 5).rotationEffect(.degrees(45))
+        return HStack(spacing: 4) {
+            if flipped { lozenge; line } else { line; lozenge }
+        }
     }
 }
 
@@ -150,12 +180,15 @@ private struct QuranCoachTextCanvas: UIViewRepresentable {
     var medinaStyle = false
     var gold: UIColor = .clear
     var paper: UIColor = .clear
+    var selectedAyah: Int? = nil
+    var ayahPress: ((Int) -> Void)? = nil
     func makeUIView(context: Context) -> QuranCoachTextView { QuranCoachTextView() }
     func updateUIView(_ view: QuranCoachTextView, context: Context) {
         view.page = page; view.coach = coach; view.stage = stage; view.ink = ink; view.tint = tint;
         view.reveal = reveal; view.markWord = markWord; view.readingTap = readingTap; view.mark = mark;
         view.blurredWordsOnly = blurredWordsOnly; view.sealInk = sealInk; view.sealTint = sealTint
         view.medinaStyle = medinaStyle; view.gold = gold; view.paper = paper
+        view.selectedAyah = selectedAyah; view.ayahPress = ayahPress
         view.setNeedsDisplay()
     }
 }
@@ -176,6 +209,8 @@ private final class QuranCoachTextView: UIView {
     var medinaStyle = false
     var gold = UIColor.clear
     var paper = UIColor.clear
+    var selectedAyah: Int?
+    var ayahPress: ((Int) -> Void)?
     private var bandImage: UIImage?
     private var bandInk = UIColor.clear
     private var bandGold = UIColor.clear
@@ -276,10 +311,7 @@ private final class QuranCoachTextView: UIView {
             }
             var size = pageSize, wordLines = lines(size: pageSize)
             func lineWidths(_ wordLines: [CTLine], size: CGFloat) -> [CGFloat] {
-                wordLines.enumerated().map { index, line in
-                    medinaStyle && row.words[index].ayahNumberLabel != nil
-                        ? size * 1.08 : CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
-                }
+                wordLines.map { CGFloat(CTLineGetTypographicBounds($0, nil, nil, nil)) }
             }
             var widths = lineWidths(wordLines, size: pageSize)
             let gapCount = CGFloat(max(0, widths.count - 1))
@@ -314,22 +346,27 @@ private final class QuranCoachTextView: UIView {
                 }
             }
             if let highlight { tint.setFill(); UIBezierPath(roundedRect: highlight, cornerRadius: 4).fill() }
-            for (index, word) in row.words.enumerated() {
-                if medinaStyle, let number = word.ayahNumberLabel, shown[index] {
-                    let diameter = min(rowHeight - 3, widths[index] - 1)
-                    drawAyahSeal(
-                        number, center: CGPoint(x: frames[index].midX, y: top + rowHeight / 2), diameter: diameter,
-                        context: context)
-                    hits.append((frames[index], word.ayahID, word.index))
-                    continue
+            // FB-33: the pressed ayah is lit across each of its lines, as Quran readers do.
+            if let selectedAyah {
+                var lit: CGRect?
+                for (index, word) in row.words.enumerated() where word.ayahID == selectedAyah {
+                    let box = CGRect(x: frames[index].minX - gap / 2, y: top + 1.5, width: frames[index].width + gap, height: rowHeight - 3)
+                    lit = lit.map { $0.union(box) } ?? box
                 }
+                if let lit {
+                    gold.withAlphaComponent(0.2).setFill()
+                    UIBezierPath(roundedRect: lit.intersection(bounds.insetBy(dx: -2, dy: 0)), cornerRadius: 7).fill()
+                }
+            }
+            for (index, word) in row.words.enumerated() {
                 if shown[index] && word.index == nil && !blurredWordsOnly {
                     let image = CTLineGetImageBounds(wordLines[index], nil)
                     let box = CGRect(
                         x: frames[index].minX + image.minX, y: baseline - image.maxY, width: image.width,
                         height: image.height)
-                    let diameter = min(box.width, box.height) * 0.5
-                    sealTint.setFill();
+                    // FB-33: the printed marker keeps the font's own ornament, lit by a soft gold disc.
+                    let diameter = min(box.width, box.height) * (medinaStyle ? 0.74 : 0.5)
+                    (medinaStyle ? gold.withAlphaComponent(0.55) : sealTint).setFill();
                     UIBezierPath(
                         ovalIn: CGRect(
                             x: box.midX - diameter / 2, y: box.midY - diameter / 2, width: diameter, height: diameter)
@@ -427,6 +464,15 @@ private final class QuranCoachTextView: UIView {
     }
     /// Only while the words are hidden from the reciter: blind recitation, or the covered one-step review.
     @objc private func press(_ gesture: UILongPressGestureRecognizer) {
+        // FB-33: while reading, a long press on an ayah opens its tafsir.
+        if let ayahPress, readingTap != nil {
+            guard gesture.state == .began,
+                let hit = hits.first(where: { $0.0.insetBy(dx: 0, dy: -4).contains(gesture.location(in: self)) })
+            else { return }
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+            ayahPress(hit.1)
+            return
+        }
         guard gesture.state == .began, let coach, !coach.bridge, stage == .covered || (coach.review && stage == .review)
         else { return }
         let point = gesture.location(in: self)

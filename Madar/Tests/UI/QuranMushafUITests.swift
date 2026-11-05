@@ -14,9 +14,9 @@ import XCTest
             app.tapCoordinate(x: 0.5, y: 0.5)
             XCTAssertEqual(app.staticTexts["quran-mushaf-number"].label, "الوجه ١٢٨")
             app.buttons["quran-mushaf-ayahs"].tap()
-            let verse = app.staticTexts["quran-mushaf-semantic-ayah"]
+            let verse = app.descendants(matching: .any)["quran-tafsir-ayah-title"]
             XCTAssertTrue(verse.waitForExistence(timeout: 5), app.debugDescription)
-            XCTAssertTrue(verse.label.hasPrefix("ٱلۡحَمۡدُ لِلَّهِ"), verse.label)
+            XCTAssertTrue(verse.label.contains("سورة الأن") && verse.label.contains("الآية ١"), verse.label)
             app.terminate()
         }
     }
@@ -46,12 +46,13 @@ import XCTest
         app.buttons["quran-mushaf-zoom"].tap()
         attach(app, "M2-V06-tools-L")
         app.buttons["quran-mushaf-ayahs"].tap()
-        let verse = app.staticTexts["quran-mushaf-semantic-ayah"]
-        XCTAssertTrue(verse.waitForExistence(timeout: 5)); XCTAssertTrue(verse.label.contains("وَإِمَّا"))
+        let verse = app.descendants(matching: .any)["quran-tafsir-ayah-title"]
+        XCTAssertTrue(verse.waitForExistence(timeout: 5)); XCTAssertTrue(verse.label.contains("الآية ٢٨"), verse.label)
         attach(app, "M2-V06-ayah-L")
-        app.buttons["التالية"].tap()
-        XCTAssertTrue(verse.label.contains("وَلَا"))
-        app.buttons["تمّ"].tap()
+        app.buttons["quran-tafsir-next"].tap()
+        XCTAssertTrue(verse.waitForExistence(timeout: 5)); XCTAssertTrue(verse.label.contains("الآية ٢٩"), verse.label)
+        app.buttons["quran-tafsir-close"].tap()
+        app.tapCoordinate(x: 0.5, y: 0.5)
         app.buttons["quran-mushaf-close"].tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["quran-resume"].exists)

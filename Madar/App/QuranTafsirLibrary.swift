@@ -67,21 +67,24 @@ final class QuranTafsirLibrary {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let catalog = try QuranResources.catalog()
-            let saadi = try await Task.detached(priority: .userInitiated) {
-                try QuranTafsirIndex.bundledSaadi(catalog: catalog)
+            // FB-33: downloaded books are decoded off the main thread too, so opening a tafsir never stalls the page.
+            let directory = directory
+            let (saadi, downloaded) = try await Task.detached(priority: .userInitiated) { () throws -> (QuranTafsirIndex, [(QuranTafsirIndex, Data)]) in
+                let saadi = try QuranTafsirIndex.bundledSaadi(catalog: catalog)
+                let files = try FileManager.default.contentsOfDirectory(
+                    at: directory, includingPropertiesForKeys: [.fileSizeKey], options: [.skipsHiddenFiles])
+                let books = files.filter { $0.pathExtension == "tafsir" }.compactMap { file -> (QuranTafsirIndex, Data)? in
+                    guard let data = try? Data(contentsOf: file),
+                          let index = try? JSONDecoder().decode(QuranTafsirIndex.self, from: data) else { return nil }
+                    return (index, data)
+                }
+                return (saadi, books)
             }.value
 
             var nextIndexes = [saadi.metadata.bookID: saadi]
             var nextBooks = [QuranTafsirLibraryBook(metadata: saadi.metadata, pageCount: 2_175, sizeBytes: nil, isBundled: true)]
-            let files = try FileManager.default.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: [.fileSizeKey],
-                options: [.skipsHiddenFiles]
-            )
-            for file in files where file.pathExtension == "tafsir" {
-                guard let data = try? Data(contentsOf: file),
-                      let index = try? JSONDecoder().decode(QuranTafsirIndex.self, from: data),
-                      index.metadata.bookID != saadi.metadata.bookID else { continue }
+            for (index, data) in downloaded {
+                guard index.metadata.bookID != saadi.metadata.bookID else { continue }
                 nextIndexes[index.metadata.bookID] = index
                 nextBooks.append(.init(
                     metadata: index.metadata,
