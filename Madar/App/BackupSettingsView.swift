@@ -289,7 +289,7 @@ struct BackupSettingsView: View {
                 MadarCard {
                     HStack(alignment: .top, spacing: 8) {
                         Text(result).font(MadarTypography.body()).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("backup-result")
-                        Button(action: model.dismissResult) { Image(systemName: "xmark").frame(width: 44, height: 44) }
+                        Button(action: model.dismissResult) { Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                             .accessibilityLabel("أخفِ النتيجة").accessibilityIdentifier("backup-result-dismiss")
                     }
                 }.padding(.horizontal, 16).padding(.top, 8)

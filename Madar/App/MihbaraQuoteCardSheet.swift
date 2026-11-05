@@ -182,7 +182,7 @@ struct MihbaraQuoteCardSheet: View {
 
     private var closeLabel: some View {
         Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(secondaryInk).frame(width: 44, height: 44).contentShape(Circle())
+            .foregroundStyle(secondaryInk).frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle).contentShape(Circle())
     }
 
     private var shareLabel: some View {

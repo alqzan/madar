@@ -108,9 +108,7 @@ struct MoneySettingsView: View {
                         Button {
                             dismiss()
                         } label: {
-                            Image(systemName: "xmark").frame(width: 44, height: 44).overlay {
-                                Circle().stroke(theme.color("reserveText"), lineWidth: 1)
-                            }
+                            Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
                         }.madarWaitsForSave().accessibilityLabel("إغلاق").accessibilityIdentifier(
                             "money-settings-close");
                         Text("إعدادات المال").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2));

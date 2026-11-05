@@ -1,12 +1,38 @@
 #if DEBUG
 import Foundation
 import CryptoKit
+import UIKit
 import SwiftData
 import MadarCore
 import MadarData
 import MadarCommands
 
 extension AppSession {
+    /// A drawn jacket for UI shots: deep indigo with a gold eight-point star lattice and a cream title label.
+    static func fixtureCoverJPEG() -> Data? {
+        let size = CGSize(width: 600, height: 860)
+        let image = UIGraphicsImageRenderer(size: size).image { ctx in
+            let g = ctx.cgContext
+            UIColor(red: 0.10, green: 0.16, blue: 0.33, alpha: 1).setFill(); g.fill(CGRect(origin: .zero, size: size))
+            UIColor(red: 0.85, green: 0.70, blue: 0.38, alpha: 0.55).setStroke(); g.setLineWidth(2)
+            for row in 0..<9 { for col in 0..<6 {
+                let c = CGPoint(x: 50 + CGFloat(col) * 100 + (row % 2 == 0 ? 0 : 50), y: 50 + CGFloat(row) * 100)
+                for turn in 0..<2 {
+                    let path = UIBezierPath(rect: CGRect(x: -24, y: -24, width: 48, height: 48))
+                    path.apply(CGAffineTransform(rotationAngle: CGFloat(turn) * .pi / 4)); path.apply(CGAffineTransform(translationX: c.x, y: c.y)); path.stroke()
+                }
+            } }
+            let label = CGRect(x: 90, y: 300, width: 420, height: 240)
+            UIColor(red: 0.95, green: 0.91, blue: 0.82, alpha: 1).setFill(); UIBezierPath(roundedRect: label, cornerRadius: 18).fill()
+            UIColor(red: 0.85, green: 0.70, blue: 0.38, alpha: 1).setStroke(); let edge = UIBezierPath(roundedRect: label.insetBy(dx: 10, dy: 10), cornerRadius: 12); edge.lineWidth = 3; edge.stroke()
+            let style = NSMutableParagraphStyle(); style.alignment = .center
+            let ink = UIColor(red: 0.10, green: 0.16, blue: 0.33, alpha: 1)
+            ("رحلة القراءة" as NSString).draw(in: CGRect(x: 100, y: 345, width: 400, height: 110), withAttributes: [.font: UIFont.systemFont(ofSize: 68, weight: .heavy), .foregroundColor: ink, .paragraphStyle: style])
+            ("من مكتبتك" as NSString).draw(in: CGRect(x: 100, y: 460, width: 400, height: 50), withAttributes: [.font: UIFont.systemFont(ofSize: 30, weight: .medium), .foregroundColor: ink, .paragraphStyle: style])
+        }
+        return image.jpegData(compressionQuality: 0.85)
+    }
+
     func prepareMihbaraFixture(group: URL) throws {
         guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_FIXTURE"], ["home","empty","reader","bindings","missingFile"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
@@ -40,6 +66,12 @@ extension AppSession {
         }
         if variant == "home" {
             let r = Book(); r.id = StableIdentity.uuid(for: "mihbara-fixture-book"); r.title = "رحلة القراءة"; r.author = "من مكتبتك"; r.pages = 250; r.currentPage = 147; r.locatorJSON = try JSONEncoder().encode(PaperBookPosition(page: 147)); r.shelf = "reading"; r.updatedAt = now; c.insert(r)
+            if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_COVER"] == "1", let jpeg = Self.fixtureCoverJPEG() {
+                // FB-36: a jacket photo on «رحلة القراءة», stored exactly as `book.saveCover` stores one.
+                let key = "book-cover:\(r.id.uuidString)", media = Media(); media.id = StableIdentity.uuid(for: key)
+                media.kind = "photo"; media.contentType = "image/jpeg"; media.sourceID = key; media.data = jpeg; media.sizeBytes = jpeg.count
+                media.sha256 = SHA256.hash(data: jpeg).map { String(format: "%02x", $0) }.joined(); c.insert(media)
+            }
             let want = Book(); want.title = "كتاب ينتظر"; want.author = "من مكتبتك"; want.shelf = "want"; want.pages = 180; c.insert(want)
             if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_FILE_ROW"] == "1" {
                 let nearEnd = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_FILE_NEAR_END"] == "1"

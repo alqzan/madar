@@ -10,7 +10,7 @@ import UIKit
         app.launchEnvironment=environment;app.launch();return app
     }
     private func open(_ app:XCUIApplication){let block=app.descendants(matching:.any).matching(identifier:"bahw-block-habits").firstMatch;XCTAssertTrue(block.waitForExistence(timeout:20));let header=app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { block.tap() };XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
-    private func shot(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
+    private func shot(_ app:XCUIApplication,_ name:String){let s=app.screenshot(),a=XCTAttachment(screenshot:s);a.name=name;a.lifetime = .keepAlways;add(a); if let dir=ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to:URL(fileURLWithPath:dir).appendingPathComponent(name+".png")) }}
     func testAutomaticThemeUsesResolvedAppearanceInLobbyAndHabitSheets() throws {
         continueAfterFailure = false
         // Fixture leaves core.theme at its schema default, auto. Only the root's resolved scheme is forced.
@@ -174,6 +174,25 @@ import UIKit
         save.tap(); XCTAssertTrue(save.waitForNonExistence(timeout: 10))
         XCTAssertTrue(band.waitForExistence(timeout: 5)); XCTAssertEqual(band.label, "أسبوعك خطوات صغيرة؛ يكفي أن تبدأ")
         shot(app, "Final-habits-past-saved-L")
+    }
+    /// FB-35 (owner, 5 Nov): Madar's own habits wait in the habits room; one tap opens the editor on that source, and a
+    /// habit already kept is not offered again.
+    func testRoomHabitsAreOfferedAndLeaveOnceAdded() throws {
+        continueAfterFailure=false;let app=app("empty");open(app)
+        let shelf=app.descendants(matching:.any)["habits-room-habits"]
+        for _ in 0..<3 where !(shelf.exists && shelf.isHittable) { app.swipeUp(velocity:.slow) }
+        XCTAssertTrue(shelf.waitForExistence(timeout:8),app.debugDescription)
+        let diary=app.buttons["habits-room-diaryLine"]
+        XCTAssertTrue(diary.exists && app.buttons["habits-room-review"].exists && app.buttons["habits-room-reading"].exists && app.buttons["habits-room-jamaah"].exists,app.debugDescription)
+        shot(app,"FB35-room-habits-L")
+        diary.tap()
+        let name=app.textFields["habit-name"];XCTAssertTrue(name.waitForExistence(timeout:5))
+        XCTAssertEqual(name.value as? String,"سطر اليوم")
+        shot(app,"FB35-room-habit-editor-L")
+        app.buttons["habit-save"].tap();XCTAssertTrue(name.waitForNonExistence(timeout:10))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","habit-row-")).firstMatch.waitForExistence(timeout:10))
+        XCTAssertFalse(app.buttons["habits-room-diaryLine"].exists,"A habit already kept is not offered again.")
+        XCTAssertTrue(app.buttons["habits-room-review"].exists,app.debugDescription)
     }
     func testEmptyAddCompleteFreezeRestoreAndRelaunch() throws {
         continueAfterFailure=false;let app=app("empty");open(app)

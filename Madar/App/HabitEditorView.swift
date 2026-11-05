@@ -15,6 +15,10 @@ private struct HabitEditorSnapshot: Equatable {
 }
 
 struct HabitEditorView:View {
+    /// A habit linked to a room starts with that room's own measure (the same values the source picker sets).
+    static let linkedDefaults: [String: (name: String, measure: HabitMeasure, unit: String, target: Int)] = [
+        "jamaah": ("الجماعة", .count, "صلاة", 5), "review": ("المراجعة", .count, "وجه", 1), "reading": ("القراءة", .duration, "minutes", 15),
+        "diaryLine": ("سطر اليوم", .count, "سطر", 1), "walking": ("المشي", .health, "steps", 6000)]
     @Environment(\.colorScheme) private var colorScheme
     @Bindable var session:AppSession
     let reading:HabitReading?
@@ -138,10 +142,10 @@ struct HabitEditorView:View {
             if let loaded=try? service.load() { paceGoal=try? service.readingGoal(today:loaded.day,book:MihbaraStand.pick(from:loaded.books)) }
         }
         .onAppear {
-            let initialName = reading?.name ?? (initialSource == "reading" ? "القراءة" : "")
+            let initialName = reading?.name ?? HabitEditorView.linkedDefaults[self.initialSource]?.name ?? ""
             let initialSource = reading?.source ?? self.initialSource
             var initialRule = reading?.summary.current?.rule ?? HabitRule(effectiveFrom:AppBahwService(session:session).today)
-            if reading == nil && initialSource == "reading" { initialRule.measure = .duration;initialRule.unit="minutes";initialRule.target=15 }
+            if reading == nil, let linked = HabitEditorView.linkedDefaults[initialSource] { initialRule.measure = linked.measure;initialRule.unit=linked.unit;initialRule.target=linked.target }
             initialRule.effectiveFrom=AppBahwService(session:session).today
             let initialMonthDays = initialRule.monthDays.map{digits.string($0)}.joined(separator:"، ")
             let initialMinimumOn = initialRule.minimum != nil

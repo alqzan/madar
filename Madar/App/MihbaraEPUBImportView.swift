@@ -33,6 +33,8 @@ import MadarDesign
             ]
             if let turathID { payload["turathID"] = .number(Double(turathID)) }
             try await app.executeBookCommand("book.importEPUB", payload: payload, id: commandID)
+            // FB-36: the EPUB's own cover goes on the book at once; a book without one keeps its binding.
+            if let cover = inspection.coverData, !cover.isEmpty { try? await app.saveBookCover(bookID, photo: cover) }
         }
         EPUBBookFiles.discard(id: inspection.id, root: app.bookStagingDirectory)
     }

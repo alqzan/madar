@@ -75,6 +75,20 @@ public enum BookBindings {
         return (max(x, y) + 0.05) / (min(x, y) + 0.05)
     }
 
+    /// FB-36: the binding whose leather is closest to a cover photo's average colour (0xRRGGBB), so a book with its
+    /// own cover keeps one of the twenty contrast-tested bindings on the shelf instead of an untested colour.
+    /// Distance is the "redmean" weighted RGB distance, which tracks perceived difference better than plain RGB.
+    public static func nearest(to rgb: UInt32) -> Int {
+        func parts(_ c: UInt32) -> (Double, Double, Double) { (Double((c >> 16) & 0xFF), Double((c >> 8) & 0xFF), Double(c & 0xFF)) }
+        let (r, g, b) = parts(rgb)
+        func distance(_ c: UInt32) -> Double {
+            let (r2, g2, b2) = parts(c), mean = (r + r2) / 2
+            let dr = r - r2, dg = g - g2, db = b - b2
+            return (2 + mean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - mean) / 256) * db * db
+        }
+        return all.indices.min { distance(all[$0].base) < distance(all[$1].base) } ?? 0
+    }
+
     /// A stable binding per book that never repeats its neighbour on the shelf.
     public static func indices(for ids: [UUID]) -> [UUID: Int] {
         var result: [UUID: Int] = [:], previous = -1

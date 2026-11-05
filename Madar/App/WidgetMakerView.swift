@@ -168,7 +168,8 @@ struct WidgetMakerView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack { Text("ماذا تعرض؟").font(MadarTypography.section()); Spacer(); if !draft.items.isEmpty { Button("امسح") { draft.items = [] }.font(MadarTypography.caption()).frame(minHeight: 44) } }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 2 : 3), spacing: 8) {
-                ForEach(WidgetMakerStyle.itemIDs, id: \.self) { id in
+                // FB-34: the Forty Nawawi left the Mihbara, so «حديث اليوم» is no longer offered (saved widgets keep working).
+                ForEach(WidgetMakerStyle.itemIDs.filter { $0 != "hadith" }, id: \.self) { id in
                     Button { toggle(id) } label: {
                         HStack { Text(title(id)).font(MadarTypography.caption()); Spacer(minLength: 3); if let n = draft.items.firstIndex(of: id) { Text(session.digits(n + 1)).font(MadarTypography.fine()).padding(5).background(theme.accentFill, in: .circle).foregroundStyle(theme.onAccent) } }
                             .padding(10).frame(maxWidth: .infinity, minHeight: 48).background(theme.surface, in: .rect(cornerRadius: 16))

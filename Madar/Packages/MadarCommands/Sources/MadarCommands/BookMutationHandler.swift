@@ -455,6 +455,35 @@ private struct GoodreadsImportSummary: Codable {
                 row.sha256 = SHA256.hash(data: drawing).map({ String(format: "%02x", $0) }).joined()
                 row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
             }
+        case .saveCover(let bookID, let image):
+            // FB-36 (owner, 5 Nov 2026): one cover photo per book, kept beside it as a Media row keyed by `sourceID`
+            // (no new field on Book). A new photo replaces the row; empty data tombstones it; a later photo restores it.
+            guard try book(bookID).deletedAt == nil else { throw DataError.invalidValue("الكتاب في المحذوفات") }
+            let key = "book-cover:\(bookID.uuidString)", stableID = StableIdentity.uuid(for: key)
+            let rows = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { $0.sourceID == key }))
+            let existing = rows.filter { $0.mergedInto == nil }.max(by: { $0.updatedAt < $1.updatedAt })
+            if image.isEmpty {
+                guard let row = existing, row.deletedAt == nil else { break }
+                row.deletedAt = now; row.deletionBarrierAt = now; row.data = nil; row.sizeBytes = 0; row.sha256 = ""
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+            } else {
+                guard let type = BookCommand.coverType(image) else { throw DataError.invalidValue("الغلاف صورة JPEG أو PNG") }
+                let row: Media
+                if let existing { row = existing }
+                else if let merged = rows.first(where: { $0.id == stableID }) { row = merged; row.mergedInto = nil }
+                else {
+                    guard try context.fetchCount(FetchDescriptor<Media>(predicate: #Predicate { $0.id == stableID })) == 0 else { throw DataError.invalidValue("معرّف الغلاف مستخدم بالفعل") }
+                    row = Media(); row.id = stableID; row.createdAt = now; context.insert(row)
+                }
+                if row.deletedAt != nil {
+                    let barrier = row.deletionBarrierAt ?? row.deletedAt ?? .distantPast
+                    row.restoredAt = max(now, barrier.addingTimeInterval(0.001)); row.deletedAt = nil
+                }
+                row.kind = "photo"; row.contentType = type; row.sourceID = key; row.state = "ok"
+                row.data = image; row.sizeBytes = image.count
+                row.sha256 = SHA256.hash(data: image).map({ String(format: "%02x", $0) }).joined()
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+            }
         }
         return command.isUndoable ? try JSONEncoder().encode(BookUndo(changes: changes, importedMediaIDs: importedMediaIDs.isEmpty ? nil : importedMediaIDs,
                                                                       restoredMedia: restoredMedia.isEmpty ? nil : restoredMedia)) : Data()

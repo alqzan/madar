@@ -471,7 +471,7 @@ struct MihbaraPaperEditor: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack { Text("كتاب ورقي").font(MadarTypography.title()); Spacer(); Button("إلغاء") { dismiss() } }
-                Text("كتابك على الطاولة، وموضعك في مدار.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                Text("كتابك على رفّ «أقرؤها الآن»، وموضعك في مدار.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
                 field("العنوان", text: $title, id: "mihbara-paper-title")
                 field("المؤلف", text: $author, id: "mihbara-paper-author")
                 field("عدد الصفحات، إن عرفته", text: $pages, id: "mihbara-paper-pages").keyboardType(.numberPad)
@@ -533,8 +533,8 @@ struct MihbaraBookCard: View {
     /// A book already on the table just continues; one on another shelf names the move it makes.
     private var paperBookStartTitle: String {
         if book.shelf == "reading" { return paperBookPrimaryAction }
-        if book.shelf == "finished" { return "ضعه على الطاولة وأعد قراءته" }
-        return "ضعه على الطاولة و" + (paperBookPrimaryAction == "ابدأه" ? "ابدأه" : "واصل القراءة")
+        if book.shelf == "finished" { return "أعد قراءته" }
+        return paperBookPrimaryAction == "ابدأه" ? "ابدأ قراءته" : "واصل القراءة"
     }
     private var paperIndexEditor: some View {
         MihbaraPaperIndexEditor(
@@ -551,11 +551,19 @@ struct MihbaraBookCard: View {
                 if book.kind == "paper" {
                     paperBookContent
                 } else {
-                    HStack { Text(book.title).font(MadarTypography.title()); Spacer(); Button("تمّ") { dismiss() } }
-                    Text(book.author).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                    if let size = MihbaraBookCovers.sizeWord(shape, digits) {
-                        Text(shape.flatMap { s in s.volumes > 1 ? s.pages.map { size + "، " + MihbaraCopy.pages($0, digits) } : nil } ?? size)
-                            .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("mihbara-book-size")
+                    HStack { Spacer(); Button("تمّ") { dismiss() } }
+                    // FB-36: the cover beside the title, as on the paper card; tap it to add or change the photo.
+                    HStack(alignment: .center, spacing: 16) {
+                        MihbaraCoverButton(app: app, book: book, books: books, shape: shape)
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(book.title).font(MadarTypography.title()).fixedSize(horizontal: false, vertical: true)
+                            Text(book.author).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                            if let size = MihbaraBookCovers.sizeWord(shape, digits) {
+                                Text(shape.flatMap { s in s.volumes > 1 ? s.pages.map { size + "، " + MihbaraCopy.pages($0, digits) } : nil } ?? size)
+                                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("mihbara-book-size")
+                            }
+                        }
+                        Spacer(minLength: 0)
                     }
                     if let finished = book.finished {
                         VStack(alignment: .leading, spacing: 4) {
@@ -563,8 +571,8 @@ struct MihbaraBookCard: View {
                             MadarDateLabel(app.dateLabels(GregorianDay.containing(finished, in: app.activePlace.timeZone)))
                         }
                     }
-                    MihbaraMarginNotesSection(app: app, bookID: book.id)
-                    if book.shelf != "reading" { Button("ضعه على الطاولة") { moveToReading() }.buttonStyle(MadarPrimaryButton()).disabled(saving).accessibilityIdentifier("mihbara-put-on-table") }
+                    MihbaraMarginNotesSection(app: app, bookID: book.id, page: book.page)
+                    if book.shelf != "reading" { Button(book.shelf == "want" ? "ابدأ قراءته" : "أعد قراءته") { moveToReading() }.buttonStyle(MadarPrimaryButton()).disabled(saving).accessibilityIdentifier("mihbara-put-on-table") }
                     if fileUnavailable {
                         Label("ملف الكتاب غير موجود على هذا الجهاز.", systemImage: "doc.badge.ellipsis")
                             .font(MadarTypography.body()).accessibilityIdentifier("mihbara-book-file-unavailable")
@@ -616,12 +624,8 @@ struct MihbaraBookCard: View {
     private var paperBookContent: some View {
         VStack(alignment: .leading, spacing: 17) {
             HStack(alignment: .center, spacing: 16) {
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(theme.ink.gradient)
-                    .frame(width: 62, height: 88)
-                    .overlay(alignment: .leading) { Rectangle().fill(theme.line.opacity(0.8)).frame(width: 4) }
-                    .shadow(color: theme.ink.opacity(0.16), radius: 7, x: 0, y: 5)
-                    .accessibilityHidden(true)
+                // FB-36: the book's own cover; tap it to add or change the photo.
+                MihbaraCoverButton(app: app, book: book, books: books, shape: shape)
                 VStack(alignment: .trailing, spacing: 7) {
                     Text(book.title).font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)).fixedSize(horizontal: false, vertical: true)
                     Text(book.author).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)

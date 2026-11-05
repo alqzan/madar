@@ -167,20 +167,12 @@ import XCTest
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: limits)], timeout: 10), .completed)
         app.buttons["tab-money"].tap()
         XCTAssertTrue(app.buttons["money-categories-open"].waitForExistence(timeout: 10))
-        openLayout("mihbara"); setVisible("mihbara", "notebook", false)
+        // FB-34: the Mihbara keeps only its shelves, and the editor offers no notebook or desk to hide.
+        openLayout("mihbara")
+        XCTAssertTrue(app.switches["room-block-mihbara-shelf"].waitForExistence(timeout: 10) || app.staticTexts["رفوف الكتب"].exists, app.debugDescription)
+        XCTAssertFalse(app.switches["room-block-mihbara-notebook"].exists)
+        XCTAssertFalse(app.switches["room-block-mihbara-desk"].exists)
         capture(app, "OR-03-mihbara-content-L")
-        app.buttons["tab-mihbara"].tap()
-        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.buttons["mihbara-notebook"].exists)
-        openLayout("mihbara"); app.buttons["room-layout-reset"].tap()
-        let notebook = app.switches["room-block-mihbara-notebook"]
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: notebook)], timeout: 10), .completed)
-        app.buttons["tab-mihbara"].tap()
-        let book = app.buttons["mihbara-notebook"]
-        XCTAssertTrue(book.waitForExistence(timeout: 15))
-        for _ in 0..<4 { if book.isHittable { break }; app.swipeUp() }
-        book.tap()
-        XCTAssertTrue(app.buttons["mihbara-notebook-close"].waitForExistence(timeout: 10))
     }
 
     func testSmartPresenceLevelsUndoPersistAndOpenSuggestedRooms() throws {

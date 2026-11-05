@@ -19,7 +19,10 @@ enum MihbaraBookCovers {
     }
 
     /// Stable per book, and never the same binding twice in a row on one shelf.
-    static func leatherIndices(for books: [MihbaraBook]) -> [UUID: Int] { BookBindings.indices(for: books.map(\.id)) }
+    /// FB-36: a book with its own cover photo takes the tested binding nearest the photo's colour.
+    @MainActor static func leatherIndices(for books: [MihbaraBook]) -> [UUID: Int] {
+        BookBindings.indices(for: books.map(\.id)).merging(MihbaraCoverStore.shared.bindings) { _, cover in cover }
+    }
 
     /// «رياض الصالحين - ت الرسالة الثاني» → («رياض الصالحين», «ت الرسالة الثاني»); «الداء والدواء = الجواب الكافي» keeps
     /// its alternative name as the subtitle. The full title stays in the accessibility label and the book card.
@@ -82,7 +85,42 @@ struct MihbaraBookCover: View {
         .shadow(color: theme.ink.opacity(0.18), radius: 6, x: 0, y: 6)
     }
 
-    private func face(title: (main: String, note: String?), fill: Color, ink: Color, width: CGFloat, height: CGFloat) -> some View {
+    @ViewBuilder private func face(title: (main: String, note: String?), fill: Color, ink: Color, width: CGFloat, height: CGFloat) -> some View {
+        if let photo = MihbaraCoverStore.shared.images[book.id] { photoFace(photo, ink: ink, width: width, height: height) }
+        else { boundFace(title: title, fill: fill, ink: ink, width: width, height: height) }
+    }
+
+    /// FB-36: the photo fills the board like a printed jacket: a light sheen across it, the hinge shadow at the spine,
+    /// a hairline gilt edge, and the reading progress on a soft dark foot so it reads on any photo.
+    private func photoFace(_ photo: UIImage, ink: Color, width: CGFloat, height: CGFloat) -> some View {
+        Image(uiImage: photo).resizable().scaledToFill()
+            .frame(width: width, height: height).clipped()
+            .overlay {
+                LinearGradient(stops: [.init(color: .white.opacity(0.22), location: 0), .init(color: .white.opacity(0.04), location: 0.35),
+                                       .init(color: .clear, location: 0.6), .init(color: .black.opacity(0.16), location: 1)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+            }
+            .overlay(alignment: .bottom) {
+                if book.shelf == "reading", let p = book.progress, MihbaraCopy.progressPercent(p) != nil {
+                    footer(ink: .white).padding(.horizontal, 10).padding(.bottom, 8).padding(.top, 18)
+                        .background(LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom))
+                        .foregroundStyle(.white)
+                }
+            }
+            .clipShape(.rect(topLeadingRadius: 3, bottomLeadingRadius: 3, bottomTrailingRadius: 8, topTrailingRadius: 8))
+            .overlay {
+                UnevenRoundedRectangle(topLeadingRadius: 3, bottomLeadingRadius: 3, bottomTrailingRadius: 8, topTrailingRadius: 8)
+                    .stroke(LinearGradient(colors: [theme.color("goldUnderstand").opacity(0.7), .white.opacity(0.15)], startPoint: .top, endPoint: .bottom), lineWidth: 0.8)
+            }
+            .overlay(alignment: .leading) {
+                LinearGradient(colors: [.black.opacity(0.34), .black.opacity(0.08), .white.opacity(0.12), .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 9).accessibilityHidden(true)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(book.title + (book.author.isEmpty ? "" : "، " + book.author))
+    }
+
+    private func boundFace(title: (main: String, note: String?), fill: Color, ink: Color, width: CGFloat, height: CGFloat) -> some View {
         let size: CGFloat = title.main.count <= 10 ? 20 : title.main.count <= 20 ? 17 : 15
         return VStack(spacing: 6) {
             // A thin gilt frame, the room's ornament on every cover.

@@ -15,7 +15,7 @@ struct QuranScreenHeader: View {
     let close: () -> Void
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: close) { Image(systemName: "chevron.backward").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("رجوع").accessibilityIdentifier("quran-screen-close")
+            Button(action: close) { Image(systemName: "chevron.backward").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("رجوع").accessibilityIdentifier("quran-screen-close")
             Text(title).font(quranSerif(28)); Spacer()
         }.padding(.vertical, 4)
     }
@@ -28,11 +28,19 @@ enum QuranLogTab: String, CaseIterable, Identifiable {
 struct QuranLogTabs: View {
     @Binding var selection: QuranLogTab
     @Environment(\.roomTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var lens
+    /// FB-35: a glass lens slides to the chosen period, like the tab bar.
     var body: some View {
         HStack(spacing: 3) {
             ForEach(QuranLogTab.allCases) { tab in
-                Button { selection = tab } label: { Text(tab.title).font(quranFont(12, bold: selection == tab)).frame(maxWidth: .infinity, minHeight: 44).background(selection == tab ? theme.surface : .clear, in: Capsule()) }
-                    .buttonStyle(.madarPlain).accessibilityIdentifier("quran-log-" + tab.id).accessibilityAddTraits(selection == tab ? .isSelected : [])
+                Button { withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) { selection = tab } } label: {
+                    Text(tab.title).font(quranFont(12, bold: selection == tab)).frame(maxWidth: .infinity, minHeight: 44)
+                        .background {
+                            if selection == tab { Capsule().fill(theme.surface.opacity(0.55)).glassEffect(.regular.interactive(), in: .capsule).matchedGeometryEffect(id: "lens", in: lens) }
+                        }
+                }
+                .buttonStyle(.madarPlain).accessibilityIdentifier("quran-log-" + tab.id).accessibilityAddTraits(selection == tab ? .isSelected : [])
             }
         }.padding(4).background(theme.color("track"), in: Capsule())
     }

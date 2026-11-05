@@ -131,7 +131,7 @@ struct QuranHifzCoachView: View {
         HStack(spacing: 10) {
             Button { sheet = .exit } label: {
                 Image(systemName: "xmark").font(.system(size: 19, weight: .regular))
-                    .frame(width: 44, height: 44).background(theme.color("track").opacity(0.35), in: Circle())
+                    .frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
             }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق الجلسة").accessibilityIdentifier("quran-session-close")
             VStack(spacing: 4) {
                 Text(state.title).font(font(14, bold: true)).lineLimit(1).minimumScaleFactor(0.8)

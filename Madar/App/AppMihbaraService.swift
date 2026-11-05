@@ -164,14 +164,7 @@ struct MihbaraMotivationCue: Identifiable {
             ))
         }
 
-        if let hadith = reading.todayHadiths.first {
-            cues.append(.init(
-                id: "hadith-\(hadith.number)", title: "ورد السنّة",
-                message: hadith.text,
-                source: reading.collection.title + " · الحديث " + digits.string(hadith.number) + "\n" + reading.collection.edition,
-                actionTitle: "افتح الحديث", hadithNumber: hadith.number
-            ))
-        }
+        // FB-34 (owner, 5 Nov): the Forty Nawawi left the Mihbara, so its «ورد السنّة» cue no longer appears.
         return cues
     }
 

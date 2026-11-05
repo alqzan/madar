@@ -20,7 +20,7 @@ struct MoneyBudgetView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 12) {
-                    Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
+                    Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                         .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-budget-close")
                     Text("تجاهله من الميزانيات").font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer(minLength: 0)

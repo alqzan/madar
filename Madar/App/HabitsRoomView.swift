@@ -35,7 +35,7 @@ extension HabitReading {
         HabitNameGlyph.symbol(for: name)
     }
 }
-struct HabitEditorIdentity: Identifiable { let id: UUID; var reading: HabitReading? = nil }
+struct HabitEditorIdentity: Identifiable { let id: UUID; var reading: HabitReading? = nil; var source = "custom" }
 struct HabitsRoomView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
@@ -56,6 +56,7 @@ struct HabitsRoomView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var viewLens
     private var theme: RoomTheme { .init(room:"bahw",dark:colorScheme == .dark) }
     private var digits: MadarNumberFormatter { .init(style:session.string("core.numerals") == "western" ? .western : .hindi) }
     private var active: [HabitReading] { readings.filter { !$0.archived } }
@@ -71,7 +72,7 @@ struct HabitsRoomView: View {
             }.padding(.horizontal,14).padding(.vertical,8)
             ScrollView {
                 VStack(alignment:.leading,spacing:8) {
-                    if active.isEmpty { empty }
+                    if active.isEmpty { empty; roomHabits }
                     else {
                         periodSummaries
                         if active.count > 1 && !dynamicTypeSize.isAccessibilitySize {
@@ -85,6 +86,7 @@ struct HabitsRoomView: View {
                         if showAll { allList } else { todayList }
                         Button { editor = .init(id:UUID()) } label: { Label("عادة صغيرة جديدة",systemImage:"plus").font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:48).overlay { RoundedRectangle(cornerRadius:16).stroke(theme.line,style:.init(lineWidth:1,dash:[4,4])) }.contentShape(.rect) }
                             .buttonStyle(.madarPlain).padding(.top,10).accessibilityIdentifier("habits-new")
+                        roomHabits
                     }
                     if readings.contains(where: \.archived) {
                         Button(showArchived ? "أخفِ العادات المحذوفة" : "عادات محذوفة") { showArchived.toggle() }.font(MadarTypography.caption()).frame(minHeight:44).accessibilityIdentifier("habit-archived")
@@ -122,7 +124,7 @@ struct HabitsRoomView: View {
             Button("احذف نهائيًا",role:.destructive) {if let row=deletingArchived{perform("habit.deleteArchived",["id":.string(row.id.uuidString)])};deletingArchived=nil}
             Button("إلغاء",role:.cancel){deletingArchived=nil}
         } message:{Text("تختفي العادة وسياساتها وتسجيلاتها. يتاح التراجع لعشر دقائق.")}
-        .sheet(item:$editor, onDismiss: { applyPendingBahwRootIfReady() }) { value in HabitEditorView(session:session,reading:value.reading,id:value.id).madarSheetErrorAlert(session) }
+        .sheet(item:$editor, onDismiss: { applyPendingBahwRootIfReady() }) { value in HabitEditorView(session:session,reading:value.reading,id:value.id,initialSource:value.source).madarSheetErrorAlert(session) }
         .sheet(item:$pastDay, onDismiss: { applyPendingBahwRootIfReady() }) { row in HabitPastDaySheet(session:session,reading:row) { reload() }.madarSheetErrorAlert(session) }
         .sheet(item:$detail,onDismiss:{
             detailPastDayDraftPresented = false
@@ -136,6 +138,54 @@ struct HabitsRoomView: View {
         session.bahwRootRequestID = nil
         session.habitsOpen = false
     }
+    /// FB-35 (owner, 5 Nov 2026): «سكشن العادات ابي فيه عادات التطبيق موجوده فيه مثل المذكرات والقرآن والورد».
+    /// The habits Madar already measures in its rooms wait here, each one tap from being tracked; one already kept is not offered.
+    private static let roomSources: [(source: String, title: String, detail: String, symbol: String, room: String)] = [
+        ("diaryLine", "سطر اليوم", "تُحسب حين تكتب في المذكرات", "MadarDiary", "notes"),
+        ("review", "المراجعة", "تُحسب من وجوه مراجعتك في القرآن", "MadarQuran", "quran"),
+        ("reading", "القراءة", "تُحسب من دقائق قراءتك في المحبرة", "books.vertical", "mihbara"),
+        ("jamaah", "الجماعة", "تُحسب من صلواتك في جماعة", "MadarPrayer", "salah"),
+        ("walking", "المشي", "تُحسب من خطواتك في تطبيق الصحة", "figure.walk", "bahw")]
+    private var roomHabitsLeft: [(source: String, title: String, detail: String, symbol: String, room: String)] {
+        let kept = Set(readings.filter { !$0.archived }.compactMap(\.source))
+        return Self.roomSources.filter { !kept.contains($0.source) && ($0.source != "walking" || HabitHealthStore.available) }
+    }
+    @ViewBuilder private var roomHabits: some View {
+        let left = roomHabitsLeft
+        if !left.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("من غرف مدار").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
+                Text("عادات يسجّلها مدار وحده مما تفعله في غرفه؛ أضفها لتظهر هنا مع عاداتك.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                ForEach(left, id: \.source) { item in
+                    Button { editor = .init(id: UUID(), source: item.source) } label: {
+                        HStack(spacing: 12) {
+                            let roomTheme = RoomTheme(room: item.room, dark: colorScheme == .dark)
+                            Group {
+                                if item.symbol.hasPrefix("Madar") { Image(item.symbol).resizable().scaledToFit() } else { Image(systemName: item.symbol).resizable().scaledToFit() }
+                            }
+                            .frame(width: 20, height: 20).foregroundStyle(roomTheme.accent)
+                            .frame(width: 40, height: 40).background(roomTheme.accent.opacity(0.12), in: .circle)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title).font(MadarTypography.section())
+                                Text(item.detail).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "plus").font(.system(size: 14, weight: .semibold)).frame(width: 34, height: 34)
+                                .glassEffect(.regular.interactive(), in: .circle).accessibilityHidden(true)
+                        }
+                        .padding(12).contentShape(.rect)
+                    }
+                    .buttonStyle(.madarPlain)
+                    .background(theme.surface, in: .rect(cornerRadius: 18))
+                    .accessibilityLabel("أضف عادة " + item.title + "، " + item.detail)
+                    .accessibilityIdentifier("habits-room-" + item.source)
+                }
+            }
+            .padding(.top, 18)
+            .accessibilityElement(children: .contain).accessibilityIdentifier("habits-room-habits")
+        }
+    }
+
     private var empty: some View {
         VStack(spacing:16) { HabitRingGlyph(share:0,done:false,symbol:nil,lineWidth:5).frame(width:60,height:60); Text("القليل الذي تدوم عليه").font(MadarTypography.title()); Text("اختر عادة صغيرة تبدأ بها، أو اربطها بما تسجّله في غرف مدار.").font(MadarTypography.body()).multilineTextAlignment(.center).foregroundStyle(theme.secondaryInk); Button { editor = .init(id:UUID()) } label: { Text("أضف أول عادة").font(MadarTypography.section()).padding(.horizontal,22).frame(minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-first") }.padding(28).frame(maxWidth:.infinity).background(theme.surface,in:.rect(cornerRadius:24)).padding(.top,25)
     }
@@ -288,14 +338,15 @@ struct HabitsRoomView: View {
             ForEach([false,true],id:\.self) { all in
                 let on = showAll == all && (!all || selectedPeriod == nil)
                 Button { withAnimation(reduceMotion ? nil : .snappy) { showAll = all; selectedPeriod = nil } } label: {
-                    Text(all ? "كل عاداتي" : "اليوم").font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:44)
-                        .background(on ? theme.accentFill.opacity(0.16) : .clear,in:.capsule)
-                        .overlay { Capsule().stroke(on ? theme.accentFill : theme.line,lineWidth:on ? 1.5 : 1) }
+                    Text(all ? "كل عاداتي" : "اليوم").font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:40)
+                        .background { if on { Capsule().fill(theme.accentFill.opacity(0.14)).glassEffect(.regular.interactive(), in: .capsule).matchedGeometryEffect(id:"lens",in:viewLens) } }
                         .foregroundStyle(on ? theme.ink : theme.secondaryInk).contentShape(.capsule)
                 }
                 .buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier(all ? "habits-view-all" : "habits-view-today")
             }
-        }.padding(.top,6)
+        }
+        // FB-35: one glass track with a lens that slides between «اليوم» and «كل عاداتي», like the tab bar.
+        .padding(4).background(theme.line.opacity(0.35),in:.capsule).padding(.top,6)
     }
     @ViewBuilder private var todayList: some View {
         let rows = todayRows, open = rows.filter { $0.summary.current?.met != true }, done = rows.filter { $0.summary.current?.met == true }

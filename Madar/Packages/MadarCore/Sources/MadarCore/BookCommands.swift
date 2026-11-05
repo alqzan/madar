@@ -29,14 +29,26 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case saveUserWord(id: UUID, word: String, language: String, bookID: UUID, bookTitle: String, locatorJSON: Data, context: String)
     /// Owner, 30 Oct 2026: the drawing on one PDF file page (0-based), as PencilKit data; empty data clears the page.
     case savePageInk(bookID: UUID, page: Int, drawing: Data)
+    /// FB-36 (owner, 5 Nov 2026): «لو اضفت غلاف الكتاب… يطلع له شكل حلو». The cover photo of any book, JPEG or PNG;
+    /// empty data takes the cover off and the book wears its binding again.
+    case saveCover(bookID: UUID, image: Data)
     public static let highlightColors: Set<String> = ["yellow", "green", "rose"]
-    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.importGoodreads", "book.delete", "book.restore", "book.removeFile", "book.restoreFile", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save", "ink.savePage"]
+    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.importGoodreads", "book.delete", "book.restore", "book.removeFile", "book.restoreFile", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save", "ink.savePage", "book.saveCover"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
         if case .removeBookFile = self { return false }
         // Saved as the reader draws; PencilKit's own undo covers the strokes while the page is open.
         if case .savePageInk = self { return false }
+        // The card offers «أزل الغلاف» and «غيّر الغلاف»; an undo chip for a photo is noise (owner: undo only where it matters).
+        if case .saveCover = self { return false }
         return true
+    }
+    /// The cover's media type from its first bytes: JPEG (FF D8 FF) or PNG (89 50 4E 47 0D 0A 1A 0A); anything else is refused.
+    public static func coverType(_ data: Data) -> String? {
+        let head = [UInt8](data.prefix(8))
+        if head.count >= 3, head[0] == 0xFF, head[1] == 0xD8, head[2] == 0xFF { return "image/jpeg" }
+        if head == [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] { return "image/png" }
+        return nil
     }
     public static func parse(_ name: String, _ p: [String: JSONValue]) -> Self? {
         func text(_ key: String) -> String? { if case .string(let s) = p[key] { s } else { nil } }
@@ -78,6 +90,12 @@ public enum BookCommand: Codable, Equatable, Sendable {
                   let page = integer("page"), let encoded = text("drawing"), encoded.count <= 11_000_000,
                   let drawing = Data(base64Encoded: encoded), drawing.count <= 8_000_000 else { return nil }
             return .savePageInk(bookID: bookID, page: page, drawing: drawing)
+        }
+        if name == "book.saveCover" {
+            guard Set(p.keys) == ["bookID", "image"], let bookID = text("bookID").flatMap(UUID.init(uuidString:)),
+                  let encoded = text("image"), encoded.count <= 4_200_000, let image = Data(base64Encoded: encoded),
+                  image.count <= 3_000_000, image.isEmpty || Self.coverType(image) != nil else { return nil }
+            return .saveCover(bookID: bookID, image: image)
         }
         if name == "word.save" {
             guard Set(p.keys) == ["id", "word", "language", "bookID", "bookTitle", "locator", "context"],

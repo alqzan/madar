@@ -17,6 +17,9 @@ struct MihbaraMarginNote: Identifiable, Equatable {
         return value.isEmpty ? nil : value
     }
 
+    /// A note on the book as a whole, not on a passage: the reader's locator shape with the book itself as its place.
+    static let bookLocator = #"{"href":"book","type":"text/plain"}"#
+
     @MainActor static func load(_ app: AppSession, bookID: UUID) throws -> [MihbaraMarginNote] {
         try ModelContext(app.container).fetch(FetchDescriptor<NotebookNote>())
             .filter { $0.targetID == bookID && $0.link == "page" && !$0.isPrivate && $0.deletedAt == nil && $0.mergedInto == nil && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -31,16 +34,26 @@ struct MihbaraMarginNote: Identifiable, Equatable {
 struct MihbaraMarginNotesSection: View {
     let app: AppSession
     let bookID: UUID
+    /// FB-34 (owner, 5 Nov: «ابي اكتب بحاشيه كل كتاب»): a new margin note sits at the page you stand on.
+    var page: Int? = nil
     @Environment(\.roomTheme) private var theme
     @State private var notes: [MihbaraMarginNote] = []
     private var digits: MadarNumberFormatter { .init(style: app.string("core.numerals") == "western" ? .western : .hindi) }
 
     var body: some View {
         // A container that always exists, so `.task` runs even before there is anything to list.
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(notes.isEmpty ? "حاشية الكتاب" : "حواشيك على الكتاب").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
+                Spacer()
+                NavigationLink {
+                    MihbaraMarginNoteEditor(app: app, note: .init(id: UUID(), bookID: bookID, text: "", locator: MihbaraMarginNote.bookLocator, page: page, updatedAt: .now)) { load() }
+                        .environment(\.roomTheme, theme)
+                } label: { Label("اكتب في الحاشية", systemImage: "square.and.pencil").font(MadarTypography.caption()).frame(minHeight: 44) }
+                .accessibilityIdentifier("mihbara-margin-new")
+            }
             if !notes.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("هوامشك على الكتاب").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
                     ForEach(notes) { note in
                         NavigationLink {
                             MihbaraMarginNoteEditor(app: app, note: note) { load() }.environment(\.roomTheme, theme)
@@ -102,7 +115,7 @@ struct MihbaraMarginNoteEditor: View {
             TextEditor(text: $text).font(MadarTypography.body()).scrollContentBackground(.hidden).focused($focused)
                 .padding(10).background(theme.surface, in: .rect(cornerRadius: 16))
                 .accessibilityLabel("نص الملاحظة").accessibilityIdentifier("mihbara-margin-text")
-            Text(trimmed.count > 2000 ? "اختصر الملاحظة إلى ألفي حرف حتى تُحفظ." : "تبقى مربوطة بهذه الفقرة في دفتر الكتاب.")
+            Text(trimmed.count > 2000 ? "اختصر الملاحظة إلى ألفي حرف حتى تُحفظ." :  (note.passage == nil ? "تبقى في حاشية الكتاب، وتظهر لك على الرف حين تقترب منها." : "تبقى مربوطة بهذه الفقرة في حاشية الكتاب."))
                 .font(MadarTypography.fine()).foregroundStyle(trimmed.count > 2000 ? theme.ink : theme.secondaryInk)
         }
         .padding(20)

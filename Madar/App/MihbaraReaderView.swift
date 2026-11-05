@@ -1432,7 +1432,7 @@ struct MihbaraReaderView: View {
         ]
         if let page = card.page { payload["page"] = .number(Double(page)) }
         do {
-            try await app.executeBookCommand("notebook.savePage", payload: payload, undoMessage: "دُوّنت الملاحظة في دفتر الكتاب")
+            try await app.executeBookCommand("notebook.savePage", payload: payload, undoMessage: "دُوّنت في حاشية الكتاب")
             readerUndoID = app.undoToken?.id
             noteDraft = nil
             closeWordCard()

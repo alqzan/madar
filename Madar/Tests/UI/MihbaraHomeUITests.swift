@@ -122,6 +122,69 @@ import UIKit
         app.terminate()
     }
 
+    /// FB-34 (owner, 5 Nov): three plain shelves top to bottom, no desk or notebook; the book card writes in the margin.
+    func testThreeShelvesReadingWantFinishedWithoutDesk() throws {
+        continueAfterFailure = false
+        let app = app("home", fileRow: true)
+        app.launchEnvironment["MADAR_UI_MIHBARA_MARGIN_NOTE"] = "1"
+        app.launch()
+        open(app)
+        let reading = app.descendants(matching: .any)["mihbara-shelf-reading"]
+        XCTAssertTrue(reading.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-notebook"].exists)
+        XCTAssertFalse(app.buttons["mihbara-wird-open"].exists)
+        shot(app, "FB34-shelves-L")
+        let want = app.descendants(matching: .any)["mihbara-shelf-want"], finished = app.descendants(matching: .any)["mihbara-shelf-finished"]
+        XCTAssertTrue(want.exists && finished.exists, app.debugDescription)
+        XCTAssertLessThan(reading.frame.minY, want.frame.minY); XCTAssertLessThan(want.frame.minY, finished.frame.minY)
+        app.swipeUp(velocity: .slow)
+        shot(app, "FB34-shelves-s1-L")
+        app.buttons["mihbara-library"].tap()
+        let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-library-book-' AND label CONTAINS 'ملف قابل للتعديل'")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        shot(app, "FB34-book-card-L")
+        let write = app.descendants(matching: .any)["mihbara-margin-new"]
+        for _ in 0..<4 where !(write.exists && write.isHittable) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(write.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "FB34-book-margin-L")
+        app.terminate()
+    }
+
+    /// FB-36 (owner, 5 Nov): a book's own cover photo shows on its face in «بين يديك» and the library, and the card
+    /// lets the reader change or take it off.
+    func testBookCoverPhotoShowsOnTheBookAndCanBeRemoved() throws {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launchEnvironment["MADAR_UI_MIHBARA_COVER"] = "1"
+        app.launch()
+        open(app)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-shelf-reading"].waitForExistence(timeout: 10), app.debugDescription)
+        shot(app, "FB36-shelves-L")
+        let now = app.descendants(matching: .any)["mihbara-reading-now"]
+        for _ in 0..<4 where !(now.exists && now.isHittable) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(now.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "FB36-reading-now-L")
+        app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
+        app.buttons["mihbara-library"].tap()
+        let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-library-book-' AND label CONTAINS 'رحلة القراءة'")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "FB36-library-L")
+        book.tap()
+        let cover = app.buttons["mihbara-cover-button"]
+        XCTAssertTrue(cover.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(cover.label, "غلاف الكتاب")
+        shot(app, "FB36-book-card-L")
+        cover.tap()
+        let remove = app.buttons["أزل صورة الغلاف"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["غيّر صورة الغلاف"].exists)
+        shot(app, "FB36-cover-menu-L")
+        remove.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier == 'mihbara-cover-button' AND label == 'أضف صورة الغلاف'")).firstMatch.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "FB36-book-card-removed-L")
+        app.terminate()
+    }
+
     /// Owner, 30 Oct: a note written on a passage is listed on the book card and edits in a full page with the passage.
     func testMarginNoteEditsInAFullPageWithItsPassage() throws {
         continueAfterFailure = false
@@ -239,6 +302,7 @@ import UIKit
     }
 
     func testMihbaraDeskRouteClosesReaderAndReturnsToTable() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
         let app = app("reader", epub: try Data(contentsOf: fixtureURL))
@@ -275,7 +339,8 @@ import UIKit
         app.terminate()
     }
 
-    func testMihbaraDeskRouteClosesLibraryAndReturnsToTable() {
+    func testMihbaraDeskRouteClosesLibraryAndReturnsToTable() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
         let app = app("home")
         app.launch(); open(app)
@@ -478,7 +543,8 @@ import UIKit
         app.terminate()
     }
 
-    func testMihbaraNotebookDeepLinkOpensItsRequestedPrivateNote() {
+    func testMihbaraNotebookDeepLinkOpensItsRequestedPrivateNote() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
         let app = app("home"); app.launchEnvironment["MADAR_UI_MIHBARA_MULTIPLE_NOTES"] = "1"; app.launch(); open(app)
         let notebook = app.buttons["mihbara-notebook"]
@@ -621,7 +687,8 @@ import UIKit
         XCTAssertTrue(rows.firstMatch.label.contains("كتاب بلا ملف"), rows.firstMatch.label)
     }
 
-    func testGoodreadsCSVPreviewImportsBookAndLinkedPrivateNote() {
+    func testGoodreadsCSVPreviewImportsBookAndLinkedPrivateNote() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
         let csv = "Book Id,Title,Author,Additional Authors,ISBN,ISBN13,My Rating,Exclusive Shelf,Date Read,Read Count,My Review,Private Notes,Number of Pages,Year Published,Date Added,Bookshelves\r\n"
             + "9001,رحلة Goodreads,أحمد,,,9780306406157,4,currently-reading,,1,\"مراجعة متعددة\r\nالسطور\",ملاحظة من Goodreads,120,2020,2020/02/01,favorites\r\n"
@@ -695,7 +762,8 @@ import UIKit
         XCTAssertTrue(restoredNote.label.contains("رحلة Goodreads"), restoredNote.label)
     }
 
-    func testMihbaraLinkWaitsForAnUnsavedNotebookDraft() {
+    func testMihbaraLinkWaitsForAnUnsavedNotebookDraft() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
         let app = app("home")
         app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
@@ -721,7 +789,8 @@ import UIKit
         app.terminate()
     }
 
-    func testMihbaraNotebookTargetLinkWaitsForDraftThenOpensRequestedNote() {
+    func testMihbaraNotebookTargetLinkWaitsForDraftThenOpensRequestedNote() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
         let app = app("home")
         app.launchEnvironment["MADAR_UI_MIHBARA_MULTIPLE_NOTES"] = "1"
@@ -771,7 +840,8 @@ import UIKit
         app.terminate()
     }
 
-    func testPrivateNoteFailedSaveKeepsDraftAndRetryPersistsIt() {
+    func testPrivateNoteFailedSaveKeepsDraftAndRetryPersistsIt() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
         let app = app("empty")
         app.launchEnvironment["MADAR_UI_NOTE_FAIL_FIRST_SAVE"] = "1"
@@ -809,7 +879,8 @@ import UIKit
         XCTAssertTrue(notes.firstMatch.label.contains(draft))
     }
 
-    func testPrivateNoteExplainsLengthLimitAndCanDiscardWithoutSaving() {
+    func testPrivateNoteExplainsLengthLimitAndCanDiscardWithoutSaving() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
         let app = app("empty"); app.launch(); open(app)
         let notebook = app.buttons["mihbara-notebook"]
@@ -999,7 +1070,8 @@ import UIKit
         }
         XCTAssertTrue(button.isHittable)
     }
-    func testHomeWirdExplicitUnderstandingUndoAndRelaunch() {
+    func testHomeWirdExplicitUnderstandingUndoAndRelaunch() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
         XCTAssertFalse(app.buttons["tab-customize"].isHittable)
         XCTAssertTrue(app.buttons["mihbara-shelf-finished"].waitForExistence(timeout:8))
@@ -1371,7 +1443,8 @@ import UIKit
         app.descendants(matching: .any)["mihbara-add-source-paper"].tap()
         XCTAssertTrue(app.textFields["mihbara-paper-title"].waitForExistence(timeout:8), app.debugDescription)
     }
-    func testPrivateNotebookOpensWithTheAlreadyUnlockedApp() {
+    func testPrivateNotebookOpensWithTheAlreadyUnlockedApp() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
         let notebook = app.buttons["mihbara-notebook"]; reach(app, notebook); notebook.tap()
         XCTAssertTrue(app.staticTexts["سر لا يظهر قبل المصادقة"].waitForExistence(timeout:8), app.debugDescription)
@@ -1379,7 +1452,8 @@ import UIKit
         shot(app, "UX-01-private-notebook-L")
         app.buttons["mihbara-notebook-close"].tap()
     }
-    func testNotebookReadFailureDoesNotPretendToBeEmptyAndCanRetry() {
+    func testNotebookReadFailureDoesNotPretendToBeEmptyAndCanRetry() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
         let app = app("home")
         app.launchEnvironment["MADAR_UI_NOTE_READ_FAILURE_ONCE"] = "1"
@@ -1396,7 +1470,8 @@ import UIKit
         shot(app, "AU-46-notebook-read-recovered-L")
         app.buttons["mihbara-notebook-close"].tap()
     }
-    func testRahlOpeningChoiceResetUndoAndRelaunch() {
+    func testRahlOpeningChoiceResetUndoAndRelaunch() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the reading desk and its opening choice left the Mihbara.")
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
         let preferences = app.buttons["mihbara-opening-preference"]; reach(app, preferences); preferences.tap()
         let afterFajr = app.buttons["mihbara-rahlOpens-afterFajr"]
@@ -1432,7 +1507,8 @@ import UIKit
 
     /// OR-32 (owner mockup A): the drawer gave way to «أكمل من حيث وقفت» for the other book in hand, and the
     /// library became a wall of covers.
-    func testContinueCardOpensTheOtherBookAndLibraryShowsCovers() {
+    func testContinueCardOpensTheOtherBookAndLibraryShowsCovers() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
         let app = app("home"); app.launchEnvironment["MADAR_UI_MIHBARA_SECOND_READING"] = "1"; app.launch(); open(app)
         XCTAssertFalse(app.buttons["mihbara-sunnah-drawer"].exists)
@@ -1462,7 +1538,8 @@ import UIKit
         shot(app, "M6-V15-library-covers-L")
     }
 
-    func testOnlyBookInHandShowsNoContinueCard() {
+    func testOnlyBookInHandShowsNoContinueCard() throws {
+        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
         let app = app("home"); app.launch(); open(app)
         for _ in 0..<4 { app.swipeUp(velocity: .slow) }

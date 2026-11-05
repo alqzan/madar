@@ -94,6 +94,7 @@ struct MihbaraHomeView: View {
             #endif
             load()
             MihbaraConversions.shared.onFinished = { load() }
+            await MihbaraCoverStore.shared.reload(app.container)
         }
         .modifier(MihbaraConversionOffer(app: app, book: $offerConversion))
         .onChange(of: app.mihbaraBookToOpen) { _, _ in openSpotlightBookIfNeeded() }
@@ -215,7 +216,8 @@ struct MihbaraHomeView: View {
                     MadarDateLabel(app.dateLabels(reading.day)).foregroundStyle(theme.secondaryInk)
                     conversionCards
                     shelfView(reading)
-                    deskAndContinuation(reading)
+                    // FB-34 (owner, 5 Nov: «الاحصائيات حقت الكتب شف لها طريقه»): what the stand used to tell, for every book in hand.
+                    MihbaraReadingNow(app: app, books: reading.books, shapes: shapes, digits: service.digits, open: { openBook($0) })
                     if let readingGoal {
                         MihbaraReadingGoalCard(app: app, goal: readingGoal, digits: service.digits,
                                                onCreate: { goalEditor = .init(reading: nil) },
@@ -511,7 +513,7 @@ struct MihbaraHomeView: View {
     /// A book can change shelf from where it sits: long-press its spine or its library row. The table holds three at most.
     @ViewBuilder private func bookMenu(_ b: MihbaraBook) -> some View {
         let conversionRunning = MihbaraConversions.shared.job(for: b.id)?.state.isActive == true
-        if b.shelf != "reading" { Button { moveBook(b, to: "reading") } label: { Label(b.shelf == "finished" || b.shelf == "old" ? "أعد قراءته على الطاولة" : "ضعه على الطاولة", systemImage: "book.pages") } }
+        if b.shelf != "reading" { Button { moveBook(b, to: "reading") } label: { Label(b.shelf == "finished" || b.shelf == "old" ? "أعد قراءته" : "ابدأ قراءته", systemImage: "book.pages") } }
         if b.shelf == "reading" {
             Button { moveBook(b, to: "finished") } label: { Label("أنهيته", systemImage: "checkmark.circle") }
             Button { moveBook(b, to: "want") } label: { Label("أعده إلى أبي أقرأها", systemImage: "bookmark") }
@@ -614,7 +616,8 @@ struct MihbaraHomeView: View {
     /// finished — with no tabs; the book you are reading stands open on the stand in front of it.
     private func shelfView(_ r: MihbaraHomeReading) -> some View {
         let leathers = MihbaraBookCovers.leatherIndices(for: r.books)
-        let readingBooks = shelfBooks(r.books, "reading").filter { $0.id != tableBook?.id }
+        // FB-34: no stand any more, so every book you are reading stands on the top shelf.
+        let readingBooks = shelfBooks(r.books, "reading")
         let want = shelfBooks(r.books, "want"), finished = shelfBooks(r.books, "finished")
         return VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -630,8 +633,9 @@ struct MihbaraHomeView: View {
                 MihbaraShelfPlank().padding(.top, -14)
             } else {
                 VStack(spacing: 10) {
-                    if !readingBooks.isEmpty {
-                        wallShelf("reading", "أقرؤها") { bookcase(readingBooks, leathers: leathers, maxRows: 2) }
+                    wallShelf("reading", "أقرؤها الآن") {
+                        if readingBooks.isEmpty { emptyWallShelf(want.isEmpty ? "ما تبدأ قراءته يقف هنا في أعلى المكتبة." : "اضغط كتابًا من «أبي أقرأها» مطوّلًا ثم «ابدأ قراءته».") }
+                        else { bookcase(readingBooks, leathers: leathers, maxRows: 2) }
                     }
                     wallShelf("want", "أبي أقرأها") {
                         if want.isEmpty { emptyWallShelf("ما تنوي قراءته يقف هنا حتى تبدأه.") }

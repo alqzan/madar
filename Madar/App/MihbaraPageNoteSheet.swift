@@ -59,7 +59,7 @@ struct MihbaraPageNoteSheet: View {
                 Text("اختصر الملاحظة إلى ألفي حرف حتى تُحفظ.").font(MadarTypography.fine()).foregroundStyle(palette.ink)
                     .accessibilityIdentifier("mihbara-note-too-long")
             } else {
-                Text("تُحفظ في دفتر هذا الكتاب مربوطة بهذه الفقرة.").font(MadarTypography.fine()).foregroundStyle(palette.ink2)
+                Text("تُحفظ في حاشية هذا الكتاب مربوطة بهذه الفقرة.").font(MadarTypography.fine()).foregroundStyle(palette.ink2)
             }
         }
         .padding(20)

@@ -68,9 +68,7 @@ struct MoneyGoalView: View {
                     Button {
                         dismiss()
                     } label: {
-                        Image(systemName: "xmark").frame(width: 44, height: 44).overlay {
-                            Circle().stroke(theme.color("reserveText"))
-                        }
+                        Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
                     }.accessibilityIdentifier("money-goal-close"); Text("جهّز لشيء قادم").font(MadarTypography.title());
                     Spacer()
                 }
