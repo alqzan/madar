@@ -131,7 +131,7 @@ struct DiaryDayOneImportView: View {
                 card {
                     sectionTitle("الوسوم")
                     Text(p.tags.map { "#" + $0 }.joined(separator: "  ")).font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("dayone-preview-tags")
-                    Text(p.tagBackfill > 0 ? "تُستعاد وسوم المدخلات القديمة من الملف الأصلي، وتبقى كتاباتك ومشاريعك كما هي." : "أول وسم في كل مدخلة يصير فصلًا في «المشاريع» (" + p.projects.joined(separator: "، ") + ")، وتبقى كل الوسوم مع النجمة والطقس في ملف داي ون الأصلي المحفوظ معها.")
+                    Text(p.tagBackfill > 0 ? "تُستعاد وسوم المدخلات القديمة من الملف الأصلي، وتبقى كتاباتك كما هي." : "تبقى كل الوسوم مع النجمة والطقس في ملف داي ون الأصلي المحفوظ معها.")
                         .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).fixedSize(horizontal: false, vertical: true)
                 }
             }

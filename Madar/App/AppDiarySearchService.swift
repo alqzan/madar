@@ -12,7 +12,8 @@ struct DiarySearchIndex {
         let allTags = Set(documents.flatMap(\.tags)).sorted()
         var seenTags=Set<String>()
         let tags = allTags.filter { seenTags.insert(DiarySearchParser.normalize($0)).inserted }.map { tag in ("#" + tag,"#" + tag,Set(documents.filter { doc in doc.tags.contains { DiarySearchParser.normalize($0)==DiarySearchParser.normalize(tag) } }.map(\.day)).count) }
-        return (places+projects+tags).sorted { $0.0 < $1.0 }
+        _ = projects // Projects left the app (owner, 5 Nov 2026).
+        return (places+tags).sorted { $0.0 < $1.0 }
     }
 }
 extension AppDiaryService {

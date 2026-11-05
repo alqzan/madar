@@ -15,6 +15,8 @@ struct HabitDetailView:View {
     @Environment(\.dismiss) private var dismiss
     @State private var busy=false
     @State private var pastDay=false
+    /// Read once when the page opens; it was rebuilt from every prayer log on each redraw of the «جمّد» menu.
+    @State private var onTrip=false
     /// A month or a year apart, the habit is kept by «آخر مرة» (item 26 «ج»): that leads the page.
     private var keptBySince:Bool { reading.source == nil && [.monthly,.yearly].contains(reading.summary.current?.rule.frequency) }
     private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
@@ -34,6 +36,7 @@ struct HabitDetailView:View {
             }.padding(22)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.roomTheme,theme)
         .sheet(isPresented:$pastDay, onDismiss: { pastDayDraftPresented = false }) { HabitPastDaySheet(session:session,reading:reading) { dismiss() }.madarSheetErrorAlert(session) }
+        .task { onTrip = (try? PrayerRepository(context:ModelContext(session.container)).activeTrip(at:session.prayerNow())) != nil }
     }
     /// The period at a glance: its arch filling with progress, what is left, and the one action that moves it.
     private func hero(_ current:HabitPeriodResult)->some View {
@@ -91,7 +94,7 @@ struct HabitDetailView:View {
             else {
                 Menu {
                     Button("جمّد أسبوعًا"){freeze(week:true)};Button("جمّد حتى أفكّه"){freeze(week:false)};Button("جمّد من أمس حتى أفكّه"){freeze(week:false,yesterday:true)}
-                    if (try? PrayerRepository(context:ModelContext(session.container)).activeTrip(at:session.prayerNow())) != nil { Button("حتى أعود من السفر"){freeze(week:false,trip:true)} }
+                    if onTrip { Button("حتى أعود من السفر"){freeze(week:false,trip:true)} }
                 } label: { outline(Label("جمّد",systemImage:"snowflake")) }.accessibilityIdentifier("habit-freeze")
             }
             Button { dismiss();edit() } label: { outline(Label("عدّل",systemImage:"pencil")) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-edit")

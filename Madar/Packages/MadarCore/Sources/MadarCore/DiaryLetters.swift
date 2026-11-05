@@ -55,8 +55,10 @@ public enum DiaryLetters {
             }
             return world.trips.contains{$0.live && after(letter.trigger == .tripStart ? $0.start:$0.end)} ? .eligible:.sealed
         case .projectFinished:
+            // Owner, 5 Nov 2026: projects left Madar, so nothing can finish one any more. A letter waiting on an unfinished project
+            // would stay sealed for ever; it becomes «هدف رسالتك حُذف» instead, which the user opens now or gives a date.
             guard let target=letter.target,let project=world.projects.first(where:{$0.id==target}),project.live else {return .orphaned}
-            return after(project.finishedAt) ? .eligible:.sealed
+            return after(project.finishedAt) ? .eligible:.orphaned
         }
     }
 }

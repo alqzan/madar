@@ -33,7 +33,7 @@ struct DiaryLetterTests {
     }
     @Test func deletedTargetOrphansAndNothingMovesBackwards() throws {
         let project=UUID(),l=try letter(.projectFinished,target:project)
-        #expect(DiaryLetters.evaluate(l,in:try world("2026-11-01T10:00:00+03:00",today:"2026-11-01",projects:[.init(id:project,finishedAt:nil,live:true)])) == .sealed)
+        #expect(DiaryLetters.evaluate(l,in:try world("2026-11-01T10:00:00+03:00",today:"2026-11-01",projects:[.init(id:project,finishedAt:nil,live:true)])) == .orphaned)
         #expect(DiaryLetters.evaluate(l,in:try world("2026-11-01T10:00:00+03:00",today:"2026-11-01",projects:[.init(id:project,finishedAt:nil,live:false)])) == .orphaned)
         #expect(DiaryLetters.evaluate(l,in:try world("2026-11-01T10:00:00+03:00",today:"2026-11-01",projects:[.init(id:project,finishedAt:at("2026-10-20T10:00:00+03:00"),live:true)])) == .eligible)
         for state in [DiaryLetterState.eligible,.opened,.orphaned] {

@@ -103,6 +103,8 @@ final class AppSession {
     }
     /// A swipe down puts the toast away; the undo itself stays valid until its token expires, as before.
     func hideUndoToast() { toastTask?.cancel(); setUndoToast(false) }
+    /// Screens that draw their own undo line right now (`hostsUndo`).
+    var localUndoHosts = 0
     var errorMessage: String?
     var onboardingComplete = false
     var selectedTab = "foundation"
@@ -126,6 +128,9 @@ final class AppSession {
         return rows
     }
     private(set) var prayerWriteInProgress = false
+    /// Caches for `AppBahwService.prayerLocation()` and `.today`, keyed by [prayerRevision, minute].
+    @ObservationIgnored var bahwLocationCache: (key: [Int], place: ActivePlace, options: PrayerCalculationOptions)?
+    @ObservationIgnored var bahwTodayCache: (key: [Int], day: GregorianDay)?
     #if DEBUG
     @ObservationIgnored var failFirstNotebookSave = false
     @ObservationIgnored private var failFirstGoodreadsImport = false
@@ -1306,8 +1311,15 @@ final class AppSession {
         container = replacement; store = SettingsStore(context: ModelContext(replacement), schema: schema)
         undoToken = nil; setUndoToast(false); expiryTask?.cancel()
     }
+    /// Owner, 5 Nov 2026: «زر التراجع الغبي ذا شله، خله باماكن بسيطه بس لاشياء تستحق التراجع مهب في كل مكان». Every save used to raise
+    /// a «تراجع» chip. Only a removal (something the user would lose) shows it now; every other change is simply done, and is corrected
+    /// where it was made. The undo token itself is unchanged, so the screens that offer their own undo still work.
+    static func undoIsWorthShowing(_ message: String) -> Bool {
+        ["حُذف", "حذف", "أُزيل", "أزيل"].contains { message.hasPrefix($0) }
+    }
     private func showUndo(_ token: AppUndoToken, message: String) {
-        undoToken = token; undoMessage = message; setUndoToast(true); expiryTask?.cancel(); toastTask?.cancel()
+        undoToken = token; undoMessage = message; expiryTask?.cancel(); toastTask?.cancel()
+        setUndoToast(Self.undoIsWorthShowing(message))
         toastTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Self.undoToastSeconds))
             guard !Task.isCancelled else { return }
@@ -1334,7 +1346,36 @@ final class AppSession {
         guard case .number(let lat) = city["lat"], case .number(let lon) = city["lon"], case .string(let zone) = city["tz"], let place = try? ActivePlace(latitude: lat, longitude: lon, timeZoneID: zone) else { return .riyadh }
         return place
     }
+    /// Owner, 5 Nov 2026: «يعلق التطبيق… بالتحريك بالانتقال بين الاقسام بالخروج والدخول». Every write and every return to the app
+    /// rebuilt every widget snapshot (prayer times, Quran, each room, the catalogue) on the main thread before the screen could move.
+    /// Widgets only need the files when the user looks away, so writes now ask for one coalesced publication shortly after the
+    /// last change, and leaving the app (`flushPendingSnapshot`) writes it at once. Privacy redaction and hosted tests stay immediate.
+    @ObservationIgnored private var snapshotTask: Task<Void, Never>?
+    static let publishesSnapshotsImmediately = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     func publishSnapshot() throws {
+        // In the background (a prayer logged from its notification, a widget's inbox drain) there is no screen to keep smooth and the
+        // app may be suspended at any moment, so the files are written now.
+        if privacyScopeTransitionPending || Self.publishesSnapshotsImmediately || UIApplication.shared.applicationState != .active {
+            snapshotTask?.cancel(); snapshotTask = nil; try publishSnapshotNow(); return
+        }
+        snapshotTask?.cancel()
+        snapshotTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1200))
+            guard let self, !Task.isCancelled else { return }
+            self.snapshotTask = nil
+            try? self.publishSnapshotNow()
+            // Callers that reloaded every timeline right after asking ran before the files existed; reload once they do.
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+    /// Writes a waiting widget publication now (the app is leaving the screen).
+    func flushPendingSnapshot() {
+        guard snapshotTask != nil else { return }
+        snapshotTask?.cancel(); snapshotTask = nil
+        try? publishSnapshotNow()
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+    private func publishSnapshotNow() throws {
         if privacyScopeTransitionPending {
             try redactSensitiveWidgetSnapshots()
             return

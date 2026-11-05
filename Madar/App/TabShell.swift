@@ -11,61 +11,115 @@ struct FoundationTab: Identifiable, Hashable {
 
 /// Only built destinations enter this shell. Future rooms supply destinations at their milestone.
 /// RL8: the one tab bar is the native glass `TabView`; no alternate style is built.
+extension EnvironmentValues {
+    /// Counts how many times this room has come to the front. Rooms stay alive between visits (no rebuild on every tap), so a room
+    /// that refreshed itself on appear refreshes on `.task(id: roomVisit)` instead.
+    @Entry var roomVisit = 0
+    /// False for a room kept alive behind the one on screen: its refresh triggers (a write elsewhere, a return to the app) wait,
+    /// and `roomVisit` catches it up when it comes to the front, so four rooms never refresh at once.
+    @Entry var isFrontRoom = true
+}
+
+/// Only built destinations enter this shell. Future rooms supply destinations at their milestone.
 struct TabShell<Content: View>: View {
     let session: AppSession
     @Binding var selection: String
     let tabs: [FoundationTab]
     @ViewBuilder let content: (String) -> Content
     @Environment(\.roomTheme) private var theme
-    @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Rooms already built, most recent last. Owner, 5 Nov 2026: «الترانزشن بين الاقسام غبيه ويعلق التطبيق… قاسي صلب». Each tap used
+    /// to destroy the room on screen and build the next one from nothing (`.id(selection)`), with a hard cut. Now a room is built on its
+    /// first visit and kept, so going back is instant and the switch is a short cross-fade. At most four stay alive (the lobby always).
+    @State private var alive: [String] = []
+    @State private var visits: [String: Int] = [:]
+    @Namespace private var lens
+    @State private var scrubbing: String?
+    @State private var tabFrames: [String: CGRect] = [:]
 
     var body: some View {
-        baseTabView.tint(theme.accent)
-    }
-
-
-    /// Owner, 3 Nov 2026: «اختفاء الأقسام خلف المزيد، مهب زين، ابيه ثابت الي تحت». The system bar lists at most five tabs and
-    /// folds the rest into «المزيد», so it is hidden and Madar draws one fixed bar with every room the user turned on.
-    /// «خصّص» stays a tab so the lobby can open it, but it is not in the bar.
-    /// Owner, 3 Nov 2026 (TestFlight 4): the hidden `TabView` kept every room alive and made the app hang on each switch. Only the
-    /// room on screen is built now; the bar below is Madar's own floating glass capsule.
-    private var baseTabView: some View {
-        content(selection)
-            .id(selection)
-            .accessibilityIdentifier(selection == "customize" ? "settings-tab" : selection + "-tab")
+        rooms
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // A `safeAreaInset` outside the navigation stack never reached the rooms' own layouts (the diary welcome buttons sat under the bar),
-            // so the bar is an overlay and its measured height is added to the safe area of everything inside.
+            // A `safeAreaInset` outside the navigation stack never reached the rooms' own layouts, so the bar is an overlay and its
+            // measured height is added to the safe area of everything inside.
             .overlay(alignment: .bottom) {
-                if barShown { fixedBar.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { session.tabBarHeight = $0 } }
-            }
-    }
-    private var barShown: Bool { session.accessoryHiders.isEmpty }
-
-    private var fixedBar: some View {
-        HStack(spacing: 0) {
-            ForEach(tabs.filter { $0.id != "customize" }) { tab in
-                let selected = selection == tab.id
-                Button { selection = tab.id } label: {
-                    VStack(spacing: 3) {
-                        Group {
-                            if tab.symbol.hasPrefix("Madar") { Image(tab.symbol + (selected ? "Selected" : "")).renderingMode(.template) }
-                            else { Image(systemName: selected ? tab.symbol + ".fill" : tab.symbol).font(.system(size: 23, weight: .light)) }
-                        }.frame(width: 26, height: 26)
-                        Text(tab.title).font(MadarTypography.fine())
-                    }
-                    .foregroundStyle(selected ? theme.accent : theme.secondaryInk)
-                    .frame(maxWidth: .infinity, minHeight: 54)
-                    .background { if selected { Capsule().fill(theme.accent.opacity(0.14)).padding(.vertical, 3) } }
-                    .contentShape(Rectangle())
+                if barShown {
+                    fixedBar
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { session.tabBarHeight = $0 }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                .buttonStyle(.madarPlain).accessibilityIdentifier("tab-" + tab.id)
+            }
+            .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: barShown)
+            .tint(theme.accent)
+            .onChange(of: selection, initial: true) { _, tab in remember(tab) }
+    }
+
+    private var rooms: some View {
+        ZStack {
+            ForEach(alive, id: \.self) { tab in
+                let front = tab == selection
+                content(tab)
+                    .environment(\.roomVisit, visits[tab] ?? 0)
+                    .environment(\.isFrontRoom, front)
+                    .accessibilityIdentifier(tab == "customize" ? "settings-tab" : tab + "-tab")
+                    .allowsHitTesting(front)
+                    .accessibilityHidden(!front)
+                    .zIndex(front ? 1 : 0)
+                    // Only the fade and a hint of depth animate; nothing inside the room is swept into the transaction.
+                    .animation(reduceMotion ? .easeInOut(duration: 0.15) : .smooth(duration: 0.24)) {
+                        $0.opacity(front ? 1 : 0).scaleEffect(front || reduceMotion ? 1 : 0.985)
+                    }
             }
         }
-        .padding(.horizontal, 6)
+    }
+
+    private func remember(_ tab: String) {
+        visits[tab, default: 0] += 1
+        alive.removeAll { $0 == tab }
+        alive.append(tab)
+        // The lobby is home and stays; the oldest other room is released when a fifth would be kept.
+        while alive.count > 4, let oldest = alive.first(where: { $0 != "foundation" && $0 != tab }) { alive.removeAll { $0 == oldest } }
+    }
+
+    private var barShown: Bool { session.accessoryHiders.isEmpty }
+    private var barTabs: [FoundationTab] { tabs.filter { $0.id != "customize" } }
+
+    private func select(_ id: String) {
+        guard id != selection else { return }
+        selection = id
+    }
+
+    /// Owner, 5 Nov 2026: «الشريط السفلي تحت لازال غبي وقذر ولاهب مرن». One Liquid Glass capsule that responds to touch, with a glass lens
+    /// that glides to the chosen room on a spring; a finger can also slide along the bar and the lens follows it, the way the system bar does.
+    private var fixedBar: some View {
+        let lit = scrubbing ?? selection
+        return GlassEffectContainer(spacing: 0) {
+            HStack(spacing: 0) {
+                ForEach(barTabs) { tab in
+                    tabButton(tab, lit: lit == tab.id)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("madar-tab-bar")) } action: { tabFrames[tab.id] = $0 }
+                }
+            }
+            .padding(4)
+            .coordinateSpace(.named("madar-tab-bar"))
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 10, coordinateSpace: .named("madar-tab-bar"))
+                    .onChanged { value in
+                        let hit = tabFrames.first { $0.value.insetBy(dx: 0, dy: -30).contains(value.location) }?.key
+                        if let hit, hit != scrubbing { withAnimation(lensAnimation) { scrubbing = hit } }
+                    }
+                    .onEnded { _ in
+                        if let target = scrubbing { select(target) }
+                        withAnimation(lensAnimation) { scrubbing = nil }
+                    }
+            )
+            .glassEffect(.regular.interactive(), in: .capsule)
+        }
+        .animation(lensAnimation, value: selection)
+        .sensoryFeedback(.selection, trigger: lit)
         .accessibilityElement(children: .contain).accessibilityAddTraits(.isTabBar).accessibilityIdentifier("fixed-tab-bar")
         #if DEBUG
-        // UI tests reach «خصّص» from any room; the bar no longer lists it, so tests get a tiny invisible handle at the top-centre of the bar (never in a release build).
+        // UI tests reach «خصّص» from any room; the bar no longer lists it, so tests get a tiny invisible handle (never in a release build).
         .overlay(alignment: .top) {
             if ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil {
                 Button { selection = "customize" } label: { Rectangle().fill(.black.opacity(0.02)).frame(width: 14, height: 14) }
@@ -73,11 +127,48 @@ struct TabShell<Content: View>: View {
             }
         }
         #endif
-        .glassEffect(.regular, in: .capsule)
-        .padding(.horizontal, 12).padding(.top, 4).padding(.bottom, 2)
+        .padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 2)
         .ignoresSafeArea(.keyboard)
     }
 
+    private var lensAnimation: Animation { reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.34, dampingFraction: 0.78) }
+
+    private func tabButton(_ tab: FoundationTab, lit: Bool) -> some View {
+        let selected = selection == tab.id
+        return Button { select(tab.id) } label: {
+            VStack(spacing: 2) {
+                Group {
+                    if tab.symbol.hasPrefix("Madar") { Image(tab.symbol + (lit ? "Selected" : "")).renderingMode(.template) }
+                    else { Image(systemName: lit ? tab.symbol + ".fill" : tab.symbol).font(.system(size: 22, weight: .light)) }
+                }
+                .frame(width: 26, height: 26)
+                .scaleEffect(lit && !reduceMotion ? 1.08 : 1)
+                Text(tab.title).font(MadarTypography.fine()).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(lit ? theme.accent : theme.ink.opacity(0.78))
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background {
+                if lit {
+                    Capsule()
+                        .fill(theme.accent.opacity(scrubbing == nil ? 0.13 : 0.2))
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.35), lineWidth: 0.6))
+                        .matchedGeometryEffect(id: "lens", in: lens)
+                        .scaleEffect(scrubbing != nil && !reduceMotion ? 1.06 : 1)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.madarPlain)
+        .accessibilityIdentifier("tab-" + tab.id)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+extension View {
+    /// A screen's own undo line: while it shows, the root one stays away, so a removal never shows two.
+    func hostsUndo(_ session: AppSession) -> some View {
+        onAppear { session.localUndoHosts += 1 }.onDisappear { session.localUndoHosts = max(0, session.localUndoHosts - 1) }
+    }
 }
 
 extension View {
@@ -208,6 +299,28 @@ private struct PrayerAccessoryStatus: View {
     }
 }
 
+/// One room's navigation root. Its only inputs are the session (a stable reference) and the tab, so when the app root redraws after a
+/// write the rooms kept alive behind the one on screen are not rebuilt with it; each redraws only for what it reads itself.
+struct MadarRoomRoot: View {
+    let session: AppSession
+    let tab: String
+    var body: some View {
+        NavigationStack {
+            Group {
+                if tab == "customize" { CustomizeMadar(session: session) }
+                else if tab == "prayer" { PrayerTodayView(session: session) }
+                else if tab == "quran" { QuranHomeView(service: AppQuranService(session: session)) }
+                else if tab == "notes" { DiaryRoomView(app: session) }
+                else if tab == "money" { MoneyRoomView(app: session, isTabRoot: true) }
+                else if tab == "mihbara" { MihbaraHomeView(app: session, isTabRoot: true) }
+                // M4-V01: the lobby replaces the M0 foundation home (kept in FoundationHome.swift, unused).
+                else { BahwLobbyView(session: session) }
+            }
+            .safeAreaPadding(.bottom, session.accessoryHiders.isEmpty ? session.tabBarHeight : 0)
+        }
+    }
+}
+
 struct MadarRootView: View {
     @Bindable var session: AppSession
     @Environment(\.colorScheme) private var colorScheme
@@ -223,19 +336,7 @@ struct MadarRootView: View {
         let allTabs: [FoundationTab] = ([FoundationTab(id: "foundation", title: "البهو", symbol: "MadarOrbit")]
             + enabledTabs.compactMap { id in AppSession.tabInfo[id] } + [FoundationTab(id: "customize", title: "خصّص", symbol: "MadarCustomize")])
         TabShell(session: session, selection: $session.selectedTab, tabs: allTabs) { tab in
-            NavigationStack {
-                Group {
-                    if tab == "customize" { CustomizeMadar(session: session) }
-                    else if tab == "prayer" { PrayerTodayView(session: session) }
-                    else if tab == "quran" { QuranHomeView(service: AppQuranService(session: session)) }
-                    else if tab == "notes" { DiaryRoomView(app: session) }
-                    else if tab == "money" { MoneyRoomView(app: session, isTabRoot: true) }
-                    else if tab == "mihbara" { MihbaraHomeView(app: session, isTabRoot: true) }
-                    // M4-V01: the lobby replaces the M0 foundation home (kept in FoundationHome.swift, unused).
-                    else { BahwLobbyView(session: session) }
-                }
-                .safeAreaPadding(.bottom, session.accessoryHiders.isEmpty ? session.tabBarHeight : 0)
-            }
+            MadarRoomRoot(session: session, tab: tab)
         }
         // Owner, 30 Oct 2026: the «افتح المحبرة» door in «خصّص» used to hang this cover on the settings page, which is rebuilt after every write,
         // so saving a note closed the whole room. Hosted here at the root it stays up until the reader leaves.
@@ -270,7 +371,6 @@ struct MadarRootView: View {
             await session.refreshPrayerNotifications()
         }
         .overlay { AnchoredUndo(session: session) }
-        .task { MadarTouchTracker.install() }
         .fullScreenCover(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in })) { FirstRunView(session: session).environment(\.roomTheme, theme).madarSheetErrorAlert(session) }
         .alert("لم تكتمل العملية", isPresented: Binding(get: {
             session.errorMessage != nil && !(session.mihbaraOpen && readingSaveCoordinator.canRetryPendingWriteErrorNow)
@@ -297,16 +397,21 @@ struct MadarRootView: View {
             if phase != .active {
                 var task = UIBackgroundTaskIdentifier.invalid
                 task = UIApplication.shared.beginBackgroundTask(withName: "madar.store.settle") { UIApplication.shared.endBackgroundTask(task) }
+                // Inside the background grant, so the store write never races suspension (0xDEAD10CC).
+                session.flushPendingSnapshot()
                 Task { try? await Task.sleep(for: .seconds(8)); UIApplication.shared.endBackgroundTask(task) }
             }
             if phase == .active && !session.maintenanceInProgress {
-                do {
-                    try session.reload()
-                    try session.publishSnapshot()
-                    session.recordBahwReturnVisit()
-                }
-                catch { session.errorMessage = "تعذّر تحديث الواجهة. \(madarUserMessage(error))" }
+                // Returning to the app used to reload, rebuild every widget and drain the inbox before the first frame moved.
+                // The first frame now shows what is already on screen; the refresh follows once the system animation has settled.
                 Task {
+                    try? await Task.sleep(for: .milliseconds(350))
+                    do {
+                        try session.reload()
+                        try session.publishSnapshot()
+                        session.recordBahwReturnVisit()
+                    }
+                    catch { session.errorMessage = "تعذّر تحديث الواجهة. \(madarUserMessage(error))" }
                     do {
                         try await session.drainInbox()
                         try (session.syncService as? AppSyncService)?.processLocalHistory()
@@ -358,52 +463,33 @@ extension View {
     }
 }
 
-/// Owner, 3 Nov 2026 (option B, «التراجع بشكل عام»): undo is a small «تراجع» chip beside the spot the user just touched, in every room,
-/// instead of a bar above the tab bar. A passive window-level recognizer only remembers where the last touch began.
-final class MadarTouchTracker: UIGestureRecognizer, UIGestureRecognizerDelegate {
-    nonisolated(unsafe) static var last = CGPoint(x: 200, y: 400)
-    nonisolated(unsafe) private static var installed = false
-    @MainActor static func install() {
-        guard !installed,
-              let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap(\.windows).first(where: \.isKeyWindow) else { return }
-        installed = true
-        window.addGestureRecognizer(MadarTouchTracker(target: nil, action: nil))
-    }
-    override init(target: Any?, action: Selector?) {
-        super.init(target: target, action: action)
-        cancelsTouchesInView = false; delaysTouchesBegan = false; delaysTouchesEnded = false; delegate = self
-    }
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-        if let touch = touches.first { Self.last = touch.location(in: nil) }
-        state = .failed
-    }
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
-}
-
+/// Owner, 5 Nov 2026: the chip that jumped up beside the finger after every tap is gone. A removal (the only thing that still offers undo)
+/// shows one quiet glass line just above the bottom bar; it glides in, leaves on its own after four seconds, and a swipe down puts it away.
 private struct AnchoredUndo: View {
     let session: AppSession
     @Environment(\.roomTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Where the chip sits is fixed when it appears, so it never drifts while the user keeps tapping.
-    @State private var anchor = CGPoint(x: 200, y: 400)
     var body: some View {
-        GeometryReader { proxy in
-            if session.undoToastVisible {
-                let x = min(max(anchor.x, 70), proxy.size.width - 70)
-                let y = min(max(anchor.y - 52, proxy.safeAreaInsets.top + 36), proxy.size.height - proxy.safeAreaInsets.bottom - 110)
-                Button { session.undo() } label: {
-                    Label("تراجع", systemImage: "arrow.uturn.backward").font(MadarTypography.body().bold()).foregroundStyle(theme.accent)
-                        .padding(.horizontal, 16).frame(minHeight: 44).contentShape(Capsule())
+        VStack {
+            Spacer()
+            if session.undoToastVisible && session.localUndoHosts == 0 {
+                HStack(spacing: 14) {
+                    Text(session.undoMessage).font(MadarTypography.caption()).foregroundStyle(theme.ink).lineLimit(1)
+                    Button { session.undo() } label: {
+                        Text("تراجع").font(MadarTypography.caption().bold()).foregroundStyle(theme.accent)
+                            .frame(minWidth: 44, minHeight: 40).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.madarPlain)
+                    .accessibilityIdentifier("undo-button")
                 }
-                .buttonStyle(.madarPlain)
+                .padding(.horizontal, 18)
                 .glassEffect(.regular.interactive(), in: .capsule)
-                .position(x: x, y: y)
-                .transition(reduceMotion ? .opacity : .scale(scale: 0.85).combined(with: .opacity))
-                .accessibilityIdentifier("undo-button")
+                .padding(.bottom, session.tabBarHeight + 10)
+                .gesture(DragGesture(minimumDistance: 12).onEnded { if $0.translation.height > 0 { session.hideUndoToast() } })
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .ignoresSafeArea()
+        .frame(maxWidth: .infinity)
         .allowsHitTesting(session.undoToastVisible)
-        .onChange(of: session.undoToastVisible) { _, visible in if visible { anchor = MadarTouchTracker.last } }
     }
 }

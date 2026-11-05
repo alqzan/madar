@@ -13,6 +13,8 @@ struct HabitSinceSection:View {
     @Environment(\.roomTheme) private var theme
     private var digits:MadarNumberFormatter{.init(style:session.string("core.numerals") == "western" ? .western : .hindi)}
     private var today:GregorianDay { AppBahwService(session:session).today }
+    /// Read once per habit change; it fetched every diary entry on each redraw.
+    @State private var memoryLines:[Memory] = []
     var body:some View {
         VStack(alignment:.leading,spacing:16) {
             if let last = reading.lastTime {
@@ -28,6 +30,7 @@ struct HabitSinceSection:View {
                 Text("لم تسجّلها بعد؛ سجّل أول مرة اليوم أو في يوم مضى، وتظهر هنا مع سطر مذكراتك يومها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
         }
+        .task(id: reading.times.map(\.day.description)) { memoryLines = loadMemoryLines() }
         .padding(18).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:24))
         .accessibilityElement(children:.contain).accessibilityIdentifier("habit-since-card")
     }
@@ -94,7 +97,7 @@ struct HabitSinceSection:View {
         }
     }
     private struct Memory { let id:UUID; let text:String; let day:GregorianDay }
-    private var memoryLines:[Memory] {
+    private func loadMemoryLines() -> [Memory] {
         guard let entries = try? HabitDiaryLines.heads(ModelContext(session.container)) else { return [] }
         return reading.times.prefix(3).compactMap { time in
             let pick = time.entryID.flatMap { id in entries.first { $0.id == id } } ?? entries.filter { $0.dayKey == time.day.description }.min { $0.createdAt < $1.createdAt }

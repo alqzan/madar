@@ -97,7 +97,7 @@ struct RoomHomeLayoutEditor: View {
     @Environment(\.dismiss) private var dismiss
     private var theme: RoomTheme { .init(room: room, dark: colorScheme == .dark) }
     private var layout: RoomHomeLayout { .init(session: session, key: room + ".layout") }
-    private var blocks: [String] { room == "mihbara" ? layout.blocks.filter { ["shelf", "desk", "notebook"].contains($0) } : layout.blocks }
+    private var blocks: [String] { room == "mihbara" ? layout.blocks.filter { ["shelf"].contains($0) } : layout.blocks.filter { $0 != "qiyam" } }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {

@@ -106,7 +106,7 @@ struct MihbaraNotebookContent: View {
             ToolbarItem(placement: .principal) { Text("الدفتر").font(MadarTypography.section()) }
             ToolbarItem(placement: .topBarTrailing) { Button("تمّ") { dismiss() }.accessibilityIdentifier("mihbara-notebook-close") }
         }
-        .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: { app.undo(); load() }, dismiss: app.hideUndoToast).accessibilityIdentifier("mihbara-undo") } }
+        .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: { app.undo(); load() }, dismiss: app.hideUndoToast).hostsUndo(app).accessibilityIdentifier("mihbara-undo") } }
         .task { load() }
         .onChange(of: app.undoToken?.id) { load() }
         .onDisappear { notes.removeAll(); editor = nil }

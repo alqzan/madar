@@ -23,6 +23,7 @@ struct BahwBlockView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.roomTheme) private var lobby
+    @Environment(\.isFrontRoom) private var isFrontRoom
     private var dark: Bool { lobby.dark }
     private var room: RoomTheme {
         switch block { case .salah: RoomTheme(room: "salah", dark: dark); case .quran: RoomTheme(room: "quran", dark: dark); case .notes: RoomTheme(room: "notes", dark: dark); case .mihbara: RoomTheme(room: "mihbara", dark: dark); default: lobby }
@@ -38,7 +39,7 @@ struct BahwBlockView: View {
             .clipShape(.rect(cornerRadius: 22))
             .task(id: block) { refreshMihbaraSnapshot() }
             .onChange(of: mayReadMihbara) { _, _ in refreshMihbaraSnapshot() }
-            .onChange(of: service.session.prayerRevision) { _, _ in refreshMihbaraSnapshot() }
+            .onChange(of: service.session.prayerRevision) { _, _ in if isFrontRoom { refreshMihbaraSnapshot() } }
             .onChange(of: service.session.selectedTab) { _, selected in
                 if selected == "foundation" { refreshMihbaraSnapshot() }
             }

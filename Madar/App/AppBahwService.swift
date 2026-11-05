@@ -54,9 +54,16 @@ struct BahwUpcomingItem: Identifiable, Equatable {
     var evaluationDate: Date? = nil
     var now: Date { evaluationDate ?? session.prayerNow() }
     var digits: MadarNumberFormatter { .init(style: session.string("core.numerals") == "western" ? .western : .hindi) }
+    /// Owner, 5 Nov 2026: «اضغط العاده يعلق التطبيق». Each call built a whole PrayerRepository (every prayer log, qada item and trip)
+    /// to learn the place and the calculation method, and the habits room asked for it several times per row on every redraw.
+    /// The answer only changes after a write or when the minute turns, so the session keeps it for that long.
     func prayerLocation() -> (place: ActivePlace, options: PrayerCalculationOptions) {
+        let key = [session.prayerRevision, Int(now.timeIntervalSince1970 / 60)]
+        if let cached = session.bahwLocationCache, cached.key == key { return (cached.place, cached.options) }
         guard let repository = try? PrayerRepository(context: ModelContext(session.container)) else { return (session.activePlace, .init()) }
-        return (repository.place(at: now), repository.calculationOptions(at: now))
+        let answer = (place: repository.place(at: now), options: repository.calculationOptions(at: now))
+        session.bahwLocationCache = (key, answer.place, answer.options)
+        return answer
     }
     var greeting: String {
         let location = prayerLocation(), day = GregorianDay.containing(now, in: location.place.timeZone)
@@ -68,6 +75,13 @@ struct BahwUpcomingItem: Identifiable, Equatable {
     }
     /// The Madar day under `core.dayStart` (RL10: never midnight unless chosen).
     var today: GregorianDay {
+        let key = [session.prayerRevision, Int(now.timeIntervalSince1970 / 60)]
+        if let cached = session.bahwTodayCache, cached.key == key { return cached.day }
+        let day = computedToday
+        session.bahwTodayCache = (key, day)
+        return day
+    }
+    private var computedToday: GregorianDay {
         let location = prayerLocation(), place = location.place, civil = GregorianDay.containing(now, in: place.timeZone)
         let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: location.options) }
         return (try? MadarDay.resolve(instant: now, place: place, boundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr, prayerDays: days).date) ?? civil

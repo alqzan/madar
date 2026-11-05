@@ -45,7 +45,8 @@ struct DiaryHubView: View {
     }
     private let tabs = [
         ("calendar", "الشهر"), ("timeline", "الأيام"), ("memories", "الذكريات"), ("photos", "الصور"),
-        ("letters", "الرسائل"), ("projects", "المشاريع"), ("index", "الفهرس"),
+        // Owner, 5 Nov 2026: «اي شي له علاقه بالمشاريع احذفه… معاد ابيه». The tab left; stored projects stay untouched.
+        ("letters", "الرسائل"), ("index", "الفهرس"),
     ]
     var body: some View {
         NavigationStack {

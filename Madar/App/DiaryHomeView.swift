@@ -46,6 +46,8 @@ struct DiaryHomeView: View {
     @Bindable var app: AppSession
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.roomVisit) private var roomVisit
+    @Environment(\.isFrontRoom) private var isFrontRoom
     @State private var snapshot: DiaryHomeSnapshot?
     @State private var selected: GregorianDay?
     @State private var customizing = false
@@ -135,7 +137,8 @@ struct DiaryHomeView: View {
             }
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .task(id: app.prayerRevision) {
+        .task(id: [isFrontRoom ? app.prayerRevision : -1, roomVisit]) {
+            guard isFrontRoom else { return }
             await refresh()
             #if DEBUG
             let environment = ProcessInfo.processInfo.environment
@@ -233,7 +236,7 @@ struct DiaryHomeView: View {
             routedHubTab = "letters"; routedLetterID = id; routedLetterRequestID = UUID(); archiveOpen = true
         }
         else if route.path.first == "project", route.path.count == 2, let rawID = route.path.last, let id = UUID(uuidString: rawID) {
-            routedHubTab = "projects"; routedProjectID = id; routedProjectRequestID = UUID(); archiveOpen = true
+            _ = id // Projects left the app (owner, 5 Nov 2026); an old link opens the diary itself.
         }
         else if route.path.first == "today" { readerEntryID = nil; readerEntryRouteID = nil; reader = try? service.currentDay() }
     }

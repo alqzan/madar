@@ -10,6 +10,8 @@ struct QuranHomeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.roomVisit) private var roomVisit
+    @Environment(\.isFrontRoom) private var isFrontRoom
     @State private var state: QuranRoomState?
     @State private var error: String?
     @State private var detail: HomeDetail?
@@ -117,9 +119,9 @@ struct QuranHomeView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .environment(\.roomTheme, theme)
         .accessibilityIdentifier("quran-home")
-        .task { do { try await refresh() } catch { self.error = quranUserMessage(error) } }
+        .task(id: roomVisit) { do { try await refresh() } catch { self.error = quranUserMessage(error) } }
         // Back from the lock screen or past midnight, «مسار اليوم» and a missed day reflect the day it is now.
-        .onChange(of: scenePhase) { _, phase in if phase == .active, active == nil { run(refresh: true) { try await refresh() } } }
+        .onChange(of: scenePhase) { _, phase in if phase == .active, active == nil, isFrontRoom { run(refresh: true) { try await refresh() } } }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in if active == nil { run(refresh: true) { try await refresh() } } }
         .refreshesAtMadarDay(service.app) { if active == nil { run(refresh: true) { try await refresh() } } }
         .onChange(of: service.app.quranRoute, initial: true) { _, route in
@@ -443,7 +445,6 @@ struct QuranHomeView: View {
                     tool("الفهرس", icon: "line.3.horizontal.decrease", id: "index") { showIndex = true }
                     tool("مراجعة حرة", icon: "arrow.left.arrow.right", id: "free") { showFree = true }
                     tool("منسوب الحفظ", icon: "chart.bar", id: "strength") { showStrength = true }
-                    if state.coverageFraction > 0 { tool("ورد القيام", icon: "moon", id: "qiyam") { showQiyam = true } }
                 }
                 Divider().overlay(theme.line)
                 Button { showOutside = true } label: { Label("التذكير والودجات", systemImage: "bell").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-outside")
@@ -565,7 +566,7 @@ struct QuranHomeView: View {
             showWeek = true
         }
         else if route.path.first == "session" {
-            if route.path.last == "qiyam" { showQiyam = true }
+            if route.path.last == "qiyam" { return }
             else if let draft = state?.draft { active = try await service.resume(draftID: draft.id) }
             else if let kind = QuranUIKind(rawValue: route.path.last == "wird" ? "hifz" : route.path.last ?? "") { active = try await service.start(kind: kind, stepID: nil, range: nil, rakaat: nil, spotID: nil) }
         }

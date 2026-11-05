@@ -50,7 +50,7 @@ struct MihbaraReaderSettingsSheet: View {
         .safeAreaInset(edge: .top) {
             VStack(spacing: 0) {
                 if hasSettingsUndo {
-                    UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast)
+                    UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
                         .accessibilityIdentifier("mihbara-reader-undo")
                         .padding(.horizontal, 12).padding(.top, 4)
                 }

@@ -336,7 +336,7 @@ struct DiaryDayView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 8) {
                     if app.undoToastVisible {
-                        UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast)
+                        UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
                             .accessibilityIdentifier("diary-day-undo")
                     }
                     HStack(spacing: 10) {
@@ -514,7 +514,7 @@ struct DiaryDayView: View {
 #if DEBUG
                 try injectReadFailureOnce("projects")
 #endif
-                (projectLinks, projectSuggestions) = try service.projectNotes(shownDay)
+                (projectLinks, projectSuggestions) = ([:], [:])
             } catch {
                 projectLinks = [:]; projectSuggestions = [:]
                 failure = madarUserMessage(error)
@@ -668,22 +668,6 @@ struct DiaryDayView: View {
                     .italic(auto || line.kind == "margin")
                     .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier(
                         "diary-day-line")
-                if let name = projectLinks[line.id] {
-                    Text("مشروع: " + name).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
-                        .accessibilityIdentifier("diary-line-project")
-                } else if let project = projectSuggestions[line.id] {
-                    Button {
-                        Task {
-                            do { try await service.link(line.id, to: project.id); niyyaSaved = true } catch {
-                                failure = madarUserMessage(error)
-                            }
-                        }
-                    } label: {
-                        Text("يتعلّق بـ«" + project.name + "»؟").font(DiaryType.label).padding(.horizontal, 10).frame(
-                            minHeight: 30
-                        ).glassEffect(.regular.interactive(), in: .capsule)
-                    }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-line-project-suggest")
-                }
                 if let first = page.originals[line.id] {
                     Button {
                         original = .init(id: line.id, text: first)

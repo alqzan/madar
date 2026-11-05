@@ -15,6 +15,8 @@ struct MoneyHomeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.roomVisit) private var roomVisit
+    @Environment(\.isFrontRoom) private var isFrontRoom
     @State private var reading: MoneyHomeReading?
     @State private var cardCount = 0
     @State private var hawlKey: String?
@@ -138,7 +140,7 @@ struct MoneyHomeView: View {
         .navigationDestination(isPresented: $expenseOpen) { MoneyExpenseView(app: app, revealed: $revealed) }
         .onChange(of: expenseOpen) { if !expenseOpen { load() } }
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
-        .task {
+        .task(id: roomVisit) {
             await app.seedMoneyDefaults()
             // Opening the room must not write on every visit (hangs on tab switches): accrue at most once every 5 minutes.
             if Date().timeIntervalSince(Self.lastAccrual) > 300 {
@@ -173,7 +175,7 @@ struct MoneyHomeView: View {
         .onChange(of: messagesOpen) { if !messagesOpen { load() } }
         .onChange(of: app.bool("core.hideMoneyUntilTouch")) { revealed = false }
         .onChange(of: app.selectedTab) { revealed = false }
-        .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } else { load() } }
+        .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } else if isFrontRoom { load() } }
         // Left open past midnight, «اليوم» and the cycle day follow the day it is now.
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in load() }
         .accessibilityIdentifier("money-home")

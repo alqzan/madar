@@ -142,7 +142,8 @@ struct BahwLobbyView: View {
     }
 
     private func presentAttention(force: Bool) {
-        guard !arranging, !drawerOpen, attention == nil, session.selectedTab == "foundation" else { return }
+        // Never over the first-run welcome (it opened on top of it and hid the welcome until dismissed).
+        guard session.onboardingComplete, session.pendingIntro == nil, !arranging, !drawerOpen, attention == nil, session.selectedTab == "foundation" else { return }
         var value = service.attention(includeReconcile: true, ignoringThrottle: force)
         #if DEBUG
         // UI tests drive the lobby behind a fixed clock and a fresh store; the sheet is opened there only on request (`MADAR_UI_ATTENTION=1`).

@@ -8,6 +8,8 @@ import MadarDesign
 /// «الصلاة القادمة» and «الرواق» are pinned: they stay at the top and are never hidden.
 struct PrayerHomeLayout: Equatable {
     static let pinned = ["next", "riwaq"]
+    /// Owner, 5 Nov 2026: «احذف حق القيام». The night-prayer card left the home and the editor, but its key stays in the stored
+    /// layout (the schema lists it) and is always hidden, so a reorder still saves a valid layout.
     static let movable = ["pending", "hali", "qada", "qiyam"]
     var order: [String]
     var hidden: Set<String>
@@ -17,8 +19,9 @@ struct PrayerHomeLayout: Equatable {
         let hiddenIDs = value?.object?["hidden"]?.array?.compactMap(\.string) ?? []
         var ordered = blocks.filter { Self.movable.contains($0) }
         for key in Self.movable where !ordered.contains(key) { ordered.append(key) }
+        ordered.removeAll { $0 == "qiyam" }; ordered.append("qiyam")
         order = ordered
-        hidden = Set(hiddenIDs).intersection(Self.movable)
+        hidden = Set(hiddenIDs).intersection(Self.movable).union(["qiyam"])
     }
     var visible: [String] { order.filter { !hidden.contains($0) } }
     var visibleCount: Int { Self.pinned.count + visible.count }
@@ -238,14 +241,14 @@ struct PrayerCustomizeView: View {
     }
 
     private var layoutCard: some View {
-        card("layout", title: "ترتيب الرئيسية", subtitle: "\(session.digits(layout.visibleCount)) من \(session.digits(PrayerHomeLayout.pinned.count + PrayerHomeLayout.movable.count)) ظاهرة", symbol: "square.grid.2x2", highlighted: true) {
+        card("layout", title: "ترتيب الرئيسية", subtitle: "\(session.digits(layout.visibleCount)) من \(session.digits(PrayerHomeLayout.pinned.count + PrayerHomeLayout.movable.count - 1)) ظاهرة", symbol: "square.grid.2x2", highlighted: true) {
             Text("الصلاة القادمة والرواق ثابتان: هما جواب «ماذا الآن؟». الباقي يتقدّم ويتأخّر ويُخفى.")
                 .font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk).padding(.bottom, 12)
             ForEach(PrayerHomeLayout.pinned, id: \.self) { key in
                 Divider().overlay(theme.ink.opacity(0.1))
                 blockRow(key, pinned: true)
             }
-            ForEach(layout.order, id: \.self) { key in
+            ForEach(layout.order.filter { $0 != "qiyam" }, id: \.self) { key in
                 Divider().overlay(theme.ink.opacity(0.1))
                 blockRow(key, pinned: false)
             }
@@ -264,7 +267,7 @@ struct PrayerCustomizeView: View {
                 Text("ثابت").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
             } else {
                 arrow("chevron.up", id: "prayer-block-up-" + key, label: "قدّم " + PrayerHomeLayout.title(key), disabled: index == 0) { session.set(layout.moved(key, by: -1).payload, key: "salah.layout") }
-                arrow("chevron.down", id: "prayer-block-down-" + key, label: "أخّر " + PrayerHomeLayout.title(key), disabled: index == nil || index == layout.order.count - 1) { session.set(layout.moved(key, by: 1).payload, key: "salah.layout") }
+                arrow("chevron.down", id: "prayer-block-down-" + key, label: "أخّر " + PrayerHomeLayout.title(key), disabled: index == nil || index == layout.order.count - 2) { session.set(layout.moved(key, by: 1).payload, key: "salah.layout") }
                 Toggle(PrayerHomeLayout.title(key), isOn: Binding(get: { !layout.hidden.contains(key) }, set: { _ in session.set(layout.toggled(key).payload, key: "salah.layout") }))
                     .labelsHidden().tint(theme.accent).disabled(session.settingsWriteInProgress).accessibilityIdentifier("prayer-block-" + key)
             }

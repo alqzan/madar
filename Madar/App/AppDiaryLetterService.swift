@@ -86,9 +86,6 @@ extension AppDiaryService {
         } else {
             choices.append(.init(id: "trip-start", title: "حين أصل في سفري القادم", trigger: .tripStart, target: nil))
         }
-        for project in try context.fetch(FetchDescriptor<Project>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.finishedAt == nil })) {
-            choices.append(.init(id: "project-" + project.id.uuidString, title: "حين ينتهي «" + project.name + "»", trigger: .projectFinished, target: project.id))
-        }
         return choices
     }
     func sealLetter(_ text: String, choice: DiaryLetterChoice, date: Date) async throws {

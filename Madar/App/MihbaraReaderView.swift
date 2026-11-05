@@ -966,7 +966,7 @@ struct MihbaraReaderView: View {
         } else if shouldShowAutoScrollPlayer {
             autoScrollPlayer
         } else if app.undoToastVisible, let token = app.undoToken, token.id == readerUndoID, !showingReaderSettings {
-            UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast)
+            UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
                 .accessibilityIdentifier("mihbara-reader-toast")
                 .padding(.bottom, 64)
         }

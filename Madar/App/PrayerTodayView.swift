@@ -23,6 +23,8 @@ struct PrayerTodayView: View {
     @State private var debugPrayerRouteOpenedAfterDismissal: Bool?
     #endif
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.roomVisit) private var roomVisit
+    @Environment(\.isFrontRoom) private var isFrontRoom
 
     @State private var onTrip = false
     /// On a trip the home takes the calm-paper palette (cooler sand, same gold ornaments) so travel looks different at a glance.
@@ -67,7 +69,7 @@ struct PrayerTodayView: View {
                                     heartNotice(snapshot)
                                 case "hali": haliCard(snapshot)
                                 case "qada": qadaCard(snapshot)
-                                default: qiyamCard(snapshot)
+                                default: EmptyView()
                                 }
                             }
                         }
@@ -92,7 +94,7 @@ struct PrayerTodayView: View {
         }
         .environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .onAppear {
+        .onChange(of: roomVisit, initial: true) {
             detectTravel(); refreshTrip()
             #if DEBUG
             let env = ProcessInfo.processInfo.environment
@@ -140,7 +142,7 @@ struct PrayerTodayView: View {
             }
             Button("إلغاء", role: .cancel) { session.prayerLogRequest = nil; pendingPrayerRoute = nil }
         } message: { Text("تعذّرت قراءة بيانات الصلاة. يمكنك المحاولة مرة أخرى.") }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { detectTravel() } }
+        .onChange(of: scenePhase) { _, phase in if phase == .active, isFrontRoom { detectTravel() } }
         .sheet(item: $selectedSheet, onDismiss: {
             prayerSheetIsVisible = false
             dispatchPendingPrayerRoute()
@@ -353,8 +355,7 @@ struct PrayerTodayView: View {
             selectedSheet = .day(day)
         case "qiyam" where route.path.count == 2:
             let rawNight = route.path[1]
-            guard let night = try? GregorianDay(rawNight) else { session.errorMessage = "تعذّر فتح ليلة القيام المطلوبة."; return }
-            selectedSheet = .qiyamNight(night)
+            _ = rawNight // The night-prayer page left the app (owner, 5 Nov 2026); an old link opens the prayer room itself.
         case "hali" where route.path.count == 1:
             selectedSheet = .statistics
         case "qada" where route.path.count == 1:
