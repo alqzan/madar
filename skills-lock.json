@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "skills": {
+    "animation-patterns": {
+      "source": "rshankras/claude-code-apple-skills",
+      "ref": "eb2ddbc8962c1e21f2b0290d9cdb4c825ef85a23",
+      "sourceType": "github",
+      "skillPath": "skills/design/animation-patterns/SKILL.md",
+      "computedHash": "748f466011bdc021960c2cf6f0e1f806061d3b0641bb9d962724f4599604194e",
+      "installMode": "copy"
+    },
+    "app-intents": {
+      "source": "n0an/App-Intents-Agent-Skill",
+      "ref": "f754f08c5ef45515cf51b026f87f8aa89d747f7d",
+      "sourceType": "github",
+      "skillPath": "app-intents/SKILL.md",
+      "computedHash": "a32a7457266d27de59362e8777c4c5e7e7da6be4f0c088d8eb217ca1a3a28ac1",
+      "installMode": "copy"
+    },
+    "arabic-uiux-master": {
+      "source": "theonlym7md/arabic-ai-skills",
+      "ref": "3bb721bb58a2e01bd9ca4fc1c7b67e0db040d5d0",
+      "sourceType": "github",
+      "skillPath": "skills/arabic-uiux-master/SKILL.md",
+      "computedHash": "8ab50d583b6745d98597bac7a0fbdda9b872782af1e08c1e9250fed02a168547",
+      "installMode": "copy"
+    },
+    "cloudkit": {
+      "source": "dpearson2699/swift-ios-skills",
+      "ref": "8d90fd121a263355a4fb44fd082af1416a5c1c2a",
+      "sourceType": "github",
+      "skillPath": "skills/cloudkit/SKILL.md",
+      "computedHash": "724ceb29bc19011b8a0a0959144db521aee93ff89f843438ebfb5411a65b3455",
+      "installMode": "copy"
+    },
+    "ios-localization": {
+      "source": "rusel95/ios-agent-skills",
+      "ref": "ff0d5455fa3663a3b82095711ae62de99cdcd64c",
+      "sourceType": "github",
+      "skillPath": "skills/ios-localization/SKILL.md",
+      "computedHash": "c7a35c9506215f6b6121b7498e7efc2182dd1bc4ca4488a011d860974fb15884",
+      "installMode": "copy"
+    },
+    "rtl-ios-skill": {
+      "source": "mohideensheiksulaiman/rtl-ios-agent-skill",
+      "ref": "9569069e720d4ceb3f662d4b955b5c02975ff7ec",
+      "sourceType": "github",
+      "skillPath": "rtl-ios-skill/SKILL.md",
+      "computedHash": "9158e394c72414f11627ad426bf2dc496b477038d67043334eded2a8fe2f64b6",
+      "installMode": "copy"
+    },
+    "swift-concurrency-pro": {
+      "source": "twostraws/Swift-Concurrency-Agent-Skill",
+      "ref": "bee3f69ba17142da148d3c5406f148ed62592b69",
+      "sourceType": "github",
+      "skillPath": "swift-concurrency-pro/SKILL.md",
+      "computedHash": "8d48e0a748eee96e1df4dc9b5def1f63dd0fc134dcbb6ca5fea2ba3eab8fef2b",
+      "installMode": "copy"
+    },
+    "swift-format-style": {
+      "source": "n0an/Swift-FormatStyle-Agent-Skill",
+      "ref": "5cda783ac709f26893bbbfb61b31c930c1e6a300",
+      "sourceType": "github",
+      "skillPath": "swift-format-style/SKILL.md",
+      "computedHash": "121966c43eb677dcb7ce3eb53baef91ea5b16ee1a905568f740ddd8ebac5adef",
+      "installMode": "copy"
+    },
+    "swift-testing-pro": {
+      "source": "twostraws/Swift-Testing-Agent-Skill",
+      "ref": "2d6bba14a3c8bf3694f218b92fffe617c41ae43e",
+      "sourceType": "github",
+      "skillPath": "swift-testing-pro/SKILL.md",
+      "computedHash": "9643a605b727d342d5d00871b5edbd0178c0cea9fdb38856ba80fd7afe3fb1a7",
+      "installMode": "copy"
+    },
+    "swiftdata-pro": {
+      "source": "twostraws/SwiftData-Agent-Skill",
+      "ref": "8051f177a0076e7fd45bdf4ee687b070ba58fdc6",
+      "sourceType": "github",
+      "skillPath": "swiftdata-pro/SKILL.md",
+      "computedHash": "585ace8e1561c6de84df85f810df7895b4bd45589203eee051e7ff58ae2bb120",
+      "installMode": "copy"
+    },
+    "swiftui-expert-skill": {
+      "source": "AvdLee/SwiftUI-Agent-Skill",
+      "ref": "204dba7c67256a8b707ee3fbc5759a824191974f",
+      "sourceType": "github",
+      "skillPath": "skills/swiftui-expert-skill/SKILL.md",
+      "computedHash": "a25d9df88ccaaf7098fe544a745a576a705c34648a46a0c52aec989ba074b85a",
+      "installMode": "copy"
+    },
+    "widgets": {
+      "source": "n0an/Widgets-Agent-Skill",
+      "ref": "06567e152df00df1db50a2935bbe62fda9e27c19",
+      "sourceType": "github",
+      "skillPath": "widgets/SKILL.md",
+      "computedHash": "f32061c8b79bcec6e8ef6399589b213a0b62dc4fd3534264ba41615e2da5791b",
+      "installMode": "copy"
+    }
+  }
+}

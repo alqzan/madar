@@ -1,0 +1,18 @@
+{
+  "name": "arabic-uiux-master",
+  "version": "2.1.0",
+  "description": "Arabic UI/UX writing, microcopy, and practical RTL design guidance for AI agents.",
+  "main": "SKILL.md",
+  "private": true,
+  "keywords": [
+    "arabic",
+    "ux-writing",
+    "microcopy",
+    "ui",
+    "copywriting",
+    "agent-skill",
+    "rtl",
+    "localization"
+  ],
+  "license": "MIT"
+}
