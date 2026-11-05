@@ -42,7 +42,7 @@ struct QuranHomeSessionFlow: View {
     }
     private var legacyBody: some View {
         VStack(spacing: 18) {
-            HStack { Text(state.title).font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق", systemImage: "xmark") { showExit = true }.labelStyle(.iconOnly).frame(width: 44, height: 44) }
+            HStack { Text(state.title).font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق", systemImage: "xmark") { showExit = true }.labelStyle(.iconOnly).frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
             Text(state.segmentTitle).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             Text(stageTitle).font(MadarTypography.section()).accessibilityIdentifier("quran-session-stage")
             ScrollView {

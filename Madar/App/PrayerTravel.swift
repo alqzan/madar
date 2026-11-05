@@ -299,7 +299,7 @@ struct PrayerTravelPairSheet: View {
         Button(action: action) {
             Text(label).font(PrayerHomeType.strong)
                 .frame(maxWidth: .infinity, minHeight: 48)
-                .background(on ? theme.color("goldSoft") : .clear, in: .capsule)
+                .background { if on { Capsule().fill(theme.color("goldSoft").opacity(0.7)).glassEffect(.regular.interactive(), in: .capsule) } }
                 .overlay { Capsule().stroke(on ? theme.line : theme.ink.opacity(0.14), lineWidth: 1) }
         }
         .buttonStyle(.madarPlain).accessibilityIdentifier(id)

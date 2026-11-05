@@ -205,7 +205,7 @@ struct MihbaraHomeView: View {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
                     if isTabRoot { Color.clear.frame(width: 44, height: 44) }
-                    else { Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right") }.accessibilityIdentifier("mihbara-back") }
+                    else { Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right").padding(.horizontal, 12).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-back") }
                     Spacer(minLength: 8)
                     Text("المحبرة").font(MadarTypography.title())
                     Spacer(minLength: 8)

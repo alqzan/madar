@@ -29,7 +29,7 @@ struct MihbaraPDFSearchView: View {
                 HStack {
                     Text("بين صفحات الكتاب").font(MadarTypography.cardTitle())
                     Spacer()
-                    Button("تمّ") { dismiss() }.frame(minHeight: 44)
+                    Button { dismiss() } label: { Text("تمّ").padding(.horizontal, 16).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain)
                         .accessibilityIdentifier("mihbara-pdf-search-close")
                 }
                 HStack(spacing: 8) {

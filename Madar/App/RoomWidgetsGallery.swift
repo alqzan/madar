@@ -13,7 +13,7 @@ struct RoomWidgetsGallery:View {
     private func mihbaraSnapshot()->(MihbaraSnapshot?,Bool){let value=session.snapshotStore.read(BuiltRoomWidget.mihbara.rawValue,as:MihbaraSnapshot.self,now:now);return(value?.payload,value?.privacy.notesLocked == true)}
     var body:some View {
         VStack(spacing:0) {
-            HStack {Text("ودجات مدار").font(MadarTypography.title()).accessibilityIdentifier("room-widgets-title");Spacer();Button("تمّ"){dismiss()}.frame(minHeight:44)}.padding(.horizontal,20).padding(.top,12)
+            HStack {Text("ودجات مدار").font(MadarTypography.title()).accessibilityIdentifier("room-widgets-title");Spacer();Button{dismiss()}label:{Text("تمّ").padding(.horizontal,16).frame(minHeight:44).glassEffect(.regular.interactive(), in: .capsule)}.buttonStyle(.madarPlain)}.padding(.horizontal,20).padding(.top,12)
             ScrollView {
                 VStack(alignment:.leading,spacing:16) {
                     Text("أضفها من معرض الودجات في الآيفون، واختر الحجم هناك. اضغط مطوّلًا على الودجة لتختار قالبها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)

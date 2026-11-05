@@ -123,7 +123,7 @@ struct QuranQiyamSessionView: View {
                 Button {
                     exit = true
                 } label: {
-                    Image(systemName: "xmark").frame(width: 44, height: 44)
+                    Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
                 }.accessibilityLabel("إغلاق الجلسة").accessibilityIdentifier("quran-qiyam-session-close"); Spacer();
                 Text("ورد القيام").font(quranFont(15, bold: true))
             }

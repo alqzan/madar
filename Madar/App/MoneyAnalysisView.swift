@@ -147,9 +147,9 @@ struct MoneyAnalysisView: View {
                     Text(range.secondary).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }.accessibilityElement(children: .combine).accessibilityIdentifier("money-analysis-range")
                 Spacer(minLength: 4)
-                Button { offset -= 1; selected = nil; load() } label: { Image(systemName: "chevron.backward").frame(width: 44, height: 44).contentShape(Rectangle()) }
+                Button { offset -= 1; selected = nil; load() } label: { Image(systemName: "chevron.backward").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                     .buttonStyle(.madarPlain).disabled(!r.canGoBack).opacity(r.canGoBack ? 1 : 0.3).accessibilityLabel(r.period == .week ? "الأسبوع السابق" : "الدورة السابقة").accessibilityIdentifier("money-analysis-previous")
-                Button { offset = min(0, offset + 1); selected = nil; load() } label: { Image(systemName: "chevron.forward").frame(width: 44, height: 44).contentShape(Rectangle()) }
+                Button { offset = min(0, offset + 1); selected = nil; load() } label: { Image(systemName: "chevron.forward").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                     .buttonStyle(.madarPlain).disabled(r.offset >= 0).opacity(r.offset < 0 ? 1 : 0.3).accessibilityLabel(r.period == .week ? "الأسبوع التالي" : "الدورة التالية").accessibilityIdentifier("money-analysis-next")
             }
             HStack(alignment: .center, spacing: 10) {

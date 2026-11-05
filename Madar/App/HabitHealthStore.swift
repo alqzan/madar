@@ -25,6 +25,8 @@ import MadarPrayer
             store.execute(query)
         }
     }
+    /// The closed days last written per habit and unit in this launch (a cache, never a record).
+    @MainActor private static var writtenClosedDays:[String:[String:MadarCore.JSONValue]]=[:]
     static func refresh(session:AppSession,closedDays:Bool=true) async throws -> [UUID:Int] {
         guard available else{return[:]}
         let context=ModelContext(session.container),repo=try PrayerRepository(context:context),today=AppBahwService(session:session).today,now=session.prayerNow()
@@ -47,7 +49,12 @@ import MadarPrayer
                 if offset==0{live[habit.id]=total}else{closedByUnit[unit,default:[:]][day.description] = .number(Double(total))}
             }
             for (unit,values) in closedByUnit {
+                // FB-32 (owner: no freezes): opening the room re-reads Health; an unchanged week is not written again,
+                // so it does not reload the store and reschedule reminders on every visit.
+                let key="\(habit.id):\(unit)"
+                guard writtenClosedDays[key] != values else { continue }
                 try await session.executeDiaryCommand("habit.refreshHealth",payload:["id":.string(habit.id.uuidString),"unit":.string(unit),"values":.object(values)])
+                writtenClosedDays[key]=values
             }
         }
         return live

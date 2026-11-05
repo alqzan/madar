@@ -28,7 +28,7 @@ struct MoneyEnvelopesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Button { dismiss() } label: { HStack(spacing: 5) { Image(systemName: "chevron.backward"); Text("المال") }.font(MadarTypography.body()).foregroundStyle(theme.color("reserveText")).frame(minHeight: 44) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-envelopes-back")
+                Button { dismiss() } label: { HStack(spacing: 5) { Image(systemName: "chevron.backward"); Text("المال") }.font(MadarTypography.body()).foregroundStyle(theme.color("reserveText")).padding(.horizontal, 12).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-envelopes-back")
                 HStack(alignment: .firstTextBaseline) {
                     Text("المظاريف").font(MadarTypography.title())
                     Spacer()

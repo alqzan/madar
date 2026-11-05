@@ -102,7 +102,7 @@ struct RoomHomeLayoutEditor: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right").frame(minHeight: 44) }
+                    Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right").padding(.horizontal, 12).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule) }
                         .accessibilityIdentifier("room-layout-back")
                     Spacer(); Text(title).font(MadarTypography.title())
                 }

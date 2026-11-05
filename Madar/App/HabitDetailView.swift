@@ -27,7 +27,7 @@ struct HabitDetailView:View {
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:18) {
-                HStack { Text(reading.name).font(MadarTypography.title());Spacer();Button("تمّ"){dismiss()}.frame(minHeight:44) }
+                HStack { Text(reading.name).font(MadarTypography.title());Spacer();Button{dismiss()}label:{Text("تمّ").padding(.horizontal,16).frame(minHeight:44).glassEffect(.regular.interactive(), in: .capsule)}.buttonStyle(.madarPlain) }
                 if keptBySince { HabitSinceSection(session:session,reading:reading) }
                 if let current=reading.summary.current { hero(current) }
                 actions

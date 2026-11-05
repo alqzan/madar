@@ -136,11 +136,23 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         return .init(arches: arches, done: arches.filter(\.done).count, nextName: upcoming.flatMap { name($0.reference) }, nextTime: clock(upcoming?.time),
                      nextAfter: upcoming.map { $0.time }.map { PrayerCopy.after(seconds: $0.timeIntervalSince(instant), digits: digits) })
     }
+    /// FB-32 (owner: no freezes): the lobby body asks for these on every render; the Quran snapshot and the diary day
+    /// are read once per store generation, day and minute, not on each frame.
+    private static var quranCache: (key: String, value: BahwQuranModel?)?
+    private static var diaryCache: (key: String, value: BahwDiaryModel?)?
+    private var cacheKey: String { "\(session.storeGeneration):\(today):\(Int(session.prayerNow().timeIntervalSince1970 / 60))" }
     func quran() -> BahwQuranModel? {
-        guard let value = try? AppQuranService(session: session).widgetSnapshot().payload else { return nil }
-        return .init(coverage: value.coverage, next: value.nextTitle, days: value.days)
+        let key = cacheKey
+        if let cached = Self.quranCache, cached.key == key { return cached.value }
+        let value = (try? AppQuranService(session: session).widgetSnapshot().payload).map { BahwQuranModel(coverage: $0.coverage, next: $0.nextTitle, days: $0.days) }
+        Self.quranCache = (key, value); return value
     }
     func diary() -> BahwDiaryModel? {
+        let key = cacheKey
+        if let cached = Self.diaryCache, cached.key == key { return cached.value }
+        let value = readDiary(); Self.diaryCache = (key, value); return value
+    }
+    private func readDiary() -> BahwDiaryModel? {
         let service = AppDiaryService(app: session)
         guard let page = try? service.day(today) else { return nil }
         let lines = page.lines.filter { ["normal", "late", "margin"].contains($0.kind) }

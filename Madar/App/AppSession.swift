@@ -245,7 +245,10 @@ final class AppSession {
         try publishSnapshot()
     }
 
+    /// Bumped on every store reload (after each write and each return to the app): derived read caches key on it.
+    @ObservationIgnored private(set) var storeGeneration = 0
     func reload() throws {
+        storeGeneration &+= 1
         if let managedStore { try managedStore.refreshIfNeeded(); container = managedStore.container }
         store = SettingsStore(context: ModelContext(container), schema: schema)
         // One read per table, not one per setting: this runs after every write and every return to the app.
@@ -1168,7 +1171,21 @@ final class AppSession {
         }
         // F02/V12: a habit change, an intention or a letter reschedules its reminder (a met habit or written intention stops reminding).
         let reschedules = name.hasPrefix("habit.") || ["diary.setIntention", "diary.sealLetter", "diary.openLetter", "diary.rescheduleLetter", "diary.refreshLetters"].contains(name)
-        let result = reschedules ? try await withSerializedPrayerNotificationMutation { try await run() } : try await run()
+        let result: CommandOutcome
+        if name == "habit.complete" {
+            // FB-32 (owner: «تعليق… لما اضغط على العادة»): the tap returns as soon as the record is saved; the
+            // reminder reschedule still runs inside the same serialized lock (RP3 holds), but the ring does not wait for it.
+            result = try await withCheckedThrowingContinuation { continuation in
+                Task { @MainActor in
+                    _ = try? await self.withSerializedPrayerNotificationMutation {
+                        do { let value = try await run(); continuation.resume(returning: value); return value }
+                        catch { continuation.resume(throwing: error); throw error }
+                    }
+                }
+            }
+        } else {
+            result = reschedules ? try await withSerializedPrayerNotificationMutation { try await run() } : try await run()
+        }
         if let id = result.undoToken {
             let token = AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600))
             showUndo(token, message: name == "habit.archive" ? "حُذفت العادة" : name == "habit.pause" ? "جُمّدت العادة" : name == "habit.resume" ? "عادت العادة" : name == "habit.complete" ? "سُجّلت" : name.hasPrefix("habit.") ? "حُفظت العادة" : name == "widget.save" ? "حُفظت الودجة" : name == "widget.delete" ? "حُذفت الودجة" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم" : name == "diary.deleteEntry" ? "حُذف السطر" : name == "diary.setIntentionResult" ? (payload["result"] == .null ? "مُسحت النتيجة" : "حُفظت النتيجة") : name.contains("Intention") ? "حُفظت النيّة" : "حُفظ السطر")

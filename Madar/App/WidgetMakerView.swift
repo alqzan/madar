@@ -140,7 +140,7 @@ struct WidgetMakerView: View {
     private var makerHeader: some View {
         HStack {
             Button { if dirty { pendingSelection = nil; discard = true } else { dismiss() } } label: {
-                Label("رجوع", systemImage: "chevron.right").frame(width: 72, height: 44)
+                Label("رجوع", systemImage: "chevron.right").frame(width: 84, height: 44).glassEffect(.regular.interactive(), in: .capsule)
             }.accessibilityIdentifier("widget-maker-close")
             VStack(spacing: 2) {
                 Text("صانع الودجة").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))

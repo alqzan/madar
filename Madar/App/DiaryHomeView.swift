@@ -265,7 +265,7 @@ struct DiaryHomeView: View {
                     MadarDateLabel(app.dateLabels(snapshot.today, weekday: true)).foregroundStyle(theme.color("ink3Text"))
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
-            Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
+            Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
             Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("التقويم").accessibilityIdentifier("diary-days")
             Button { customizing = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                 .buttonStyle(.madarPlain).accessibilityLabel("خصّص المذكرات").accessibilityIdentifier("diary-customize")
@@ -275,7 +275,7 @@ struct DiaryHomeView: View {
         Button { app.set(.string(calendar.rawValue), key: "notes.match") { selected = nil } } label: {
             Text(title).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption))
                 .padding(.horizontal, 10).frame(minHeight: 36)
-                .background(service.preferredMatch == calendar ? theme.surface : .clear, in: .capsule)
+                .background { if service.preferredMatch == calendar { Capsule().fill(theme.surface.opacity(0.6)).glassEffect(.regular.interactive(), in: .capsule) } }
         }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-match-" + calendar.rawValue)
     }
     private func hero(_ snapshot: DiaryHomeSnapshot) -> some View {
