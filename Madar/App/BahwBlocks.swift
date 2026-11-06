@@ -421,7 +421,7 @@ struct BahwBlockView: View {
                                     PrayerStar().fill(arch.done ? room.accent : arch.next ? room.accent.opacity(0.35) : room.ink.opacity(0.14))
                                         .frame(width: 10, height: 10).offset(y: -2)
                                 }.frame(maxWidth: size == .small ? 26 : 34).frame(height: (size == .small ? 36 : 40) + (jumuah ? 8 : 0)).accessibilityHidden(true)
-                                if size != .small { Text(arch.name + " " + arch.time).font(small).lineLimit(1) }
+                                if size != .small { Text(arch.name + " " + arch.time).font(small).lineLimit(1).minimumScaleFactor(0.6) }
                             }.frame(maxWidth: .infinity)
                                 .accessibilityElement(children: .ignore).accessibilityLabel(arch.name + "، " + arch.clock24 + (arch.done ? "، صُلّيت" : ""))
                                 .accessibilityIdentifier("foundation-prayer-time-" + arch.id)

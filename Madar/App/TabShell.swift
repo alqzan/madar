@@ -159,17 +159,32 @@ private struct MadarSystemTabBar: UIViewRepresentable {
     }
 
     private static func item(_ tab: FoundationTab) -> UITabBarItem {
+        // Owner, 6 Nov 2026: «مضغوط النص… المذكرات داخله بالشعار». Madar's own glyphs were drawn taller than system symbols, so the
+        // Arabic ascenders of the label touched them; every icon now fits the system's 24-point box and the label sits a little lower.
         let custom = tab.symbol.hasPrefix("Madar")
-        let image = custom ? UIImage(named: tab.symbol)?.withRenderingMode(.alwaysTemplate) : UIImage(systemName: tab.symbol)
-        let selected = custom ? UIImage(named: tab.symbol + "Selected")?.withRenderingMode(.alwaysTemplate) : UIImage(systemName: tab.symbol + ".fill")
+        let symbol = UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+        let image = custom ? fitted(UIImage(named: tab.symbol)) : UIImage(systemName: tab.symbol, withConfiguration: symbol)
+        let selected = custom ? fitted(UIImage(named: tab.symbol + "Selected")) : UIImage(systemName: tab.symbol + ".fill", withConfiguration: symbol)
         let item = UITabBarItem(title: tab.title, image: image, selectedImage: selected ?? image)
+        item.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: 2)
         item.accessibilityIdentifier = "tab-" + tab.id
         return item
     }
 
+    /// Scales a glyph to fit 24 × 24 points, keeping its proportions, as a template the bar tints.
+    private static func fitted(_ image: UIImage?) -> UIImage? {
+        guard let image, image.size.width > 0, image.size.height > 0 else { return image }
+        let box: CGFloat = 24
+        let scale = min(box / image.size.width, box / image.size.height)
+        let size = CGSize(width: (image.size.width * scale).rounded(), height: (image.size.height * scale).rounded())
+        return UIGraphicsImageRenderer(size: size).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }.withRenderingMode(.alwaysTemplate)
+    }
+
     private static var appearance: UITabBarAppearance {
         let appearance = UITabBarAppearance()
-        let font = UIFontMetrics(forTextStyle: .caption2).scaledFont(for: UIFont(name: "thmanyahsans-Bold", size: 11) ?? .systemFont(ofSize: 11, weight: .semibold))
+        // Fixed size, as the system bar keeps it: a label that grew with the owner's larger text ran into its icon. Larger text
+        // still reads through the system's long-press large-content view on the bar.
+        let font = UIFont(name: "thmanyahsans-Medium", size: 11) ?? .systemFont(ofSize: 11, weight: .medium)
         for layout in [appearance.stackedLayoutAppearance, appearance.inlineLayoutAppearance, appearance.compactInlineLayoutAppearance] {
             layout.normal.titleTextAttributes = [.font: font]
             layout.selected.titleTextAttributes = [.font: font]
