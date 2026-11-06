@@ -27,6 +27,11 @@ public enum PrayerMutation: Codable, Equatable, Sendable {
     case makeUp(PrayerReference, at: Date? = nil, fridayKind: FridayPrayerKind? = nil)
     case addOldMissed(PrayerReference, fridayKind: FridayPrayerKind? = nil)
     case restoreOldMissed(PrayerReference, fridayKind: FridayPrayerKind? = nil)
+    /// FB-39 (owner, 6 Nov): «أضف ٣٠٠ فجر». One old missed prayer per real day, counting back from `lastDay`
+    /// (before the tracking start); days already owed or recorded are skipped, never doubled.
+    case addOldMissedRun(prayer: Prayer, count: Int, lastDay: GregorianDay)
+    /// FB-39: «قضيتُ ٥ من الفجر». Makes up the oldest `count` open debts of that prayer, now.
+    case makeUpOldest(prayer: Prayer, count: Int)
     case markUnrecorded([PrayerReference])
     case resolveGap([PrayerGapResolution])
     case answerHeart(PrayerReference, PrayerHeart?)
@@ -44,6 +49,8 @@ public enum PrayerMutation: Codable, Equatable, Sendable {
 }
 
 extension PrayerMutation {
+    /// Ten years of one prayer in a single command.
+    public static let maximumRun = 3660
     static func parse(name: String, payload: [String: JSONValue]) throws -> (Self, String?) {
         func string(_ key: String) throws -> String { guard case .string(let value) = payload[key] else { throw CoreError.invalidCommand }; return value }
         func ref(_ object: [String: JSONValue]) throws -> PrayerReference {
@@ -137,6 +144,15 @@ extension PrayerMutation {
         case "prayer.editTrackingStart":
             guard Set(payload.keys) == ["dayKey"] else { throw CoreError.invalidCommand }
             return (.editTrackingStart(try GregorianDay(string("dayKey"))), "salah.trackingStart")
+        case "prayer.addOldMissedRun":
+            guard Set(payload.keys) == ["prayer", "count", "lastDayKey"], let prayer = Prayer(rawValue: try string("prayer")),
+                  case .number(let raw) = payload["count"], raw.rounded() == raw, (1...PrayerMutation.maximumRun).contains(Int(raw)) else { throw CoreError.invalidCommand }
+            let last = try GregorianDay(string("lastDayKey"))
+            return (.addOldMissedRun(prayer: prayer, count: Int(raw), lastDay: last), "prayer.run.\(prayer.rawValue).\(last).\(Int(raw))")
+        case "prayer.makeUpOldest":
+            guard Set(payload.keys) == ["prayer", "count"], let prayer = Prayer(rawValue: try string("prayer")),
+                  case .number(let raw) = payload["count"], raw.rounded() == raw, (1...PrayerMutation.maximumRun).contains(Int(raw)) else { throw CoreError.invalidCommand }
+            return (.makeUpOldest(prayer: prayer, count: Int(raw)), nil)
         case "prayer.agePending", "prayer.initializeTracking":
             guard payload.isEmpty else { throw CoreError.invalidCommand }
             return (name == "prayer.agePending" ? .agePending : .initializeTracking, nil)

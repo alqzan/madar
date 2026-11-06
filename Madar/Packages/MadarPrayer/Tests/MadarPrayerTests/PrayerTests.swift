@@ -37,6 +37,36 @@ import MadarData
         #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt == nil)
         #expect(try context.fetch(FetchDescriptor<PrayerLog>()).count == 1 && context.fetch(FetchDescriptor<QadaItem>()).count == 1)
     }
+    /// FB-39 (owner, 6 Nov): qada by count. Tracking starts 2026-10-07, so «٧ ظهر آخرها ٦ أكتوبر» means the seven days
+    /// 30 Sep … 6 Oct. 4 Oct is already owed and is not doubled; 2 Oct is a Friday, so its noon prayer is recorded as Dhuhr.
+    /// Then «قضيتُ ٣» makes up the three oldest (30 Sep, 1 Oct, 2 Oct). Values worked by hand.
+    @Test func qadaByCountAddsRealDaysOnceAndMakesUpTheOldest() throws {
+        let container = try container(); let context = container.mainContext
+        try apply(.addOldMissed(try ref("2026-10-04", .dhuhr)), context, at: "2026-10-07T12:01:00+03:00")
+        func open() throws -> [String] { try context.fetch(FetchDescriptor<QadaItem>()).filter { $0.deletedAt == nil && $0.madeUpAt == nil }.map(\.originalDayKey).sorted() }
+        let week = ["2026-09-30", "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06"]
+        let firstRun = try #require(try apply(.addOldMissedRun(prayer: .dhuhr, count: 7, lastDay: GregorianDay("2026-10-06")), context, at: "2026-10-07T12:02:00+03:00"))
+        #expect(try open() == week)
+        try PrayerMutationHandler.undo(firstRun, in: context, now: time("2026-10-07T12:03:00+03:00"), writer: "test-device"); try context.save()
+        #expect(try open() == ["2026-10-04"], "Undoing the run leaves the debt that was there before it.")
+        // Asking again brings the undone days back, still once each.
+        try apply(.addOldMissedRun(prayer: .dhuhr, count: 7, lastDay: GregorianDay("2026-10-06")), context, at: "2026-10-07T12:04:00+03:00")
+        #expect(try open() == week)
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).count == 7)
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).first { $0.dayKey == "2026-10-02" }?.fridayKind == "dhuhr")
+        let makeUp = try #require(try apply(.makeUpOldest(prayer: .dhuhr, count: 3), context, at: "2026-10-07T12:05:00+03:00"))
+        #expect(try open() == ["2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06"])
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.status == "qada" }.map(\.dayKey).sorted() == ["2026-09-30", "2026-10-01", "2026-10-02"])
+        try PrayerMutationHandler.undo(makeUp, in: context, now: time("2026-10-07T12:06:00+03:00"), writer: "test-device"); try context.save()
+        #expect(try open() == week)
+        #expect(throws: PrayerDomainError.invalidRecord) {
+            try apply(.addOldMissedRun(prayer: .fajr, count: 3, lastDay: GregorianDay("2026-10-07")), context, at: "2026-10-07T12:08:00+03:00")
+        }
+        context.rollback()
+        #expect(throws: PrayerDomainError.invalidRecord) {
+            try apply(.makeUpOldest(prayer: .asr, count: 1), context, at: "2026-10-07T12:09:00+03:00")
+        }
+    }
     @Test func missedAndMakeUpWaitForEachPrayerWindowEnd() throws {
         let day = try GregorianDay("2026-10-07")
         let place = try ActivePlace(latitude: 24.7136, longitude: 46.6753, timeZoneID: "Asia/Riyadh")

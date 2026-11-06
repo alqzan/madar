@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-// Generated from Specification/data-dictionary.json (schema V14). UUID foreign keys intentionally avoid ownership relationships.
+// Generated from Specification/data-dictionary.json (schema V15). UUID foreign keys intentionally avoid ownership relationships.
 @MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
 @Model public final class Setting {
     public var id: UUID = UUID()
@@ -3126,6 +3126,7 @@ extension Habit: MadarRecordModel {
     public var windowAnchor: String? = nil
     public var windowStartMin: Int? = nil
     public var windowEndMin: Int? = nil
+    public var intervalDays: Int? = nil
     public init() {}
 }
 extension HabitPolicy: MadarRecordModel {
@@ -3155,6 +3156,7 @@ extension HabitPolicy: MadarRecordModel {
             "windowAnchor": JSONValue.encode(windowAnchor),
             "windowStartMin": JSONValue.encode(windowStartMin),
             "windowEndMin": JSONValue.encode(windowEndMin),
+            "intervalDays": JSONValue.encode(intervalDays),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -3182,6 +3184,7 @@ extension HabitPolicy: MadarRecordModel {
         windowAnchor = try record.decode("windowAnchor", as: String?.self)
         windowStartMin = try record.decode("windowStartMin", as: Int?.self)
         windowEndMin = try record.decode("windowEndMin", as: Int?.self)
+        intervalDays = try record.fields["intervalDays"]?.decode(Int?.self)
     }
 }
 @Model public final class HabitPause {

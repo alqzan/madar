@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.removeAccount", "money.confirmClear", "money.markVisit", "money.seedCategories",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setCategoryPreferredCard", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.saveZakat", "money.prepareGoal"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setCategoryPreferredCard", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.saveZakat", "money.prepareGoal", "money.logTransfer", "money.moveEnvelope"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
     /// M5-X00: the budget-ignore stamp's optional reason.
@@ -151,6 +151,17 @@ public enum MoneyCommandPayload {
             if p["transactionID"] != nil { return id("transactionID") && p["expense"] == nil }
             guard case .object(let expense) = p["expense"], expense["allocations"] == nil else { return false }
             return validate(name: "money.logExpense", payload: expense)
+        case "money.logTransfer":
+            // FB-39 (owner, 6 Nov): money moved between two of the user's own accounts, or a cash withdrawal to the wallet.
+            guard Set(p.keys).isSubset(of: ["kind", "amountMinor", "fromAccountID", "toAccountID", "eventAt", "note", "rateAtTime", "allocations"]),
+                  choices("kind", ["transfer", "withdrawal"]), positive("amountMinor"), id("fromAccountID"), id("toAccountID"),
+                  p["fromAccountID"] != p["toAccountID"], p["eventAt"] == nil || date(p["eventAt"]) != nil,
+                  optionalText("note"), optionalText("rateAtTime", max: 40) else { return false }
+            return p["allocations"] == nil || allocationRows(p["allocations"])
+        case "money.moveEnvelope":
+            // FB-39 (owner, 6 Nov): part of one envelope's balance moved to another, or from/to the reserve or the surplus.
+            func side(_ key: String) -> Bool { if case .string(let raw) = p[key] { ["reserve", "surplus"].contains(raw) || UUID(uuidString: raw) != nil } else { false } }
+            return Set(p.keys) == ["from", "to", "amountMinor"] && side("from") && side("to") && p["from"] != p["to"] && positive("amountMinor")
         case "money.logExpense":
             // M5-V17: the sheet may split the charge over an envelope and «يومك» (F02); rows as in confirmTransaction.
             return Set(p.keys).isSubset(of: ["amountMinor", "currency", "merchant", "method", "categoryID", "fromAccountID", "cardID", "eventAt", "rateAtTime", "showInDiary", "allocations", "categorySource"])

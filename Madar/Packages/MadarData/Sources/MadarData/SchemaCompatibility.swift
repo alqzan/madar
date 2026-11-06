@@ -24,6 +24,7 @@ enum SchemaCompatibility {
         case 11: MadarSchemaV11.syncedNames
         case 12: MadarSchemaV12.syncedNames
         case 13: MadarSchemaV13.syncedNames
+        case 14: MadarSchemaV14.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -79,6 +80,8 @@ enum SchemaCompatibility {
             if version < 13, row.model == "Trip", row.fields["journeyID"] == nil { row.fields["journeyID"] = .null }
             // V14: pre-existing categories have no recorded provenance and must not train merchant suggestions.
             if version < 14, row.model == "MoneyTransaction", row.fields["categorySource"] == nil { row.fields["categorySource"] = .null }
+            // V15: every older habit policy has no day interval.
+            if version < 15, row.model == "HabitPolicy", row.fields["intervalDays"] == nil { row.fields["intervalDays"] = .null }
             return row
         }
     }

@@ -1636,11 +1636,21 @@ private struct PrayerOldMissedSheet: View {
     @State private var fridayKind: FridayPrayerKind? = nil
     @State private var confirmRestore = false
     @State private var rootBlockerID = UUID()
+    // FB-39 (owner, 6 Nov): «أضف ٣٠٠ فجر» — many old missed prayers at once, each on its own real day.
+    @State private var byCount = false
+    @State private var countText = ""
     @Environment(\.roomTheme) private var theme
     private var hasUnsavedInput: Bool {
         GregorianDay.containing(date, in: session.activePlace.timeZone) != trackingStart.adding(days: -1)
-            || prayer != .fajr || fridayKind != nil
+            || prayer != .fajr || fridayKind != nil || !countText.isEmpty
     }
+    private var count: Int? {
+        let digits = countText.compactMap(\.wholeNumberValue)
+        guard !digits.isEmpty else { return nil }
+        let value = digits.reduce(0) { $0 * 10 + $1 }
+        return (1...PrayerMutation.maximumRun).contains(value) ? value : nil
+    }
+    private var lastDay: GregorianDay { .containing(date, in: session.activePlace.timeZone) }
     init(session: AppSession, trackingStart: GregorianDay, finished: @escaping () -> Void,
          rootDraftChanged: @escaping (UUID, Bool) -> Void) {
         self.session = session; self.trackingStart = trackingStart; self.finished = finished; self.rootDraftChanged = rootDraftChanged
@@ -1661,14 +1671,42 @@ private struct PrayerOldMissedSheet: View {
             Form {
                 Section {
                     Text("الفوائت القديمة لا تُضاف إلا باختيارك؛ ما قبل بداية التتبّع يبقى بلا تسجيل.")
-                    DatePicker("التاريخ", selection: pickerDate, in: ...maximumDate, displayedComponents: .date)
+                    Picker("الطريقة", selection: $byCount) {
+                        Text("يوم واحد").tag(false)
+                        Text("بالعدد").tag(true)
+                    }.pickerStyle(.segmented).accessibilityIdentifier("prayer-old-mode")
+                    if byCount {
+                        HStack {
+                            Text("كم فرضًا؟")
+                            Spacer()
+                            TextField("٣٠٠", text: $countText).keyboardType(.numberPad).multilineTextAlignment(.center)
+                                .frame(width: 96).accessibilityIdentifier("prayer-old-count")
+                        }
+                    }
+                    DatePicker(byCount ? "آخرها يوم" : "التاريخ", selection: pickerDate, in: ...maximumDate, displayedComponents: .date)
                         .environment(\.calendar, calendar).environment(\.timeZone, session.activePlace.timeZone)
                         .accessibilityIdentifier("prayer-old-date")
                     MadarDateLabel(session.dateLabels(.containing(date, in: session.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
                     Picker("الصلاة", selection: $prayer) {
                         ForEach(Prayer.allCases, id: \.self) { Text(title($0)).tag($0) }
                     }.accessibilityIdentifier("prayer-old-prayer")
-                    if fridayNoon {
+                    if byCount, let count {
+                        // Both calendars for the first and last day of the run.
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("يُضاف من \(title(prayer)) " + WidgetCopy.agree(count, MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi), one: "فرض واحد", two: "فرضان", few: "فروض", many: "فرضًا") + "، فرض لكل يوم:")
+                                .font(MadarTypography.caption())
+                            HStack(alignment: .top) {
+                                Text("من").font(MadarTypography.caption())
+                                MadarDateLabel(session.dateLabels(lastDay.adding(days: -(count - 1))), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
+                            }
+                            HStack(alignment: .top) {
+                                Text("إلى").font(MadarTypography.caption())
+                                MadarDateLabel(session.dateLabels(lastDay), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
+                            }
+                            Text("الأيام المسجّلة من قبل تبقى كما هي، ولا يتكرر فرض.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        }.accessibilityElement(children: .combine).accessibilityIdentifier("prayer-old-count-preview")
+                    }
+                    if fridayNoon && !byCount {
                         Picker("فرض ظهر الجمعة", selection: $fridayKind) {
                             Text("اختر النوع").tag(Optional<FridayPrayerKind>.none)
                             Text("الجمعة").tag(Optional(FridayPrayerKind.jumuah))
@@ -1676,6 +1714,11 @@ private struct PrayerOldMissedSheet: View {
                         }.accessibilityIdentifier("prayer-old-friday")
                     }
                 }
+                if byCount {
+                    Section {
+                        Button("أضف الفوائت") { saveRun() }.accessibilityIdentifier("prayer-old-count-save")
+                    }.disabled(session.prayerWriteInProgress || count == nil)
+                } else {
                 Section {
                     if restoring {
                         Text("حذفتَ هذا التسجيل أو تراجعتَ عنه؛ يمكنك إعادته من الزر أدناه.")
@@ -1684,9 +1727,10 @@ private struct PrayerOldMissedSheet: View {
                         Button("أضف الفائتة") { save(false) }.accessibilityIdentifier("prayer-old-save")
                     }
                 }.disabled(session.prayerWriteInProgress || (fridayNoon && fridayKind == nil))
+                }
             }
             .scrollContentBackground(.hidden).background(theme.background)
-            .navigationTitle("فائتة قديمة").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(byCount ? "فوائت قديمة" : "فائتة قديمة").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إغلاق") { finished() } } }
             .confirmationDialog("أعد تسجيل هذه الفائتة؟", isPresented: $confirmRestore, titleVisibility: .visible) {
                 Button("أعد التسجيل") { save(true) }
@@ -1696,6 +1740,10 @@ private struct PrayerOldMissedSheet: View {
             .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
             .onDisappear { rootDraftChanged(rootBlockerID, false) }
         }
+    }
+    private func saveRun() {
+        guard let count else { return }
+        session.addOldMissedRun(prayer: prayer, count: count, lastDay: lastDay) { success in if success { finished() } }
     }
     private func save(_ restore: Bool) { session.addOldMissedPrayer(reference, fridayKind: fridayNoon ? fridayKind : nil, restoreDeleted: restore) { success in if success { finished() } } }
     private func title(_ prayer: Prayer) -> String { switch prayer { case .fajr: "الفجر"; case .dhuhr: "الظهر"; case .asr: "العصر"; case .maghrib: "المغرب"; case .isha: "العشاء" } }

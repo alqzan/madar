@@ -1036,7 +1036,7 @@
    "section": "حضور مدار",
    "title": "الاقتراح حسب الوقت",
    "type": "choice",
-   "default": "calm",
+   "default": "medium",
    "scope": "sync",
    "options": [
     {
@@ -1462,7 +1462,7 @@
    "section": "التذكير",
    "title": "نبّهني قبل الأذان",
    "type": "bool",
-   "default": true,
+   "default": false,
    "scope": "sync",
    "note": "وقت الصلاة نفسه يفوت بفواته. من الأذان حتى نهاية الحرمة لا يصل شيء (RP3)، فيُرسل التنبيه قبل الأذان بـ salah.beforeAdhanMin دقيقة، ولا يُزاح بعد الأذان أبدًا: إن وقع في حرمة سابقة أو في ساعات الصمت سقط",
    "storage": "Setting (synced)",
@@ -1489,7 +1489,7 @@
    "section": "التذكير",
    "title": "تذكير القضاء",
    "type": "choice",
-   "default": "afterFajr",
+   "default": "off",
    "scope": "sync",
    "options": [
     {

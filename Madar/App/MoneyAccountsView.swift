@@ -16,6 +16,7 @@ struct MoneyAccountsView: View {
     @State private var errorMessage: String?
     @State private var appeared = false
     @State private var reconcileOpen = false
+    @State private var transferOpen = false
     #if DEBUG
     @State private var injectedReadFailure = false
     #endif
@@ -62,6 +63,11 @@ struct MoneyAccountsView: View {
                             Button(action: addAccount) { Label("أضف أول حساب", systemImage: "plus").font(MadarTypography.body().bold()).padding(.horizontal, 18).frame(minHeight: 44).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-accounts-empty-add")
                         }.padding(.vertical, 20)
                     }
+                    // FB-39 (owner, 6 Nov): money between two own accounts, or a cash withdrawal, in one sheet.
+                    if transferable(r).count >= 2 {
+                        Button { transferOpen = true } label: { Label("حوّل بين حساباتي أو اسحب نقدًا", systemImage: "arrow.left.arrow.right").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48) }
+                            .buttonStyle(.madarPlain).foregroundStyle(theme.accent).background(theme.surface, in: .rect(cornerRadius: 14)).accessibilityIdentifier("money-accounts-transfer")
+                    }
                     HStack(spacing: 8) {
                         Label(r.shortcutAt == nil ? "لم تصل رسالة عبر الاختصار بعد" : "رسائل عبر الاختصار", systemImage: r.shortcutAt == nil ? "tray" : "checkmark.circle").font(MadarTypography.caption())
                         Spacer(minLength: 0)
@@ -76,6 +82,7 @@ struct MoneyAccountsView: View {
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).toolbar(.hidden, for: .navigationBar, .tabBar)
             .task { load(); withAnimation(reduceMotion ? nil : .easeOut(duration: 0.5)) { appeared = true } }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $selected) { MoneyAccountSheet(app: app, original: $0, visible: visible, revealed: $revealed) }.sheet(item: $selectedSource) { source($0) }
+            .sheet(isPresented: $transferOpen, onDismiss: load) { if let r = reading { MoneyTransferView(app: app, accounts: transferable(r)).environment(\.roomTheme, theme) } }
             .navigationDestination(isPresented: $reconcileOpen) { MoneyReconcileView(app: app, revealed: $revealed) }
             .accessibilityIdentifier("money-accounts")
     }
@@ -174,6 +181,106 @@ struct MoneyAccountsView: View {
             reading = try service.loadAccounts(); errorMessage = nil
         } catch {
             errorMessage = reading == nil ? "لم تكتمل قراءة الحسابات. أعد المحاولة." : "تعذّر تحديث الحسابات؛ تعرض آخر قراءة ناجحة. أعد المحاولة."
+        }
+    }
+}
+
+extension MoneyAccountsView {
+    /// Own tracked accounts with a known balance: the only ones money can move between.
+    func transferable(_ r: MoneyAccountsReading) -> [MoneyAccountRow] {
+        r.rows.filter { $0.side == .cash && $0.accountID != nil && $0.edit?.ownership == "mine" && $0.edit?.tracked == true && $0.amountMinor != nil }
+    }
+}
+
+/// FB-39 (owner, 6 Nov): «حوّل» between own accounts (no effect on «يومك»), or «اسحب نقدًا» into the wallet, which the
+/// withdrawal setting charges once. The kind follows the two accounts, so the user never picks it.
+private struct MoneyTransferView: View {
+    let app: AppSession
+    let accounts: [MoneyAccountRow]
+    @Environment(\.roomTheme) private var theme
+    @Environment(\.dismiss) private var dismiss
+    @State private var fromID: UUID?
+    @State private var toID: UUID?
+    @State private var input = ""
+    @State private var note = ""
+    @State private var date = Date()
+    @State private var working = false
+    @State private var errorMessage: String?
+    private var service: AppMoneyService { .init(app: app) }
+    private var from: MoneyAccountRow? { accounts.first { $0.accountID == fromID } }
+    private var to: MoneyAccountRow? { accounts.first { $0.accountID == toID } }
+    private var withdrawal: Bool { to?.edit?.kind == "cash" && from?.edit?.kind != "cash" }
+    private var amountMinor: Int? {
+        guard let currency = from?.currency, let exponent = CurrencyExponents.specified.exponent(currency) else { return nil }
+        let raw = BankMessageParser.clean(input).replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let minor = MoneyAmountInput.minor(raw, exponent: exponent), minor > 0 else { return nil }
+        return minor
+    }
+    private var problem: String? {
+        guard let from, let to else { return nil }
+        if from.accountID == to.accountID { return "اختر حسابين مختلفين." }
+        if from.currency != to.currency { return "الحسابان بعملتين مختلفتين؛ التحويل هنا بعملة واحدة." }
+        return nil
+    }
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                MoneyPageHeader(title: withdrawal ? "سحب نقدي" : "تحويل بين حساباتي", close: { dismiss() }, closeDisabled: working)
+                picker("من", selection: $fromID, id: "money-transfer-from")
+                picker("إلى", selection: $toID, id: "money-transfer-to")
+                TextField("المبلغ", text: $input).keyboardType(.decimalPad).font(MadarTypography.cardTitle()).padding(14)
+                    .overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.line, lineWidth: 1) }.accessibilityIdentifier("money-transfer-amount")
+                DatePicker("الوقت", selection: $date, in: ...Date(), displayedComponents: [.date, .hourAndMinute]).environment(\.timeZone, app.activePlace.timeZone).frame(minHeight: 44)
+                MadarDateLabel(app.dateLabels(.containing(date, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
+                TextField("ملاحظة، إن أردت", text: $note).frame(minHeight: 44).accessibilityIdentifier("money-transfer-note")
+                if let problem { Text(problem).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
+                else if let from, let to, let minor = amountMinor, let fromBalance = from.amountMinor, let toBalance = to.amountMinor {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("يصير «" + from.name + "» " + service.amount(fromBalance - minor, currency: from.currency) + "، و«" + to.name + "» " + service.amount(toBalance + minor, currency: to.currency) + ".").font(MadarTypography.body())
+                        Text(withdrawal ? (app.bool("mal.cashWithdrawalAsSpend") ? "سحب نقدي: يُحتسب من يومك الآن، ولا يُحتسب ما تصرفه من النقد مرة أخرى." : "سحب نقدي: لا يمسّ يومك؛ يُحتسب ما تصرفه من النقد حين تسجّله.") : "تحويل بين حساباتك؛ لا يمسّ يومك ولا مظاريفك.")
+                            .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    }.accessibilityElement(children: .combine).accessibilityIdentifier("money-transfer-preview")
+                }
+                if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
+                Button(working ? "جارٍ الحفظ…" : withdrawal ? "سجّل السحب" : "سجّل التحويل", action: save).buttonStyle(MadarPrimaryButton())
+                    .disabled(working || from == nil || to == nil || problem != nil || amountMinor == nil).accessibilityIdentifier("money-transfer-save")
+            }.padding(20)
+        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.large]).presentationDragIndicator(.visible).madarSheetLock(saving: working)
+            .onAppear {
+                if fromID == nil { fromID = accounts.first { $0.edit?.kind != "cash" }?.accountID ?? accounts.first?.accountID }
+                if toID == nil { toID = accounts.first { $0.accountID != fromID && $0.edit?.kind == "cash" }?.accountID ?? accounts.first { $0.accountID != fromID }?.accountID }
+                date = app.prayerNow()
+            }
+    }
+    private func picker(_ title: String, selection: Binding<UUID?>, id: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(accounts) { account in
+                        let selected = selection.wrappedValue == account.accountID
+                        Button { selection.wrappedValue = account.accountID } label: {
+                            VStack(alignment: .leading, spacing: 2) { Text(account.name).font(MadarTypography.caption().bold()); Text(figure: account.amountMinor.map { service.amount($0, currency: account.currency) } ?? "—").font(MadarTypography.fine()) }
+                                .padding(.horizontal, 14).frame(minHeight: 48)
+                                .foregroundStyle(selected ? theme.onAccent : theme.ink)
+                                .background(selected ? theme.color("accent") : theme.surface, in: .rect(cornerRadius: 14))
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier(id + "-" + account.name)
+                    }
+                }
+            }.scrollIndicators(.hidden)
+        }
+    }
+    private func save() {
+        guard !working, let from = from?.accountID, let to = to?.accountID, let minor = amountMinor, problem == nil else { return }
+        working = true
+        var payload: [String: MadarCore.JSONValue] = ["kind": .string(withdrawal ? "withdrawal" : "transfer"), "amountMinor": .string(String(minor)),
+            "fromAccountID": .string(from.uuidString), "toAccountID": .string(to.uuidString), "eventAt": .string(ISO8601DateFormatter().string(from: date))]
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { payload["note"] = .string(String(trimmed.prefix(80))) }
+        Task {
+            defer { working = false }
+            do { try await app.executeMoneyCommand("money.logTransfer", payload: payload); dismiss() }
+            catch { errorMessage = "لم يُسجَّل؛ تأكد من الحسابين والمبلغ ثم أعد المحاولة." }
         }
     }
 }

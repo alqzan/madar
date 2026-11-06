@@ -49,10 +49,18 @@ extension AppMoneyService {
             return .init(id: plan.id, state: .init(totalMinor: total, paychecks: count, paidMinor: paid.reduce(0) { $0 + $1.amountMinor }, paidCount: Set(paid.map(\.idempotencyKey)).count))
         }
         var balance = 0
+        // FB-39: a move names the other side: «نُقل إلى هدايا»، «نُقل من الفائض».
+        let moveGroups = Set(rows.filter { $0.idempotencyKey.hasPrefix("move:") }.compactMap(\.groupID))
+        let partners = moveGroups.isEmpty ? [] : try context.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.targetID != id && $0.groupID.map(moveGroups.contains) == true }
+        func moveTitle(_ row: Allocation) -> String {
+            let partner = partners.first { $0.groupID == row.groupID }
+            let name = partner?.target == "reserve" ? "الاحتياطي" : partner?.target == "surplus" ? "الفائض" : partner?.targetID.flatMap { pid in home.envelopes.first { $0.id == pid }?.name } ?? "مظروف آخر"
+            return (row.amountMinor < 0 ? "نُقل إلى " : "نُقل من ") + name
+        }
         let entries = rows.map { row in
             balance += row.amountMinor
             let transaction = transactions.first { $0.id == row.transactionID }
-            let title = transaction?.merchant ?? (row.kind == "repay" ? "سداد دين المظروف" : row.kind == "fund" ? "تخصيص للمظروف" : row.kind == "refund" ? "ردّ إلى المظروف" : row.amountMinor < 0 ? "صرف من المظروف" : "رصيد المظروف")
+            let title = row.idempotencyKey.hasPrefix("move:") ? moveTitle(row) : transaction?.merchant ?? (row.kind == "repay" ? "سداد دين المظروف" : row.kind == "fund" ? "تخصيص للمظروف" : row.kind == "refund" ? "ردّ إلى المظروف" : row.amountMinor < 0 ? "صرف من المظروف" : "رصيد المظروف")
             return MoneyEnvelopeEntry(id: row.id, at: transaction?.eventAt ?? row.createdAt, amountMinor: row.amountMinor, balanceMinor: balance, title: title, isSpend: transaction != nil && row.amountMinor < 0)
         }
         return .init(home: home, envelope: envelope, entries: entries.reversed(), savingMinor: plans.reduce(0) { $0 + $1.perPaycheckMinor }, savingPlanID: plans.count == 1 ? plans.first?.id : nil, repayment: repayment)

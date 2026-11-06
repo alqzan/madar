@@ -85,7 +85,7 @@ struct BahwBlockView: View {
     }
 
     private func periodRing(_ f: HabitFrequency, rows: [HabitReading], selected: Bool) -> some View {
-        let group = rows.filter { $0.summary.current?.rule.frequency == f }
+        let group = rows.filter { $0.summary.current?.rule.band == f }
         let met = group.filter { $0.summary.current?.met == true }.count
         let share: Double = group.isEmpty ? 0 : Double(met) / Double(group.count)
         let spoken: String = group.isEmpty ? "لا عادات" : digits.string(met) + " من " + digits.string(group.count)
@@ -110,7 +110,7 @@ struct BahwBlockView: View {
         .accessibilityAddTraits(selected ? .isSelected : []).accessibilityIdentifier("bahw-habits-period-" + f.rawValue)
     }
     private func periodChoice(_ f: HabitFrequency, rows: [HabitReading], selected: Bool) -> some View {
-        let group = rows.filter { $0.summary.current?.rule.frequency == f }
+        let group = rows.filter { $0.summary.current?.rule.band == f }
         let met = group.filter { $0.summary.current?.met == true }.count
         let spoken = group.isEmpty ? "لا عادات" : digits.string(met) + " من " + digits.string(group.count)
         return Button { withAnimation(reduceMotion ? nil : .snappy) { habitPeriod = f } } label: {
@@ -332,9 +332,9 @@ struct BahwBlockView: View {
                 // Owner 20 Oct («ولا فيه تفريق صاحي»): the period rings choose which habits the grid shows, as in the
                 // habits room; it opens on the first period with something unfinished.
                 let periods=[HabitFrequency.daily,.weekly,.monthly,.yearly]
-                let open=periods.first{f in rows.contains{$0.summary.current?.rule.frequency == f && $0.summary.current?.met != true && !$0.paused}} ?? periods.first{f in rows.contains{$0.summary.current?.rule.frequency == f}} ?? .daily
-                let period=habitPeriod.flatMap{p in rows.contains{$0.summary.current?.rule.frequency == p} ? p : nil} ?? open
-                let shown=service.session.habitRowsForWidgetScope(rows.filter{$0.summary.current?.rule.frequency == period})
+                let open=periods.first{f in rows.contains{$0.summary.current?.rule.band == f && $0.summary.current?.met != true && !$0.paused}} ?? periods.first{f in rows.contains{$0.summary.current?.rule.band == f}} ?? .daily
+                let period=habitPeriod.flatMap{p in rows.contains{$0.summary.current?.rule.band == p} ? p : nil} ?? open
+                let shown=service.session.habitRowsForWidgetScope(rows.filter{$0.summary.current?.rule.band == period})
                 if dynamicTypeSize.isAccessibilitySize {
                     ScrollView(.vertical) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -677,7 +677,7 @@ private struct BahwHabitPeriod: View {
     let theme: RoomTheme
 
     private var active: [HabitReading] {
-        rows.filter { !$0.paused && $0.summary.current?.rule.frequency == frequency && ($0.summary.current?.target ?? 0) > 0 }
+        rows.filter { !$0.paused && $0.summary.current?.rule.band == frequency && ($0.summary.current?.target ?? 0) > 0 }
     }
 
     var body: some View {

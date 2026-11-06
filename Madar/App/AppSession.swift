@@ -453,6 +453,18 @@ final class AppSession {
             "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null, "restoreDeleted": .bool(restoreDeleted)
         ]), undoMessage: "أُضيفت الفائتة القديمة", completion: completion)
     }
+    /// FB-39: «أضف ٣٠٠ فجر» — one old missed prayer per day, counting back from `lastDay`.
+    func addOldMissedRun(prayer: Prayer, count: Int, lastDay: GregorianDay, completion: ((Bool) -> Void)? = nil) {
+        sendPrayerCommand(name: "prayer.addOldMissedRun", payload: .object([
+            "prayer": .string(prayer.rawValue), "count": .number(Double(count)), "lastDayKey": .string(lastDay.description)
+        ]), undoMessage: "أُضيفت الفوائت القديمة", completion: completion)
+    }
+    /// FB-39: «قضيتُ ٥ من الفجر» — the oldest debts of that prayer, made up now.
+    func makeUpOldest(prayer: Prayer, count: Int, completion: ((Bool) -> Void)? = nil) {
+        sendPrayerCommand(name: "prayer.makeUpOldest", payload: .object([
+            "prayer": .string(prayer.rawValue), "count": .number(Double(count))
+        ]), undoMessage: "سُجّل القضاء", completion: completion)
+    }
     func qiyamRequiresRestore(_ night: GregorianDay) throws -> Bool {
         try PrayerRepository(context: ModelContext(container)).nightRequiresRestore(night)
     }

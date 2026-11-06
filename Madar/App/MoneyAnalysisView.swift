@@ -81,7 +81,7 @@ struct MoneyAnalysisView: View {
                     Task { aiAvailability = await MadarAIAvailabilityChecker.check() }
                 }
             }) {
-                let initialScope: MadarAIAnalysisScope = current == .week ? .week : ((reading?.offset ?? 0) < 0 ? .custom : .cycle)
+                let initialScope: MadarAIAnalysisScope = current == .week ? .week : current == .cycle && (reading?.offset ?? 0) == 0 ? .cycle : .custom
                 let range = initialScope == .custom ? reading.map { MadarAIDateRange(first: $0.first, last: min($0.last, $0.today)) } : nil
                 MadarAIAnalysisSheet(app: app, kind: .money, initialScope: initialScope,
                                      initialDay: reading?.first, initialRange: range)
@@ -123,9 +123,9 @@ struct MoneyAnalysisView: View {
     }
     private var periodPicker: some View {
         HStack(spacing: 4) {
-            ForEach([MoneyAnalysisPeriod.week, .cycle]) { p in
+            ForEach([MoneyAnalysisPeriod.week, .cycle, .month, .year]) { p in
                 Button { guard p != current else { return }; period = p; offset = 0; selected = nil; load() } label: {
-                    Text(p == .week ? "الأسبوع" : "الدورة").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 44)
+                    Text(p == .week ? "الأسبوع" : p == .cycle ? "الدورة" : p == .month ? "الشهر" : "السنة").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 44)
                         .background(p == current ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(p == current ? theme.background : theme.ink)
                 }.buttonStyle(.madarPlain).accessibilityAddTraits(p == current ? .isSelected : []).accessibilityIdentifier("money-analysis-period-" + p.rawValue)
             }
@@ -148,9 +148,9 @@ struct MoneyAnalysisView: View {
                 }.accessibilityElement(children: .combine).accessibilityIdentifier("money-analysis-range")
                 Spacer(minLength: 4)
                 Button { offset -= 1; selected = nil; load() } label: { Image(systemName: "chevron.backward").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
-                    .buttonStyle(.madarPlain).disabled(!r.canGoBack).opacity(r.canGoBack ? 1 : 0.3).accessibilityLabel(r.period == .week ? "الأسبوع السابق" : "الدورة السابقة").accessibilityIdentifier("money-analysis-previous")
+                    .buttonStyle(.madarPlain).disabled(!r.canGoBack).opacity(r.canGoBack ? 1 : 0.3).accessibilityLabel(r.period == .week ? "الأسبوع السابق" : r.period == .month ? "الشهر السابق" : r.period == .year ? "السنة السابقة" : "الدورة السابقة").accessibilityIdentifier("money-analysis-previous")
                 Button { offset = min(0, offset + 1); selected = nil; load() } label: { Image(systemName: "chevron.forward").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
-                    .buttonStyle(.madarPlain).disabled(r.offset >= 0).opacity(r.offset < 0 ? 1 : 0.3).accessibilityLabel(r.period == .week ? "الأسبوع التالي" : "الدورة التالية").accessibilityIdentifier("money-analysis-next")
+                    .buttonStyle(.madarPlain).disabled(r.offset >= 0).opacity(r.offset < 0 ? 1 : 0.3).accessibilityLabel(r.period == .week ? "الأسبوع التالي" : r.period == .month ? "الشهر التالي" : r.period == .year ? "السنة التالية" : "الدورة التالية").accessibilityIdentifier("money-analysis-next")
             }
             HStack(alignment: .center, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -189,12 +189,38 @@ struct MoneyAnalysisView: View {
                     HStack { MadarDateLabel(app.dateLabels(d.day, weekday: true)); Spacer(); Text(figure: amount(d.spentMinor) + " من " + (d.dailyMinor.map(amount) ?? "غير معروف")) }.font(MadarTypography.body())
                 }
             }.accessibilityIdentifier("money-analysis-days")
+        } else if r.period == .year {
+            yearBars(r)
         } else {
             VStack(alignment: .leading, spacing: 8) {
                 bars(r).frame(height: r.period == .week ? 178 : 196)
                 if let d = chosen(r) { dayLine(d, r) }
             }
         }
+    }
+    /// FB-39: a year reads as its twelve months, each against what «يومك» allowed in it.
+    private func yearBars(_ r: MoneyAnalysisReading) -> some View {
+        let months = Dictionary(grouping: r.days.filter { $0.day <= r.today }, by: \.day.month)
+        let rows = (1...12).map { m in (month: m, spent: months[m]?.reduce(0) { $0 + $1.spentMinor } ?? 0, allowed: months[m]?.reduce(0) { $0 + ($1.dailyMinor ?? 0) } ?? 0, has: months[m] != nil) }
+        let peak = max(1, rows.map { max($0.spent, $0.allowed) }.max() ?? 1)
+        let formatter: DateFormatter = { let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "ar"); f.timeZone = .gmt; f.dateFormat = "MMMM"; return f }()
+        return VStack(alignment: .leading, spacing: 6) {
+            ForEach(rows, id: \.month) { row in
+                let name = (try? GregorianDay(year: r.first.year, month: row.month, day: 1)).map { formatter.string(from: $0.date(in: .gmt).addingTimeInterval(43200)) } ?? ""
+                HStack(spacing: 10) {
+                    Text(name).font(MadarTypography.caption()).frame(width: 64, alignment: .leading)
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            if row.allowed > 0 { Capsule().stroke(theme.line, lineWidth: 1).frame(width: proxy.size.width * CGFloat(Double(row.allowed) / Double(peak))) }
+                            Capsule().fill(row.allowed > 0 && row.spent > row.allowed ? theme.color("due") : theme.color("surplus"))
+                                .frame(width: visible && row.has ? max(row.spent > 0 ? 3 : 0, proxy.size.width * CGFloat(Double(max(0, row.spent)) / Double(peak))) : 0)
+                        }
+                    }.frame(height: 12)
+                    Text(figure: row.has && visible ? amount(row.spent) : row.has ? "•••" : "—").font(MadarTypography.fine()).frame(width: 78, alignment: .trailing)
+                }.frame(minHeight: 24).accessibilityElement(children: .combine).accessibilityIdentifier("money-analysis-month-" + String(row.month))
+            }
+            Text("الإطار ما أتاحه «يومك» في الشهر؛ الأحمر شهر تجاوزه.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+        }.accessibilityElement(children: .contain).accessibilityIdentifier("money-analysis-year")
     }
     private func bars(_ r: MoneyAnalysisReading) -> some View {
         let line = r.dailyLineMinor
@@ -302,7 +328,7 @@ struct MoneyAnalysisView: View {
                 Text("أين راح صرفك؟").font(.custom("Amiri-Bold", size: 27, relativeTo: .title2)).accessibilityAddTraits(.isHeader)
                 Spacer()
                 if rows.contains(where: { $0.capMinor != nil }) {
-                    HStack(spacing: 4) { Rectangle().fill(theme.ink).frame(width: 2, height: 12); Text(r.period == .week ? "الخط حصة الأسبوع من حدّك" : "الخط حدّك") }
+                    HStack(spacing: 4) { Rectangle().fill(theme.ink).frame(width: 2, height: 12); Text(r.period == .cycle ? "الخط حدّك" : "الخط حصة الفترة من حدّك") }
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
             }

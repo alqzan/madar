@@ -14,7 +14,7 @@ public enum MadarSchemaV2: VersionedSchema {
         Allocation.self, MadarFrozenReconciliationV8.Reconciliation.self, BankMessage.self, Cycle.self, CyclePolicy.self, Envelope.self,
         MadarFrozenMoneyV4.EnvelopePlan.self, MadarFrozenMoneyV6.Obligation.self, InstallmentItem.self, MadarFrozenCategoryV9.Category.self, CategoryLimit.self,
         MerchantRule.self, MadarFrozenMoneyV4.ZakatProfile.self, Book.self, ReadingSession.self, Highlight.self, NotebookNote.self,
-        HadithProgress.self, UserWord.self, Habit.self, HabitPolicy.self, HabitPause.self, HabitLog.self,
+        HadithProgress.self, UserWord.self, Habit.self, MadarFrozenHabitPolicyV14.HabitPolicy.self, HabitPause.self, HabitLog.self,
         WidgetConfig.self
     ]
     public static let deviceTypes: [any PersistentModel.Type] = [

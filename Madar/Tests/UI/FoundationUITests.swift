@@ -600,6 +600,39 @@ import XCTest
         app.terminate()
     }
 
+    /// FB-39 (owner, 6 Nov): qada by count. Tracking starts 3 Oct, so «٥ فجر» ending on the default last day (2 Oct)
+    /// are 28 Sep … 2 Oct; «قضيتُ ٢» then makes up the two oldest (28 and 29 Sep). Days worked by hand.
+    func test_FB39_QadaByCountAddsRunAndMakesUpOldest() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-08T09:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-03", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        let prayerTab = app.buttons["tab-prayer"]; XCTAssertTrue(prayerTab.waitForExistence(timeout: 15)); prayerTab.tap()
+        // The button sits low in the room and appears only once scrolled to, as in the M1-T09 test.
+        let add = app.buttons["prayer-old-missed"]; scrollTo(add, in: app); add.tap()
+        let mode = app.segmentedControls["prayer-old-mode"].buttons["بالعدد"]
+        XCTAssertTrue(mode.waitForExistence(timeout: 10), app.debugDescription); mode.tap()
+        let count = app.textFields["prayer-old-count"]; XCTAssertTrue(count.waitForExistence(timeout: 5)); count.tap(); count.typeText("5")
+        XCTAssertTrue(app.descendants(matching: .any)["prayer-old-count-preview"].waitForExistence(timeout: 5), app.debugDescription)
+        attachScreenshot(app, named: "FB39-qada-by-count-L")
+        let save = app.buttons["prayer-old-count-save"]; scrollTo(save, in: app); save.tap()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 10), app.debugDescription)
+        let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
+        func row(_ day: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: "prayer-qada-row-\(day)-fajr").firstMatch }
+        XCTAssertTrue(row("2026-09-28").waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(row("2026-10-02").exists, app.debugDescription)
+        XCTAssertFalse(row("2026-09-27").exists)
+        let bulk = app.buttons["prayer-qada-bulk-open"]; scrollTo(bulk, in: app); bulk.tap()
+        let made = app.textFields["prayer-qada-bulk-count"]; XCTAssertTrue(made.waitForExistence(timeout: 8), app.debugDescription); made.tap(); made.typeText("2")
+        attachScreenshot(app, named: "FB39-qada-bulk-makeup-L")
+        app.buttons["prayer-qada-bulk-save"].tap()
+        XCTAssertTrue(row("2026-09-28").waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(row("2026-09-29").exists)
+        XCTAssertTrue(row("2026-09-30").exists, app.debugDescription)
+        app.terminate()
+    }
+
     func test_M1T09_OldMissedSaveUndoRestoreMakeUpAndRelaunch() throws {
         continueAfterFailure = false
         for size in ["L"] {
@@ -1886,5 +1919,17 @@ import XCTest
             start.tap()
             if start.exists && start.isHittable { start.tap() }
         }
+        // A store without a fixture reaches the location step: choose a city by hand, then «ليس الآن» for photos.
+        let city = app.buttons["first-run-city"]
+        guard city.waitForExistence(timeout: 2) else { return }
+        city.tap()
+        let field = app.textFields["city-search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), app.debugDescription); field.tap(); field.typeText("الرياض")
+        let hit = app.buttons["city-hit-الرياض"]
+        XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
+        if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
+        let later = app.buttons["first-run-continue"]
+        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
+        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
     }
 }

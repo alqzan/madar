@@ -216,6 +216,79 @@ import MadarInbox
         #expect(undone.count == 2); #expect(undone.filter { $0.targetID == envelope.id }.reduce(0) { $0 + $1.amountMinor } == -100_000)
         #expect(try await f.run("money.repayEnvelopeNow", ["id": .string(envelope.id.uuidString), "source": .string("reserve"), "debtMinor": .string("100000")]).status == .rejected)
     }
+    /// FB-39 (owner, 6 Nov). Hand-worked: the fixture's bank holds 20,000.00 and the wallet 100.00 (2,010,000 in all).
+    /// A 500.00 withdrawal moves 50,000 from the bank to the wallet: the total stays 2,010,000 and, with
+    /// `mal.cashWithdrawalAsSpend` on by default, «يومك» is charged 50,000 once. Moving 300.00 from the bank to a second
+    /// own account of 0 is budget-neutral: bank 1,920,000, saving 30,000. Undo restores the balances.
+    @Test func ownTransferAndCashWithdrawalMoveBalancesAndChargeOnlyTheWithdrawal() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let saving = UUID()
+        #expect(try await f.run("money.saveAccount", ["id": .string(saving.uuidString), "name": .string("ادخار"), "bank": .string("Bank"),
+            "kind": .string("savings"), "ownership": .string("mine"), "currency": .string("SAR"), "balanceMinor": .string("0"),
+            "balanceAt": .string("2026-10-14T00:00:00Z"), "last4": .string("5555"), "senderIDs": .array([.string("Bank")])]).status == .applied)
+        func balance(_ id: UUID) throws -> Int {
+            let c = ModelContext(f.container), account = try #require(try c.fetch(FetchDescriptor<Account>()).first { $0.id == id })
+            return try MoneyRepository(context: c).accountBalance(account, at: f.now)
+        }
+        func daily() throws -> Int { try ModelContext(f.container).fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.target == "daily" }.reduce(0) { $0 + $1.amountMinor } }
+        func move(_ kind: String, _ from: UUID, _ to: UUID, _ amount: Int, id: UUID = UUID()) async throws -> CommandOutcome {
+            try await f.run("money.logTransfer", ["kind": .string(kind), "amountMinor": .string(String(amount)), "fromAccountID": .string(from.uuidString), "toAccountID": .string(to.uuidString)], id: id)
+        }
+        // Bank → wallet is a withdrawal, never a plain transfer; one account cannot send to itself.
+        #expect(try await move("transfer", f.bank, f.cash, 50_000).status == .rejected)
+        #expect(try await move("withdrawal", f.bank, f.bank, 50_000).status == .rejected)
+        let withdrawal = UUID()
+        #expect(try await move("withdrawal", f.bank, f.cash, 50_000, id: withdrawal).status == .applied)
+        _ = try await move("withdrawal", f.bank, f.cash, 50_000, id: withdrawal) // replay: no second row
+        #expect(try balance(f.bank) == 1_950_000); #expect(try balance(f.cash) == 60_000)
+        #expect(try f.basis().inAccountMinor == 2_010_000); #expect(try daily() == -50_000)
+        let transfer = UUID()
+        #expect(try await move("transfer", f.bank, saving, 30_000, id: transfer).status == .applied)
+        #expect(try balance(f.bank) == 1_920_000); #expect(try balance(saving) == 30_000)
+        #expect(try f.basis().inAccountMinor == 2_010_000); #expect(try daily() == -50_000)
+        #expect(try await f.run("system.undo", ["undoToken": .string(transfer.uuidString)]).status == .applied)
+        #expect(try balance(f.bank) == 1_950_000); #expect(try balance(saving) == 0)
+        // Wallet → bank (depositing cash) is a plain neutral transfer.
+        #expect(try await move("transfer", f.cash, f.bank, 10_000).status == .applied)
+        #expect(try balance(f.cash) == 50_000); #expect(try balance(f.bank) == 1_960_000); #expect(try daily() == -50_000)
+    }
+    /// FB-39 (owner, 6 Nov). Hand-worked: «سفر» holds 300.00, «هدايا» 0, the surplus 200.00. 100.00 from سفر to هدايا
+    /// leaves 200.00 and 100.00; the whole surplus can then go to سفر (400.00), and not one halala more.
+    @Test func envelopeMovesKeepTheTotalAndNeverOverdraw() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let c = ModelContext(f.container), travel = Envelope(), gifts = Envelope()
+        travel.name = "سفر"; gifts.name = "هدايا"; c.insert(travel); c.insert(gifts)
+        for (target, targetID, amount) in [("envelope", Optional(travel.id), 30_000), ("surplus", nil, 20_000)] {
+            let row = Allocation(); row.target = target; row.targetID = targetID; row.amountMinor = amount; row.kind = "fund"; row.idempotencyKey = UUID().uuidString; c.insert(row)
+        }
+        try c.save()
+        func held(_ id: UUID?) throws -> Int { try ModelContext(f.container).fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && (id == nil ? $0.target == "surplus" : $0.targetID == id) }.reduce(0) { $0 + $1.amountMinor } }
+        func move(_ from: String, _ to: String, _ amount: Int, id: UUID = UUID()) async throws -> CommandOutcome {
+            try await f.run("money.moveEnvelope", ["from": .string(from), "to": .string(to), "amountMinor": .string(String(amount))], id: id)
+        }
+        let first = UUID()
+        #expect(try await move(travel.id.uuidString, gifts.id.uuidString, 10_000, id: first).status == .applied)
+        #expect(try held(travel.id) == 20_000); #expect(try held(gifts.id) == 10_000)
+        #expect(try await move(gifts.id.uuidString, travel.id.uuidString, 10_001).status == .rejected)
+        #expect(try await move(gifts.id.uuidString, gifts.id.uuidString, 1).status == .rejected)
+        #expect(try await move("surplus", travel.id.uuidString, 20_000).status == .applied)
+        #expect(try held(travel.id) == 40_000); #expect(try held(nil) == 0)
+        #expect(try await move("surplus", travel.id.uuidString, 1).status == .rejected)
+        #expect(try held(travel.id) + held(gifts.id) + held(nil) == 50_000)
+        #expect(try await move(UUID().uuidString, travel.id.uuidString, 1).status == .rejected)
+        // Undo puts a move back: 50.00 to هدايا (150.00) and back to 100.00.
+        let second = UUID()
+        #expect(try await move(travel.id.uuidString, gifts.id.uuidString, 5_000, id: second).status == .applied)
+        #expect(try held(gifts.id) == 15_000)
+        #expect(try await f.run("system.undo", ["undoToken": .string(second.uuidString)]).status == .applied)
+        #expect(try held(gifts.id) == 10_000); #expect(try held(travel.id) == 40_000)
+        // Once the moved money has left هدايا again, undoing the move would overdraw it, so it is refused.
+        let third = UUID()
+        #expect(try await move(travel.id.uuidString, gifts.id.uuidString, 5_000, id: third).status == .applied)
+        let c2 = ModelContext(f.container), spent = Allocation(); spent.target = "envelope"; spent.targetID = gifts.id; spent.amountMinor = -15_000; spent.kind = "spend"; spent.idempotencyKey = UUID().uuidString; c2.insert(spent); try c2.save()
+        #expect((try? await f.run("system.undo", ["undoToken": .string(third.uuidString)]))?.status != .applied)
+        #expect(try held(gifts.id) == 0)
+    }
     @Test func madaDraftConfirmationReplayAndUndoKeepCashAndDebtSeparate() async throws {
         let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
         let intake = UUID(), confirm = UUID()

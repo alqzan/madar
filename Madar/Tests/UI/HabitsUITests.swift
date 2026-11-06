@@ -194,6 +194,24 @@ import UIKit
         XCTAssertFalse(app.buttons["habits-room-diaryLine"].exists,"A habit already kept is not offered again.")
         XCTAssertTrue(app.buttons["habits-room-review"].exists,app.debugDescription)
     }
+    /// FB-39 (owner, 6 Nov): «كل ٣ أيام» with a free first day; the habit is saved and shows in the room.
+    func testEveryFewDaysHabitWithFreeFirstDay() throws {
+        continueAfterFailure=false;let app=app("empty");open(app)
+        app.buttons["habit-first"].tap()
+        let name=app.textFields["habit-name"];XCTAssertTrue(name.waitForExistence(timeout:5));name.tap();name.typeText("زيارة الوالدين")
+        let frequency=app.buttons["habit-frequency"];XCTAssertTrue(frequency.waitForExistence(timeout:5));frequency.tap()
+        let interval=app.buttons["كل عدد من الأيام"];XCTAssertTrue(interval.waitForExistence(timeout:5));interval.tap()
+        let stepper=app.steppers["habit-interval"];XCTAssertTrue(stepper.waitForExistence(timeout:5))
+        XCTAssertEqual(stepper.label,"كل ٣ أيام")
+        app.buttons["habit-interval-Increment"].tap()
+        XCTAssertTrue(stepper.label == "كل ٤ أيام" || NSPredicate(format:"label == %@","كل ٤ أيام").evaluate(with:stepper),stepper.label)
+        XCTAssertTrue(app.datePickers["habit-first-day"].exists)
+        shot(app,"FB39-habit-interval-editor-L")
+        app.buttons["habit-save"].tap();XCTAssertTrue(name.waitForNonExistence(timeout:10))
+        let row=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","habit-row-")).firstMatch
+        if !row.waitForExistence(timeout:5), app.buttons["habits-today-empty"].exists { app.buttons["habits-today-empty"].tap() }
+        XCTAssertTrue(row.waitForExistence(timeout:10),app.debugDescription);shot(app,"FB39-habit-interval-room-L")
+    }
     func testEmptyAddCompleteFreezeRestoreAndRelaunch() throws {
         continueAfterFailure=false;let app=app("empty");open(app)
         XCTAssertTrue(app.buttons["habit-first"].exists);shot(app,"M4-V02-empty-L");app.buttons["habit-first"].tap()

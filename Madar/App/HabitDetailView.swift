@@ -21,7 +21,7 @@ struct HabitDetailView:View {
     private var keptBySince:Bool { reading.source == nil && [.monthly,.yearly].contains(reading.summary.current?.rule.frequency) }
     private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
     /// «تُقاس يوميًا»: the adverb, not the adjective «يومية».
-    private func measured(_ f:HabitFrequency)->String { switch f {case .daily:"يوميًا";case .weekly:"أسبوعيًا";case .monthly:"شهريًا";case .yearly:"سنويًا"} }
+    private func measured(_ f:HabitFrequency)->String { switch f {case .daily:"يوميًا";case .interval:"في كل مدة";case .weekly:"أسبوعيًا";case .monthly:"شهريًا";case .yearly:"سنويًا"} }
     private var digits:MadarNumberFormatter{.init(style:session.string("core.numerals") == "western" ? .western : .hindi)}
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body:some View {

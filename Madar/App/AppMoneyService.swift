@@ -173,7 +173,7 @@ struct MoneyHomeReading {
         due.sort { $0.due == $1.due ? $0.id.uuidString < $1.id.uuidString : $0.due < $1.due }
         let length = cycle?.input.expectedLengthDays ?? 30
         let cycleObligations = due.filter { $0.due < max(cycle?.expectedEndDay ?? today.adding(days: length), today.adding(days: 1)) }.reduce(0) { $0 + $1.amountMinor } + flexibleExtraMinor
-        let history = Dictionary(grouping: allocations.filter { $0.target == "surplus" || $0.targetID.map { id in envelopes.contains { $0.id == id && $0.role == "surplus" } } == true }, by: { $0.cycleID })
+        let history = Dictionary(grouping: allocations.filter { !$0.idempotencyKey.hasPrefix("move:") }.filter { $0.target == "surplus" || $0.targetID.map { id in envelopes.contains { $0.id == id && $0.role == "surplus" } } == true }, by: { $0.cycleID })
             .sorted { ($0.value.map(\.createdAt).min() ?? .distantPast) < ($1.value.map(\.createdAt).min() ?? .distantPast) }.suffix(6).map { $0.value.reduce(0) { $0 + $1.amountMinor } }
         let reserveReading = ReserveEngine.read(balanceMinor: reserve, dailyMinor: cycle?.headline.todayAllowanceMinor, cycleLengthDays: length, obligationsPerCycleMinor: cycleObligations)
         return .init(salaryDates: try salaryForecastDays(cycle: cycle, today: today, zone: zone), cycle: cycle, basis: basis, currency: currency, hasAccounts: !accounts.isEmpty,

@@ -69,7 +69,8 @@ extension MoneyRepository {
                 startDay: max(1, plan.startDayKey.flatMap { try? GregorianDay($0) }.map { MadarCalendarDays.distance(from: start, to: $0) + 1 } ?? 1),
                 endDay: plan.untilDate.map { MadarCalendarDays.distance(from: start, to: .containing($0, in: place.timeZone)) + 1 },
                 maximumMinorPerCycle: goalEnvelopes.first(where: { $0.id == plan.id && $0.id == envelope })?.targetMinor.map { target in
-                    let alreadyFunded = allAllocations.filter { $0.targetID == envelope && $0.kind == "fund" && $0.amountMinor > 0 && !($0.cycleID == cycle.id && $0.idempotencyKey.hasPrefix("daily:")) }.reduce(0) { $0 + $1.amountMinor }
+                    // FB-39 review: money moved in (or out) by the user counts toward the goal like its funding.
+                    let alreadyFunded = allAllocations.filter { $0.targetID == envelope && (($0.kind == "fund" && $0.amountMinor > 0 && !($0.cycleID == cycle.id && $0.idempotencyKey.hasPrefix("daily:"))) || $0.idempotencyKey.hasPrefix("move:")) }.reduce(0) { $0 + $1.amountMinor }
                     return max(0, target - alreadyFunded)
                 })
         }

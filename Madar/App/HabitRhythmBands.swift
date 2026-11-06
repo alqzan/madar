@@ -34,7 +34,7 @@ struct HabitRhythmBand:View {
     private var label:some View { Text(caption).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(maxWidth:.infinity,alignment:.leading).fixedSize(horizontal:false,vertical:true) }
     @ViewBuilder private var drawing:some View {
         switch frequency {
-        case .daily: steps
+        case .daily, .interval: steps
         case .weekly: week
         case .monthly: crescent
         case .yearly: arcs
@@ -133,6 +133,9 @@ struct HabitRhythmBand:View {
     private var caption:String {
         let open = rows.filter { !$0.paused && $0.summary.current.map { $0.target > 0 && !$0.met } == true }
         switch frequency {
+        case .interval:
+            guard let next = open.first, let p = next.summary.current else { return "عادات المُدد تمّت" }
+            return next.name+"، "+habitProgressText(p.value,p.target,p.rule.unit,digits)
         case .daily:
             let week = lastSeven
             guard !week.isEmpty else { return "لا عادة يومية جارية" }

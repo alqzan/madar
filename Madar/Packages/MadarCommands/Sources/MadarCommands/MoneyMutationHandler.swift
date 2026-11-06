@@ -270,6 +270,52 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 guard p["allocations"] == nil else { throw MoneyCommandError.invalidSplit }
                 try touch(row, now, writer)
             }
+        case "money.logTransfer":
+            // FB-39 (owner, 6 Nov): both sides are the user's own tracked accounts in one currency. A transfer moves money
+            // between them and touches no budget; money from a bank account into the cash wallet is always a withdrawal,
+            // so `mal.cashWithdrawalAsSpend` decides its charge in one place (F01/RM5).
+            let kind = text(p, "kind")
+            let accounts = try context.fetch(FetchDescriptor<Account>()).filter { live($0) }
+            guard let fromID = uuid(p, "fromAccountID"), let toID = uuid(p, "toAccountID"), fromID != toID,
+                  let from = accounts.first(where: { $0.id == fromID }), let to = accounts.first(where: { $0.id == toID }),
+                  [from, to].allSatisfy({ $0.ownership == "mine" && $0.tracked }) else { throw MoneyCommandError.invalidReference }
+            guard from.currency == to.currency else { throw MoneyCommandError.invalidCurrency }
+            let intoWallet = to.kind == "cash" && from.kind != "cash"
+            guard kind == (intoWallet ? "withdrawal" : "transfer") else { throw MoneyCommandError.invalidReference }
+            let row = MoneyTransaction(); row.id = id; row.kind = kind; row.source = "manual"; row.method = "transfer"
+            row.amountMinor = MoneyCommandPayload.integer(p["amountMinor"]) ?? 0; row.currency = from.currency
+            row.homeCurrency = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
+            row.fromAccountID = fromID; row.toAccountID = toID; row.merchant = optionalText(p, "note").flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+            row.rateAtTime = optionalText(p, "rateAtTime"); row.rateSource = row.rateAtTime == nil ? nil : "manual"
+            row.showInDiary = false
+            try stampDay(row, at: MoneyCommandPayload.date(p["eventAt"]) ?? issuedAt, context: context, now: now)
+            row.reviewState = "needsLook"; row.createdAt = now; context.insert(row)
+            try confirm(row, payload: p["allocations"].map { ["allocations": $0] } ?? [:], commandID: id, context: context, now: now, writer: writer)
+        case "money.moveEnvelope":
+            // FB-39 (owner, 6 Nov): one pair of allocations, out of one balance and into the other; the total never changes.
+            // The reserve and the surplus are read as repayEnvelopeNow reads them. Only money that is there can move.
+            guard let amount = MoneyCommandPayload.integer(p["amountMinor"]), amount > 0 else { throw MoneyCommandError.invalidAmount }
+            let envelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { live($0) }
+            let allocations = try context.fetch(FetchDescriptor<Allocation>()).filter { live($0) }
+            func side(_ key: String) throws -> (target: AllocationTarget, balance: Int) {
+                let raw = text(p, key)
+                if raw == "reserve" || raw == "surplus" {
+                    let roleIDs = Set(envelopes.filter { $0.role == raw }.map(\.id))
+                    let balance = try sum(allocations.filter { ($0.target == raw && $0.targetID == nil) || $0.targetID.map(roleIDs.contains) == true }.map(\.amountMinor))
+                    return (raw == "reserve" ? .reserve : .surplus, balance)
+                }
+                guard let envelopeID = UUID(uuidString: raw), let envelope = envelopes.first(where: { $0.id == envelopeID }),
+                      !["reserve", "surplus"].contains(envelope.role) else { throw MoneyCommandError.invalidReference }
+                return (.envelope(envelopeID.uuidString), try sum(allocations.filter { $0.targetID == envelopeID }.map(\.amountMinor)))
+            }
+            let from = try side("from"), to = try side("to")
+            guard from.target != to.target else { throw MoneyCommandError.invalidReference }
+            guard from.balance >= amount else { throw MoneyCommandError.invalidAmount }
+            let key = "move:" + id.uuidString
+            try writeAllocations([
+                .init(groupID: key, target: from.target, amountMinor: -amount, kind: .adjust, idempotencyKey: key + ":from"),
+                .init(groupID: key, target: to.target, amountMinor: amount, kind: .adjust, idempotencyKey: key + ":to")
+            ], context: context, now: now, writer: writer)
         case "money.confirmTransaction":
             let row = try transaction(uuid(p, "id"), context)
             guard row.reviewState != "ok" else { throw MoneyCommandError.alreadyConfirmed }
@@ -675,7 +721,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let messages = try context.fetch(FetchDescriptor<BankMessage>())
         let existing = rows.compactMap { old -> BankDedupe.Movement? in
             // M5-V17: an expense recorded by hand has no message; it still counts, so its bank message waits for a decision.
-            let fingerprint = messages.first(where: { $0.id == old.messageID })?.fingerprint ?? (old.messageID == nil && old.source == "manual" && old.kind == "expense" ? "manual:" + old.id.uuidString : nil)
+            let fingerprint = messages.first(where: { $0.id == old.messageID })?.fingerprint ?? (old.messageID == nil && old.source == "manual" && ["expense", "transfer", "withdrawal"].contains(old.kind) ? "manual:" + old.id.uuidString : nil)
             guard let fingerprint else { return nil }
             return .init(accountKey: key.uuidString, amountMinor: old.amountMinor, merchant: old.merchant, at: old.eventAt, fingerprint: fingerprint)
         }
@@ -1060,6 +1106,12 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                try MoneyAccountRules.duplicateLast4(before.fields["last4"]?.string, bank: before.fields["bank"]?.string ?? "", excluding: before.id, in: context) {
                 throw MoneyCommandError.undoSuperseded
             }
+        }
+        // FB-39 review: undoing a move takes the money back out of where it went; never below what is there now.
+        let liveAllocations = try context.fetch(FetchDescriptor<Allocation>()).filter { live($0) }
+        for row in liveAllocations where changedIDs.contains(row.id) && row.idempotencyKey.hasPrefix("move:") && row.amountMinor > 0 {
+            let held = try sum(liveAllocations.filter { row.targetID == nil ? ($0.target == row.target && $0.targetID == nil) : $0.targetID == row.targetID }.map(\.amountMinor))
+            guard held >= row.amountMinor else { throw MoneyCommandError.undoSuperseded }
         }
         for after in inverse.after {
             var restored = inverse.before.first { recordKey($0) == recordKey(after) } ?? after

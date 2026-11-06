@@ -22,6 +22,25 @@ import XCTest
         app.buttons["money-accounts-retry"].tap()
         XCTAssertTrue(app.staticTexts["money-accounts-net"].waitForExistence(timeout: 10), app.debugDescription)
     }
+    /// FB-39 (owner, 6 Nov): 100.00 from the current account to the 300.00 wallet is a withdrawal; the wallet then holds 400.00.
+    func testCashWithdrawalBetweenOwnAccounts() {
+        continueAfterFailure = false
+        let app = open("expense")
+        let open = app.buttons["money-accounts-transfer"]
+        for _ in 0..<6 where !open.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(open.waitForExistence(timeout: 5), app.debugDescription); open.tap()
+        let from = app.buttons["money-transfer-from-الحساب الجاري"], to = app.buttons["money-transfer-to-محفظة النقد"]
+        XCTAssertTrue(from.waitForExistence(timeout: 5), app.debugDescription); from.tap(); to.tap()
+        let amount = app.textFields["money-transfer-amount"]; amount.tap(); amount.typeText("100")
+        let preview = app.descendants(matching: .any)["money-transfer-preview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 5)); XCTAssertTrue(preview.label.contains("سحب نقدي"), preview.label)
+        shot(app, "FB39-money-withdrawal-L")
+        app.buttons["money-transfer-save"].tap()
+        XCTAssertTrue(amount.waitForNonExistence(timeout: 10))
+        open.tap()
+        XCTAssertTrue(app.buttons["money-transfer-to-محفظة النقد"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["money-transfer-to-محفظة النقد"].label.contains("٤٠٠"), app.buttons["money-transfer-to-محفظة النقد"].label)
+    }
     func testTreeSourcesProtectedCheckpointAndAddNotMineWithUndo() {
         continueAfterFailure = false
         let app = open("accounts"), net = app.staticTexts["money-accounts-net"]

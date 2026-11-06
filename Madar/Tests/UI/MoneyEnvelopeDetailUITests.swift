@@ -27,6 +27,29 @@ import XCTest
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "من الراتب القادم")).firstMatch.waitForExistence(timeout: 10))
     }
 
+    /// FB-39 (owner, 6 Nov): «هدية» holds 460.00; moving 100.00 to «الطوارئ» leaves 360.00 and names the move in the history.
+    func testEnvelopeMoveToAnotherEnvelope() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00"]
+        app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
+        let envelopes = app.buttons["money-envelopes-open"]; XCTAssertTrue(envelopes.waitForExistence(timeout: 10)); envelopes.tap()
+        let gift = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-envelope-هدية-")).firstMatch
+        for _ in 0..<6 { if gift.isHittable { break }; app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(gift.isHittable, app.debugDescription); gift.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["money-envelope-detail"].waitForExistence(timeout: 10))
+        // The detail can still be settling when it first draws; wait for the button, then tap its centre.
+        let move = app.buttons["money-envelope-move"]; XCTAssertTrue(move.waitForExistence(timeout: 10), app.debugDescription)
+        move.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let side = app.buttons["money-move-side-الطوارئ"]; XCTAssertTrue(side.waitForExistence(timeout: 5), app.debugDescription); side.tap()
+        let amount = app.textFields["money-move-amount"]; amount.tap(); amount.typeText("100")
+        let preview = app.staticTexts["money-move-preview"]; XCTAssertTrue(preview.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(preview.label.contains("٣٦٠"), preview.label); XCTAssertTrue(preview.label.contains("١٬٣٠٠") || preview.label.contains("١٣٠٠"), preview.label)
+        shot(app, "FB39-money-envelope-move-L")
+        app.buttons["money-move-save"].tap(); XCTAssertTrue(amount.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "نُقل إلى الطوارئ")).firstMatch.waitForExistence(timeout: 10), app.debugDescription)
+    }
     func testDebtPreviewUsesExactAmountsAndDoesNotChangeBalance() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00"]

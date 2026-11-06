@@ -73,8 +73,22 @@ struct HabitEditorView:View {
                         else if let title=reading?.sourceTitle { Text("تُقرأ من "+title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     }
                     section("التكرار") {
-                        Picker("تكرار العادة",selection:$rule.frequency) { Text("يومية").tag(HabitFrequency.daily);Text("أسبوعية").tag(HabitFrequency.weekly);Text("شهرية").tag(HabitFrequency.monthly);Text("سنوية").tag(HabitFrequency.yearly) }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-frequency")
+                        Picker("تكرار العادة",selection:Binding(get:{rule.frequency},set:{rule.frequency=$0;rule.intervalDays = $0 == .interval ? (rule.intervalDays ?? 3) : nil})) { Text("يومية").tag(HabitFrequency.daily);Text("كل عدد من الأيام").tag(HabitFrequency.interval);Text("أسبوعية").tag(HabitFrequency.weekly);Text("شهرية").tag(HabitFrequency.monthly);Text("سنوية").tag(HabitFrequency.yearly) }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-frequency")
                         if reading != nil { Text("تغيير التكرار يبدأ سلسلة جديدة؛ السجل يبقى. بقية التغييرات لا تمسّ الفترات الماضية.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                        // FB-39 (owner, 6 Nov): «كل ٣ أيام»، «كل ٤٠ يومًا» — any day inside each block counts.
+                        if rule.frequency == .interval {
+                            Stepper(value:Binding(get:{rule.intervalDays ?? 3},set:{rule.intervalDays=$0}),in:2...3660) {
+                                Text("كل "+WidgetCopy.agree(rule.intervalDays ?? 3,digits,one:"يوم",two:"يومين",few:"أيام",many:"يومًا"))
+                            }.frame(minHeight:44).accessibilityIdentifier("habit-interval")
+                            Text("أي يوم داخل كل مدة يكفي؛ تبدأ المدة الأولى من تاريخ البداية.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        }
+                        // FB-39: a new habit may begin on a free date. A past date opens its days for logging; a later one waits.
+                        if reading == nil {
+                            DatePicker("تبدأ من",selection:Binding(get:{rule.effectiveFrom.date(in:session.activePlace.timeZone).addingTimeInterval(43200)},set:{rule.effectiveFrom=GregorianDay.containing($0,in:session.activePlace.timeZone)}),in:firstDayRange,displayedComponents:.date)
+                                .environment(\.timeZone,session.activePlace.timeZone).frame(minHeight:44).accessibilityIdentifier("habit-first-day")
+                            MadarDateLabel(session.dateLabels(rule.effectiveFrom),primaryFont:MadarTypography.caption(),secondaryFont:MadarTypography.fine())
+                            if rule.effectiveFrom < AppBahwService(session:session).today { Text("تستطيع أن تسجّل الأيام الماضية من صفحة العادة بعد حفظها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                        }
                         if rule.frequency == .weekly { Text("أيام محددة، أو اتركها لِأي يوم").font(MadarTypography.caption());dayButtons($rule.weekdays) }
                         if rule.frequency == .monthly || rule.frequency == .yearly {
                             Picker("التقويم",selection:$rule.hijri){Text("هجري").tag(true);Text("ميلادي").tag(false)}.pickerStyle(.segmented)
@@ -202,12 +216,17 @@ struct HabitEditorView:View {
             if start{rule.windowStart=(c.hour ?? 0)*60+(c.minute ?? 0)}else{rule.windowEnd=(c.hour ?? 0)*60+(c.minute ?? 0)}
         })
     }
+    private var firstDayRange:ClosedRange<Date> {
+        let today=AppBahwService(session:session).today,zone=session.activePlace.timeZone
+        return today.adding(days:-3660).date(in:zone)...today.adding(days:366).date(in:zone).addingTimeInterval(86399)
+    }
     private var targetLimit:Int { source == "jamaah" ? 5 : 100000 }
     private var targetStep:Int { switch rule.unit { case "steps": 500; case "minutes","exerciseMinutes": 5; default: 1 } }
     private func save(){
         busy=true;issue=nil
         do{
-            var saved=rule;saved.effectiveFrom=AppBahwService(session:session).today
+            var saved=rule;if reading != nil { saved.effectiveFrom=AppBahwService(session:session).today }
+            if saved.frequency != .interval { saved.intervalDays=nil }
             let english=monthDays.map { $0.wholeNumberValue.map(String.init) ?? String($0) }.joined()
             let parts=english.split(whereSeparator:{!$0.isNumber});let parsed=parts.compactMap{Int($0)}
             // Days of the month count only for a monthly habit; a hidden field never blocks another rhythm.

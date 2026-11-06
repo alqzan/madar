@@ -197,20 +197,21 @@ import XCTest
             for _ in 0..<8 { if item.isHittable && item.frame.maxY < app.frame.maxY - 170 { return }; app.swipeUp(velocity: .slow) }
             XCTAssertTrue(item.isHittable, app.debugDescription)
         }
+        // FB-39 (owner, 6 Nov): «متوسط» is the default; «هادئ» hides the suggestions.
+        openSetting(); selected("medium")
+        app.buttons["option-bahw.smartPresence-calm"].tap(); selected("calm")
         app.buttons["tab-foundation"].tap()
         XCTAssertFalse(app.buttons["bahw-suggestion-quran"].exists)
         XCTAssertFalse(app.buttons["bahw-suggestion-notes"].exists)
-        openSetting(); selected("calm")
-        app.buttons["option-bahw.smartPresence-medium"].tap(); selected("medium")
+        openSetting(); app.buttons["option-bahw.smartPresence-medium"].tap(); selected("medium")
         app.buttons["tab-foundation"].tap()
         let quran = app.buttons["bahw-suggestion-quran"]
         XCTAssertTrue(quran.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertFalse(app.buttons["bahw-suggestion-notes"].exists)
         reveal(quran); capture(app, "OR-03-smart-medium-L"); quran.tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))
+        // FB-32: a setting change shows no undo line; the reset at the foot of the page brings the default back.
         openSetting(); app.buttons["option-bahw.smartPresence-present"].tap(); selected("present")
-        app.buttons["undo-button"].tap(); selected("medium")
-        app.buttons["option-bahw.smartPresence-present"].tap(); selected("present")
         capture(app, "OR-03-smart-settings-L")
         app.terminate(); app.launch(); finishOnboarding(app)
         app.buttons["tab-foundation"].tap()

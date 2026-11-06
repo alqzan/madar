@@ -128,6 +128,35 @@ private struct PrayerInverse: Codable {
             let needsRestore = repository.oldMissedRequiresRestore(ref)
             guard !needsRestore || restoring else { throw PrayerDomainError.explicitRestoreRequired }
             if repository.qada(ref) == nil || needsRestore { try setLog(ref, status: .missed, fridayKind: fridayKind, oldAllowed: true, restoring: restoring) }
+        case .addOldMissedRun(let prayer, let count, let lastDay):
+            guard (1...PrayerMutation.maximumRun).contains(count), lastDay < track.day else { throw PrayerDomainError.invalidRecord }
+            let zone = repository.place(at: now).timeZone
+            var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+            var added = 0
+            for back in 0..<count {
+                let ref = PrayerReference(day: lastDay.adding(days: -back), prayer: prayer)
+                // A day already owed, made up or recorded keeps what it has; one the user deleted or undid comes back,
+                // since asking for the run again is the explicit choice (RP1).
+                if repository.qada(ref) != nil || repository.log(ref) != nil { continue }
+                let fridayNoon = prayer == .dhuhr && calendar.component(.weekday, from: ref.day.date(in: zone)) == 6
+                try setLog(ref, status: .missed, fridayKind: fridayNoon ? .dhuhr : nil, oldAllowed: true, restoring: repository.oldMissedRequiresRestore(ref))
+                added += 1
+            }
+            guard added > 0 else { throw PrayerDomainError.invalidRecord }
+        case .makeUpOldest(let prayer, let count):
+            guard (1...PrayerMutation.maximumRun).contains(count) else { throw PrayerDomainError.invalidRecord }
+            let open = repository.qadaRows
+                .filter { $0.prayer == prayer.rawValue && $0.deletedAt == nil && $0.mergedInto == nil && $0.madeUpAt == nil }
+                .sorted { $0.originalDayKey < $1.originalDayKey }
+                .compactMap { row in (try? GregorianDay(row.originalDayKey)).map { PrayerReference(day: $0, prayer: prayer) } }
+            guard !open.isEmpty else { throw PrayerDomainError.invalidRecord }
+            let zone = repository.place(at: now).timeZone
+            var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+            for ref in open.prefix(count) {
+                let kind = repository.log(ref)?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:))
+                let fridayNoon = prayer == .dhuhr && calendar.component(.weekday, from: ref.day.date(in: zone)) == 6
+                try makeUp(ref, at: now, fridayKind: kind ?? (fridayNoon ? .dhuhr : nil))
+            }
         case .answerHeart(let ref, let heart):
             guard let row = repository.log(ref), ["jamaah", "alone", "qada"].contains(row.status) else { throw PrayerDomainError.invalidRecord }
             if row.heart != heart?.rawValue { try capture(row); row.heart = heart?.rawValue; try touch(row) }

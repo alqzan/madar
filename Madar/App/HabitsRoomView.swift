@@ -6,8 +6,8 @@ import MadarDesign
 import MadarCommands
 
 extension HabitFrequency {
-    var arabic: String { switch self { case .daily: "يومية"; case .weekly: "أسبوعية"; case .monthly: "شهرية"; case .yearly: "سنوية" } }
-    var periodArabic: String { switch self { case .daily: "أيام"; case .weekly: "أسابيع"; case .monthly: "أشهر"; case .yearly: "سنوات" } }
+    var arabic: String { switch self { case .daily: "يومية"; case .interval: "كل عدة أيام"; case .weekly: "أسبوعية"; case .monthly: "شهرية"; case .yearly: "سنوية" } }
+    var periodArabic: String { switch self { case .daily: "أيام"; case .interval: "مُدد"; case .weekly: "أسابيع"; case .monthly: "أشهر"; case .yearly: "سنوات" } }
 }
 extension HabitReading {
     /// What was missed in the habit's own unit (audit 28 Oct: «فاتتك فترة» meant nothing for a daily habit):
@@ -16,6 +16,7 @@ extension HabitReading {
         let n = max(1, summary.consecutiveMisses)
         let forms: (verb: String, one: String, two: String, few: String, many: String) = switch summary.current?.rule.frequency {
         case .daily?: (n > 2 ? "فاتتك" : "فاتك", "يوم", "يومان", "أيام", "يومًا")
+        case .interval?: (n > 2 ? "فاتتك" : "فاتك", "مدة", "مدتان", "مُدد", "مدة")
         case .weekly?: (n > 2 ? "فاتتك" : "فاتك", "أسبوع", "أسبوعان", "أسابيع", "أسبوعًا")
         case .monthly?: (n > 2 ? "فاتتك" : "فاتك", "شهر", "شهران", "أشهر", "شهرًا")
         case .yearly?: ("فاتتك", "سنة", "سنتان", "سنوات", "سنة")
@@ -217,6 +218,7 @@ struct HabitsRoomView: View {
         let left = daysLeft(p)
         switch p.rule.frequency {
         case .weekly: return p.dueDays.contains(today) || left <= 2
+        case .interval: return left <= 2
         case .monthly: return left <= 7
         case .yearly: return false
         case .daily: return true
@@ -321,12 +323,13 @@ struct HabitsRoomView: View {
     }
 
     private func periodSummary(_ frequency: HabitFrequency) -> some View {
-        let group = active.filter { $0.summary.current?.rule.frequency == frequency }
+        let group = active.filter { $0.summary.current?.rule.band == frequency }
         let rows = group.filter { !$0.paused && ($0.summary.current?.target ?? 0) > 0 }
         let done = rows.filter { $0.summary.current?.met == true }.count
         let count = rows.isEmpty ? (group.isEmpty ? "لا عادات" : "لا شيء مستحق") : digits.string(done) + " من " + digits.string(rows.count)
         let title: String = switch frequency {
         case .daily: "اليوم"
+        case .interval: "المُدد"
         case .weekly: "الأسبوع"
         case .monthly: "الشهر"
         case .yearly: "السنة"
@@ -366,7 +369,7 @@ struct HabitsRoomView: View {
                 .buttonStyle(.madarPlain).background(theme.surface,in:.rect(cornerRadius:20)).accessibilityIdentifier("habits-today-empty")
         } else {
             ForEach([HabitFrequency.daily, .weekly, .monthly, .yearly], id: \.self) { frequency in
-                let group = open.filter { $0.summary.current?.rule.frequency == frequency }
+                let group = open.filter { $0.summary.current?.rule.band == frequency }
                 if !group.isEmpty {
                     Text(frequency.arabic).font(MadarTypography.section()).padding(.top, 4)
                         .accessibilityIdentifier("habits-today-group-" + frequency.rawValue)
@@ -391,7 +394,7 @@ struct HabitsRoomView: View {
     }
     @ViewBuilder private var allList: some View {
         ForEach([HabitFrequency.daily,.weekly,.monthly,.yearly],id:\.self) { f in
-            let rows = active.filter { ($0.summary.current?.rule.frequency ?? .daily) == f }.sorted { priority($0) < priority($1) }
+            let rows = active.filter { ($0.summary.current?.rule.band ?? .daily) == f }.sorted { priority($0) < priority($1) }
             if !rows.isEmpty && (selectedPeriod == nil || selectedPeriod == f) {
                 HStack(alignment:.firstTextBaseline) {
                     Text(f == .daily ? "كل يوم" : f == .weekly ? "كل أسبوع" : f == .monthly ? "كل شهر" : "كل سنة").font(MadarTypography.section())
@@ -611,7 +614,7 @@ func arabicCount(_ count:Int,_ forms:[String],_ digits:MadarNumberFormatter)->St
 }
 func habitPeriodCount(_ count:Int,_ frequency:HabitFrequency,_ digits:MadarNumberFormatter)->String {
     let forms:[String]
-    switch frequency {case .daily:forms=["يوم واحد","يومان","أيام","يومًا"];case .weekly:forms=["أسبوع واحد","أسبوعان","أسابيع","أسبوعًا"];case .monthly:forms=["شهر واحد","شهران","أشهر","شهرًا"];case .yearly:forms=["سنة واحدة","سنتان","سنوات","سنة"]}
+    switch frequency {case .daily:forms=["يوم واحد","يومان","أيام","يومًا"];case .interval:forms=["مدة واحدة","مدتان","مُدد","مدة"];case .weekly:forms=["أسبوع واحد","أسبوعان","أسابيع","أسبوعًا"];case .monthly:forms=["شهر واحد","شهران","أشهر","شهرًا"];case .yearly:forms=["سنة واحدة","سنتان","سنوات","سنة"]}
     return count == 1 ? forms[0] : count == 2 ? forms[1] : digits.string(count)+" "+(count == 0 || (3...10).contains(count%100) ? forms[2] : forms[3])
 }
 /// Named in the habit's own period when known: «تنكسر السلسلة بفوت يومين متتاليين. الأيام المجمدة مستثناة.»
@@ -619,10 +622,21 @@ func habitBreakExplanation(_ periods:Int,_ frequency:HabitFrequency?=nil)->Strin
     let forms:[String], frozen:String
     switch frequency {
     case .daily?: forms=["يوم واحد","يومين متتاليين","ثلاثة أيام متتالية"]; frozen="الأيام"
+    case .interval?: forms=["مدة واحدة","مدتين متتاليتين","ثلاث مدد متتالية"]; frozen="المُدد"
     case .weekly?: forms=["أسبوع واحد","أسبوعين متتاليين","ثلاثة أسابيع متتالية"]; frozen="الأسابيع"
     case .monthly?: forms=["شهر واحد","شهرين متتاليين","ثلاثة أشهر متتالية"]; frozen="الأشهر"
     case .yearly?: forms=["سنة واحدة","سنتين متتاليتين","ثلاث سنوات متتالية"]; frozen="السنوات"
     case nil: forms=["فترة واحدة","فترتين متتاليتين","ثلاث فترات متتالية"]; frozen="الفترات"
     }
     return "تنكسر السلسلة بفوت "+forms[min(max(periods,1),3)-1]+". "+frozen+" المجمدة مستثناة."
+}
+
+/// FB-39: an «every N days» habit sits in the band nearest its length — up to a week with the weekly habits,
+/// up to a month with the monthly ones, longer with the yearly ones — so every grouped view shows it.
+extension HabitRule {
+    var band: HabitFrequency {
+        guard frequency == .interval else { return frequency }
+        let days = intervalDays ?? 3
+        return days <= 7 ? .weekly : days <= 31 ? .monthly : .yearly
+    }
 }

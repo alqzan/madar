@@ -44,7 +44,9 @@ import MadarPrayer
         case "fee": movement = .fee(onCard: card?.kind == "credit")
         case "cardPayment": movement = .cardPayment
         case "withdrawal": movement = .withdrawal
-        case "transfer": movement = owned(from) && owned(to) ? .ownTransfer : row.fromAccountID == nil ? .income(isSalary: false) : .externalTransfer(notSpend: false)
+        // FB-39 review: a manual transfer was checked as own-to-own when logged; removing or untracking one side later
+        // must not turn it into spending.
+        case "transfer": movement = (row.source == "manual" && row.fromAccountID != nil && row.toAccountID != nil) || (owned(from) && owned(to)) ? .ownTransfer : row.fromAccountID == nil ? .income(isSalary: false) : .externalTransfer(notSpend: false)
         case "income", "salary": movement = .income(isSalary: row.kind == "salary")
         case "refund": movement = .refund(card?.kind == "credit" ? .creditCard : .account)
         case "cashback": movement = .cashbackRedeemed(card?.kind == "credit" ? .creditCard : .account)

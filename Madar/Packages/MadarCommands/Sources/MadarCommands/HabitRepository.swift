@@ -39,6 +39,7 @@ public struct HabitRepository {
         r.restWeekdays = (row.restWeekdays ?? []).compactMap { weekdays.firstIndex(of: $0).map { $0 + 1 } }
         r.monthDays = row.monthDays ?? []; r.hijri = row.monthCalendar == "hijri"; r.yearMonth = row.yearMonth ?? 1; r.yearDay = row.yearDay ?? 1
         r.windowAnchor = row.windowAnchor.flatMap(Prayer.init(rawValue:)); r.windowStart = row.windowStartMin; r.windowEnd = row.windowEndMin
+        r.intervalDays = r.frequency == .interval ? row.intervalDays : nil
         return r
     }
     static func apply(_ rule: HabitRule, to row: HabitPolicy) {
@@ -47,6 +48,7 @@ public struct HabitRepository {
         row.weekdays = rule.weekdays.map { weekdays[$0-1] }; row.restWeekdays = rule.restWeekdays.map { weekdays[$0-1] }
         row.monthDays = rule.monthDays; row.monthCalendar = rule.hijri ? "hijri" : "gregorian"; row.yearMonth = rule.yearMonth; row.yearDay = rule.yearDay
         row.windowAnchor = rule.windowAnchor?.rawValue; row.windowStartMin = rule.windowStart; row.windowEndMin = rule.windowEnd
+        row.intervalDays = rule.intervalDays
     }
     static func travelDay(at instant: Date, place: ActivePlace, boundary: DayBoundary, options: PrayerCalculationOptions) -> GregorianDay {
         let civil = GregorianDay.containing(instant, in: place.timeZone)

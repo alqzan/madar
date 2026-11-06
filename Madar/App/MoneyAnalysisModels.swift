@@ -6,8 +6,9 @@ import MadarMoney
 import MadarCommands
 
 /// `mal.analysisDefault`: the two periods the spec names («التقرير المخطوط، الدورة والأسبوع»).
+/// FB-39 (owner, 6 Nov): also the calendar month and year, each compared with the one before.
 enum MoneyAnalysisPeriod: String, CaseIterable, Identifiable {
-    case cycle, week
+    case cycle, week, month, year
     var id: String { rawValue }
 }
 
@@ -456,6 +457,11 @@ extension AppMoneyService {
             first = analysisWeekStart(today).adding(days: 7 * target); last = first.adding(days: 6)
             title = target == 0 ? "هذا الأسبوع" : target == -1 ? "الأسبوع الماضي" : "أسبوع"
             canGoBack = starts[0].1 < first
+        case .month, .year:
+            target = min(0, offset)
+            let span = calendarSpan(period, today: today, offset: target)
+            first = span.first; last = span.last; title = span.title
+            canGoBack = starts[0].1 < first
         }
         let days = ledger.days(range(first, last))
         let elapsed = days.filter { $0.day <= today }
@@ -468,6 +474,7 @@ extension AppMoneyService {
         let previous: (first: GregorianDay, last: GregorianDay, name: String)? = switch period {
             case .cycle: span(target - 1).map { ($0.first, $0.last, "دورة " + cycleMonthName(start: $0.first, end: $0.last.adding(days: 1))) }
             case .week: (first.adding(days: -7), first.adding(days: -1), target == 0 ? "الأسبوع الماضي" : "الأسبوع الذي قبله")
+            case .month, .year: { let s = calendarSpan(period, today: today, offset: target - 1); return (s.first, s.last, s.title) }()
         }
         if let previous, !elapsed.isEmpty {
             let aligned = Array(ledger.days(range(previous.first, previous.last)).prefix(elapsed.count))
@@ -484,7 +491,7 @@ extension AppMoneyService {
         let byID = Dictionary(confirmed.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let rows: [MoneyTransaction] = switch period {
             case .cycle: confirmed.filter { $0.cycleID != nil && $0.cycleID == starts[target].0.id }
-            case .week: confirmed.filter { row in
+            case .week, .month, .year: confirmed.filter { row in
                 let key = row.kind == "refund" ? row.relatedTransactionID.flatMap { byID[$0]?.dayKey } ?? row.dayKey : row.dayKey
                 guard let day = try? GregorianDay(key) else { return false }
                 return day >= first && day <= last
@@ -508,8 +515,8 @@ extension AppMoneyService {
         func cap(_ category: UUID) -> Int? {
             switch period {
             case .cycle: return cycleLimit(category, target)?.limit
-            case .week:
-                // Each week day takes its own cycle's even share of that cycle's limit.
+            case .week, .month, .year:
+                // Each day takes its own cycle's even share of that cycle's limit.
                 var total: Int?
                 for index in starts.indices {
                     guard let s = span(index), s.last >= first, s.first <= last, let limit = cycleLimit(category, index) else { continue }
@@ -546,6 +553,21 @@ extension AppMoneyService {
                      categories: categories, merchants: Array(top.prefix(5)), metDays: judged.filter { $0.within == .met }.count, judgedDays: judged.count,
                      pendingDays: elapsed.filter { $0.within == .pending }.count,
                      pace: AnalysisEngine.pace(spentMinor: known.reduce(0) { $0 + $1.spentMinor }, allowanceMinor: allowance, knownDays: known.count, remainingDays: remaining))
+    }
+
+    /// The Gregorian month or year `offset` steps back from today's: «نوفمبر ٢٠٢٦»، «سنة ٢٠٢٦».
+    func calendarSpan(_ period: MoneyAnalysisPeriod, today: GregorianDay, offset: Int) -> (first: GregorianDay, last: GregorianDay, title: String) {
+        if period == .year {
+            let year = today.year + offset
+            let first = (try? GregorianDay(year: year, month: 1, day: 1)) ?? today, last = (try? GregorianDay(year: year, month: 12, day: 31)) ?? today
+            return (first, last, "سنة " + digits.string(year))
+        }
+        var year = today.year, month = today.month + offset
+        while month < 1 { month += 12; year -= 1 }
+        let first = (try? GregorianDay(year: year, month: month, day: 1)) ?? today
+        let next = month == 12 ? (try? GregorianDay(year: year + 1, month: 1, day: 1)) : (try? GregorianDay(year: year, month: month + 1, day: 1))
+        let formatter = DateFormatter(); formatter.calendar = Calendar(identifier: .gregorian); formatter.locale = Locale(identifier: "ar"); formatter.timeZone = .gmt; formatter.dateFormat = "MMMM"
+        return (first, (next ?? first.adding(days: 31)).adding(days: -1), formatter.string(from: first.date(in: .gmt).addingTimeInterval(43200)) + " " + digits.string(year))
     }
 
     /// «٢١ مرة»، «مرتان»، «٣ مرات».

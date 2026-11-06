@@ -4618,7 +4618,8 @@
             "daily",
             "weekly",
             "monthly",
-            "yearly"
+            "yearly",
+            "interval"
           ]
         },
         {
@@ -4740,7 +4741,14 @@
           "optional": true,
           "unit": "minutes",
           "note": "start ≠ end; window ≤ 24 h"
-        }
+        },
+          {
+            "name": "intervalDays",
+            "type": "Int?",
+            "optional": true,
+            "range": [2, 3660],
+            "note": "FB-39 (owner, 6 Nov): frequency = interval; each period is intervalDays consecutive days counted from effectiveFrom"
+          }
       ]
     },
     {
@@ -5802,6 +5810,16 @@
         "kind": "explicit old missed prayer before trackingStart; atomic PrayerLog + QadaItem and durable undo; restoration retains deletion barriers",
         "auth": "app"
       },
+      "prayer.addOldMissedRun": {
+        "payload": "{prayer, count: Int 1...3660, lastDayKey: YYYY-MM-DD before trackingStart}",
+        "kind": "FB-39 qada by count: one old missed PrayerLog + QadaItem per real day counting back from lastDayKey; days already owed or recorded are skipped; one durable undo",
+        "auth": "app"
+      },
+      "prayer.makeUpOldest": {
+        "payload": "{prayer, count: Int 1...3660}",
+        "kind": "FB-39 qada by count: makes up the oldest open QadaItems of that prayer now (PrayerLog qada + madeUpAt); one durable undo",
+        "auth": "app"
+      },
       "prayer.logQiyam": {
         "payload": "{nightKey, rakaat: Int 0...99, witr: Bool, restoreDeleted?: Bool = false}",
         "kind": "upsert QiyamNight (nightKey), durable undo; deleted night requires explicit restoreDeleted=true and retains its deletion barrier",
@@ -5977,5 +5995,5 @@
       "execution": "Immediately on press, within undo window"
     }
   },
-  "storeSchemaVersion": 14
+  "storeSchemaVersion": 15
 }

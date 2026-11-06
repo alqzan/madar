@@ -33,7 +33,7 @@ extension AppSession {
             return .init(id:r.id.uuidString,title:r.name,value:value,detail:r.summary.atRisk ? "القليل يحفظ سلسلتك" : r.isNow ? "وقتها الآن" : r.sourceTitle.map{"تُقرأ من "+$0} ?? "",share:Double(p.value)/Double(max(1,p.target)),route:"madar://bahw/habits/"+r.id.uuidString,done:p.met)
         }
         let periods=[HabitFrequency.daily,.weekly,.monthly,.yearly].map { f->RoomWidgetSnapshot.Row in
-            let group=readings.filter{$0.summary.current?.rule.frequency==f && !$0.paused && ($0.summary.current?.target ?? 0)>0},met=group.filter{$0.summary.current?.met==true}.count
+            let group=readings.filter{$0.summary.current?.rule.band==f && !$0.paused && ($0.summary.current?.target ?? 0)>0},met=group.filter{$0.summary.current?.met==true}.count
             // `detail` carries the compact remainder for the lock-screen circle; empty means nothing is due in this period.
             return .init(id:f.rawValue,title:f.arabic,value:WidgetCopy.periodProgress(met:met,total:group.count,digits:digits),detail:group.isEmpty ? "" : met==group.count ? "تمّ" : digits.string(group.count-met),share:Double(met)/Double(max(1,group.count)),route:BuiltRoomWidget.habits.route,completedCount:met,targetCount:group.count)
         }
@@ -119,7 +119,7 @@ extension AppSession {
         func scheduled(_ day: GregorianDay, rule: HabitRule) -> Bool {
             guard !rule.restWeekdays.contains(HabitEngine.weekday(day)) else { return false }
             switch rule.frequency {
-            case .daily:
+            case .daily, .interval:
                 return false
             case .weekly:
                 // A weekly target without selected weekdays has a period end, not a named occurrence.

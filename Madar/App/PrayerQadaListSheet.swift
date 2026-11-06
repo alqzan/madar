@@ -19,6 +19,7 @@ struct PrayerQadaListSheet: View {
     @State private var items: [PrayerQada] = []
     @State private var didLoad = false
     @State private var readFailed = false
+    @State private var bulkOpen = false
     private var hasUnsavedInput: Bool { chosen != nil }
     private var digits: MadarNumberFormatter { MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi) }
 
@@ -69,6 +70,13 @@ struct PrayerQadaListSheet: View {
             .frame(height: readFailed || !didLoad ? 120 : min(CGFloat(items.count) * 61 + 1, 280))
             .padding(.top, 16)
             actions(readFailed || !didLoad ? nil : selected, canAddOld: didLoad && !readFailed)
+            // FB-39 (owner, 6 Nov): «قضيتُ ٥ من الفجر» without touching each row.
+            if didLoad && !readFailed && items.count > 1 {
+                Button { bulkOpen = true } label: {
+                    Text("قضيتُ عددًا منها").font(PrayerHomeType.body).frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.madarPlain).padding(.top, 6).accessibilityIdentifier("prayer-qada-bulk-open")
+            }
         }
         .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -80,6 +88,7 @@ struct PrayerQadaListSheet: View {
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(34)
         .task { load() }
+        .sheet(isPresented: $bulkOpen, onDismiss: load) { PrayerQadaBulkMakeUpSheet(session: session, items: items) }
         .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
         .onDisappear { rootDraftChanged(rootBlockerID, false) }
     }
@@ -133,3 +142,58 @@ struct PrayerQadaListSheet: View {
     }
 }
 
+/// FB-39: make up several debts of one prayer at once. The oldest go first, as in «اقضِ واحدة».
+private struct PrayerQadaBulkMakeUpSheet: View {
+    let session: AppSession
+    let items: [PrayerQada]
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.roomTheme) private var theme
+    @State private var prayer: Prayer = .fajr
+    @State private var countText = ""
+    private var digits: MadarNumberFormatter { MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi) }
+    private var owed: [Prayer: Int] { Dictionary(grouping: items, by: \.reference.prayer).mapValues(\.count) }
+    private var available: [Prayer] { Prayer.allCases.filter { (owed[$0] ?? 0) > 0 } }
+    private var count: Int? {
+        let values = countText.compactMap(\.wholeNumberValue)
+        guard !values.isEmpty else { return nil }
+        let value = values.reduce(0) { $0 * 10 + $1 }
+        return (1...(owed[prayer] ?? 0)).contains(value) ? value : nil
+    }
+    private func title(_ prayer: Prayer) -> String { switch prayer { case .fajr: "الفجر"; case .dhuhr: "الظهر"; case .asr: "العصر"; case .maghrib: "المغرب"; case .isha: "العشاء" } }
+    private func prayers(_ n: Int) -> String { WidgetCopy.agree(n, digits, one: "صلاة واحدة", two: "صلاتان", few: "صلوات", many: "صلاة") }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("قضيتُ عددًا منها").font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).accessibilityAddTraits(.isHeader)
+            Picker("الصلاة", selection: $prayer) {
+                ForEach(available, id: \.self) { Text(title($0)).tag($0) }
+            }
+            .pickerStyle(.segmented).accessibilityIdentifier("prayer-qada-bulk-prayer")
+            Text("عليك من \(title(prayer)) " + prayers(owed[prayer] ?? 0) + ".").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+            HStack {
+                Text("كم قضيت؟").font(PrayerHomeType.body)
+                Spacer()
+                TextField("٥", text: $countText).keyboardType(.numberPad).multilineTextAlignment(.center)
+                    .font(PrayerHomeType.strong).frame(width: 96, height: 48)
+                    .background(theme.surface, in: .rect(cornerRadius: 12))
+                    .accessibilityIdentifier("prayer-qada-bulk-count")
+            }
+            Text("تُسجَّل الأقدم أولًا، بتاريخ اليوم.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            Button {
+                guard let count else { return }
+                session.makeUpOldest(prayer: prayer, count: count) { success in if success { dismiss() } }
+            } label: {
+                Text(count.map { "سجّل قضاء " + prayers($0) } ?? "سجّل القضاء").font(PrayerHomeType.strong).foregroundStyle(theme.background)
+                    .frame(maxWidth: .infinity, minHeight: 56).background(theme.ink, in: .rect(cornerRadius: 18))
+            }
+            .buttonStyle(.madarPlain).disabled(count == nil || session.prayerWriteInProgress).opacity(count == nil ? 0.4 : 1)
+            .accessibilityIdentifier("prayer-qada-bulk-save")
+        }
+        .padding(22).frame(maxHeight: .infinity, alignment: .top)
+        .background(theme.background).foregroundStyle(theme.ink)
+        .presentationDetents([.height(420)]).presentationBackground(theme.background)
+        .environment(\.layoutDirection, .rightToLeft)
+        .onAppear { if let first = available.first, owed[prayer] == nil { prayer = first } }
+        .onChange(of: prayer) { _, _ in countText = "" }
+    }
+}

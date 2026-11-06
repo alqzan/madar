@@ -20,8 +20,15 @@ private struct HabitUndo: Codable {
         var inverse = HabitUndo()
         switch command {
         case .save(let identity, let name, let source, let rule, let homeOnly, let reminder):
-            guard rule.effectiveFrom == today else { throw DataError.invalidValue("التعديل يبدأ من اليوم") }
             let existing = habits.first { $0.id == identity }
+            // FB-39 (owner, 6 Nov): a new habit may start on a free first date, back up to ten years (then its past days can be
+            // logged) or ahead up to a year; an edit of an existing habit still starts today and never rewrites closed periods.
+            if existing == nil {
+                guard rule.effectiveFrom >= today.adding(days: -3660), rule.effectiveFrom <= today.adding(days: 366) else { throw DataError.invalidValue("تاريخ البداية بعيد جدًا") }
+            } else {
+                guard rule.effectiveFrom == today else { throw DataError.invalidValue("التعديل يبدأ من اليوم") }
+            }
+            let start = rule.effectiveFrom
             guard existing?.deletedAt == nil, existing?.mergedInto == nil else { throw DataError.invalidValue("استعادة صريحة مطلوبة") }
             if let existing, existing.linkedSource != source { throw DataError.invalidValue("مصدر العادة ثابت؛ أضف عادة جديدة") }
             let row = existing ?? Habit(), before = try existing?.record()
@@ -29,9 +36,9 @@ private struct HabitUndo: Codable {
             if existing == nil { row.startDate = now; row.createdAt = now; row.order = habits.count; context.insert(row) }
             try touch(row); inverse.changes.append(.init(before: before, after: try row.record()))
             let policies = try context.fetch(FetchDescriptor<HabitPolicy>())
-            let oldPolicy = policies.first { $0.habitID == identity && $0.effectiveFrom == today.description && $0.deletedAt == nil && $0.mergedInto == nil }
+            let oldPolicy = policies.first { $0.habitID == identity && $0.effectiveFrom == start.description && $0.deletedAt == nil && $0.mergedInto == nil }
             let policy = oldPolicy ?? HabitPolicy(), old = try oldPolicy?.record()
-            if oldPolicy == nil { policy.id = StableIdentity.uuid(for: "habit-policy:\(identity):\(today)"); policy.habitID = identity; policy.createdAt = now; context.insert(policy) }
+            if oldPolicy == nil { policy.id = StableIdentity.uuid(for: "habit-policy:\(identity):\(start)"); policy.habitID = identity; policy.createdAt = now; context.insert(policy) }
             HabitRepository.apply(rule, to: policy); try touch(policy)
             inverse.changes.append(.init(before: old, after: try policy.record()))
             if let origin=try HabitContextProvenance.ensureOrigin(habit:row,context:context,now:now,writer:writer),existing==nil {

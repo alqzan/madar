@@ -22,6 +22,26 @@ struct HabitEngineTests {
         let result = try HabitEngine.evaluate(rules: [r], facts: [fact("2022-01-01",key:frequency == .monthly ? "g:2022-01" : frequency == .yearly ? "g:2022" : "2022-01-01")], today: day("2026-01-01"), days: days)
         #expect(result.streak == 0 && result.consecutiveMisses >= 2)
     }
+    /// FB-39 (owner, 6 Nov): «كل ٣ أيام» from 1 Oct. Periods 1–3, 4–6, 7–9, 10–12 Oct. Done on 2 Oct and 9 Oct only:
+    /// complete, missed (one miss keeps the streak at breakAfter 2), complete, then waiting. Streak 2. Worked by hand.
+    @Test func everyThreeDaysCountsAnyDayInsideEachBlock() throws {
+        var r = rule("2026-10-01", frequency: .interval); r.intervalDays = 3
+        let result = try HabitEngine.evaluate(rules: [r], facts: [fact("2026-10-02", key: ""), fact("2026-10-09", key: "")], today: day("2026-10-10"), days: days)
+        #expect(result.periods.map(\.key) == ["2026-10-01", "2026-10-04", "2026-10-07", "2026-10-10"])
+        #expect(result.periods.map(\.outcome) == [.complete, .missed, .complete, .waiting])
+        #expect(result.periods.last?.dueDays == [day("2026-10-10"), day("2026-10-11"), day("2026-10-12")])
+        #expect(result.streak == 2 && result.consecutiveMisses == 0)
+        var missing = rule("2026-10-01", frequency: .interval)
+        #expect(throws: CoreError.invalidCommand) { try missing.validate() }
+        missing.intervalDays = 1
+        #expect(throws: CoreError.invalidCommand) { try missing.validate() }
+        var daily = rule("2026-10-01"); daily.intervalDays = 3
+        #expect(throws: CoreError.invalidCommand) { try daily.validate() }
+        // A rule saved before intervals existed still decodes, with no interval.
+        let old = try JSONEncoder().encode(rule("2026-10-01"))
+        var object = try #require(JSONSerialization.jsonObject(with: old) as? [String: Any]); object.removeValue(forKey: "intervalDays")
+        #expect(try JSONDecoder().decode(HabitRule.self, from: JSONSerialization.data(withJSONObject: object)).intervalDays == nil)
+    }
     @Test func freezePersistsAndDoesNotBreakStreak() throws {
         let r = rule("2026-10-01")
         let result = try HabitEngine.evaluate(rules: [r], facts: [fact("2026-10-01"), fact("2026-10-07")], pauses: [.init(from: day("2026-10-02"), until: day("2026-10-07"))], today: day("2026-10-07"), days: days)

@@ -13,6 +13,7 @@ struct MoneyEnvelopeDetailView: View {
     @State private var reading: MoneyEnvelopeDetailReading?
     @State private var repayOpen = false
     @State private var savingOpen = false
+    @State private var moveOpen = false
     @State private var savingAdd = true
     @State private var errorMessage: String?
     private var service: AppMoneyService { .init(app: app) }
@@ -47,6 +48,11 @@ struct MoneyEnvelopeDetailView: View {
                         }
                     }
                     if reading.envelope.balanceMinor < 0 && visible { debtRow(reading) }
+                    // FB-39 (owner, 6 Nov): move part of a balance to another envelope, or bring money in from the surplus or reserve.
+                    if visible {
+                        Button { moveOpen = true } label: { Label("انقل مبلغًا", systemImage: "arrow.left.arrow.right").font(MadarTypography.body()).frame(minHeight: 44) }
+                            .buttonStyle(.madarPlain).foregroundStyle(theme.accent).accessibilityIdentifier("money-envelope-move")
+                    }
                     if visible, let short = shortfall(reading), let due = reading.envelope.due {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text("بحسب خطتك، يوم"); MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.body(), secondaryFont: MadarTypography.fine()); Text("ينقصه " + service.amount(short))
@@ -72,6 +78,9 @@ struct MoneyEnvelopeDetailView: View {
             .accessibilityIdentifier("money-envelope-detail").task { load() }.onChange(of: app.prayerRevision) { load() }
             .sheet(isPresented: $repayOpen) {
                 if let reading { MoneyRepaymentView(app: app, reading: reading, initialSalaries: suggestedSalaries(reading)).environment(\.roomTheme, theme) }
+            }
+            .sheet(isPresented: $moveOpen, onDismiss: load) {
+                if let reading { MoneyEnvelopeMoveView(app: app, reading: reading).environment(\.roomTheme, theme) }
             }
             .sheet(isPresented: $savingOpen) {
                 if let reading, let plan = reading.savingPlanID { MoneySavingChangeView(app: app, plan: plan, currentMinor: reading.savingMinor, add: savingAdd).environment(\.roomTheme, theme) }
@@ -316,6 +325,90 @@ private struct MoneyEnvelopeRoad: View {
             previous = date; previousSlot = nextSlot
         }
         return nil
+    }
+}
+
+/// FB-39 (owner, 6 Nov): one balance to another. The other side is any envelope, the surplus or the reserve; the
+/// sentence under the amount names both balances after the move, so the user sees the result before saving.
+private struct MoneyEnvelopeMoveView: View {
+    struct Side: Identifiable { var id: String; var name: String; var balanceMinor: Int }
+    let app: AppSession
+    let reading: MoneyEnvelopeDetailReading
+    @Environment(\.roomTheme) private var theme
+    @Environment(\.dismiss) private var dismiss
+    @State private var outward = true
+    @State private var other = ""
+    @State private var input = ""
+    @State private var working = false
+    @State private var errorMessage: String?
+    private var service: AppMoneyService { .init(app: app) }
+    private var sides: [Side] {
+        reading.home.envelopes.filter { $0.id != reading.envelope.id }.map { Side(id: $0.id.uuidString, name: $0.name, balanceMinor: $0.balanceMinor) }
+            + [Side(id: "surplus", name: "الفائض", balanceMinor: reading.home.surplusMinor), Side(id: "reserve", name: "الاحتياطي", balanceMinor: reading.home.reserveMinor)]
+    }
+    private var chosen: Side? { sides.first { $0.id == other } }
+    private var available: Int { max(0, outward ? reading.envelope.balanceMinor : chosen?.balanceMinor ?? 0) }
+    private var exponent: Int { CurrencyExponents.specified.exponent(app.string("core.currency")) ?? 2 }
+    private var amountMinor: Int? {
+        let raw = BankMessageParser.clean(input).replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let minor = MoneyAmountInput.minor(raw, exponent: exponent), minor > 0 else { return nil }
+        return minor
+    }
+    private var preview: String? {
+        guard let side = chosen, let minor = amountMinor, minor <= available else { return nil }
+        let mine = reading.envelope.balanceMinor + (outward ? -minor : minor), theirs = side.balanceMinor + (outward ? minor : -minor)
+        return "يصير «" + reading.envelope.name + "» " + service.amount(mine) + "، و«" + side.name + "» " + service.amount(theirs) + "."
+    }
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                MoneyPageHeader(title: "انقل مبلغًا", close: { dismiss() }, closeDisabled: working)
+                Picker("الاتجاه", selection: $outward) { Text("من «" + reading.envelope.name + "»").tag(true); Text("إلى «" + reading.envelope.name + "»").tag(false) }
+                    .pickerStyle(.segmented).accessibilityIdentifier("money-move-direction")
+                Text(outward ? "إلى" : "من").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(sides) { side in
+                            Button { other = side.id } label: {
+                                VStack(alignment: .leading, spacing: 2) { Text(side.name).font(MadarTypography.caption().bold()); Text(figure: service.amount(side.balanceMinor)).font(MadarTypography.fine()) }
+                                    .padding(.horizontal, 14).frame(minHeight: 48)
+                                    .foregroundStyle(other == side.id ? theme.onAccent : theme.ink)
+                                    .background(other == side.id ? theme.color("accent") : theme.surface, in: .rect(cornerRadius: 14))
+                            }.buttonStyle(.madarPlain).accessibilityIdentifier("money-move-side-" + side.name)
+                        }
+                    }
+                }.scrollIndicators(.hidden)
+                TextField("المبلغ", text: $input).keyboardType(.decimalPad).font(MadarTypography.cardTitle()).padding(14)
+                    .overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.line, lineWidth: 1) }.accessibilityIdentifier("money-move-amount")
+                HStack {
+                    Text("المتاح " + service.amount(available)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Spacer()
+                    Button("انقل الكل") { input = plain(available) }.disabled(available <= 0 || (!outward && chosen == nil)).frame(minHeight: 44).accessibilityIdentifier("money-move-all")
+                }
+                if let preview { Text(preview).font(MadarTypography.body()).accessibilityIdentifier("money-move-preview") }
+                else if let minor = amountMinor, minor > available { Text("المبلغ أكبر من المتاح.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
+                if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
+                Button(working ? "جارٍ النقل…" : "انقل", action: save).buttonStyle(MadarPrimaryButton()).disabled(working || preview == nil).accessibilityIdentifier("money-move-save")
+            }.padding(20)
+        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium, .large]).presentationDragIndicator(.visible).madarSheetLock(saving: working)
+    }
+    private func plain(_ minor: Int) -> String {
+        guard exponent > 0 else { return String(minor) }
+        var scale = 1; for _ in 0..<exponent { scale *= 10 }
+        let fraction = String(minor % scale)
+        return String(minor / scale) + "." + String(repeating: "0", count: max(0, exponent - fraction.count)) + fraction
+    }
+    private func save() {
+        guard !working, let minor = amountMinor, preview != nil else { return }
+        let mine = reading.envelope.id.uuidString
+        working = true
+        Task {
+            defer { working = false }
+            do {
+                try await app.executeMoneyCommand("money.moveEnvelope", payload: ["from": .string(outward ? mine : other), "to": .string(outward ? other : mine), "amountMinor": .string(String(minor))])
+                dismiss()
+            } catch { errorMessage = "لم يُنقل المبلغ؛ ربما تغيّر الرصيد. أعد فتح المظروف." }
+        }
     }
 }
 

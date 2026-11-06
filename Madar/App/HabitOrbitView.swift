@@ -23,7 +23,7 @@ struct HabitOrbitView:View {
             let centre = CGPoint(x:g.size.width/2,y:175), base = min(g.size.width/2-14,164.0)
             ZStack {
                 ForEach(Array(frequencies.enumerated()),id:\.element) { index,f in
-                    let radius=base-Double(3-index)*28, rows=readings.filter{$0.summary.current?.rule.frequency == f}, due=rows.filter{!$0.paused && ($0.summary.current?.target ?? 0)>0}, met=due.filter{$0.summary.current?.met == true}.count
+                    let radius=base-Double(3-index)*28, rows=readings.filter{$0.summary.current?.rule.band == f}, due=rows.filter{!$0.paused && ($0.summary.current?.target ?? 0)>0}, met=due.filter{$0.summary.current?.met == true}.count
                     Circle().stroke(theme.line,lineWidth:1).frame(width:radius*2,height:radius*2).position(centre)
                     Circle().trim(from:0,to:due.isEmpty ? 0 : Double(met)/Double(due.count)).stroke(theme.accentFill.opacity(0.6),style:.init(lineWidth:3.5,lineCap:.round)).rotationEffect(.degrees(-90)).frame(width:radius*2,height:radius*2).position(centre)
                     let period = f == .daily ? "اليوم" : f == .weekly ? "الأسبوع" : f == .monthly ? "الشهر" : "السنة"

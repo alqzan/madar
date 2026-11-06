@@ -62,6 +62,8 @@ public enum CommandOperation: Codable, Equatable, Sendable {
     case continuePrayerTrip(city: String, country: String, place: ActivePlace, homeKm: Double?)
     case endPrayerTrip(UUID)
     case logPrayerPair(day: GregorianDay, pair: PrayerPair, status: PrayerStoredStatus, shortened: Bool, mode: PrayerPairMode)
+    /// FB-39: qada by count (`prayer.addOldMissedRun`, `prayer.makeUpOldest`), staged as one prayer mutation with one undo.
+    case stagePrayerMutation(PrayerMutation)
 }
 public struct CoreCommandReceipt: Codable, Equatable, Sendable {
     public let commandID: UUID
@@ -121,7 +123,7 @@ public protocol CommandStoreAdapter: Sendable {
 public struct CommandBus: Sendable {
     // Names implemented by this milestone. Unknown and later-room names are invalid
     // before authorization, so they cannot become indefinitely recoverable needsApp work.
-    public static let appOnlyCommandNames: Set<String> = Set(["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.continueTrip", "prayer.endTrip", "prayer.logPair"]).union(MoneyCommandPayload.names.subtracting(transportBlindWriteNames)).union(HabitCommand.names.subtracting(transportBlindWriteNames)).union(BookCommand.names).union(QuranCommandPayload.names).union(DiaryEditorCommand.names).union(["diary.appendLine", "diary.addMargin", "diary.freezeDay", "diary.completeWelcome"])
+    public static let appOnlyCommandNames: Set<String> = Set(["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.addOldMissedRun", "prayer.makeUpOldest", "prayer.editTrackingStart", "prayer.startTrip", "prayer.continueTrip", "prayer.endTrip", "prayer.logPair"]).union(MoneyCommandPayload.names.subtracting(transportBlindWriteNames)).union(HabitCommand.names.subtracting(transportBlindWriteNames)).union(BookCommand.names).union(QuranCommandPayload.names).union(DiaryEditorCommand.names).union(["diary.appendLine", "diary.addMargin", "diary.freezeDay", "diary.completeWelcome"])
     /// §16 blindWrite commands that Shortcuts, widgets and Controls may queue through the inbox.
     /// They reveal nothing and carry an explicit day or period, so a late drain cannot misdate them.
     public static let transportBlindWriteNames: Set<String> = ["prayer.log", "habit.complete", "money.ingestBankMessage", "money.logExpense"]
@@ -204,6 +206,11 @@ public struct CommandBus: Sendable {
                 default: return .init(status: .rejected, reason: "invalidPayload")
                 }
                 semantics = .upsert; naturalKey = key
+            } catch { return .init(status: .rejected, reason: "invalidPayload") }
+        case "prayer.addOldMissedRun", "prayer.makeUpOldest":
+            do {
+                let (mutation, key) = try PrayerMutation.parse(name: envelope.name, payload: payload)
+                operation = .stagePrayerMutation(mutation); semantics = key == nil ? .append : .upsert; naturalKey = key
             } catch { return .init(status: .rejected, reason: "invalidPayload") }
         case "prayer.editTrackingStart":
             do {

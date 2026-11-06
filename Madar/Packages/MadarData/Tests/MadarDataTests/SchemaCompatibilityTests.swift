@@ -262,7 +262,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 14)
+        #expect(MadarSchema.version == 15)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -285,7 +285,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 14)
+        #expect(MadarSchema.version == 15)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
@@ -682,6 +682,58 @@ import Testing
         let reopened = try ManagedDataStore(root: root)
         #expect(reopened.binding.generationID == upgraded.binding.generationID)
         #expect(try RecordFingerprint.hash(RecordBridge.all(reopened.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expected))
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        }
+    }
+
+    /// V15 (FB-39, owner 6 Nov) adds optional HabitPolicy.intervalDays; a V14 weekly policy keeps every field and gets no interval.
+    @Test func schemaV14UpgradeKeepsHabitPolicyAndLeavesIntervalNil() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV15-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let policyID = UUID(), habitID = UUID(), stamp = Date(timeIntervalSince1970: 1_797_000_000)
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV14.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV14.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV14.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+            let row = MadarFrozenHabitPolicyV14.HabitPolicy()
+            row.id = policyID; row.habitID = habitID; row.effectiveFrom = "2026-10-01"; row.frequency = "weekly"
+            row.measure = "count"; row.unit = "pages"; row.target = 10; row.minimum = 4
+            row.createdAt = stamp; row.updatedAt = stamp; row.writerID = "synthetic-v14"
+            old.mainContext.insert(row)
+            let shape = HabitPolicy(); shape.id = policyID; shape.habitID = habitID; shape.effectiveFrom = row.effectiveFrom
+            shape.frequency = row.frequency; shape.measure = row.measure; shape.unit = row.unit
+            shape.target = row.target; shape.minimum = row.minimum; shape.createdAt = stamp; shape.updatedAt = stamp; shape.writerID = row.writerID
+            var record = try shape.record(); record.fields.removeValue(forKey: "intervalDays"); before.append(record)
+            before.append(contentsOf: try seedAllRoomMigrationRecords(in: old.mainContext, stamp: stamp))
+            try old.mainContext.save()
+        }
+        try DurableFiles.encode(14, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: stamp), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        do {
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        let policy = try #require(upgraded.container.mainContext.fetch(FetchDescriptor<HabitPolicy>()).first { $0.id == policyID })
+        #expect(policy.intervalDays == nil && policy.frequency == "weekly" && policy.target == 10 && policy.minimum == 4 && policy.habitID == habitID)
+        let expected = try SchemaCompatibility.currentRecords(before, from: 14)
+        #expect(expected.first { $0.model == "HabitPolicy" }?.fields["intervalDays"] == .null)
+        try RecordValidator.validate(expected)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(upgraded.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expected))
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(reopened.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expected))
+        let fresh = try #require(reopened.container.mainContext.fetch(FetchDescriptor<HabitPolicy>()).first { $0.id == policyID })
+        fresh.frequency = "interval"; fresh.intervalDays = 3; try reopened.container.mainContext.save()
+        let sealed = try BackupCodec.export(records: RecordBridge.all(reopened.container.mainContext), passphrase: "synthetic interval password")
+        let checked = try BackupCodec.validate(sealed, passphrase: "synthetic interval password")
+        #expect(checked.records.first { $0.id == policyID }?.fields["intervalDays"] == .number(3))
         #expect(try stableGenerationHashes(generation) == sourceHash)
         }
     }

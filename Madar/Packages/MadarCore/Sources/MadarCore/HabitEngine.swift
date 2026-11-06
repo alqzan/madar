@@ -1,6 +1,8 @@
 import Foundation
 
-public enum HabitFrequency: String, Codable, Sendable { case daily, weekly, monthly, yearly }
+/// `interval` (FB-39, owner 6 Nov: «كل ٣ أيام»، «كل ٤٠ يومًا»): each period is `intervalDays` consecutive days
+/// counted from the habit's first date; any day inside the period counts.
+public enum HabitFrequency: String, Codable, Sendable { case daily, weekly, monthly, yearly, interval }
 public enum HabitMeasure: String, Codable, Sendable { case once, count, duration, health }
 /// Rules are versioned; identity, archived state and owning-room facts are deliberately outside this pure engine.
 public struct HabitRule: Codable, Equatable, Sendable {
@@ -20,12 +22,14 @@ public struct HabitRule: Codable, Equatable, Sendable {
     public var windowAnchor: Prayer? = nil
     public var windowStart: Int? = nil
     public var windowEnd: Int? = nil
+    public var intervalDays: Int? = nil
     public init(effectiveFrom: GregorianDay) { self.effectiveFrom = effectiveFrom }
     public func validate() throws {
         guard target > 0, minimum.map({ $0 > 0 && $0 <= target }) ?? true,
               weekdays.allSatisfy({ (1...7).contains($0) }), restWeekdays.allSatisfy({ (1...7).contains($0) }),
               monthDays.allSatisfy({ (1...31).contains($0) }), (1...12).contains(yearMonth), (1...31).contains(yearDay),
-              (windowStart == nil) == (windowEnd == nil) else { throw CoreError.invalidCommand }
+              (windowStart == nil) == (windowEnd == nil),
+              frequency == .interval ? (intervalDays.map { (2...3660).contains($0) } ?? false) : intervalDays == nil else { throw CoreError.invalidCommand }
         if let start = windowStart, let end = windowEnd {
             let difference = end.subtractingReportingOverflow(start)
             guard !difference.overflow, (-1439...1440).contains(difference.partialValue), difference.partialValue != 0,
@@ -86,9 +90,14 @@ public struct HabitSummary: Sendable {
 public enum HabitEngine {
     public static func weekday(_ day: GregorianDay) -> Int { var c = Calendar(identifier: .gregorian); c.timeZone = .gmt; return c.component(.weekday, from: day.date(in: .gmt)) }
     private static func weekStart(_ day: GregorianDay, _ start: MadarWeekStart) -> GregorianDay { day.adding(days: -((weekday(day) - (start == .saturday ? 7 : 1) + 7) % 7)) }
-    private static func naturalStart(_ day: GregorianDay, _ rule: HabitRule, _ days: MadarCalendarDays, _ week: MadarWeekStart) -> GregorianDay {
+    private static func intervalStart(_ day: GregorianDay, origin: GregorianDay, length: Int) -> GregorianDay {
+        let offset = MadarCalendarDays.distance(from: origin, to: day)
+        return origin.adding(days: Int((Double(offset) / Double(length)).rounded(.down)) * length)
+    }
+    private static func naturalStart(_ day: GregorianDay, _ rule: HabitRule, _ days: MadarCalendarDays, _ week: MadarWeekStart, anchor: GregorianDay? = nil) -> GregorianDay {
         switch rule.frequency {
         case .daily: day
+        case .interval: intervalStart(day, origin: anchor ?? rule.effectiveFrom, length: rule.intervalDays ?? 1)
         case .weekly: weekStart(day, week)
         case .monthly: rule.hijri ? days.hijriMonthStart(containing: day) : try! GregorianDay(year: day.year, month: day.month, day: 1)
         case .yearly: rule.hijri ? MadarYear.hijriYear(day, days).start : try! GregorianDay(year: day.year, month: 1, day: 1)
@@ -97,6 +106,7 @@ public enum HabitEngine {
     private static func next(_ start: GregorianDay, _ rule: HabitRule, _ days: MadarCalendarDays, _ week: MadarWeekStart, extendWeek: Bool = true) -> GregorianDay {
         switch rule.frequency {
         case .daily: return start.adding(days: 1)
+        case .interval: return start.adding(days: rule.intervalDays ?? 1)
         case .weekly:
             let first = weekStart(start, week); return first < start && extendWeek ? first.adding(days: 14) : first.adding(days: 7)
         case .monthly:
@@ -109,7 +119,7 @@ public enum HabitEngine {
     }
     public static func periodKey(_ start: GregorianDay, rule: HabitRule, days: MadarCalendarDays) -> String {
         switch rule.frequency {
-        case .daily, .weekly: return start.description
+        case .daily, .weekly, .interval: return start.description
         case .monthly, .yearly:
             let h = days.hijri(start), year = rule.hijri ? h.year : start.year, month = rule.hijri ? h.month : start.month
             return (rule.hijri ? "h:" : "g:") + String(format: "%04d", year) + (rule.frequency == .monthly ? String(format: "-%02d", month) : "")
@@ -149,7 +159,7 @@ public enum HabitEngine {
                 let h = periodDays.hijri(day), monthLength = rule.hijri ? periodDays.hijriMonthLength(containing: day) : MadarCalendarDays.gregorianMonthLength(year: day.year, month: day.month)
                 var isDue = true
                 switch rule.frequency {
-                case .daily: break
+                case .daily, .interval: break
                 case .weekly: isDue = rule.weekdays.isEmpty || rule.weekdays.contains(weekday(day))
                 case .monthly: isDue = rule.monthDays.isEmpty || Set(rule.monthDays.map { min($0, monthLength) }).contains(rule.hijri ? h.day : day.day)
                 case .yearly: isDue = (rule.hijri ? h.month : day.month) == rule.yearMonth && (rule.hijri ? h.day : day.day) == min(rule.yearDay, monthLength)
@@ -164,7 +174,7 @@ public enum HabitEngine {
                 day = day.adding(days: 1)
             }
             if frequencyChanged {
-                var leading = naturalStart(cursor, rule, periodDays, week)
+                var leading = rule.frequency == .interval ? cursor : naturalStart(cursor, rule, periodDays, week)
                 while leading < cursor { if isScheduled(leading) { scheduled += 1 }; leading = leading.adding(days:1) }
             }
             let designated = (rule.frequency == .weekly && !rule.weekdays.isEmpty) || (rule.frequency == .monthly && !rule.monthDays.isEmpty)

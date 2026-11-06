@@ -11,6 +11,20 @@ import XCTest
         return app
     }
 
+    /// FB-39 (owner, 6 Nov): the calendar month (October 2026 on the 16th) and the year as twelve months.
+    func testMonthAndYearPeriods() throws {
+        continueAfterFailure = false
+        let app = openAnalysis(fixture: "analysis")
+        let month = app.buttons["money-analysis-period-month"]; XCTAssertTrue(month.waitForExistence(timeout: 10), app.debugDescription); month.tap()
+        let range = app.descendants(matching: .any)["money-analysis-range"]
+        XCTAssertTrue(range.waitForExistence(timeout: 5)); XCTAssertTrue(range.label.contains("أكتوبر") && range.label.contains("٢٠٢٦"), range.label)
+        shot(app, "FB39-analysis-month-L")
+        app.buttons["money-analysis-period-year"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["money-analysis-year"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(range.label.contains("سنة ٢٠٢٦"), range.label)
+        XCTAssertTrue(app.descendants(matching: .any)["money-analysis-month-10"].exists)
+        shot(app, "FB39-analysis-year-L")
+    }
     func testCycleWeekDaySelectionAndHistory() throws {
         continueAfterFailure = false
         let app = openAnalysis(fixture: "analysis")
@@ -18,7 +32,7 @@ import XCTest
         XCTAssertTrue(app.otherElements["money-analysis-chart"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["money-analysis-period-cycle"].isSelected)
         XCTAssertTrue(app.otherElements["money-analysis-compare"].exists || app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "عن الأيام نفسها")).firstMatch.exists)
-        XCTAssertFalse(app.buttons["سنوي"].exists, "No yearly entry point in v1")
+        // FB-39 (owner, 6 Nov): month and year joined v1; testMonthAndYearPeriods covers them.
         shot(app, "M5-V14-ana-1-L")
         XCTAssertTrue(app.descendants(matching: .any)["money-analysis-category-مطاعم"].exists)
         // Choosing a day writes nothing and names it with both calendars.
