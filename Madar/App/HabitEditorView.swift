@@ -101,7 +101,15 @@ struct HabitEditorView:View {
                             Text("دقائق الحركة تشمل كل تمرين، وليست المشي وحده. السماح بالصحة باختيارك، ولا يكتب مدار فيها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         if rule.measure != .once {
-                            Stepper("الهدف: "+habitUnitCount(rule.target,rule.unit,digits),value:$rule.target,in:1...(source == "jamaah" ? 5 : 100000)).frame(minHeight:44).accessibilityIdentifier("habit-target")
+                            // FB-39: a step of one up to 100000 meant 2000 taps to move a walking goal from 6000 to 8000 steps; type it, or step by a sensible amount.
+                            HStack(spacing:10) {
+                                Stepper("الهدف: "+habitUnitCount(rule.target,rule.unit,digits),value:$rule.target,in:1...targetLimit,step:targetStep).frame(minHeight:44).accessibilityIdentifier("habit-target")
+                                if source != "jamaah" {
+                                    TextField("الهدف",value:Binding(get:{rule.target},set:{rule.target=min(targetLimit,max(1,$0))}),format:.number)
+                                        .keyboardType(.numberPad).multilineTextAlignment(.center).frame(width:76,height:40)
+                                        .background(theme.surface,in:.rect(cornerRadius:10)).accessibilityIdentifier("habit-target-field")
+                                }
+                            }
                             if !rule.weekdays.isEmpty && rule.frequency == .weekly || !monthDays.isEmpty && rule.frequency == .monthly { Text("الأيام المحددة تحدد هدف الفترة؛ ما زاد مكافأة.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             Toggle("أقلّ القليل يحفظ السلسلة",isOn:$minimumOn).frame(minHeight:44).accessibilityIdentifier("habit-minimum-toggle")
                             if minimumOn { Stepper("أقلّ القليل: "+habitUnitCount(min(rule.target,rule.minimum ?? 1),rule.unit,digits),value:Binding(get:{min(rule.target,rule.minimum ?? 1)},set:{rule.minimum=$0}),in:1...max(1,rule.target)).frame(minHeight:44) }
@@ -125,8 +133,9 @@ struct HabitEditorView:View {
                             if source == "custom" || (reading != nil && reminder == "push") { Text("إشعار لطيف").tag("push") }
                             Text("بلا تذكير").tag("none")
                         }.pickerStyle(.menu).accessibilityIdentifier("habit-reminder")
+                            .onChange(of:reminder){ _,new in if new == "push" && source == "custom" { windowOn = true } }
                         if reminder == "push" {
-                            Text(source == "custom" ? "حدّد وقت العادة واسمح بالإشعارات ليصل التذكير." : "الإشعار غير متاح للعادة المرتبطة؛ يمكنك اختيار نقطة البهو.")
+                            Text(source == "custom" ? "يصلك الإشعار في بداية وقت العادة، فوقتها مطلوب." : "الإشعار غير متاح للعادة المرتبطة؛ يمكنك اختيار نقطة البهو.")
                                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         Toggle("للبيت فقط، تتوقف في السفر",isOn:$homeOnly).frame(minHeight:44)
@@ -193,6 +202,8 @@ struct HabitEditorView:View {
             if start{rule.windowStart=(c.hour ?? 0)*60+(c.minute ?? 0)}else{rule.windowEnd=(c.hour ?? 0)*60+(c.minute ?? 0)}
         })
     }
+    private var targetLimit:Int { source == "jamaah" ? 5 : 100000 }
+    private var targetStep:Int { switch rule.unit { case "steps": 500; case "minutes","exerciseMinutes": 5; default: 1 } }
     private func save(){
         busy=true;issue=nil
         do{
@@ -209,6 +220,8 @@ struct HabitEditorView:View {
             if saved.target <= 0 {issue="اجعل الهدف أكبر من صفر.";busy=false;return}
             if let low=saved.minimum, low <= 0 || low > saved.target {issue="الحد الأدنى بين ١ والهدف.";busy=false;return}
             if let a=saved.windowStart, let b=saved.windowEnd, a == b {issue="وقت البداية والنهاية يجب أن يختلفا.";busy=false;return}
+            // FB-39: a «إشعار لطيف» without a time never fires (RoomReminders.habit needs the window), so it is not saved silently.
+            if reminder == "push" && source == "custom" && !windowOn {issue="الإشعار يحتاج وقتًا للعادة: فعّل «له وقت في اليوم».";busy=false;return}
             try saved.validate()
             let json=try JSONDecoder().decode(MadarCore.JSONValue.self,from:JSONEncoder().encode(saved))
             var p:[String:MadarCore.JSONValue]=["id":.string(id.uuidString),"name":.string(name),"rule":json,"homeOnly":.bool(homeOnly),"reminder":.string(reminder)]

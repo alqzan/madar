@@ -139,6 +139,10 @@ struct BahwLobbyView: View {
             if phase == .active { Task { try? await Task.sleep(for: .seconds(0.9)); presentAttention(force: false) } }
         }
         .onChange(of: session.attentionRequest) { _, _ in presentAttention(force: true) }
+        // FB-39: an app opened into another room (a widget, a notification) never showed what waits once the lobby came to the front.
+        .onChange(of: session.selectedTab) { _, tab in
+            if tab == "foundation" { Task { try? await Task.sleep(for: .seconds(0.5)); presentAttention(force: false) } }
+        }
     }
 
     private func presentAttention(force: Bool) {

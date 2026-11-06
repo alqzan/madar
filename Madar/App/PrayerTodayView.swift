@@ -1196,6 +1196,7 @@ private struct PrayerGapResolutionSheet: View {
     @State private var choices: [PrayerReference: Choice] = [:]
     @State private var rootBlockerID = UUID()
     @State private var confirmClose = false
+    @State private var confirmAloneAll = false
 
     /// One choice as the user reads it; Friday noon carries its kind explicitly (RP5).
     struct Choice: Hashable {
@@ -1255,13 +1256,18 @@ private struct PrayerGapResolutionSheet: View {
         return first == last ? dateLabel(first) : "من " + dateLabel(first) + " إلى " + dateLabel(last)
     }
 
-    /// One tap settles the whole gap and closes; the undo bar on the home page reverses it.
+    /// One tap settles the whole gap and closes. Undo is for removals only (FB-32), so «صلّيتها كلها» first asks with the count (FB-39).
     private var quickActions: some View {
         VStack(spacing: 10) {
-            Button { apply(Choice(status: .alone, fridayKind: nil), to: references, saveNow: true) } label: {
+            Button { confirmAloneAll = true } label: {
                 quickLabel("صلّيتها كلها", detail: "تُسجَّل في وقتها، وحدي")
             }
             .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-gap-alone-all")
+            .confirmationDialog("تسجيل " + WidgetCopy.agree(references.count, digits, one: "صلاة واحدة", two: "صلاتين", few: "صلوات", many: "صلاة") + " وحدك في وقتها؟",
+                                isPresented: $confirmAloneAll, titleVisibility: .visible) {
+                Button("نعم، سجّلها") { apply(Choice(status: .alone, fridayKind: nil), to: references, saveNow: true) }
+                Button("ليس الآن", role: .cancel) {}
+            }
             Button { apply(Choice(status: .unrecordedHistory), to: references, saveNow: true) } label: {
                 quickLabel("لم أسجّل هذه الفترة", detail: "لا قضاء ولا نسبة ولا سلسلة")
             }

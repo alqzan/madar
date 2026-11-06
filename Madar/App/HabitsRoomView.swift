@@ -267,7 +267,8 @@ struct HabitsRoomView: View {
                         complete(next, delta: period.rule.measure == .duration ? 15 : 1)
                     } else { detail = next }
                 } label: {
-                    Text(next.source == nil ? "سجّل" : "افتحها").font(MadarTypography.caption())
+                    // FB-39: the button names the habit it logs; a bare «سجّل» logged a habit the card never showed.
+                    Text((next.source == nil ? "سجّل " : "افتح ") + next.name).font(MadarTypography.caption()).lineLimit(1)
                         .padding(.horizontal, 14).frame(minHeight: 44)
                         .background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent)
                 }

@@ -111,15 +111,6 @@ import MadarSnapshots
         XCTAssertEqual(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).filter { $0.prayer == "fajr" && $0.status == "jamaah" }.count, 1)
     }
 
-    func testFailedMihbaraIdeaCaptureIsReportedAsFinalFailure() async throws {
-        let (app, _) = try session()
-        app.authorizeProtectedData()
-        app.failFirstNotebookSave = true
-        let request = MadarIntentRequest.capture(text: "فكرة: حديقة صغيرة", id: UUID())
-        let completed = await app.handleIntentRequest(request)
-        XCTAssertTrue(completed, "A permanent command failure is reported; it is not retained as a locked request.")
-        XCTAssertEqual(MadarIntentHandoff.shared.takeFailure(request), "لم تُحفظ الفكرة في دفتر المحبرة. أعد المحاولة.")
-    }
     func testConcurrentIntentSubmissionWaitsUntilItsRequestIsHandled() async throws {
         let handoff = MadarIntentHandoff()
         let first = MadarIntentRequest.capture(text: "مصروف أول", id: UUID())
@@ -150,18 +141,15 @@ import MadarSnapshots
         XCTAssertEqual(saved?.dayKey, yesterday.description)
     }
 
-    func testMihbaraIdeaCaptureWritesOnePrivateNoteAndOpensItsRoom() async throws {
+    func testIdeaCaptureWritesOneDiaryLineNotAHiddenNotebookNote() async throws {
         let (app,container)=try session(),id=UUID()
         app.authorizeProtectedData()
         let applied=await app.handleIntentRequest(.capture(text:"فكرة: خطة قراءة جديدة",id:id))
         XCTAssertTrue(applied)
-        XCTAssertEqual(app.selectedTab,"mihbara");XCTAssertFalse(app.mihbaraOpen);XCTAssertNotNil(app.undoToken)
-        let rows=try ModelContext(container).fetch(FetchDescriptor<NotebookNote>()),note=try XCTUnwrap(rows.first{$0.id==id})
-        XCTAssertTrue(note.isPrivate);XCTAssertEqual(note.link,"general");XCTAssertEqual(note.text,"خطة قراءة جديدة")
-        XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<Entry>()),0)
-        let replayed=await app.handleIntentRequest(.capture(text:"فكرة: خطة قراءة جديدة",id:id))
-        XCTAssertTrue(replayed)
-        XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<NotebookNote>()),1)
+        XCTAssertEqual(app.selectedTab,"notes")
+        XCTAssertEqual(try ModelContext(container).fetch(FetchDescriptor<Entry>()).filter{$0.text=="فكرة: خطة قراءة جديدة"}.count,1)
+        XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<NotebookNote>()),0)
+        XCTAssertEqual(CaptureIntentResponse.make(route:CaptureRouter.route("فكرة: خطة"),handled:true),.added)
     }
 
     func testMoneyCaptureOpensConfirmationWithoutWritingOrRequiringDiaryUnlock() async throws {

@@ -3,10 +3,10 @@ import Foundation
 import MadarCore
 
 /// §9 single capture. Runs in the app process (RA2) through an in-process handoff, never a public
-/// link, and lands with the room's own confirmation and 10-minute undo. Money opens its confirmation sheet; before M6 «فكرة: …» becomes a diary line. The dialog never repeats the text (§14).
+/// link, and lands with the room's own confirmation and 10-minute undo. Money opens its confirmation sheet; «فكرة: …» becomes a diary line (FB-39: the notebook has no entry point). The dialog never repeats the text (§14).
 struct CaptureIntent: AppIntent {
     static let title: LocalizedStringResource = "التقط في مدار"
-    static let description = IntentDescription("جملة واحدة تذهب إلى غرفتها: «صليت العصر جماعة» إلى الصلاة، «قهوة ١٨» إلى تأكيد المصروف، «فكرة: …» إلى دفتر المحبرة، وغيرها إلى صفحة اليوم.")
+    static let description = IntentDescription("جملة واحدة تذهب إلى غرفتها: «صليت العصر جماعة» إلى الصلاة، «قهوة ١٨» إلى تأكيد المصروف، وغيرها، ومنها «فكرة: …»، إلى صفحة اليوم.")
     static let supportedModes: IntentModes = .foreground
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
@@ -60,12 +60,11 @@ enum CaptureIntentResponse: Equatable {
     static func make(route: CaptureRoute, handled: Bool) -> Self {
         switch route {
         case .moneyExpense: handled ? .reviewExpense : .heldExpense
-        case .mihbaraIdea: handled ? .savedIdea : .heldIdea
+        case .mihbaraIdea: handled ? .added : .heldDiary
         case .empty: .empty
         case .tooLong: .tooLong
         case .logPrayer: handled ? .prayerRequestSent : .heldPrayer
         case .choosePrayerStatus: handled ? .choosePrayerStatus : .heldPrayer
-        case .diaryLine(_, kind: .idea): handled ? .savedIdea : .heldIdea
         case .diaryLine: handled ? .added : .heldDiary
         }
     }

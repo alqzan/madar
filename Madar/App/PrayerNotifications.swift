@@ -108,6 +108,8 @@ struct PrayerNotificationSlot: Equatable {
 @MainActor
 final class PrayerNotificationCoordinator {
     static let categoryID = "salah.ask"
+    /// Friday noon: «في جماعة» needs the Jumu'ah/Dhuhr choice (RP5), so that button opens the app on the choice instead of recording.
+    static let fridayCategoryID = "salah.ask.friday"
     static let snoozeActionID = "salah.snooze"
     static let jamaahActionID = "salah.jamaah"
     static let aloneActionID = "salah.alone"
@@ -128,7 +130,10 @@ final class PrayerNotificationCoordinator {
         let jamaah = UNNotificationAction(identifier: Self.jamaahActionID, title: "في جماعة", options: [])
         let alone = UNNotificationAction(identifier: Self.aloneActionID, title: "وحدي", options: [])
         let category = UNNotificationCategory(identifier: Self.categoryID, actions: [jamaah, alone, snooze], intentIdentifiers: [], options: [])
-        center.setNotificationCategories([category])
+        // FB-39: the old Friday «في جماعة» ran in the background, could not open the app, and so recorded nothing.
+        let fridayJamaah = UNNotificationAction(identifier: Self.jamaahActionID, title: "في جماعة", options: [.foreground])
+        let friday = UNNotificationCategory(identifier: Self.fridayCategoryID, actions: [fridayJamaah, alone, snooze], intentIdentifiers: [], options: [])
+        center.setNotificationCategories([category, friday])
     }
 
     func attach(to session: AppSession) async {
@@ -289,7 +294,7 @@ final class PrayerNotificationCoordinator {
                 let friday = prayer == .dhuhr && calendar.component(.weekday, from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600)) == 6
                 if friday && !alone {
                     // RP5: Friday noon in congregation needs an explicit Jumu'ah/Dhuhr choice, so the app opens for it.
-                    session.selectedTab = "prayer"
+                    session.selectedTab = "prayer"; session.prayerLogRequest = .dhuhr
                 } else {
                     session.recordPrayer(reference, status: alone ? .alone : .jamaah, fridayKind: friday ? .dhuhr : nil)
                 }
@@ -526,12 +531,18 @@ final class PrayerNotificationCoordinator {
         return Prayer(rawValue: String(parts[2]))
     }
 
+    static func isFridayNoon(dayKey: String, prayer: Prayer, timeZone: TimeZone) -> Bool {
+        guard prayer == .dhuhr, let day = try? GregorianDay(dayKey) else { return false }
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+        return calendar.component(.weekday, from: day.date(in: timeZone).addingTimeInterval(12 * 3600)) == 6
+    }
+
     private static func makeRequest(candidate: NotificationCandidate, prayer: Prayer, timeZone: TimeZone, snooze: Bool, before: Bool = false) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = title(prayer)
         content.body = snooze ? "صلّيتها؟" : "مرّ وقت على الأذان. صلّيتها؟"
         // The record actions (في جماعة / وحدي) belong to the ask only: a prayer cannot be recorded before its adhan (RP2).
-        if before { content.body = "يقترب الأذان" } else { content.categoryIdentifier = Self.categoryID }
+        if before { content.body = "يقترب الأذان" } else { content.categoryIdentifier = isFridayNoon(dayKey: candidate.dayKey, prayer: prayer, timeZone: timeZone) ? Self.fridayCategoryID : Self.categoryID }
         content.threadIdentifier = "salah.\(candidate.dayKey)"
         content.sound = .default
         content.userInfo = ["requestID": candidate.id, "dayKey": candidate.dayKey, "prayer": prayer.rawValue, "snooze": snooze, "before": before]

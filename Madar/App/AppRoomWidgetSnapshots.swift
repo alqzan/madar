@@ -60,20 +60,13 @@ extension AppSession {
     /// diary-linked note never enters an App Group file, even when the rest of Mihbara is visible.
     func mihbaraWidgetSnapshot(locked:Bool,at instant:Date?=nil)->MihbaraSnapshot {
         guard !locked else { return .init() }
-        let now=instant ?? prayerNow(),context=ModelContext(container)
+        let now=instant ?? prayerNow()
         do {
             let reading=try AppMihbaraService(app:self).load(at:now)
             let current=MihbaraStand.pick(from:reading.books)
             let book=current.map { MihbaraSnapshot.BookSummary(id:$0.id,title:$0.title,author:$0.author,currentPage:(($0.isReadableEPUB || $0.isReadablePDF) ? MihbaraCopy.pagesRead($0) : $0.page).flatMap{$0>0 ? $0 : nil},pages:$0.pages) }
-            let hadith=reading.todayHadiths.first.map { MihbaraSnapshot.HadithSummary(collectionID:reading.collection.collectionID,number:$0.number,title:$0.title) }
-            let notes=try context.fetch(FetchDescriptor<NotebookNote>())
-            // Owner, 30 Oct: notebook text reaches the widget only with the same opt-in as the diary's (`notes.widgetContent`, off by default).
-            let notebookShown=bool("notes.widgetContent")
-            let lastLine:String?=notes.filter{ notebookShown && $0.deletedAt==nil && $0.mergedInto==nil && !$0.isPrivate && $0.link != "fromDiary"}
-                .sorted{$0.updatedAt>$1.updatedAt}
-                .compactMap{$0.text.trimmingCharacters(in:.whitespacesAndNewlines)}
-                .first{$0.isEmpty == false}
-            return .init(currentBook:book,hadithToday:hadith,shelfCount:reading.books.count,lastNotebookLine:lastLine)
+            // FB-39: hadith of the day and the notebook have no entry point in the room any more, so the widget no longer shows them.
+            return .init(currentBook:book,shelfCount:reading.books.count)
         } catch { return .init() }
     }
     func publishRoomWidgetSnapshots(at now:Date) throws {

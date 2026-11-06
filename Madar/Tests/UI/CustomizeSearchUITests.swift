@@ -10,6 +10,7 @@ import XCTest
         let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = "Improve-search-after-L"; attachment.lifetime = .keepAlways; add(attachment)
         clear.tap(); XCTAssertTrue(clear.waitForNonExistence(timeout: 5))
         XCTAssertNotEqual(search.value as? String, "المظهر")
-        XCTAssertTrue(app.buttons["room-widgets-gallery"].exists)
+        // The settings home (not the old flat list) returns after clearing; its first door is «أقسامك والبهو».
+        XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "أقسامك والبهو")).firstMatch.waitForExistence(timeout: 5), app.debugDescription)
     }
 }

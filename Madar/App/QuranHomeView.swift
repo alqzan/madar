@@ -245,7 +245,9 @@ struct QuranHomeView: View {
             Button { showPlan = true } label: { HStack(spacing: 6) { Circle().fill(theme.color("hifz")).frame(width: 7, height: 7); Text(state.streakLabel).font(bodyFont(12, bold: true)) }
                 .padding(.horizontal, 13).padding(.vertical, 9).background(theme.color("hifzTint"), in: Capsule())
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-streak")
-            } else if state.plan != nil {
+            }
+            // FB-39: the plan (amount, reminder, rest day, missed-day choice) is always one tap away, not only behind a streak pill.
+            if state.plan != nil {
                 Button { showPlan = true } label: { Label("خطّتك", systemImage: "slider.horizontal.3").font(bodyFont(12, bold: true)).frame(minHeight: 44) }
                     .buttonStyle(.madarPlain).accessibilityIdentifier("quran-open-plan")
             }

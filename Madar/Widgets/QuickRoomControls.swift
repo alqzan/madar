@@ -35,6 +35,6 @@ struct MihbaraRoomControl:ControlWidget {
     var body:some ControlWidgetConfiguration {
         StaticControlConfiguration(kind:"com.alqzan.madar2.mihbara-open") {
         ControlWidgetButton(action:OpenMihbaraRoomIntent()){Label("المحبرة",systemImage:"books.vertical")}
-        }.displayName("المحبرة").description("يفتح رفّك ومكتبك في المحبرة.")
+        }.displayName("المحبرة").description("يفتح مكتبتك في المحبرة.")
     }
 }

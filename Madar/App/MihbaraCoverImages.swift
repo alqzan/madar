@@ -141,7 +141,7 @@ struct MihbaraCoverButton: View {
         saving = true
         Task {
             defer { saving = false }
-            do { try await app.saveBookCover(book.id, photo: photo) } catch { app.errorMessage = error.localizedDescription }
+            do { try await app.saveBookCover(book.id, photo: photo) } catch { app.errorMessage = madarUserMessage(error) }
         }
     }
 }

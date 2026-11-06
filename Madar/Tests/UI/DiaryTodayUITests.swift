@@ -31,7 +31,7 @@ import XCTest
         XCTAssertTrue(excerpt.exists)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "صورة هذا اليوم لم تُنقل")).firstMatch.exists)
         let write = app.buttons["diary-write"]
-        let accessory = app.descendants(matching: .any)["tab-accessory-next-prayer"]
+        let accessory = app.otherElements["fixed-tab-bar"]   // FB-31: the glass tab bar replaced the prayer accessory
         XCTAssertLessThanOrEqual(write.frame.maxY, accessory.frame.minY, "Writing stays above the native accessory")
         XCTAssertLessThanOrEqual(accessory.frame.minY - write.frame.maxY, 24, "No duplicate bottom spacer")
         capture(app, "M3-restored-diary-L")

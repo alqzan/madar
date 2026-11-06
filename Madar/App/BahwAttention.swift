@@ -88,6 +88,8 @@ struct BahwAttentionSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     @State private var choices: [String: Option] = [:]
+    /// FB-39: «صلّيتها وحدي» for a whole gap writes many records at once; it asks first, naming the count.
+    @State private var confirmGapAlone = false
     @State private var moneyOpen = false
     @State private var reconcileOpen = false
     @State private var revealed = false
@@ -140,6 +142,13 @@ struct BahwAttentionSheet: View {
         .background(theme.background).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme)
         .presentationDetents([.medium, .large]).presentationDragIndicator(.visible).presentationBackground(theme.background)
+        // FB-39: a swipe-down used to leave the sheet unseen, so it came back on every return to the app, and it dropped chosen chips silently.
+        .interactiveDismissDisabled(saveEnabled || saving)
+        .onDisappear { markSeen() }
+        .confirmationDialog(gapAloneTitle, isPresented: $confirmGapAlone, titleVisibility: .visible) {
+            Button("نعم، سجّلها") { apply(.alone, to: attention.prayers.filter { !$0.fridayNoon }) }
+            Button("ليس الآن", role: .cancel) {}
+        } message: { Text("تُسجَّل كل واحدة «وحدي» في وقتها، وتصحّح أيًّا منها من صفحة الصلاة.") }
         .sheet(isPresented: $reconcileOpen, onDismiss: refreshReconcile) {
             NavigationStack { MoneyReconcileView(app: session, revealed: $revealed) }
         }
@@ -149,6 +158,10 @@ struct BahwAttentionSheet: View {
     }
 
     private var saveEnabled: Bool { !choices.isEmpty }
+    private var gapAloneTitle: String {
+        let n = attention.prayers.filter { !$0.fridayNoon }.count
+        return "تسجيل " + WidgetCopy.agree(n, digits, one: "صلاة واحدة", two: "صلاتين", few: "صلوات", many: "صلاة") + " وحدك؟"
+    }
 
     private var prayersSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -157,7 +170,7 @@ struct BahwAttentionSheet: View {
             if longGap {
                 Text("لا يلزمك واحدة واحدة. لا يُحسب عليك شيء.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 HStack(spacing: 10) {
-                    chip("صلّيتها وحدي", on: false, id: "bahw-attention-gap-alone") { apply(.alone, to: attention.prayers.filter { !$0.fridayNoon }) }
+                    chip("صلّيتها وحدي", on: false, id: "bahw-attention-gap-alone") { confirmGapAlone = true }
                     chip("لم أسجّل الفترة", on: false, id: "bahw-attention-gap-skip") { apply(.skip, to: attention.prayers) }
                 }
             } else {
@@ -268,7 +281,7 @@ struct BahwAttentionSheet: View {
         }.buttonStyle(.madarPlain).accessibilityIdentifier(id).accessibilityAddTraits(on ? .isSelected : [])
     }
 
-    /// One tap settles the whole gap and saves at once (one short undo on the home).
+    /// Settles the chosen items and saves at once (the «وحدي» gap choice is confirmed first).
     private func apply(_ option: Option, to items: [BahwAttention.PrayerItem]) {
         for item in items { choices[item.id] = option }
         save()

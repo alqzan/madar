@@ -40,7 +40,8 @@ struct CustomizeMadar: View {
                     }
                 }
                 if query.isEmpty {
-                    SettingsHome(session: session, openTafsir: { quranTafsirLibrary = true }, openMaker: { widgetMaker = true }, openGallery: { widgetGallery = true })
+                    SettingsHome(session: session, openTafsir: { quranTafsirLibrary = true }, openMaker: { widgetMaker = true }, openGallery: { widgetGallery = true },
+                                 resetAll: { confirmReset = true }, changes: changesLabel)
                 } else {
                 if query.isEmpty || normalized("المحبرة").contains(normalized(query)) {
                     Button { session.mihbaraOpen = true } label: {
@@ -79,20 +80,7 @@ struct CustomizeMadar: View {
                     ForEach(sections, id: \.self) { section in
                         SettingsSection(title: section, symbol: symbols[section] ?? "slider.horizontal.3", definitions: filtered.filter { sectionFor($0.key) == section }, session: session, searching: !query.isEmpty, highlightedSettingKey: highlightedSettingKey)
                     }
-                    if sections.contains("الإشعارات") && (session.bool("salah.askReminder") || session.bool("salah.beforeReminder")) && !session.notificationsAuthorized {
-                        MadarCard {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text(session.notificationPermissionTitle).font(MadarTypography.body())
-                                if session.canRequestNotificationPermission {
-                                    Button("اسمح بإشعارات الصلاة") { session.requestPrayerNotificationPermission() }
-                                        .frame(minHeight: 44).accessibilityIdentifier("prayer-notification-permission-request")
-                                } else if session.shouldOpenNotificationSettings {
-                                    Button("افتح إعدادات النظام") { session.openPrayerNotificationSettings() }
-                                        .frame(minHeight: 44).accessibilityIdentifier("prayer-notification-permission-settings")
-                                }
-                            }
-                        }
-                    }
+                    if sections.contains("الإشعارات") { NotificationPermissionCard(session: session) }
                 }
                 // The data links are searchable too: «نسخ» or «انقل» used to land on an empty result.
                 if query.isEmpty || normalized("النسخ والاستعادة نسخة احتياطية انقل من مدار القديم المزامنة").contains(normalized(query)) {
@@ -221,6 +209,8 @@ func sectionFor(_ key: String) -> String {
     if key == "core.homeCity" { return "مدينتك" }
     if ["salah.showMosqueStreak", "salah.askHeart"].contains(key) { return "الصلاة" }
     if key == "core.faceIDLock" { return "الخصوصية" }
+    // FB-39: these prayer keys used to fall through to «المظهر», so travel method, qada reminder and pending days were never on the prayer page.
+    if ["salah.pendingDays", "salah.tripMethod", "salah.travelShortenCombine", "salah.qadaReminder", "salah.pool", "salah.fridayTallArch"].contains(key) { return "الصلاة" }
     if key == "core.spotlightIndex" { return "البحث" }
     if ["salah.beforeReminder", "salah.beforeAdhanMin", "notes.eveningLine", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil"].contains(key) { return "الإشعارات" }
     return "المظهر"
@@ -458,6 +448,50 @@ struct CustomizeRoom<Preview: View>: View {
                 MadarCard { SettingControl(definition: definition, session: session) }
             }
             Text("المظهر واليوم ومدينتك من خصّص مدار").font(MadarTypography.caption())
+        }
+    }
+}
+
+
+/// FB-39: shown at the top of the notifications page too (it used to appear only in search results), so a refused permission is never hidden
+/// behind switches that look on and do nothing.
+struct NotificationPermissionCard: View {
+    @Bindable var session: AppSession
+    var body: some View {
+        if (session.bool("salah.askReminder") || session.bool("salah.beforeReminder") || session.bool("notif.thisDeviceReminders")) && !session.notificationsAuthorized {
+            MadarCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(session.notificationPermissionTitle).font(MadarTypography.body())
+                    if session.canRequestNotificationPermission {
+                        Button("اسمح بالإشعارات") { session.requestPrayerNotificationPermission() }
+                            .frame(minHeight: 44).accessibilityIdentifier("prayer-notification-permission-request")
+                    } else if session.shouldOpenNotificationSettings {
+                        Button("افتح إعدادات النظام") { session.openPrayerNotificationSettings() }
+                            .frame(minHeight: 44).accessibilityIdentifier("prayer-notification-permission-settings")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One page's own «back to the agreed defaults», confirmed, data untouched (every setting has a reset; FB-39).
+struct SettingsPageReset: View {
+    @Bindable var session: AppSession
+    let keys: [String]
+    @State private var confirming = false
+    @Environment(\.roomTheme) private var theme
+    private var changed: Int { session.schema.settings.filter { keys.contains($0.key) && session.values[$0.key] != $0.defaultValue }.count }
+    var body: some View {
+        if changed > 0 {
+            Button { confirming = true } label: {
+                Text("أعِد هذه الصفحة إلى الافتراضي").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.madarPlain).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("settings-page-reset")
+            .confirmationDialog("تعود إعدادات هذه الصفحة إلى ما اتفقنا عليه؟", isPresented: $confirming, titleVisibility: .visible) {
+                Button("أعِد الافتراضي", role: .destructive) { session.reset(keys) }
+                Button("إلغاء", role: .cancel) {}
+            } message: { Text("بياناتك لا تُمسّ.") }
         }
     }
 }

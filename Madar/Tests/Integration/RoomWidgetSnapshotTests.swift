@@ -164,16 +164,16 @@ import MadarPrayer
         let diaryNote=NotebookNote();diaryNote.text="SECRET-DIARY-LINE";diaryNote.isPrivate=false;diaryNote.link="fromDiary";diaryNote.targetID=UUID();diaryNote.updatedAt=now.addingTimeInterval(3);context.insert(diaryNote)
         let publicNote=NotebookNote();publicNote.text=String(repeating:"م",count:100);publicNote.isPrivate=false;publicNote.link="idea";publicNote.updatedAt=now.addingTimeInterval(4);context.insert(publicNote)
         try context.save()
-        // Notebook text stays off the widget until the same opt-in as the diary's is on.
+        // FB-39: the notebook has no entry point, so its text never reaches the widget, even with the opt-in.
         XCTAssertNil(app.mihbaraWidgetSnapshot(locked:false,at:now).lastNotebookLine)
         try await app.applySettingsAndWait(["notes.widgetContent":.bool(true)])
         try app.publishRoomWidgetSnapshots(at:now)
 
         let envelope=try XCTUnwrap(app.snapshotStore.read(BuiltRoomWidget.mihbara.rawValue,as:MihbaraSnapshot.self,now:now))
         XCTAssertEqual(envelope.payload.currentBook?.id,book.id);XCTAssertEqual(envelope.payload.currentBook?.currentPage,14);XCTAssertEqual(envelope.payload.currentBook?.pages,240)
-        XCTAssertEqual(envelope.payload.shelfCount,1);XCTAssertEqual(envelope.payload.lastNotebookLine?.count,80)
+        XCTAssertEqual(envelope.payload.shelfCount,1);XCTAssertNil(envelope.payload.lastNotebookLine);XCTAssertNil(envelope.payload.hadithToday)
         let encoded=try JSONEncoder().encode(envelope.payload),json=String(decoding:encoded,as:UTF8.self)
-        XCTAssertFalse(json.contains("SECRET-PRIVATE-NOTE"));XCTAssertFalse(json.contains("SECRET-DIARY-LINE"))
+        XCTAssertFalse(json.contains("SECRET-PRIVATE-NOTE"));XCTAssertFalse(json.contains("SECRET-DIARY-LINE"));XCTAssertFalse(json.contains("مممم"))
         XCTAssertEqual(envelope.privacy.notesLocked,false)
         let locked=app.mihbaraWidgetSnapshot(locked:true,at:now)
         XCTAssertNil(locked.currentBook);XCTAssertNil(locked.hadithToday);XCTAssertEqual(locked.shelfCount,0);XCTAssertNil(locked.lastNotebookLine)

@@ -9,6 +9,7 @@ struct MihbaraPageNoteSheet: View {
     let save: (String) async -> Bool
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
+    @State private var confirmDiscard = false
     @State private var saving = false
     @State private var rootBlockerID = UUID()
     @FocusState private var focused: Bool
@@ -16,8 +17,14 @@ struct MihbaraPageNoteSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Button("إلغاء") { dismiss() }.font(MadarTypography.body()).frame(minHeight: 44)
+                // FB-39: «إلغاء» threw a written note away in one tap.
+                Button("إلغاء") { if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { dismiss() } else { confirmDiscard = true } }
+                    .font(MadarTypography.body()).frame(minHeight: 44)
                     .accessibilityIdentifier("mihbara-note-cancel")
+                    .confirmationDialog("تترك ما كتبته؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
+                        Button("اترك الحاشية", role: .destructive) { dismiss() }
+                        Button("أكمل الكتابة", role: .cancel) {}
+                    }
 #if DEBUG
                 if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] == "1",
                    ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil {

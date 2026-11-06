@@ -10,6 +10,8 @@ struct SettingsHome: View {
     let openTafsir: () -> Void
     let openMaker: () -> Void
     let openGallery: () -> Void
+    let resetAll: () -> Void
+    let changes: String
     @Environment(\.roomTheme) private var theme
 
     var body: some View {
@@ -28,8 +30,9 @@ struct SettingsHome: View {
                 if session.roomEnabled(.habits) { link("العادات", "التذكير والسلسلة وما تعرضه الودجة", "checkmark.circle") { sectionsPage("العادات", ["العادات", "الذكاء"]) } }
                 if session.roomEnabled(.year) { link("السنة", "أي سنة تعرض", "calendar") { sectionsPage("السنة", ["السنة"]) } }
                 if session.roomEnabled(.upcoming) { link("الأيام القادمة", "عدد الأيام المعروضة", "hourglass") { sectionsPage("الأيام القادمة", ["الأيام القادمة"]) } }
-                if session.roomEnabled(.quran) { door("القرآن", "التفاسير والورد", "book", openTafsir) }
-                if session.roomEnabled(.mal) { door("المال", "إعدادات المال داخل القسم", "banknote") { session.moneyOpen = true } }
+                if session.roomEnabled(.quran) { door("القرآن", "مكتبة التفاسير", "book", openTafsir) }
+                if session.roomEnabled(.notes) { link("المذكرات", "الصفحة والتقويم والهامش والنقل", "book.closed") { DiaryCustomizeView(app: session) } }
+                if session.roomEnabled(.mal) { door("المال", "اليوم والحدود والتذكيرات والسفر", "banknote") { session.moneyOpensSettings = true; session.moneyOpen = true } }
                 if session.roomEnabled(.mihbara) { door("المحبرة", "إعدادات المحبرة داخل القسم", "books.vertical") { session.mihbaraOpen = true } }
                 if !hasRoomSettings { Text("أضف قسمًا من «أقسامك والبهو» لتظهر إعداداته هنا.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
             }
@@ -46,14 +49,16 @@ struct SettingsHome: View {
                     }
                 }
                 link("انقل من مدار القديم", "استيراد بياناتك السابقة", "square.and.arrow.down") { LegacyMoveView(app: session) }
+                door("أعِد الإعدادات المتفق عليها", changes, "arrow.counterclockwise", resetAll)
             }
         }
     }
 
-    private var hasRoomSettings: Bool { [BahwBlock.salah, .habits, .year, .upcoming, .quran, .mal, .mihbara].contains { session.roomEnabled($0) } }
+    private var hasRoomSettings: Bool { [BahwBlock.salah, .habits, .year, .upcoming, .quran, .notes, .mal, .mihbara].contains { session.roomEnabled($0) } }
 
     private func sectionsPage(_ title: String, _ sections: [String]) -> some View {
         SettingsPage(title: title) {
+            if sections.contains("الإشعارات") { NotificationPermissionCard(session: session) }
             ForEach(sections, id: \.self) { section in
                 let definitions = session.schema.settings.filter { definition in
                     guard AppSession.supportedKeys.contains(definition.key), sectionFor(definition.key) == section else { return false }
@@ -65,6 +70,7 @@ struct SettingsHome: View {
                     SettingsSection(title: section, symbol: "slider.horizontal.3", definitions: definitions, session: session, searching: true, highlightedSettingKey: nil)
                 }
             }
+            SettingsPageReset(session: session, keys: AppSession.supportedKeys.filter { sections.contains(sectionFor($0)) })
         }
     }
 

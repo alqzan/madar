@@ -397,7 +397,7 @@ import XCTest
         let moneyShot = XCTAttachment(screenshot: app.screenshot()); moneyShot.name = "M0-native-glass-money-active-L"; moneyShot.lifetime = .keepAlways; add(moneyShot)
         app.buttons["tab-mihbara"].tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
-        tabBar.buttons["القرآن"].tap()
+        app.buttons["tab-quran"].tap()
         XCTAssertTrue(app.buttons["quran-start-plan"].waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertFalse(app.buttons["quran-streak"].exists)
         XCTAssertFalse(app.buttons["quran-level-hifz-medium"].exists)

@@ -430,7 +430,7 @@ struct DiaryDayView: View {
                     .environment(\.roomTheme, theme)
             }
             .sheet(item: $editing) { edit in
-                DiaryLineEditSheet(app: app, edit: edit) { niyyaSaved = true }.environment(\.roomTheme, theme)
+                DiaryLineEditSheet(app: app, edit: edit) { }.environment(\.roomTheme, theme)
                     .diaryRootDraftBlocking(app)
             }
             .sheet(item: $original) { first in
@@ -693,30 +693,40 @@ struct DiaryDayView: View {
                 RoundedRectangle(cornerRadius: 12).stroke(theme.accent, lineWidth: 2)
             }
         }.animation(.easeInOut(duration: 0.2), value: highlightedEntryID)
-            .contextMenu {
-                if page.editable.contains(line.id) {
-                    Button("عدّل السطر", systemImage: "pencil") { editing = .init(id: line.id, text: line.text) }
+            // FB-39: editing and deleting a line lived only in a long press; a quiet «⋯» shows that the line can be changed.
+            .overlay(alignment: .topTrailing) {
+                if page.editable.contains(line.id) || page.deletable.contains(line.id) {
+                    Menu { lineActions(line, page: page) } label: {
+                        Image(systemName: "ellipsis").font(.footnote).foregroundStyle(theme.color("ink3Text"))
+                            .frame(width: 36, height: 30).contentShape(Rectangle())
+                    }.accessibilityLabel("خيارات السطر").accessibilityIdentifier("diary-line-menu").offset(x: 14, y: 2)
                 }
-                if page.deletable.contains(line.id), let id = UUID(uuidString: line.id) {
-                    Button(role: .destructive) {
-                        deleteConfirmation = id
-                    } label: {
-                        Label("احذف السطر", systemImage: "trash")
-                    }
-                    .accessibilityIdentifier("diary-line-delete")
-                }
-                if shownDay == today, ["normal", "late", "ghad"].contains(line.kind), !line.text.isEmpty {
-                    Button("اجعلها نيّة اليوم") {
-                        Task {
-                            do { try await service.saveIntention(line.text, day: shownDay); niyyaSaved = true } catch {
-                                failure = madarUserMessage(error)
-                            }
-                        }
-                    }
-                }
-            }.padding(.leading, 6).padding(.trailing, travel == nil || typeSize.isAccessibilitySize ? 18 : 92).padding(
+            }
+            .contextMenu { lineActions(line, page: page) }.padding(.leading, 6).padding(.trailing, travel == nil || typeSize.isAccessibilitySize ? 18 : 92).padding(
                 .vertical, 10
             ).frame(minHeight: 34)
+    }
+    @ViewBuilder private func lineActions(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
+        if page.editable.contains(line.id) {
+            Button("عدّل السطر", systemImage: "pencil") { editing = .init(id: line.id, text: line.text) }
+        }
+        if page.deletable.contains(line.id), let id = UUID(uuidString: line.id) {
+            Button(role: .destructive) {
+                deleteConfirmation = id
+            } label: {
+                Label("احذف السطر", systemImage: "trash")
+            }
+            .accessibilityIdentifier("diary-line-delete")
+        }
+        if shownDay == today, ["normal", "late", "ghad"].contains(line.kind), !line.text.isEmpty {
+            Button("اجعلها نيّة اليوم") {
+                Task {
+                    do { try await service.saveIntention(line.text, day: shownDay); niyyaSaved = true } catch {
+                        failure = madarUserMessage(error)
+                    }
+                }
+            }
+        }
     }
     private func revealInitialEntry(using proxy: ScrollViewProxy) {
         guard let initialEntryID,

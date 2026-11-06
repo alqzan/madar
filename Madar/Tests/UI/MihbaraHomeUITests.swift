@@ -26,15 +26,15 @@ import UIKit
         let unit = app.descendants(matching: .any)["habit-reading-unit"]
         let target = app.descendants(matching: .any)["habit-target"]
         XCTAssertTrue(target.waitForExistence(timeout: 4), app.debugDescription)
-        target.buttons.element(boundBy: 1).tap()   // «+» once: 15 → 16 minutes
+        target.buttons.element(boundBy: 1).tap()   // «+» once: 15 → 20 minutes (FB-39: minutes step by 5)
         unit.buttons["بالصفحات"].tap()
         unit.buttons["بالدقائق"].tap()
-        XCTAssertTrue(target.label.contains("١٦"), target.label)
+        XCTAssertTrue(target.label.contains("٢٠"), target.label)
         save.tap()
         let left = app.staticTexts["mihbara-goal-left"]
         XCTAssertTrue(left.waitForExistence(timeout: 10), app.debugDescription)
-        // 8 minutes read that day against the 16-minute target kept above: 8 left (it was 7 left of the default 15).
-        XCTAssertEqual(left.label, "بقي ٨ دقائق")
+        // 8 minutes read that day against the 20-minute target kept above: 12 left (it was 7 left of the default 15).
+        XCTAssertEqual(left.label, "بقي ١٢ دقيقة")
         for _ in 0..<3 where !app.buttons["mihbara-goal-edit"].isHittable { app.swipeUp(velocity: .slow) }
         shot(app, "MIH-GOAL-after-L")
         app.terminate()
@@ -80,7 +80,7 @@ import UIKit
         XCTAssertTrue(save.waitForExistence(timeout: 8), app.debugDescription)
         app.descendants(matching: .any)["habit-reading-unit"].buttons["بالدقائق"].tap()
         let target = app.descendants(matching: .any)["habit-target"]
-        for _ in 0..<10 { target.buttons.element(boundBy: 0).tap() }
+        for _ in 0..<2 { target.buttons.element(boundBy: 0).tap() }   // 15 → 5 minutes (FB-39: minutes step by 5)
         save.tap()
         let over = app.staticTexts["mihbara-goal-left"]
         XCTAssertTrue(over.waitForExistence(timeout: 10), app.debugDescription)
@@ -1052,6 +1052,11 @@ import UIKit
         XCTAssertTrue(close.waitForExistence(timeout:5), app.debugDescription); close.tap()
         XCTAssertTrue(close.waitForNonExistence(timeout:5), app.debugDescription)
     }
+    /// FB-32 (owner): the undo line appears only after a deletion, never after a save.
+    private func noUndo(_ app: XCUIApplication) {
+        let button = app.descendants(matching: .any)["mihbara-undo"].buttons["undo-button"]
+        XCTAssertFalse(button.waitForExistence(timeout: 2), app.debugDescription)
+    }
     private func undo(_ app: XCUIApplication) {
         let button = app.descendants(matching: .any)["mihbara-undo"].buttons["undo-button"]
         XCTAssertTrue(button.waitForExistence(timeout:8), app.debugDescription)
@@ -1261,8 +1266,7 @@ import UIKit
         shot(app, "M6-V20-paper-index-s1-L")
         let save = app.buttons["mihbara-paper-save"]; reach(app, save); save.tap()
         XCTAssertTrue(app.staticTexts["دفتر البدايات"].waitForExistence(timeout: 8))
-        undo(app)
-        XCTAssertTrue(app.staticTexts["أضف كتابك الأول"].waitForExistence(timeout: 8))
+        noUndo(app)
     }
     func testPaperIndexBackConfirmsBeforeDiscardingChanges() throws {
         continueAfterFailure = false
@@ -1278,7 +1282,8 @@ import UIKit
         let back = app.buttons["mihbara-paper-back"]
         for _ in 0..<8 where !back.isHittable { app.swipeDown(velocity: .slow) }
         XCTAssertTrue(back.isHittable, app.debugDescription); back.tap()
-        let keep = app.buttons["mihbara-paper-continue"].firstMatch
+        // iOS 27 shows this confirmation as a popover with no cancel row; tapping outside it keeps writing.
+        let keep = app.otherElements["PopoverDismissRegion"]
         XCTAssertTrue(keep.waitForExistence(timeout: 8), app.debugDescription); keep.tap()
         XCTAssertEqual(chapter.value as? String, changed, "Keeping the editor open preserves the draft.")
         back.tap()
@@ -1365,11 +1370,12 @@ import UIKit
         let saveIndex = app.buttons["mihbara-paper-save"]; reach(app, saveIndex); saveIndex.tap()
         XCTAssertTrue(app.staticTexts["فهرس طبعتك"].waitForExistence(timeout: 8), app.debugDescription)
         app.buttons["mihbara-paper-start"].tap()
-        undo(app)
+        noUndo(app)
 
         let savedBook = app.buttons["mihbara-book-continue"]
         XCTAssertTrue(savedBook.waitForExistence(timeout: 8), app.debugDescription); savedBook.tap()
-        XCTAssertTrue(app.buttons["mihbara-paper-index-prompt"].waitForExistence(timeout: 8), app.debugDescription)
+        // FB-32: no undo after a save, so the index typed above is kept and shows on the reopened card.
+        XCTAssertTrue(app.staticTexts["فهرس طبعتك"].waitForExistence(timeout: 8), app.debugDescription)
     }
 
     func testLongPaperTitleKeepsReadingAndDetailsActionsReachable() {

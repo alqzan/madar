@@ -78,7 +78,6 @@ struct QuranFreeView: View {
                         Text("من الوجه " + service.numerals.string(range.lowerBound) + " إلى " + service.numerals.string(range.upperBound))
                             .font(quranFont(16, bold: true)).accessibilityIdentifier("quran-free-range-summary")
                         Text(saved == 0 ? "هذا النطاق للقراءة فقط؛ لا يُسجّل تقييمًا أو يزيد حفظك أو سلسلتك" : "يُسجّل من النطاق ما اكتمل في صدرك (" + service.faceCount(saved) + ")؛ الباقي قراءة فقط").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
-                        Text("سرد متصل").font(quranFont(13)).frame(maxWidth: .infinity, minHeight: 38).glassEffect(.regular.interactive(), in: .capsule)
                         Button(saved == 0 ? "ابدأ القراءة" : "ابدأ التسميع") {
                             beginReading(range)
                         }.font(quranFont(16,bold:true)).foregroundStyle(theme.onAccent).frame(maxWidth:.infinity,minHeight:50).background(theme.accent,in:Capsule()).disabled(busy || pages.isEmpty).accessibilityIdentifier("quran-free-start")

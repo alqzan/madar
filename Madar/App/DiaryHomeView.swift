@@ -484,7 +484,15 @@ struct DiaryHomeView: View {
         }.padding(.horizontal, 14).padding(.vertical, 8).background(theme.background)
     }
     private func todayBar(_ day: DiaryDisplayDay) -> some View {
-        HStack(spacing: 10) {
+        // FB-39 (FB-28): with nothing written today the bar is one clear action that opens the editor; «صفحة اليوم» opened an empty reader.
+        if day.lines.isEmpty && day.media.isEmpty && day.photo == nil && (try? service.travel(day.day)) == nil {
+            return AnyView(Button { editor = .init(margin: nil) } label: {
+                Label("اكتب سطرك الأول اليوم", systemImage: "pencil").font(MadarTypography.section())
+                    .frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-write")
+                .padding(.horizontal, 14).padding(.vertical, 8).background(theme.background))
+        }
+        return AnyView(HStack(spacing: 10) {
             Button { reader = day.day } label: {
                 VStack(alignment: .leading, spacing: 2) { Text("صفحة اليوم").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)); Text(day.lines.isEmpty ? "اكتب سطرك الأول" : "آخرها " + service.time(day.lines.last!.at)).font(DiaryType.label) }
                     .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading).padding(.horizontal, 18)
@@ -492,7 +500,7 @@ struct DiaryHomeView: View {
             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-today")
             Button { editor = .init(margin: nil) } label: { Label("اكتب", systemImage: "pencil").font(MadarTypography.section()).padding(.horizontal, 22).frame(minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }
                 .buttonStyle(.madarPlain).accessibilityIdentifier("diary-write")
-        }.padding(.horizontal, 14).padding(.vertical, 8).background(theme.background)
+        }.padding(.horizontal, 14).padding(.vertical, 8).background(theme.background))
     }
     private func pill(_ title: String, id: String, ink: Color? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) { Text(title).font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(ink ?? theme.ink).overlay { Capsule().stroke(ink ?? theme.line, lineWidth: 1) } }

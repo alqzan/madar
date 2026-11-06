@@ -225,7 +225,7 @@ private struct MihbaraRoomWidgetContent:View {
             if locked {
                 Spacer(minLength:0);Label("افتح مدار",systemImage:"lock").font(MadarTypography.section());Text("المحتوى محمي").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk);Spacer(minLength:0)
             } else if snapshot?.currentBook == nil && snapshot?.hadithToday == nil && snapshot?.lastNotebookLine == nil {
-                Spacer(minLength:0);Text("ضع كتابًا على الطاولة").font(.custom("thmanyahserifdisplay-Bold",size:20,relativeTo:.title3));Text("أو اقرأ حديث اليوم").font(.custom("thmanyahsans-Regular",size:12,relativeTo:.caption)).foregroundStyle(theme.secondaryInk);Spacer(minLength:0)
+                Spacer(minLength:0);Text("ابدأ كتابًا من رفّك").font(.custom("thmanyahserifdisplay-Bold",size:20,relativeTo:.title3));Text("ويظهر هنا موضعك منه").font(.custom("thmanyahsans-Regular",size:12,relativeTo:.caption)).foregroundStyle(theme.secondaryInk);Spacer(minLength:0)
             } else {
                 if let book=snapshot?.currentBook {
                     VStack(alignment:.leading,spacing:3) {

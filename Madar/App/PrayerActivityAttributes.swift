@@ -65,8 +65,8 @@ extension MadarContextActivityAttributes.Kind {
 
     var destination: URL? {
         switch self {
-        case .letter: URL(string: "madar://notes/today")
-        case .iftar: URL(string: "madar://notes/today")
+        case .letter: URL(string: "madar://notes/letters")
+        case .iftar: URL(string: "madar://prayer")
         case .travel: URL(string: "madar://prayer")
         }
     }

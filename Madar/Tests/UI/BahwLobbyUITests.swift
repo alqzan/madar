@@ -22,7 +22,10 @@ import XCTest
         app.buttons["bahw-arrange-start"].tap()
         XCTAssertTrue(app.buttons["bahw-arrange"].waitForExistence(timeout: 5), app.debugDescription)
         app.buttons["bahw-arrange"].tap()
-        app.buttons["bahw-customize"].tap()
+        // The arrange bar animates away over the header; tap customize only once it is gone.
+        XCTAssertTrue(app.buttons["bahw-arrange"].waitForNonExistence(timeout: 5), app.debugDescription)
+        let customize = app.buttons["bahw-customize"]
+        XCTAssertTrue(customize.waitForExistence(timeout: 5) && customize.isHittable, app.debugDescription); customize.tap()
         XCTAssertTrue(app.textFields["settings-search"].waitForExistence(timeout: 10), app.debugDescription)
         app.buttons["tab-foundation"].tap()
         XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 10), app.debugDescription)

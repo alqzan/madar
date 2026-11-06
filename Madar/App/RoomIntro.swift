@@ -35,6 +35,8 @@ extension AppSession {
         return !UserDefaults.standard.bool(forKey: introKey(block))
     }
     func markIntroSeen(_ block: BahwBlock) { UserDefaults.standard.set(true, forKey: introKey(block)) }
+    /// True once the room's intro was shown: from then on a hidden lobby tile is the user's own choice and a tab visit leaves it hidden (FB-39).
+    func roomWasOpenedBefore(_ block: BahwBlock) -> Bool { UserDefaults.standard.bool(forKey: introKey(block)) }
 
     /// The lobby's door: the first visit shows the introduction, later visits open the room.
     func requestOpen(_ block: BahwBlock) {

@@ -99,9 +99,9 @@ extension AppSession {
             case .empty: errorMessage = "لم يصل نص لالتقاطه."; return true
             case .tooLong: errorMessage = "النص أطول من سطر واحد في صفحة اليوم (٢٠٠٠ حرف)."; return true
             case .diaryLine(let line, let kind):
-                if kind == .idea { return await saveMihbaraIdeaFromIntent(text: line, id: id) }
-                return await addDiaryLineFromIntent(text: line, day: "today", id: id)
-            case .mihbaraIdea(let idea): return await saveMihbaraIdeaFromIntent(text: idea, id: id)
+                return await addDiaryLineFromIntent(text: kind == .idea ? "فكرة: " + line : line, day: "today", id: id)
+            // FB-39: the Mihbara notebook has no entry point any more, so an idea lands on today's diary page where the owner can see it.
+            case .mihbaraIdea(let idea): return await addDiaryLineFromIntent(text: "فكرة: " + idea, day: "today", id: id)
             case .logPrayer(let prayer, let status, let shortened, let fridayKind):
                 return logPrayerFromCapture(prayer, status: status, shortened: shortened, fridayKind: fridayKind)
             case .choosePrayerStatus(let prayer, _):

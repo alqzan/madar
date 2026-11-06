@@ -33,6 +33,8 @@ final class AppSession {
     var moneyOpen = false
     /// One-shot: the money room opens straight on the bank messages (after the old-Madar move left some for review).
     var moneyOpensMessages = false
+    /// Settings home «المال» row: open the room straight on its settings (FB-39).
+    var moneyOpensSettings = false
     var moneyRoute: Route?
     /// A money-root link closes the pushed screens, but waits while the expense draft holds unsaved input.
     var moneyRootRequestID: UUID?

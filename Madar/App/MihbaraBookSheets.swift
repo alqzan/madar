@@ -619,7 +619,7 @@ struct MihbaraBookCard: View {
         .task { page = digits.string(book.page ?? 0).filter { $0.wholeNumberValue != nil } }
         .confirmationDialog("اختر كتابًا يرجع إلى أبي أقرأها", isPresented: $choosingSlot, titleVisibility: .visible) { ForEach(books.filter { $0.shelf == "reading" && $0.id != book.id }) { old in Button(old.title) { move("reading", replacing: old.id) } } }
         .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } } }
-        .presentationDetents(book.kind == "paper" ? [.height(360)] : [.large])
+        .presentationDetents(book.kind == "paper" ? [.height(book.shelf == "reading" ? 520 : 360)] : [.large])
     }
     private var paperBookContent: some View {
         VStack(alignment: .leading, spacing: 17) {
@@ -646,6 +646,25 @@ struct MihbaraBookCard: View {
                     }
                 }
                 Spacer(minLength: 0)
+            }
+
+            // FB-39: the page you reached, right on the card. It used to take «الفهرس والتفاصيل» → scroll → «احفظ الفهرس».
+            if book.shelf == "reading" {
+                HStack(spacing: 10) {
+                    Text("وصلت إلى صفحة").font(MadarTypography.body())
+                    TextField(book.page.map { digits.string($0) } ?? "٠", text: $page)
+                        .keyboardType(.numberPad).multilineTextAlignment(.center).font(MadarTypography.body().bold())
+                        .frame(width: 84, height: 44).background(theme.surface, in: .rect(cornerRadius: 12))
+                        .overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.line, lineWidth: 1) }
+                        .accessibilityIdentifier("mihbara-paper-quick-page")
+                    Spacer(minLength: 0)
+                    Button { finish = false; savePosition() } label: {
+                        Text("احفظ").font(MadarTypography.body().bold()).padding(.horizontal, 18).frame(minHeight: 44)
+                            .foregroundStyle(theme.background).background(theme.ink, in: .capsule)
+                    }
+                    .buttonStyle(.madarPlain).disabled(saving || mihbaraInteger(page) == nil || mihbaraInteger(page) == book.page)
+                    .accessibilityIdentifier("mihbara-paper-quick-page-save")
+                }
             }
 
             if paperChapters.isEmpty {
@@ -698,6 +717,19 @@ struct MihbaraBookCard: View {
             .buttonStyle(.madarPlain)
             .disabled(saving)
             .accessibilityIdentifier("mihbara-paper-start")
+            if book.shelf == "reading" {
+                // FB-39: a book on «أقرؤها» is finished or put back from its own card, not only from a long press on its spine.
+                HStack(spacing: 10) {
+                    Button { finishPaperBook() } label: {
+                        Text("أنهيته").font(.system(size: 15, weight: .semibold)).foregroundStyle(theme.ink).frame(maxWidth: .infinity, minHeight: 40)
+                    }
+                    .buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("mihbara-paper-finish")
+                    Button { move("want") } label: {
+                        Text("أعده إلى «أبي أقرأها»").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity, minHeight: 40)
+                    }
+                    .buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("mihbara-paper-back-to-want")
+                }
+            }
 
             NavigationLink { paperIndexEditor } label: {
                 Text("الفهرس والتفاصيل")
@@ -722,6 +754,10 @@ struct MihbaraBookCard: View {
     private func move(_ shelf: String, replacing: UUID? = nil) {
         var p: [String:MadarCore.JSONValue] = ["id":.string(book.id.uuidString),"shelf":.string(shelf)]; if let replacing { p["replacing"] = .string(replacing.uuidString) }
         saving = true; Task { do { try await app.executeBookCommand("book.moveShelf", payload: p); if shelf == "reading" { onTable() } else { dismiss() } } catch { app.errorMessage = madarUserMessage(error) }; saving = false }
+    }
+    private func finishPaperBook() {
+        let last = book.pages ?? mihbaraInteger(page) ?? book.page ?? 0
+        page = String(last); finish = true; savePosition()
     }
     private func savePosition() {
         guard let n = mihbaraInteger(page) else { app.errorMessage = "اكتب رقم صفحة صحيحًا"; return }

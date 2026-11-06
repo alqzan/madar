@@ -584,7 +584,7 @@ struct MoneySettingsView: View {
         case .travel: app.bool("mal.travelPausesDaily") ? "تتوقف" : "تستمر";
         case .messages: "الاختصار";
         case .room: "خصوصيتك";
-        case .reconciliation: service.digits.string(Int(app.number("mal.reconcileEveryDays"))) + " يوم"
+        case .reconciliation: WidgetCopy.agree(Int(app.number("mal.reconcileEveryDays")), service.digits, one: "يوم واحد", two: "يومان", few: "أيام", many: "يومًا")
         }
     }
     private var keys: [String] {
