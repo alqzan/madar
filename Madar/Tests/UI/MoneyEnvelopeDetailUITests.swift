@@ -50,6 +50,41 @@ import XCTest
         app.buttons["money-move-save"].tap(); XCTAssertTrue(amount.waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "نُقل إلى الطوارئ")).firstMatch.waitForExistence(timeout: 10), app.debugDescription)
     }
+    /// FB-45: an envelope's name and a bill's name and amount can be corrected after saving.
+    func testRenameEnvelopeAndEditBill() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00"]
+        app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
+        let envelopes = app.buttons["money-envelopes-open"]; XCTAssertTrue(envelopes.waitForExistence(timeout: 10)); envelopes.tap()
+        let gift = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-envelope-هدية-")).firstMatch
+        for _ in 0..<6 { if gift.isHittable { break }; app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(gift.isHittable, app.debugDescription); gift.tap()
+        let rename = app.buttons["money-envelope-rename"]; XCTAssertTrue(rename.waitForExistence(timeout: 10), app.debugDescription)
+        rename.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let name = app.textFields["money-edit-name"]; XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText(" العيد")
+        shot(app, "FB45-money-envelope-rename-L")
+        // Return on the keyboard saves (the save button can sit under the keyboard in a medium sheet).
+        name.typeText("\n"); _ = name.waitForNonExistence(timeout: 10)
+        let error = app.staticTexts["money-edit-error"]
+        XCTAssertFalse(error.exists, error.exists ? error.label : "")
+        XCTAssertFalse(name.exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["هدية العيد"].waitForExistence(timeout: 10), app.debugDescription)
+        app.terminate(); app.launch()
+        let tab2 = app.buttons["tab-customize"]; XCTAssertTrue(tab2.waitForExistence(timeout: 20)); tab2.tap()
+        let search2 = app.textFields["settings-search"]; XCTAssertTrue(search2.waitForExistence(timeout: 10)); search2.tap(); search2.typeText("المال"); app.buttons["money-open"].tap()
+        let obligations = app.buttons["money-obligations-open"]; for _ in 0..<6 { if obligations.exists && obligations.isHittable { break }; app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(obligations.waitForExistence(timeout: 10), app.debugDescription); obligations.tap()
+        let bill = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "الكهرباء")).firstMatch
+        XCTAssertTrue(bill.waitForExistence(timeout: 10), app.debugDescription); bill.tap()
+        let edit = app.buttons["money-obligation-edit"]; XCTAssertTrue(edit.waitForExistence(timeout: 10), app.debugDescription); edit.tap()
+        let billName = app.textFields["money-edit-name"]; XCTAssertTrue(billName.waitForExistence(timeout: 5)); billName.tap(); billName.typeText(" والماء")
+        XCTAssertTrue(app.textFields["money-edit-amount"].exists, "A bill's amount can change")
+        shot(app, "FB45-money-bill-edit-L")
+        billName.tap(); billName.typeText("\n"); XCTAssertTrue(billName.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "الكهرباء والماء")).firstMatch.waitForExistence(timeout: 10), app.debugDescription)
+    }
     func testDebtPreviewUsesExactAmountsAndDoesNotChangeBalance() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00"]

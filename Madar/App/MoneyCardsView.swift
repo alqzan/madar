@@ -22,6 +22,7 @@ struct MoneyCardsView: View {
     @State private var failure: String?
     @State private var jarOpen = false
     @State private var adding = false
+    @State private var editingCard: UUID?
     @State private var appliedRouteRequestID: UUID?
     @State private var routeTargetUnavailable = false
     private let tabs = ["نظرة", "متى يخرج النقد", "تقويم السداد", "المطابقة"]
@@ -81,6 +82,7 @@ struct MoneyCardsView: View {
             .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $jarOpen) { MoneyCashbackView(app: app, revealed: $revealed) }
             .sheet(isPresented: $adding, onDismiss: { load() }) { MoneyCardSheet(app: app) }
+            .sheet(item: Binding(get: { editingCard.map(MoneyEditTarget.init) }, set: { editingCard = $0?.id }), onDismiss: { load() }) { MoneyCardSheet(app: app, editingID: $0.id) }
     }
     private var tabStrip: some View {
         HStack(spacing: 0) {
@@ -133,6 +135,9 @@ struct MoneyCardsView: View {
     }
     private func overview(_ c: MoneyCardReading) -> some View {
         VStack(alignment: .leading, spacing: 22) {
+            // FB-45: a card's name, bank, digits or account can be corrected after it is saved.
+            Button { editingCard = c.id } label: { Label("عدّل البطاقة", systemImage: "pencil").font(MadarTypography.caption()).frame(minHeight: 44) }
+                .accessibilityIdentifier("money-card-edit")
             if c.kind != "credit" {
                 Text(c.kind == "debit" ? "تُخصم مشتريات مدى من الحساب مباشرة" : "المشتريات من رصيد البطاقة المدفوع مقدمًا").font(MadarTypography.cardTitle())
                 Text("لا تدخل في «عليك»، ولا يُنتظر سداد ائتماني لها.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
@@ -433,3 +438,6 @@ private struct MoneyCardEtching: Shape {
         }
     }
 }
+
+/// A sheet target for editing an existing money row by id.
+struct MoneyEditTarget: Identifiable { let id: UUID }

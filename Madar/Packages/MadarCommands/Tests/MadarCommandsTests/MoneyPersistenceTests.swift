@@ -771,6 +771,41 @@ import MadarInbox
         #expect(!MoneyCommandPayload.validate(name: "money.saveObligation", payload: ["kind": .string("bill"), "name": .string("x"), "amountMinor": .string("1"), "dueDay": .number(32)]))
         #expect(!MoneyCommandPayload.validate(name: "money.saveObligation", payload: ["kind": .string("loan"), "name": .string("x"), "amountMinor": .string("1"), "count": .number(0), "firstDue": .string("2026-11-05")]))
     }
+    /// FB-45: a subscription's name and amount can change; the bill due this cycle reserves the new amount, and undo
+    /// restores the old one. An instalment plan keeps its amount (its ladder is written) but can be renamed.
+    @Test func editObligationChangesFutureReservationAndUndoes() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let club = UUID(), loan = UUID()
+        #expect(try await f.run("money.saveObligation", ["kind": .string("subscription"), "name": .string("النادي"), "amountMinor": .string("15000"),
+            "repeatEvery": .number(1), "repeatUnit": .string("month"), "firstDue": .string("2026-10-20")], id: club).status == .applied)
+        let edit = UUID()
+        #expect(try await f.run("money.editObligation", ["id": .string(club.uuidString), "name": .string("نادي الحي"), "amountMinor": .string("18000")], id: edit).status == .applied)
+        let edited = try #require(try ModelContext(f.container).fetch(FetchDescriptor<Obligation>()).first { $0.id == club })
+        #expect(edited.name == "نادي الحي" && edited.amountMinor == 18_000 && edited.totalMinor == 18_000)
+        #expect(try MoneyRepository(context: ModelContext(f.container)).basisInput(at: f.now).billsDueMinor == 18_000)
+        #expect(try await f.run("system.undo", ["undoToken": .string(edit.uuidString)]).status == .applied)
+        let back = try #require(try ModelContext(f.container).fetch(FetchDescriptor<Obligation>()).first { $0.id == club })
+        #expect(back.name == "النادي" && back.amountMinor == 15_000)
+        #expect(try MoneyRepository(context: ModelContext(f.container)).basisInput(at: f.now).billsDueMinor == 15_000)
+
+        #expect(try await f.run("money.saveObligation", ["kind": .string("loan"), "name": .string("قسط القرض"), "amountMinor": .string("285000"), "count": .number(3), "firstDue": .string("2026-11-05")], id: loan).status == .applied)
+        #expect(try await f.run("money.editObligation", ["id": .string(loan.uuidString), "name": .string("قسط القرض"), "amountMinor": .string("300000")]).status == .rejected)
+        #expect(try await f.run("money.editObligation", ["id": .string(loan.uuidString), "name": .string("قسط السيارة"), "amountMinor": .string("285000")]).status == .applied)
+        let renamed = try #require(try ModelContext(f.container).fetch(FetchDescriptor<Obligation>()).first { $0.id == loan })
+        #expect(renamed.name == "قسط السيارة" && renamed.amountMinor == 285_000 && renamed.totalMinor == 855_000)
+    }
+    /// FB-45: an envelope can be renamed; the reserve and the surplus keep their own names. Undo restores the old name.
+    @Test func renameEnvelopeAndUndo() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let c = ModelContext(f.container), envelope = Envelope(); envelope.name = "سفر"; c.insert(envelope)
+        let reserve = Envelope(); reserve.name = "الاحتياطي"; reserve.role = "reserve"; c.insert(reserve); try c.save()
+        let rename = UUID()
+        #expect(try await f.run("money.renameEnvelope", ["id": .string(envelope.id.uuidString), "name": .string("سفر الصيف")], id: rename).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Envelope>()).first { $0.id == envelope.id }?.name == "سفر الصيف")
+        #expect(try await f.run("money.renameEnvelope", ["id": .string(reserve.id.uuidString), "name": .string("أي اسم")]).status == .rejected)
+        #expect(try await f.run("system.undo", ["undoToken": .string(rename.uuidString)]).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Envelope>()).first { $0.id == envelope.id }?.name == "سفر")
+    }
     /// M5-X00 (owner 16 Oct): a subscription on a free interval and first due day; the owner's rent every 6 months, first
     /// due 18 Feb 2027, is not reserved in October 2026, while a monthly one due on 20 Oct is. Undo removes it.
     @Test func flexibleSubscriptionStoresItsScheduleReservesOnlyItsDueDaysAndUndoes() async throws {

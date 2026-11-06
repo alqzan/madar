@@ -14,6 +14,7 @@ struct MoneyEnvelopeDetailView: View {
     @State private var repayOpen = false
     @State private var savingOpen = false
     @State private var moveOpen = false
+    @State private var renaming: MoneyEditNameSheet.Target?
     @State private var savingAdd = true
     @State private var errorMessage: String?
     private var service: AppMoneyService { .init(app: app) }
@@ -25,7 +26,11 @@ struct MoneyEnvelopeDetailView: View {
                 if let reading {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .firstTextBaseline) {
-                            Text(reading.envelope.name).font(MadarTypography.title()); Spacer()
+                            Text(reading.envelope.name).font(MadarTypography.title())
+                            // FB-45: the envelope's name can be corrected; its money and plans stay as they are.
+                            Button { renaming = .envelope(reading.envelope.id) } label: { Image(systemName: "pencil").frame(width: 44, height: 44).contentShape(.rect) }
+                                .buttonStyle(.madarPlain).foregroundStyle(theme.secondaryInk).accessibilityLabel("عدّل اسم المظروف").accessibilityIdentifier("money-envelope-rename")
+                            Spacer()
                             Text(figure: amount(reading.envelope.balanceMinor)).font(MadarTypography.title()).foregroundStyle(reading.envelope.balanceMinor < 0 ? theme.color("debt") : theme.ink).accessibilityIdentifier("money-detail-balance")
                         }
                         if let target = reading.envelope.targetMinor, visible {
@@ -79,6 +84,7 @@ struct MoneyEnvelopeDetailView: View {
             .sheet(isPresented: $repayOpen) {
                 if let reading { MoneyRepaymentView(app: app, reading: reading, initialSalaries: suggestedSalaries(reading)).environment(\.roomTheme, theme) }
             }
+            .sheet(item: $renaming, onDismiss: load) { MoneyEditNameSheet(app: app, target: $0, visible: visible).environment(\.roomTheme, theme) }
             .sheet(isPresented: $moveOpen, onDismiss: load) {
                 if let reading { MoneyEnvelopeMoveView(app: app, reading: reading).environment(\.roomTheme, theme) }
             }

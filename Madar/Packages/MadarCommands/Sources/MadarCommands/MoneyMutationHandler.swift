@@ -363,6 +363,23 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 }
             }
             obligation.createdAt = now; context.insert(obligation); try touch(obligation, now, writer)
+        case "money.editObligation":
+            // FB-45: the name always; the amount only for a bill or subscription (future reservations follow it; paid
+            // movements keep their own amounts). An instalment plan's ladder is already written, so its amount is fixed.
+            guard let obligationID = uuid(p, "id"), let row = try context.fetch(FetchDescriptor<Obligation>()).first(where: { $0.id == obligationID && live($0) }) else { throw MoneyCommandError.missingRow }
+            let name = text(p, "name").trimmingCharacters(in: .whitespacesAndNewlines), amount = MoneyCommandPayload.integer(p["amountMinor"]) ?? 0
+            guard !name.isEmpty, amount > 0, row.isRecurring || amount == row.amountMinor else { throw MoneyCommandError.invalidAmount }
+            if row.name != name || row.amountMinor != amount {
+                row.name = name
+                if row.isRecurring { row.amountMinor = amount; row.totalMinor = amount }
+                try touch(row, now, writer)
+            }
+        case "money.renameEnvelope":
+            guard let envelopeID = uuid(p, "id"), let row = try context.fetch(FetchDescriptor<Envelope>()).first(where: { $0.id == envelopeID && live($0) }),
+                  !["reserve", "surplus"].contains(row.role) else { throw MoneyCommandError.missingRow }
+            let name = text(p, "name").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { throw MoneyCommandError.invalidReference }
+            if row.name != name { row.name = name; try touch(row, now, writer) }
         case "money.confirmSalary":
             try confirmSalary(p, command: id, context: context, now: now, writer: writer)
         case "money.confirmClear":

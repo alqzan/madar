@@ -11,6 +11,8 @@ import MadarCommands
 /// one live card per bank + digits, and a debit or prepaid card names the account it draws from.
 struct MoneyCardSheet: View {
     let app: AppSession
+    /// FB-45: an existing card opens here to be corrected (name, bank, digits, account, message names); same command.
+    var editingID: UUID? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @State private var id = UUID()
@@ -20,6 +22,11 @@ struct MoneyCardSheet: View {
     @State private var kind = "debit"
     @State private var accountID: UUID?
     @State private var initialAccountID: UUID?
+    /// What the form held when it opened; a change from it is an unsaved edit.
+    @State private var initial = (name: "", bank: "", last4: "", kind: "debit", senders: "")
+    /// A card with confirmed movements keeps its type and account (`money.saveCard` refuses a change).
+    @State private var lockedKind = false
+    @State private var missing = false
     @State private var senders = ""
     @State private var accounts: [(id: UUID, name: String, bank: String)] = []
     @State private var saving = false
@@ -28,19 +35,15 @@ struct MoneyCardSheet: View {
     @FocusState private var editing: Bool
     /// Keep typed and selected card details from being lost to a room-root link.
     private var hasUnsavedInput: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || !bank.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || digits.count > 0
-            || !normalizedAliases.isEmpty
-            || kind != "debit"
-            || accountID != initialAccountID
+        name != initial.name || bank != initial.bank || last4 != initial.last4 || senders != initial.senders
+            || kind != initial.kind || accountID != initialAccountID
     }
     private var blocksRootRoute: Bool { hasUnsavedInput || saving }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var digits: String { last4.map { c in c.wholeNumberValue.map(String.init) ?? String(c) }.joined() }
     private var canSave: Bool {
         !saving && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !bank.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && name.count <= 80 && bank.count <= 80 && digits.count == 4 && digits.allSatisfy(\.isASCII) && (kind == "credit" || accountID != nil)
+            && name.count <= 80 && bank.count <= 80 && digits.count == 4 && digits.allSatisfy(\.isASCII) && (kind == "credit" || accountID != nil) && !missing
     }
 
     private var waiting: String? {
@@ -55,14 +58,15 @@ struct MoneyCardSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack { Text("بطاقة جديدة").font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-card-editor-close") }
+                    HStack { Text(editingID == nil ? "بطاقة جديدة" : "عدّل البطاقة").font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-card-editor-close") }
                     rootRouteTestButton
                     field("اسم البطاقة") { TextField("مثل: بطاقة المشتريات", text: $name).focused($editing).accessibilityIdentifier("money-card-name") }
                     field("البنك") { TextField("اسم البنك", text: $bank).focused($editing).accessibilityIdentifier("money-card-bank") }
                     field("آخر أربعة أرقام") { TextField("آخر ٤", text: $last4).keyboardType(.numberPad).focused($editing).accessibilityIdentifier("money-card-last4") }
                     Picker("النوع", selection: $kind) {
                         Text("مدى").tag("debit"); Text("ائتمانية").tag("credit"); Text("مسبقة الدفع").tag("prepaid")
-                    }.pickerStyle(.segmented).disabled(saving).accessibilityIdentifier("money-card-kind")
+                    }.pickerStyle(.segmented).disabled(saving || lockedKind).accessibilityIdentifier("money-card-kind")
+                    if lockedKind { Text("نوعها وحسابها ثابتان لأن لها حركات معتمدة؛ يتغيّر الاسم والبنك والأرقام.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true) }
                     Text(kind == "credit" ? "مشترياتها دين عليك حتى تسددها، ويظهر موعد سدادها في «تقويم السداد»." : "تُخصم مشترياتها من حسابك مباشرة، فاختر الحساب.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                     VStack(alignment: .leading, spacing: 8) {
@@ -80,7 +84,7 @@ struct MoneyCardSheet: View {
                                         }
                                         Spacer(minLength: 0)
                                     }.padding(10).frame(minHeight: 48).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }.contentShape(Rectangle())
-                                }.disabled(saving).accessibilityAddTraits(accountID == account.id ? .isSelected : []).accessibilityIdentifier("money-card-account-\(account.id.uuidString)")
+                                }.disabled(saving || lockedKind).accessibilityAddTraits(accountID == account.id ? .isSelected : []).accessibilityIdentifier("money-card-account-\(account.id.uuidString)")
                             }
                         }
                     }
@@ -93,7 +97,7 @@ struct MoneyCardSheet: View {
                 }.padding(20)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-card-keyboard-done") } }
-                .task { loadAccounts() }
+                .task { loadAccounts(); loadExisting() }
                 .onChange(of: kind) { _, value in if value != "credit", accountID == nil, accounts.count == 1 { accountID = accounts[0].id } }
                 .madarSheetLock(saving: saving, draft: hasUnsavedInput)
         }
@@ -127,6 +131,18 @@ struct MoneyCardSheet: View {
         initialAccountID = accountID
     }
 
+    private func loadExisting() {
+        guard let editingID else { return }
+        let context = ModelContext(app.container)
+        guard let card = try? context.fetch(FetchDescriptor<Card>()).first(where: { $0.id == editingID && $0.deletedAt == nil && $0.mergedInto == nil }) else {
+            missing = true; failure = "لم تعد هذه البطاقة موجودة."; return
+        }
+        lockedKind = ((try? context.fetch(FetchDescriptor<MoneyTransaction>())) ?? []).contains { $0.cardID == editingID && $0.reviewState == "ok" && $0.deletedAt == nil }
+        id = card.id; name = card.name; bank = card.bank; last4 = card.last4; kind = card.kind; accountID = card.accountID
+        senders = card.aliases.joined(separator: "\n"); initialAccountID = accountID
+        initial = (name, bank, last4, kind, senders)
+    }
+
     private func save() {
         guard canSave else { return }; editing = false
         let aliases = Array(Set(senders.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty && $0.count <= 80 })).sorted().prefix(20)
@@ -137,7 +153,7 @@ struct MoneyCardSheet: View {
         saving = true; failure = nil
         Task {
             do { try await app.executeMoneyCommand("money.saveCard", payload: payload); dismiss() }
-            catch { saving = false; failure = error is MoneyCommandError ? "لم تُحفظ البطاقة. قد تكون عندك بطاقة بالبنك والأرقام نفسها، أو حُذف الحساب المختار." : "لم تُحفظ البطاقة الآن. حاول مرة أخرى بعد قليل." }
+            catch { saving = false; failure = editingID != nil ? "لم يُحفظ التعديل. قد تكون عندك بطاقة بالبنك والأرقام نفسها." : error is MoneyCommandError ? "لم تُحفظ البطاقة. قد تكون عندك بطاقة بالبنك والأرقام نفسها، أو حُذف الحساب المختار." : "لم تُحفظ البطاقة الآن. حاول مرة أخرى بعد قليل." }
         }
     }
 }

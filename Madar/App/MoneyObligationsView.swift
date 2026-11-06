@@ -30,6 +30,7 @@ struct MoneyObligationsView: View {
     @State private var injectedReadFailure = false
     #endif
     @State private var selected: String?
+    @State private var editing: MoneyEditNameSheet.Target?
     @State private var obligationSheet: ObligationSheetRoute?
     @State private var revealed = false
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -84,6 +85,7 @@ struct MoneyObligationsView: View {
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task(id: "\(app.prayerRevision)-\(retryAttempt)") { load() }
+            .sheet(item: $editing, onDismiss: load) { MoneyEditNameSheet(app: app, target: $0, visible: visible).environment(\.roomTheme, theme) }
             .sheet(item: $obligationSheet) { route in
                 if let reading {
                     MoneyObligationSheet(app: app, ladder: reading.ladder, visible: visible, revealed: $revealed, suggestion: route.suggestion)
@@ -220,6 +222,11 @@ struct MoneyObligationsView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text(due.name).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
+                // FB-45: a saved commitment can be corrected: its name, and a bill or subscription's amount.
+                if let obligationID = due.obligationID, due.group != .statement {
+                    Button { editing = .obligation(obligationID) } label: { Image(systemName: "pencil").frame(width: 44, height: 44).contentShape(.rect) }
+                        .buttonStyle(.madarPlain).foregroundStyle(theme.secondaryInk).accessibilityLabel("عدّل الالتزام").accessibilityIdentifier("money-obligation-edit")
+                }
                 Spacer(minLength: 8)
                 Text(figure: amount(due.amountMinor)).font(.custom("thmanyahserifdisplay-Black", size: 26, relativeTo: .title2))
             }
