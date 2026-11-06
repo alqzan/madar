@@ -81,7 +81,7 @@ struct MoneyEnvelopesView: View {
                     Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة") { load(routeRequestID: initialRouteRequestID) }.frame(minHeight: 44)
                 } else { ProgressView().frame(maxWidth: .infinity, minHeight: 200) }
             }.padding(.horizontal, 18).padding(.top, 0).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
-        }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
+        }.madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task(id: initialRouteRequestID) { load(routeRequestID: initialRouteRequestID) }.onChange(of: app.prayerRevision) { load() }
             .sheet(isPresented: $targetOpen) { MoneyReserveTargetView(app: app, current: reading?.reserveTargetMinor, visible: visible, revealed: $revealed) { load() }.environment(\.roomTheme, theme) }

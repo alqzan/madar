@@ -228,7 +228,7 @@ struct MihbaraHomeView: View {
             .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 28)
             .frame(maxWidth: 650).frame(maxWidth: .infinity)
         }
-        .clipped()
+        .madarTopClipped()
         .onChange(of: date) { if !shelfReadFailed { load() } }
         .onChange(of: scrollTarget) { _, target in handleScrollTargetChange(target, proxy: proxy) }
     }

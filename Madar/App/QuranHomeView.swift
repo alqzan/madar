@@ -114,7 +114,7 @@ struct QuranHomeView: View {
                 }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36)
             } else if error == nil { ProgressView().frame(maxWidth: .infinity).padding(60) }
         }
-        .clipped()
+        .madarTopClipped()
         .background(theme.background.ignoresSafeArea())
         .foregroundStyle(theme.ink)
         .toolbarVisibility(.hidden, for: .navigationBar)

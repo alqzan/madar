@@ -88,7 +88,7 @@ struct PrayerTodayView: View {
                 .frame(maxWidth: 620)
                 .frame(maxWidth: .infinity)
             }
-            .clipped()
+            .madarTopClipped()
             .background(theme.background)
             .foregroundStyle(theme.ink)
         }

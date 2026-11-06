@@ -112,7 +112,7 @@ struct MoneyHomeView: View {
     }
     var body: some View {
         ScrollView { homeContent }
-        .clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
+        .madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $envelopesOpen) { MoneyEnvelopesView(app: app, revealed: $revealed, initialEnvelopeID: $routedEnvelopeID, initialRouteRequestID: $routedEnvelopeRequestID) }
         .onChange(of: envelopesOpen) { _, isOpen in if !isOpen { routedEnvelopeID = nil; routedEnvelopeRequestID = nil } }

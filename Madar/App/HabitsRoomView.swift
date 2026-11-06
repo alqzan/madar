@@ -99,7 +99,7 @@ struct HabitsRoomView: View {
                     }
                     VStack(spacing:5) { Text("«أحبّ الأعمال إلى الله أدومها وإن قلّ»").font(MadarTypography.body()); Text("متفق عليه، من حديث عائشة رضي الله عنها").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }.frame(maxWidth:.infinity).padding(.vertical,24)
                 }.padding(.horizontal,14).padding(.vertical,8)
-            }.clipped()
+            }.madarTopClipped()
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent)
         .toolbarVisibility(.hidden,for:.navigationBar).environment(\.roomTheme,theme)

@@ -495,3 +495,14 @@ private struct AnchoredUndo: View {
         .allowsHitTesting(session.undoToastVisible)
     }
 }
+
+
+/// Owner, 6 Nov 2026: «الجلاس ابدا مهب موجود». A room's scroll view was clipped to its frame, so nothing ever passed under the
+/// bottom Liquid Glass bar and the glass read as a flat capsule. This clip keeps scrolling ink out of the status bar only; below,
+/// the content runs on under the glass bar (and any floating glass button) for the glass to refract.
+struct MadarTopClip: Shape {
+    func path(in rect: CGRect) -> Path { Path(CGRect(x: rect.minX - 400, y: rect.minY, width: rect.width + 800, height: rect.height + 2000)) }
+}
+extension View {
+    func madarTopClipped() -> some View { clipShape(MadarTopClip()) }
+}

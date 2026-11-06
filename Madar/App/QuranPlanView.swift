@@ -129,7 +129,7 @@ struct QuranPlanView: View {
                     Button("أعِد المحاولة") { load(at: service.currentTime()) }.font(quranFont(14, bold: true)).frame(minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("quran-plan-retry")
                 }
             }.padding(16)
-        }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
+        }.madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
             .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app).accessibilityIdentifier("quran-plan-undo") } }
             .fullScreenCover(isPresented: $showSetup, onDismiss: { load(at: service.currentTime()) }) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
             .task(id: currentDay) { load(at: evaluatedAt) }.onChange(of: app.settingsWriteInProgress) { if !app.settingsWriteInProgress { load(at: service.currentTime()) } }.onChange(of: app.undoToken?.id) { load(at: service.currentTime()) }
