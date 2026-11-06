@@ -1813,7 +1813,11 @@ import UIKit
         XCTAssertTrue(card.waitForNonExistence(timeout:5))
         XCTAssertTrue(closeReader.waitForExistence(timeout:5), app.debugDescription)
         useReaderMode(app, "pages")
-        paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
+        sleep(2)
+        // Pages lay the chapter out again; press the copy of the paragraph that is on screen, not one in another column.
+        let screen = app.windows.firstMatch.frame
+        let copies = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).allElementsBoundByIndex
+        paragraph = copies.first { screen.contains($0.frame) } ?? copies.first { screen.intersects($0.frame) } ?? paragraph
         paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.15)).press(forDuration: 1.2)
         XCTAssertTrue(card.waitForExistence(timeout:8), app.debugDescription)
         app.buttons["mihbara-highlight-yellow"].tap()
@@ -1861,14 +1865,13 @@ import UIKit
         XCTAssertTrue(card.waitForNonExistence(timeout: 5))
         XCTAssertTrue(closeReader.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(readerFooter.waitForExistence(timeout: 5), app.debugDescription)
-        let undo = app.descendants(matching: .any)["mihbara-reader-toast"].buttons["undo-button"]
-        XCTAssertTrue(undo.waitForExistence(timeout: 5), app.debugDescription); undo.tap()
-        XCTAssertTrue(undo.waitForNonExistence(timeout: 8))
-        // Tapping the highlighted paragraph reopens its card with the restored colour.
+        // Owner, 5 Nov 2026: undo only after a deletion, so a colour change shows none.
+        XCTAssertFalse(app.descendants(matching: .any)["mihbara-reader-toast"].buttons["undo-button"].exists, app.debugDescription)
+        // Tapping the highlighted paragraph reopens its card with its colour.
         paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
         sleep(1); shot(app, "M6-V08-retap-L")
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(app.buttons["mihbara-highlight-yellow"].waitForSelection(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-highlight-green"].waitForSelection(timeout: 5), app.debugDescription)
         XCTAssertFalse(app.buttons["mihbara-word-lookup"].exists)
         let copiedButton = app.buttons["mihbara-word-copy"]
         copiedButton.tap()
@@ -1881,7 +1884,7 @@ import UIKit
         app.buttons["mihbara-note-save"].tap()
         XCTAssertTrue(text.waitForNonExistence(timeout: 8))
         XCTAssertFalse(card.exists)
-        XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-toast"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["mihbara-reader-toast"].buttons["undo-button"].exists, app.debugDescription)
         sleep(1); shot(app, "M6-V08-saved-L")
     }
 
@@ -2159,7 +2162,10 @@ import UIKit
         shot(app, "M6-V14-word-L")
         app.buttons["mihbara-word-save"].tap()
         XCTAssertTrue(card.waitForNonExistence(timeout: 8), app.debugDescription)
-        sleep(1)
+        // A single tap ends the last selection gesture; without it WebKit grows the next long press into a phrase.
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).tap()
+        sleep(2)
+        if card.exists { app.buttons["mihbara-word-close"].tap(); _ = card.waitForNonExistence(timeout: 5) }
         paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).press(forDuration: 0.8)
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.staticTexts["mihbara-word-saved"].waitForExistence(timeout: 5), app.debugDescription)

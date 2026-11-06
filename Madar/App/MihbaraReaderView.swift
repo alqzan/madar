@@ -1234,6 +1234,8 @@ struct MihbaraReaderView: View {
         withAnimation(.easeOut(duration: 0.2)) { wordCard = nil }
         copiedAt = nil
         navigatorController?.clearSelection()
+        // The page lets go of text focus too, so the next long press starts a new word instead of growing the last one.
+        navigatorController?.view.endEditing(true)
     }
 
     @MainActor private func selectionChanged(_ selection: Selection) {
