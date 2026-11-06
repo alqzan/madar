@@ -216,6 +216,38 @@ import UIKit
         XCTAssertTrue(page.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("٢ من ٢"), app.debugDescription)
     }
 
+    /// FB-45: on the last page the reader asks «أنهيته؟»; a touch saves, puts the book on «أنهيتها» and closes.
+    func testPDFLastPageAsksFinishedAndMovesTheBook() {
+        continueAfterFailure = false
+        let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 300, height: 400)).pdfData { canvas in
+            for page in 1...2 { canvas.beginPage(); ("الصفحة \(page) من كتاب قصير يُختم" as NSString).draw(in: CGRect(x: 20, y: 35, width: 260, height: 320), withAttributes: [.font: UIFont.systemFont(ofSize: 21)]) }
+        }
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب يُختم", "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString()]
+        app.launch()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let confirm = app.buttons["mihbara-import-confirm"]; XCTAssertTrue(confirm.waitForExistence(timeout: 20), app.debugDescription)
+        for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+        confirm.tap(); keepAsPDF(app)
+        let want = app.buttons["mihbara-shelf-want"]; XCTAssertTrue(want.waitForExistence(timeout: 15)); want.tap()
+        let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "كتاب يُختم")).firstMatch
+        XCTAssertTrue(imported.waitForExistence(timeout: 8), app.debugDescription); imported.tap()
+        let next = app.buttons["mihbara-pdf-next"]; XCTAssertTrue(next.waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-reader-finish"].exists, "Page 1 of 2 is not the end")
+        next.tap()
+        let finish = app.buttons["mihbara-reader-finish"]; XCTAssertTrue(finish.waitForExistence(timeout: 5), app.debugDescription)
+        attach(app, "FB45-pdf-finish-L")
+        finish.tap()
+        XCTAssertTrue(next.waitForNonExistence(timeout: 10), "The reader closes after «أنهيته؟»")
+        let finished = app.buttons["mihbara-shelf-finished"]; XCTAssertTrue(finished.waitForExistence(timeout: 8), app.debugDescription); finished.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "كتاب يُختم")).firstMatch.waitForExistence(timeout: 8), app.debugDescription)
+    }
+
     /// Owner, 21 October 2026: a PDF becomes a flowing book on the device, through the normal EPUB review.
     func testTextPDFConvertsOnDeviceIntoAFlowingBook() {
         continueAfterFailure = false

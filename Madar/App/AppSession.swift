@@ -1203,7 +1203,7 @@ final class AppSession {
             return result
         }
         // F02/V12: a habit change, an intention or a letter reschedules its reminder (a met habit or written intention stops reminding).
-        let reschedules = name.hasPrefix("habit.") || ["diary.setIntention", "diary.sealLetter", "diary.openLetter", "diary.rescheduleLetter", "diary.refreshLetters"].contains(name)
+        let reschedules = name.hasPrefix("habit.") || ["diary.setIntention", "diary.deleteIntention", "diary.sealLetter", "diary.openLetter", "diary.rescheduleLetter", "diary.refreshLetters"].contains(name)
         let result: CommandOutcome
         if name == "habit.complete" {
             // FB-32 (owner: «تعليق… لما اضغط على العادة»): the tap returns as soon as the record is saved; the
