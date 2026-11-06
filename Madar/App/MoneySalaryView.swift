@@ -30,7 +30,8 @@ struct MoneySalaryView: View {
     private func signed(_ minor: Int) -> String { visible ? (minor > 0 ? "+" : minor < 0 ? "−" : "") + service.amount(abs(minor)) : "•••" }
     private func tint(_ key: String) -> Color { key == "ink" ? theme.ink : theme.color(key + "Text") }
 
-    var body: some View {
+    var body: some View { screen.hidesMoneyInBackground($revealed) }
+    @ViewBuilder private var screen: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header

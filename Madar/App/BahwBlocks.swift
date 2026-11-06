@@ -13,6 +13,8 @@ struct BahwBlockView: View {
     let block: BahwBlock
     let size: BahwBlockSize
     var interactive = true
+    /// §7.1 «المال مخفي حتى اللمس»: the lobby shows the figures for four seconds after a touch, then hides them again.
+    var moneyRevealed = false
     @State private var mihbaraSnapshot: MihbaraSnapshot?
     @State private var mihbaraLocked = true
     @State private var habitPeriod: HabitFrequency?
@@ -79,9 +81,9 @@ struct BahwBlockView: View {
 
     @ViewBuilder private var money: some View {
         if size == .icon {
-            let payload = service.session.moneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch"), at: service.now)
+            let payload = service.session.moneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now)
             VStack(spacing: 2) { Text("لك الآن").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)); displayFigure(payload.rows.first?.value ?? "افتح", "thmanyahserifdisplay-Bold", size: 22, relativeTo: .largeTitle).lineLimit(1).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, maxHeight: .infinity).foregroundStyle(MadarToken.colors["widgetIdentity.room.mal.\(dark ? "dark" : "light").ink"] ?? lobby.ink)
-        } else { MoneyWidgetContent(snapshot: service.session.moneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch"), at: service.now), family: size == .icon ? .accessoryCircular : size == .small ? .systemSmall : size == .wide ? .systemMedium : .systemLarge, template: size == .wide ? "basis" : "now") }
+        } else { MoneyWidgetContent(snapshot: service.session.moneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now), family: size == .icon ? .accessoryCircular : size == .small ? .systemSmall : size == .wide ? .systemMedium : .systemLarge, template: size == .wide ? "basis" : "now") }
     }
 
     private func periodRing(_ f: HabitFrequency, rows: [HabitReading], selected: Bool) -> some View {

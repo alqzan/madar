@@ -70,6 +70,8 @@ struct BahwLobbyView: View {
     @State private var drawerOpen = false
     @State private var wiggle = false
     @State private var attention: BahwAttention?
+    @State private var moneyRevealed = false
+    @State private var moneyRevealID = 0
     @Environment(\.scenePhase) private var scenePhase
     private var theme: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var service: AppBahwService { .init(session: session) }
@@ -130,6 +132,13 @@ struct BahwLobbyView: View {
         .navigationDestination(isPresented: $session.yearOpen) { BahwYearView(session: session) }
         .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]).madarSheetErrorAlert(session) }
         .onChange(of: arranging) { _, on in wiggle = on && !reduceMotion }
+        .task(id: moneyRevealID) {
+            guard moneyRevealed else { return }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeIn(duration: 0.3)) { moneyRevealed = false }
+        }
+        .onChange(of: session.selectedTab) { moneyRevealed = false }
         .sheet(item: $attention) { value in
             BahwAttentionSheet(session: session, attention: value).madarSheetErrorAlert(session)
         }
@@ -212,9 +221,9 @@ struct BahwLobbyView: View {
         Group {
             // Larger habits cards contain real quick-log buttons, so their header opens the room.
             // The icon has no quick actions and remains a single room-entry button.
-            if block == .habits && size == .icon { Button { open(block) } label: { BahwBlockView(service: service, block: block, size: size, interactive: !arranging).contentShape(.rect(cornerRadius:22)) } }
-            else if block == .habits { BahwBlockView(service: service, block: block, size: size, interactive: !arranging).contentShape(.rect(cornerRadius:22)) }
-            else { Button { open(block) } label: { BahwBlockView(service: service, block: block, size: size, interactive: !arranging).contentShape(.rect(cornerRadius:22)) } }
+            if block == .habits && size == .icon { Button { open(block) } label: { BahwBlockView(service: service, block: block, size: size, interactive: !arranging, moneyRevealed: block == .mal && moneyRevealed).contentShape(.rect(cornerRadius:22)) } }
+            else if block == .habits { BahwBlockView(service: service, block: block, size: size, interactive: !arranging, moneyRevealed: block == .mal && moneyRevealed).contentShape(.rect(cornerRadius:22)) }
+            else { Button { open(block) } label: { BahwBlockView(service: service, block: block, size: size, interactive: !arranging, moneyRevealed: block == .mal && moneyRevealed).contentShape(.rect(cornerRadius:22)) } }
         }.buttonStyle(.madarPlain)
             .rotationEffect(.degrees(wiggle ? 0.7 : 0)).animation(wiggle ? .easeInOut(duration: 0.14).repeatForever(autoreverses: true) : .default, value: wiggle)
             .overlay(alignment: .topLeading) {
@@ -250,6 +259,12 @@ struct BahwLobbyView: View {
     }
     private func open(_ block: BahwBlock) {
         guard !arranging else { return }
+        // The first touch on hidden money shows it for four seconds; a touch while it shows opens the room.
+        if block == .mal, session.bool("core.hideMoneyUntilTouch"), !moneyRevealed {
+            withAnimation(.easeOut(duration: 0.2)) { moneyRevealed = true }
+            moneyRevealID &+= 1
+            return
+        }
         session.requestOpen(block)
     }
     private func sizeTitle(_ size: BahwBlockSize) -> String {

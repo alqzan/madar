@@ -165,7 +165,8 @@ struct BahwUpcomingItem: Identifiable, Equatable {
                      hijriMonthIndex: days.hijri(day).month - 1, gregorianMonthIndex: day.month - 1, ramadanIn: MadarYear.ramadanIn(day, days), landmarks: MadarYear.landmarks(day, days))
     }
     /// User days (stored rules) and the seasons as read models; a user day with the same title and date hides the automatic one.
-    func upcoming(limit: Int) -> [BahwUpcomingItem] {
+    /// `outside`: the widget snapshot; the salary day stays in the app when money is hidden outside it (`core.hideMoneyOutside`).
+    func upcoming(limit: Int, outside: Bool = false) -> [BahwUpcomingItem] {
         let days = calendarDays, day = today
         var items: [BahwUpcomingItem] = []
         if let rows = try? ModelContext(session.container).fetch(FetchDescriptor<UpcomingDay>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })) {
@@ -177,10 +178,20 @@ struct BahwUpcomingItem: Identifiable, Equatable {
                 }
             }
         }
-        let seasons: [(String, Int, Int)] = [("رمضان", 9, 1), ("عيد الفطر", 10, 1), ("يوم عرفة", 12, 9), ("عيد الأضحى", 12, 10)]
-        for (title, month, date) in seasons {
-            let rule = MadarUpcomingRule(calendar: .hijri, month: month, day: date, repeats: .yearly)
+        // §8 seasons (14-shared): Ramadan, the white days, the ten of Dhul-Hijjah and Arafah, the two Eids.
+        let seasons: [(String, Int, Int, MadarUpcomingRule.Repeats)] = [("رمضان", 9, 1, .yearly), ("عيد الفطر", 10, 1, .yearly), ("عشر ذي الحجة", 12, 1, .yearly),
+                                                                        ("يوم عرفة", 12, 9, .yearly), ("عيد الأضحى", 12, 10, .yearly), ("الأيام البيض", 1, 13, .monthly)]
+        for item in automaticUpcoming() where !(outside && item.id == "auto-salary" && session.bool("core.hideMoneyOutside")) {
+            guard !items.contains(where: { $0.title == item.title && $0.day == item.day }) else { continue }
+            items.append(item)
+        }
+        for (title, month, date, repeats) in seasons {
+            let rule = MadarUpcomingRule(calendar: .hijri, month: month, day: date, repeats: repeats)
             guard let ring = rule.ring(today: day, days), !items.contains(where: { $0.title == title && $0.day == ring.next }) else { continue }
+            // The white days are three (13–15): on the 14th and 15th they are still «اليوم», not next month.
+            if repeats == .monthly, (14...15).contains(days.hijri(day).day) {
+                items.append(.init(id: "season-\(month)-\(date)", title: title, day: day, daysLeft: 0, closed: 1, hijri: true)); continue
+            }
             items.append(.init(id: "season-\(month)-\(date)", title: title, day: ring.next, daysLeft: ring.daysLeft, closed: ring.closed, hijri: true))
         }
         return Array(items.sorted { Self.nearestFirst(($0.elapsedDays, $0.daysLeft, $0.title), ($1.elapsedDays, $1.daysLeft, $1.title)) }.prefix(limit))

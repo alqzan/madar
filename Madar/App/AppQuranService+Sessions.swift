@@ -270,8 +270,7 @@ extension AppQuranService {
         if draft.kind == .drill, let card = try await drillCard(value, catalog: catalog) {
             state.title = "اختبار مواضع الخطأ"; state.drill = card
         }
-        if let coach = value.coach {
-            let record = catalog.ayah(id: draft.ayahID)!
+        if let coach = value.coach, let record = catalog.ayah(id: draft.ayahID) {
             let target = QuranCoachProgress.repetitionTarget(coach.intensity)
             let ayahNumber = numerals.string(record.ayahNumber)
             let pages = Set(try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }).sorted()

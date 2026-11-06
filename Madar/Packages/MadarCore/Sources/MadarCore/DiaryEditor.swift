@@ -7,6 +7,7 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case transcript(entry: UUID, text: String)
     case intention(id: UUID, day: String, text: String)
     case intentionResult(id: UUID, result: String?)
+    case deleteIntention(UUID)
     case edit(entry: UUID, revision: UUID, text: String)
     case deleteEntry(UUID)
     // §7.3 N04 letters and projects.
@@ -23,7 +24,7 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case deleteUpcomingDay(UUID)
     case saveWidget(id: UUID, name: String, familyID: String, items: [String], style: WidgetMakerStyle)
     case deleteWidget(UUID)
-    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult", "diary.editEntry", "diary.deleteEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay", "widget.save", "widget.delete"]
+    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult", "diary.deleteIntention", "diary.editEntry", "diary.deleteEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay", "widget.save", "widget.delete"]
     public static func parse(_ name: String, _ value: [String: JSONValue]) -> Self? {
         func uuid(_ key: String) -> UUID? { value[key]?.string.flatMap(UUID.init(uuidString:)) }
         switch name {
@@ -48,6 +49,9 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
         case "diary.setIntention":
             guard Set(value.keys) == ["id","dayKey","text"],let id=uuid("id"),let day=value["dayKey"]?.string,(try? GregorianDay(day)) != nil,let text=value["text"]?.string,!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{return nil}
             return .intention(id:id,day:day,text:text)
+        case "diary.deleteIntention":
+            guard Set(value.keys) == ["id"],let id=uuid("id") else{return nil}
+            return .deleteIntention(id)
         case "diary.setIntentionResult":
             guard Set(value.keys) == ["id","result"],let id=uuid("id"),value["result"] == .null || value["result"]?.string.map({["done","partial","notEasy"].contains($0)}) == true else{return nil}
             return .intentionResult(id:id,result:value["result"]?.string)

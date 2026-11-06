@@ -44,7 +44,7 @@ struct QuranYearView: View {
                                         context.fill(Path(roundedRect: rect, cornerRadius: 1), with: .color((review ? theme.color("review") : theme.color("hifz")).opacity(n == 0 ? 0.12 : min(1, 0.3 + n * 0.7))))
                                     }
                                 }.frame(height: 78).accessibilityLabel("خريطة النشاط من الأقدم يمينًا إلى اليوم يسارًا")
-                                HStack { Text(value.days.first?.month ?? ""); Spacer(); Text(value.days.last?.month ?? "") }.font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+                                HStack(alignment: .top) { edgeMonth(value.days.first); Spacer(); edgeMonth(value.days.last) }.foregroundStyle(theme.secondaryInk)
                             }
                             HStack(spacing: 5) { Text("أقل"); ForEach([0.15,0.35,0.6,1.0], id: \.self) { a in RoundedRectangle(cornerRadius: 2).fill(theme.color(review ? "review" : "hifz").opacity(a)).frame(width: 10, height: 10) }; Text("أكثر"); Spacer(); Text("الحفظ والمراجعة") }.font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                         }
@@ -54,7 +54,7 @@ struct QuranYearView: View {
                             Text("الأشهر الهجرية").font(quranFont(17, bold: true))
                             Text(value.title).font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                             if let best = value.months.max(by: { $0.hifz < $1.hifz }), best.hifz > 0 {
-                                Text("أكثر شهر حفظًا: " + best.title + " (" + service.faceCount(best.hifz) + ")").font(quranFont(13)).accessibilityIdentifier("quran-year-best")
+                                Text("أكثر شهر حفظًا: " + best.title + (best.gregorian.isEmpty ? "" : "، " + best.gregorian) + " (" + service.faceCount(best.hifz) + ")").font(quranFont(13)).accessibilityIdentifier("quran-year-best")
                             }
                             monthBars(value.months, review: false)
                             Divider().overlay(theme.line)
@@ -81,6 +81,7 @@ struct QuranYearView: View {
             .sheet(item: $month) { item in
                 ScrollView { VStack(alignment: .leading, spacing: 14) {
                     Text(item.title).font(quranSerif(25))
+                    if !item.gregorian.isEmpty { Text(item.gregorian).font(quranFont(13)).foregroundStyle(theme.secondaryInk) }
                     ForEach(value?.days.filter { $0.monthID == item.id && ($0.hifz > 0 || $0.review > 0) } ?? []) { day in
                         MadarDateLabel(day.date); Text("حفظ " + service.faceCount(day.hifz) + "، مراجعة " + service.faceCount(day.review)).font(quranFont(13))
                     }
@@ -89,7 +90,17 @@ struct QuranYearView: View {
                 }.padding(24) }.background(theme.surface).foregroundStyle(theme.ink).presentationDetents([.medium, .large]).environment(\.layoutDirection, .rightToLeft)
             }
     }
-    private func monthRow(_ m: QuranUIYearMonth) -> some View { Button { month = m } label: { Text(m.title + "، حفظ " + service.faceCount(m.hifz) + "، مراجعة " + service.faceCount(m.review)).font(quranFont(14)).frame(minHeight: 44) } }
+    private func edgeMonth(_ day: QuranUIYearDay?) -> some View {
+        VStack(spacing: 1) { Text(day?.month ?? "").font(quranFont(11)); Text(day?.gregorianMonth ?? "").font(quranFont(11)).opacity(0.8) }
+    }
+    private func monthRow(_ m: QuranUIYearMonth) -> some View {
+        Button { month = m } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(m.title + "، حفظ " + service.faceCount(m.hifz) + "، مراجعة " + service.faceCount(m.review)).font(quranFont(14))
+                if !m.gregorian.isEmpty { Text(m.gregorian).font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
+            }.frame(minHeight: 44)
+        }
+    }
     private func monthBars(_ months: [QuranUIYearMonth], review: Bool) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             let peak = months.map { review ? $0.review : $0.hifz }.max() ?? 0

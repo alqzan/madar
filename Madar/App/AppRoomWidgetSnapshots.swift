@@ -46,7 +46,7 @@ extension AppSession {
             .init(id:"gregorian",title:digits.string(year.gregorianYear)+" م",value:digits.string(year.gregorian.basisPoints/100)+"٪\u{061C}",detail:"بقي "+service.daysPhrase(year.gregorian.remaining),share:Double(year.gregorian.basisPoints)/10000,route:BuiltRoomWidget.year.route)]
         if string("core.firstCalendar")=="gregorian"{yearRows.reverse()}
         payloads[.year] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"عامك، يومًا بيوم",emptyTitle:"افتح السنة",rows:yearRows)
-        let upcoming=locked ? [] : service.upcoming(limit:7).map { item->RoomWidgetSnapshot.Row in
+        let upcoming=locked ? [] : service.upcoming(limit:7,outside:true).map { item->RoomWidgetSnapshot.Row in
             let labels=dateLabels(item.day)
             return .init(id:item.id,title:item.title,value:item.elapsedDays.map(service.sincePhrase) ?? WidgetCopy.daysLeft(item.daysLeft,digits:digits,dayCount:service.dayCount),detail:labels.primary,secondDate:labels.secondary,share:item.closed,route:BuiltRoomWidget.upcoming.route)
         }

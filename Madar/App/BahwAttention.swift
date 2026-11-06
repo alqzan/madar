@@ -56,7 +56,7 @@ extension AppBahwService {
             let order: [Prayer: Int] = [.fajr: 0, .dhuhr: 1, .asr: 2, .maghrib: 3, .isha: 4]
             result.prayers = references.sorted { ($0.day, order[$0.prayer] ?? 0) < ($1.day, order[$1.prayer] ?? 0) }.map { reference in
                 let friday = fridays.contains(reference)
-                let dayWord = reference.day == today ? "اليوم" : reference.day == today.adding(days: -1) ? "أمس" : session.dateLabels(reference.day, compact: true).primary
+                let dayWord = reference.day == today ? "اليوم" : reference.day == today.adding(days: -1) ? "أمس" : session.dateLabels(reference.day, compact: true).combined
                 return .init(reference: reference, name: friday ? "الجمعة" : names[reference.prayer] ?? "", dayWord: dayWord, fridayNoon: friday)
             }
         }

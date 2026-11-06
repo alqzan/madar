@@ -71,6 +71,13 @@ struct DiaryEntryDeletion: Codable {
         let before=try row.record();row.result=result;row.updatedAt=StableIdentity.monotonic(now:now,previous:row.updatedAt);row.writerID=writer
         return try JSONEncoder().encode(DiaryInverse(model:"Niyya",after:row.record(),dayKey:row.dayKey,previousOrigin:nil,before:before))
     }
+    /// FB-45: an intention can be removed (tombstone); undo brings it back with its text and result.
+    static func deleteIntention(id:UUID,context:ModelContext,now:Date,writer:String) throws -> Data {
+        guard let row=try context.fetch(FetchDescriptor<Niyya>()).first(where:{$0.id==id && $0.deletedAt==nil && $0.mergedInto==nil}) else{throw DataError.invalidValue("missing intention")}
+        let before=try row.record(),stamp=StableIdentity.monotonic(now:now,previous:row.updatedAt)
+        row.deletedAt=stamp;row.deletionBarrierAt=stamp;row.updatedAt=stamp;row.writerID=writer
+        return try JSONEncoder().encode(DiaryInverse(model:"NiyyaDeletion",after:row.record(),dayKey:row.dayKey,previousOrigin:nil,before:before))
+    }
     static func setTranscript(entry: UUID, text: String, context: ModelContext, now: Date, writer: String) throws -> Data {
         guard let row = try context.fetch(FetchDescriptor<Entry>()).first(where: { $0.id == entry && $0.deletedAt == nil && $0.mergedInto == nil }), let media = row.mediaID,
             try context.fetch(FetchDescriptor<Media>()).contains(where: { $0.id == media && $0.kind == "audio" && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("audio entry required") }
@@ -176,6 +183,13 @@ struct DiaryEntryDeletion: Codable {
                 try restored.set(writer, for: "writerID")
                 try row.apply(restored)
             }
+        } else if inverse.model == "NiyyaDeletion" {
+            guard let row=try context.fetch(FetchDescriptor<Niyya>()).first(where:{$0.id==inverse.after.id && $0.mergedInto==nil}),try row.record()==inverse.after,var restored=inverse.before else{throw DataError.invalidValue("undo superseded: intention deletion")}
+            let barrier=inverse.after.date("deletionBarrierAt") ?? inverse.after.date("deletedAt") ?? now
+            try restored.set(Optional<Date>.none,for:"deletedAt");try restored.set(Optional<Date>.none,for:"deletionBarrierAt")
+            try restored.set(max(now,barrier.addingTimeInterval(0.001)),for:"restoredAt")
+            try restored.set(StableIdentity.monotonic(now:now,previous:inverse.after.date("updatedAt") ?? now),for:"updatedAt");try restored.set(writer,for:"writerID")
+            try row.apply(restored)
         } else if inverse.model == "Niyya" {
             guard let row=try context.fetch(FetchDescriptor<Niyya>()).first(where:{$0.id==inverse.after.id && $0.mergedInto==nil}),try row.record()==inverse.after else{throw DataError.invalidValue("undo superseded: intention")}
             if let before=inverse.before {row.text=try before.decode("text",as:String.self);row.result=try before.decode("result",as:String?.self);row.updatedAt=StableIdentity.monotonic(now:now,previous:row.updatedAt);row.writerID=writer}

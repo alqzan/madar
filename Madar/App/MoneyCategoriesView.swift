@@ -32,7 +32,8 @@ struct MoneyCategoriesView: View {
     /// Each shelf's books take their own binding colour, in category order (the canonical's brown, green, blue, purple, grey).
     private func binding(_ index: Int) -> Color { [theme.color("reserveText"), theme.color("surplus"), theme.color("accent"), theme.color("bills"), theme.secondaryInk][index % 5] }
 
-    var body: some View {
+    var body: some View { screen.hidesMoneyInBackground($revealed) }
+    @ViewBuilder private var screen: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {

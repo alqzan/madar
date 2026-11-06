@@ -667,6 +667,9 @@ struct MihbaraBookCard: View {
                 }
             }
 
+            // FB-45 (owner FB-34: «ابي اكتب بحاشيه كل كتاب»): a paper book keeps its margin notes on its card too.
+            MihbaraMarginNotesSection(app: app, bookID: book.id, page: book.page)
+
             if paperChapters.isEmpty {
                 NavigationLink { paperIndexEditor } label: {
                     HStack(spacing: 12) {

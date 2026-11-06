@@ -40,7 +40,8 @@ struct MoneyObligationsView: View {
         switch group { case .loan: theme.color("accent"); case .installment: theme.color("bills"); case .bill: theme.color("surplus"); case .subscription: theme.color("reserve"); case .statement: theme.color("due") }
     }
 
-    var body: some View {
+    var body: some View { screen.hidesMoneyInBackground($revealed) }
+    @ViewBuilder private var screen: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {

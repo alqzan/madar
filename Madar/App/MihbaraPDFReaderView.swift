@@ -166,6 +166,9 @@ struct MihbaraPDFReaderView: View {
 
     private var footer: some View {
         VStack(spacing: 8) {
+            if pageCount > 0, book.shelf != "finished", Double(pageIndex + 1) >= max(1, (Double(pageCount) * 0.98).rounded(.down)) {
+                MihbaraFinishPrompt(app: app, book: book, tint: readerTheme.accentFill, ink: ink, saveCoordinator: saveCoordinator) { finishAndClose() }
+            }
             if pageCount > 0 {
                 ProgressView(value: Double(pageIndex + 1), total: Double(pageCount))
                     .tint(readerTheme.accentFill)

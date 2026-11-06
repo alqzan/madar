@@ -315,6 +315,22 @@ import XCTest
         // Both dates always (owner, 15 Oct): the Hijri date sits beside the Gregorian one.
         capture(app, "UX-06-upcoming-L")
     }
+    /// FB-45 (§7.1 automatic sources): the salary from Money and the season of the white days sit among the rings.
+    func testUpcomingReadsSalaryAndWhiteDays() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+                                 "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_QURAN_FIXTURE": "home"]
+        app.launch(); finishOnboarding(app)
+        app.buttons["tab-foundation"].tap()
+        let upcoming = app.descendants(matching: .any).matching(identifier: "bahw-block-upcoming").firstMatch
+        XCTAssertTrue(upcoming.waitForExistence(timeout: 15))
+        app.swipeUp(velocity: .slow)
+        let items = app.descendants(matching: .any).matching(identifier: "bahw-upcoming-item").allElementsBoundByIndex.map(\.label)
+        XCTAssertTrue(items.contains { $0.hasPrefix("الراتب") }, items.joined(separator: " | "))
+        XCTAssertTrue(items.contains { $0.hasPrefix("الأيام البيض") }, items.joined(separator: " | "))
+        capture(app, "FB45-upcoming-after-L")
+    }
     func testEmptyDiaryOpensWriterAndKeepsDraft() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

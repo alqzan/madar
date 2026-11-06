@@ -34,4 +34,16 @@ import MadarData
         await #expect(throws:DataError.self) { try await bus.execute(.init(name:"system.undo",payload:.object(["undoToken":.string(token.uuidString)]),issuedAt:time),now:time.addingTimeInterval(17)) }
         #expect(try ModelContext(container).fetch(FetchDescriptor<Niyya>()).first{$0.id==ids[0]}?.result=="done")
     }
+    /// FB-45: «احذف النيّة» tombstones the row (never a hard delete) and undo restores its text and result.
+    @Test func deleteIntentionTombstonesAndUndoRestores() async throws {
+        let root=FileManager.default.temporaryDirectory.appending(path:"IntentionDelete-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
+        let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),bus=CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0})),id=UUID(),time=now()
+        _ = try await bus.execute(.init(name:"diary.setIntention",payload:.object(["id":.string(id.uuidString),"dayKey":.string("2026-10-15"),"text":.string("أصل رحمي")]),issuedAt:time),now:time)
+        _ = try await bus.execute(.init(name:"diary.setIntentionResult",payload:.object(["id":.string(id.uuidString),"result":.string("done")]),issuedAt:time),now:time.addingTimeInterval(1))
+        let outcome=try await bus.execute(.init(name:"diary.deleteIntention",payload:.object(["id":.string(id.uuidString)]),issuedAt:time),now:time.addingTimeInterval(2));let token=try #require(outcome.undoToken)
+        var rows=try ModelContext(container).fetch(FetchDescriptor<Niyya>());#expect(rows.count==1);#expect(rows[0].deletedAt != nil)
+        await #expect(throws:DataError.self){try await bus.execute(.init(name:"diary.setIntentionResult",payload:.object(["id":.string(id.uuidString),"result":.string("partial")]),issuedAt:time),now:time.addingTimeInterval(3))}
+        #expect(try await bus.execute(.init(name:"system.undo",payload:.object(["undoToken":.string(token.uuidString)]),issuedAt:time),now:time.addingTimeInterval(4)).status == .applied)
+        rows=try ModelContext(container).fetch(FetchDescriptor<Niyya>());#expect(rows.count==1);#expect(rows[0].deletedAt==nil);#expect(rows[0].text=="أصل رحمي");#expect(rows[0].result=="done")
+    }
 }

@@ -12,5 +12,5 @@ struct MoneyQuickExpense: View {
     let app: AppSession
     let seed: MoneyExpenseSeed
     @State private var revealed = false
-    var body: some View { NavigationStack { MoneyExpenseView(app: app, revealed: $revealed, seed: seed) } }
+    var body: some View { NavigationStack { MoneyExpenseView(app: app, revealed: $revealed, seed: seed) }.hidesMoneyInBackground($revealed) }
 }

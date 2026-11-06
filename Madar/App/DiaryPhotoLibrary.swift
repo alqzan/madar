@@ -37,7 +37,11 @@ enum DiaryPhotoLibrary {
     static func image(_ asset: PHAsset, side: CGFloat) async -> UIImage? {
         let options = PHImageRequestOptions(); options.deliveryMode = .opportunistic; options.isNetworkAccessAllowed = false; options.resizeMode = .fast
         return await withCheckedContinuation { done in
-            PHImageManager.default().requestImage(for: asset, targetSize: CGSize(width: side, height: side), contentMode: .aspectFill, options: options) { image, _ in done.resume(returning: image) }
+            // `.opportunistic` calls back twice (a degraded image, then the final one); a continuation resumes once (FB-45: crash).
+            PHImageManager.default().requestImage(for: asset, targetSize: CGSize(width: side, height: side), contentMode: .aspectFill, options: options) { image, info in
+                if (info?[PHImageResultIsDegradedKey] as? Bool) == true { return }
+                done.resume(returning: image)
+            }
         }
     }
     static func data(_ asset: PHAsset) async -> Data? {

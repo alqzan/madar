@@ -649,6 +649,9 @@ struct MihbaraReaderView: View {
 
     private var footerContent: some View {
         VStack(spacing: 7) {
+            if let readerProgress, readerProgress >= 0.98, book.shelf != "finished" {
+                MihbaraFinishPrompt(app: app, book: book, tint: palette.accent, ink: palette.ink, saveCoordinator: saveCoordinator) { finishAndClose() }
+            }
             if let readerProgress {
                 ProgressView(value: readerProgress)
                     .tint(palette.accent)

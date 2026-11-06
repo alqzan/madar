@@ -40,6 +40,7 @@ import MadarData
             return try DiaryMutationHandler.stage(text: caption, day: day, targetDay: nil, id: id, context: context, now: now, writer: writer, mediaIDs: kind == "audio" ? [] : [file], audioID: kind == "audio" ? file : nil, storedDay: try GregorianDay(writingDay))
         case .intention(let id,let day,let text): return try DiaryMutationHandler.setIntention(id:id,day:day,text:text,context:context,now:now,writer:writer)
         case .intentionResult(let id,let result): return try DiaryMutationHandler.setIntentionResult(id:id,result:result,context:context,now:now,writer:writer)
+        case .deleteIntention(let id): return try DiaryMutationHandler.deleteIntention(id:id,context:context,now:now,writer:writer)
         case .sealLetter(let letter, let text, let trigger, let value, let target): return try DiaryLetterHandler.seal(id: letter, text: text, trigger: trigger, value: value, target: target, context: context, now: now, writer: writer)
         case .refreshLetters: try DiaryLetterHandler.refresh(context: context, now: now, writer: writer); return nil
         case .openLetter(let letter): try DiaryLetterHandler.open(letter, context: context, now: now, writer: writer); return nil

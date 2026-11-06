@@ -31,6 +31,9 @@ extension AppDiaryService {
     func saveIntention(_ text:String,id:UUID=UUID(),day:GregorianDay) async throws {
         try await app.executeDiaryCommand("diary.setIntention",payload:["id":.string(id.uuidString),"dayKey":.string(day.description),"text":.string(text)])
     }
+    func deleteIntention(_ id:UUID) async throws {
+        try await app.executeDiaryCommand("diary.deleteIntention",payload:["id":.string(id.uuidString)])
+    }
     func setIntentionResult(_ id:UUID,result:String?) async throws {
         try await app.executeDiaryCommand("diary.setIntentionResult",payload:["id":.string(id.uuidString),"result":result.map{.string($0)} ?? .null])
     }
