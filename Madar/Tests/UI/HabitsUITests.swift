@@ -208,9 +208,9 @@ import UIKit
         row().tap();XCTAssertTrue(app.buttons["habit-resume"].waitForExistence(timeout:5));shot(app,"M4-V02-frozen-L");app.buttons["habit-resume"].tap();XCTAssertTrue(app.buttons["habit-resume"].waitForNonExistence(timeout:5))
         row().tap();app.buttons["habit-delete"].tap();XCTAssertTrue(app.buttons["habit-first"].waitForExistence(timeout:5));app.buttons["habit-archived"].tap();app.buttons["استعدها"].tap();XCTAssertTrue(row().waitForExistence(timeout:5))
         app.terminate();app.launch();open(app);XCTAssertTrue(row().waitForExistence(timeout:10));shot(app,"M4-V02-accessory-after-L");XCTAssertTrue(row().isHittable)
-        let accessory=app.descendants(matching:.any).matching(identifier:"tab-accessory-next-prayer").firstMatch
+        let accessory=app.otherElements["fixed-tab-bar"] // FB-31: the glass tab bar replaced the next-prayer accessory.
         XCTAssertTrue(accessory.waitForExistence(timeout:10))
-        XCTAssertLessThanOrEqual(row().frame.maxY,accessory.frame.minY,"The first habit row should finish above the floating room accessory.")
+        XCTAssertLessThanOrEqual(row().frame.maxY,accessory.frame.minY,"The first habit row should finish above the glass tab bar.")
         row().tap();XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["habit-progress"].label.contains("١ من ١"))
         app.buttons["تمّ"].tap();row().tap();app.buttons["habit-delete"].tap()
         XCTAssertTrue(app.buttons["habit-archived"].waitForExistence(timeout:5));app.buttons["habit-archived"].tap()
@@ -218,7 +218,11 @@ import UIKit
         XCTAssertTrue(finalDelete.waitForExistence(timeout:5));finalDelete.tap();app.buttons["احذف نهائيًا"].tap()
         XCTAssertTrue(app.buttons["habit-archived"].waitForNonExistence(timeout:5))
         let undo=app.buttons["تراجع"];XCTAssertTrue(undo.waitForExistence(timeout:5));undo.tap()
-        XCTAssertTrue(app.buttons["habit-archived"].waitForExistence(timeout:5));if !app.buttons["استعدها"].exists {app.buttons["habit-archived"].tap()};app.buttons["استعدها"].tap()
+        // The archived list sits low in the room; a covered button would take the tap to the glass bar above it.
+        func clear(_ e:XCUIElement){for _ in 0..<6 where !(e.isHittable && e.frame.maxY < accessory.frame.minY) {app.swipeUp(velocity:.slow)}}
+        let archived=app.buttons["habit-archived"];XCTAssertTrue(archived.waitForExistence(timeout:5))
+        if !app.buttons["استعدها"].exists {clear(archived);archived.tap()}
+        let restore=app.buttons["استعدها"];XCTAssertTrue(restore.waitForExistence(timeout:5));clear(restore);restore.tap()
         XCTAssertTrue(row().waitForExistence(timeout:5))
     }
     func testTodayStepAndAllHabitsLists() throws {
@@ -237,7 +241,7 @@ import UIKit
         XCTAssertTrue(yearlyBead.exists); yearlyBead.tap()
         XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout: 5)); app.buttons["تمّ"].tap()
         // The orbit sits above the lists, so rows are scrolled clear of the floating accessory before a tap.
-        let accessory=app.descendants(matching:.any).matching(identifier:"tab-accessory-next-prayer").firstMatch
+        let accessory=app.otherElements["fixed-tab-bar"] // FB-31: the glass tab bar replaced the next-prayer accessory.
         func reveal(_ e:XCUIElement) {
             for _ in 0..<8 {
                 let floor=accessory.exists ? accessory.frame.minY : app.frame.maxY-120

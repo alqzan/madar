@@ -356,7 +356,7 @@ private struct BahwSuggestionsView: View {
     @State private var suggestions: [BahwSuggestion] = []
     @Environment(\.roomTheme) private var theme
     private var refreshKey: String {
-        "\(session.prayerRevision)-\(session.string("bahw.smartPresence"))-\(Int(session.prayerNow().timeIntervalSince1970 / 60))-\(session.protectedDataAuthorized)"
+        "\(session.prayerRevision)-\(session.habitReadingsVersion)-\(session.string("bahw.smartPresence"))-\(Int(session.prayerNow().timeIntervalSince1970 / 60))-\(session.protectedDataAuthorized)"
     }
     var body: some View {
         VStack(spacing: 0) {

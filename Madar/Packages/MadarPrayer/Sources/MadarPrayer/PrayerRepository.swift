@@ -3,7 +3,7 @@ import SwiftData
 import MadarCore
 import MadarData
 
-@MainActor public final class PrayerRepository {
+public final class PrayerRepository {
     public let context: ModelContext
     public let settings: SettingsStore
     public let home: ActivePlace

@@ -51,7 +51,7 @@ public struct QuranDataSnapshot: Sendable {
     public let testPages: [Int]
 }
 
-@MainActor public final class QuranRepository {
+public final class QuranRepository {
     public let context: ModelContext
     public let catalog: QuranResourceCatalog
     public let settings: SettingsStore

@@ -4,7 +4,7 @@ import MadarCore
 import MadarData
 
 /// B02: a week-start setting change is an epoch, including a later undo; it never regroups an older week.
-@MainActor enum HabitWeekHistory {
+enum HabitWeekHistory {
     struct Change:Codable {let day:String;let start:String}
     struct History:Codable {let initial:String;var changes:[Change]}
     static let key="sys.habitWeekHistory"

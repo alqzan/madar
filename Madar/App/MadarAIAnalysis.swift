@@ -475,7 +475,7 @@ struct MadarAIAnalysisSheet: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Button("تمّ") { dismiss() }.font(MadarTypography.body()).frame(minWidth: 44, minHeight: 44)
+                Button { dismiss() } label: { Text("تمّ").font(MadarTypography.body()).padding(.horizontal, 16).frame(minWidth: 44, minHeight: 44).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain)
                     .accessibilityIdentifier("madar-ai-close")
                 Spacer()
                 Text(kind == .diary ? "اسأل يومياتك" : "اسأل عن مالك")

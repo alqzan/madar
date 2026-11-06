@@ -107,10 +107,16 @@ import XCTest
         let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: present)
         XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, app.debugDescription)
         app.buttons["tab-foundation"].tap()
+        // Owner, 4 Nov 2026: unsorted bank messages also raise «شيء ينتظرك» on open; «لاحقًا» leaves them to the lobby suggestion.
+        let later = app.buttons["bahw-attention-primary"]
+        if later.waitForExistence(timeout: 4) { later.tap(); XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription) }
         let suggestion = app.buttons["bahw-suggestion-money"]
         for _ in 0..<8 where !suggestion.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(suggestion.isHittable, app.debugDescription); suggestion.tap()
+        // The suggestion raises «شيء ينتظرك», where «افرزها» opens the bank messages.
+        let sort = app.buttons["bahw-attention-money"]
+        XCTAssertTrue(sort.waitForExistence(timeout: 8), app.debugDescription); sort.tap()
         XCTAssertTrue(app.staticTexts["money-messages-title"].waitForExistence(timeout: 15), app.debugDescription)
     }
     func testHabitWideAndSmallBlocksShowAtRisk() throws {
@@ -383,6 +389,22 @@ import XCTest
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
         if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
+        // A store without a fixture reaches the location step: choose a city by hand, then «ليس الآن» for photos.
+        let city = app.buttons["first-run-city"]
+        guard city.waitForExistence(timeout: 2) else { return }
+        city.tap()
+        let field = app.textFields["city-search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), app.debugDescription); field.tap(); field.typeText("الرياض")
+        let hit = app.buttons["city-hit-الرياض"]
+        XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
+        if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
+        let later = app.buttons["first-run-continue"]
+        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
+        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
     }
-    private func capture(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
+    private func capture(_ app: XCUIApplication, _ name: String) {
+        let s = app.screenshot(), a = XCTAttachment(screenshot: s); a.name = name; a.lifetime = .keepAlways; add(a)
+        // xcodebuild can hang after the run and lose attachments; a shot folder keeps them on disk.
+        if let dir = ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png")) }
+    }
 }

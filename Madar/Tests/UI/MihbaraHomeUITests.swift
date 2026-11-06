@@ -1177,7 +1177,8 @@ import UIKit
         shot(app, "M6-J13-delete-confirm-L")
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "يبقى عنوانه وسجل جلسات القراءة")).firstMatch.exists, app.debugDescription)
         confirm.tap()
-        XCTAssertTrue(book.waitForNonExistence(timeout: 8), app.debugDescription)
+        // FB-31 keeps the lobby alive behind the room; its tile refreshes when the lobby is shown again, so only the Mihbara is checked here.
+        XCTAssertTrue(app.otherElements["settings-tab"].staticTexts["رحلة القراءة"].waitForNonExistence(timeout: 8), app.debugDescription)
         shot(app, "M6-J13-delete-after-L")
         undo(app)
         reach(app, library); library.tap()
@@ -1208,7 +1209,7 @@ import UIKit
     func testFileBookNearEndShowsOnePageRemainingUntilComplete() {
         continueAfterFailure = false
         let app = app("home", fileNearEnd: true); app.launch(); open(app)
-        let remaining = app.staticTexts["بقيت صفحة واحدة"]
+        let remaining = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "بقيت صفحة واحدة")).firstMatch
         XCTAssertTrue(remaining.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.staticTexts["أتممت قراءته"].exists, app.debugDescription)
         let percentages = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "٪"))
@@ -1242,8 +1243,8 @@ import UIKit
         let author = app.textFields["mihbara-paper-author"]; author.tap(); author.typeText("من مكتبتي")
         let pages = app.textFields["mihbara-paper-pages"]; pages.tap(); pages.typeText("٢٥٠"); if app.toolbars.buttons["تمّ"].exists { app.toolbars.buttons["تمّ"].tap() }
         let save = app.buttons["mihbara-paper-save"]; reach(app,save); shot(app,"M6-V01-add-paper-L"); save.tap()
-        XCTAssertTrue(app.staticTexts["كتابي الأول"].firstMatch.waitForExistence(timeout:8)); shot(app, "M6-shared-undo-glass-L"); undo(app)
-        XCTAssertTrue(app.staticTexts["أضف كتابك الأول"].waitForExistence(timeout:8))
+        XCTAssertTrue(app.staticTexts["كتابي الأول"].firstMatch.waitForExistence(timeout:8)); shot(app, "M6-shared-added-L")
+        XCTAssertFalse(app.descendants(matching: .any)["undo-button"].waitForExistence(timeout: 2), "FB-32: undo is offered only after a deletion.")
     }
     func testPaperIndexUsesEditableChapterRowsAndOneUndoableSave() {
         continueAfterFailure = false; let app = app("empty", paperIndex: true); app.launch(); open(app)
@@ -1414,11 +1415,12 @@ import UIKit
         XCTAssertTrue(app.buttons["mihbara-paper-start"].label.contains("واصل القراءة"))
         XCTAssertFalse(app.staticTexts["mihbara-paper-title-pinned"].exists, app.debugDescription)
         shot(app, "M6-V23-long-title-actions-L")
-        app.scrollViews.firstMatch.swipeUp(velocity: .slow)
-        let pinnedTitle = app.staticTexts["mihbara-paper-title-pinned"]
-        XCTAssertTrue(pinnedTitle.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(pinnedTitle.isHittable, app.debugDescription)
-        XCTAssertTrue(pinnedTitle.label.contains("مدخل طويل إلى القراءة"), pinnedTitle.label)
+        // FB-34/36: the card (cover, title, place, two actions) fits without scrolling, so its title never needs pinning; after a swipe
+        // the full title and both actions are still in view. The pinned line stays for a card that does scroll.
+        app.swipeUp(velocity: .slow)
+        let fullTitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "مدخل طويل إلى القراءة")).firstMatch
+        XCTAssertTrue(fullTitle.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(fullTitle.isHittable || app.staticTexts["mihbara-paper-title-pinned"].isHittable, app.debugDescription)
         XCTAssertTrue(details.isHittable, app.debugDescription)
         XCTAssertTrue(start.isHittable, app.debugDescription)
         shot(app, "M6-V23-long-title-actions-s1-L")
@@ -1601,7 +1603,9 @@ import UIKit
         footerBar.tap()
         XCTAssertTrue(footerBar.waitForSelection(timeout: 5))
         shot(app, "M6-V07-options-changed-L")
-        let undo = app.descendants(matching: .any)["mihbara-reader-undo"].buttons["undo-button"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
+        // FB-32: a reader option is changed back by choosing it again; no undo bar.
+        XCTAssertFalse(app.descendants(matching: .any)["undo-button"].waitForExistence(timeout: 2), "FB-32: undo is offered only after a deletion.")
+        app.buttons["mihbara-reader-footer-full"].tap()
         XCTAssertTrue(app.buttons["mihbara-reader-footer-full"].waitForSelection(timeout: 5))
         XCTAssertTrue(app.buttons["mihbara-reader-lineSpacing-3"].isSelected)
         footerBar.tap(); XCTAssertTrue(footerBar.waitForSelection(timeout: 5))
@@ -1773,18 +1777,8 @@ import UIKit
         XCTAssertTrue(app.switches["mihbara-reader-justify"].waitForValue("1", timeout: 8), app.debugDescription)
         XCTAssertTrue(app.switches["mihbara-reader-heavier"].waitForValue("0", timeout: 8), app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-reader-footer-full"].waitForSelection(timeout: 8), app.debugDescription)
-        let undo = app.descendants(matching: .any)["mihbara-reader-undo"].buttons["undo-button"]
-        XCTAssertTrue(undo.waitForExistence(timeout: 8), app.debugDescription)
-        shot(app, "M6-V24-reader-settings-undo-L")
-        undo.tap()
-        let restoredSpacing = app.buttons["mihbara-reader-lineSpacing-3"]
-        reach(app, restoredSpacing); XCTAssertTrue(restoredSpacing.waitForSelection(timeout: 8), app.debugDescription)
-        let restoredMargins = app.buttons["mihbara-reader-margins-1"]
-        reach(app, restoredMargins); XCTAssertTrue(restoredMargins.isSelected, app.debugDescription)
-        XCTAssertEqual(app.switches["mihbara-reader-justify"].value as? String, "0", app.debugDescription)
-        XCTAssertEqual(app.switches["mihbara-reader-heavier"].value as? String, "1", app.debugDescription)
-        let restoredFooterBar = app.buttons["mihbara-reader-footer-bar"]
-        reach(app, restoredFooterBar); XCTAssertTrue(restoredFooterBar.isSelected, app.debugDescription)
+        shot(app, "M6-V24-reader-settings-reset-L")
+        XCTAssertFalse(app.descendants(matching: .any)["undo-button"].waitForExistence(timeout: 2), "FB-32: undo is offered only after a deletion.")
     }
 
     func testReaderWordCardHighlightsParagraphUndoesNotesAndCopies() throws {
@@ -2164,9 +2158,8 @@ import UIKit
         XCTAssertFalse(app.staticTexts["لا يوجد تعريف لهذه الكلمة في قاموس الجهاز"].exists, app.debugDescription)
         shot(app, "M6-V14-word-L")
         app.buttons["mihbara-word-save"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-toast"].waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(card.waitForNonExistence(timeout: 5))
-
+        XCTAssertTrue(card.waitForNonExistence(timeout: 8), app.debugDescription)
+        sleep(1)
         paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).press(forDuration: 0.8)
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.staticTexts["mihbara-word-saved"].waitForExistence(timeout: 5), app.debugDescription)

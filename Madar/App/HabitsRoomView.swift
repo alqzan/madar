@@ -40,6 +40,9 @@ struct HabitsRoomView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
     @State private var readings: [HabitReading] = []
+    /// FB-38: the readings are computed off the main thread; until the first arrives nothing (not the empty state) is drawn.
+    @State private var loaded = false
+    @State private var reloadTask: Task<Void, Never>?
     @State private var liveHealth: [UUID:Int] = [:]
     @State private var detail: HabitReading?
     @State private var editor: HabitEditorIdentity?
@@ -72,7 +75,8 @@ struct HabitsRoomView: View {
             }.padding(.horizontal,14).padding(.vertical,8)
             ScrollView {
                 VStack(alignment:.leading,spacing:8) {
-                    if active.isEmpty { empty; roomHabits }
+                    if !loaded { Color.clear.frame(height: 1) }
+                    else if active.isEmpty { empty; roomHabits }
                     else {
                         periodSummaries
                         if active.count > 1 && !dynamicTypeSize.isAccessibilitySize {
@@ -463,10 +467,23 @@ struct HabitsRoomView: View {
         }
     }
     private func progress(_ row:HabitReading)->String { guard let p=row.summary.current else{return "لا فترة بعد"}; return p.target == 0 ? "سجلك محفوظ" : p.rule.measure == .once && p.target == 1 ? (p.value >= 1 ? "تمّت" : "") : habitProgressText(p.value,p.target,p.rule.unit,digits) }
+    /// Owner, 5 Nov 2026 («اضغط العاده يعلق التطبيق»): every table of every habit is read on a background context, and only the
+    /// latest request lands, so a tap, a Health refresh and a prayer write in a row never stack reads on the main thread.
     private func reload() {
+        reloadTask?.cancel()
+        let container = session.container, now = session.prayerNow(), health = liveHealth
+        reloadTask = Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                Result { try HabitRepository(context: ModelContext(container)).readings(at: now, includeArchived: true, liveHealth: health) }
+            }.value
+            guard !Task.isCancelled else { return }
+            apply(result)
+        }
+    }
+    private func apply(_ result: Result<[HabitReading], Error>) {
         do {
-            let fresh = try HabitRepository(context: ModelContext(session.container)).readings(at: session.prayerNow(), includeArchived: true, liveHealth: liveHealth)
-            readings = fresh
+            let fresh = try result.get()
+            readings = fresh; loaded = true
             if let selected = detail, let updated = selected.refreshed(in: fresh) { detail = updated }
             if let id = session.habitRouteID {
                 if let row = fresh.first(where: { $0.id == id }) {
@@ -474,7 +491,7 @@ struct HabitsRoomView: View {
                 }
                 session.habitRouteID = nil
             }
-        } catch { session.errorMessage = madarUserMessage(error) }
+        } catch { loaded = true; session.errorMessage = madarUserMessage(error) }
     }
     private func complete(_ row: HabitReading, delta: Int) {
         guard !completionInFlight.contains(row.id) else { return }

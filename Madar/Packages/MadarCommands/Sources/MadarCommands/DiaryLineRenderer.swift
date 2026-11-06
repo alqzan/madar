@@ -17,7 +17,7 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
     public init(id: String, at: Date, text: String, kind: String, tzID: String? = nil, markdown: Bool? = nil) { self.id = id; self.at = at; self.text = text; self.kind = kind; self.tzID = tzID; self.markdown = markdown }
 }
 @MainActor public enum DiaryLineRenderer {
-    public static func today(context: ModelContext, now: Date) throws -> GregorianDay {
+    nonisolated public static func today(context: ModelContext, now: Date) throws -> GregorianDay {
         let repo = try PrayerRepository(context: context), place = repo.place(at: now), civil = GregorianDay.containing(now, in: place.timeZone)
         let options = repo.calculationOptions(at: now)
         let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: options) }

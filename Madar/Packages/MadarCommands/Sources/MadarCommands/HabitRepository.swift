@@ -27,7 +27,7 @@ public struct HabitTime: Equatable, Sendable {
     public let day: GregorianDay
     public let entryID: UUID?
 }
-@MainActor public struct HabitRepository {
+public struct HabitRepository {
     public let context: ModelContext
     public init(context: ModelContext) { self.context = context }
     static let weekdays = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]

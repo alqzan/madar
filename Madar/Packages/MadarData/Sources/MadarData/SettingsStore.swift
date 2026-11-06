@@ -101,7 +101,7 @@ public struct SettingsSchema: Decodable, Sendable {
 }
 public struct SettingsUndoToken: Codable, Sendable, Hashable { public let id: UUID; public let expiresAt: Date }
 private struct UndoChange: Codable { let key: String; let before: JSONValue; let after: JSONValue }
-@MainActor public final class SettingsStore {
+public final class SettingsStore {
     public let schema: SettingsSchema
     public let context: ModelContext
     private var invalidReads = Set<String>()

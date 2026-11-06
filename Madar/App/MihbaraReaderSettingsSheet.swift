@@ -72,7 +72,7 @@ struct MihbaraReaderSettingsSheet: View {
             Text(english ? "كتاب إنجليزي · إعداداتك للإنجليزي" : "كتاب عربي · إعداداتك للعربي").font(MadarTypography.fine().weight(.semibold))
                 .lineLimit(1)
                 .padding(.horizontal, 12).padding(.vertical, 6).background(well, in: .capsule)
-            Button("تمّ") { dismiss() }.font(MadarTypography.caption()).frame(minWidth: 44, minHeight: 44)
+            Button { dismiss() } label: { Text("تمّ").font(MadarTypography.caption()).padding(.horizontal, 14).frame(minWidth: 44, minHeight: 44).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain)
                 .accessibilityIdentifier("mihbara-reader-settings-close")
         }
     }

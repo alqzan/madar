@@ -213,7 +213,7 @@ struct DiaryHubView: View {
                 Button {
                     year = selectedYear - 1
                 } label: {
-                    Image(systemName: "chevron.forward").frame(width: 44, height: 44)
+                    Image(systemName: "chevron.forward").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
                 }.accessibilityLabel("السنة السابقة").accessibilityIdentifier("diary-year-previous")
                 VStack(alignment: .leading, spacing: 3) {
                     Text(service.digits.string(selectedYear)).font(DiaryType.title).accessibilityIdentifier(
@@ -223,7 +223,7 @@ struct DiaryHubView: View {
                 Button {
                     year = selectedYear + 1
                 } label: {
-                    Image(systemName: "chevron.backward").frame(width: 44, height: 44)
+                    Image(systemName: "chevron.backward").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
                 }.accessibilityLabel("السنة التالية")
                 Spacer()
                 HStack(spacing: 0) {
@@ -352,7 +352,7 @@ struct DiaryHubView: View {
                 Button {
                     if month > 1 { self.month = month - 1 } else { year = selectedYear - 1; self.month = 12 }
                 } label: {
-                    Image(systemName: "chevron.forward").frame(width: 44, height: 44)
+                    Image(systemName: "chevron.forward").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
                 };
                 VStack(alignment: .leading, spacing: 3) {
                     Text(grid.monthName(year: selectedYear, month: month)).font(DiaryType.heading);
@@ -361,7 +361,7 @@ struct DiaryHubView: View {
                 Button {
                     if month < 12 { self.month = month + 1 } else { year = selectedYear + 1; self.month = 1 }
                 } label: {
-                    Image(systemName: "chevron.backward").frame(width: 44, height: 44)
+                    Image(systemName: "chevron.backward").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
                 }
             }.buttonStyle(.madarPlain)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 6) {

@@ -50,6 +50,17 @@ struct TabShell<Content: View>: View {
                 }
             }
             .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: barShown)
+            #if DEBUG
+            // UI tests reach «خصّص» from any room; the bar no longer lists it, so tests get a tiny invisible handle (never in a release
+            // build). It sits in the corner under the bar: on the bar it lay over the Quran tab, and a tap there opened the Quran.
+            .overlay(alignment: .bottomLeading) {
+                if barShown, ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil {
+                    Button { selection = "customize" } label: { Rectangle().fill(.black.opacity(0.02)).frame(width: 14, height: 14) }
+                        .accessibilityIdentifier("tab-customize").accessibilityLabel("خصّص")
+                        .ignoresSafeArea()
+                }
+            }
+            #endif
             .tint(theme.accent)
             .onChange(of: selection, initial: true) { _, tab in remember(tab) }
     }
@@ -118,15 +129,6 @@ struct TabShell<Content: View>: View {
         .animation(lensAnimation, value: selection)
         .sensoryFeedback(.selection, trigger: lit)
         .accessibilityElement(children: .contain).accessibilityAddTraits(.isTabBar).accessibilityIdentifier("fixed-tab-bar")
-        #if DEBUG
-        // UI tests reach «خصّص» from any room; the bar no longer lists it, so tests get a tiny invisible handle (never in a release build).
-        .overlay(alignment: .top) {
-            if ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil {
-                Button { selection = "customize" } label: { Rectangle().fill(.black.opacity(0.02)).frame(width: 14, height: 14) }
-                    .accessibilityIdentifier("tab-customize").accessibilityLabel("خصّص")
-            }
-        }
-        #endif
         .padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 2)
         .ignoresSafeArea(.keyboard)
     }

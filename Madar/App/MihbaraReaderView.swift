@@ -539,7 +539,7 @@ struct MihbaraReaderView: View {
                     HStack(spacing: 5) {
                         Text("المحبرة").font(MadarTypography.caption())
                         Image(systemName: "chevron.right").font(.system(size: 15, weight: .medium))
-                    }.frame(minHeight: 44).contentShape(Rectangle())
+                    }.padding(.horizontal, 14).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule).contentShape(.capsule)
                 }
                 .accessibilityLabel("العودة إلى المحبرة")
                 .accessibilityIdentifier("mihbara-reader-close")

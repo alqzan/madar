@@ -120,12 +120,31 @@ final class AppSession {
     /// The lobby asks for habit readings from several tiles every minute; the answer only changes after a write (a new revision)
     /// or when the five-minute bucket turns over, so it is read once per such change.
     @ObservationIgnored private var habitReadingsCache: (revision: Int, bucket: Int, rows: [HabitReading])?
+    /// Bumped when a background habit read lands, so the tiles that showed the previous answer redraw with the new one.
+    private(set) var habitReadingsVersion = 0
+    @ObservationIgnored private var habitReadingsRefresh: (revision: Int, bucket: Int)?
     func habitReadings(at now: Date) -> [HabitReading] {
-        let bucket = Int(now.timeIntervalSince1970 / 300)
-        if let cache = habitReadingsCache, cache.revision == prayerRevision, cache.bucket == bucket { return cache.rows }
-        let rows = (try? HabitRepository(context: ModelContext(container)).readings(at: now)) ?? []
-        habitReadingsCache = (prayerRevision, bucket, rows)
-        return rows
+        let bucket = Int(now.timeIntervalSince1970 / 300), revision = prayerRevision
+        _ = habitReadingsVersion
+        if let cache = habitReadingsCache, cache.revision == revision, cache.bucket == bucket { return cache.rows }
+        guard let stale = habitReadingsCache else {
+            // The very first read is synchronous, so the lobby never draws an empty habits tile on launch.
+            let rows = (try? HabitRepository(context: ModelContext(container)).readings(at: now)) ?? []
+            habitReadingsCache = (revision, bucket, rows)
+            return rows
+        }
+        // FB-38: after a write (a habit tap, a prayer) the last answer stays on screen while the new one is read off the main thread.
+        if habitReadingsRefresh?.revision != revision || habitReadingsRefresh?.bucket != bucket {
+            habitReadingsRefresh = (revision, bucket)
+            let container = container
+            Task {
+                let rows = await Task.detached(priority: .userInitiated) { (try? HabitRepository(context: ModelContext(container)).readings(at: now)) ?? [] }.value
+                // A write landed during the read: the next call reads again; the redraw makes that call happen.
+                if prayerRevision == revision { habitReadingsCache = (revision, bucket, rows) } else { habitReadingsRefresh = nil }
+                habitReadingsVersion &+= 1
+            }
+        }
+        return stale.rows
     }
     private(set) var prayerWriteInProgress = false
     /// Caches for `AppBahwService.prayerLocation()` and `.today`, keyed by [prayerRevision, minute].
@@ -1188,7 +1207,7 @@ final class AppSession {
         }
         if let id = result.undoToken {
             let token = AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600))
-            showUndo(token, message: name == "habit.archive" ? "حُذفت العادة" : name == "habit.pause" ? "جُمّدت العادة" : name == "habit.resume" ? "عادت العادة" : name == "habit.complete" ? "سُجّلت" : name.hasPrefix("habit.") ? "حُفظت العادة" : name == "widget.save" ? "حُفظت الودجة" : name == "widget.delete" ? "حُذفت الودجة" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم" : name == "diary.deleteEntry" ? "حُذف السطر" : name == "diary.setIntentionResult" ? (payload["result"] == .null ? "مُسحت النتيجة" : "حُفظت النتيجة") : name.contains("Intention") ? "حُفظت النيّة" : "حُفظ السطر")
+            showUndo(token, message: name == "habit.archive" ? "حُذفت العادة" : name == "habit.deleteArchived" ? "حُذفت العادة نهائيًا" : name == "habit.pause" ? "جُمّدت العادة" : name == "habit.resume" ? "عادت العادة" : name == "habit.complete" ? "سُجّلت" : name.hasPrefix("habit.") ? "حُفظت العادة" : name == "widget.save" ? "حُفظت الودجة" : name == "widget.delete" ? "حُذفت الودجة" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم" : name == "diary.deleteEntry" ? "حُذف السطر" : name == "diary.setIntentionResult" ? (payload["result"] == .null ? "مُسحت النتيجة" : "حُفظت النتيجة") : name.contains("Intention") ? "حُفظت النيّة" : "حُفظ السطر")
             if name == "diary.deleteEntry" { scheduleDiaryMediaCleanup(after: token.expiresAt) }
         }
     }
