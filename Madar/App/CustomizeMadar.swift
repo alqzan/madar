@@ -286,6 +286,11 @@ struct SettingControl: View {
                 Text(unitForms == nil ? definition.title : String(definition.title.dropLast(unitSuffix.count))).font(MadarTypography.section())
                 Spacer()
                 if definition.scope == "device" { Text("لهذا الجهاز").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                // Owner, 6 Nov 2026: «مشطوف». A switch on its own line under the title ran past the card's edge; it sits beside its title, as iOS does.
+                if definition.type == "bool" {
+                    Toggle(definition.title, isOn: Binding(get: { session.bool(definition.key) }, set: { session.set(.bool($0), key: definition.key) }))
+                        .labelsHidden().fixedSize().accessibilityIdentifier("setting-\(definition.key)")
+                }
             }
             switch definition.type {
             case "choice":
@@ -294,8 +299,7 @@ struct SettingControl: View {
                     VStack(alignment: .leading, spacing: 8) { choices }
                 }
             case "bool":
-                Toggle(definition.title, isOn: Binding(get: { session.bool(definition.key) }, set: { session.set(.bool($0), key: definition.key) }))
-                    .labelsHidden().accessibilityIdentifier("setting-\(definition.key)")
+                EmptyView()
             case "int":
                 Stepper(value: Binding(get: { shownInt }, set: { value in
                     sentInt = value

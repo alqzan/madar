@@ -33,19 +33,21 @@ struct TabShell<Content: View>: View {
     /// first visit and kept, so going back is instant and the switch is a short cross-fade. At most four stay alive (the lobby always).
     @State private var alive: [String] = []
     @State private var visits: [String: Int] = [:]
-    @Namespace private var lens
-    @State private var scrubbing: String?
-    @State private var tabFrames: [String: CGRect] = [:]
+
+    @State private var barHeight: CGFloat = 0
+    @State private var bottomInset: CGFloat = 0
 
     var body: some View {
         rooms
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0; session.tabBarHeight = max(0, barHeight - $0) }
             // A `safeAreaInset` outside the navigation stack never reached the rooms' own layouts, so the bar is an overlay and its
             // measured height is added to the safe area of everything inside.
             .overlay(alignment: .bottom) {
                 if barShown {
                     fixedBar
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { session.tabBarHeight = $0 }
+                        // The system bar reaches down over the home indicator; only the part above it is added to the rooms' safe area.
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { barHeight = $0; session.tabBarHeight = max(0, $0 - bottomInset) }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
@@ -57,7 +59,8 @@ struct TabShell<Content: View>: View {
                 if barShown, ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil {
                     Button { selection = "customize" } label: { Rectangle().fill(.black.opacity(0.02)).frame(width: 14, height: 14) }
                         .accessibilityIdentifier("tab-customize").accessibilityLabel("خصّص")
-                        .ignoresSafeArea()
+                        // Just above the system bar: a UIKit bar takes every touch inside its own frame.
+                        .padding(.bottom, max(0, barHeight - bottomInset) + 2)
                 }
             }
             #endif
@@ -76,9 +79,13 @@ struct TabShell<Content: View>: View {
                     .allowsHitTesting(front)
                     .accessibilityHidden(!front)
                     .zIndex(front ? 1 : 0)
-                    // Only the fade and a hint of depth animate; nothing inside the room is swept into the transaction.
-                    .animation(reduceMotion ? .easeInOut(duration: 0.15) : .smooth(duration: 0.24)) {
-                        $0.opacity(front ? 1 : 0).scaleEffect(front || reduceMotion ? 1 : 0.985)
+                    // Owner, 6 Nov 2026: «ولاهب بالمرونه… بالانتقال بالتحريك». The room arriving rises out of a soft focus on a light spring
+                    // while the one leaving sinks back; only these few properties animate, nothing inside the room is swept along.
+                    .animation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.38, dampingFraction: 0.82)) {
+                        $0.opacity(front ? 1 : 0)
+                            .scaleEffect(front || reduceMotion ? 1 : 0.96)
+                            .blur(radius: front || reduceMotion ? 0 : 8)
+                            .offset(y: front || reduceMotion ? 0 : 14)
                     }
             }
         }
@@ -100,69 +107,83 @@ struct TabShell<Content: View>: View {
         selection = id
     }
 
-    /// Owner, 5 Nov 2026: «الشريط السفلي تحت لازال غبي وقذر ولاهب مرن». One Liquid Glass capsule that responds to touch, with a glass lens
-    /// that glides to the chosen room on a spring; a finger can also slide along the bar and the lens follows it, the way the system bar does.
+    /// Owner, 6 Nov 2026: «الجلاس ضعيف… ولاهب بالمرونه اطلاقاً». The hand-drawn capsule never refracted or moved like the system bar, so the
+    /// bar is now the system's own `UITabBar` (Liquid Glass, the liquid selection lens, press and drag-to-switch), holding every room with no
+    /// «More» (a standalone bar has no More tab; owner FB-15). «خصّص» stays out of it and lights no tab.
     private var fixedBar: some View {
-        let lit = scrubbing ?? selection
-        return GlassEffectContainer(spacing: 0) {
-            HStack(spacing: 0) {
-                ForEach(barTabs) { tab in
-                    tabButton(tab, lit: lit == tab.id)
-                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("madar-tab-bar")) } action: { tabFrames[tab.id] = $0 }
-                }
-            }
-            .padding(4)
-            .coordinateSpace(.named("madar-tab-bar"))
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 10, coordinateSpace: .named("madar-tab-bar"))
-                    .onChanged { value in
-                        let hit = tabFrames.first { $0.value.insetBy(dx: 0, dy: -30).contains(value.location) }?.key
-                        if let hit, hit != scrubbing { withAnimation(lensAnimation) { scrubbing = hit } }
-                    }
-                    .onEnded { _ in
-                        if let target = scrubbing { select(target) }
-                        withAnimation(lensAnimation) { scrubbing = nil }
-                    }
-            )
-            .glassEffect(.regular.interactive(), in: .capsule)
-        }
-        .animation(lensAnimation, value: selection)
-        .sensoryFeedback(.selection, trigger: lit)
-        .accessibilityElement(children: .contain).accessibilityAddTraits(.isTabBar).accessibilityIdentifier("fixed-tab-bar")
-        .padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 2)
-        .ignoresSafeArea(.keyboard)
+        MadarSystemTabBar(tabs: barTabs, selection: selection, accent: theme.accent, ink: theme.ink, select: select)
+            .accessibilityIdentifier("fixed-tab-bar")
+            .ignoresSafeArea(.container, edges: .bottom)
+            .ignoresSafeArea(.keyboard)
+            .sensoryFeedback(.selection, trigger: selection)
+    }
+}
+
+/// The system tab bar hosted alone: it draws, refracts and animates itself; Madar only feeds it rooms and reads the tap.
+private struct MadarSystemTabBar: UIViewRepresentable {
+    let tabs: [FoundationTab]
+    let selection: String
+    let accent: Color
+    let ink: Color
+    let select: (String) -> Void
+    @Environment(\.layoutDirection) private var layoutDirection
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> UITabBar {
+        let bar = UITabBar()
+        bar.delegate = context.coordinator
+        bar.isTranslucent = true
+        return bar
     }
 
-    private var lensAnimation: Animation { reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.34, dampingFraction: 0.78) }
-
-    private func tabButton(_ tab: FoundationTab, lit: Bool) -> some View {
-        let selected = selection == tab.id
-        return Button { select(tab.id) } label: {
-            VStack(spacing: 2) {
-                Group {
-                    if tab.symbol.hasPrefix("Madar") { Image(tab.symbol + (lit ? "Selected" : "")).renderingMode(.template) }
-                    else { Image(systemName: lit ? tab.symbol + ".fill" : tab.symbol).font(.system(size: 22, weight: .light)) }
-                }
-                .frame(width: 26, height: 26)
-                .scaleEffect(lit && !reduceMotion ? 1.08 : 1)
-                Text(tab.title).font(MadarTypography.fine()).lineLimit(1).minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(lit ? theme.accent : theme.ink.opacity(0.78))
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background {
-                if lit {
-                    Capsule()
-                        .fill(theme.accent.opacity(scrubbing == nil ? 0.13 : 0.2))
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.35), lineWidth: 0.6))
-                        .matchedGeometryEffect(id: "lens", in: lens)
-                        .scaleEffect(scrubbing != nil && !reduceMotion ? 1.06 : 1)
-                }
-            }
-            .contentShape(Rectangle())
+    func updateUIView(_ bar: UITabBar, context: Context) {
+        let coordinator = context.coordinator
+        coordinator.select = select
+        bar.semanticContentAttribute = layoutDirection == .rightToLeft ? .forceRightToLeft : .forceLeftToRight
+        bar.tintColor = UIColor(accent)
+        bar.unselectedItemTintColor = UIColor(ink.opacity(0.72))
+        if coordinator.ids != tabs.map(\.id) {
+            coordinator.ids = tabs.map(\.id)
+            bar.setItems(tabs.map(Self.item), animated: false)
+            bar.standardAppearance = Self.appearance
+            bar.scrollEdgeAppearance = Self.appearance
         }
-        .buttonStyle(.madarPlain)
-        .accessibilityIdentifier("tab-" + tab.id)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        let target = bar.items?.first { $0.accessibilityIdentifier == "tab-" + selection }
+        if bar.selectedItem !== target { bar.selectedItem = target }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITabBar, context: Context) -> CGSize? {
+        let width = proposal.width ?? uiView.window?.bounds.width ?? 390
+        return CGSize(width: width, height: uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height)
+    }
+
+    private static func item(_ tab: FoundationTab) -> UITabBarItem {
+        let custom = tab.symbol.hasPrefix("Madar")
+        let image = custom ? UIImage(named: tab.symbol)?.withRenderingMode(.alwaysTemplate) : UIImage(systemName: tab.symbol)
+        let selected = custom ? UIImage(named: tab.symbol + "Selected")?.withRenderingMode(.alwaysTemplate) : UIImage(systemName: tab.symbol + ".fill")
+        let item = UITabBarItem(title: tab.title, image: image, selectedImage: selected ?? image)
+        item.accessibilityIdentifier = "tab-" + tab.id
+        return item
+    }
+
+    private static var appearance: UITabBarAppearance {
+        let appearance = UITabBarAppearance()
+        let font = UIFontMetrics(forTextStyle: .caption2).scaledFont(for: UIFont(name: "thmanyahsans-Bold", size: 11) ?? .systemFont(ofSize: 11, weight: .semibold))
+        for layout in [appearance.stackedLayoutAppearance, appearance.inlineLayoutAppearance, appearance.compactInlineLayoutAppearance] {
+            layout.normal.titleTextAttributes = [.font: font]
+            layout.selected.titleTextAttributes = [.font: font]
+        }
+        return appearance
+    }
+
+    final class Coordinator: NSObject, UITabBarDelegate {
+        var ids: [String] = []
+        var select: (String) -> Void = { _ in }
+        func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
+            guard let id = item.accessibilityIdentifier?.replacingOccurrences(of: "tab-", with: "") else { return }
+            select(id)
+        }
     }
 }
 
@@ -319,6 +340,8 @@ struct MadarRoomRoot: View {
                 else { BahwLobbyView(session: session) }
             }
             .safeAreaPadding(.bottom, session.accessoryHiders.isEmpty ? session.tabBarHeight : 0)
+            // Every scrolling page in the room, settings and pushed pages included, fades softly under the clock instead of a hard cut.
+            .scrollEdgeEffectStyle(.soft, for: .top)
         }
     }
 }
@@ -504,5 +527,6 @@ struct MadarTopClip: Shape {
     func path(in rect: CGRect) -> Path { Path(CGRect(x: rect.minX - 400, y: rect.minY, width: rect.width + 800, height: rect.height + 2000)) }
 }
 extension View {
-    func madarTopClipped() -> some View { clipShape(MadarTopClip()) }
+    /// Owner, 6 Nov 2026: «مشطوف». The hard cut under the clock is gone: the system's soft scroll edge fades the ink out under the status bar.
+    func madarTopClipped() -> some View { scrollEdgeEffectStyle(.soft, for: .top) }
 }

@@ -7,8 +7,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
             "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00", "MADAR_UI_PRAYER_FIXTURE": "homeShowcase"]
         app.launch()
-        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
-        if app.buttons["first-run-continue"].waitForExistence(timeout: 2) { app.buttons["first-run-continue"].tap() }
+        finishOnboarding(app)
         openReminders(app)
         let toggle = app.switches["setting-salah.liveActivity"]
         XCTAssertEqual(toggle.value as? String, "0")
@@ -30,8 +29,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
             "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00", "MADAR_UI_PRAYER_FIXTURE": "homeShowcase"]
         app.launch()
-        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
-        if app.buttons["first-run-continue"].waitForExistence(timeout: 2) { app.buttons["first-run-continue"].tap() }
+        finishOnboarding(app)
         app.buttons["tab-prayer"].tap()
         let customize = app.buttons["prayer-customize"]
         XCTAssertTrue(customize.waitForExistence(timeout: 10)); customize.tap()
@@ -93,5 +91,26 @@ import XCTest
     private func capture(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name
         attachment.lifetime = .keepAlways; add(attachment)
+    }
+
+    private func finishOnboarding(_ app: XCUIApplication) {
+        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
+        let start = app.buttons["first-run-continue"]
+        if start.waitForExistence(timeout: 2) {
+            start.tap()
+            if start.exists && start.isHittable { start.tap() }
+        }
+        // A store without a fixture reaches the location step: choose a city by hand, then «ليس الآن» for photos.
+        let city = app.buttons["first-run-city"]
+        guard city.waitForExistence(timeout: 2) else { return }
+        city.tap()
+        let field = app.textFields["city-search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), app.debugDescription); field.tap(); field.typeText("الرياض")
+        let hit = app.buttons["city-hit-الرياض"]
+        XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
+        if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
+        let later = app.buttons["first-run-continue"]
+        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
+        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
     }
 }
