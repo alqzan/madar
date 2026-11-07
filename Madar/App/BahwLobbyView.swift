@@ -62,8 +62,20 @@ struct BahwGridLayout: Layout {
     }
 }
 
+private struct BahwMinuteTimelineSchedule: TimelineSchedule, Equatable, Sendable {
+    let isActive: Bool
+
+    func entries(from startDate: Date, mode: Mode) -> AnySequence<Date> {
+        guard isActive else { return AnySequence(EmptyCollection<Date>()) }
+        let minuteStart = Date(timeIntervalSince1970: floor(startDate.timeIntervalSince1970 / 60) * 60)
+        let schedule = PeriodicTimelineSchedule(from: minuteStart, by: 60)
+        return AnySequence(schedule.entries(from: startDate, mode: mode))
+    }
+}
+
 struct BahwLobbyView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isFrontRoom) private var isFrontRoom
     @Bindable var session: AppSession
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var arranging = false
@@ -77,7 +89,7 @@ struct BahwLobbyView: View {
     private var service: AppBahwService { .init(session: session) }
     private var layout: BahwLayoutValue { BahwLayoutValue(session.values["bahw.layout"]) }
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { _ in
+        TimelineView(BahwMinuteTimelineSchedule(isActive: isFrontRoom)) { _ in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header.padding(.top, 8).padding(.bottom, 4)
