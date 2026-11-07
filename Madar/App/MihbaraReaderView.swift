@@ -787,9 +787,11 @@ struct MihbaraReaderView: View {
             initialLocator = startLocator
             currentLocator = startLocator
             let context = ModelContext(app.container)
-            let sessions = (try? context.fetch(FetchDescriptor<ReadingSession>()))?.filter {
-                $0.bookID == book.id && $0.deletedAt == nil && $0.mergedInto == nil
-            } ?? []
+            let bookID = book.id
+            let sessionDescriptor = FetchDescriptor<ReadingSession>(predicate: #Predicate<ReadingSession> {
+                $0.bookID == bookID && $0.deletedAt == nil && $0.mergedInto == nil
+            })
+            let sessions = (try? context.fetch(sessionDescriptor)) ?? []
             readingHistorySeconds = sessions.reduce(0) { $0 + max(0, $1.activeSeconds) }
             readingHistoryProgression = sessions.reduce(0.0) { max($0, $1.endProgression) }
             sessionStartLocator = startLocator
