@@ -110,6 +110,7 @@ import UIKit
         let synchronous = try service.home(), background = try await service.homeOffMain()
         XCTAssertEqual(background.today, synchronous.today)
         XCTAssertEqual(background.selection.days, synchronous.selection.days)
+        XCTAssertEqual(background.echoes, synchronous.echoes)
         XCTAssertEqual(background.days.map(\.id), synchronous.days.map(\.id))
         XCTAssertEqual(background.days.map { $0.lines.map(\.text) }, synchronous.days.map { $0.lines.map(\.text) })
         let syncDay = try service.day(yesterday), backgroundDay = try await service.dayOffMain(yesterday)

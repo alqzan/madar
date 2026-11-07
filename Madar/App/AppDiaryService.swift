@@ -45,11 +45,20 @@ struct DiaryHomeSnapshot {
     let echoes: [DiaryEcho]
     let todayPage: DiaryDisplayDay
 }
-private struct DiaryHomePlan {
+private struct DiaryHomePlan: Sendable {
     let selection: DiaryMemorySelection
     let echoes: [DiaryEcho]
     let visible: Set<GregorianDay>
     let rendered: Set<GregorianDay>
+}
+private struct DiaryHomePlanConfiguration: Sendable {
+    let match: FirstCalendar
+    let includeDayOne: Bool
+    let yearsBack: Int?
+    let noMemory: String
+    let zone: TimeZone
+    let hijriSource: HijriSource
+    let sightingOffset: Int
 }
 private struct DiaryDayReadConfiguration: Sendable {
     let timeZoneID: String
@@ -118,15 +127,38 @@ private struct DiaryDayReadConfiguration: Sendable {
     func homeOffMain(match: FirstCalendar? = nil) async throws -> DiaryHomeSnapshot {
         try authorizeRead()
         let today = try currentDay(), facts = try await memoryFactsOffMain()
-        let plan = homePlan(facts: facts, today: today, match: match)
+        let configuration = homePlanConfiguration(match: match)
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let plan = Self.projectHomePlan(facts: facts, today: today, configuration: configuration)
+            try Task.checkCancellation()
+            return plan
+        }
+        let plan = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
         let lines = try await liveAutoLinesOffMain(for: plan.rendered)
         try authorizeRead()
         return try await renderHomeOffMain(today: today, plan: plan, automaticLines: lines)
     }
     private func homePlan(facts: [DiaryMemoryDay], today: GregorianDay, match: FirstCalendar?) -> DiaryHomePlan {
-        let selection = memorySelection(facts: facts, today: today, match: match)
+        Self.projectHomePlan(facts: facts, today: today, configuration: homePlanConfiguration(match: match))
+    }
+    private func homePlanConfiguration(match: FirstCalendar?) -> DiaryHomePlanConfiguration {
+        let zone = app.activePlace.timeZone
+        let hijriSource = HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura
+        let sightingOffset = Int(app.number("core.hijriOffset"))
+        let resolvedMatch = match ?? preferredMatch
+        return DiaryHomePlanConfiguration(match: resolvedMatch, includeDayOne: app.bool("notes.includeDayOne"),
+            yearsBack: app.values["notes.yearsBack"]?.number.map(Int.init), noMemory: app.string("notes.noMemory"),
+            zone: zone, hijriSource: hijriSource, sightingOffset: sightingOffset)
+    }
+    nonisolated private static func projectHomePlan(
+        facts: [DiaryMemoryDay], today: GregorianDay, configuration: DiaryHomePlanConfiguration
+    ) -> DiaryHomePlan {
+        let selection = DiaryMemories.select(days: facts, today: today, match: configuration.match,
+            includeDayOne: configuration.includeDayOne, yearsBack: configuration.yearsBack, noMemory: configuration.noMemory,
+            zone: configuration.zone, hijriSource: configuration.hijriSource, sightingOffset: configuration.sightingOffset)
         let recent = facts.map(\.day).filter { $0 < today }.sorted(by: >).prefix(5)
-        let echoes = DiaryMemories.echoes(days: facts, today: today, includeDayOne: app.bool("notes.includeDayOne"), zone: app.activePlace.timeZone)
+        let echoes = DiaryMemories.echoes(days: facts, today: today, includeDayOne: configuration.includeDayOne, zone: configuration.zone)
         let visible = Set(selection.days + Array(recent) + echoes.compactMap(\.day))
         return DiaryHomePlan(selection: selection, echoes: echoes, visible: visible, rendered: visible.union([today]))
     }
