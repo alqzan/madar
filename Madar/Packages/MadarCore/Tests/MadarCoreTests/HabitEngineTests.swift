@@ -96,6 +96,17 @@ struct HabitEngineTests {
         let undo = try HabitEngine.evaluate(rules: [r], facts: [baseline,a,b,fact("2026-10-01",-1)], today: day("2026-10-01"), days: days)
         #expect(undo.current?.value == 3)
     }
+    @Test func indexedFactsKeepStoredKeysAndOriginalAdditionOrder() throws {
+        var r = rule("2026-10-01"); r.measure = .count; r.target = 1
+        let first = fact("2026-10-01", Int.max, key: "")
+        let subtract = fact("2026-10-02", -1, key: "2026-10-01")
+        let add = fact("2026-10-01", 1, key: "")
+        let result = try HabitEngine.evaluate(rules: [r], facts: [first, subtract, add], today: day("2026-10-02"), days: days)
+        #expect(result.periods.first?.value == Int.max)
+        #expect(throws: CoreError.invalidCommand) {
+            try HabitEngine.evaluate(rules: [r], facts: [first, add, subtract], today: day("2026-10-02"), days: days)
+        }
+    }
     @Test func hijriCorrectionDoesNotMoveARecordedRamadanPeriod() throws {
         var r=rule("2027-03-08",frequency:.monthly);r.hijri=true;r.monthDays=[30]
         let a=try HabitEngine.evaluate(rules:[r],facts:[fact("2027-03-08",key:"h:1448-09")],today:day("2027-03-09"),days:days,calendarChanges:[.init(day:day("2027-03-09"),source:.sighting,offset:1)])

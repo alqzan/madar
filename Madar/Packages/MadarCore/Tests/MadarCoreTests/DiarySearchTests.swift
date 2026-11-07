@@ -44,6 +44,27 @@ struct DiarySearchTests {
         #expect(hit("كتاب") && hit("والكتاب") && hit("صبر") && hit("الكتاب صبر"))
         #expect(!hit("قلم") && !hit("كتاب قلم"))
     }
+    @Test func bulkSearchKeepsArabicWordsDateAndTagFilters() throws {
+        let p = try parser(tags: ["سفر"])
+        let docs = [
+            DiarySearchDocument(id: "match", day: try GregorianDay("2025-10-15"), text: "بالصبر أسافر", tags: ["سَفَر"]),
+            DiarySearchDocument(id: "wrong-year", day: try GregorianDay("2026-10-15"), text: "الصبر أسافر", tags: ["سفر"]),
+            DiarySearchDocument(id: "wrong-tag", day: try GregorianDay("2025-10-15"), text: "الصبر أسافر", tags: ["بيت"]),
+            DiarySearchDocument(id: "wrong-word", day: try GregorianDay("2025-10-15"), text: "رحلة سعيدة", tags: ["سفر"])
+        ]
+        let chips: [DiarySearchChip] = [.init(label: "2025", rule: .year(2025, .gregorian)), .init(label: "سفر", rule: .tag("سفر")), .init(label: "صبر", rule: .words("صبر"))]
+        #expect(try p.matching(docs, chips: chips).map(\.id) == ["match"])
+    }
+    @Test func cancelledBulkSearchDoesNotReturnOldResults() async throws {
+        let p = try parser()
+        let docs = [DiarySearchDocument(id: "old", day: try GregorianDay("2026-10-15"), text: "الصبر")]
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try p.matching(docs, chips: [.init(label: "الصبر", rule: .words("الصبر"))])
+        }
+        do { _ = try await task.value; Issue.record("A canceled search must not publish its results") }
+        catch is CancellationError { }
+    }
     @Test func monthOnlyRangeRunsFromTheFirstToTheLastDay() throws {
         #expect(try parser().parse("من مايو إلى يونيو").map(\.rule)==[.range(try GregorianDay("2026-05-01"),try GregorianDay("2026-06-30"))])
         #expect(try parser().parse("من فبراير ٢٠٢٤ إلى فبراير ٢٠٢٤").map(\.rule)==[.range(try GregorianDay("2024-02-01"),try GregorianDay("2024-02-29"))])

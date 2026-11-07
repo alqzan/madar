@@ -136,6 +136,13 @@ public enum HabitEngine {
         for rule in rules { try rule.validate() }
         guard let first = rules.first, first.effectiveFrom <= today, (1...3).contains(breakAfter) else { return .init(periods: [], streak: 0, consecutiveMisses: 0) }
         var identities = Set<UUID>(); let facts = facts.filter { identities.insert($0.id).inserted }
+        // Keep original order for overflow checks while indexing each fact only once.
+        var factsByDay: [GregorianDay: [(Int, HabitFact)]] = [:]
+        var factsByKey: [String: [(Int, HabitFact)]] = [:]
+        for (index, fact) in facts.enumerated() where fact.day >= first.effectiveFrom && fact.day <= today && !pauses.contains(where: { $0.contains(fact.day) }) {
+            if fact.periodKey.isEmpty { factsByDay[fact.day, default: []].append((index, fact)) }
+            else { factsByKey[fact.periodKey, default: []].append((index, fact)) }
+        }
         func calendar(at day:GregorianDay)->MadarCalendarDays {
             guard let change=orderedCalendars.last(where:{$0.day<=day})else{return days}
             return MadarCalendarDays(zone:days.zone,source:change.source,offset:change.offset)
@@ -155,6 +162,7 @@ public enum HabitEngine {
             let rule = rules.last(where: { $0.effectiveFrom < end && $0.effectiveFrom <= today && $0.frequency == atStart.frequency }) ?? atStart
             if rule.frequency != lastFrequency { streak = 0; misses = 0; lastFrequency = rule.frequency }
             var due: [GregorianDay] = [], scheduled = 0, eligible = 0, day = cursor
+            var periodFacts: [(Int, HabitFact)] = []
             func isScheduled(_ day: GregorianDay) -> Bool {
                 let h = periodDays.hijri(day), monthLength = rule.hijri ? periodDays.hijriMonthLength(containing: day) : MadarCalendarDays.gregorianMonthLength(year: day.year, month: day.month)
                 var isDue = true
@@ -167,6 +175,7 @@ public enum HabitEngine {
                 return isDue && !rule.restWeekdays.contains(weekday(day))
             }
             while day < end {
+                if let found = factsByDay[day] { periodFacts.append(contentsOf: found) }
                 if isScheduled(day) {
                     scheduled += 1
                     if day >= first.effectiveFrom && !pauses.contains(where: { $0.contains(day) }) { due.append(day); eligible += 1 }
@@ -182,10 +191,11 @@ public enum HabitEngine {
             let prorated = (base / divisor) * eligible + ((base % divisor) * eligible + divisor - 1) / divisor
             let target = designated ? eligible : (eligible == 0 ? 0 : max(1, prorated))
             let key = periodKey(cursor, rule: rule, days: periodDays)
-            let activeFacts = facts.filter { fact in fact.day >= first.effectiveFrom && (fact.periodKey.isEmpty ? (fact.day >= cursor && fact.day < end) : fact.periodKey == key) && fact.day <= today && (fact.unit == nil || fact.unit == rule.unit) && !pauses.contains(where: { $0.contains(fact.day) }) }
+            if let found = factsByKey[key] { periodFacts.append(contentsOf: found) }
+            periodFacts.sort { $0.0 < $1.0 }
             // Events retain their stored day/period key; evaluate by actual day for policy transitions and weekly history.
             var sum = 0
-            for fact in activeFacts { let added = sum.addingReportingOverflow(fact.delta); guard !added.overflow else { throw CoreError.invalidCommand }; sum = added.partialValue }
+            for (_, fact) in periodFacts where fact.unit == nil || fact.unit == rule.unit { let added = sum.addingReportingOverflow(fact.delta); guard !added.overflow else { throw CoreError.invalidCommand }; sum = added.partialValue }
             let value = max(0, sum)
             let outcome: HabitOutcome = target == 0 ? .excluded : value >= target ? .complete : (rule.minimum.map { value >= min($0, target) } ?? false) ? .minimum : end <= today ? .missed : .waiting
             let result = HabitPeriodResult(key: key, start: cursor, end: end, rule: rule, dueDays: due, target: target, value: value, outcome: outcome)

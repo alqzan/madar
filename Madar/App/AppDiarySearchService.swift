@@ -3,17 +3,34 @@ import SwiftData
 import MadarCore
 import MadarData
 
-struct DiarySearchIndex {
+struct DiarySearchIndex: Sendable {
     let documents: [DiarySearchDocument]
     let parser: DiarySearchParser
-    var terms: [(String, String, Int)] {
-        let places = parser.places.map { place in (place,"في " + place,Set(documents.filter { $0.place == place }.map(\.day)).count) }
-        let projects = parser.projects.map { name,id in (name,"⌗" + name,Set(documents.filter { $0.projectID == id }.map(\.day)).count) }
-        let allTags = Set(documents.flatMap(\.tags)).sorted()
-        var seenTags=Set<String>()
-        let tags = allTags.filter { seenTags.insert(DiarySearchParser.normalize($0)).inserted }.map { tag in ("#" + tag,"#" + tag,Set(documents.filter { doc in doc.tags.contains { DiarySearchParser.normalize($0)==DiarySearchParser.normalize(tag) } }.map(\.day)).count) }
-        _ = projects // Projects left the app (owner, 5 Nov 2026).
-        return (places+tags).sorted { $0.0 < $1.0 }
+    let terms: [(String, String, Int)]
+    init(documents: [DiarySearchDocument], parser: DiarySearchParser) {
+        self.documents = documents
+        self.parser = parser
+        var placeDays: [String: Set<GregorianDay>] = [:]
+        var tagDays: [String: Set<GregorianDay>] = [:]
+        var allTags: Set<String> = []
+        for document in documents {
+            if let place = document.place { placeDays[place, default: []].insert(document.day) }
+            for tag in document.tags {
+                allTags.insert(tag)
+                tagDays[DiarySearchParser.normalize(tag), default: []].insert(document.day)
+            }
+        }
+        let places = parser.places.map { ($0, "في " + $0, placeDays[$0]?.count ?? 0) }
+        var seenTags: Set<String> = []
+        let tags = allTags.sorted().compactMap { tag -> (String, String, Int)? in
+            let key = DiarySearchParser.normalize(tag)
+            guard seenTags.insert(key).inserted else { return nil }
+            return ("#" + tag, "#" + tag, tagDays[key]?.count ?? 0)
+        }
+        terms = (places + tags).sorted { $0.0 < $1.0 }
+    }
+    @concurrent func matching(_ chips: [DiarySearchChip]) async throws -> [DiarySearchDocument] {
+        try parser.matching(documents, chips: chips)
     }
 }
 extension AppDiaryService {

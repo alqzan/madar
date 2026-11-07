@@ -107,6 +107,8 @@ Codex takes these first, in order, before any other queue. Feature freeze until 
 
 | RV-01 | مراجعة أحدث أعمال كلود وأجزاء المشروع — ٧ نوفمبر | تصحيح إنهاء الكتاب بعد فشل حفظ الموضع، وإلغاء معاينة PDF أثناء النسخ، وسلسلة عادة الورد المرتبطة بالقرآن، وتجاوز ضرب نسبة الراتب الكبير. اختبارات المحبرة والحزم وحساب المال مذكورة في التسليم. مراجعة مستقلة للمال: لا Critical/High ناتج عن التغيير. المتبقي: التحقق من تمثيل مخطط الحفظ الجزئي عند عبور وجهين؛ حسابات مالية أخرى للأرقام القصوى مثل تنبيه حد الفئة تحتاج فحصًا؛ والنسخة الجديدة لم تُجرّب على جهاز المالك. | done — الإصلاحات المختبرة؛ المراجعة الشاملة والتجربة على الجهاز لم تكتمل |
 
+| PERF-01 | «اختبره… أخف أسرع أسهل للاستخدام بشكل أكبر بكثير» — ٧ نوفمبر | تسريع مطابقة بحث المذكرات وتجهيز فهرسه، مع إظهار التقدم وإلغاء النتائج القديمة؛ فهرسة وقائع العادات مرة واحدة مع الحفاظ على الترتيب والمفاتيح؛ وقراءة ملف PDF والتحقق منه خارج واجهة البحث. قياس تجريبي على الماك: بحث ٢٬٢٦٣ نصًا ١٧٧←٥ مللي ثانية للمطابقة؛ عادة ٥ سنوات ١٩٫٨←٠٫٣ ثانية للمحرك. النتيجة ليست قياسًا على iPhone أو لفتح التطبيق كاملًا. | done — التحسينات المختبرة؛ بقي القياس على iPhone وبقية فرص الأداء |
+
 ## Owner follow-up — 1 Nov 2026
 
 Owner approved the other 51 states from the pending gallery; real-device/use acceptance remains separate. M2-V10 alone is reopened to match its canonical design, including its crafted details. Spec: §7.4 Quran log in `docs/HANDOFF/sections/11-r-quran.md`, shared shapes §5, existing Quran fixes; no new data or scheduling rule.
@@ -597,17 +599,6 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
-## Handover — FB-39b الميزات الموافق عليها، FB-41 إشعار الصلاة الواحد، FB-40 رفع TestFlight — 2026-11-06 — Claude
-- **Works now:** القضاء بالعدد (إضافة وقضاء الأقدم)، عادات «كل عدد من الأيام» وتاريخ بداية حر (المخطط V15)، تحويل بين الحسابات وسحب نقدي، نقل بين المظاريف والفائض والاحتياطي (سجل المظروف يسمّي الطرف الآخر)، التحليل بالشهر والسنة، `bahw.smartPresence` = متوسط، وإشعار صلاة واحد افتراضيًا (FB-41).
-- **Verified:** `swift test` MadarCore ١٨٣ نجحت؛ MadarCommands (عادات ٢٠، مال ٨٠) نجحت؛ MadarPrayer `qadaByCount…` نجح؛ MadarData ترحيل V14←V15 نجح. على `Madar 15 Pro Max`: `test_FB39_QadaByCount…`، `testEveryFewDaysHabitWithFreeFirstDay`، `testEmptyAddComplete…`، `testCashWithdrawalBetweenOwnAccounts`، و`RoomNotificationsIntegrationTests` (١٧) نجحت. و`testEnvelopeMoveToAnotherEnvelope` و`testMonthAndYearPeriods` و`testCycleWeekDaySelectionAndHistory` نجحت. فشل `test_M1T09_OldMissed…` القديم (ينتظر «تراجع» بعد الحفظ، أُزيل في FB-32).
-- **Fixed in tests:** مساعد `finishOnboarding` في FoundationUITests لم يكن يتخطى خطوة الموقع، فكانت اختبارات الصلاة تبقى في البهو؛ صار مثل مساعد البهو.
-- **Differences left:** لم تُقارن الشاشات الجديدة بتصميم مرجعي (لا لوحة مرجعية لها)؛ صُممت بأسلوب غرفة المال وأوراقها.
-- **Not verified:** لا تجربة على iPhone المالك. لم يُفحص وصول الإشعار الفعلي على جهاز.
-- **Bar (FB-42/43):** الشريط السفلي الآن `UITabBar` النظام مستضافًا في `TabShell.swift` (`MadarSystemTabBar`)؛ ارتفاعه فوق مؤشر الرجوع يُضاف لمساحة الغرف الآمنة. حافة تمرير ناعمة في كل صفحات الغرف (`scrollEdgeEffectStyle(.soft, for: .top)`)، ومفاتيح الإعدادات بجانب عناوينها. نسخة 8. تحقّق: لقطات المحاكي (البهو، الصلاة، الإعدادات، الخصوصية)؛ `BahwCustomizeUITests` نجح منه `testRoomContentVisibility…` و`testSmartPresenceLevels…`. ما زالت تفشل لأسباب قديمة: ثلاثة في BahwCustomize (تبحث عن `bahw-custom-blocks` في صفحة الإعدادات الأولى قبل FB-39، وعن «تراجع» أُزيل في FB-32)، و`testActivitySetting…` (ينتظر «تراجع»)، و`testPrayerCustomizeExposes…` (فشل أيضًا على الكود السابق `6855558d`، والبطاقة `riwaq` غير قابلة للنقر في الاختبار).
-- **Next:** النسخة (8) رُفعت إلى App Store Connect؛ ملاحظات المالك عليها أولًا؛ `test_M1T09_OldMissed…` ما زال يعتمد على التراجع بعد الحفظ (قبل FB-32).
-- **Model/effort:** Claude Opus 5.5؛ الجهد غير مكشوف. مراجعة المال بوكيل للقراءة فقط.
-- **Usage:** نافذة الخمس ساعات ٧٤٪ قبل الإيداع، والأسبوعي ٦٢٪.
-
 ## Handover — FB-45 تحسين عميق («/improve deep») — 2026-11-06 — Claude
 - **Works now:** «الأيام القادمة» في البهو تقرأ الراتب القادم، و«تمام الجزء ١٥» بوتيرة الحفظ، والرحلة الجارية، والأيام البيض، وعشر ذي الحجة. صور المذكرات لا تنهار (استئناف مزدوج). حذف النيّة بتراجع. كتلة المال المخفية تظهر ٤ ثوانٍ. «أنهيته؟» في قارئَي EPUB وPDF. حواشٍ للكتاب الورقي. أشهر سجل القرآن بالتقويمين. وأيام «شيء ينتظرك» بالتقويمين. وشاشات المال الفرعية تخفي الأرقام عند الخلفية.
 - **Verified:** `xcodebuild build` ← BUILD SUCCEEDED. `swift test --filter QuranNextJuzTests` ٣/٣ (قيم من حقائق المصحف: الجزء ٢ صفحات ٢٢–٤١). `swift test` MadarCore ١٨٣ نجحت. `swift test --filter Diary` في MadarCommands ٢٠ نجحت (منها `deleteIntentionTombstonesAndUndoRestores`). على `Madar 15 Pro Max`: `testUpcomingReadsSalaryAndWhiteDays` و`testUpcomingShowsGregorianDatesAndComparableRings` نجحا. `git diff --check` نظيف.
@@ -625,4 +616,13 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Not verified:** iPhone المالك وTestFlight بالتغييرات الجديدة؛ إلغاء PDF أثناء النسخ نفسه لم يُختبر زمنيًا؛ لم يُفحص كل المشروع أو كل حدود المبالغ.
 - **Next:** تحقق من حساب تنبيه حد الفئة عند المبالغ القصوى، ومن دلالة الحفظ الجزئي عبر وجهين في AppQuranService.swift؛ استكمل المراجعة والاختبارات على الجهاز.
 - **Model/effort:** Codex؛ النموذج والجهد غير مكشوفين؛ مساعدون للبحث ومراجعة المال.
+- **Usage:** غير مكشوف.
+
+## Handover — PERF-01 أداء وسهولة — 2026-11-07 — Codex
+- **Works now:** مطابقة البحث وقراءة PDF خارج الواجهة؛ فهرس البحث يحسب الوسوم مرة واحدة مع إشارات انتظار؛ حساب العادات لا يمسح الوقائع لكل فترة.
+- **Verified:** MadarCore `swift test` 185/185، واختبارات البحث النهائية 9/9، وHabitPersistence/HabitWird 17/17؛ محاكي iOS 27.0: العادة ذات الفترة الحرة 1/1، بحث PDF 1/1، تكامل بحث المذكرات 1/1، بحث النتائج المتبدلة 1/1 في `codex-search-final-20261107.xcresult` بعد آخر تعديل.
+- **Differences left:** شاشة البحث تضيف مؤشر تجهيز الفهرس ومؤشر البحث؛ لقطات M3-V08-search-L وM3-V08-results-L في نتيجتي codex-diary-alert-before وcodex-diary-search-speed.
+- **Not verified:** القياس على iPhone المالك والبيانات الحقيقية، وإلغاء فهرسة PDF أثناء قراءة الملف؛ لم تُثبت سرعة التطبيق كلها. اختبار تعديل فلتر السنة يفشل على النسخة السابقة والحالية عند بقاء تنبيه «تطبيق»؛ السبب غير محسوم.
+- **Next:** تشخيص تنبيه تعديل الفلتر؛ تحديث اختبارَي Foundation القديمين (ينتظران تراجع الصلاة وزر الإعدادات القديم)؛ قياس فتح المال واليوميات على بيانات كبيرة ومراجعة تحسينات المال.
+- **Model/effort:** Codex، النموذج والجهد غير مكشوفين؛ مساعدين للبحث.
 - **Usage:** غير مكشوف.

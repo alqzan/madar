@@ -111,7 +111,28 @@ public struct DiarySearchParser: Sendable {
         return chips
     }
     public func matches(_ document:DiarySearchDocument, chips:[DiarySearchChip]) -> Bool {
-        chips.allSatisfy { chip in switch chip.rule {
+        let prepared = prepare(chips)
+        return matches(document, prepared: prepared)
+    }
+    /// Prepare each query once for the whole index, rather than normalising it for every document.
+    public func matching(_ documents: [DiarySearchDocument], chips: [DiarySearchChip]) throws -> [DiarySearchDocument] {
+        let prepared = prepare(chips)
+        var result: [DiarySearchDocument] = []
+        for (offset, document) in documents.enumerated() {
+            if offset.isMultiple(of: 64) { try Task.checkCancellation() }
+            if matches(document, prepared: prepared) { result.append(document) }
+        }
+        try Task.checkCancellation()
+        return result
+    }
+    private func prepare(_ chips: [DiarySearchChip]) -> [(DiarySearchRule, [Set<String>]?)] {
+        chips.map { chip in
+            if case .words(let words) = chip.rule { return (chip.rule, Self.wordVariants(words)) }
+            return (chip.rule, nil)
+        }
+    }
+    private func matches(_ document: DiarySearchDocument, prepared: [(DiarySearchRule, [Set<String>]?)]) -> Bool {
+        prepared.allSatisfy { rule, needles in switch rule {
         case .range(let a,let b): document.day>=a && document.day<=b
         case .month(let m,let y,let first): parts(document.day,first).month==m && (y==nil || parts(document.day,first).year==y)
         case .year(let y,let first): parts(document.day,first).year==y
@@ -120,7 +141,7 @@ public struct DiarySearchParser: Sendable {
         case .place(let place): Self.normalize(document.place ?? "")==Self.normalize(place)
         case .project(let id): document.projectID==id
         case .tag(let tag): document.tags.contains { Self.normalize($0)==Self.normalize(tag) }
-        case .words(let words): Self.contains(document.words,needles:Self.wordVariants(words))
+        case .words: Self.contains(document.words,needles:needles ?? [])
         } }
     }
     static func wordVariants(_ text:String) -> [Set<String>] {

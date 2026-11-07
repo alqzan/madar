@@ -3,6 +3,10 @@ import MadarCore
 import MadarDesign
 
 struct DiarySearchView: View {
+    private struct SearchRequest: Equatable {
+        let indexGeneration: Int
+        let chips: [DiarySearchChip]
+    }
     @Bindable var app: AppSession
     var initialQuery: String? = nil
     var initialQueryRequestID: UUID? = nil
@@ -11,6 +15,9 @@ struct DiarySearchView: View {
     @State private var query=""
     @State private var index:DiarySearchIndex?
     @State private var chips:[DiarySearchChip]=[]
+    @State private var results:[DiarySearchDocument]=[]
+    @State private var searching=false
+    @State private var indexGeneration=0
     @State private var failure:String?
     @State private var loadAttempt=0
     #if DEBUG
@@ -25,7 +32,6 @@ struct DiarySearchView: View {
     @State private var routedLetterID:UUID?
     @FocusState private var focused:Bool
     private var service:AppDiaryService { .init(app:app) }
-    private var results:[DiarySearchDocument] { guard let index,!chips.isEmpty else{return []};return index.documents.filter{index.parser.matches($0,chips:chips)} }
     var body:some View {
         NavigationStack {
             ScrollView {
@@ -46,7 +52,9 @@ struct DiarySearchView: View {
                         }.font(DiaryType.label).padding(.horizontal,12).frame(minHeight:44).background(theme.surface,in:.capsule).overlay{Capsule().stroke(theme.line)} } }}.scrollIndicators(.hidden)
                         if chips.contains(where:{if case .words=$0.rule {true}else{false}}) { Text("بحثت عن الكلمات: "+chips.compactMap{if case .words(let words)=$0.rule {words}else{nil}}.joined(separator:"، ")).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                         if !found.isEmpty { Text(arabicCount(found.count,["نتيجة واحدة","نتيجتان","نتائج","نتيجة"],service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
-                        if found.isEmpty {
+                        if searching {
+                            ProgressView("نبحث في مذكراتك…").font(DiaryType.label).accessibilityIdentifier("diary-search-loading")
+                        } else if found.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("لا أيام تطابق هذا البحث").font(DiaryType.heading).accessibilityIdentifier("diary-search-empty")
                                 Text("جرّب كلمة أقصر، أو احذف أحد الفلاتر لتوسيع البحث.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text"))
@@ -65,6 +73,8 @@ struct DiarySearchView: View {
                         Text("فهرس الكتاب").font(DiaryType.heading).foregroundStyle(theme.accent).padding(.top,12)
                         if index.terms.isEmpty {Text("تظهر هنا الأماكن والوسوم التي استخدمتها.").font(DiaryType.writing)}
                         ForEach(index.terms,id:\.1) { name,filter,count in Button {query=filter;focused=false} label:{HStack{Text(name).font(DiaryType.writing);Rectangle().fill(theme.line).frame(height:1);Text(PrayerCopy.days(count, digits: service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.frame(minHeight:44)}.buttonStyle(.madarPlain) }
+                    } else if failure == nil {
+                        ProgressView("نجهّز فهرس مذكراتك…").font(DiaryType.label).padding(.vertical, 12).accessibilityIdentifier("diary-search-index-loading")
                     }
                 }.padding(18)
             }.navigationBarTitleDisplayMode(.inline).scrollDismissesKeyboard(.interactively).background(theme.background).foregroundStyle(theme.ink)
@@ -86,6 +96,27 @@ struct DiarySearchView: View {
                     if !query.isEmpty { try? await Task.sleep(for:.milliseconds(220)); guard !Task.isCancelled else {return} }
                     chips=index?.parser.parse(query) ?? []
                 }
+                .onChange(of: chips) { _, _ in
+                    results = []
+                    searching = index != nil && !chips.isEmpty
+                }
+                .task(id: SearchRequest(indexGeneration: indexGeneration, chips: chips)) {
+                    guard let index, !chips.isEmpty else { results = []; searching = false; return }
+                    let requestChips = chips
+                    let requestGeneration = indexGeneration
+                    searching = true
+                    do {
+                        let matches = try await index.matching(requestChips)
+                        guard !Task.isCancelled, requestGeneration == indexGeneration, requestChips == chips else { return }
+                        results = matches
+                        searching = false
+                    } catch is CancellationError { return }
+                    catch {
+                        guard !Task.isCancelled, requestGeneration == indexGeneration, requestChips == chips else { return }
+                        results = []
+                        searching = false
+                    }
+                }
                 .alert("تعديل الفلتر",isPresented:Binding(get:{editing != nil},set:{if !$0{editing=nil}})){TextField("الكلمة أو التاريخ",text:$replacement);Button("تطبيق"){if let old=editing,let i=chips.firstIndex(where:{$0.id==old.id}),let parser=index?.parser {chips.replaceSubrange(i...i,with:parser.parse(replacement))};editing=nil};Button("إلغاء",role:.cancel){editing=nil}}
                 .sheet(isPresented:Binding(get:{reader != nil},set:{if !$0{reader=nil;readerEntryID=nil;readerEntryRouteID=nil}})){if let reader {DiaryDayView(app:app,day:reader,initialEntryID:readerEntryID,initialEntryRouteID:readerEntryRouteID).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}}
                 .fullScreenCover(isPresented: $letterHubOpen, onDismiss: { routedLetterID = nil }) {
@@ -104,6 +135,7 @@ struct DiarySearchView: View {
             }
             #endif
             index=try await service.searchIndexOffMain()
+            indexGeneration += 1
             chips=index?.parser.parse(query) ?? []
             failure=nil
         } catch { index=nil; chips=[]; failure="تعذّر فتح فهرس المذكرات. أعد المحاولة." }

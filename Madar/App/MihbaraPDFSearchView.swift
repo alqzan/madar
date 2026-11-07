@@ -122,7 +122,9 @@ struct MihbaraPDFSearchView: View {
         do {
             let authorized = app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized
             guard authorized else { return }
-            let bytes = try AppMihbaraService(app: app).pdfData(for: book)
+            let bytes = try await AppMihbaraService(app: app).pdfDataOffMain(for: book)
+            try Task.checkCancellation()
+            guard jobID == id, app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { return }
             let reader = PDFBookTextReader(data: bytes, language: book.language)
             total = try await reader.pageCount()
             for index in pages.count..<total {
