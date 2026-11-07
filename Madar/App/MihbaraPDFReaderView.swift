@@ -217,15 +217,21 @@ struct MihbaraPDFReaderView: View {
                 throw PDFReaderError.unreadable
             }
             #endif
-            let bytes = try await service.pdfDataOffMain(for: book)
+            async let bytesTask = service.pdfDataOffMain(for: book)
+            async let inkTask = try? service.pageInkOffMain(bookID: book.id)
+            let bytes = try await bytesTask
+            let savedInk = await inkTask
+            try Task.checkCancellation()
             guard document == nil, let opened = PDFDocument(data: bytes), !opened.isLocked, opened.pageCount > 0,
                   opened.page(at: 0) != nil else { throw PDFReaderError.unreadable }
             document = opened
-            inkLayer = makeInkLayer()
+            inkLayer = savedInk.map { makeInkLayer(saved: $0) }
             pageIndex = startPage.map { min(max($0, 0), opened.pageCount - 1) } ?? restoredIndex(count: opened.pageCount)
             let now = Date()
             beginSegment(at: now)
             readingClock = ActiveReadingClock(startedAt: now, foreground: scenePhase == .active && canRead)
+        } catch is CancellationError {
+            return
         } catch { self.error = madarUserMessage(error) }
     }
 
@@ -350,20 +356,18 @@ struct MihbaraPDFReaderView: View {
         readingClock = nil
     }
 
-    /// Drawings load with the file; a failed read leaves the reader open without the pen rather than risk overwriting them.
-    @MainActor private func makeInkLayer() -> MihbaraInkOverlay? {
-        do {
-            let bookID = book.id
-            let layer = MihbaraInkOverlay(saved: try service.pageInk(bookID: bookID)) { page, data in
-                do {
-                    try await app.executeBookCommand("ink.savePage", payload: ["bookID": .string(bookID.uuidString), "page": .number(Double(page)), "drawing": .string(data.base64EncodedString())])
-                } catch { app.errorMessage = madarUserMessage(error) }
-            }
-            layer.tool = inkTool
-            // One turn later, so PencilKit has registered the stroke with its undo manager before the bar asks it.
-            layer.onChange = { DispatchQueue.main.async { inkRevision += 1 } }
-            return layer
-        } catch { return nil }
+    /// A failed saved-drawing read leaves the reader open without the pen rather than risk overwriting them.
+    @MainActor private func makeInkLayer(saved: [Int: Data]) -> MihbaraInkOverlay {
+        let bookID = book.id
+        let layer = MihbaraInkOverlay(saved: saved) { page, data in
+            do {
+                try await app.executeBookCommand("ink.savePage", payload: ["bookID": .string(bookID.uuidString), "page": .number(Double(page)), "drawing": .string(data.base64EncodedString())])
+            } catch { app.errorMessage = madarUserMessage(error) }
+        }
+        layer.tool = inkTool
+        // One turn later, so PencilKit has registered the stroke with its undo manager before the bar asks it.
+        layer.onChange = { DispatchQueue.main.async { inkRevision += 1 } }
+        return layer
     }
 
     @MainActor private func setInking(_ on: Bool) {
