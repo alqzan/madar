@@ -109,6 +109,8 @@ Codex takes these first, in order, before any other queue. Feature freeze until 
 
 | PERF-01 | «اختبره… أخف أسرع أسهل للاستخدام بشكل أكبر بكثير» — ٧ نوفمبر | تسريع مطابقة بحث المذكرات وتجهيز فهرسه، مع إظهار التقدم وإلغاء النتائج القديمة؛ فهرسة وقائع العادات مرة واحدة مع الحفاظ على الترتيب والمفاتيح؛ وقراءة ملف PDF والتحقق منه خارج واجهة البحث. قياس تجريبي على الماك: بحث ٢٬٢٦٣ نصًا ١٧٧←٥ مللي ثانية للمطابقة؛ عادة ٥ سنوات ١٩٫٨←٠٫٣ ثانية للمحرك. النتيجة ليست قياسًا على iPhone أو لفتح التطبيق كاملًا. | done — التحسينات المختبرة؛ بقي القياس على iPhone وبقية فرص الأداء |
 
+| PERF-02 | «أول ما أفتح التطبيق يعلق» — ٧ نوفمبر | تقليل قراءات العادات المتكررة عند تجهيز لقطات الودجات وكتالوجها إلى قراءة واحدة لكل نشر، مع الحفاظ على إخفاء البيانات والأخطاء والقراءة الجديدة في النشر التالي. اختبار الودجات والخصوصية 4/4 على المحاكي. سبب تعليق iPhone لم يثبت بعد؛ يلزم قياس تجربة البناء 11 على الجهاز. بناء 0.1.0 (11) جاهز للأرشفة والرفع بطلب المالك. | ready for TestFlight |
+
 ## Owner follow-up — 1 Nov 2026
 
 Owner approved the other 51 states from the pending gallery; real-device/use acceptance remains separate. M2-V10 alone is reopened to match its canonical design, including its crafted details. Spec: §7.4 Quran log in `docs/HANDOFF/sections/11-r-quran.md`, shared shapes §5, existing Quran fixes; no new data or scheduling rule.
@@ -599,16 +601,6 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
-## Handover — FB-45 تحسين عميق («/improve deep») — 2026-11-06 — Claude
-- **Works now:** «الأيام القادمة» في البهو تقرأ الراتب القادم، و«تمام الجزء ١٥» بوتيرة الحفظ، والرحلة الجارية، والأيام البيض، وعشر ذي الحجة. صور المذكرات لا تنهار (استئناف مزدوج). حذف النيّة بتراجع. كتلة المال المخفية تظهر ٤ ثوانٍ. «أنهيته؟» في قارئَي EPUB وPDF. حواشٍ للكتاب الورقي. أشهر سجل القرآن بالتقويمين. وأيام «شيء ينتظرك» بالتقويمين. وشاشات المال الفرعية تخفي الأرقام عند الخلفية.
-- **Verified:** `xcodebuild build` ← BUILD SUCCEEDED. `swift test --filter QuranNextJuzTests` ٣/٣ (قيم من حقائق المصحف: الجزء ٢ صفحات ٢٢–٤١). `swift test` MadarCore ١٨٣ نجحت. `swift test --filter Diary` في MadarCommands ٢٠ نجحت (منها `deleteIntentionTombstonesAndUndoRestores`). على `Madar 15 Pro Max`: `testUpcomingReadsSalaryAndWhiteDays` و`testUpcomingShowsGregorianDatesAndComparableRings` نجحا. `git diff --check` نظيف.
-- **Verified (2):** `testPDFLastPageAsksFinishedAndMovesTheBook` (جديد: لا سؤال في الصفحة ١ من ٢، السؤال في الأخيرة، يُغلق القارئ والكتاب في «أنهيتها») و`QuranYearUITests` (٢) نجحت. فشل اختباران في `DiaryIntentionUITests` قبل بلوغ النيّة (لا يظهر `diary-today` عند ٧:٠٠ صباحًا، بلا لقطة)؛ تعديلي لا يمس ذلك المسار لكن لم أثبت أنه قديم بتشغيله على الكود السابق. وأُصلح: عتبة «أنهيته؟» في PDF تقرّب للأعلى (كتاب من صفحتين كان يُسأل من الأولى)، وحذف النيّة يعيد جدولة تذكيرها، و«عدّل» بقي ظاهرًا وبجانبه زر حذف.
-- **Differences left:** لقطة البهو بعد التعديل: `Artifacts/FB45/FB45-upcoming-after-L.png`، ولقطة «أنهيته؟» `FB45-pdf-finish-L` في نتيجة الاختبار. لم تُلتقط شاشات النيّة والحواشي الورقية.
-- **Not verified:** لا تجربة على iPhone المالك ولا رفع TestFlight. ظهور المال ٤ ثوانٍ في البهو لم يُجرَّب يدويًا على المحاكي.
-- **Next:** بقية جولة المساعدين في صف FB-45: تعديل البطاقة والالتزام واسم المظروف (مع مراجعة المال)، تنقّل إحصاءات الصلاة بالشهر، أسطر المذكرات التلقائية «أخفِ/اجعله سطري»، مقياس المصروف في «منذ ذاك اليوم»، إعدادات المال الأربعة بلا واجهة، البحث في العادات.
-- **Model/effort:** Claude Opus 5.5؛ الجهد غير مكشوف. مساعدو Haiku للقراءة فقط (غرفة لكل مساعد).
-- **Usage:** غير مكشوف.
-
 ## Handover — RV-01 مراجعة وإصلاحات — 2026-11-07 — Codex
 - **Works now:** حفظ موضع القراءة يسبق إنهاء الكتاب؛ إلغاء معاينة PDF يوقف عملها؛ سلسلة عادة الورد من القرآن؛ حساب نسب المال ٠–١٠٠٪ يتحمل مبالغ كبيرة ضمن Int.
 - **Verified:** `swift test` على MadarCore وMadarMoney وMadarData وMadarCommands وMadarPrayer وMadarQuran نجحت قبل الإصلاحات؛ بعدها HabitWird 1/1، PDFBookImport 8/8، BasisAndClose وCycleEngine 27/27. `xcodebuild test` على Madar 15 Pro Max، iOS 27.0: `testPDFLastPageAsksFinishedAndMovesTheBook` 1/1، النتيجة `codex-review-mihbara-r3-20261107.xcresult`.
@@ -626,3 +618,12 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Next:** تشخيص تنبيه تعديل الفلتر؛ تحديث اختبارَي Foundation القديمين (ينتظران تراجع الصلاة وزر الإعدادات القديم)؛ قياس فتح المال واليوميات على بيانات كبيرة ومراجعة تحسينات المال.
 - **Model/effort:** Codex، النموذج والجهد غير مكشوفين؛ مساعدين للبحث.
 - **Usage:** غير مكشوف.
+
+## Handover — PERF-02 بداية التطبيق وTestFlight — 2026-11-07 — Codex
+- **Works now:** نشر الودجات يشارك قراءة العادات خلال النشر الواحد ويحتفظ بفشل القراءة؛ رقم البناء 11.
+- **Verified:** `xcodebuild test` أربع حالات الودجات والخصوصية 4/4، `codex-startup-focused-20261107.xcresult`، على Madar 15 Pro Max/iOS 27.0؛ `git diff --check`.
+- **Differences left:** لا تغيير مرئي مقصود.
+- **Not verified:** تعليق البداية على iPhone المالك، أو أن التعديل وحده أزاله؛ الاتصال بالجهاز تجاوز المهلة. اختبار البهو القديم فشل متوقعًا تبويبًا باسم «البهو»؛ المجموعة الواسعة أُوقفت عند حالة طويلة.
+- **Next:** أرشفة ورفع 0.1.0 (11) ثم تجربة المالك للبداية؛ إن استمر التعليق فقِس فتح المخزن ولقطات الودجات ومهام البهو على الجهاز.
+- **Model/effort:** Codex؛ النموذج والجهد غير مكشوفين؛ مساعدون للبحث.
+- **Usage:** ٨٥٪ من نافذة الخمس ساعات عند آخر فحص.

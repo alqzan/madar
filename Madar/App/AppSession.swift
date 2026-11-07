@@ -1425,12 +1425,19 @@ final class AppSession {
         try? publishSnapshotNow()
         WidgetCenter.shared.reloadAllTimelines()
     }
-    private func publishSnapshotNow() throws {
+    func publishSnapshotNow(readHabitReadings: (() throws -> [HabitReading])? = nil) throws {
         if privacyScopeTransitionPending {
             try redactSensitiveWidgetSnapshots()
             return
         }
         let instant = prayerNow()
+        var habitResult: Result<[HabitReading], Error>?
+        func sharedHabitReadings() throws -> [HabitReading] {
+            if let habitResult { return try habitResult.get() }
+            let result = Result { try readHabitReadings?() ?? HabitRepository(context: ModelContext(container)).readings(at: instant) }
+            habitResult = result
+            return try result.get()
+        }
         try pendingInbox.publishGeneration(inboxGeneration())
         try publishNotificationBudget(at: instant)
         let prayerSource=try PrayerRepository(context:ModelContext(container)),place=prayerSource.place(at:instant),options=prayerSource.calculationOptions(at:instant)
@@ -1447,7 +1454,7 @@ final class AppSession {
         }
         let snapshot = SnapshotEnvelope(name: "foundation", generatedAt: instant, validUntil: instant.addingTimeInterval(3600), dayKey: key.dayKey, tzID: place.timeZoneID, privacy: SnapshotPrivacy(), payload: FoundationSnapshot(firstCalendar: string("core.firstCalendar"), numerals: string("core.numerals")))
         try snapshotStore.write(snapshot)
-        try publishRoomWidgetSnapshots(at:instant)
+        try publishRoomWidgetSnapshots(at:instant,readHabitReadings:sharedHabitReadings)
         publishPrayerNextSnapshot(at: instant, tzID: place.timeZoneID, dayKey: key.dayKey)
         if string("core.faceIDLock") == "app" {
             try redactQuranWidgetSnapshot()
@@ -1456,7 +1463,7 @@ final class AppSession {
             do { try snapshotStore.write(quran.widgetSnapshot()); WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran") }
             catch { try? redactQuranWidgetSnapshot() }
         }
-        try publishWidgetCatalog(at: instant)
+        try publishWidgetCatalog(at: instant, readHabitReadings: sharedHabitReadings)
     }
     /// The next-prayer widget reads this file only; it holds times, never counts or streaks (RP9, RU2).
     private func publishPrayerNextSnapshot(at instant: Date, tzID: String, dayKey: String) {

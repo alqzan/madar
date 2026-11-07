@@ -6,6 +6,27 @@ import MadarSnapshots
 @testable import Madar
 
 @MainActor final class WidgetMakerSnapshotTests: XCTestCase {
+    func testSnapshotPublicationSharesHabitReadAndPreservesFailure() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "SharedWidgetHabits-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let app = try AppSession(container: MadarContainerFactory.makeLocal(at: root), groupDirectory: root)
+        try await app.applySettingsAndWait(["core.faceIDLock": .string("none")])
+        var first = WidgetMakerDraft(); first.name = "أولى"; first.items = ["habitsToday"]
+        var second = WidgetMakerDraft(); second.name = "ثانية"; second.items = ["habitsToday"]
+        try await app.saveWidget(first); try await app.saveWidget(second)
+        var calls = 0
+        try app.publishSnapshotNow(readHabitReadings: { calls += 1; return [] })
+        XCTAssertEqual(calls, 1, "A publication with multiple widgets must read habits only once")
+        let at = app.prayerNow()
+        let catalog = try XCTUnwrap(app.snapshotStore.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: at))
+        XCTAssertEqual(catalog.payload.configs.count, 2)
+        calls = 0
+        try app.publishSnapshotNow(readHabitReadings: { calls += 1; throw CocoaError(.fileReadUnknown) })
+        XCTAssertEqual(calls, 1, "A failed read is shared only for the current publication")
+        let habits = try XCTUnwrap(app.snapshotStore.read("habits", as: RoomWidgetSnapshot.self, now: app.prayerNow()))
+        XCTAssertEqual(habits.payload.heading, "تعذّر تحديث العادات")
+        XCTAssertTrue(habits.payload.rows.isEmpty)
+    }
     func testIndividualHabitIdentitySurvivesTheWidgetJSON() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "WidgetHabitIdentity-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

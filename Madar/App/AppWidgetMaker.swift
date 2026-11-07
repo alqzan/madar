@@ -32,12 +32,12 @@ extension AppSession {
         try await executeDiaryCommand("widget.save", payload: ["id": .string(draft.id.uuidString), "name": .string(draft.name),
                                                              "familyID": .string(draft.familyID), "items": .array(draft.items.map(MadarCore.JSONValue.string)), "style": style])
     }
-    func publishWidgetCatalog(at now: Date) throws {
+    func publishWidgetCatalog(at now: Date, readHabitReadings: (() throws -> [HabitReading])? = nil) throws {
         let service = AppBahwService(session: self, evaluationDate: now), day = service.today, dates = dateLabels(day)
         let locked = MadarLockScope(rawValue: string("core.faceIDLock"))?.effective == .app
         let configs = try widgetMakerDrafts().map { draft in
             WidgetCatalogSnapshot.Config(id: draft.id, name: locked ? "ودجة مدار" : draft.name, familyID: draft.familyID,
-                                         styleJSON: try JSONEncoder().encode(draft.style), rows: locked ? [] : widgetMakerRows(draft, at: now))
+                                         styleJSON: try JSONEncoder().encode(draft.style), rows: locked ? [] : widgetMakerRows(draft, at: now, readHabitReadings: readHabitReadings))
         }
         let location = service.prayerLocation(), nextDay = day.adding(days: 1)
         let end: Date?
@@ -66,16 +66,16 @@ extension AppSession {
                                                  payload: WidgetCatalogSnapshot(datePrimary: dates.primary, dateSecondary: dates.secondary, configs: metadata, locked: locked)))
         WidgetCenter.shared.reloadTimelines(ofKind: "MadarMaker")
     }
-    func widgetMakerRows(_ draft: WidgetMakerDraft, at now: Date, outside: Bool = true) -> [WidgetCatalogSnapshot.Row] {
+    func widgetMakerRows(_ draft: WidgetMakerDraft, at now: Date, outside: Bool = true, readHabitReadings: (() throws -> [HabitReading])? = nil) -> [WidgetCatalogSnapshot.Row] {
         let service = AppBahwService(session: self, evaluationDate: now), digits = service.digits, day = service.today
         let dates = dateLabels(day)
         let quran = try? AppQuranService(session: self, clock: { now }).widgetSnapshot().payload
-        var roomValues = roomWidgetPayloads(locked: false, at: now)
+        var roomValues = roomWidgetPayloads(locked: false, at: now, readHabitReadings: readHabitReadings)
         if !outside {
             roomValues[.diaryWrite]?.rows = diaryWidgetRows(today: day)
             roomValues[.money] = moneyWidgetPayload(hidden: bool("core.hideMoneyUntilTouch"), at: now)
         }
-        let readings = (try? HabitRepository(context: ModelContext(container)).readings(at: now)) ?? []
+        let readings = (try? (readHabitReadings?() ?? HabitRepository(context: ModelContext(container)).readings(at: now))) ?? []
         let book = mihbaraWidgetSnapshot(locked: false, at: now)
         let prayer = snapshotStore.read("prayerNext", as: PrayerNextSnapshot.self, now: now)?.payload
         var result: [WidgetCatalogSnapshot.Row] = []

@@ -69,7 +69,7 @@ extension AppSession {
             return .init(currentBook:book,shelfCount:reading.books.count)
         } catch { return .init() }
     }
-    func publishRoomWidgetSnapshots(at now:Date) throws {
+    func publishRoomWidgetSnapshots(at now:Date, readHabitReadings:(() throws -> [HabitReading])? = nil) throws {
         let service=AppBahwService(session:self,evaluationDate:now),prayers=try PrayerRepository(context:ModelContext(container))
         let next=service.today.adding(days:1),place=prayers.place(at:now),options=prayers.calculationOptions(at:now)
         let end:Date?
@@ -80,7 +80,7 @@ extension AppSession {
         }
         let expiry=min(now.addingTimeInterval(3600),end ?? now.addingTimeInterval(900))
         let locked=string("core.faceIDLock")=="app"
-        for (room,payload) in roomWidgetPayloads(locked:locked,at:now) {
+        for (room,payload) in roomWidgetPayloads(locked:locked,at:now,readHabitReadings:readHabitReadings) {
             let envelope=SnapshotEnvelope(name:room.rawValue,generatedAt:now,validUntil:expiry,dayKey:service.today.description,tzID:place.timeZoneID,privacy:SnapshotPrivacy(moneyHidden:room == .money ? locked || bool("core.hideMoneyOutside") : true,notesLocked:locked),payload:payload)
             try snapshotStore.write(envelope)
             WidgetCenter.shared.reloadTimelines(ofKind:"MadarRoom-"+room.rawValue)
@@ -90,13 +90,13 @@ extension AppSession {
         WidgetCenter.shared.reloadTimelines(ofKind:"MadarRoom-"+BuiltRoomWidget.mihbara.rawValue)
         // Names outlive the day so Siri can still find a habit; its period is only trusted until the day ends.
         let periodsEnd=end ?? now.addingTimeInterval(900)
-        try snapshotStore.write(SnapshotEnvelope(name:HabitShortcutSnapshot.name,generatedAt:now,validUntil:now.addingTimeInterval(30*86400),dayKey:service.today.description,tzID:place.timeZoneID,privacy:SnapshotPrivacy(notesLocked:locked),payload:habitShortcutPayload(locked:locked,at:now,periodsValidUntil:periodsEnd)))
+        try snapshotStore.write(SnapshotEnvelope(name:HabitShortcutSnapshot.name,generatedAt:now,validUntil:now.addingTimeInterval(30*86400),dayKey:service.today.description,tzID:place.timeZoneID,privacy:SnapshotPrivacy(notesLocked:locked),payload:habitShortcutPayload(locked:locked,at:now,periodsValidUntil:periodsEnd,readHabitReadings:readHabitReadings)))
     }
     /// Same step as the lobby and habit card buttons, so «أتممت» from Siri means what a tap means.
-    func habitShortcutPayload(locked:Bool,at now:Date,periodsValidUntil:Date)->HabitShortcutSnapshot {
+    func habitShortcutPayload(locked:Bool,at now:Date,periodsValidUntil:Date,readHabitReadings:(() throws -> [HabitReading])? = nil)->HabitShortcutSnapshot {
         guard !locked else {return .init(items:[],periodsValidUntil:now)}
         let digits=AppBahwService(session:self,evaluationDate:now).digits
-        let readings=(try? HabitRepository(context:ModelContext(container)).readings(at:now)) ?? []
+        let readings=(try? (readHabitReadings?() ?? HabitRepository(context:ModelContext(container)).readings(at:now))) ?? []
         return .init(items:readings.compactMap { r in
             guard r.source == nil, !r.archived, !r.paused, let p=r.summary.current, p.target>0, p.rule.measure != .health else {return nil}
             let step=p.rule.measure == .duration ? 15 : 1
