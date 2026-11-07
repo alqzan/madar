@@ -770,16 +770,15 @@ struct MihbaraReaderView: View {
             let routed = initialLocatorJSON.flatMap { readiumLocator(Data($0.utf8)) }
             if initialLocatorJSON != nil && routed == nil { message = "موضع القراءة في الرابط غير صالح؛ فُتح الكتاب عند موضعك المحفوظ." }
             let now = Date()
-            let (readyPublication, firstLocator, readyPages, readyPositionCount, volumeStarts) = await prepareReader(from: opened)
+            let (readyPublication, firstLocator, readyPages, readyPositionCount, volumeStart) = await prepareReader(from: opened, volume: volume)
             printPages = readyPages
             var startLocator = routed ?? saved ?? firstLocator
             // Owner, 21 Oct 2026: a tapped volume opens at its first page, unless the saved place is already inside it.
             if let volume {
                 let labels = readyPages.map(\.label)
                 let savedPage = saved.flatMap { s in pageCoordinate(s).map { $0 - 1 } ?? readyPages.firstIndex { $0.href.isEquivalentTo(s.href.removingFragment()) } }
-                if let page = BookVolumes.startPage(volume: volume, labels: labels, savedPage: savedPage),
-                   let key = BookVolumes.key(labels[page]), let index = BookVolumes.order(labels).firstIndex(of: key),
-                   volumeStarts.indices.contains(index), let start = volumeStarts[index] {
+                if BookVolumes.startPage(volume: volume, labels: labels, savedPage: savedPage) != nil,
+                   let start = volumeStart {
                     startLocator = start
                     volumeAnchor = start.locations.fragments.first
                 }
@@ -809,7 +808,7 @@ struct MihbaraReaderView: View {
         }
     }
 
-    nonisolated private func prepareReader(from publication: sending Publication) async -> (Publication, Locator?, [MihbaraPrintPage], Int, [Locator?]) {
+    nonisolated private func prepareReader(from publication: sending Publication, volume requestedVolume: Int?) async -> (Publication, Locator?, [MihbaraPrintPage], Int, Locator?) {
         let firstLocator = await publication.locate(progression: 0)
         let positions = await publication.positionsByReadingOrder().getOrNil() ?? []
         let positionCount = positions.reduce(0) { $0 + $1.count }
@@ -819,14 +818,21 @@ struct MihbaraReaderView: View {
             let target = link.url(relativeTo: publication.baseURL)
             result.append(.init(href: target.removingFragment(), fragment: target.fragment, label: label))
         }
-        // The first printed page of each volume of a set, in reading order.
-        var volumeStarts: [Locator?] = []
-        var seen = Set<String>()
-        for link in publication.pageList {
-            guard let key = link.title.flatMap(BookVolumes.key), seen.insert(key).inserted else { continue }
-            volumeStarts.append(await publication.locate(link))
+        // Locate only the tapped volume's first printed page; ordinary opens need no volume jump.
+        var volumeStart: Locator?
+        if let requestedVolume {
+            var seen = Set<String>()
+            var volumeIndex = 0
+            for link in publication.pageList {
+                guard let key = link.title.flatMap(BookVolumes.key), seen.insert(key).inserted else { continue }
+                if volumeIndex == requestedVolume {
+                    volumeStart = await publication.locate(link)
+                    break
+                }
+                volumeIndex += 1
+            }
         }
-        return (publication, firstLocator, result, positionCount, volumeStarts)
+        return (publication, firstLocator, result, positionCount, volumeStart)
     }
 
     /// Readium's jump to a page-break anchor lands one page short in right-to-left books when the anchor falls
