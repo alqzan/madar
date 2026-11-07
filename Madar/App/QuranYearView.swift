@@ -12,6 +12,8 @@ struct QuranYearView: View {
     @State private var review = true
     @State private var month: QuranUIYearMonth?
     @State private var error: String?
+    @State private var loadRequestID = UUID()
+    @State private var reloadTask: Task<Void, Never>?
 #if DEBUG
     @State private var loadCount = 0
 #endif
@@ -61,23 +63,36 @@ struct QuranYearView: View {
                             monthBars(value.months, review: true)
                         }
                     }
-                } else if let error { Text(error).accessibilityIdentifier("quran-year-error"); Button("حاول مرة أخرى", action: load).accessibilityIdentifier("quran-year-retry") }
+                } else if let error {
+                    Text(error).accessibilityIdentifier("quran-year-error")
+                    Button("حاول مرة أخرى", action: reload).accessibilityIdentifier("quran-year-retry")
+                } else {
+                    ProgressView("نجهّز سجل السنة…")
+                        .frame(maxWidth: .infinity)
+                        .padding(50)
+                        .accessibilityIdentifier("quran-year-loading")
+                }
             }.padding(16).padding(.bottom, 20)
         }.foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea()).tint(theme.color("review"))
             .task {
-                load()
+                await load()
                 #if DEBUG
                 let environment = ProcessInfo.processInfo.environment
                 if environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
                    environment["MADAR_UI_QURAN_YEAR_READ_FAILURE_AFTER_FIRST"] == "1" {
                     await Task.yield()
-                    load()
+                    await load()
                 }
                 #endif
             }
             // Left open past midnight, the log follows the day it is now.
-            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in load() }
-            .refreshesAtMadarDay(service.app) { load() }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in reload() }
+            .refreshesAtMadarDay(service.app) { reload() }
+            .onDisappear {
+                reloadTask?.cancel()
+                reloadTask = nil
+                loadRequestID = UUID()
+            }
             .sheet(item: $month) { item in
                 ScrollView { VStack(alignment: .leading, spacing: 14) {
                     Text(item.title).font(quranSerif(25))
@@ -128,7 +143,17 @@ struct QuranYearView: View {
         let abbreviations = [("جمادى الأولى", "جم١"), ("جمادى الآخرة", "جم٢"), ("ربيع الأول", "رب١"), ("ربيع الآخر", "رب٢"), ("ذو القعدة", "قع"), ("ذو الحجة", "حج"), ("محرم", "مح"), ("صفر", "صف"), ("رجب", "رج"), ("شعبان", "شع"), ("رمضان", "رم"), ("شوال", "شو")]
         return abbreviations.first { title.hasPrefix($0.0) }?.1 ?? title
     }
-    private func load() {
+    @MainActor private func reload() {
+        reloadTask?.cancel()
+        let requestID = UUID()
+        loadRequestID = requestID
+        reloadTask = Task { await load(requestID: requestID) }
+    }
+    @MainActor private func load(requestID: UUID? = nil) async {
+        let requestID = requestID ?? UUID()
+        loadRequestID = requestID
+        guard !Task.isCancelled else { return }
+        error = nil
         do {
             #if DEBUG
             loadCount += 1
@@ -139,7 +164,16 @@ struct QuranYearView: View {
                 throw CocoaError(.fileReadUnknown)
             }
             #endif
-            value = try service.yearLog(); error = nil
-        } catch { value = nil; self.error = quranUserMessage(error) }
+            let result = try await service.yearLogOffMain()
+            try Task.checkCancellation()
+            guard loadRequestID == requestID else { return }
+            value = result
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled, loadRequestID == requestID else { return }
+            value = nil
+            self.error = quranUserMessage(error)
+        }
     }
 }

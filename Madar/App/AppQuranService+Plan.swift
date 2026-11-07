@@ -40,7 +40,9 @@ extension AppQuranService {
             }
         }
         let streak = QuranProgressEngine.streak(activities: v.activities, through: v.day.date, restDay: v.restDay)
-        var result = QuranUIPlanOverview(day: v.day.date, input: v.plan == nil ? nil : input, forecasts: forecasts, streak: dayCount(streak.days), days: Array(try yearLog(from: v).days.suffix(28)), version: v.plan.map { "نسخة الخطة " + numerals.string($0.version) } ?? "لا خطة حفظ بعد")
+        let yearDays = try await yearDaysOffMain(from: v, count: 28)
+        try Task.checkCancellation()
+        var result = QuranUIPlanOverview(day: v.day.date, input: v.plan == nil ? nil : input, forecasts: forecasts, streak: dayCount(streak.days), days: yearDays, version: v.plan.map { "نسخة الخطة " + numerals.string($0.version) } ?? "لا خطة حفظ بعد")
         if v.plan != nil {
             result.missPreviews = try missedDayPreviews(input: input, startingOn: v.day.date, level: v.habitualHifzLevel)
             var habitual = input; habitual.amount *= v.habitualHifzLevel.hifzFactor
