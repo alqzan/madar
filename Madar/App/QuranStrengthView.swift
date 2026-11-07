@@ -6,6 +6,8 @@ struct QuranStrengthView: View {
     let close: () -> Void
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var type
+    @Environment(\.isFrontRoom) private var isFrontRoom
+    @Environment(\.roomVisit) private var roomVisit
     @State private var board: QuranUIStrengthBoard?
     @State private var selected: Int?
     @State private var recovery = false
@@ -14,8 +16,12 @@ struct QuranStrengthView: View {
     @State private var review = false
     @State private var busy = false
     @State private var error: String?
+    @State private var loadRequestID: UUID?
     private var app: AppSession { service.app }
     private var part: QuranUIStrengthPart? { board?.parts.first { $0.id == selected } }
+    private var loadTaskID: String {
+        "\(isFrontRoom ? "front" : "back"):\(roomVisit):\(app.storeGeneration):\(app.undoToken?.id.uuidString ?? "none")"
+    }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -70,6 +76,14 @@ struct QuranStrengthView: View {
                         tubes(board.parts); legend
                     }
                     if let part { partCard(part) }
+                } else if error == nil {
+                    HStack(spacing: 8) {
+                        ProgressView().tint(theme.color("review"))
+                        Text("نجهّز المنسوب…").font(quranFont(13)).foregroundStyle(theme.secondaryInk)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 90)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("quran-strength-loading")
                 }
                 if let error { Text(error).font(quranFont(13)).foregroundStyle(theme.color("dueText")) }
             }.padding(16)
@@ -81,7 +95,10 @@ struct QuranStrengthView: View {
                         .accessibilityIdentifier("quran-strength-undo")
                 }
             }
-            .task { load() }.onChange(of: app.undoToken?.id) { load() }
+            .task(id: loadTaskID) {
+                guard isFrontRoom else { loadRequestID = UUID(); return }
+                await load()
+            }
             .sheet(isPresented: $recovery) { recoverySheet }
             .sheet(isPresented: $details) { faceDetails }
             .fullScreenCover(isPresented: $review) {
@@ -178,7 +195,7 @@ struct QuranStrengthView: View {
                     if !p.raised.isEmpty && !p.scheduled {
                         Button {
                             run {
-                                try await service.perform(.raisePages(juz: p.id)); load()
+                                try await service.perform(.raisePages(juz: p.id))
                             }
                         } label: {
                             Text("ارفعه، " + service.faceCount(p.raised.count) + " للغد").font(
@@ -207,7 +224,7 @@ struct QuranStrengthView: View {
                         ).font(quranFont(13));
                         Button("ألغِ خطة الاسترداد") {
                             run {
-                                try await service.perform(.cancelRecovery); load(); recovery = false
+                                try await service.perform(.cancelRecovery); recovery = false
                             }
                         }.frame(minHeight: 44).accessibilityIdentifier("quran-recovery-cancel")
                     }
@@ -229,7 +246,7 @@ struct QuranStrengthView: View {
                     if board.far > 0 {
                         Button(board.active == nil ? "ابدأ الاسترداد" : "ابدأ خطة جديدة") {
                             run {
-                                try await service.perform(.createRecovery(days: days)); load(); recovery = false
+                                try await service.perform(.createRecovery(days: days)); recovery = false
                             }
                         }.font(quranFont(16, bold: true)).foregroundStyle(theme.onAccent).frame(
                             maxWidth: .infinity, minHeight: 50
@@ -286,11 +303,21 @@ struct QuranStrengthView: View {
             "quran-strength-legend")
     }
     private func waterText(_ n: Int) -> Color { theme.color(n > 70 ? "reviewText" : n >= 50 ? "hifzText" : "dueText") }
-    private func load() {
+    private func load() async {
+        let requestID = UUID()
+        loadRequestID = requestID
         do {
-            let value = try service.strengthBoard(); board = value; error = nil;
+            let value = try await service.strengthBoard()
+            try Task.checkCancellation()
+            guard loadRequestID == requestID else { return }
+            board = value; error = nil
             if selected == nil { selected = value.parts.min { $0.strength < $1.strength }?.id }
-        } catch { self.error = quranUserMessage(error) }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled, loadRequestID == requestID else { return }
+            self.error = quranUserMessage(error)
+        }
     }
     private func run(_ work: @escaping @MainActor () async throws -> Void) {
         guard !busy else { return }; busy = true;
