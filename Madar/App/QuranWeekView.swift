@@ -11,6 +11,8 @@ struct QuranWeekView: View {
     @State private var week: QuranUIWeek?
     @State private var selected: QuranUIWeekDay?
     @State private var error: String?
+    @State private var loadRequestID = UUID()
+    @State private var reloadTask: Task<Void, Never>?
 #if DEBUG
     @State private var loadCount = 0
 #endif
@@ -25,24 +27,29 @@ struct QuranWeekView: View {
                 if let week {
                     if service.app.string("quran.weekLogView") != "summary" { rings(week) }
                     summary(week)
-                } else if let error { Text(error).accessibilityIdentifier("quran-week-error"); Button("حاول مرة أخرى", action: load).frame(minHeight: 44).accessibilityIdentifier("quran-week-retry") }
+                } else if let error { Text(error).accessibilityIdentifier("quran-week-error"); Button("حاول مرة أخرى", action: reload).frame(minHeight: 44).accessibilityIdentifier("quran-week-retry") }
                 else { ProgressView().frame(maxWidth: .infinity).padding(50) }
             }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 24)
         }.foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea()).tint(theme.color("review"))
             .task {
-                load()
+                await load()
                 #if DEBUG
                 let environment = ProcessInfo.processInfo.environment
                 if environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
                    environment["MADAR_UI_QURAN_WEEK_READ_FAILURE_AFTER_FIRST"] == "1" {
                     await Task.yield()
-                    load()
+                    await load()
                 }
                 #endif
             }
             // Left open past midnight, the log follows the day it is now.
-            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in load() }
-            .refreshesAtMadarDay(service.app) { load() }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in reload() }
+            .refreshesAtMadarDay(service.app) { reload() }
+            .onDisappear {
+                reloadTask?.cancel()
+                reloadTask = nil
+                loadRequestID = UUID()
+            }
             .sheet(item: $selected) { day in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
@@ -126,7 +133,17 @@ struct QuranWeekView: View {
     private func faces(_ value: Int) -> String { QuranDayCloseCopy.faces(value, digits: service.numerals) }
     private func font(_ size: CGFloat, bold: Bool = false) -> Font { .custom(bold ? "thmanyahsans-Bold" : "thmanyahsans-Regular", size: size, relativeTo: .body) }
     private func serif(_ size: CGFloat) -> Font { .custom("Amiri-Bold", size: size, relativeTo: .title2) }
-    private func load() {
+    @MainActor private func reload() {
+        reloadTask?.cancel()
+        let requestID = UUID()
+        loadRequestID = requestID
+        reloadTask = Task { await load(requestID: requestID) }
+    }
+    @MainActor private func load(requestID: UUID? = nil) async {
+        let requestID = requestID ?? UUID()
+        loadRequestID = requestID
+        guard !Task.isCancelled else { return }
+        error = nil
         do {
             #if DEBUG
             loadCount += 1
@@ -137,7 +154,16 @@ struct QuranWeekView: View {
                 throw CocoaError(.fileReadUnknown)
             }
             #endif
-            week = try service.weeklyLog(); error = nil
-        } catch { week = nil; self.error = quranUserMessage(error) }
+            let result = try await service.weeklyLogOffMain()
+            try Task.checkCancellation()
+            guard loadRequestID == requestID else { return }
+            week = result
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled, loadRequestID == requestID else { return }
+            week = nil
+            self.error = quranUserMessage(error)
+        }
     }
 }

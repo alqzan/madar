@@ -1,5 +1,6 @@
 import Foundation
 import MadarCore
+import MadarData
 import MadarQuran
 import MadarCommands
 
@@ -15,28 +16,45 @@ struct QuranUIWeek: Sendable {
 extension AppQuranService {
     /// The same rolling seven days as the Quran home and its widget. Rest days never enter the denominator.
     func weeklyLog() throws -> QuranUIWeek {
-        let value = try snapshot(), today = value.day.date
+        try weeklyLog(from: snapshot())
+    }
+    func weeklyLogOffMain(at instant: Date? = nil) async throws -> QuranUIWeek {
+        let (snapshots, _, _) = try await snapshotsOffMain(at: instant ?? clock(), hifzLevels: [nil])
+        try Task.checkCancellation()
+        guard let value = snapshots.first else { throw DataError.invalidValue("Quran week snapshot") }
+        let result = try weeklyLog(from: value)
+        try Task.checkCancellation()
+        return result
+    }
+    func weeklyLog(from value: QuranDataSnapshot) throws -> QuranUIWeek {
+        let today = value.day.date
         let first = value.sessions.filter { $0.kind == .hifz }.map(\.dayKey).min()
         let active = Set(value.activities.filter(\.countsForStreak).map(\.dayKey))
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: value.day.timeZoneID) ?? .gmt
         let weekdays = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"]
         let partial = Set(value.coverage.partialRecentPortions.flatMap { $0.memorizedRanges.flatMap { Array($0.first...$0.last) } })
+        let digits = self.numerals
+        let hijriSource = HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura
+        let sightingOffset = Int(app.number("core.hijriOffset"))
+        let hifzByDay = Dictionary(grouping: value.completedOn.values, by: \.self).mapValues(\.count)
+        let reviewByDay = Dictionary(grouping: value.sessions.filter { [.review, .free, .qiyam].contains($0.kind) }, by: \.dayKey)
+            .mapValues { Set($0.flatMap { $0.grades.map(\.page) }).count }
         var credited: [Int: GregorianDay] = [:]
         for session in value.sessions where session.kind == .hifz {
             for ayah in session.ayahs.first...session.ayahs.last where credited[ayah] == nil { credited[ayah] = session.dayKey }
         }
+        let partialAyahsByDay = Dictionary(grouping: credited.filter { partial.contains($0.key) }.map(\.value), by: \.self).mapValues(\.count)
         let firstCalendar = FirstCalendar.hijri // Quran room: Hijri always first (owner, 16 and 22 Oct)
         func day(_ key: GregorianDay) -> QuranUIWeekDay {
             let instant = key.date(in: calendar.timeZone).addingTimeInterval(12 * 3600)
             let weekday = weekdays[calendar.component(.weekday, from: instant) - 1]
             let date = DualDate(instant: instant, timeZone: calendar.timeZone,
-                source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(app.number("core.hijriOffset")))
-                .labels(firstCalendar: firstCalendar, numerals: numerals.style).combined
-            let reviewed = Set(value.sessions.filter { $0.dayKey == key && [.review, .free, .qiyam].contains($0.kind) }.flatMap { $0.grades.map(\.page) }).count
+                source: hijriSource, sightingOffset: sightingOffset)
+                .labels(firstCalendar: firstCalendar, numerals: digits.style).combined
             let eligible = first.map { key >= $0 } == true && !value.restDay.contains(key)
             return QuranUIWeekDay(id: key.description, label: key == today ? "اليوم" : weekday, date: weekday + " " + date,
-                hifz: value.completedOn.values.filter { $0 == key }.count, review: reviewed,
-                partialAyahs: credited.filter { $0.value == key && partial.contains($0.key) }.count,
+                hifz: hifzByDay[key] ?? 0, review: reviewByDay[key] ?? 0,
+                partialAyahs: partialAyahsByDay[key] ?? 0,
                 eligible: eligible, active: active.contains(key), rest: value.restDay.contains(key), today: key == today)
         }
         let days = (-6...0).map { day(today.adding(days: $0)) }, previous = (-13 ... -7).map { day(today.adding(days: $0)) }
@@ -44,7 +62,7 @@ extension AppQuranService {
             if current == prior { return "مثل الأسبوع الماضي" }
             guard prior > 0 else { return "بداية جديدة هذا الأسبوع" }
             let amount = Int((Double(abs(current - prior)) * 100 / Double(prior)).rounded())
-            return numerals.percent(amount) + (current > prior ? " أكثر من الأسبوع الماضي" : " أقل من الأسبوع الماضي")
+            return digits.percent(amount) + (current > prior ? " أكثر من الأسبوع الماضي" : " أقل من الأسبوع الماضي")
         }
         let hifz = days.reduce(0) { $0 + $1.hifz }, review = days.reduce(0) { $0 + $1.review }
         let work = days.filter { $0.eligible && $0.active }.count, previousWork = previous.filter { $0.eligible && $0.active }.count
