@@ -408,8 +408,9 @@ final class AppSession {
     }
     func prayerSnapshot(at now: Date) throws -> PrayerSnapshot {
         _ = prayerRevision // Observation invalidates the derived view after a committed write.
-        // Several lobby tiles and notification plans ask for the same instant: compute it once per 5 seconds, and drop everything on any committed write or settings reload (both bump the revision).
-        let bucket = Int(now.timeIntervalSince1970 / 5)
+        // The prayer screen refreshes its clock once a minute; every tile asking during that minute can share this full history snapshot.
+        // A committed write or settings reload bumps the revision, so the same minute is recomputed immediately when its facts change.
+        let bucket = Int(now.timeIntervalSince1970 / 60)
         if prayerSnapshotCache.revision != prayerRevision { prayerSnapshotCache = (prayerRevision, [:]) }
         if let cached = prayerSnapshotCache.rows[bucket] { return cached }
         let snapshot = try PrayerRepository(context: ModelContext(container)).snapshot(now: now)

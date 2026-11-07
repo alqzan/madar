@@ -154,10 +154,8 @@ struct BahwUpcomingItem: Identifiable, Equatable {
     }
     private func readDiary() -> BahwDiaryModel? {
         let service = AppDiaryService(app: session)
-        guard let page = try? service.day(today) else { return nil }
-        let lines = page.lines.filter { ["normal", "late", "margin"].contains($0.kind) }
-        let last = lines.max { $0.at < $1.at }
-        return .init(count: lines.count, last: last?.at, lastTZID: last?.tzID, photo: page.photo)
+        guard let summary = try? service.lobbySummary(today) else { return nil }
+        return .init(count: summary.count, last: summary.last, lastTZID: summary.lastTZID, photo: summary.photo)
     }
     func year() -> BahwYearModel {
         let days = calendarDays, day = today

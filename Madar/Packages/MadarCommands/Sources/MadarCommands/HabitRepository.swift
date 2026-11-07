@@ -65,17 +65,31 @@ public struct HabitRepository {
         let until = returnDay == from ? from.adding(days: 1) : returnDay
         return HabitBreak(from: from, until: until)
     }
-    public func readings(at now: Date, includeArchived: Bool = false, liveHealth: [UUID:Int] = [:]) throws -> [HabitReading] {
+    public func reading(id: UUID, at now: Date) throws -> HabitReading? {
+        try readings(at: now, onlyHabitID: id).first
+    }
+    public func readings(at now: Date, includeArchived: Bool = false, liveHealth: [UUID:Int] = [:], onlyHabitID: UUID? = nil) throws -> [HabitReading] {
         let settings = try SettingsStore(context: context), prayers = try PrayerRepository(context: context), place = prayers.place(at: now)
         let today = try DiaryLineRenderer.today(context: context, now: now)
         let boundary = DayBoundary(rawValue: try settings.value(for: "core.dayStart").string ?? "fajr") ?? .fajr
         let calendar = MadarCalendarDays(zone: place.timeZone, source: HijriSource(rawValue: (try settings.value(for: "core.hijriSource")).string ?? "ummAlQura") ?? .ummAlQura, offset: Int((try settings.value(for: "core.hijriOffset")).number ?? 0))
-        let policies = try context.fetch(FetchDescriptor<HabitPolicy>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        let events = try context.fetch(FetchDescriptor<HabitEvent>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        let pauses = try context.fetch(FetchDescriptor<HabitPause>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        let legacy = try context.fetch(FetchDescriptor<HabitLog>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let policies: [HabitPolicy], events: [HabitEvent], pauses: [HabitPause], legacy: [HabitLog], fetchedHabits: [Habit]
+        if let onlyHabitID {
+            let id = onlyHabitID
+            policies = try context.fetch(FetchDescriptor<HabitPolicy>(predicate: #Predicate { $0.habitID == id && $0.deletedAt == nil && $0.mergedInto == nil }))
+            events = try context.fetch(FetchDescriptor<HabitEvent>(predicate: #Predicate { $0.habitID == id && $0.deletedAt == nil && $0.mergedInto == nil }))
+            pauses = try context.fetch(FetchDescriptor<HabitPause>(predicate: #Predicate { $0.habitID == id && $0.deletedAt == nil && $0.mergedInto == nil }))
+            legacy = try context.fetch(FetchDescriptor<HabitLog>(predicate: #Predicate { $0.habitID == id && $0.deletedAt == nil && $0.mergedInto == nil }))
+            fetchedHabits = try context.fetch(FetchDescriptor<Habit>(predicate: #Predicate { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }))
+        } else {
+            policies = try context.fetch(FetchDescriptor<HabitPolicy>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            events = try context.fetch(FetchDescriptor<HabitEvent>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            pauses = try context.fetch(FetchDescriptor<HabitPause>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            legacy = try context.fetch(FetchDescriptor<HabitLog>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            fetchedHabits = try context.fetch(FetchDescriptor<Habit>())
+        }
         let trips = try context.fetch(FetchDescriptor<Trip>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.start != nil }
-        let habits = try context.fetch(FetchDescriptor<Habit>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && (includeArchived || $0.archivedAt == nil) }.sorted { $0.order == $1.order ? $0.id.uuidString < $1.id.uuidString : $0.order < $1.order }
+        let habits = fetchedHabits.filter { $0.deletedAt == nil && $0.mergedInto == nil && (includeArchived || $0.archivedAt == nil) }.sorted { $0.order == $1.order ? $0.id.uuidString < $1.id.uuidString : $0.order < $1.order }
         // Group the rows once: each habit then reads its own rows instead of scanning every row three or four times.
         let policiesByHabit = Dictionary(grouping: policies, by: \.habitID)
         let eventsByHabit = Dictionary(grouping: events, by: \.habitID)

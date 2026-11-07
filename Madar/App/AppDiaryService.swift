@@ -32,6 +32,12 @@ struct DiaryDisplayDay: Identifiable {
     /// Photos an import referenced but did not contain (N01: shown as missing, never invented).
     var missingPhotos: Int { media.filter { $0.kind == "missing" && $0.contentType == "photo" }.count }
 }
+struct DiaryLobbySummary {
+    let count: Int
+    let last: Date?
+    let lastTZID: String?
+    let photo: Data?
+}
 struct DiaryHomeSnapshot {
     let today: GregorianDay
     let selection: DiaryMemorySelection
@@ -193,6 +199,48 @@ struct DiaryHomeSnapshot {
             }), originals: Dictionary(uniqueKeysWithValues: chains.originals.compactMap { head, root in all.first { $0.id == root }.map { (head.uuidString, $0.text) } }),
             editable: Set(entries.filter { $0.mediaID == nil && $0.source != "autoPinned" && ["normal", "late", "ghad"].contains($0.ink) }.map(\.id.uuidString)),
             deletable: deletable)
+    }
+
+    /// The lobby needs a count, the latest writing time and one optional photo; building the full diary day also reads
+    /// intentions, auto-lines, every margin, settings and all attached media, so keep this query scoped to the visible day.
+    func lobbySummary(_ day: GregorianDay) throws -> DiaryLobbySummary {
+        try authorizeRead()
+        let context = ModelContext(app.container), key = day.description
+        let allEntries = try context.fetch(FetchDescriptor<Entry>(
+            predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil },
+            sortBy: [SortDescriptor(\.eventAt)]
+        ))
+        let chains = Self.revisionChains(allEntries)
+        let entries = allEntries.filter { chains.heads.contains($0.id) }
+        let countedEntries = entries.filter { $0.ink == "normal" || $0.ink == "late" }
+        let margins = try context.fetch(FetchDescriptor<MarginNote>(
+            predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && ($0.targetDayKey == key || $0.writtenDayKey == key) }
+        ))
+        let latest = (countedEntries.map { ($0.eventAt, $0.tzID) } + margins.map { ($0.writtenAt, $0.tzID) })
+            .max { $0.0 < $1.0 }
+        var places: PrayerRepository?
+        func timeZoneID(_ stored: String?, at instant: Date) -> String {
+            if let stored, TimeZone(identifier: stored) != nil { return stored }
+            if places == nil { places = try? PrayerRepository(context: context) }
+            return places?.place(at: instant).timeZoneID ?? app.activePlace.timeZoneID
+        }
+        let lastTZID = latest.map { timeZoneID($0.1, at: $0.0) }
+
+        var photo: Data?
+        if app.bool("notes.showPhoto"),
+           let page = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil }))
+            .max(by: { $0.updatedAt < $1.updatedAt }) {
+            let mediaIDs = (page.photoMediaID.map { [$0] } ?? []) + entries.flatMap(\.attachmentMediaIDs)
+            for id in mediaIDs {
+                if let media = try context.fetch(FetchDescriptor<Media>(
+                    predicate: #Predicate { $0.id == id && $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil }
+                )).first, let data = media.data {
+                    photo = data
+                    break
+                }
+            }
+        }
+        return DiaryLobbySummary(count: countedEntries.count + margins.count, last: latest?.0, lastTZID: lastTZID, photo: photo)
     }
 
     /// Authored text for a user-requested, temporary AI analysis.

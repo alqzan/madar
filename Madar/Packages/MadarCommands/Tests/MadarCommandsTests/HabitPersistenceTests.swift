@@ -11,6 +11,24 @@ import MadarData
         var result: [String:MadarCore.JSONValue] = ["id":.string(id.uuidString),"name":.string("ماء"),"rule":try JSONDecoder().decode(MadarCore.JSONValue.self,from:JSONEncoder().encode(rule))]
         if let source { result["source"] = .string(source) }; return result
     }
+    @Test func focusedReadReturnsOnlyTheRequestedHabit() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitFocusedRead-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let context = ModelContext(container), day = try GregorianDay("2026-10-15")
+        let wanted = UUID(), other = UUID()
+        for (order, id) in [(0, wanted), (1, other)] {
+            let habit = Habit(); habit.id = id; habit.name = "عادة \(order)"; habit.kind = "custom"
+            habit.startDate = now; habit.createdAt = now; habit.updatedAt = now; habit.order = order; context.insert(habit)
+            let policy = HabitPolicy(); policy.id = UUID(); policy.habitID = id
+            policy.effectiveFrom = day.description; policy.createdAt = now; policy.updatedAt = now; context.insert(policy)
+        }
+        try context.save()
+
+        let repository = HabitRepository(context: ModelContext(container))
+        #expect(try repository.reading(id: wanted, at: now)?.id == wanted)
+        #expect(try repository.readings(at: now, onlyHabitID: wanted).map(\.id) == [wanted])
+    }
     @Test func countEventsReplayUndoAndArchivePreserveHistory() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitFlow-\(UUID())"); defer { try? FileManager.default.removeItem(at:root) }
         let container = try MadarContainerFactory.makeLocal(at:root), bus = CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))

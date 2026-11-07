@@ -89,4 +89,54 @@ import MadarData
         XCTAssertEqual(diary.lastTZID, "Europe/London")
         XCTAssertEqual(lobby.time(try XCTUnwrap(diary.last), zone: diary.lastTZID), travelClock)
     }
+
+    func testLobbyDiarySummaryMatchesVisibleDayLinesAndReadsOnlyItsPhoto() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryLobbySummary-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let instant = ISO8601DateFormatter().date(from: "2026-11-07T10:00:00Z")!
+        let day = try GregorianDay("2026-11-07"), otherDay = try GregorianDay("2026-11-08")
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let context = ModelContext(container), settings = try SettingsStore(context: context)
+        try settings.prepare(.bool(true), for: "notes.showPhoto", now: instant)
+
+        func entry(_ ink: String, _ date: Date, dayKey: GregorianDay, text: String) -> Entry {
+            let row = Entry(); row.dayKey = dayKey.description; row.eventAt = date; row.tzID = "Europe/London"
+            row.ink = ink; row.text = text; row.createdAt = instant; row.updatedAt = date; return row
+        }
+        let original = entry("normal", instant, dayKey: day, text: "قبل التعديل")
+        original.source = "native"; context.insert(original)
+        let revision = entry("normal", instant.addingTimeInterval(600), dayKey: day, text: "بعد التعديل")
+        revision.source = "revision"; revision.sourceID = original.id.uuidString; context.insert(revision)
+        context.insert(entry("late", instant.addingTimeInterval(1_200), dayKey: day, text: "متأخر"))
+        context.insert(entry("ghad", instant.addingTimeInterval(3_600), dayKey: day, text: "غد"))
+        context.insert(entry("normal", instant.addingTimeInterval(7_200), dayKey: otherDay, text: "يوم آخر"))
+
+        let targetedMargin = MarginNote(); targetedMargin.targetDayKey = day.description; targetedMargin.writtenDayKey = otherDay.description
+        targetedMargin.text = "هامش مستهدف"; targetedMargin.writtenAt = instant.addingTimeInterval(1_800)
+        targetedMargin.tzID = "Europe/London"; context.insert(targetedMargin)
+        let writtenMargin = MarginNote(); writtenMargin.targetDayKey = otherDay.description; writtenMargin.writtenDayKey = day.description
+        writtenMargin.text = "هامش مكتوب"; writtenMargin.writtenAt = instant.addingTimeInterval(2_400)
+        writtenMargin.tzID = "Europe/London"; context.insert(writtenMargin)
+        let unrelatedMargin = MarginNote(); unrelatedMargin.targetDayKey = otherDay.description; unrelatedMargin.writtenDayKey = otherDay.description
+        unrelatedMargin.text = "هامش يوم آخر"; unrelatedMargin.writtenAt = instant.addingTimeInterval(4_800); context.insert(unrelatedMargin)
+        let intention = Niyya(); intention.dayKey = day.description; intention.text = "نية"; intention.createdAt = instant.addingTimeInterval(5_400); context.insert(intention)
+
+        let photoBytes = Data([0x89, 0x50, 0x4E, 0x47])
+        let media = Media(); media.kind = "photo"; media.contentType = "image/png"; media.data = photoBytes; context.insert(media)
+        let page = DayPage(); page.dayKey = day.description; page.photoMediaID = media.id; page.updatedAt = instant; context.insert(page)
+        try context.save()
+
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        let service = AppDiaryService(app: app), summary = try service.lobbySummary(day)
+        let visible = try service.day(day).lines.filter { ["normal", "late", "margin"].contains($0.kind) }
+        let latest = visible.max { $0.at < $1.at }
+        XCTAssertEqual(summary.count, 4)
+        XCTAssertEqual(summary.count, visible.count)
+        XCTAssertEqual(summary.last, instant.addingTimeInterval(2_400))
+        XCTAssertEqual(summary.last, latest?.at)
+        XCTAssertEqual(summary.lastTZID, "Europe/London")
+        XCTAssertEqual(summary.lastTZID, latest?.tzID)
+        XCTAssertEqual(summary.photo, photoBytes)
+    }
 }

@@ -40,6 +40,11 @@ struct PrayerTodayArch: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.prayerPool) private var pool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isFrontRoom) private var isFrontRoom
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Keep animated marks quiet while this retained room sits behind another room or the app is inactive.
+    private var pauseContinuousMotion: Bool { reduceMotion || !isFrontRoom || scenePhase != .active }
 
     private var statusText: String {
         switch cell.status {
@@ -153,7 +158,7 @@ struct PrayerTodayArch: View {
         case .missed:
             PrayerStar().stroke(theme.color("missed"), lineWidth: 1.2).frame(width: 15, height: 15)
         case .pending:
-            TimelineView(.animation(minimumInterval: 1 / 15, paused: reduceMotion)) { context in
+            TimelineView(.animation(minimumInterval: 1 / 15, paused: pauseContinuousMotion)) { context in
                 let phase = reduceMotion ? 0.25 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2) / 2
                 Capsule().fill(theme.accent).frame(width: 14, height: 2).opacity(0.35 + 0.5 * abs(1 - 2 * phase))
             }
@@ -177,7 +182,7 @@ struct PrayerTodayArch: View {
                 .overlay(alignment: .top) {
                     // A slow, restrained glint gives the next arch a quiet water reflection.
                     // Reduced Motion holds the same glint at its center frame.
-                    TimelineView(.animation(minimumInterval: 1 / 12, paused: reduceMotion || !isNext)) { context in
+                    TimelineView(.animation(minimumInterval: 1 / 12, paused: pauseContinuousMotion || !isNext)) { context in
                         let time = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
                         let phase = (sin(time * 0.35) + 1) / 2
                         Capsule()

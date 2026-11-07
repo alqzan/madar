@@ -79,13 +79,13 @@ struct TabShell<Content: View>: View {
                     .allowsHitTesting(front)
                     .accessibilityHidden(!front)
                     .zIndex(front ? 1 : 0)
-                    // Owner, 6 Nov 2026: «ولاهب بالمرونه… بالانتقال بالتحريك». The room arriving rises out of a soft focus on a light spring
-                    // while the one leaving sinks back; only these few properties animate, nothing inside the room is swept along.
-                    .animation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.38, dampingFraction: 0.82)) {
+                    // The room arriving lifts out of a lighter focus on a shorter, more settled spring; the one leaving sinks back.
+                    // Keeping the transform small makes switches feel direct and avoids blurring an entire live room at full strength.
+                    .animation(reduceMotion ? .easeInOut(duration: 0.12) : .spring(response: 0.32, dampingFraction: 0.86)) {
                         $0.opacity(front ? 1 : 0)
-                            .scaleEffect(front || reduceMotion ? 1 : 0.96)
-                            .blur(radius: front || reduceMotion ? 0 : 8)
-                            .offset(y: front || reduceMotion ? 0 : 14)
+                            .scaleEffect(front || reduceMotion ? 1 : 0.98)
+                            .blur(radius: front || reduceMotion ? 0 : 5)
+                            .offset(y: front || reduceMotion ? 0 : 8)
                     }
             }
         }

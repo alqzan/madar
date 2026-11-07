@@ -12,15 +12,14 @@ private struct HabitUndo: Codable {
 @MainActor enum HabitMutationHandler {
     static func stage(_ command: HabitCommand, id: UUID, context: ModelContext, now: Date, writer: String) throws -> Data? {
         let today = try DiaryLineRenderer.today(context: context, now: now)
-        let habits = try context.fetch(FetchDescriptor<Habit>())
-        func habit(_ id: UUID) throws -> Habit { guard let row = habits.first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("العادة غير موجودة") }; return row }
+        func habit(_ id: UUID) throws -> Habit { guard let row = try context.fetch(FetchDescriptor<Habit>(predicate: #Predicate { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil })).first else { throw DataError.invalidValue("العادة غير موجودة") }; return row }
         func touch(_ row: any MadarRecordModel) throws {
             var record = try row.record(); try record.set(StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? .distantPast), for:"updatedAt"); try record.set(writer, for:"writerID"); try row.apply(record)
         }
         var inverse = HabitUndo()
         switch command {
         case .save(let identity, let name, let source, let rule, let homeOnly, let reminder):
-            let existing = habits.first { $0.id == identity }
+            let existing = try context.fetch(FetchDescriptor<Habit>(predicate: #Predicate { $0.id == identity })).first
             // FB-39 (owner, 6 Nov): a new habit may start on a free first date, back up to ten years (then its past days can be
             // logged) or ahead up to a year; an edit of an existing habit still starts today and never rewrites closed periods.
             if existing == nil {
@@ -33,10 +32,10 @@ private struct HabitUndo: Codable {
             if let existing, existing.linkedSource != source { throw DataError.invalidValue("مصدر العادة ثابت؛ أضف عادة جديدة") }
             let row = existing ?? Habit(), before = try existing?.record()
             row.id = identity; row.name = name; row.linkedSource = source; row.kind = source == nil ? "custom" : "linked"; row.homeOnly = homeOnly; row.reminder = reminder
-            if existing == nil { row.startDate = now; row.createdAt = now; row.order = habits.count; context.insert(row) }
+            if existing == nil { row.startDate = now; row.createdAt = now; row.order = try context.fetchCount(FetchDescriptor<Habit>()); context.insert(row) }
             try touch(row); inverse.changes.append(.init(before: before, after: try row.record()))
-            let policies = try context.fetch(FetchDescriptor<HabitPolicy>())
-            let oldPolicy = policies.first { $0.habitID == identity && $0.effectiveFrom == start.description && $0.deletedAt == nil && $0.mergedInto == nil }
+            let effectiveFrom = start.description
+            let oldPolicy = try context.fetch(FetchDescriptor<HabitPolicy>(predicate: #Predicate { $0.habitID == identity && $0.effectiveFrom == effectiveFrom && $0.deletedAt == nil && $0.mergedInto == nil })).first
             let policy = oldPolicy ?? HabitPolicy(), old = try oldPolicy?.record()
             if oldPolicy == nil { policy.id = StableIdentity.uuid(for: "habit-policy:\(identity):\(start)"); policy.habitID = identity; policy.createdAt = now; context.insert(policy) }
             HabitRepository.apply(rule, to: policy); try touch(policy)
@@ -46,7 +45,7 @@ private struct HabitUndo: Codable {
             }
         case .complete(let identity, let delta, let periodKey, let day, let entryID):
             let row = try habit(identity); guard row.archivedAt == nil, row.kind == "custom" else { throw DataError.invalidValue("العادة المربوطة تُسجّل في غرفتها") }
-            let reading = try HabitRepository(context: context).readings(at: now).first { $0.id == identity }
+            let reading = try HabitRepository(context: context).reading(id: identity, at: now)
             let prayers = try PrayerRepository(context: context), event = HabitEvent()
             let target: HabitPeriodResult, logDay: GregorianDay
             if let day, day != today {
