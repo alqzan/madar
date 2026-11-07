@@ -17,7 +17,9 @@ import XCTest
         XCTAssertFalse(element("bahw-date").label.contains("·"))
         for block in ["habits", "salah", "quran", "mal", "year", "upcoming"] { XCTAssertTrue(element("bahw-block-" + block).exists, block) }
         // Every shipped room, including Mihbara from M6, has a lobby destination.
-        XCTAssertTrue(element("bahw-salah-next").label.contains("المغرب"), element("bahw-salah-next").label)
+        let nextPrayer = element("bahw-salah-next")
+        XCTAssertTrue(nextPrayer.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(nextPrayer.label.contains("المغرب"), nextPrayer.label)
         capture(app, "M4-V01-lobby-L")
         app.buttons["bahw-arrange-start"].tap()
         XCTAssertTrue(app.buttons["bahw-arrange"].waitForExistence(timeout: 5), app.debugDescription)

@@ -19,9 +19,9 @@ struct BahwBlockView: View {
     @State private var mihbaraLocked = true
     @State private var habitPeriod: HabitFrequency?
     @State private var completionInFlight: Set<UUID> = []
-    /// The prayer history is recomputed to find the next prayer: once per minute and per committed prayer write, not per redraw.
-    private final class PrayerCache { var key: [Int] = []; var model: BahwPrayerModel? }
-    @State private var prayerCache = PrayerCache()
+    /// The lobby reads the full prayer history once per minute off the main actor, then reuses its projection for redraws.
+    @State private var prayerModel: BahwPrayerModel?
+    @State private var prayerLoadedKey: [Int] = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.roomTheme) private var lobby
@@ -56,7 +56,12 @@ struct BahwBlockView: View {
         switch block {
         case .mal: money
         case .habits: habits
-        case .salah: salah
+        case .salah:
+            let key = prayerKey, isFront = isFrontRoom
+            salah.task(id: key + [isFront ? 1 : 0]) {
+                guard isFront else { return }
+                await refreshPrayer(for: key)
+            }
         case .quran: quran
         case .notes: notes
         case .year: year
@@ -399,13 +404,36 @@ struct BahwBlockView: View {
     }
 
     // MARK: prayer
-    private func cachedPrayer() -> BahwPrayerModel? {
-        let key = [Int(service.now.timeIntervalSince1970 / 60), service.session.prayerRevision]
-        if prayerCache.key != key { prayerCache.model = service.prayer(); prayerCache.key = key }
-        return prayerCache.model
+    private var prayerKey: [Int] {
+        [Int(service.now.timeIntervalSince1970 / 60), service.session.prayerRevision]
+    }
+    private var currentPrayer: BahwPrayerModel? {
+        let key = prayerKey, instant = service.now
+        if prayerLoadedKey == key { return prayerModel }
+        guard prayerLoadedKey.count == 2,
+              prayerLoadedKey[1] == key[1],
+              prayerModel?.nextAt.map({ $0 > instant }) == true else { return nil }
+        return prayerModel
+    }
+    private func refreshPrayer(for key: [Int]) async {
+        guard block == .salah, prayerLoadedKey != key else { return }
+        let instant = service.now
+        guard key == [Int(instant.timeIntervalSince1970 / 60), service.session.prayerRevision] else { return }
+        do {
+            let snapshot = try await service.session.prayerSnapshotOffMain(at: instant)
+            try Task.checkCancellation()
+            guard key == prayerKey else { return }
+            prayerModel = AppBahwService(session: service.session, evaluationDate: instant).prayer(snapshot: snapshot)
+            prayerLoadedKey = key
+        } catch is CancellationError {
+        } catch {
+            guard key == prayerKey else { return }
+            prayerModel = nil
+            prayerLoadedKey = key
+        }
     }
     @ViewBuilder private var salah: some View {
-        if let model = cachedPrayer() {
+        if let model = currentPrayer {
             if size == .icon {
                 VStack(spacing: 2) { Text(model.nextName ?? "الصلاة").font(small).foregroundStyle(room.secondaryInk); Text(model.nextTime ?? "").font(big).minimumScaleFactor(0.6) }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -443,7 +471,13 @@ struct BahwBlockView: View {
                     }
                 }
             }
-        } else { Text("المواقيت غير متاحة لهذا الموقع اليوم.").font(small).foregroundStyle(room.secondaryInk) }
+        } else if prayerLoadedKey != prayerKey {
+            ProgressView().controlSize(.small).tint(room.accent)
+                .accessibilityLabel("جارٍ تحديث مواقيت الصلاة")
+                .accessibilityIdentifier("bahw-salah-loading")
+        } else {
+            Text("المواقيت غير متاحة لهذا الموقع اليوم.").font(small).foregroundStyle(room.secondaryInk)
+        }
     }
 
     // MARK: Quran

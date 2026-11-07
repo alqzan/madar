@@ -24,6 +24,7 @@ struct BahwPrayerModel: Equatable {
     let arches: [Arch]
     let done: Int
     let nextName: String?
+    let nextAt: Date?
     let nextTime: String?
     let nextAfter: String?
 }
@@ -136,6 +137,9 @@ struct BahwUpcomingItem: Identifiable, Equatable {
 
     func prayer() -> BahwPrayerModel? {
         guard let snapshot = try? session.prayerSnapshot(at: now) else { return nil }
+        return prayer(snapshot: snapshot)
+    }
+    func prayer(snapshot: PrayerSnapshot) -> BahwPrayerModel {
         let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
         let zone = snapshot.next?.place.timeZone ?? session.activePlace.timeZone, instant = now
         let upcoming = snapshot.next
@@ -158,7 +162,7 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         let arches = snapshot.today.cells.map { cell in
             BahwPrayerModel.Arch(id: cell.reference.prayer.rawValue, name: name(cell.reference) ?? "", time: clock(cell.prayerTime), clock24: clock24(cell.prayerTime), done: [.jamaah, .alone].contains(cell.status), next: cell.reference == upcoming?.reference)
         }
-        return .init(arches: arches, done: arches.filter(\.done).count, nextName: upcoming.flatMap { name($0.reference) }, nextTime: clock(upcoming?.time),
+        return .init(arches: arches, done: arches.filter(\.done).count, nextName: upcoming.flatMap { name($0.reference) }, nextAt: upcoming?.time, nextTime: clock(upcoming?.time),
                      nextAfter: upcoming.map { $0.time }.map { PrayerCopy.after(seconds: $0.timeIntervalSince(instant), digits: digits) })
     }
     /// FB-32 (owner: no freezes): the lobby body asks for these on every render; the Quran snapshot and the diary day

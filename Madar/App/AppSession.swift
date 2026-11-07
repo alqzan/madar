@@ -420,6 +420,27 @@ final class AppSession {
         prayerSnapshotCache.rows[bucket] = snapshot
         return snapshot
     }
+    func prayerSnapshotOffMain(at now: Date) async throws -> PrayerSnapshot {
+        let revision = prayerRevision, generation = storeGeneration, container = self.container
+        let bucket = Int(now.timeIntervalSince1970 / 60)
+        if prayerSnapshotCache.revision != revision { prayerSnapshotCache = (revision, [:]) }
+        if let cached = prayerSnapshotCache.rows[bucket] { return cached }
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let snapshot = try PrayerRepository(context: ModelContext(container)).snapshot(now: now)
+            try Task.checkCancellation()
+            return snapshot
+        }
+        let snapshot = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+        try Task.checkCancellation()
+        guard !maintenanceInProgress else { throw BackupOperationError.busy }
+        guard prayerRevision == revision, storeGeneration == generation, self.container === container else { throw CancellationError() }
+        if prayerSnapshotCache.revision != revision { prayerSnapshotCache = (revision, [:]) }
+        if let cached = prayerSnapshotCache.rows[bucket] { return cached }
+        if prayerSnapshotCache.rows.count >= 8 { prayerSnapshotCache.rows.removeAll() }
+        prayerSnapshotCache.rows[bucket] = snapshot
+        return snapshot
+    }
     @ObservationIgnored private var prayerSnapshotCache: (revision: Int, rows: [Int: PrayerSnapshot]) = (-1, [:])
     func prayerNow(_ fallback: Date = .now) -> Date {
 #if DEBUG

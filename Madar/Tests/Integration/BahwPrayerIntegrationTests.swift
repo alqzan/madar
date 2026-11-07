@@ -1,6 +1,7 @@
 import XCTest
 import MadarData
 import MadarCore
+import MadarPrayer
 import SwiftData
 @testable import Madar
 
@@ -56,6 +57,18 @@ import SwiftData
         XCTAssertTrue(model.nextAfter?.contains("بعد") == true)
         // Tomorrow's Fajr must not be highlighted as an unlogged arch in today's five.
         XCTAssertFalse(model.arches.contains { $0.next })
+    }
+    func testPrayerSnapshotOffMainMatchesTheRepositorySnapshot() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "BahwPrayerOffMain-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
+        let now = ISO8601DateFormatter().date(from: "2026-10-15T22:00:00+03:00")!
+        let expected = try PrayerRepository(context: ModelContext(container)).snapshot(now: now)
+        let actual = try await app.prayerSnapshotOffMain(at: now)
+        XCTAssertEqual(actual, expected)
+        XCTAssertEqual(try app.prayerSnapshot(at: now), expected, "The async result joins the existing per-minute cache")
+        let service = AppBahwService(session: app, evaluationDate: now)
+        XCTAssertEqual(service.prayer(snapshot: actual), service.prayer())
     }
     /// §7.2: on Friday the Dhuhr arch and the next-prayer line read «الجمعة» in the lobby too.
     func testFridayDhuhrReadsJumuahInTheLobby() throws {
