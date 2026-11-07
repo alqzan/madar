@@ -152,7 +152,7 @@ struct DiaryHomeSnapshot {
         for niyya in try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.dayKey==key && $0.deletedAt==nil && $0.mergedInto==nil})) {lines.append(.init(id:niyya.id.uuidString,at:niyya.createdAt,text:niyya.text,kind:"intention",tzID:eventTimeZoneID(nil,at:niyya.createdAt)))}
         let margins = try context.fetch(FetchDescriptor<MarginNote>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         for margin in margins where margin.targetDayKey == key || margin.writtenDayKey == key {
-            let text = margin.targetDayKey == key ? margin.text : "كتبت في هامش " + bothDates(try GregorianDay(margin.targetDayKey), calendar: .gregorian) + ": " + margin.text
+            let text = margin.targetDayKey == key ? margin.text : "كتبت في هامش " + ((try? GregorianDay(margin.targetDayKey)).map { bothDates($0, calendar: .gregorian) } ?? margin.targetDayKey) + ": " + margin.text
             lines.append(.init(id: "margin." + margin.id.uuidString, at: margin.writtenAt, text: text, kind: "margin",
                                tzID: eventTimeZoneID(margin.tzID, at: margin.writtenAt)))
         }

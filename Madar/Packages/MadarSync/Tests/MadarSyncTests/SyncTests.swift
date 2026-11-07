@@ -78,6 +78,31 @@ private actor Accounts: CloudAccountProviding {
         #expect(rows.filter { $0.deletedAt == nil && $0.mergedInto == nil }.isEmpty)
         #expect(try history.drain(container: manager.container, generationID: manager.binding.generationID) { _ in }.transactions == 0)
     }
+    /// Owner 7 Nov 2026: a launch after a session that only wrote device rows no longer re-merges the whole store,
+    /// while a synced change still merges duplicates exactly as before.
+    @Test func deviceOnlyChangesAdvanceTheCursorWithoutMergingAndSyncedChangesStillMerge() throws {
+        let directory = root(); defer { try? FileManager.default.removeItem(at: directory) }
+        let manager = try ManagedDataStore(root: directory)
+        let generation = manager.binding.generationID
+        let history = HistoryProcessor()
+        let writer = ModelContext(manager.container); writer.author = "madar.command.app"
+        let visit = DeviceSetting(); visit.key = "sys.bahwReturnVisit"; visit.valueJSON = Data("{}".utf8); visit.updatedAt = Date()
+        writer.insert(visit); try writer.save()
+        let deviceOnly = try history.drain(container: manager.container, generationID: generation) { _ in }
+        #expect(deviceOnly.transactions >= 1)
+        #expect(deviceOnly.changedModels == ["DeviceSetting"])
+        #expect(deviceOnly.reconciledRows == 0)
+        #expect(try history.drain(container: manager.container, generationID: generation) { _ in }.transactions == 0)
+        // Two live versions of one natural key: the synced change must still merge them into one.
+        let older = PrayerLog(); older.dayKey = "2026-10-09"; older.prayer = "fajr"; older.status = "alone"; older.updatedAt = Date(timeIntervalSince1970: 100)
+        let newer = PrayerLog(); newer.dayKey = "2026-10-09"; newer.prayer = "fajr"; newer.status = "jamaah"; newer.updatedAt = Date(timeIntervalSince1970: 200)
+        writer.insert(older); writer.insert(newer); try writer.save()
+        let synced = try history.drain(container: manager.container, generationID: generation) { _ in }
+        #expect(synced.changedModels.contains("PrayerLog"))
+        #expect(synced.reconciledRows >= 1)
+        let live = try ModelContext(manager.container).fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        #expect(live.count == 1); #expect(live.first?.status == "jamaah")
+    }
     @Test func corruptCursorAndNewGenerationRecoverWithoutSkippingData() throws {
         let directory = root(); defer { try? FileManager.default.removeItem(at: directory) }
         let manager = try ManagedDataStore(root: directory)

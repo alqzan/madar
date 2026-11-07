@@ -243,10 +243,15 @@ import XCTest
         let large = app.buttons["كبيرة"]
         if !large.waitForExistence(timeout: 3) { sizeButton.tap() }
         XCTAssertTrue(large.waitForExistence(timeout: 5), app.debugDescription); large.tap(); app.buttons["bahw-arrange"].tap()
+        // The period change animates: wait for the ring count instead of reading it mid-transition.
+        func waitForRings(_ count: Int) {
+            let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == %d", count), object: rings)
+            XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed, "rings \(rings.count) ≠ \(count)\n\(app.debugDescription)")
+        }
         app.buttons["bahw-habits-period-yearly"].tap()
-        XCTAssertEqual(rings.count, 1, app.debugDescription)
+        waitForRings(1)
         app.buttons["bahw-habits-period-daily"].tap()
-        XCTAssertEqual(rings.count, 6, app.debugDescription)
+        waitForRings(6)
         XCTAssertTrue(water.label.contains("١"), water.label)
         // Let the selected-period transition settle before the visual evidence is captured.
         Thread.sleep(forTimeInterval: 0.7)
@@ -367,9 +372,7 @@ import XCTest
         XCTAssertTrue(app.staticTexts["bahw-greeting"].waitForExistence(timeout: 10))
         capture(app, "UX-10-glass-shortcuts-expanded-L")
         // Owner, 3 Nov 2026: one fixed bar with every enabled room, no «المزيد» and no accessory; «خصّص» opens from the lobby.
-        for title in ["البهو", "الصلاة", "القرآن", "المذكرات", "المال", "المحبرة"] {
-            XCTAssertTrue(app.otherElements["fixed-tab-bar"].buttons[title].exists, "Missing tab: \(title)\n\(app.debugDescription)")
-        }
+        // Since FB-43 the bar is the system's own tab bar, so each room is checked by its tab identifier below.
         for room in ["foundation", "prayer", "quran", "notes", "money", "mihbara"] {
             let shortcut = app.buttons["tab-\(room)"]
             XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing room tab: \(room)\n\(app.debugDescription)")

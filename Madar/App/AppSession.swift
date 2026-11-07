@@ -1111,7 +1111,7 @@ final class AppSession {
         let result: T
         do { result = try await body(now) } catch { try? reload(); try? publishSnapshot(); throw error }
         try reload(); try publishSnapshot(); WidgetCenter.shared.reloadAllTimelines()
-        Task { await refreshPrayerNotifications() }
+        requestPrayerNotificationRefresh()
         return result
     }
 
@@ -1136,7 +1136,7 @@ final class AppSession {
             // The command is committed: a failed refresh must not read as a failed save, or a retry with a new ID records it twice.
             do { try reload(); try publishSnapshot() } catch { errorMessage = "حُفظ التغيير، لكن تعذّر تحديث العرض. أغلق الصفحة وافتحها مرة أخرى." }
             // A confirmed spend can cross a category's 80% line (M5-V10); re-plan room reminders through the one arbiter.
-            Task { await refreshPrayerNotifications() }
+            requestPrayerNotificationRefresh()
         }
         if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة" : name == "money.logExpense" ? "سُجّل المصروف" : name == "money.deleteTransaction" ? "حُذفت الحركة" : name == "money.removeAccount" ? "حُذف الحساب" : "حُفظ التغيير") }
     }
@@ -1274,6 +1274,18 @@ final class AppSession {
         catch BackupOperationError.busy { }
         catch { errorMessage = "تعذّر تحديث موعد الرسالة. \(madarUserMessage(error))" }
     }
+    /// Pull-to-refresh in the lobby (owner 7 Nov 2026): bank messages and Shortcuts waiting in the inbox come in, every tile reads again
+    /// (the reload bumps the revision the lobby caches key on), and the widgets and reminders follow.
+    func refreshFromPull() async {
+        do { try await drainInbox() }
+        catch BackupOperationError.busy { }
+        catch { errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
+        do { try reload(); try publishSnapshot() }
+        catch { errorMessage = "تعذّر تحديث الواجهة. \(madarUserMessage(error))" }
+        requestPrayerNotificationRefresh()
+    }
+    /// Lifecycle asks (launch, return, unlock, a save) share one plan that runs once they settle; see `requestRefresh`.
+    func requestPrayerNotificationRefresh() { prayerNotifications?.requestRefresh() }
     func refreshPrayerNotifications() async {
         do { try await prayerNotifications?.refresh() }
         catch { errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(madarUserMessage(error))" }
@@ -1404,8 +1416,10 @@ final class AppSession {
     static let publishesSnapshotsImmediately = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     func publishSnapshot() throws {
         // In the background (a prayer logged from its notification, a widget's inbox drain) there is no screen to keep smooth and the
-        // app may be suspended at any moment, so the files are written now.
-        if privacyScopeTransitionPending || Self.publishesSnapshotsImmediately || UIApplication.shared.applicationState != .active {
+        // app may be suspended at any moment, so the files are written now. `.inactive` is NOT background: it is the state of a cold
+        // launch and of every return to the app, exactly when the first screen must appear (owner 7 Nov: «أول ما أفتح التطبيق يعلق»);
+        // leaving the app still writes at once through `flushPendingSnapshot`.
+        if privacyScopeTransitionPending || Self.publishesSnapshotsImmediately || UIApplication.shared.applicationState == .background {
             snapshotTask?.cancel(); snapshotTask = nil; try publishSnapshotNow(); return
         }
         snapshotTask?.cancel()

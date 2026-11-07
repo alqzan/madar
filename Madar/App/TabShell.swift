@@ -408,7 +408,7 @@ struct MadarRootView: View {
                 try await (session.backupService as? AppBackupService)?.runScheduledBackup()
             } catch BackupOperationError.busy { }
             catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
-            await session.refreshPrayerNotifications()
+            session.requestPrayerNotificationRefresh()
         }
         .overlay { AnchoredUndo(session: session) }
         .fullScreenCover(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in })) { FirstRunView(session: session).environment(\.roomTheme, theme).madarSheetErrorAlert(session) }
@@ -429,7 +429,7 @@ struct MadarRootView: View {
         }
         // A new time zone moves every prayer time: plan the reminders again while the app is open (on return it already does).
         .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in
-            Task { await session.refreshPrayerNotifications() }
+            session.requestPrayerNotificationRefresh()
         }
         .onChange(of: scenePhase) { _, phase in
             // The crash log from the owner's iPhone (3 Nov, termination 0xDEAD10CC) shows the app suspended while a SwiftData read
@@ -439,6 +439,8 @@ struct MadarRootView: View {
                 task = UIApplication.shared.beginBackgroundTask(withName: "madar.store.settle") { UIApplication.shared.endBackgroundTask(task) }
                 // Inside the background grant, so the store write never races suspension (0xDEAD10CC).
                 session.flushPendingSnapshot()
+                // A reminder plan still waiting for saves to settle runs now, so leaving the app never strands an old request.
+                if phase == .background { Task { await session.prayerNotifications?.flushPendingRefresh() } }
                 Task { try? await Task.sleep(for: .seconds(8)); UIApplication.shared.endBackgroundTask(task) }
             }
             if phase == .active && !session.maintenanceInProgress {
@@ -458,7 +460,7 @@ struct MadarRootView: View {
                         try await (session.backupService as? AppBackupService)?.runScheduledBackup()
                     } catch BackupOperationError.busy { }
                     catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
-                    await session.refreshPrayerNotifications()
+                    session.requestPrayerNotificationRefresh()
                 }
             }
         }

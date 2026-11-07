@@ -110,6 +110,8 @@ struct BahwLobbyView: View {
                     }
                 }.padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
             }
+            // Owner 7 Nov 2026: pull down to bring in what arrived outside the app and read every tile again now.
+            .refreshable { await session.refreshFromPull() }
             // The hidden navigation bar must not let scrolling ink enter the status-bar safe area.
             .madarTopClipped()
         }

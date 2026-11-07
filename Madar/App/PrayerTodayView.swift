@@ -1647,7 +1647,8 @@ private struct PrayerOldMissedSheet: View {
     private var count: Int? {
         let digits = countText.compactMap(\.wholeNumberValue)
         guard !digits.isEmpty else { return nil }
-        let value = digits.reduce(0) { $0 * 10 + $1 }
+        // Stops growing past the maximum: a long paste of digits used to overflow Int and crash.
+        let value = digits.reduce(0) { $0 > PrayerMutation.maximumRun ? $0 : $0 * 10 + $1 }
         return (1...PrayerMutation.maximumRun).contains(value) ? value : nil
     }
     private var lastDay: GregorianDay { .containing(date, in: session.activePlace.timeZone) }

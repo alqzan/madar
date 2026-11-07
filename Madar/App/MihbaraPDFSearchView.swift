@@ -66,7 +66,7 @@ struct MihbaraPDFSearchView: View {
                         Button("واصل استخراج النص") { failure = nil; phase = "scanning"; jobID = UUID() }
                             .frame(minHeight: 44).accessibilityIdentifier("mihbara-pdf-ocr-resume")
                     }
-                    Text("يُقرأ النص الموجود أولًا، وتُقرأ صفحات الصور على جهازك. النص الضوئي قد يخطئ؛ راجع صورة الصفحة. يُحذف هذا النص عند إغلاق البحث.")
+                    Text("صفحات الصور تُقرأ على جهازك وقد تخطئ، فراجع الصفحة. يُحذف هذا النص عند إغلاق البحث.")
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
                 if !PDFBookPageText.normalize(query).isEmpty {

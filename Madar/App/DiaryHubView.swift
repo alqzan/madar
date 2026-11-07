@@ -465,7 +465,8 @@ struct DiaryHubView: View {
             // A read that failed says so; «لا ذكريات» is only for a day that truly has none.
             if case .failure(let error) = loaded {
                 Text(madarUserMessage(error)).font(DiaryType.writing).accessibilityIdentifier("diary-hub-memory-error")
-                Button("أعد المحاولة") { memoryReadFailurePending = false }
+                // A real failure leaves the flag false already: bumping the attempt is what reads again.
+                Button("أعد المحاولة") { memoryReadFailurePending = false; loadAttempt += 1 }
                     .frame(minHeight: 44).accessibilityIdentifier("diary-hub-memories-retry")
             } else {
                 timeline(

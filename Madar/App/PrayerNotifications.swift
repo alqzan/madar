@@ -142,8 +142,43 @@ final class PrayerNotificationCoordinator {
         let queued = pendingResponses
         pendingResponses.removeAll()
         for response in queued { await handle(response) }
+        // Owner 7 Nov 2026 («أول ما أفتح التطبيق يعلق»): planning every reminder took about two seconds on the main thread and ran
+        // before the first screen. In the foreground the plan follows the first frame (the lobby's launch task asks for it);
+        // a background launch (a notification answered while Madar was closed) still plans now, before it can be suspended.
+        if UIApplication.shared.applicationState == .background {
+            do { try await refresh() }
+            catch { session.errorMessage = "تعذّر إعداد تذكيرات الصلاة. \(madarUserMessage(error))" }
+        } else {
+            requestRefresh()
+        }
+    }
+
+    /// One plan for a burst of asks (launch, return to the app, unlock, several saves in a row), run once they settle.
+    /// In the background, where the app may be suspended at any moment, the plan runs at once.
+    private var pendingRefresh: Task<Void, Never>?
+    func requestRefresh(after delay: Duration = .milliseconds(1200)) {
+        guard UIApplication.shared.applicationState != .background else {
+            pendingRefresh?.cancel(); pendingRefresh = nil
+            Task { [weak self] in await self?.refreshReportingFailure() }
+            return
+        }
+        pendingRefresh?.cancel()
+        pendingRefresh = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: delay)
+            guard let self, !Task.isCancelled else { return }
+            self.pendingRefresh = nil
+            await self.refreshReportingFailure()
+        }
+    }
+    /// Leaving the app: a waiting plan runs now, inside the scene's background grant.
+    func flushPendingRefresh() async {
+        guard let task = pendingRefresh else { return }
+        task.cancel(); pendingRefresh = nil
+        await refreshReportingFailure()
+    }
+    private func refreshReportingFailure() async {
         do { try await refresh() }
-        catch { session.errorMessage = "تعذّر إعداد تذكيرات الصلاة. \(madarUserMessage(error))" }
+        catch { session?.errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(madarUserMessage(error))" }
     }
 
     func requestAuthorization() async throws {
@@ -156,6 +191,7 @@ final class PrayerNotificationCoordinator {
     }
 
     func refresh(now suppliedNow: Date? = nil) async throws {
+        pendingRefresh?.cancel(); pendingRefresh = nil
         guard let session, session.beginNotificationStoreAccess() else { return }
         defer { session.endNotificationStoreAccess() }
         await acquireLifecycleLock()
@@ -175,6 +211,9 @@ final class PrayerNotificationCoordinator {
 
     func refreshAfterSerializedMutation() async {
         guard let session, session.notificationStoreAccessAvailable else { return }
+        // In the foreground a save no longer waits about two seconds for the whole plan (owner 7 Nov: taps froze); the plan follows
+        // once the saves settle. In the background (logging from a notification) it still runs under the lock before suspension.
+        if UIApplication.shared.applicationState != .background && !AppSession.publishesSnapshotsImmediately { requestRefresh(); return }
         do { try await refreshLocked(session: session, suppliedNow: nil) }
         catch {
             guard !isExpectedNoPrayerBoundary(error, session: session) else { return }
@@ -226,8 +265,12 @@ final class PrayerNotificationCoordinator {
 
         let globalEnabled = session.bool("notif.thisDeviceReminders") && Self.canSchedule(currentAuthorization)
         if globalEnabled {
+            // Each stage reads a different room on the main thread: let pending touches through between them.
+            await Task.yield()
             candidates += try AppQuranService(session: session, clock: { now }).notificationCandidates(prayerDays: days, now: now)
-            candidates += try RoomNotificationContent.candidates(session: session, prayerDays: days, now: now)
+            await Task.yield()
+            candidates += try await RoomNotificationContent.candidates(session: session, prayerDays: days, now: now)
+            await Task.yield()
         }
         let planningDays = RoomNotificationContent.planningPrayerDays(session: session, candidates: candidates, current: days, now: now)
         let externalPendingCount = existing.filter { !Self.manages($0.identifier) }.count

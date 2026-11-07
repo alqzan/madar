@@ -123,7 +123,7 @@ struct PrayerCustomizeView: View {
                     Text("لا إعداد يطابق «\(query)». جرّب «المواقيت» أو «التذكير».").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
                     Button("امسح البحث") { query = "" }.font(PrayerHomeType.body.bold()).frame(minHeight: 44).accessibilityIdentifier("prayer-customize-clear-search")
                 }
-                Text("حرمة الصلاة ليست هنا لأنها لا تُطفأ: من الأذان حتى انقضاء الصلاة لا يرسل مدار شيئًا.")
+                Text("من الأذان حتى انقضاء الصلاة لا يرسل مدار شيئًا، وهذا لا يُطفأ.")
                     .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 4)
             }
             .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
@@ -338,7 +338,7 @@ struct PrayerCustomizeView: View {
                 if group.id == "log", query.isEmpty { Divider().overlay(theme.ink.opacity(0.1)); trackingStartBlock }
                 if group.id == "times" && query.isEmpty && session.bool("salah.travelShortenCombine") && session.string("core.travelMode") != "manual" && !askedLocation && travelLocator.canAskForLocation {
                     Divider().overlay(theme.ink.opacity(0.1))
-                    Text("يقارن مدار موقعك بمدينتك مرة واحدة عند فتح الصلاة ليعرف أنك سافرت، دون أن يحفظه أو يرسله. وإن لم تسمح فوضع السفر اليدوي يبقى متاحًا.").font(PrayerHomeType.body)
+                    Text("يقارن موقعك بمدينتك عند فتح الصلاة ليعرف أنك سافرت، ولا يحفظه. وبدونه يبقى السفر اليدوي.").font(PrayerHomeType.body)
                     Button("اسمح بالموقع لكشف السفر") { askedLocation = true; travelLocator.askForLocation() }
                         .frame(minHeight: 44).accessibilityIdentifier("prayer-travel-location-request")
                 }

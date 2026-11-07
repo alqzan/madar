@@ -42,7 +42,11 @@ public struct HistoryDrainReport: Equatable, Sendable {
         for transaction in fresh { if tokens[transaction.storeIdentifier].map({ transaction.token > $0 }) ?? true { tokens[transaction.storeIdentifier] = transaction.token } }
         do {
             let mergeContext = ModelContext(container); mergeContext.autosaveEnabled = false; mergeContext.author = "madar.sync.reconciliation"
-            let count = try RowMerger(context: mergeContext).run()
+            // The merge reads synced rows only and is idempotent, so when no synced model changed since the last drain it cannot
+            // change anything. Owner 7 Nov 2026 («أول ما أفتح التطبيق يعلق»): a launch after a session that only wrote device rows
+            // (the visit record, the notification ledger) re-read and re-merged the whole store on the main thread.
+            let needsMerge = recovered || !models.isDisjoint(with: MadarSchema.syncedNames)
+            let count = needsMerge ? try RowMerger(context: mergeContext).run() : 0
             // Snapshot failure leaves cursor untouched; replay is safe because merge is idempotent.
             try publishSnapshots(models)
             let row = cursorRow ?? DeviceSetting(); row.key = cursorKey

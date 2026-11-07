@@ -34,6 +34,33 @@ private struct DictionarySpec: Decodable { let models: [ModelDefinition]; let re
         while seen.insert(current).inserted, let row = rows.first(where: { $0.model == model && $0.id == current && $0.fields["mergedInto"] == .null }) ?? rows.first(where: { $0.model == model && $0.id == current }), let value = row.fields["mergedInto"]?.string, let next = UUID(uuidString: value) { current = next }
         return current
     }
+    /// Where `resolve` looks, built once per pass. Owner 7 Nov 2026 («أول ما أفتح التطبيق يعلق»): the linear search above ran for every
+    /// foreign key of every row, so the merge after each launch grew with the square of the store (3.4 s on the main thread with real data).
+    /// For each (model, id) it keeps the first unmerged row and the first row in array order, exactly the two rows `resolve` picks between.
+    struct ResolveIndex {
+        var unmerged: [String: Int] = [:]
+        var first: [String: Int] = [:]
+        init(_ rows: [DataRecord]) {
+            for index in rows.indices {
+                let key = Self.key(rows[index].model, rows[index].id)
+                if first[key] == nil { first[key] = index }
+                if unmerged[key] == nil, rows[index].fields["mergedInto"] == .null { unmerged[key] = index }
+            }
+        }
+        static func key(_ model: String, _ id: UUID) -> String { model + "|" + id.uuidString }
+    }
+    /// Same answer as `resolve(id:model:rows:)` while no row's model, id or unmerged state changes after `index` was built.
+    /// Rewriting a `mergedInto` to the end of its own chain (what the passes below do) keeps every answer the same.
+    static func resolve(id: UUID, model: String, rows: [DataRecord], index: ResolveIndex) -> UUID {
+        var current = id; var seen = Set<UUID>()
+        while seen.insert(current).inserted {
+            let key = ResolveIndex.key(model, current)
+            guard let position = index.unmerged[key] ?? index.first[key],
+                  let value = rows[position].fields["mergedInto"]?.string, let next = UUID(uuidString: value) else { break }
+            current = next
+        }
+        return current
+    }
     public static func mergeVersions(_ lhs: DataRecord, _ rhs: DataRecord) throws -> DataRecord {
         guard lhs.model == rhs.model && lhs.id == rhs.id else { throw DataError.invalidValue("logical record version mismatch") }
         var winner = newer(lhs,than:rhs) ? lhs : rhs
@@ -51,13 +78,14 @@ private struct DictionarySpec: Decodable { let models: [ModelDefinition]; let re
         let spec = try JSONDecoder().decode(DictionarySpec.self, from: Data(contentsOf: url))
         var rows = input
         // Resolve previously persisted aliases too, including children imported after an earlier merge.
+        let aliasIndex = ResolveIndex(rows)
         for i in rows.indices {
             guard let definition = spec.models.first(where: { $0.name == rows[i].model }) else { continue }
             for field in definition.fields {
                 guard var target = field.fk else { continue }
                 if target == "(targetModel)" { target = rows[i].fields["targetModel"]?.string ?? "" }
-                if let text = rows[i].fields[field.name]?.string, let id = UUID(uuidString:text) { rows[i].fields[field.name] = .string(resolve(id:id,model:target,rows:rows).uuidString) }
-                else if let values = rows[i].fields[field.name]?.array { rows[i].fields[field.name] = .array(values.map { value in guard let text = value.string, let id = UUID(uuidString:text) else { return value }; return .string(resolve(id:id,model:target,rows:rows).uuidString) }) }
+                if let text = rows[i].fields[field.name]?.string, let id = UUID(uuidString:text) { rows[i].fields[field.name] = .string(resolve(id:id,model:target,rows:rows,index:aliasIndex).uuidString) }
+                else if let values = rows[i].fields[field.name]?.array { rows[i].fields[field.name] = .array(values.map { value in guard let text = value.string, let id = UUID(uuidString:text) else { return value }; return .string(resolve(id:id,model:target,rows:rows,index:aliasIndex).uuidString) }) }
             }
         }
         for i in rows.indices where rows[i].fields["mergedInto"] == .null {
@@ -130,13 +158,14 @@ private struct DictionarySpec: Decodable { let models: [ModelDefinition]; let re
                     }
                 }
             }
+            let passIndex = ResolveIndex(rows)
             for i in rows.indices {
                 guard let definition = spec.models.first(where: { $0.name == rows[i].model }) else { continue }
                 for field in definition.fields {
                     guard let fk = field.fk else { continue }
                     let target = fk == "(targetModel)" ? (rows[i].fields["targetModel"]?.string ?? "") : fk
-                    if let text = rows[i].fields[field.name]?.string, let id = UUID(uuidString:text) { rows[i].fields[field.name] = .string(resolve(id:id,model:target,rows:rows).uuidString) }
-                    else if let values = rows[i].fields[field.name]?.array { rows[i].fields[field.name] = .array(values.map { value in guard let text = value.string, let id = UUID(uuidString:text) else { return value }; return .string(resolve(id:id,model:target,rows:rows).uuidString) }) }
+                    if let text = rows[i].fields[field.name]?.string, let id = UUID(uuidString:text) { rows[i].fields[field.name] = .string(resolve(id:id,model:target,rows:rows,index:passIndex).uuidString) }
+                    else if let values = rows[i].fields[field.name]?.array { rows[i].fields[field.name] = .array(values.map { value in guard let text = value.string, let id = UUID(uuidString:text) else { return value }; return .string(resolve(id:id,model:target,rows:rows,index:passIndex).uuidString) }) }
                 }
             }
             try cascade(&rows)

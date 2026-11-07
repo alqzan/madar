@@ -67,7 +67,8 @@ extension AppBahwService {
     }
     /// Accounts whose latest bank message carries a balance and whose book has not moved since it (the same rule as the reconcile page's prefill).
     func reconcileOffers() -> [BahwAttention.ReconcileItem] {
-        guard let reading = try? AppMoneyService(app: session).loadReconcile(at: now) else { return [] }
+        // The reminder planner reads the same whole-ledger reading: share it until money or the day changes.
+        guard let reading = MoneyReadingCache.read(session, now, \.reconcile, { try AppMoneyService(app: session).loadReconcile(at: now) }) else { return [] }
         let cutoff = now.addingTimeInterval(-Double(Self.reconcileOfferAfterDays) * 86_400)
         return reading.rows.compactMap { row in
             guard row.side == .account, let suggestion = row.suggestion, row.pending.isEmpty else { return nil }

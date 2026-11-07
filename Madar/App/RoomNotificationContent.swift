@@ -14,7 +14,7 @@ import MadarPrayer
     static func isRoomRequest(_ id: String) -> Bool { roomPrefixes.contains { id.hasPrefix($0) } }
 
     /// Qada while something is owed, and each push habit's window start today (custom, due, unmet, not paused).
-    static func candidates(session: AppSession, prayerDays: [PrayerDay], now: Date) throws -> [NotificationCandidate] {
+    static func candidates(session: AppSession, prayerDays: [PrayerDay], now: Date) async throws -> [NotificationCandidate] {
         var result = RoomReminders.qada(days: prayerDays, time: RoomReminders.QadaTime(rawValue: session.string("salah.qadaReminder")) ?? .afterFajr,
                                         owed: try session.prayerSnapshot(at: now).statistics.owed, now: now)
         let service = AppBahwService(session: session, evaluationDate: now), today = service.today
@@ -30,7 +30,13 @@ import MadarPrayer
                 result.append(candidate)
             }
         }
-        return result + (try diaryCandidates(session: session, prayerDays: prayerDays, now: now)) + limitCandidates(session: session, prayerDays: prayerDays, now: now) + cardCandidates(session: session, prayerDays: prayerDays, now: now) + billCandidates(session: session, prayerDays: prayerDays, now: now) + reconciliationCandidates(session: session, prayerDays: prayerDays, now: now) + zakatCandidates(session: session, now: now)
+        // Each family may read a whole room on the main thread: yield between them so a tap is never held behind all of them.
+        result += try diaryCandidates(session: session, prayerDays: prayerDays, now: now); await Task.yield()
+        result += limitCandidates(session: session, prayerDays: prayerDays, now: now); await Task.yield()
+        result += cardCandidates(session: session, prayerDays: prayerDays, now: now); await Task.yield()
+        result += billCandidates(session: session, prayerDays: prayerDays, now: now); await Task.yield()
+        result += reconciliationCandidates(session: session, prayerDays: prayerDays, now: now); await Task.yield()
+        return result + zakatCandidates(session: session, now: now)
     }
 
     /// Builds two upcoming amount-free requests from the saved hawl preference. Each has its own
@@ -106,7 +112,7 @@ import MadarPrayer
     }
 
     static func cardCandidates(session: AppSession, prayerDays: [PrayerDay], now: Date) -> [NotificationCandidate] {
-        guard session.string("mal.cardDue") != "off", let reading = try? AppMoneyService(app: session).loadCards(at: now) else { return [] }
+        guard session.string("mal.cardDue") != "off", let reading = MoneyReadingCache.read(session, now, \.cards, { try AppMoneyService(app: session).loadCards(at: now) }) else { return [] }
         let lead = session.string("mal.cardDue") == "1day" ? 1 : 3
         return reading.dues.filter { $0.cardID != nil }.flatMap { due -> [NotificationCandidate] in
             [lead, due.cashAfterMinor < 0 ? 0 : nil].compactMap { before -> NotificationCandidate? in
@@ -120,7 +126,7 @@ import MadarPrayer
 
     /// Bills and subscriptions: a reminder at the lead set in «تذكير سداد البطاقة» and another on the due day, amount-free.
     static func billCandidates(session: AppSession, prayerDays: [PrayerDay], now: Date) -> [NotificationCandidate] {
-        guard session.string("mal.cardDue") != "off", let reading = try? AppMoneyService(app: session).loadObligations() else { return [] }
+        guard session.string("mal.cardDue") != "off", let reading = MoneyReadingCache.read(session, now, \.obligations, { try AppMoneyService(app: session).loadObligations() }) else { return [] }
         let lead = session.string("mal.cardDue") == "1day" ? 1 : 3
         return (reading.bills + reading.subscriptions).filter { $0.obligationID != nil }.flatMap { due -> [NotificationCandidate] in
             [lead, 0].compactMap { before -> NotificationCandidate? in
@@ -135,7 +141,7 @@ import MadarPrayer
     /// M5-V10 «تنبيه ٨٠٪»: one request per category at 80% of its limit this cycle (`mal.alert80`, default on).
     /// The money reading needs the store unlocked; while it is not, no alert is planned rather than a guessed one.
     static func limitCandidates(session: AppSession, prayerDays: [PrayerDay], now: Date) -> [NotificationCandidate] {
-        guard session.bool("mal.alert80"), let reading = try? AppMoneyService(app: session).loadCategories(), let cycle = reading.cycleID else { return [] }
+        guard session.bool("mal.alert80"), let reading = MoneyReadingCache.read(session, now, \.categories, { try AppMoneyService(app: session).loadCategories() }), let cycle = reading.cycleID else { return [] }
         let dayKey = (try? DiaryLineRenderer.today(context: ModelContext(session.container), now: now))?.description ?? GregorianDay.containing(now, in: session.activePlace.timeZone).description
         let planned = (try? ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>()))?.filter { $0.deletedAt == nil && $0.state == "submitted" && $0.requestID.hasPrefix("mal.alert80.") } ?? []
         return reading.shelves.compactMap { shelf in
@@ -148,7 +154,7 @@ import MadarPrayer
     /// One generic reminder for the oldest account/card/installment due for review; never exposes balances or provider names.
     static func reconciliationCandidates(session: AppSession, prayerDays: [PrayerDay], now: Date) -> [NotificationCandidate] {
         let interval = Int(session.number("mal.reconcileEveryDays"))
-        guard (1...365).contains(interval), let reading = try? AppMoneyService(app: session).loadReconcile(at: now) else { return [] }
+        guard (1...365).contains(interval), let reading = MoneyReadingCache.read(session, now, \.reconcile, { try AppMoneyService(app: session).loadReconcile(at: now) }) else { return [] }
         let context = ModelContext(session.container)
         let planned = (try? context.fetch(FetchDescriptor<NotificationLedger>()))?.filter {
             $0.deletedAt == nil && $0.state == "submitted" && $0.requestID.hasPrefix("mal.reconcile.")
@@ -314,6 +320,8 @@ import MadarPrayer
 
     /// Whether a room reminder still matters when it arrives in the foreground; a stale one stays silent.
     static func stillRelevant(_ id: String, session: AppSession, now: Date) throws -> Bool {
+        // Decides whether a reminder about to show is still true: always from live rows, never from the planning cache.
+        MoneyReadingCache.liveReads += 1; defer { MoneyReadingCache.liveReads -= 1 }
         if id.hasPrefix("quran.") || id.hasPrefix("digest.") {
             let value = try AppQuranService(session: session, clock: { now }).snapshot()
             guard id.hasPrefix("quran.") else { return true }
@@ -434,4 +442,49 @@ import MadarPrayer
 enum QuranReminderCopy {
     static let title = "وردك ينتظرك", body = "دقائق مع القرآن تكفي، تابع من حيث توقفت"
     static let lateTitle = "مراجعة اليوم", lateBody = "أوجه تنتظر مراجعتك قبل أن تبعد عنك"
+}
+
+/// Money readings for reminder planning, kept while the money tables, the money settings, the day and the store are unchanged.
+/// Owner 7 Nov 2026 («أول ما أفتح التطبيق يعلق»): every refresh rebuilt the whole money home four times on the main thread, about
+/// two seconds with real data, after each habit tap, Quran save and return to the app. The key is a cheap fingerprint (row count and newest
+/// `updatedAt` of each money table, one row fetched per table), so any write, through a command or not, is seen. Ledger rows stay live,
+/// and the foreground «still relevant» checks keep reading live.
+@MainActor enum MoneyReadingCache {
+    struct Key: Equatable { let container: ObjectIdentifier; let day: String; let unlocked: Bool; let settings: String; let tables: [Double] }
+    struct Slots {
+        var cards: MoneyCardsReading??; var obligations: MoneyObligationsReading??
+        var categories: MoneyCategoriesReading??; var reconcile: MoneyReconcileReading??
+    }
+    private static var key: Key?
+    private static var slots = Slots()
+    static var liveReads = 0
+    static func read<T>(_ session: AppSession, _ now: Date, _ slot: WritableKeyPath<Slots, T??>, _ load: () throws -> T) -> T? {
+        if liveReads > 0 { return try? load() }
+        guard let current = try? currentKey(session, now) else { return try? load() }
+        if key != current { key = current; slots = Slots() }
+        if let cached = slots[keyPath: slot] { return cached }
+        // A failed read (busy store, locked data) is not kept: the next refresh tries again.
+        guard let value = try? load() else { return nil }
+        slots[keyPath: slot] = .some(value)
+        return value
+    }
+    private static func currentKey(_ session: AppSession, _ now: Date) throws -> Key {
+        let context = ModelContext(session.container)
+        var tables: [Double] = []
+        func mark<M: PersistentModel>(_ type: M.Type, _ updated: any KeyPath<M, Date> & Sendable) throws {
+            var newest = FetchDescriptor<M>(sortBy: [SortDescriptor(updated, order: .reverse)]); newest.fetchLimit = 1
+            tables.append(Double(try context.fetchCount(FetchDescriptor<M>())))
+            tables.append(try context.fetch(newest).first?[keyPath: updated].timeIntervalSince1970 ?? 0)
+        }
+        try mark(Account.self, \.updatedAt); try mark(Card.self, \.updatedAt); try mark(Statement.self, \.updatedAt)
+        try mark(CashbackEntry.self, \.updatedAt); try mark(MoneyTransaction.self, \.updatedAt); try mark(Allocation.self, \.updatedAt)
+        try mark(Reconciliation.self, \.updatedAt); try mark(BankMessage.self, \.updatedAt); try mark(Cycle.self, \.updatedAt)
+        try mark(CyclePolicy.self, \.updatedAt); try mark(Envelope.self, \.updatedAt); try mark(EnvelopePlan.self, \.updatedAt)
+        try mark(Obligation.self, \.updatedAt); try mark(InstallmentItem.self, \.updatedAt); try mark(MadarData.Category.self, \.updatedAt)
+        try mark(CategoryLimit.self, \.updatedAt); try mark(MerchantRule.self, \.updatedAt); try mark(Trip.self, \.updatedAt)
+        let settings = session.values.filter { $0.key.hasPrefix("mal.") || $0.key.hasPrefix("core.") }
+            .sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ";")
+        return Key(container: ObjectIdentifier(session.container), day: GregorianDay.containing(now, in: session.activePlace.timeZone).description,
+                   unlocked: session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized, settings: settings, tables: tables)
+    }
 }

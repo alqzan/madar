@@ -5,6 +5,7 @@ import MadarCore
 import MadarDesign
 import CoreSpotlight
 import Observation
+import MadarCommands
 
 @main
 struct MadarApp: App {
@@ -33,13 +34,16 @@ private struct MadarSceneContent: View {
                 session.privacyPresenter?.transition(phase)
                 guard phase == .active else { return }
                 Task {
-                    do { try await session.drainInbox() }
-                    catch BackupOperationError.busy { }
-                    catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
+                    // The root view drains the inbox on every return; only while it is hidden behind the lock does this layer do it.
+                    if session.lockController?.canPresent(.app) != true {
+                        do { try await session.drainInbox() }
+                        catch BackupOperationError.busy { }
+                        catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
+                    }
                     await session.reconcileSpotlightIndex()
                     await session.refreshEligibleDiaryLettersForNotificationLifecycle()
                     await MadarIntentHandoff.shared.flush()
-                    await session.refreshPrayerNotifications()
+                    session.requestPrayerNotificationRefresh()
                 }
             }
             // A diary line from Siri waits behind the diary lock and lands once it opens.
@@ -51,7 +55,7 @@ private struct MadarSceneContent: View {
                     }
                     if session.lockController?.canPresent(.notes) ?? session.protectedDataAuthorized {
                         await session.refreshEligibleDiaryLettersForNotificationLifecycle()
-                        await session.refreshPrayerNotifications()
+                        session.requestPrayerNotificationRefresh()
                     }
                     await MadarIntentHandoff.shared.flush()
                 }
@@ -128,6 +132,9 @@ private struct MadarSceneContent: View {
     func load() async {
         if session != nil { return }
         if let loading { await loading.value; return }
+        // The verified Quran catalog (about half a second to parse) is needed by the lobby, the widgets and the reminders:
+        // read it on a background thread while the store opens instead of on the main thread under the first screen.
+        Task.detached(priority: .userInitiated) { _ = try? QuranResources.catalog() }
         let task = Task { await openSession() }
         loading = task
         await task.value
