@@ -1,9 +1,10 @@
 import XCTest
 @MainActor final class RoomWidgetsUITests:XCTestCase {
-    private func openGallery(quranFixture: String? = nil, habitFixture:String="showcase", now:String="2026-10-15T20:00:00+03:00")->XCUIApplication {
+    private func openGallery(quranFixture: String? = nil, prayerFixture:String? = nil, habitFixture:String="showcase", now:String="2026-10-15T20:00:00+03:00")->XCUIApplication {
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":habitFixture,"MADAR_UI_MIHBARA_FIXTURE":"home","MADAR_UI_NOW":now,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
         if let quranFixture { app.launchEnvironment["MADAR_UI_QURAN_FIXTURE"] = quranFixture }
-        app.launch()
+        if let prayerFixture { app.launchEnvironment["MADAR_UI_PRAYER_FIXTURE"] = prayerFixture }
+        app.launch(); finishOnboarding(app)
         XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout:20));app.buttons["tab-customize"].tap()
         let search=app.textFields["settings-search"];XCTAssertTrue(search.waitForExistence(timeout:10));search.tap();search.typeText("خارج التطبيق")
         let gallery=app.buttons["room-widgets-gallery"];XCTAssertTrue(gallery.waitForExistence(timeout:10));gallery.tap()
@@ -13,7 +14,7 @@ import XCTest
     func testQuranSmallReviewPreviewOpensItsPath() throws {
         continueAfterFailure = false
         let app = openGallery(quranFixture: "widgetReview")
-        let preview = app.buttons["room-widget-quran"]
+        let preview = app.links["room-widget-quran"]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         // The four-level minimum is not a cap: this fixture also has overdue faces.
         XCTAssertTrue(preview.label.contains("القرآن") && preview.label.contains("٠ من "), preview.label)
@@ -25,7 +26,7 @@ import XCTest
     func testDefaultRoomPreviewsAndDirectDiaryWriting() throws {
         continueAfterFailure=false;let app=openGallery();shot(app,"M4-W01-X1-Raisiya-L")
         app.swipeUp(velocity:.slow);shot(app,"M4-W01-X1-Raisiya-s1-L")
-        let write=app.buttons["room-widget-diaryWrite"]
+        let write=app.links["room-widget-diaryWrite"]
         for _ in 0..<3 where !write.isHittable{app.swipeUp(velocity:.slow)}
         XCTAssertTrue(write.exists);write.tap()
         XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout:10))
@@ -39,10 +40,10 @@ import XCTest
         XCTAssertTrue(medium.waitForExistence(timeout:10));XCTAssertTrue(medium.isHittable)
         XCTAssertLessThanOrEqual(medium.frame.maxY,app.frame.maxY,"The entire medium preview should be visible")
         XCTAssertTrue(small.exists)
-        XCTAssertEqual(medium.descendants(matching:.button).count,3,"The medium preview contains three scheduled habits")
-        let weekly=app.buttons.matching(NSPredicate(format:"label CONTAINS %@","مشوار الأربعاء"))
-        let monthly=app.buttons.matching(NSPredicate(format:"label CONTAINS %@","ورد الشهر"))
-        let yearly=app.buttons.matching(NSPredicate(format:"label CONTAINS %@","مراجعة السنة"))
+        XCTAssertEqual(medium.descendants(matching:.link).count,3,"The medium preview contains three scheduled habits")
+        let weekly=app.links.matching(NSPredicate(format:"label CONTAINS %@","مشوار الأربعاء"))
+        let monthly=app.links.matching(NSPredicate(format:"label CONTAINS %@","ورد الشهر"))
+        let yearly=app.links.matching(NSPredicate(format:"label CONTAINS %@","مراجعة السنة"))
         XCTAssertEqual(weekly.count,2,"The medium and small previews each show the nearest weekly habit")
         XCTAssertEqual(monthly.count,1,"Only the medium preview includes the second scheduled habit")
         XCTAssertEqual(yearly.count,1,"Only the medium preview includes the third scheduled habit")
@@ -52,8 +53,8 @@ import XCTest
         for _ in 0..<6 where !small.isHittable || small.frame.maxY>app.frame.maxY {app.swipeUp(velocity:.slow)}
         XCTAssertTrue(small.isHittable,"The small preview should be visible for its own screenshot")
         XCTAssertLessThanOrEqual(small.frame.maxY,app.frame.maxY,"The entire small preview should be visible")
-        XCTAssertEqual(small.descendants(matching:.button).count,1,"The small preview contains only the nearest scheduled habit")
-        XCTAssertTrue(small.buttons.firstMatch.label.contains("مشوار الأربعاء"),small.buttons.firstMatch.label)
+        XCTAssertEqual(small.descendants(matching:.link).count,1,"The small preview contains only the nearest scheduled habit")
+        XCTAssertTrue(small.links.firstMatch.label.contains("مشوار الأربعاء"),small.links.firstMatch.label)
         shot(app,"M4-W01-habits-coming-small-L")
     }
     func testUpcomingSmallPreviewKeepsBothDaysInsideItsBounds() throws {
@@ -70,10 +71,10 @@ import XCTest
         let widthRatio=small.frame.width/app.frame.width
         XCTAssertGreaterThan(widthRatio,0.35,"The small preview should stay large enough to read")
         XCTAssertLessThanOrEqual(widthRatio,0.45,"The small preview should follow the available gallery width without overflowing")
-        XCTAssertEqual(small.buttons.count,2,"The small widget preserves the two-day capacity")
+        XCTAssertEqual(small.links.count,2,"The small widget preserves the two-day capacity")
         let contentLeft=small.frame.minX+14
         let contentRight=small.frame.maxX-14
-        for button in small.buttons.allElementsBoundByIndex {
+        for button in small.links.allElementsBoundByIndex {
             XCTAssertTrue(button.isHittable,button.label)
             XCTAssertGreaterThanOrEqual(button.frame.minX,contentLeft,"A day cell must stay inside the widget's left margin")
             XCTAssertLessThanOrEqual(button.frame.maxX,contentRight,"A day cell must stay inside the widget's right margin")
@@ -94,9 +95,9 @@ import XCTest
         XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout:10));app.buttons["tab-customize"].tap()
         let search=app.textFields["settings-search"];XCTAssertTrue(search.waitForExistence(timeout:10));search.tap();search.typeText("خارج التطبيق")
         let gallery=app.buttons["room-widgets-gallery"];XCTAssertTrue(gallery.waitForExistence(timeout:10));gallery.tap();XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForExistence(timeout:10))
-        let last=app.buttons["room-widget-diary-lastLine"]
+        let last=app.links["room-widget-diary-lastLine"]
         for _ in 0..<4 where !last.isHittable{app.swipeUp(velocity:.slow)}
-        XCTAssertTrue(last.exists);XCTAssertTrue(app.buttons["room-widget-diary-thatDay"].exists)
+        XCTAssertTrue(last.exists);XCTAssertTrue(app.links["room-widget-diary-thatDay"].exists)
         shot(app,"M3-V16-diary-widgets-L")
     }
     func testLockStandByAndControlPreviewsOpenHabits() throws {
@@ -104,7 +105,7 @@ import XCTest
         let link=app.buttons["room-widgets-lock"];XCTAssertTrue(link.waitForExistence(timeout:5));link.tap()
         XCTAssertTrue(app.staticTexts["lock-widgets-title"].waitForExistence(timeout:5));shot(app,"M4-W02-X2-Qifl-L")
         app.swipeUp(velocity:.slow);shot(app,"M4-W02-X2-Qifl-s1-L")
-        let habits=app.buttons["control-preview-habits"]
+        let habits=app.links["control-preview-habits"]
         for _ in 0..<3 where !habits.isHittable{app.swipeUp(velocity:.slow)}
         XCTAssertTrue(habits.exists);habits.tap()
         XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))
@@ -112,7 +113,7 @@ import XCTest
     func testLockHabitCircleShowsCompletionAndOpensItsRoom() throws {
         continueAfterFailure = false
         let app = openGallery(); app.buttons["room-widgets-lock"].tap()
-        let circle = app.buttons["lock-circle-habits"]
+        let circle = app.links["lock-circle-habits"]
         XCTAssertTrue(circle.waitForExistence(timeout: 10))
         XCTAssertTrue(circle.label.contains("٠") && circle.label.contains("من ٣"), circle.label)
         XCTAssertFalse(circle.label.contains("متبقية"))
@@ -121,12 +122,13 @@ import XCTest
         circle.tap(); XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10))
     }
     func testPrayerWidgetPreviewOpensPrayerDirectly() throws {
-        continueAfterFailure=false;let app=openGallery();app.buttons["room-widget-prayer"].tap()
+        continueAfterFailure=false;let app=openGallery(prayerFixture:"homeShowcase",now:"2026-10-07T16:20:00+03:00");app.links["room-widget-prayer"].tap()
         XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForNonExistence(timeout:5))
         XCTAssertTrue(app.buttons["tab-prayer"].isSelected)
+        shot(app,"PERF05-transition-prayer-room-L")
     }
     func testMihbaraWidgetPreviewOpensRoomDirectly() throws {
-        continueAfterFailure=false;let app=openGallery(),mihbara=app.buttons["room-widget-mihbara"]
+        continueAfterFailure=false;let app=openGallery(),mihbara=app.links["room-widget-mihbara"]
         for _ in 0..<5 where !mihbara.isHittable{app.swipeUp(velocity:.slow)}
         XCTAssertTrue(mihbara.waitForExistence(timeout:10));shot(app,"M6-X01-mihbara-widget-L");mihbara.tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout:10),app.debugDescription)
@@ -135,7 +137,7 @@ import XCTest
     func testMihbaraControlPreviewOpensRoom() throws {
         continueAfterFailure=false;let app=openGallery()
         app.buttons["room-widgets-lock"].tap();XCTAssertTrue(app.staticTexts["lock-widgets-title"].waitForExistence(timeout:8))
-        let control=app.buttons["control-preview-mihbara"]
+        let control=app.links["control-preview-mihbara"]
         for _ in 0..<5 where !control.isHittable{app.swipeUp(velocity:.slow)}
         XCTAssertTrue(control.waitForExistence(timeout:10));shot(app,"M6-X01-control-preview-L");control.tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout:10),app.debugDescription)
@@ -151,5 +153,24 @@ import XCTest
         app.buttons["diary-customize-back"].tap();XCTAssertTrue(app.buttons["diary-customize"].waitForExistence(timeout:10));app.buttons["diary-customize"].tap()
         let reopenedSearch=app.textFields["diary-customize-search"];XCTAssertTrue(reopenedSearch.waitForExistence(timeout:10));reopenedSearch.tap();reopenedSearch.typeText("سطور الأقسام")
         XCTAssertEqual(app.switches["diary-auto-mihbara"].value as? String,"0")
+    }
+    private func finishOnboarding(_ app: XCUIApplication) {
+        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
+        let start = app.buttons["first-run-continue"]
+        if start.waitForExistence(timeout: 2) {
+            start.tap()
+            if start.exists && start.isHittable { start.tap() }
+        }
+        let city = app.buttons["first-run-city"]
+        guard city.waitForExistence(timeout: 2) else { return }
+        city.tap()
+        let field = app.textFields["city-search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), app.debugDescription); field.tap(); field.typeText("الرياض")
+        let hit = app.buttons["city-hit-الرياض"]
+        XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
+        if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
+        let later = app.buttons["first-run-continue"]
+        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
+        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
     }
 }

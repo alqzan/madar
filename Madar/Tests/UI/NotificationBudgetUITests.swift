@@ -1,13 +1,11 @@
 import XCTest
 
 @MainActor final class NotificationBudgetUITests: XCTestCase {
-    func testDailyNotificationBudgetDefaultsUndoAndGlobalReset() throws {
+    func testDailyNotificationBudgetDefaultAndGlobalReset() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
-        app.launch()
-        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
-        if app.buttons["first-run-continue"].waitForExistence(timeout: 2) { app.buttons["first-run-continue"].tap() }
+        app.launch(); finishOnboarding(app)
         let customize = app.buttons["tab-customize"]
         XCTAssertTrue(customize.waitForExistence(timeout: 15), app.debugDescription)
         customize.tap()
@@ -37,22 +35,16 @@ import XCTest
         if firstValue == 3 { increment.tap(); waitValue(budget, 4); increment.tap() }
         waitValue(budget, 5)
 
-        let undo = app.buttons["undo-button"]
-        XCTAssertTrue(undo.waitForExistence(timeout: 8), app.debugDescription)
-        undo.tap(); waitValue(budget, 4)
-        increment.tap(); waitValue(budget, 5)
-
         app.buttons["settings-clear-search"].tap()
-        let reset = app.buttons["reset-settings"]
+        let reset = app.buttons["settings-door-أعِد الإعدادات المتفق عليها"]
         scrollTo(reset, in: app)
         reset.tap()
         let confirm = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "أعِد الافتراضي", "reset-settings")).firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 8), app.debugDescription)
         confirm.tap()
-        XCTAssertTrue(undo.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(app.buttons["undo-button"].exists, "An ordinary settings reset is corrected in place and does not raise the global removal undo toast.")
         search.tap(); search.typeText("notif.dailyBudget\n")
         waitValue(budget, 4)
-        undo.tap(); waitValue(budget, 5)
         app.terminate()
     }
 
@@ -87,5 +79,25 @@ import XCTest
     private func capture(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+    }
+
+    private func finishOnboarding(_ app: XCUIApplication) {
+        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
+        let start = app.buttons["first-run-continue"]
+        if start.waitForExistence(timeout: 2) {
+            start.tap()
+            if start.exists && start.isHittable { start.tap() }
+        }
+        let city = app.buttons["first-run-city"]
+        guard city.waitForExistence(timeout: 2) else { return }
+        city.tap()
+        let field = app.textFields["city-search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), app.debugDescription); field.tap(); field.typeText("الرياض")
+        let hit = app.buttons["city-hit-الرياض"]
+        XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
+        if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
+        let later = app.buttons["first-run-continue"]
+        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
+        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
     }
 }

@@ -167,7 +167,7 @@ import XCTest
 
         let root = app.buttons["prayer-root-test-route"]
         XCTAssertTrue(root.waitForExistence(timeout: 5), app.debugDescription); root.tap()
-        XCTAssertTrue(yes.waitForExistence(timeout: 5), "The prayer root request must wait until both trip-start writes finish.")
+        XCTAssertTrue(yes.exists && !yes.isEnabled, "The prayer root request must leave the trip sheet open while its writes are in flight.")
         XCTAssertTrue(app.staticTexts["prayer-today-summary"].waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.buttons["prayer-travel-pill"].waitForExistence(timeout: 8), app.debugDescription)
         app.terminate()
@@ -327,13 +327,10 @@ import XCTest
         let skip = app.buttons["prayer-heart-skip"]
         XCTAssertTrue(skip.exists); skip.tap()
         XCTAssertTrue(skip.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
-        app.buttons["undo-button"].tap()
-        let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "وحدي"), object: asr)
-        XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 10), .completed, asr.label)
+        XCTAssertFalse(app.buttons["undo-button"].waitForExistence(timeout: 1), "A prayer log is saved in place; the global undo toast is reserved for removals.")
         asr.tap()
         XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(alone.isSelected, "Undo restores the prayer before the companion sheet capture")
+        XCTAssertTrue(app.buttons["prayer-status-jamaah"].isSelected, "The one-tap prayer status remains saved when the sheet is reopened.")
         XCTAssertTrue(app.buttons["prayer-heart-present"].exists)
         attachScreenshot(app, named: "M1-V02-log-heart-L")
         app.terminate()
@@ -475,14 +472,14 @@ import XCTest
     }
 
     /// M1-V06: the qada sheet, for comparison with screens/salah/06-S5-Qada.jpg; also choosing a specific one (T10).
-    func test_M1V06_QadaSheetChoosesSpecificPrayerAndUndoes() throws {
+    func test_M1V06_QadaSheetChoosesSpecificPrayerAndMakesItUp() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
-            "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
+            "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light",
+            "MADAR_UI_PRAYER_ROUTE": "madar://salah/qada"]
         app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-        let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
         XCTAssertTrue(app.staticTexts["prayer-qada-title"].waitForExistence(timeout: 10), app.debugDescription)
         let isha = app.buttons["prayer-qada-row-2026-10-06-isha"]
         XCTAssertTrue(isha.waitForExistence(timeout: 10), app.debugDescription)
@@ -498,8 +495,7 @@ import XCTest
         let confirm = app.buttons["prayer-makeup-confirm"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 10), app.debugDescription)
         confirm.tap()
-        let undo = app.buttons["undo-button"]; XCTAssertTrue(undo.waitForExistence(timeout: 15), app.debugDescription)
-        undo.tap()
+        XCTAssertFalse(app.buttons["undo-button"].waitForExistence(timeout: 1), "Making up a prayer is saved in place without the global removal undo toast.")
         app.terminate()
     }
 
@@ -1369,7 +1365,7 @@ import XCTest
         attachScreenshot(app, named: "M0-customize-RTL")
     }
 
-    func test_M1T01_PrayerLogPersistsChangeUndo() throws {
+    func test_M1T01_PrayerLogsPersistThroughRelaunch() throws {
         continueAfterFailure = false
         let storeID = UUID().uuidString
         let app = XCUIApplication()
@@ -1403,22 +1399,17 @@ import XCTest
         let firstScreen = XCTAttachment(screenshot: app.screenshot())
         firstScreen.name = "M1-T01-prayer-today-default-L"; firstScreen.lifetime = .keepAlways; add(firstScreen)
         record("jamaah", in: app)
-        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.buttons["undo-button"].waitForExistence(timeout: 1), "Prayer logs no longer show the global undo toast.")
         app.terminate(); app.launch(); finishOnboarding(app); openPrayer(app)
         XCTAssertTrue(fajrArch(app).label.contains("جماعة"), fajrArch(app).label)
 
         record("alone", in: app)
-        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
-        app.buttons["undo-button"].tap()
-        let restored = fajrArch(app)
-        let jamaahRestored = NSPredicate(format: "label CONTAINS %@", "جماعة")
-        expectation(for: jamaahRestored, evaluatedWith: restored)
-        waitForExpectations(timeout: 15)
+        XCTAssertFalse(app.buttons["undo-button"].waitForExistence(timeout: 1), "Prayer logs no longer show the global undo toast.")
         app.terminate(); app.launch(); finishOnboarding(app); openPrayer(app)
-        XCTAssertTrue(fajrArch(app).label.contains("جماعة"), fajrArch(app).label)
+        XCTAssertTrue(fajrArch(app).label.contains("وحدي"), fajrArch(app).label)
         app.terminate()
     }
-    func test_M1T02_MissedMakeUpUndoAndRelaunch() throws {
+    func test_M1T02_MissedPrayerPersistsAndAppearsInQadaAfterRelaunch() throws {
         continueAfterFailure = false
         let storeID = UUID().uuidString
         let app = XCUIApplication()
@@ -1430,7 +1421,7 @@ import XCTest
         ]
         app.launch(); finishOnboarding(app)
         func fajrArch(_ target: XCUIApplication) -> XCUIElement {
-            target.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "الفجر" )).firstMatch
+            target.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
         }
         let prayerTab = app.buttons["tab-prayer"]
         XCTAssertTrue(prayerTab.waitForExistence(timeout: 10), app.debugDescription)
@@ -1443,40 +1434,20 @@ import XCTest
         scrollTo(later, in: app)
         XCTAssertTrue(later.waitForExistence(timeout: 10), app.debugDescription)
         later.tap()
-        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.buttons["undo-button"].waitForExistence(timeout: 1), "A missed-prayer choice is saved in place without the global removal undo toast.")
         attachScreenshot(app, named: "M1-T02-missed-explicit-L")
 
-        app.terminate(); app.launch(); finishOnboarding(app)
+        app.terminate()
+        app.launchEnvironment["MADAR_UI_PRAYER_ROUTE"] = "madar://salah/qada"
+        app.launch(); finishOnboarding(app)
         let reopenedTab = app.buttons["tab-prayer"]
         XCTAssertTrue(reopenedTab.waitForExistence(timeout: 10), app.debugDescription)
         reopenedTab.tap()
         let reopenedFajr = fajrArch(app)
         XCTAssertTrue(reopenedFajr.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(reopenedFajr.label.contains("فاتتني"), reopenedFajr.label)
-        let makeUpButton = app.buttons["prayer-qada-makeup"]
-        scrollTo(makeUpButton, in: app)
-        makeUpButton.tap()
-        let confirmMakeUp = app.buttons["prayer-makeup-confirm"]
-        XCTAssertTrue(confirmMakeUp.waitForExistence(timeout: 10), app.debugDescription)
-        confirmMakeUp.tap()
-        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
-
-        let qadaArch = fajrArch(app)
-        let qadaLabel = NSPredicate(format: "label CONTAINS %@", "قُضيت")
-        expectation(for: qadaLabel, evaluatedWith: qadaArch)
-        waitForExpectations(timeout: 10)
-        app.buttons["undo-button"].tap()
-        let restored = fajrArch(app)
-        let missedLabel = NSPredicate(format: "label CONTAINS %@", "فاتتني")
-        expectation(for: missedLabel, evaluatedWith: restored)
-        waitForExpectations(timeout: 15)
-        attachScreenshot(app, named: "M1-T02-makeup-undo-restores-missed-L")
-
-        app.terminate(); app.launch(); finishOnboarding(app)
-        app.buttons["tab-prayer"].tap()
-        let afterRelaunch = fajrArch(app)
-        XCTAssertTrue(afterRelaunch.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(afterRelaunch.label.contains("فاتتني"), afterRelaunch.label)
+        XCTAssertTrue(app.staticTexts["prayer-qada-title"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "prayer-qada-row-")).firstMatch.exists, "The saved missed prayer appears in the qada list after relaunch.")
         app.terminate()
     }
     func test_M1T02_BulkPendingRecovery() throws {
