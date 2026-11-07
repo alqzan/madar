@@ -54,6 +54,7 @@ struct MihbaraBookCover: View {
     let leather: Int
     let digits: MadarNumberFormatter
     @Environment(\.roomTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let binding = MihbaraBookCovers.binding(leather)
@@ -75,7 +76,29 @@ struct MihbaraBookCover: View {
                     // The page block: thicker for longer books.
                     LinearGradient(colors: [theme.surface, theme.surface.opacity(0.82), theme.surface], startPoint: .top, endPoint: .bottom)
                         .frame(width: metrics.thickness, height: metrics.height - 8)
-                        .overlay { VStack(spacing: 2.2) { ForEach(0..<Int(metrics.height / 4), id: \.self) { _ in Rectangle().fill(theme.ink.opacity(0.06)).frame(height: 0.5) } } }
+                        .overlay {
+                            if dynamicTypeSize.isAccessibilitySize {
+                                VStack(spacing: 2.2) {
+                                    ForEach(0..<Int(metrics.height / 4), id: \.self) { _ in
+                                        Rectangle().fill(theme.ink.opacity(0.06)).frame(height: 0.5)
+                                    }
+                                }
+                            } else {
+                                Canvas { context, size in
+                                    let count = Int(metrics.height / 4)
+                                    let lineHeight: CGFloat = 0.5, spacing: CGFloat = 2.2
+                                    let stackHeight = CGFloat(count) * lineHeight + CGFloat(max(0, count - 1)) * spacing
+                                    let firstY = (size.height - stackHeight) / 2
+                                    var lines = Path()
+                                    for index in 0..<count {
+                                        let y = firstY + CGFloat(index) * (lineHeight + spacing)
+                                        lines.addRect(CGRect(x: 0, y: y, width: size.width, height: lineHeight))
+                                    }
+                                    context.fill(lines, with: .color(theme.ink.opacity(0.06)))
+                                }
+                                .frame(width: metrics.thickness, height: metrics.height - 8)
+                            }
+                        }
                         .clipShape(.rect(bottomTrailingRadius: 2, topTrailingRadius: 2))
                         .offset(x: metrics.thickness - 1)
                         .accessibilityHidden(true)
