@@ -32,6 +32,8 @@ import MadarData
         let reading = try #require(HabitRepository(context: ModelContext(container)).readings(at: now).first { $0.id == id })
         #expect(reading.source == "wird")
         #expect(reading.summary.current?.value == 1 && reading.summary.current?.met == true)
+        // The habit begins on the 15th, but Quran already counted the 14th: RL4 uses the owner's streak.
+        #expect(reading.summary.streak == 2)
         #expect(reading.times.map(\.day.description) == ["2026-10-15", "2026-10-14"])
         // The unit is the wird itself; any other unit is refused at parse.
         var wrong = payload; rule.unit = "وجه"; wrong["rule"] = try JSONDecoder().decode(MadarCore.JSONValue.self, from: JSONEncoder().encode(rule))

@@ -32,6 +32,20 @@ import MadarData
         return root
     }
 
+    @Test func canceledPreviewLeavesSourceAndNoStagedCopy() async throws {
+        let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("كتاب.pdf"), bytes = pdf(), id = UUID()
+        try bytes.write(to: source)
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await PDFBookFiles.stageForPreview(source: source, root: root, id: id)
+        }
+        do { _ = try await task.value; Issue.record("Canceled PDF preview must throw") }
+        catch is CancellationError { }
+        #expect(!FileManager.default.fileExists(atPath: PDFBookFiles.stagedURL(id: id, root: root).path))
+        #expect(try Data(contentsOf: source) == bytes)
+    }
+
     @Test func previewDetectsTextAndTextlessPagesWithoutCreatingAnyRows() throws {
         let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root.appendingPathComponent("Store"))

@@ -56,6 +56,11 @@ import Testing
         }
     }
 
+    @Test func percentAllowanceHandlesLargeRepresentableSalary() {
+        let mode = AllowanceMode.percent(basisPoints: 10_000, incomeMinor: 1_000_000_000_000_000)
+        #expect(CycleEngine.freeze(mode, expectedLengthDays: 30) == FrozenRate(dailyRateMinor: 33_333_333_333_333, lastDayRemainderMinor: 10))
+    }
+
     @Test func l08APlanLargerThanTheAllowanceDepositsOnlyWhatItTook() {
         // Allowance 10000/day; the plan wants 12000/day for 30 days.
         let input = CycleInput(expectedLengthDays: 30, policies: [.init(mode: .fixed(allowanceMinor: 10_000))],

@@ -9,7 +9,8 @@ struct MihbaraFinishPrompt: View {
     let book: MihbaraBook
     let tint: Color
     let ink: Color
-    let saveCoordinator: MihbaraReadingSaveCoordinator
+    let prepareToFinish: @MainActor () async -> Bool
+    let resumeReading: @MainActor () -> Void
     let close: @MainActor () -> Void
     @State private var working = false
 
@@ -18,11 +19,11 @@ struct MihbaraFinishPrompt: View {
             guard !working else { return }
             working = true
             Task { @MainActor in
-                await saveCoordinator.waitForCurrentAttempt()
+                guard await prepareToFinish() else { resumeReading(); working = false; return }
                 do {
                     try await app.executeBookCommand("book.moveShelf", payload: ["id": .string(book.id.uuidString), "shelf": .string("finished")])
                     close()
-                } catch { app.errorMessage = madarUserMessage(error); working = false }
+                } catch { resumeReading(); app.errorMessage = madarUserMessage(error); working = false }
             }
         } label: {
             Label("أنهيته؟ ضعه في «أنهيتها»", systemImage: "checkmark.seal")

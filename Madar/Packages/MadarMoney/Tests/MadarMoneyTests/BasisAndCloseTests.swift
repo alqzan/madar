@@ -135,5 +135,10 @@ import Testing
         #expect(MoneyMath.divideRounded(-5, by: 2) == -3)
         #expect(MoneyMath.divideRounded(4, by: 3) == 1)
         #expect(MoneyMath.applying(basisPoints: 4_000, to: 1_500_000) == 600_000)
+        #expect(MoneyMath.applying(basisPoints: 10_000, to: 1_000_000_000_000_000) == 1_000_000_000_000_000)
+        #expect(MoneyMath.applying(basisPoints: 5_000, to: Int.max) == 4_611_686_018_427_387_904)
+        #expect(MoneyMath.applying(basisPoints: 10_000, to: Int.min) == Int.min)
+        #expect(MoneyMath.applying(basisPoints: 3_333, to: 15_001) == 5_000)
+        #expect(MoneyMath.applying(basisPoints: 5_000, to: -5) == -3)
     }
 }

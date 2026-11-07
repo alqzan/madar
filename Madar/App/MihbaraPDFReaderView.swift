@@ -167,7 +167,7 @@ struct MihbaraPDFReaderView: View {
     private var footer: some View {
         VStack(spacing: 8) {
             if pageCount > 0, book.shelf != "finished", Double(pageIndex + 1) >= max(1, (Double(pageCount) * 0.98).rounded(.up)) {
-                MihbaraFinishPrompt(app: app, book: book, tint: readerTheme.accentFill, ink: ink, saveCoordinator: saveCoordinator) { finishAndClose() }
+                MihbaraFinishPrompt(app: app, book: book, tint: readerTheme.accentFill, ink: ink, prepareToFinish: prepareToFinish, resumeReading: { resume(at: Date()) }) { close() }
             }
             if pageCount > 0 {
                 ProgressView(value: Double(pageIndex + 1), total: Double(pageCount))
@@ -370,6 +370,20 @@ struct MihbaraPDFReaderView: View {
         if !on { inkLayer?.flushAll() }
         inkLayer?.drawing = on
         withAnimation(.snappy) { inking = on }
+    }
+
+    @MainActor private func prepareToFinish() async -> Bool {
+        app.armMihbaraLocatorFailureOnReaderCloseForUITest()
+        inkLayer?.flushAll()
+        pause(at: Date())
+        await saveCoordinator.waitForCurrentAttempt()
+        guard !saveCoordinator.hasPending else {
+            saveCoordinator.dismissPendingWriteError()
+            isPendingSaveAlert = true
+            pendingSaveAlert = pendingSaveMessage
+            return false
+        }
+        return true
     }
 
     @MainActor private func finishAndClose() {

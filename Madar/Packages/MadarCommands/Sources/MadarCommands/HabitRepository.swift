@@ -168,7 +168,7 @@ public struct HabitRepository {
                         wirdCache = (days.sorted().map { HabitFact(id: StableIdentity.uuid(for: "habit-wird:\($0)"), day: $0, periodKey: "", delta: 1) },
                                      QuranProgressEngine.streak(activities: snapshot.activities, through: today, restDay: snapshot.restDay).days)
                     }
-                    facts = wirdCache!.facts
+                    facts = wirdCache!.facts; ownerStreak = wirdCache!.streak
                 case "diaryLine":
                     if let cached = diaryCache { facts = cached; break }
                     let entries = try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source != "autoPinned" && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

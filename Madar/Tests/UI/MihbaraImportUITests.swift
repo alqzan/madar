@@ -225,7 +225,8 @@ import UIKit
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
             "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
-            "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب يُختم", "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString()]
+            "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب يُختم", "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString(),
+            "MADAR_UI_MIHBARA_LOCATOR_FAIL_ON_CLOSE": "1"]
         app.launch()
         let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
@@ -242,6 +243,16 @@ import UIKit
         next.tap()
         let finish = app.buttons["mihbara-reader-finish"]; XCTAssertTrue(finish.waitForExistence(timeout: 5), app.debugDescription)
         attach(app, "FB45-pdf-finish-L")
+        finish.tap()
+        let pending = app.alerts["قارئ PDF"]
+        XCTAssertTrue(pending.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(next.exists, "A failed position save must keep the reader open")
+        pending.buttons["mihbara-reading-save-retry"].firstMatch.tap()
+        XCTAssertTrue(next.waitForNonExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(want.waitForExistence(timeout: 8)); want.tap()
+        XCTAssertTrue(imported.waitForExistence(timeout: 8), "The book must remain on its original shelf after a failed save")
+        imported.tap()
+        XCTAssertTrue(finish.waitForExistence(timeout: 12), app.debugDescription)
         finish.tap()
         XCTAssertTrue(next.waitForNonExistence(timeout: 10), "The reader closes after «أنهيته؟»")
         let finished = app.buttons["mihbara-shelf-finished"]; XCTAssertTrue(finished.waitForExistence(timeout: 8), app.debugDescription); finished.tap()

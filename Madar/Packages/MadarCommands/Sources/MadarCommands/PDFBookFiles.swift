@@ -55,7 +55,12 @@ public enum PDFBookFiles {
 
     public static func stagedURL(id: UUID, root: URL) -> URL { root.appendingPathComponent(id.uuidString).appendingPathExtension("pdf") }
 
+    @concurrent public static func stageForPreview(source: URL, root: URL, id: UUID) async throws -> PDFBookInspection {
+        try stage(source: source, root: root, id: id)
+    }
+
     public static func stage(source: URL, root: URL, id: UUID = UUID()) throws -> PDFBookInspection {
+        try Task.checkCancellation()
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
         let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .contentTypeKey, .fileSizeKey])
@@ -83,6 +88,7 @@ public enum PDFBookFiles {
         defer { try? output.close() }
         var copied = 0
         while let chunk = try input.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+            try Task.checkCancellation()
             copied += chunk.count
             try checkSize(copied)
             try output.write(contentsOf: chunk)
@@ -90,6 +96,7 @@ public enum PDFBookFiles {
         try output.synchronize()
         guard copied == Int(length) else { throw DataError.invalidValue("تغيّر الملف أثناء نسخه؛ اختره مرة أخرى.") }
         let inspection = try inspect(id: id, root: root, fileName: source.lastPathComponent)
+        try Task.checkCancellation()
         complete = true
         return inspection
     }
@@ -105,6 +112,7 @@ public enum PDFBookFiles {
         try input.seek(toOffset: 0)
         var hash = SHA256(), actualSize = 0
         while let chunk = try input.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+            try Task.checkCancellation()
             actualSize += chunk.count; try checkSize(actualSize); hash.update(data: chunk)
         }
         guard actualSize == size, let document = PDFDocument(url: file) else { throw DataError.invalidValue("تعذّر فتح ملف PDF؛ قد يكون تالفًا.") }
@@ -112,6 +120,7 @@ public enum PDFBookFiles {
         guard document.pageCount > 0, document.pageCount <= maximumPages else { throw DataError.invalidValue("الحد الأقصى ١٠٠٠ صفحة؛ لا يُضاف ملف فارغ.") }
         var textPages = 0, sample = ""
         for index in 0..<document.pageCount {
+            try Task.checkCancellation()
             guard let page = document.page(at: index) else { throw DataError.invalidValue("تعذّر فحص إحدى صفحات الملف.") }
             let text = page.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !text.isEmpty { textPages += 1; if sample.count < 16_000 { sample += String(text.prefix(16_000 - sample.count)) + " " } }

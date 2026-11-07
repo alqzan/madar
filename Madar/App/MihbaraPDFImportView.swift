@@ -9,10 +9,9 @@ import MadarDesign
     func stagePDF(_ source: URL, id: UUID) async throws -> PDFBookInspection {
         guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         let root = app.bookStagingDirectory
-        let inspection = try await Task.detached(priority: .userInitiated) {
-            try PDFBookFiles.stage(source: source, root: root, id: id)
-        }.value
+        let inspection = try await PDFBookFiles.stageForPreview(source: source, root: root, id: id)
         do {
+            try Task.checkCancellation()
             guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
             _ = try AppMihbaraService(app: app).bookRestorableFromFile(sha256: inspection.sha256, sizeBytes: inspection.sizeBytes, formats: ["pdf", "pdfScanned"])
             return inspection

@@ -650,7 +650,7 @@ struct MihbaraReaderView: View {
     private var footerContent: some View {
         VStack(spacing: 7) {
             if let readerProgress, readerProgress >= 0.98, book.shelf != "finished" {
-                MihbaraFinishPrompt(app: app, book: book, tint: palette.accent, ink: palette.ink, saveCoordinator: saveCoordinator) { finishAndClose() }
+                MihbaraFinishPrompt(app: app, book: book, tint: palette.accent, ink: palette.ink, prepareToFinish: prepareToFinish, resumeReading: { resumeReader(at: Date()) }) { close() }
             }
             if let readerProgress {
                 ProgressView(value: readerProgress)
@@ -1593,6 +1593,19 @@ struct MihbaraReaderView: View {
             isClosing = false
             openOriginal?(id, page)
         }
+    }
+
+    @MainActor private func prepareToFinish() async -> Bool {
+        app.armMihbaraLocatorFailureOnReaderCloseForUITest()
+        pauseReader(at: Date())
+        await saveCoordinator.waitForCurrentAttempt()
+        guard !saveCoordinator.hasPending else {
+            saveCoordinator.dismissPendingWriteError()
+            isPendingSaveAlert = true
+            readerAlert = pendingSaveMessage
+            return false
+        }
+        return true
     }
 
     @MainActor private func finishAndClose() {
