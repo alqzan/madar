@@ -68,6 +68,8 @@ import MadarCommands
 
         let first = try await service.previewPlan(input, at: now)
         XCTAssertEqual(service.forecastDay(at: now), firstDay)
+        let firstBackgroundDay = try await service.forecastDayOffMain(at: now)
+        XCTAssertEqual(firstBackgroundDay, firstDay)
         XCTAssertEqual(first.title, app.dateLabels(firstFinish, first: .hijri).primary)
         XCTAssertEqual(first.estimatedDays, 604)
         let firstOverview = try await service.planOverview(at: now)
@@ -77,6 +79,8 @@ import MadarCommands
         now = ISO8601DateFormatter().date(from: "2026-10-16T00:01:00+03:00")!
         let next = try await service.previewPlan(input, at: now)
         XCTAssertEqual(service.forecastDay(at: now), nextDay)
+        let nextBackgroundDay = try await service.forecastDayOffMain(at: now)
+        XCTAssertEqual(nextBackgroundDay, nextDay)
         XCTAssertEqual(next.title, app.dateLabels(nextFinish, first: .hijri).primary)
         XCTAssertEqual(next.estimatedDays, 604)
         let nextOverview = try await service.planOverview(at: now)

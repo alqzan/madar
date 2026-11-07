@@ -20,6 +20,9 @@ import MadarPrayer
     func forecastDay(at instant: Date) -> GregorianDay? {
         try? DiaryLineRenderer.today(context: ModelContext(app.container), now: instant)
     }
+    func forecastDayOffMain(at instant: Date) async throws -> GregorianDay? {
+        try await app.madarDayOffMain(at: instant)
+    }
     func repository() throws -> QuranRepository {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
         return try QuranRepository(context: ModelContext(app.container), catalog: QuranResources.catalog())

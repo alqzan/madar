@@ -442,6 +442,44 @@ final class AppSession {
         return snapshot
     }
     @ObservationIgnored private var prayerSnapshotCache: (revision: Int, rows: [Int: PrayerSnapshot]) = (-1, [:])
+    /// Day-boundary checks use PrayerRepository too. Plan timelines and the Quran room share one read per minute
+    /// so checking whether the day changed never scans prayer history on the main actor.
+    func madarDayOffMain(at now: Date) async throws -> GregorianDay? {
+        guard !maintenanceInProgress else { throw BackupOperationError.busy }
+        let revision = prayerRevision, generation = storeGeneration, container = self.container
+        let key = [Int(now.timeIntervalSince1970 / 60), revision, generation]
+        if madarDayCache.key == key { return madarDayCache.day }
+
+        let worker: Task<GregorianDay?, Error>
+        if let current = madarDayLoad, current.key == key {
+            worker = current.task
+        } else {
+            madarDayLoad?.task.cancel()
+            worker = Task.detached(priority: .utility) {
+                try Task.checkCancellation()
+                let day = try? DiaryLineRenderer.today(context: ModelContext(container), now: now)
+                try Task.checkCancellation()
+                return day
+            }
+            madarDayLoad = (key, worker)
+        }
+
+        do {
+            let day = try await worker.value
+            guard !maintenanceInProgress else { throw BackupOperationError.busy }
+            let isCurrent = prayerRevision == revision && storeGeneration == generation && self.container === container
+            if isCurrent { madarDayCache = (key, day) }
+            if madarDayLoad?.key == key { madarDayLoad = nil }
+            try Task.checkCancellation()
+            guard isCurrent else { throw CancellationError() }
+            return day
+        } catch {
+            if madarDayLoad?.key == key { madarDayLoad = nil }
+            throw error
+        }
+    }
+    @ObservationIgnored private var madarDayCache: (key: [Int], day: GregorianDay?) = ([], nil)
+    @ObservationIgnored private var madarDayLoad: (key: [Int], task: Task<GregorianDay?, Error>)?
     func prayerNow(_ fallback: Date = .now) -> Date {
 #if DEBUG
         if let diaryBoundaryUITestClockOverride { return diaryBoundaryUITestClockOverride }

@@ -636,15 +636,24 @@ struct QuranMushafRequest: Identifiable { let id = UUID(); let page: Int; var ay
 struct QuranMadarDayRefresh: ViewModifier {
     let app: AppSession
     let refresh: () -> Void
+    @Environment(\.isFrontRoom) private var isFrontRoom
     @State private var shownKey: String?
     func body(content: Content) -> some View {
-        content.task {
-            shownKey = app.currentMadarDayKey()
+        content.task(id: isFrontRoom) {
+            guard isFrontRoom else { return }
+            do { shownKey = try await app.madarDayOffMain(at: app.prayerNow())?.description }
+            catch is CancellationError { return }
+            catch { }
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
-                guard let key = app.currentMadarDayKey(), key != shownKey else { continue }
-                shownKey = key
-                refresh()
+                do { try await Task.sleep(for: .seconds(60)) }
+                catch { return }
+                do {
+                    guard let key = try await app.madarDayOffMain(at: app.prayerNow())?.description,
+                          key != shownKey else { continue }
+                    shownKey = key
+                    refresh()
+                } catch is CancellationError { return }
+                catch { continue }
             }
         }
     }

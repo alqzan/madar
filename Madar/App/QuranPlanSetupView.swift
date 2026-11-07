@@ -8,6 +8,7 @@ struct QuranPlanSetupView: View {
     let service: AppQuranService
     let close: () -> Void
     @Environment(\.roomTheme) private var theme
+    @Environment(\.isFrontRoom) private var isFrontRoom
     @State private var input: QuranUIPlanInput?
     @State private var initialStart = 1
     @State private var customStartAyah = 1
@@ -15,6 +16,9 @@ struct QuranPlanSetupView: View {
     @State private var customStart = false
     @State private var page = 1
     @State private var forecastState: QuranUIForecastState?
+    @State private var loadedForecastDay: GregorianDay?
+    @State private var forecastDayRevision = -1
+    @State private var forecastDayGeneration = -1
     @State private var busy = false
     @State private var error: String?
     #if DEBUG
@@ -40,10 +44,36 @@ struct QuranPlanSetupView: View {
             page = startPage
         } catch { self.error = quranUserMessage(error) }
     }
+    private var visibleForecastDay: GregorianDay? {
+        guard forecastDayRevision == service.app.prayerRevision,
+              forecastDayGeneration == service.app.storeGeneration else { return nil }
+        return loadedForecastDay
+    }
+    private func dayReadKey(at instant: Date) -> [Int] {
+        [Int(instant.timeIntervalSince1970 / 60), service.app.prayerRevision, service.app.storeGeneration, isFrontRoom ? 1 : 0]
+    }
+    @MainActor private func refreshForecastDay(at instant: Date, key: [Int]) async {
+        guard isFrontRoom else { return }
+        do {
+            let day = try await service.forecastDayOffMain(at: instant)
+            try Task.checkCancellation()
+            guard isFrontRoom, key == dayReadKey(at: service.currentTime()) else { return }
+            loadedForecastDay = day
+            forecastDayRevision = key[1]
+            forecastDayGeneration = key[2]
+        } catch is CancellationError {
+        } catch {
+            guard key == dayReadKey(at: service.currentTime()) else { return }
+            loadedForecastDay = nil
+            forecastDayRevision = key[1]
+            forecastDayGeneration = key[2]
+        }
+    }
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { _ in
             let evaluatedAt = service.currentTime()
-            let forecastDay = service.forecastDay(at: evaluatedAt)
+            let dayReadKey = dayReadKey(at: evaluatedAt)
+            let forecastDay = visibleForecastDay
             let forecastKey = input.map { QuranUIForecastKey(input: $0, day: forecastDay) }
             VStack(spacing: 0) {
                 QuranScreenHeader(title: "خطة الحفظ") { if step > 0 { step -= 1 } else { close() } }.padding(
@@ -119,15 +149,15 @@ struct QuranPlanSetupView: View {
             }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review"))
                 .disabled(busy)
                 .task { loadPlan() }
+                .task(id: dayReadKey) { await refreshForecastDay(at: evaluatedAt, key: dayReadKey) }
                 .task(id: forecastKey) {
-                    guard let input, let forecastKey else { forecastState = nil; return }
+                    guard isFrontRoom, let input, let forecastKey, let expectedDay = forecastKey.day else { forecastState = nil; return }
                     do {
                         let result = try await service.previewPlan(input, at: evaluatedAt)
                         try Task.checkCancellation()
-                        guard let day = forecastKey.day,
-                            service.forecastDay(at: service.currentTime()) == day
-                        else { return }
-                        forecastState = QuranUIForecastState(input: input, day: day, forecast: result)
+                        guard try await service.forecastDayOffMain(at: service.currentTime()) == expectedDay,
+                              isFrontRoom else { return }
+                        forecastState = QuranUIForecastState(input: input, day: expectedDay, forecast: result)
                         error = nil
                     } catch is CancellationError {} catch { self.error = quranUserMessage(error) }
                 }

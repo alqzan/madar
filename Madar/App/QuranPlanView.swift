@@ -1,4 +1,5 @@
 import SwiftUI
+import MadarCore
 import MadarDesign
 import MadarCommands
 
@@ -7,13 +8,24 @@ struct QuranPlanView: View {
     let close: () -> Void
     let onSetupPresentationChange: (Bool) -> Void
     @Environment(\.roomTheme) private var theme
+    @Environment(\.isFrontRoom) private var isFrontRoom
     @State private var overview: QuranUIPlanOverview?
     @State private var error: String?
     @State private var busy = false
     @State private var showSetup = false
     @State private var previewLevel: QuranUILevel?
     @State private var overviewRequestID = UUID()
+    @State private var loadedMadarDay: GregorianDay?
+    @State private var madarDayRevision = -1
+    @State private var madarDayGeneration = -1
     private var app: AppSession { service.app }
+    private var displayedMadarDay: GregorianDay? {
+        guard madarDayRevision == app.prayerRevision, madarDayGeneration == app.storeGeneration else { return nil }
+        return loadedMadarDay
+    }
+    private func dayReadKey(at instant: Date) -> [Int] {
+        [Int(instant.timeIntervalSince1970 / 60), app.prayerRevision, app.storeGeneration, isFrontRoom ? 1 : 0]
+    }
     private let resetKeys = ["quran.hifzLevel", "quran.reviewLevel", "quran.restDay", "quran.wirdReminder", "quran.reviewSchedule"]
     init(service: AppQuranService, close: @escaping () -> Void, onSetupPresentationChange: @escaping (Bool) -> Void = { _ in }) {
         self.service = service
@@ -23,7 +35,8 @@ struct QuranPlanView: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { _ in
             let evaluatedAt = service.currentTime()
-            let currentDay = service.forecastDay(at: evaluatedAt)
+            let dayReadKey = dayReadKey(at: evaluatedAt)
+            let currentDay = displayedMadarDay
             ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 QuranScreenHeader(title: "خطّتك", close: close)
@@ -133,7 +146,10 @@ struct QuranPlanView: View {
         }.madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
             .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app).accessibilityIdentifier("quran-plan-undo") } }
             .fullScreenCover(isPresented: $showSetup, onDismiss: { reload(at: service.currentTime()) }) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
-            .task(id: currentDay) { await load(at: evaluatedAt) }
+            .task(id: dayReadKey) { await refreshMadarDay(at: evaluatedAt, key: dayReadKey) }
+            .task(id: currentDay) {
+                if overview == nil || overview?.day != currentDay { await load(at: evaluatedAt) }
+            }
             .onChange(of: app.settingsWriteInProgress) { if !app.settingsWriteInProgress { reload(at: service.currentTime()) } }
             .onChange(of: app.undoToken?.id) { reload(at: service.currentTime()) }
             .onChange(of: showSetup, initial: true) { _, presented in onSetupPresentationChange(presented) }
@@ -142,6 +158,23 @@ struct QuranPlanView: View {
         }
     }
     private var line: some View { Divider().overlay(theme.line) }
+    @MainActor private func refreshMadarDay(at instant: Date, key: [Int]) async {
+        guard isFrontRoom else { return }
+        do {
+            let day = try await service.forecastDayOffMain(at: instant)
+            try Task.checkCancellation()
+            guard isFrontRoom, key == dayReadKey(at: service.currentTime()) else { return }
+            loadedMadarDay = day
+            madarDayRevision = key[1]
+            madarDayGeneration = key[2]
+        } catch is CancellationError {
+        } catch {
+            guard key == dayReadKey(at: service.currentTime()) else { return }
+            loadedMadarDay = nil
+            madarDayRevision = key[1]
+            madarDayGeneration = key[2]
+        }
+    }
     private func missedDayChart(_ overview: QuranUIPlanOverview, policy: String) -> some View {
         let choice = policy == "ask" ? "spread" : policy
         let days = overview.missPreviews[choice] ?? []

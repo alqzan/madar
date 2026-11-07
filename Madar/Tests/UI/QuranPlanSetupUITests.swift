@@ -78,7 +78,10 @@ import XCTest
         XCTAssertTrue(app.steppers["quran-setup-page"].waitForExistence(timeout:5));app.buttons["quran-setup-next"].tap()
         app.buttons["quran-setup-unit-quarter"].tap();capture(app,"M2-V13-amount-L");app.buttons["quran-setup-next"].tap()
         app.buttons["quran-setup-rhythm-light"].tap();app.buttons["quran-setup-next"].tap()
-        app.buttons["quran-setup-rest-none"].tap();app.buttons["quran-setup-next"].tap();capture(app,"M2-V13-summary-L")
+        app.buttons["quran-setup-rest-none"].tap();app.buttons["quran-setup-next"].tap()
+        let forecast = app.staticTexts["quran-setup-forecast"]
+        expectation(for: NSPredicate(format: "label != %@", "نحسب موعدك"), evaluatedWith: forecast)
+        waitForExpectations(timeout: 10);capture(app,"M2-V13-summary-L")
         app.buttons["quran-setup-next"].tap();XCTAssertTrue(app.buttons["quran-plan-edit"].waitForExistence(timeout:10))
         for _ in 0..<5 { if app.staticTexts["quran-plan-version"].isHittable { break };app.swipeUp() }
         XCTAssertTrue(app.staticTexts["quran-plan-version"].label.contains("٢"))
