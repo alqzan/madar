@@ -1,5 +1,6 @@
 import Foundation
 import MadarCore
+import MadarCommands
 import MadarQuran
 
 struct QuranUIYearDay: Identifiable, Sendable {
@@ -18,7 +19,10 @@ struct QuranUIYear: Sendable {
 extension AppQuranService {
     func displayDate(_ day: GregorianDay) -> String { app.dateLabels(day, first: .hijri).combined }
     func yearLog(at instant: Date? = nil) throws -> QuranUIYear {
-        let value = try repository().snapshot(at: instant ?? clock()), today = value.day.date
+        try yearLog(from: repository().snapshot(at: instant ?? clock()))
+    }
+    func yearLog(from value: QuranDataSnapshot) throws -> QuranUIYear {
+        let today = value.day.date
         let zone = TimeZone(identifier: value.day.timeZoneID) ?? .gmt
         let gregorianNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
         let names = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"]

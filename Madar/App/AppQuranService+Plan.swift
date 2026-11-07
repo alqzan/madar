@@ -26,13 +26,21 @@ extension AppQuranService {
             unit: (QuranUIUnit(rawValue: v.plan?.plan.unit.rawValue ?? row.unit) ?? .page), amount: v.plan?.plan.amount ?? row.amount,
             rhythm: (QuranUIRhythm(rawValue: v.plan?.plan.intensity.rawValue ?? row.rhythm) ?? .balanced), restDay: v.restDay.rawValue, missPolicy: v.plan?.missPolicy ?? row.missPolicy)
     }
-    func planOverview(at instant: Date? = nil) throws -> QuranUIPlanOverview {
+    func planOverview(at instant: Date? = nil) async throws -> QuranUIPlanOverview {
         let evaluatedAt = instant ?? clock()
-        let v = try repository().snapshot(at: evaluatedAt), input = planInput(from: v)
+        let (snapshots, catalog, preHifzDay) = try await snapshotsOffMain(at: evaluatedAt, hifzLevels: [nil], includePreHifzDaySnapshot: true)
+        try Task.checkCancellation()
+        guard let v = snapshots.first else { throw DataError.invalidValue("Quran snapshot") }
+        let input = planInput(from: v)
         var forecasts: [String: QuranUIForecast] = [:]
-        if v.plan != nil { for level in QuranDayLevel.allCases { forecasts[level.rawValue] = try forecast(input, snapshot: v, using: level, at: evaluatedAt) } }
+        if v.plan != nil {
+            for level in QuranDayLevel.allCases {
+                try Task.checkCancellation()
+                forecasts[level.rawValue] = try forecast(input, snapshot: v, using: level, at: evaluatedAt, preHifzDay: preHifzDay, resourceCatalog: catalog)
+            }
+        }
         let streak = QuranProgressEngine.streak(activities: v.activities, through: v.day.date, restDay: v.restDay)
-        var result = QuranUIPlanOverview(day: v.day.date, input: v.plan == nil ? nil : input, forecasts: forecasts, streak: dayCount(streak.days), days: Array(try yearLog(at: evaluatedAt).days.suffix(28)), version: v.plan.map { "نسخة الخطة " + numerals.string($0.version) } ?? "لا خطة حفظ بعد")
+        var result = QuranUIPlanOverview(day: v.day.date, input: v.plan == nil ? nil : input, forecasts: forecasts, streak: dayCount(streak.days), days: Array(try yearLog(from: v).days.suffix(28)), version: v.plan.map { "نسخة الخطة " + numerals.string($0.version) } ?? "لا خطة حفظ بعد")
         if v.plan != nil {
             result.missPreviews = try missedDayPreviews(input: input, startingOn: v.day.date, level: v.habitualHifzLevel)
             var habitual = input; habitual.amount *= v.habitualHifzLevel.hifzFactor

@@ -25,7 +25,8 @@ import MadarPrayer
         return try QuranRepository(context: ModelContext(app.container), catalog: QuranResources.catalog())
     }
     func snapshot() throws -> QuranDataSnapshot { try repository().snapshot(at: clock()) }
-    private func snapshotsOffMain(at instant: Date, hifzLevels: [QuranDayLevel?], priority: TaskPriority = .userInitiated) async throws -> (snapshots: [QuranDataSnapshot], catalog: QuranResourceCatalog) {
+    func snapshotsOffMain(at instant: Date, hifzLevels: [QuranDayLevel?], includePreHifzDaySnapshot: Bool = false,
+                          priority: TaskPriority = .userInitiated) async throws -> (snapshots: [QuranDataSnapshot], catalog: QuranResourceCatalog, preHifzDay: QuranDataSnapshot?) {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
         let container = app.container, generation = app.storeGeneration
         let worker = Task.detached(priority: priority) {
@@ -39,7 +40,14 @@ import MadarPrayer
                 snapshots.append(try reader.snapshot(at: instant, previewHifzLevel: level))
                 try Task.checkCancellation()
             }
-            return (snapshots, catalog)
+            var preHifzDay: QuranDataSnapshot?
+            if includePreHifzDaySnapshot, let snapshot = snapshots.first,
+               snapshot.sessions.contains(where: { $0.kind == .hifz && $0.dayKey == snapshot.day.date }) {
+                try Task.checkCancellation()
+                preHifzDay = try reader.snapshot(at: instant, excludingSessionDay: snapshot.day.date)
+                try Task.checkCancellation()
+            }
+            return (snapshots, catalog, preHifzDay)
         }
         let result = try await withTaskCancellationHandler {
             try await worker.value
@@ -90,7 +98,7 @@ import MadarPrayer
     func load() async throws -> QuranRoomState { try await loadState(deferHifzAmounts: false) }
     func loadState(deferHifzAmounts: Bool) async throws -> QuranRoomState {
         let evaluatedAt = clock()
-        let (snapshots, catalog) = try await snapshotsOffMain(at: evaluatedAt, hifzLevels: [nil])
+        let (snapshots, catalog, _) = try await snapshotsOffMain(at: evaluatedAt, hifzLevels: [nil])
         try Task.checkCancellation()
         guard let snapshot = snapshots.first else { throw DataError.invalidValue("Quran snapshot") }
         let today = snapshot.day.date
@@ -234,7 +242,7 @@ import MadarPrayer
     }
     func hifzAmounts(for hifzUnit: QuranHifzUnit) async throws -> [String: String] {
         let evaluatedAt = clock()
-        let (previews, catalog) = try await snapshotsOffMain(at: evaluatedAt, hifzLevels: QuranDayLevel.allCases.map(Optional.some), priority: .utility)
+        let (previews, catalog, _) = try await snapshotsOffMain(at: evaluatedAt, hifzLevels: QuranDayLevel.allCases.map(Optional.some), priority: .utility)
         var amounts: [String: String] = [:]
         for (level, preview) in zip(QuranDayLevel.allCases, previews) {
             amounts[level.rawValue] = try memorizationAmount(preview.hifz, unit: hifzUnit, catalog: catalog)
@@ -246,18 +254,23 @@ import MadarPrayer
     }
     func previewPlan(_ input: QuranUIPlanInput, at instant: Date?) async throws -> QuranUIForecast {
         let evaluatedAt = instant ?? clock()
-        return try forecast(input, snapshot: repository().snapshot(at: evaluatedAt), at: evaluatedAt)
+        let (snapshots, catalog, preHifzDay) = try await snapshotsOffMain(at: evaluatedAt, hifzLevels: [nil], includePreHifzDaySnapshot: true)
+        try Task.checkCancellation()
+        guard let snapshot = snapshots.first else { throw DataError.invalidValue("Quran snapshot") }
+        return try forecast(input, snapshot: snapshot, at: evaluatedAt, preHifzDay: preHifzDay, resourceCatalog: catalog)
     }
-    func forecast(_ input: QuranUIPlanInput, snapshot: QuranDataSnapshot, using level: QuranDayLevel? = nil, at instant: Date? = nil) throws -> QuranUIForecast {
+    func forecast(_ input: QuranUIPlanInput, snapshot: QuranDataSnapshot, using level: QuranDayLevel? = nil, at instant: Date? = nil,
+                  preHifzDay: QuranDataSnapshot? = nil, resourceCatalog: QuranResourceCatalog? = nil) throws -> QuranUIForecast {
         let evaluatedAt = instant ?? clock()
         guard let unit = QuranHifzUnit(rawValue: input.unit.rawValue), let rest = QuranRestDay(rawValue: input.restDay), input.amount.isFinite, input.amount > 0, (1...6236).contains(input.startAyah) else { throw QuranPlanError.invalidAmount }
         let remainingAyahs = (input.startAyah...6236).filter { !snapshot.coverage.coveredAyahs.contains($0) }.count
-        let catalog = try QuranResources.catalog()
+        let catalog: QuranResourceCatalog
+        if let resourceCatalog { catalog = resourceCatalog } else { catalog = try QuranResources.catalog() }
         let remainingPages = Set(catalog.ayahs.filter { $0.id >= input.startAyah }.map(\.page)).subtracting(snapshot.coverage.completedPages).count
         let unitFaces = unit == .ayah ? (remainingAyahs == 0 ? 0 : Double(remainingPages) / Double(remainingAyahs)) : (unit == .half ? 0.5 : unit == .quarter ? 0.25 : 1)
         var startingOn = snapshot.day.date
         if snapshot.sessions.contains(where: { $0.kind == .hifz && $0.dayKey == snapshot.day.date }) {
-            let before = try repository().snapshot(at: evaluatedAt, excludingSessionDay: snapshot.day.date)
+            let before = try preHifzDay ?? repository().snapshot(at: evaluatedAt, excludingSessionDay: snapshot.day.date)
             if let start = try before.coverage.frontier(from: input.startAyah) {
                 let limit = (start...6236).first { before.coverage.coveredAyahs.contains($0) }.map { $0 - 1 } ?? 6236
                 let target = try QuranPortionEngine.portion(from: start, through: limit, unit: unit, amount: input.amount,

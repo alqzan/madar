@@ -12,6 +12,7 @@ struct QuranPlanView: View {
     @State private var busy = false
     @State private var showSetup = false
     @State private var previewLevel: QuranUILevel?
+    @State private var overviewRequestID = UUID()
     private var app: AppSession { service.app }
     private let resetKeys = ["quran.hifzLevel", "quran.reviewLevel", "quran.restDay", "quran.wirdReminder", "quran.reviewSchedule"]
     init(service: AppQuranService, close: @escaping () -> Void, onSetupPresentationChange: @escaping (Bool) -> Void = { _ in }) {
@@ -101,7 +102,7 @@ struct QuranPlanView: View {
                                 Text("لو فاتك يوم").font(quranFont(17, bold: true))
                                 Text("اختر ما يحدث في يوم الحفظ التالي").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
                                 ForEach([("ask","اسألني كل مرة"),("spread","وزّعه على ثلاثة أيام"),("double","ضاعف اليوم"),("skip","تجاوزه")], id: \.0) { key, title in
-                                    Button { var p = input; p.missPolicy = key; run { try await service.perform(.savePlan(p)); load() } } label: {
+                                    Button { var p = input; p.missPolicy = key; run { try await service.perform(.savePlan(p)); await load() } } label: {
                                         HStack(spacing: 10) {
                                             Image(systemName: input.missPolicy == key ? "largecircle.fill.circle" : "circle").foregroundStyle(input.missPolicy == key ? theme.color("hifzText") : theme.secondaryInk)
                                             VStack(alignment: .leading, spacing: 3) {
@@ -126,13 +127,15 @@ struct QuranPlanView: View {
                 if let error { Text(error).font(quranFont(13)) }
                 // AU-95: a failed first read left only the header; one tap reads the plan again.
                 if overview == nil, error != nil {
-                    Button("أعِد المحاولة") { load(at: service.currentTime()) }.font(quranFont(14, bold: true)).frame(minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("quran-plan-retry")
+                    Button("أعِد المحاولة") { reload(at: service.currentTime()) }.font(quranFont(14, bold: true)).frame(minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("quran-plan-retry")
                 }
             }.padding(16)
         }.madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
             .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app).accessibilityIdentifier("quran-plan-undo") } }
-            .fullScreenCover(isPresented: $showSetup, onDismiss: { load(at: service.currentTime()) }) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
-            .task(id: currentDay) { load(at: evaluatedAt) }.onChange(of: app.settingsWriteInProgress) { if !app.settingsWriteInProgress { load(at: service.currentTime()) } }.onChange(of: app.undoToken?.id) { load(at: service.currentTime()) }
+            .fullScreenCover(isPresented: $showSetup, onDismiss: { reload(at: service.currentTime()) }) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
+            .task(id: currentDay) { await load(at: evaluatedAt) }
+            .onChange(of: app.settingsWriteInProgress) { if !app.settingsWriteInProgress { reload(at: service.currentTime()) } }
+            .onChange(of: app.undoToken?.id) { reload(at: service.currentTime()) }
             .onChange(of: showSetup, initial: true) { _, presented in onSetupPresentationChange(presented) }
             .onChange(of: app.string("quran.hifzLevel")) { previewLevel = nil }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { app.errorMessage != nil }, set: { if !$0 { app.errorMessage = nil } })) { Button("تمّ") { app.errorMessage = nil } } message: { Text(app.errorMessage ?? "") }
@@ -221,6 +224,21 @@ struct QuranPlanView: View {
     private func choiceRow(_ title: String, key: String, options: [(String,String)], dot: String? = "review") -> some View {
         Menu { ForEach(options, id: \.0) { value, label in Button(label) { app.set(.string(value), key: key) }.accessibilityIdentifier("quran-plan-option-" + key + "-" + value) } } label: { row(title, detail: options.first { $0.0 == app.string(key) }?.1 ?? "—", dot: dot, chevron: true) }.accessibilityIdentifier("quran-plan-" + key)
     }
-    private func load(at instant: Date? = nil) { do { overview = try service.planOverview(at: instant); error = nil } catch { self.error = quranUserMessage(error) } }
+    @MainActor private func load(at instant: Date? = nil) async {
+        let requestID = UUID(); overviewRequestID = requestID
+        do {
+            let value = try await service.planOverview(at: instant)
+            try Task.checkCancellation()
+            guard overviewRequestID == requestID else { return }
+            overview = value; error = nil
+        } catch is CancellationError {
+        } catch {
+            guard overviewRequestID == requestID else { return }
+            self.error = quranUserMessage(error)
+        }
+    }
+    private func reload(at instant: Date? = nil) {
+        Task { @MainActor in await load(at: instant) }
+    }
     private func run(_ work: @escaping @MainActor () async throws -> Void) { guard !busy else { return }; busy = true; Task { defer { busy = false }; do { try await work() } catch { self.error = quranUserMessage(error) } } }
 }

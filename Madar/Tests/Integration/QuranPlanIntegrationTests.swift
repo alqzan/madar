@@ -70,7 +70,7 @@ import MadarCommands
         XCTAssertEqual(service.forecastDay(at: now), firstDay)
         XCTAssertEqual(first.title, app.dateLabels(firstFinish, first: .hijri).primary)
         XCTAssertEqual(first.estimatedDays, 604)
-        let firstOverview = try service.planOverview(at: now)
+        let firstOverview = try await service.planOverview(at: now)
         XCTAssertEqual(firstOverview.day, firstDay)
         XCTAssertEqual(firstOverview.forecasts["medium"]?.title, first.title)
 
@@ -79,7 +79,7 @@ import MadarCommands
         XCTAssertEqual(service.forecastDay(at: now), nextDay)
         XCTAssertEqual(next.title, app.dateLabels(nextFinish, first: .hijri).primary)
         XCTAssertEqual(next.estimatedDays, 604)
-        let nextOverview = try service.planOverview(at: now)
+        let nextOverview = try await service.planOverview(at: now)
         XCTAssertEqual(nextOverview.day, nextDay)
         XCTAssertEqual(nextOverview.forecasts["medium"]?.title, next.title)
     }
@@ -97,7 +97,7 @@ import MadarCommands
         let partial = try await service.previewPlan(input); XCTAssertEqual(partial.title,expected); XCTAssertEqual(partial.secondaryDate,"٩ يونيو ٢٠٢٨ م")
         row.toAyah=7;try context.save() // Whole first face: 603 remain, starting tomorrow gives the same date.
         let complete = try await service.previewPlan(input); XCTAssertEqual(complete.title,expected)
-        let overview=try service.planOverview()
+        let overview=try await service.planOverview()
         XCTAssertEqual(overview.forecasts.count,4)
         XCTAssertNotEqual(overview.forecasts["simple"]?.title,overview.forecasts["deep"]?.title)
     }
