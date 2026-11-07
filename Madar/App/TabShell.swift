@@ -79,12 +79,11 @@ struct TabShell<Content: View>: View {
                     .allowsHitTesting(front)
                     .accessibilityHidden(!front)
                     .zIndex(front ? 1 : 0)
-                    // The room arriving lifts out of a lighter focus on a shorter, more settled spring; the one leaving sinks back.
-                    // Keeping the transform small makes switches feel direct and avoids blurring an entire live room at full strength.
+                    // The room arriving lifts through opacity, a small scale and an 8-point offset; the compact transform keeps the
+                    // retained room subtree inexpensive to composite while each switch stays settled and direct.
                     .animation(reduceMotion ? .easeInOut(duration: 0.12) : .spring(response: 0.32, dampingFraction: 0.86)) {
                         $0.opacity(front ? 1 : 0)
                             .scaleEffect(front || reduceMotion ? 1 : 0.98)
-                            .blur(radius: front || reduceMotion ? 0 : 5)
                             .offset(y: front || reduceMotion ? 0 : 8)
                     }
             }

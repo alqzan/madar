@@ -16,6 +16,10 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
     public var markdown: Bool? = nil
     public init(id: String, at: Date, text: String, kind: String, tzID: String? = nil, markdown: Bool? = nil) { self.id = id; self.at = at; self.text = text; self.kind = kind; self.tzID = tzID; self.markdown = markdown }
 }
+public struct DiaryAutoLineVisibility: Sendable {
+    fileprivate let hiddenKeys: Set<String>
+    fileprivate let pinnedKeys: Set<String>
+}
 @MainActor public enum DiaryLineRenderer {
     nonisolated public static func today(context: ModelContext, now: Date) throws -> GregorianDay {
         let repo = try PrayerRepository(context: context), place = repo.place(at: now), civil = GregorianDay.containing(now, in: place.timeZone)
@@ -31,9 +35,21 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
     /// app when every day re-read every table). Each day's lines are exactly those `live(day:)` gives.
     public static func live(days: Set<String>, context: ModelContext) throws -> [String: [DiaryAutoLine]] {
         guard !days.isEmpty else { return [:] }
+        let visibility = try visibility(context: context)
+        var lines = try liveWithoutMoney(days: days, visibility: visibility, context: context)
+        let moneyLines = try liveMoneyLines(days: days, visibility: visibility, context: context)
+        for (key, rows) in moneyLines { lines[key, default: []].append(contentsOf: rows) }
+        return lines.mapValues { $0.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at } }
+    }
+    nonisolated public static func visibility(context: ModelContext) throws -> DiaryAutoLineVisibility {
         let hiddenKeys = Set(try context.fetch(FetchDescriptor<HiddenAutoLine>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.map { "\($0.eventKind)|\($0.eventID?.uuidString ?? "")" })
         let pinnedKeys = Set(try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source == "autoPinned" }.map { "\($0.pinnedEventKind ?? "")|\($0.pinnedEventID?.uuidString ?? "")" })
-        func visible(_ kind: String, _ id: UUID) -> Bool { let key = kind + "|" + id.uuidString; return !hiddenKeys.contains(key) && !pinnedKeys.contains(key) }
+        return DiaryAutoLineVisibility(hiddenKeys: hiddenKeys, pinnedKeys: pinnedKeys)
+    }
+    /// Room reads safe to run away from the main actor. Money stays on its repository's required actor.
+    nonisolated public static func liveWithoutMoney(days: Set<String>, visibility: DiaryAutoLineVisibility, context: ModelContext) throws -> [String: [DiaryAutoLine]] {
+        guard !days.isEmpty else { return [:] }
+        func visible(_ kind: String, _ id: UUID) -> Bool { let key = kind + "|" + id.uuidString; return !visibility.hiddenKeys.contains(key) && !visibility.pinnedKeys.contains(key) }
         var lines: [String: [DiaryAutoLine]] = [:]
         let names = ["fajr": "الفجر", "dhuhr": "الظهر", "asr": "العصر", "maghrib": "المغرب", "isha": "العشاء"]
         for row in try context.fetch(FetchDescriptor<PrayerLog>()) where days.contains(row.dayKey) && row.deletedAt == nil && row.mergedInto == nil && visible("salah", row.id) {
@@ -105,9 +121,17 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
             lines[String(group.split(separator: "|")[0]), default: []].append(.init(id: "habits." + latest.id.uuidString, at: latest.eventAt, text: text, kind: "habits",
                                                         tzID: latest.tzID.isEmpty ? nil : latest.tzID))
         }
+        return lines
+    }
+    public static func liveMoneyLines(days: Set<String>, visibility: DiaryAutoLineVisibility, context: ModelContext) throws -> [String: [DiaryAutoLine]] {
+        guard !days.isEmpty else { return [:] }
+        func visible(_ id: UUID) -> Bool { let key = "mal|" + id.uuidString; return !visibility.hiddenKeys.contains(key) && !visibility.pinnedKeys.contains(key) }
+        var lines: [String: [DiaryAutoLine]] = [:]
+        let settings = try SettingsStore(context: context)
+        let digits = MadarNumberFormatter(style: try settings.value(for: "core.numerals") == .string("western") ? .western : .hindi)
         let money = MoneyRepository(context: context)
         let effects = try money.effectContext()
-        for row in try money.confirmedTransactions() where days.contains(row.dayKey) && row.showInDiary && visible("mal", row.id) {
+        for row in try money.confirmedTransactions() where days.contains(row.dayKey) && row.showInDiary && visible(row.id) {
             let charge = try money.effect(of: row, includingExcluded: true, in: effects).budgetChargeMinor
             guard charge != 0, let exponent = CurrencyExponents.specified.exponent(row.homeCurrency) else { continue }
             let amount = digits.amount(minorUnits: Int64(abs(charge)), fractionDigits: exponent, signed: false)
@@ -116,7 +140,7 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
                                                         text: (charge > 0 ? "صرفت " : "استعدت ") + amount + " " + currency, kind: "mal",
                                                         tzID: row.tzID.isEmpty ? nil : row.tzID))
         }
-        return lines.mapValues { $0.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at } }
+        return lines
     }
     /// RD1: keep the first closed-day snapshot. Initial historical pages get a baseline on first observation.
     public static func freeze(_ day: GregorianDay, context: ModelContext, now: Date, writer: String) throws {

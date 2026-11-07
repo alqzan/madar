@@ -152,6 +152,8 @@ final class AppSession {
     /// Caches for `AppBahwService.prayerLocation()` and `.today`, keyed by [prayerRevision, minute].
     @ObservationIgnored var bahwLocationCache: (key: [Int], place: ActivePlace, options: PrayerCalculationOptions)?
     @ObservationIgnored var bahwTodayCache: (key: [Int], day: GregorianDay)?
+    /// The habit orbit reuses day starts and calendar periods while deriving its moving clock dot from the current instant.
+    @ObservationIgnored var bahwHabitOrbitCache: BahwHabitOrbitSchedule?
     #if DEBUG
     @ObservationIgnored var failFirstNotebookSave = false
     @ObservationIgnored private var failFirstGoodreadsImport = false

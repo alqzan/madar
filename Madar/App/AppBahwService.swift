@@ -6,6 +6,18 @@ import MadarPrayer
 import MadarCommands
 import MadarSnapshots
 
+struct BahwHabitOrbitPeriod: Equatable {
+    let elapsed: Int
+    let length: Int
+}
+
+struct BahwHabitOrbitSchedule {
+    let key: [Int]
+    let dayStart: Date?
+    let nextDayStart: Date?
+    let periods: [HabitFrequency: BahwHabitOrbitPeriod]
+}
+
 /// §7.1 lobby read models. Every number is read from the room that owns it; the lobby stores only its layout.
 struct BahwPrayerModel: Equatable {
     struct Arch: Identifiable, Equatable { let id: String; let name: String; let time: String; let clock24: String; let done: Bool; let next: Bool }
@@ -89,23 +101,36 @@ struct BahwUpcomingItem: Identifiable, Equatable {
 
     /// W2's black clock dots show elapsed time, independently of a habit's completion or reminder window.
     func habitOrbitPositions() -> [HabitFrequency: Double] {
-        let location = prayerLocation(), place = location.place, day = today
-        let boundary = DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr
-        func start(_ key: GregorianDay) -> Date? {
-            DiaryFreeze.dayEnd(day: key.adding(days: -1), boundary: boundary, timeZone: place.timeZone,
-                nextDay: PrayerTimesEngine.calculate(day: key, place: place, options: location.options))
+        let key = [session.prayerRevision, Int(now.timeIntervalSince1970 / 60)]
+        let schedule: BahwHabitOrbitSchedule
+        if let cached = session.bahwHabitOrbitCache, cached.key == key {
+            schedule = cached
+        } else {
+            let location = prayerLocation(), place = location.place, day = today
+            let boundary = DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr
+            func start(_ key: GregorianDay) -> Date? {
+                DiaryFreeze.dayEnd(day: key.adding(days: -1), boundary: boundary, timeZone: place.timeZone,
+                    nextDay: PrayerTimesEngine.calculate(day: key, place: place, options: location.options))
+            }
+            let days = MadarCalendarDays(zone: place.timeZone, source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, offset: Int(session.number("core.hijriOffset")))
+            let hijri = session.string("core.firstCalendar") == "hijri"
+            let periods: [(HabitFrequency, MadarPeriod)] = [
+                (.weekly, MadarYear.week(day, start: MadarWeekStart(rawValue: session.string("core.weekStart")) ?? .saturday)),
+                (.monthly, hijri ? MadarYear.hijriMonth(day, days) : MadarYear.gregorianMonth(day)),
+                (.yearly, hijri ? MadarYear.hijriYear(day, days) : MadarYear.gregorianYear(day))
+            ]
+            schedule = BahwHabitOrbitSchedule(
+                key: key,
+                dayStart: start(day),
+                nextDayStart: start(day.adding(days: 1)),
+                periods: Dictionary(uniqueKeysWithValues: periods.map { ($0.0, BahwHabitOrbitPeriod(elapsed: $0.1.elapsed, length: $0.1.length)) })
+            )
+            session.bahwHabitOrbitCache = schedule
         }
-        guard let from = start(day), let to = start(day.adding(days: 1)), to > from else { return [:] }
+        guard let from = schedule.dayStart, let to = schedule.nextDayStart, to > from else { return [:] }
         let daily = min(1, max(0, now.timeIntervalSince(from) / to.timeIntervalSince(from)))
-        let days = MadarCalendarDays(zone: place.timeZone, source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, offset: Int(session.number("core.hijriOffset")))
-        let hijri = session.string("core.firstCalendar") == "hijri"
-        let periods: [(HabitFrequency, MadarPeriod)] = [
-            (.weekly, MadarYear.week(day, start: MadarWeekStart(rawValue: session.string("core.weekStart")) ?? .saturday)),
-            (.monthly, hijri ? MadarYear.hijriMonth(day, days) : MadarYear.gregorianMonth(day)),
-            (.yearly, hijri ? MadarYear.hijriYear(day, days) : MadarYear.gregorianYear(day))
-        ]
         var positions: [HabitFrequency: Double] = [.daily: daily]
-        for (frequency, period) in periods { positions[frequency] = (Double(period.elapsed) + daily) / Double(period.length) }
+        for (frequency, period) in schedule.periods { positions[frequency] = (Double(period.elapsed) + daily) / Double(period.length) }
         return positions
     }
 

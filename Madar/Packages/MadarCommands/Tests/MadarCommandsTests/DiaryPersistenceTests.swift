@@ -38,11 +38,17 @@ import MadarData
         session.tzID = "Europe/London"; context.insert(session)
         let reading = ReadingSession(); reading.dayKey = day.description; reading.end = eventAt; reading.activeSeconds = 120
         reading.tzID = "Europe/London"; context.insert(reading)
+        let earlier = day.adding(days: -1)
+        let earlierPrayer = PrayerLog(); earlierPrayer.dayKey = earlier.description; earlierPrayer.prayer = "isha"; earlierPrayer.status = "alone"
+        earlierPrayer.eventAt = eventAt.addingTimeInterval(-86_400); earlierPrayer.tzID = "Europe/Paris"; context.insert(earlierPrayer)
         try context.save()
 
         let lines = try DiaryLineRenderer.live(day: day, context: context)
         #expect(lines.count == 3)
         #expect(lines.allSatisfy { $0.tzID == "Europe/London" })
+        let batch = try DiaryLineRenderer.live(days: [day.description, earlier.description], context: context)
+        #expect(batch[day.description] == lines)
+        #expect(batch[earlier.description]?.map(\.tzID) == ["Europe/Paris"])
     }
     /// OR-11: N3 shows what was read and the day's habits. Al-Fatiha is ayahs 1–7 on page 1; Al-Baqara 1 is ayah 8.
     @Test func quranLinesNameTheAmountAndHabitsWriteTheirDay() throws {

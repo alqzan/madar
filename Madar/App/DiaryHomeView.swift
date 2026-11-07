@@ -534,7 +534,7 @@ struct DiaryHomeView: View {
                 }
             }
 #endif
-            var value = try service.home()
+            var value = try await service.homeOffMain()
             let shape = app.string("notes.homeShape")
             let displayed = shape == "echoes" ? value.echoes.compactMap(\.day) : shape == "margin" ? [selected ?? opening(value)].compactMap { $0 } : value.selection.days
             for day in Set(displayed) {
@@ -542,7 +542,7 @@ struct DiaryHomeView: View {
                 try await service.prepareClosedDay(day)
             }
             guard generation == refreshGeneration, !Task.isCancelled else { return }
-            value = try service.home()
+            value = try await service.homeOffMain()
             guard generation == refreshGeneration, !Task.isCancelled else { return }
             snapshot = value; failure = nil
         } catch {

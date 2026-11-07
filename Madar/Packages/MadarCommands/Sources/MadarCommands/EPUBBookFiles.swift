@@ -22,6 +22,8 @@ public struct EPUBBookInspection: Equatable, Sendable, Identifiable {
     public let version: String
     public let outline: [EPUBBookOutlineItem]
     public let hasPageList: Bool
+    public let printedPageCount: Int?
+    public let printedVolumeCount: Int
     public let hasCover: Bool
     public let coverData: Data?
     public let hasFootnotes: Bool?
@@ -187,17 +189,25 @@ public enum EPUBBookFiles {
         let ncxItem = ncxID.flatMap { manifest[$0] }
         var outline: [EPUBBookOutlineItem] = []
         var hasPageList = false
+        var pageLabels: [String] = []
         if let navigationItem {
             let nav = try xml(archive, path: navigationItem.path, maximum: metadataMemberLimit)
             if let toc = nav.descendants(named: "nav").first(where: { $0.attribute("type")?.split(whereSeparator: { $0.isWhitespace }).contains("toc") == true }) {
                 outline = anchors(in: toc, depth: 0)
             }
-            hasPageList = nav.descendants(named: "nav").contains { $0.attribute("type")?.split(whereSeparator: { $0.isWhitespace }).contains("page-list") == true }
-        } else if let ncxItem {
-            let ncx = try xml(archive, path: ncxItem.path, maximum: metadataMemberLimit)
-            if let navMap = ncx.descendants(named: "navMap").first { outline = ncxItems(navMap, depth: 0) }
-            hasPageList = !ncx.descendants(named: "pageTarget").isEmpty
+            if let pageList = nav.descendants(named: "nav").first(where: { $0.attribute("type")?.split(whereSeparator: { $0.isWhitespace }).contains("page-list") == true }) {
+                hasPageList = true
+                pageLabels = pageList.descendants(named: "a").map { $0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
+            }
         }
+        if pageLabels.isEmpty, let ncxItem {
+            let ncx = try xml(archive, path: ncxItem.path, maximum: metadataMemberLimit)
+            if navigationItem == nil, let navMap = ncx.descendants(named: "navMap").first { outline = ncxItems(navMap, depth: 0) }
+            pageLabels = ncx.descendants(named: "pageTarget").map { $0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
+            if !pageLabels.isEmpty { hasPageList = true }
+        }
+        let printedPageCount = pageLabels.isEmpty ? nil : pageLabels.count
+        let printedVolumeCount = pageLabels.isEmpty ? 1 : max(1, BookVolumes.order(pageLabels).count)
 
         let hasFootnotes = scanFootnotes(archive, spineRefs: spineRefs, manifest: manifest)
         let fallbackTitle = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
@@ -206,6 +216,7 @@ public enum EPUBBookFiles {
                                   author: String(authors.joined(separator: "، ").prefix(300)), languageCode: language.flatMap { $0.isEmpty ? nil : String($0.prefix(80)) },
                                   direction: ["rtl", "ltr"].contains(direction?.lowercased() ?? "") ? direction?.lowercased() : nil,
                                   version: version.hasPrefix("3") ? "3" : "2", outline: Array(outline.prefix(2000)), hasPageList: hasPageList,
+                                  printedPageCount: printedPageCount, printedVolumeCount: printedVolumeCount,
                                   hasCover: hasCover, coverData: coverData, hasFootnotes: hasFootnotes)
     }
 

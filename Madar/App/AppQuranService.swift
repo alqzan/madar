@@ -25,6 +25,31 @@ import MadarPrayer
         return try QuranRepository(context: ModelContext(app.container), catalog: QuranResources.catalog())
     }
     func snapshot() throws -> QuranDataSnapshot { try repository().snapshot(at: clock()) }
+    private func snapshotsOffMain(at instant: Date, hifzLevels: [QuranDayLevel?], priority: TaskPriority = .userInitiated) async throws -> (snapshots: [QuranDataSnapshot], catalog: QuranResourceCatalog) {
+        guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
+        let container = app.container, generation = app.storeGeneration
+        let worker = Task.detached(priority: priority) {
+            try Task.checkCancellation()
+            let catalog = try QuranResources.catalog()
+            let reader = try QuranRepository(context: ModelContext(container), catalog: catalog)
+            var snapshots: [QuranDataSnapshot] = []
+            snapshots.reserveCapacity(hifzLevels.count)
+            for level in hifzLevels {
+                try Task.checkCancellation()
+                snapshots.append(try reader.snapshot(at: instant, previewHifzLevel: level))
+                try Task.checkCancellation()
+            }
+            return (snapshots, catalog)
+        }
+        let result = try await withTaskCancellationHandler {
+            try await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
+        guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
+        guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+        return result
+    }
     func command(_ name: String, _ payload: [String: MadarCore.JSONValue] = [:]) async throws {
         _ = try await app.executeQuranCommand(name, payload: payload)
     }
@@ -65,7 +90,10 @@ import MadarPrayer
     func load() async throws -> QuranRoomState { try await loadState(deferHifzAmounts: false) }
     func loadState(deferHifzAmounts: Bool) async throws -> QuranRoomState {
         let evaluatedAt = clock()
-        let snapshot = try repository().snapshot(at: evaluatedAt), catalog = try QuranResources.catalog(), today = snapshot.day.date
+        let (snapshots, catalog) = try await snapshotsOffMain(at: evaluatedAt, hifzLevels: [nil])
+        try Task.checkCancellation()
+        guard let snapshot = snapshots.first else { throw DataError.invalidValue("Quran snapshot") }
+        let today = snapshot.day.date
         let coverage = snapshot.coverage, completed = coverage.completedPages.count
         let juz = coverage.completedJuz.count, outside = coverage.pagesOutsideCompletedJuz.count
         let coverageTitle = completed == 0 ? "أول الطريق" : (juz == 0 ? faceCount(outside) : count(juz, singular: "جزء واحد", dual: "جزآن", plural: "أجزاء") + (outside > 0 ? " و" + faceCount(outside) : ""))
@@ -173,7 +201,7 @@ import MadarPrayer
             detail: value.key.wordIndex == nil ? "الآية كاملة" : "موضع كلمة", isToday: todayKeys.contains(value.key), closed: !value.isOpen, canDrill: true) }
         // The four level previews each rebuild a whole snapshot; the home asks to fill them in after its first paint (`hifzAmounts(for:)`).
         var amounts: [String: String] = [:]
-        if !deferHifzAmounts, let plan = snapshot.plan { amounts = try hifzAmounts(for: plan.plan.unit) }
+        if !deferHifzAmounts, let plan = snapshot.plan { amounts = try await hifzAmounts(for: plan.plan.unit) }
         return QuranRoomState(coverageTitle: coverageTitle, coverageFraction: Double(completed) / 604,
             percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), hifzAmounts: amounts, streakDays: streak.days, balanceTitle: balance,
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: (QuranUILevel(rawValue: snapshot.hifzLevel.rawValue) ?? .simple),
@@ -200,15 +228,15 @@ import MadarPrayer
         }
     }
     /// What each day level asks for today, in the plan's own unit; one preview snapshot per level.
-    func hifzAmounts(for unit: QuranUIUnit) throws -> [String: String] {
+    func hifzAmounts(for unit: QuranUIUnit) async throws -> [String: String] {
         guard let hifzUnit = QuranHifzUnit(rawValue: unit.rawValue) else { return [:] }
-        return try hifzAmounts(for: hifzUnit)
+        return try await hifzAmounts(for: hifzUnit)
     }
-    func hifzAmounts(for hifzUnit: QuranHifzUnit) throws -> [String: String] {
-        let evaluatedAt = clock(), reader = try repository(), catalog = try QuranResources.catalog()
+    func hifzAmounts(for hifzUnit: QuranHifzUnit) async throws -> [String: String] {
+        let evaluatedAt = clock()
+        let (previews, catalog) = try await snapshotsOffMain(at: evaluatedAt, hifzLevels: QuranDayLevel.allCases.map(Optional.some), priority: .utility)
         var amounts: [String: String] = [:]
-        for level in QuranDayLevel.allCases {
-            let preview = try reader.snapshot(at: evaluatedAt, previewHifzLevel: level)
+        for (level, preview) in zip(QuranDayLevel.allCases, previews) {
             amounts[level.rawValue] = try memorizationAmount(preview.hifz, unit: hifzUnit, catalog: catalog)
         }
         return amounts

@@ -416,7 +416,7 @@ struct MihbaraEPUBImportView: View {
             try Task.checkCancellation()
             guard !departed else { return }
             inspection = value
-            printedShape = (try? EPUBBookFiles.printedShape(file: EPUBBookFiles.stagedURL(id: fileID, root: app.bookStagingDirectory))).map { MihbaraBookShape(pages: $0.pages, volumes: $0.volumes) }
+            printedShape = value.printedPageCount.map { MihbaraBookShape(pages: $0, volumes: value.printedVolumeCount) }
             if let recoveryBook {
                 title = recoveryBook.title; author = recoveryBook.author; language = recoveryBook.language
             } else {

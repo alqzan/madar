@@ -129,9 +129,14 @@ extension AppDiaryService {
         try authorizeRead()
         let context = ModelContext(app.container)
         let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.projectID != nil }, sortBy: [SortDescriptor(\.eventAt)])))
+        var entriesByProject: [UUID: [Entry]] = [:]
+        for entry in entries {
+            guard let projectID = entry.projectID else { continue }
+            entriesByProject[projectID, default: []].append(entry)
+        }
         return try context.fetch(FetchDescriptor<Project>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.createdAt)])).map { project in
             .init(id: project.id, name: project.name, intention: project.intention, keyword: project.keyword, finishedAt: project.finishedAt, reflection: project.reflection,
-                  lines: entries.filter { $0.projectID == project.id }.compactMap { row in (try? GregorianDay(row.dayKey)).map { .init(id: row.id, day: $0, text: row.text) } })
+                  lines: (entriesByProject[project.id] ?? []).compactMap { row in (try? GregorianDay(row.dayKey)).map { .init(id: row.id, day: $0, text: row.text) } })
         }
     }
     /// «يتعلّق بـ«…»؟» for one line: open projects whose keyword the line mentions, unless it is linked already.

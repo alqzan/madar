@@ -20,6 +20,7 @@ struct QuranHomeView: View {
     @State private var busy = false
     /// A refresh asked for while another operation runs is replayed once it ends, so the home never stays stale.
     @State private var refreshPending = false
+    @State private var refreshGeneration = UUID()
     @State private var showDayClose = false
     /// The page travels with the presentation: an `isPresented` cover read `readerPage` stale, so links opened page 1.
     @State private var mushaf: QuranMushafRequest?
@@ -120,7 +121,11 @@ struct QuranHomeView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .environment(\.roomTheme, theme)
         .accessibilityIdentifier("quran-home")
-        .task(id: roomVisit) { do { try await refresh() } catch { self.error = quranUserMessage(error) } }
+        .task(id: roomVisit) {
+            do { try await refresh() }
+            catch is CancellationError { }
+            catch { if !Task.isCancelled { self.error = quranUserMessage(error) } }
+        }
         // Back from the lock screen or past midnight, «مسار اليوم» and a missed day reflect the day it is now.
         .onChange(of: scenePhase) { _, phase in if phase == .active, active == nil, isFrontRoom { run(refresh: true) { try await refresh() } } }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in if active == nil { run(refresh: true) { try await refresh() } } }
@@ -459,16 +464,19 @@ struct QuranHomeView: View {
         Button(action: action) { VStack(spacing: 8) { Image(systemName: icon).font(.system(size: 18)).frame(height: 24); Text(title).font(bodyFont(11, bold: true)).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, minHeight: 74, alignment: .top).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-tool-" + id)
     }
     private func refresh() async throws {
+        let generation = UUID()
+        refreshGeneration = generation
         let previous = state?.hifzAmounts ?? [:]
         var loaded = try await service.loadState(deferHifzAmounts: true)
+        guard !Task.isCancelled, refreshGeneration == generation else { return }
         loaded.hifzAmounts = previous
         state = loaded
         // Level amounts follow the first paint; the previous ones stay on screen meanwhile.
         if let unit = loaded.plan?.input.unit {
-            Task {
-                try? await Task.sleep(for: .milliseconds(60))
-                if let amounts = try? service.hifzAmounts(for: unit), state?.plan?.input.unit == unit { state?.hifzAmounts = amounts }
-            }
+            try? await Task.sleep(for: .milliseconds(60))
+            guard !Task.isCancelled, refreshGeneration == generation else { return }
+            if let amounts = try? await service.hifzAmounts(for: unit), !Task.isCancelled,
+               refreshGeneration == generation, state?.plan?.input.unit == unit { state?.hifzAmounts = amounts }
         }
     }
     private func clearIndexRoute() { indexInitialUnit = .surah; indexInitialItemID = nil; indexRouteRequestID = nil }

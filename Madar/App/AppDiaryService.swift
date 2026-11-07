@@ -7,7 +7,7 @@ import MadarPrayer
 import MadarQuran
 
 typealias DiaryDisplayLine = DiaryAutoLine
-struct DiaryDisplayDay: Identifiable {
+struct DiaryDisplayDay: Identifiable, Sendable {
     var id: String { day.description }
     let day: GregorianDay
     let lines: [DiaryDisplayLine]
@@ -44,6 +44,29 @@ struct DiaryHomeSnapshot {
     let days: [DiaryDisplayDay]
     let echoes: [DiaryEcho]
     let todayPage: DiaryDisplayDay
+}
+private struct DiaryHomePlan {
+    let selection: DiaryMemorySelection
+    let echoes: [DiaryEcho]
+    let visible: Set<GregorianDay>
+    let rendered: Set<GregorianDay>
+}
+private struct DiaryDayReadConfiguration: Sendable {
+    let timeZoneID: String
+    let firstCalendar: FirstCalendar
+    let hijriSource: HijriSource
+    let sightingOffset: Int
+    let numerals: NumeralStyle
+    let enabledAutoLineKinds: Set<String>
+    let showPhoto: Bool
+    let showPlace: Bool
+
+    func bothDates(_ day: GregorianDay, calendar: FirstCalendar? = nil) -> String {
+        let zone = TimeZone(identifier: timeZoneID) ?? .current
+        return DualDate(instant: day.date(in: zone).addingTimeInterval(12 * 3600), timeZone: zone,
+            source: hijriSource, sightingOffset: sightingOffset)
+            .labels(firstCalendar: calendar ?? firstCalendar, numerals: numerals).combined
+    }
 }
 
 @MainActor final class AppDiaryService {
@@ -86,16 +109,114 @@ struct DiaryHomeSnapshot {
     }
     func home(match: FirstCalendar? = nil) throws -> DiaryHomeSnapshot {
         try authorizeRead()
-        let today = try currentDay(), facts = try memoryFacts()
+        let today = try currentDay(), plan = homePlan(facts: try memoryFacts(), today: today, match: match)
+        let context = ModelContext(app.container), keys = Set(plan.rendered.map(\.description))
+        let liveKeys = try Self.unfrozenDayKeys(keys, context: context)
+        let lines = try DiaryLineRenderer.live(days: liveKeys, context: context)
+        return try renderHome(today: today, plan: plan, automaticLines: lines)
+    }
+    func homeOffMain(match: FirstCalendar? = nil) async throws -> DiaryHomeSnapshot {
+        try authorizeRead()
+        let today = try currentDay(), facts = try await memoryFactsOffMain()
+        let plan = homePlan(facts: facts, today: today, match: match)
+        let lines = try await liveAutoLinesOffMain(for: plan.rendered)
+        try authorizeRead()
+        return try await renderHomeOffMain(today: today, plan: plan, automaticLines: lines)
+    }
+    private func homePlan(facts: [DiaryMemoryDay], today: GregorianDay, match: FirstCalendar?) -> DiaryHomePlan {
         let selection = memorySelection(facts: facts, today: today, match: match)
         let recent = facts.map(\.day).filter { $0 < today }.sorted(by: >).prefix(5)
         let echoes = DiaryMemories.echoes(days: facts, today: today, includeDayOne: app.bool("notes.includeDayOne"), zone: app.activePlace.timeZone)
         let visible = Set(selection.days + Array(recent) + echoes.compactMap(\.day))
-        return try .init(today: today, selection: selection, days: visible.sorted(by: >).map { try self.day($0) }, echoes: echoes, todayPage: day(today))
+        return DiaryHomePlan(selection: selection, echoes: echoes, visible: visible, rendered: visible.union([today]))
+    }
+    private func renderHome(today: GregorianDay, plan: DiaryHomePlan, automaticLines: [String: [DiaryAutoLine]]) throws -> DiaryHomeSnapshot {
+        try .init(today: today, selection: plan.selection,
+            days: plan.visible.sorted(by: >).map { try self.day($0, liveAutoLines: automaticLines[$0.description] ?? []) }, echoes: plan.echoes,
+            todayPage: day(today, liveAutoLines: automaticLines[today.description] ?? []))
+    }
+    private var dayReadConfiguration: DiaryDayReadConfiguration {
+        let auto = app.values["notes.autoLines"]?.object ?? [:]
+        var kinds = Set(auto.compactMap { $0.value == .bool(true) ? $0.key : nil })
+        if auto["habits"] == nil { kinds.insert("habits") }
+        return .init(timeZoneID: app.activePlace.timeZoneID, firstCalendar: app.diaryFirstCalendar,
+            hijriSource: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura,
+            sightingOffset: Int(app.number("core.hijriOffset")),
+            numerals: app.string("core.numerals") == "western" ? .western : .hindi,
+            enabledAutoLineKinds: kinds, showPhoto: app.bool("notes.showPhoto"), showPlace: app.bool("notes.showPlace"))
+    }
+    private func renderHomeOffMain(today: GregorianDay, plan: DiaryHomePlan, automaticLines: [String: [DiaryAutoLine]]) async throws -> DiaryHomeSnapshot {
+        let container = app.container, configuration = dayReadConfiguration, days = plan.rendered
+        let worker = Task.detached(priority: .userInitiated) {
+            let context = ModelContext(container)
+            let eventPlaces = try PrayerRepository(context: context)
+            var result: [String: DiaryDisplayDay] = [:]
+            result.reserveCapacity(days.count)
+            for day in days {
+                try Task.checkCancellation()
+                result[day.description] = try Self.readDisplayDay(day, context: context,
+                    liveAutoLines: automaticLines[day.description] ?? [], configuration: configuration, eventPlaces: eventPlaces)
+            }
+            return result
+        }
+        let pages = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+        try authorizeRead()
+        let visible = try plan.visible.sorted(by: >).map { day -> DiaryDisplayDay in
+            guard let page = pages[day.description] else { throw DataError.invalidValue("Diary page snapshot") }
+            return page
+        }
+        guard let todayPage = pages[today.description] else { throw DataError.invalidValue("Diary today snapshot") }
+        return .init(today: today, selection: plan.selection, days: visible, echoes: plan.echoes, todayPage: todayPage)
+    }
+    private func memoryFactsOffMain() async throws -> [DiaryMemoryDay] {
+        let container = app.container
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let facts = try Self.memoryFacts(context: ModelContext(container))
+            try Task.checkCancellation()
+            return facts
+        }
+        let facts = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+        try authorizeRead()
+        return facts
+    }
+    private func liveAutoLinesOffMain(for days: Set<GregorianDay>) async throws -> [String: [DiaryAutoLine]] {
+        let container = app.container, keys = Set(days.map(\.description))
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let context = ModelContext(container)
+            let liveKeys = try Self.unfrozenDayKeys(keys, context: context)
+            guard !liveKeys.isEmpty else { return (liveKeys, Optional<DiaryAutoLineVisibility>.none, [String: [DiaryAutoLine]]()) }
+            let visibility = try DiaryLineRenderer.visibility(context: context)
+            let lines = try DiaryLineRenderer.liveWithoutMoney(days: liveKeys, visibility: visibility, context: context)
+            try Task.checkCancellation()
+            return (liveKeys, Optional(visibility), lines)
+        }
+        let (liveKeys, visibility, nonMoneyLines) = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+        try authorizeRead()
+        var lines = nonMoneyLines
+        if let visibility {
+            let moneyLines = try DiaryLineRenderer.liveMoneyLines(days: liveKeys, visibility: visibility, context: ModelContext(container))
+            for (key, rows) in moneyLines { lines[key, default: []].append(contentsOf: rows) }
+        }
+        lines = lines.mapValues { $0.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at } }
+        return lines
+    }
+    nonisolated private static func unfrozenDayKeys(_ keys: Set<String>, context: ModelContext) throws -> Set<String> {
+        var liveKeys = keys
+        for key in keys {
+            try Task.checkCancellation()
+            let frozenKey = "sys.diaryAutoLines." + key
+            let descriptor = FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == frozenKey && $0.deletedAt == nil && $0.mergedInto == nil })
+            if try !context.fetch(descriptor).isEmpty { liveKeys.remove(key) }
+        }
+        return liveKeys
     }
     /// Memory facts are day keys and booleans only (written, photo, Day One, hidden); no text leaves this function.
     func memoryFacts() throws -> [DiaryMemoryDay] {
-        let context = ModelContext(app.container)
+        try Self.memoryFacts(context: ModelContext(app.container))
+    }
+    nonisolated private static func memoryFacts(context: ModelContext) throws -> [DiaryMemoryDay] {
         let pages = try context.fetch(FetchDescriptor<DayPage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil })
         var photoDescriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil })
@@ -124,9 +245,25 @@ struct DiaryHomeSnapshot {
             hijriSource: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(app.number("core.hijriOffset")))
     }
     func day(_ day: GregorianDay) throws -> DiaryDisplayDay {
+        try self.day(day, liveAutoLines: nil)
+    }
+    private func day(_ day: GregorianDay, liveAutoLines: [DiaryAutoLine]?) throws -> DiaryDisplayDay {
         try authorizeRead()
-        let context = ModelContext(app.container), key = day.description
+        let context = ModelContext(app.container)
+        let autoLines: [DiaryAutoLine]
+        if let liveAutoLines { autoLines = liveAutoLines }
+        else {
+            let frozenKey = "sys.diaryAutoLines." + day.description
+            let descriptor = FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == frozenKey && $0.deletedAt == nil && $0.mergedInto == nil })
+            autoLines = try context.fetch(descriptor).isEmpty ? DiaryLineRenderer.live(day: day, context: context) : []
+        }
         let eventPlaces = try PrayerRepository(context: context)
+        return try Self.readDisplayDay(day, context: context, liveAutoLines: autoLines,
+            configuration: dayReadConfiguration, eventPlaces: eventPlaces)
+    }
+    nonisolated private static func readDisplayDay(_ day: GregorianDay, context: ModelContext, liveAutoLines: [DiaryAutoLine], configuration: DiaryDayReadConfiguration, eventPlaces: PrayerRepository) throws -> DiaryDisplayDay {
+        try Task.checkCancellation()
+        let key = day.description
         func eventTimeZoneID(_ stored: String?, at instant: Date) -> String {
             if let stored, TimeZone(identifier: stored) != nil { return stored }
             return eventPlaces.place(at: instant).timeZoneID
@@ -156,29 +293,41 @@ struct DiaryHomeSnapshot {
                                     tzID: eventTimeZoneID(row.tzID, at: row.eventAt), markdown: markdown ? true : nil)
         }
         for niyya in try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.dayKey==key && $0.deletedAt==nil && $0.mergedInto==nil})) {lines.append(.init(id:niyya.id.uuidString,at:niyya.createdAt,text:niyya.text,kind:"intention",tzID:eventTimeZoneID(nil,at:niyya.createdAt)))}
-        let margins = try context.fetch(FetchDescriptor<MarginNote>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        for margin in margins where margin.targetDayKey == key || margin.writtenDayKey == key {
-            let text = margin.targetDayKey == key ? margin.text : "كتبت في هامش " + ((try? GregorianDay(margin.targetDayKey)).map { bothDates($0, calendar: .gregorian) } ?? margin.targetDayKey) + ": " + margin.text
+        let margins = try context.fetch(FetchDescriptor<MarginNote>(
+            predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && ($0.targetDayKey == key || $0.writtenDayKey == key) }
+        ))
+        for margin in margins {
+            try Task.checkCancellation()
+            let text = margin.targetDayKey == key ? margin.text : "كتبت في هامش " + ((try? GregorianDay(margin.targetDayKey)).map { configuration.bothDates($0, calendar: .gregorian) } ?? margin.targetDayKey) + ": " + margin.text
             lines.append(.init(id: "margin." + margin.id.uuidString, at: margin.writtenAt, text: text, kind: "margin",
                                tzID: eventTimeZoneID(margin.tzID, at: margin.writtenAt)))
         }
-        let frozen = try context.fetch(FetchDescriptor<DeviceSetting>()).first { $0.key == "sys.diaryAutoLines." + key && $0.deletedAt == nil && $0.mergedInto == nil }
+        let frozenKey = "sys.diaryAutoLines." + key
+        let frozen = try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == frozenKey && $0.deletedAt == nil && $0.mergedInto == nil })).first
         do {
             let auto: [DiaryDisplayLine]
             if let frozen { auto = try JSONDecoder().decode([DiaryDisplayLine].self, from: frozen.valueJSON) }
-            else { auto = try DiaryLineRenderer.live(day: day, context: context) }
-            let enabled = app.values["notes.autoLines"]?.object ?? [:]
-            // OR-11: «habits» joined the map later; a stored map without it keeps the schema default (on).
-            lines += auto.filter { enabled[$0.kind] == .bool(true) || ($0.kind == "habits" && enabled["habits"] == nil) }.map { line in
+            else { auto = liveAutoLines }
+            lines += auto.filter { configuration.enabledAutoLineKinds.contains($0.kind) }.map { line in
                 var dated = line
                 dated.tzID = eventTimeZoneID(line.tzID, at: line.at)
                 return dated
             }
         }
         let mediaLinks = entries.flatMap { entry in (entry.attachmentMediaIDs + (entry.mediaID.map { [$0] } ?? [])).map { (entry.id.uuidString, $0) } }
+        let photoIDs = configuration.showPhoto ? (page?.photoMediaID.map { [$0] } ?? []) + entries.flatMap(\.attachmentMediaIDs) : []
+        let requestedMediaIDs = Array(Set(mediaLinks.map(\.1) + photoIDs))
+        let mediaRows: [Media]
+        if requestedMediaIDs.isEmpty { mediaRows = [] }
+        else {
+            let descriptor = FetchDescriptor<Media>(predicate: #Predicate { requestedMediaIDs.contains($0.id) && $0.deletedAt == nil && $0.mergedInto == nil })
+            mediaRows = try context.fetch(descriptor)
+        }
+        let mediaByID = Dictionary(mediaRows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var attachments: [DiaryDisplayMedia] = []
         for (entry, id) in mediaLinks {
-            if let row = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil })).first {
+            try Task.checkCancellation()
+            if let row = mediaByID[id] {
                 if let data = row.data { attachments.append(.init(id: row.id, entryID: entry, kind: row.kind, contentType: row.contentType, data: data, duration: row.durationS, assetID: DiaryPhotoLink.assetID(sourceID: row.sourceID))) }
                 // N01: an attachment the export did not contain is shown as missing, never invented.
                 else if row.state == "missing" { attachments.append(.init(id: row.id, entryID: entry, kind: "missing", contentType: row.kind, data: Data(), duration: nil)) }
@@ -186,15 +335,16 @@ struct DiaryHomeSnapshot {
         }
         var photo: Data?
         var photoID: UUID?
-        if app.bool("notes.showPhoto") {
-            for id in (page?.photoMediaID.map { [$0] } ?? []) + entries.flatMap(\.attachmentMediaIDs) {
-                if let item = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { $0.id == id && $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil })).first, item.data != nil {
+        if configuration.showPhoto {
+            for id in photoIDs {
+                try Task.checkCancellation()
+                if let item = mediaByID[id], item.kind == "photo", item.data != nil {
                     photo = item.data; photoID = id; break
                 }
             }
         }
         return .init(day: day, lines: lines.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at }, photo: photo,
-            place: app.bool("notes.showPlace") ? entries.compactMap(\.place).first : nil, dayOne: page?.origin == "dayOne", photoID: photoID, media: attachments, marginDays: Dictionary(uniqueKeysWithValues: margins.compactMap { margin in
+            place: configuration.showPlace ? entries.compactMap(\.place).first : nil, dayOne: page?.origin == "dayOne", photoID: photoID, media: attachments, marginDays: Dictionary(uniqueKeysWithValues: margins.compactMap { margin in
                 guard let day = try? GregorianDay(margin.writtenDayKey) else { return nil }; return ("margin." + margin.id.uuidString, day)
             }), originals: Dictionary(uniqueKeysWithValues: chains.originals.compactMap { head, root in all.first { $0.id == root }.map { (head.uuidString, $0.text) } }),
             editable: Set(entries.filter { $0.mediaID == nil && $0.source != "autoPinned" && ["normal", "late", "ghad"].contains($0.ink) }.map(\.id.uuidString)),
