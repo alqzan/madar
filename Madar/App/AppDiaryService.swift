@@ -247,6 +247,28 @@ private struct DiaryDayReadConfiguration: Sendable {
     func day(_ day: GregorianDay) throws -> DiaryDisplayDay {
         try self.day(day, liveAutoLines: nil)
     }
+    func dayOffMain(_ day: GregorianDay) async throws -> DiaryDisplayDay {
+        try authorizeRead()
+        let generation = app.storeGeneration, container = app.container, configuration = dayReadConfiguration
+        let liveLines = try await liveAutoLinesOffMain(for: [day])
+        try Task.checkCancellation()
+        let lines = liveLines[day.description] ?? []
+        try authorizeRead()
+        guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let context = ModelContext(container), eventPlaces = try PrayerRepository(context: context)
+            let page = try Self.readDisplayDay(day, context: context, liveAutoLines: lines,
+                configuration: configuration, eventPlaces: eventPlaces)
+            try Task.checkCancellation()
+            return page
+        }
+        let page = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+        try Task.checkCancellation()
+        try authorizeRead()
+        guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+        return page
+    }
     private func day(_ day: GregorianDay, liveAutoLines: [DiaryAutoLine]?) throws -> DiaryDisplayDay {
         try authorizeRead()
         let context = ModelContext(app.container)

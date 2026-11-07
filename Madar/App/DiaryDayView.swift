@@ -488,7 +488,10 @@ struct DiaryDayView: View {
             if page?.day != shownDay { page = nil; aiComposerOpen = false; aiAvailability = .checking }
             try await service.prepareClosedDay(shownDay)
             guard !Task.isCancelled, canReadDiary else { page = nil; aiComposerOpen = false; return }
-            page = try service.day(shownDay)
+            let displayPage = try await service.dayOffMain(shownDay)
+            try Task.checkCancellation()
+            guard canReadDiary, displayPage.day == shownDay else { return }
+            page = displayPage
             intentions = try service.intentions(shownDay)
             arc = service.dayArc(shownDay)
             appearance = try service.appearance(shownDay)
