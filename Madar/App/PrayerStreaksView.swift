@@ -83,6 +83,7 @@ struct PrayerStreakArches: View {
     @Environment(\.roomTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var grown = false
+    private var allUnstarted: Bool { levels.allSatisfy { $0.count(stats) == 0 } }
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
@@ -95,10 +96,17 @@ struct PrayerStreakArches: View {
                             Text(level.short).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(2).minimumScaleFactor(0.85).fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 4)
-                        Text(level.count(stats) == 0 ? "لم تبدأ بعد" : PrayerCopy.days(level.count(stats), digits: digits))
-                            .font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline))
-                            .lineLimit(1).fixedSize()
+                        if !allUnstarted {
+                            Text(level.count(stats) == 0 ? "لم تبدأ بعد" : PrayerCopy.days(level.count(stats), digits: digits))
+                                .font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline))
+                                .lineLimit(1).fixedSize()
+                        }
                     }
+                }
+                // Three «لم تبدأ بعد» in a row said one thing three times.
+                if allUnstarted {
+                    Text("تبدأ سلاسلك من أول صلاة تسجّلها").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("prayer-streaks-unstarted")
                 }
             }
             .frame(maxWidth: .infinity)

@@ -123,15 +123,18 @@ import XCTest
             let app = XCUIApplication()
             app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": past ? "light" : "dark", "MADAR_UI_NOW": "2026-10-15T22:00:00+03:00"]
             if past { app.launchEnvironment["MADAR_UI_TRACKING_START"] = "2026-10-01" }
-            app.launch()
-            if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
-            let start = app.buttons["first-run-continue"]
-            if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
+            app.launch(); finishOnboarding(app)
             app.buttons["tab-prayer"].tap()
             let summary = app.staticTexts["prayer-today-summary"]
             XCTAssertTrue(summary.waitForExistence(timeout: 15))
             XCTAssertTrue(summary.label.contains("لم تُسجَّل"), summary.label)
             XCTAssertFalse(summary.label.contains("بقيت"), summary.label)
+            // At 22:00 the next prayer is tomorrow's Fajr, and the note names the passed prayers instead of a second count.
+            XCTAssertTrue(app.staticTexts["الصلاة القادمة غدًا"].exists, app.debugDescription)
+            if !past {
+                let note = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "مضى وقت الفجر والظهر والعصر والمغرب")).firstMatch
+                XCTAssertTrue(note.exists, app.debugDescription)
+            }
             let old = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "من فترة سابقة")).firstMatch
             XCTAssertEqual(old.exists, past, app.debugDescription)
             let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = past ? "UX-08-real-history-L" : "UX-08-first-night-L"; shot.lifetime = .keepAlways; add(shot)
@@ -139,6 +142,23 @@ import XCTest
         }
     }
 
+    private func finishOnboarding(_ app: XCUIApplication) {
+        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
+        let start = app.buttons["first-run-continue"]
+        if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
+        // This store reaches the location step: without a city the first-run cover stays over the lobby and every tap below is lost.
+        let city = app.buttons["first-run-city"]
+        guard city.waitForExistence(timeout: 2) else { return }
+        city.tap()
+        let field = app.textFields["city-search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), app.debugDescription); field.tap(); field.typeText("الرياض")
+        let hit = app.buttons["city-hit-الرياض"]
+        XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
+        if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
+        let later = app.buttons["first-run-continue"]
+        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
+        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
+    }
     private func attachScreenshot(_ app: XCUIApplication, named name: String) {
         let screenshot = app.screenshot()
         let attachment = XCTAttachment(screenshot: screenshot)

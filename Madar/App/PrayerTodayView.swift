@@ -590,7 +590,9 @@ struct PrayerTodayView: View {
     private func nextPrayer(_ snapshot: PrayerSnapshot, now: Date) -> some View {
         VStack(spacing: 6) {
             if let next = snapshot.next {
-                Text("الصلاة القادمة").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+                // After Isha the next prayer is tomorrow's Fajr; say so above today's earlier Fajr arch.
+                let tomorrow = !snapshot.today.cells.contains { $0.reference == next.reference }
+                Text(tomorrow ? "الصلاة القادمة غدًا" : "الصلاة القادمة").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
                 Text(nextTitle(next.reference, snapshot: snapshot))
                     .font(PrayerHomeType.hero)
                     .lineLimit(1).minimumScaleFactor(0.7)
@@ -712,8 +714,15 @@ struct PrayerTodayView: View {
                 action: "سجِّلها", identifier: "prayer-pending-review") { choose(first, snapshot: snapshot) })
         }
         let hasHistoricalGap = gap.contains { $0.day < snapshot.today.day }
+        // The line under the arches already counts every unrecorded prayer, the open one included («٥ صلوات»); this note
+        // speaks of those whose time has passed, so it names them instead of showing a second, smaller count («٤ صلوات»).
+        let passedToday = gap.filter { $0.day == snapshot.today.day }.map { self.title($0.prayer) }
+        let named = passedToday.count == gap.count && passedToday.count <= 4
+            ? "مضى وقت " + (passedToday.count < 2 ? passedToday.joined() : passedToday.dropLast().joined(separator: " و") + " و" + passedToday.last!) + " ولم تُسجَّل"
+            : PrayerCopy.pending(gap.count, digits: digits)
         return AnyView(PrayerNoticeRow(
-            title: hasHistoricalGap ? "يبدأ سجلّك من اليوم" : PrayerCopy.pending(gap.count, digits: digits),
+            // Unrecorded prayers from earlier days are counted as such; «يبدأ سجلّك من اليوم» contradicted the history beside it.
+            title: hasHistoricalGap ? PrayerCopy.unconfirmed(gap.filter { $0.day < snapshot.today.day }.count, digits: digits) : named,
             detail: "سجّل الصلاة بعد أدائها. ما لم تصلّه يبقى بلا سجل.",
             action: nil, identifier: "prayer-unconfirmed-note", perform: nil))
     }
