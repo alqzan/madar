@@ -11,7 +11,12 @@ import XCTest
         func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
         XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout: 15), app.debugDescription)
         app.buttons["tab-customize"].tap()
-        XCTAssertTrue(element("bahw-custom-blocks").waitForExistence(timeout: 10), app.debugDescription)
+        // Owner, 3 Nov: the lobby's widgets and sizes live behind «أقسامك والبهو» on the settings home.
+        func openSections() {
+            let sections = app.buttons["settings-link-أقسامك والبهو"]; XCTAssertTrue(sections.waitForExistence(timeout: 10), app.debugDescription); sections.tap()
+            XCTAssertTrue(element("bahw-custom-blocks").waitForExistence(timeout: 10), app.debugDescription)
+        }
+        openSections()
         for block in ["habits", "salah", "quran", "mal", "year", "upcoming", "notes", "mihbara"] {
             XCTAssertTrue(element("bahw-custom-block-" + block).exists, block)
         }
@@ -26,16 +31,17 @@ import XCTest
         XCTAssertTrue(wide.isSelected)
         let visible = app.switches["bahw-custom-visible-year"]; reveal(visible); visible.tap()
         XCTAssertEqual(visible.value as? String, "0")
-        revealUp(element("bahw-custom-open-lobby")); element("bahw-custom-open-lobby").tap()
+        app.buttons["tab-foundation"].tap()
         XCTAssertTrue(element("bahw-block-quran").waitForExistence(timeout: 8))
         XCTAssertFalse(element("bahw-block-year").exists)
 
-        let customizeTab = app.buttons["tab-customize"]
-        if customizeTab.exists { customizeTab.tap() } else {
-            let shortcut = app.buttons["tab-customize"]; XCTAssertTrue(shortcut.waitForExistence(timeout: 8)); shortcut.tap()
-        }
-        let reset = app.buttons["reset-settings"]; XCTAssertTrue(reset.waitForExistence(timeout: 8)); reset.tap()
-        let confirm = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "أعِد الافتراضي", "reset-settings")).firstMatch; XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
+        app.buttons["tab-customize"].tap()
+        // The room keeps its pushed page; go back to the settings home for the general reset.
+        let resetDoor = app.buttons["settings-door-أعِد الإعدادات المتفق عليها"]
+        if !resetDoor.waitForExistence(timeout: 3) { app.navigationBars.buttons.firstMatch.tap() }
+        XCTAssertTrue(resetDoor.waitForExistence(timeout: 8), app.debugDescription); reveal(resetDoor); resetDoor.tap()
+        let confirm = app.buttons["أعِد الافتراضي"]; XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription); confirm.tap()
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 5)); revealUp(app.buttons["settings-link-أقسامك والبهو"]); openSections()
         XCTAssertTrue(app.buttons["bahw-custom-size-quran-small"].waitForExistence(timeout: 5)); reveal(app.buttons["bahw-custom-size-quran-small"])
         XCTAssertTrue(app.buttons["bahw-custom-size-quran-small"].isSelected)
         XCTAssertEqual(app.switches["bahw-custom-visible-year"].value as? String, "1")
@@ -60,9 +66,10 @@ import XCTest
         openReminderSettings()
         let dot = app.buttons["option-bahw.reminder-dot"], push = app.buttons["option-bahw.reminder-push"]
         XCTAssertTrue(dot.waitForExistence(timeout: 10), app.debugDescription); XCTAssertTrue(push.isSelected, "a new habit's reminder starts as a gentle notification (owner, 4 Nov 2026)")
+        // An ordinary settings change shows no «تراجع» toast (owner, 24–30 Oct); it is corrected where it was made.
         dot.tap(); waitSelected(dot)
-        let undo = app.buttons["undo-button"]
-        XCTAssertTrue(undo.waitForExistence(timeout: 10)); undo.tap(); waitSelected(push)
+        XCTAssertFalse(app.buttons["undo-button"].exists)
+        push.tap(); waitSelected(push)
         dot.tap(); waitSelected(dot)
         push.tap(); waitSelected(push)
         capture(app, "OR-03-habit-reminder-settings-L")
@@ -79,7 +86,7 @@ import XCTest
         for _ in 0..<6 where !reminder.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(reminder.isHittable, app.debugDescription)
         XCTAssertTrue(reminder.label.contains("إشعار لطيف"), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["حدّد وقت العادة واسمح بالإشعارات ليصل التذكير."].exists)
+        XCTAssertTrue(app.staticTexts["يصلك الإشعار في بداية وقت العادة، فوقتها مطلوب."].exists)
         capture(app, "OR-03-new-habit-reminder-L")
 
         // Linked habits are read from their owning room; the scheduler does not send this custom-habit alert for them.
@@ -91,12 +98,14 @@ import XCTest
         XCTAssertTrue(reminder.isHittable, app.debugDescription)
         XCTAssertTrue(reminder.label.contains("نقطة في البهو"), app.debugDescription)
         reminder.tap()
-        XCTAssertFalse(app.buttons["إشعار لطيف"].exists, app.debugDescription)
-        app.buttons["نقطة في البهو"].tap()
+        // Query the open menu only: the settings room kept behind the sheet shows the same option labels.
+        let menu = app.collectionViews.firstMatch; XCTAssertTrue(menu.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(menu.buttons["إشعار لطيف"].exists, app.debugDescription)
+        menu.buttons["نقطة في البهو"].tap()
         for _ in 0..<6 where !source.isHittable { app.swipeDown(velocity: .slow) }
         source.tap(); app.buttons["أسجّلها هنا"].tap()
         for _ in 0..<6 where !reminder.isHittable { app.swipeUp(velocity: .slow) }
-        reminder.tap(); app.buttons["إشعار لطيف"].tap()
+        reminder.tap(); let pushItem = app.collectionViews.buttons["إشعار لطيف"]; XCTAssertTrue(pushItem.waitForExistence(timeout: 5), app.debugDescription); pushItem.tap()
         app.buttons["habit-save"].tap()
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "عادة جديدة،")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription); row.tap()
@@ -237,8 +246,10 @@ import XCTest
         let now = app.buttons["option-bahw.widgetScope-todayOnly"], full = app.buttons["option-bahw.widgetScope-todayAndAfter"]
         XCTAssertTrue(full.waitForExistence(timeout: 10)); XCTAssertEqual(full.label, "اليوم كله"); XCTAssertEqual(now.label, "الآن فقط")
         selected("option-bahw.widgetScope-todayAndAfter")
+        // Owner, 24–30 Oct: an ordinary settings change shows no «تراجع» toast (only removals do); it is corrected where it was made.
         now.tap(); selected("option-bahw.widgetScope-todayOnly")
-        app.buttons["undo-button"].tap(); selected("option-bahw.widgetScope-todayAndAfter")
+        XCTAssertFalse(app.buttons["undo-button"].exists)
+        full.tap(); selected("option-bahw.widgetScope-todayAndAfter")
         now.tap(); selected("option-bahw.widgetScope-todayOnly"); capture(app, "OR-03-habit-widget-scope-L")
         app.terminate(); app.launch(); openScope(); selected("option-bahw.widgetScope-todayOnly")
     }
