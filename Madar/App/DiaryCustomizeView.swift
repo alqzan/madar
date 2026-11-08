@@ -169,7 +169,7 @@ struct DiaryCustomizeView: View {
         Button { confirmReset = true } label: { Text("أعِد الافتراضي").font(MadarTypography.caption()).padding(.horizontal, 10).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-customize-reset")
     }
     private var visiblePartsText: String { let n = visibleOrder.count; return n == 1 ? "جزء واحد ظاهر" : n == 2 ? "جزءان ظاهران" : app.digits(n) + ((3...10).contains(n % 100) ? " أجزاء ظاهرة" : " جزءًا ظاهرًا") }
-    private func previewLine(_ title: String, _ value: String) -> some View { HStack { Text(title).foregroundStyle(theme.color("ink3Text")); Spacer(minLength: 5); Text(value) }.font(DiaryType.label) }
+    private func previewLine(_ title: String, _ value: String) -> some View { HStack { Text(title).foregroundStyle(theme.color("ink3Text")); Spacer(minLength: 5); Text(figure: value) }.font(DiaryType.label) }
     private var homeCard: some View {
         section("home", title: "الرئيسية", subtitle: label("notes.homeShape") + "، " + visiblePartsText, symbol: "square.grid.2x2") {
             Text(shape == "window" ? "قدّم بطاقات السنين أو أيامك بما يناسبك. شريط صفحة اليوم ثابت في الأسفل." : shape == "margin" ? "الصفحة وشريط اليوم ثابتان. اختر ما يظهر حول الذكرى؛ ترتيب الهامش ثابت." : "الأصداء أولًا وشريط صفحة اليوم في الأسفل. يمكنك إظهار أيامك أو إخفاؤها.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))

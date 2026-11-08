@@ -67,7 +67,7 @@ struct BahwCustomizePreview: View {
     private func line(_ title: String, _ value: String) -> some View {
         HStack(spacing: 12) {
             Text(title).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk).frame(width: 54, alignment: .leading)
-            Text(value).font(MadarTypography.caption().bold()).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            Text(figure: value).font(MadarTypography.caption().bold()).lineLimit(2).fixedSize(horizontal: false, vertical: true)
         }
     }
     /// DA-09: each tile in its own card's colours, as W4 draws them (Quran's green cover, money's blue, the diary's clay).
@@ -119,7 +119,7 @@ struct BahwBlocksSection: View {
                     Image(systemName: "line.3.horizontal").font(.system(size: 18)).frame(width: 48, height: 48).background(lobby.color("amber").opacity(0.16), in: .rect(cornerRadius: 14))
                     VStack(alignment: .leading, spacing: 3) {
                         Text("الودجات وأحجامها").font(MadarTypography.section())
-                        Text(summary).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
+                        Text(figure: summary).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
                     }
                     Spacer()
                     Image(systemName: expanded ? "chevron.up" : "chevron.down").foregroundStyle(lobby.secondaryInk)

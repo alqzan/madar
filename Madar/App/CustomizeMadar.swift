@@ -192,9 +192,9 @@ struct CustomizeMadar: View {
             if dynamicType.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title).foregroundStyle(theme.secondaryInk)
-                    Text(value)
+                    Text(figure: value)
                 }
-            } else { HStack { Text(title).foregroundStyle(theme.secondaryInk); Spacer(); Text(value) } }
+            } else { HStack { Text(title).foregroundStyle(theme.secondaryInk); Spacer(); Text(figure: value) } }
         }.font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
     }
 }
@@ -254,7 +254,7 @@ struct SettingsSection: View {
                     MadarGlyph(symbol, size: 22).foregroundStyle(theme.ink).frame(width: 48, height: 48).background(theme.background, in: .rect(cornerRadius: 14)).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title).font(MadarTypography.section()).foregroundStyle(theme.ink)
-                        if !summary.isEmpty { Text(summary).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true) }
+                        if !summary.isEmpty { Text(figure: summary).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true) }
                     }
                 }
             }

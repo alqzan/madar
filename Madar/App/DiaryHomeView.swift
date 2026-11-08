@@ -423,7 +423,7 @@ struct DiaryHomeView: View {
                         Divider().overlay(theme.line)
                         VStack(alignment: .leading, spacing: 7) {
                             Text(title).font(MadarTypography.section())
-                            Text(value).font(DiaryType.label).foregroundStyle(theme.color("autoInkText")).fixedSize(horizontal: false, vertical: true)
+                            Text(figure: value).font(DiaryType.label).foregroundStyle(theme.color("autoInkText")).fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }.padding(18).frame(maxWidth: .infinity, alignment: .leading)

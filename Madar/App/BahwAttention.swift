@@ -127,7 +127,7 @@ struct BahwAttentionSheet: View {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.name).font(MadarTypography.body().bold())
-                        Text(reconcileLine(item, money: money)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        Text(figure: reconcileLine(item, money: money)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     }
                     Spacer(minLength: 8)
                     Button(item.matches ? "ثبّت" : "طابق") {
