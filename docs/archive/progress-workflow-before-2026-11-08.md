@@ -75,3 +75,15 @@ Agents take the first unfinished step and continue down the list in the same ses
 - Approve hosting the support and privacy pages, and give a contact for App Review.
 - Optional: taste feedback on any screen you dislike, any time.
 
+
+
+# Archived session handover — retained 8 November 2026
+
+## Handover — استقرار ما قبل TestFlight — 2026-11-08 — Codex
+- **Works now:** تحسينات استجابة القرآن واليوميات والمحبرة والمال والبهو والصلاة؛ لا يُنشأ سجل قبل أداء الصلاة، وتُسجّل الصلاة المؤداة بعد وقتها كـ`qada` بلا دين أو تذكير؛ سجل القرآن يتبع `core.firstCalendar`. رُفع 0.1.0 (13) إلى App Store Connect وبدأت معالجته.
+- **Verified:** `swift test` MadarPrayer 38/38 وPrayerHistoryMaintenance 1/1؛ `xcodebuild -quiet build` نجح؛ Xcode iOS 27.0 7/7 (`codex-prayer-retirement-20261108-r2.xcresult`)، `git diff --check`، وفحص JSON و`plutil`؛ أرشيف 0.1.0 (13) من `4d994ec5`، والتصدير: `Upload succeeded`.
+- **Differences left:** لم تُشغّل مقارنة `compare-screens.py` لهذه الدفعة؛ التغيير المقصود هو حذف مدخل الفوائت، ولا توجد قياسات زمنية على iPhone المالك.
+- **Not verified:** اكتمال معالجة Apple، وظهور النسخة في TestFlight أو تثبيتها على جهاز المالك.
+- **Next:** بعد اكتمال المعالجة، يثبت المالك نسخة TestFlight على iPhone ويجربها؛ القبول على الجهاز منفصل عن المحاكي.
+- **Model/effort:** Codex؛ النموذج والجهد غير مكشوفين؛ مراجعة Sol Ultra للقراءة فقط واكتملت إصلاحاتها.
+- **Usage:** ١٤٪ باقية عند آخر فحص.
