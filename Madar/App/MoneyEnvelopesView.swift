@@ -230,7 +230,7 @@ struct MoneyReserveTargetView: View {
             }
             Spacer(minLength: 0)
         }.padding(20).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
-            .presentationDetents([.medium]).presentationDragIndicator(.visible).madarSheetLock(saving: working)
+            .presentationDetents([.large]).presentationDragIndicator(.visible).madarSheetLock(saving: working)
             .task { fill() }.onChange(of: numbersVisible) { fill() }
     }
     private var numbersVisible: Bool { visible || revealed }

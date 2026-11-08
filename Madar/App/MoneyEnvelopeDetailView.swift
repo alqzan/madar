@@ -438,7 +438,7 @@ private struct MoneySavingChangeView: View {
             if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
             Button(working ? "جارٍ الحفظ…" : "احفظ التعديل", action: save).buttonStyle(MadarPrimaryButton()).disabled(working || changeMinor == nil).accessibilityIdentifier("money-saving-change-save")
             Spacer(minLength: 0)
-        }.padding(20).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium]).presentationDragIndicator(.visible).madarSheetLock(saving: working)
+        }.padding(20).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.large]).presentationDragIndicator(.visible).madarSheetLock(saving: working)
     }
     private func save() {
         guard !working else { return }

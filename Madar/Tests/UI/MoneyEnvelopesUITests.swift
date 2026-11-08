@@ -37,12 +37,12 @@ import XCTest
         app.buttons["money-reserve-target-save"].tap(); XCTAssertTrue(input.waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["money-reserve-target"].firstMatch.label.contains("٢٠٠٬٠٠٠"))
         shot(app, "M5-V03-target-L")
-        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["money-reserve-target"].firstMatch.waitForNonExistence(timeout: 10))
+        // FB-32 (owner): an ordinary save shows no undo line; the saved goal stays across a relaunch.
+        XCTAssertFalse(app.buttons["تراجع"].exists)
         app.swipeUp(velocity: .slow); shot(app, "M5-V03-envelopes-surplus-L"); app.swipeUp(velocity: .slow); shot(app, "M5-V03-envelopes-s1-L")
         app.terminate(); app.launch(); open(app)
         XCTAssertFalse(app.descendants(matching: .any)["money-reserve-after"].firstMatch.exists)
-        XCTAssertFalse(app.descendants(matching: .any)["money-reserve-target"].firstMatch.exists)
+        XCTAssertTrue(app.descendants(matching: .any)["money-reserve-target"].firstMatch.label.contains("٢٠٠٬٠٠٠"))
         XCTAssertTrue(app.staticTexts["money-envelope-reserve"].label.contains("١٠٠٬٠٠٠"))
     }
     func testReserveGoalSaveRequiresPositiveAmount() throws {
@@ -126,7 +126,7 @@ import XCTest
     }
     func testGoalForecastShowsFundedAndShortDatesAndPersistsThroughRelaunch() throws {
         continueAfterFailure = false; let app = make("funding"); open(app)
-        let gift = app.buttons["money-envelope-هدية"], emergency = app.buttons["money-envelope-الطوارئ"]
+        let gift = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-envelope-هدية")).firstMatch, emergency = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-envelope-الطوارئ")).firstMatch
         reachGoal(gift, in: app)
         XCTAssertTrue(gift.waitForExistence(timeout: 10))
         XCTAssertTrue(gift.label.contains("بحسب خطتك، يكتمل بحلول الموعد"), gift.label)
@@ -146,7 +146,7 @@ import XCTest
     }
     func testHiddenGoalsDoNotExposeConditionalAmountsUntilReveal() throws {
         continueAfterFailure = false; let app = make("hidden"); open(app)
-        let gift = app.buttons["money-envelope-هدية"]
+        let gift = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-envelope-هدية")).firstMatch
         XCTAssertFalse(gift.label.contains("بحسب خطتك"), gift.label)
         XCTAssertFalse(app.staticTexts["تقدير دون صرف جديد"].exists)
         app.buttons["money-envelopes-reveal"].tap()
