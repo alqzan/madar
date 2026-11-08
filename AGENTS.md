@@ -7,42 +7,27 @@ You are building **Madar**, a native iPhone app (SwiftUI, Arabic RTL). The appro
 - `screens/`
 - `design-tokens.json`, `settings-schema.json`, `screens-index.json`, `data-dictionary.json`, `provenance.json`
 
-## Source of truth
+## Authority and current mandate — 8 November 2026
 
-1. **Review fixes:** `docs/HANDOFF/Madar - Handoff Review Fixes - V1.md` overrides the handoff where they conflict.
-   - `[FIX]` items correct defects. Apply them.
-   - `[DEFAULT]` items are recommended changes, applied by default. The owner may revert any of them, and the reversal is logged in `docs/DECISIONS.md`.
-2. **Then the handoff's own precedence** (full table in §1):
-   - Behaviour, rules, formulas, and what ships in v1: the **text** wins, then the JSON, then the screenshots.
-   - Exact values (keys, defaults, ranges, hex): the JSON files. A mismatch between JSON and text is a bug: apply the text and log it.
-   - Layout only: the `canonical` screenshot wins. `superseded` and `deferred` screens are not built.
-   - Sample numbers in screenshots are never hard-coded.
-3. **New conflict:** apply this precedence, add a row to `docs/DECISIONS.md`, and continue. Ask the owner only if the conflict changes one of these:
-   - a rule
-   - a data-model field
-   - a licence
-   - a `[DEFAULT]` item
+1. The owner's latest explicit instruction wins over older owner decisions, this protocol, the board and the handoff. Log a changed decision once in `docs/DECISIONS.md`; do not keep both versions as current instructions.
+2. `AGENTS.md` and `CLAUDE.md` are one protocol. Keep them byte-identical. `docs/PROGRESS.md` is the current work and delivery status; `docs/DECISIONS.md` records why a rule changed. Archived boards, old handovers and memory are historical evidence, not competing queues or instructions.
+3. For product questions not changed by the owner: review fixes (`docs/HANDOFF/Madar - Handoff Review Fixes - V1.md`) override the handoff. Behaviour and scope: text, then JSON, then screenshots. Exact keys/defaults/ranges/hex: JSON; resolve text/JSON conflicts using the text and record them. Canonical screenshots are the visual baseline; never copy sample data or prototype controls.
+4. Current owner request: first reconcile the project instructions and board, then improve the whole app for ease, flexibility, simplicity and responsiveness. Revisit previously approved interfaces when there is a concrete improvement. This authorizes reversible UI/flow corrections and helper-assisted bug/UX inspection; older review bans, strict screenshot-copy requirements and pre-first-TestFlight freezes do not block this work.
+5. Existing product/data/licensing safeguards still apply. Ask only for an unresolved product-rule/default/data-model/licence change, public publication, or access to/migration/deletion of real owner data. Do not ask again for work already authorized.
 
-**Overrides in force from the review** (details in the fixes file):
-- **RA1:** the v1 store is local-only. No CloudKit.
-- **RA2:** only the app process opens the store. Extensions write to an inbox.
-- **RA3:** M0 is lean.
-- **RP1:** an unlogged prayer never becomes "missed" or qada automatically.
-- **RU1:** never put "·" next to a digit.
+**Product safeguards:** RA1 local-only v1 (CloudKit remains deferred until explicit authorization); RA2 only the app opens the store, extensions use inbox/snapshots; RA3 lean M0; RP1 no automatic missed/qada record; RU1 no middle dot next to a digit. Later explicit owner decisions, including prayer records and calendar order, override original handoff wording.
 
-## Owner override — automatic commit and TestFlight upload (8 Nov 2026)
+## Delivery — standing owner authorization
 
-The owner authorizes every directly requested Madar app change to be completed, committed, and uploaded to internal TestFlight without asking again. This supersedes the card queue, feature freeze, and any wait for a separate owner upload approval for those requests.
-
-- Keep the marketing version unchanged unless requested; increment `CURRENT_PROJECT_VERSION` for each upload.
-- Use the matching board card when one exists. Do not invent cards; for a direct request without a card, make one descriptive `[OWNER] ...` commit and record it in the decisions log and handover.
-- Run the applicable build and focused checks, then archive, export, and upload to App Store Connect/TestFlight. This authorizes internal TestFlight delivery only, not public App Store release or App Review submission.
-- Apple account access, signing, provisioning, and processing remain technical requirements. If one blocks upload, finish and commit the validated change, record the exact blocker, and continue when the external state allows; do not ask the owner to re-authorize.
-- This workflow change does not relax local-only storage, migration, privacy, data-loss, licensing, or other product rules.
+- Complete, validate and commit directly requested changes on `main`, then archive/export/upload to internal TestFlight without another permission step. Public App Store release and App Review submission are separate.
+- Use an existing card when relevant. For a direct request without a matching card, use one descriptive `[OWNER]` commit and record the result in the current work section and handover; no invented card IDs.
+- Keep `MARKETING_VERSION` unless requested; increment `CURRENT_PROJECT_VERSION` once per upload. Batch this whole-app improvement request into coherent validated commits and a delivery build, rather than uploading every small fix.
+- Treat signing, provisioning and Apple processing as technical requirements. Verify them live; do not carry an old blocker forward without checking. Record archive, upload, processing and owner-device acceptance separately.
+- iOS deployment target and the sole test runtime are 27.0. Use an installed Xcode that supports them; no exact Xcode patch version is pinned by this protocol. A newer installed Xcode alone is not a blocker.
 
 ## What to read: per task, never everything
 
-Do not load the whole handoff into context. Each task card in `docs/PROGRESS.md` lists the spec sections and fix IDs it needs. Read those and nothing else, and use `grep` to find a section instead of reading the spec end to end.
+Do not load the whole handoff into context. Each task card in `docs/PROGRESS.md` lists the spec sections and fix IDs it needs. Read those and nothing else, and use `rg` to find a section instead of reading the spec end to end.
 
 | When | Read |
 |---|---|
@@ -61,7 +46,7 @@ Do not load the whole handoff into context. Each task card in `docs/PROGRESS.md`
 ## Rules (from the approved brief)
 
 **Design**
-- **Same as the design or better, never worse.** Match the screenshots in layout, spacing, type and tone. Improve only when the result is clearly better on iOS 27 (a native component, accessibility, performance), and log the change in `docs/DECISIONS.md`.
+- **Same as the design or better, never worse.** Use the screenshots as the baseline for room identity, spacing, type and tone. The current owner mandate permits clearer, simpler flows beyond old approvals; record intentional changes in `docs/DECISIONS.md`.
 - **Go deeper and improve — owner, 15 October 2026.** The approved design is the floor, not the ceiling. In every card, and when revisiting screens already built, look for what would make Madar clearly better for the user: clearer copy, less repetition, better empty states, smoother flows, richer use of the data a room already owns, native iOS 27 polish. Small improvements that keep the rules, the data model and the v1 scope: build them, log one row in `docs/DECISIONS.md` (what, why, before/after screenshot names) and say so in the handover. Bigger ideas (a new feature, a rule or data-model change, anything outside v1): add a row to the board section «Ideas — for the owner» with the idea and why, and do not build it until the owner says yes. The owner wants Madar to feel very smart and "wow": crafted touches like the reflection under the prayer arches matter a lot to them (light, reflection, depth, gentle motion that respects Reduce Motion, each room's own ornament), and so does intelligence — the app anticipates the next useful thing from the data it already has (time of day, next prayer, what is due, what is near) instead of showing static numbers. **Creativity is the default (owner, 15 October 2026):** be bold and inventive in design and experience; build creative improvements without waiting for approval, as long as they keep the rules, the data model and the licences and can be reverted. The owner reviews afterwards and says what they do not like; that feedback is logged and followed. Only changes to rules, the data model, licences or v1 scope wait in «Ideas — for the owner». Show the real thing, never an abstract label: an amount the user can picture («نصف صفحة»، «٥ أسطر») instead of a multiplier («×١½»).
 - **Deployment target is iOS 27.0.** Build and validate on iOS 27; use iOS 27 APIs directly without maintaining iOS 26 compatibility paths.
 - **Arabic, right to left, everywhere.** Arabic-Indic digits by default.
@@ -117,72 +102,44 @@ Do not load the whole handoff into context. Each task card in `docs/PROGRESS.md`
 - Use exactly one simulator: iPhone 15 Pro Max named `Madar 15 Pro Max` on iOS 27.0, with UDID `390840AD-4FF0-476F-8E1D-E0C521A58E45`. Never create or use another simulator device or iOS simulator runtime.
 - A session without macOS (Codex cloud, a Claude Code cloud session) writes code and pure-Swift tests only. It never claims a build or run it could not perform.
 
-## Milestones
+## Work selection and session protocol
 
-The order is M0 Foundation, M1 Prayer, M2 Quran, M3 Diary, M4 Lobby + Habits + Widgets, M5 Money, M6 Mihbara, M7 final integration.
+- Read the current work section and newest handover in `docs/PROGRESS.md`, relevant decisions, Git state, running jobs and live usage before starting. Preserve other work. Read only the spec sections relevant to the change.
+- Direct owner requests take priority. Otherwise take the first actionable `ready` card in the active queue. Historical tables do not create a second queue. If blocked, record the precise blocker and continue independent useful work.
+- Before editing a screen, state the screen, its canonical reference (or that the state has none), and the intended visible improvement. Prefer existing components and the room's own paper, typography and ornament; avoid unexplained controls and repetitive copy.
+- The approved design is a baseline. Improve a confusing flow even if previously approved, retaining product rules and room identity. Log the reason and before/after evidence. Do not claim a redesign is pixel-matched to an older canonical.
+- Capture changed visual states at default text size. Use `python3 Madar/scripts/compare-screens.py <board> <shot.png> [<scrolled.png>]` when a canonical applies; document intentional differences. Only the owner marks a screen `approved`; agents use `matched — awaiting owner` or `built — awaiting owner` for intentional redesigns.
+- Keep Dynamic Type paths working, but do not run enlarged-text or accessibility-inspector audits unless newly requested.
 
-- M0 is lean (fix RA3).
-- Inside each room, work screen by screen in the board's order. A screen matches its canonical design before the next screen starts (visual acceptance, below).
-- Each milestone ends with a build on the owner's iPhone that passes its acceptance checks.
+## Helpers and review
 
----
+- Use cheaper read-only helpers for bug hunts, copy/UX inspection, searches and log reading. The main agent verifies findings and owns all source edits, builds, tests, simulator operations and commits. Give helpers bounded areas and avoid duplicate coverage.
+- Use available helper slots for independent useful work during long runs; do not launch work merely to fill time, and do not change files an active build/test depends on. The actual runtime concurrency limit applies; there is no requirement to create unlimited agents.
+- The current whole-app inspection is authorized. Avoid repeated general reviews and separate review reports. Record actionable findings in the current board section and apply the high-value ones.
+- One focused review is required for changes that migrate/could delete stored records and for money engine/data changes. Fix Critical/High findings with tests before building screens on them. Room completion gets one focused UX pass, with useful findings applied.
+- Use the strongest available reasoning for money engine/data rules; use inexpensive helpers for read-only discovery. Record actual model/effort when exposed; never invent a model name or usage number.
 
-## Working protocol — owner revision, 13 October 2026
+## Verification and failure handling
 
-This replaces the 12 October working protocol. Product rules above are unchanged. Reason: about 15 sessions produced about 190 commits, half of them records, claims and handovers, and prayer screens that work but do not look like the approved design. Older handovers, reports and automation memory are history, not instructions.
+- Run `python3 Madar/scripts/prepare-workspace.py` before native builds in a fresh checkout. Regenerate with XcodeGen when project inputs or test/source file membership change.
+- Engines: pure-Swift behavioural tests with expected values from the spec, not the implementation. Screens/flows: build and run the smallest meaningful affected UI/integration slice; add coverage for new behaviour. Do not rerun unrelated suites.
+- Before committing changed code: build, affected checks and `git diff --check`. Documentation-only commits require link/path/consistency checks and diff checking, not an unrelated app build. Run `check-review-contracts.py` and `check-shipping-sources.py` at milestone gates, not every commit.
+- Report actual executed test counts and result bundles. A successful test build or zero executed tests is not a passing suite. Simulator evidence is separate from owner-iPhone acceptance, visual approval, performance measurement and distribution.
+- Diagnose a failure once; try at most two evidence-based repairs for the same blocker, then record it and move to independent work. Do not silently skip or label failed/unrun checks passed.
+- Use synthetic isolated stores. Do not open/migrate/delete real owner/family records or run on their device without explicit authorization. Do not erase the shared simulator or its stores to make a test pass.
 
-### 1. What a session delivers
+## Usage, commits and handover
 
-- Something the owner can **see** on the phone: a screen that matches its canonical design, or the engine/flow a visible screen needs next. Several small cards per session are welcome.
-- Take the first `ready` card in `docs/PROGRESS.md`. Do not reorder the queue or invent cards. If the card is blocked, write the blocker in its row and take the next `ready` card.
-- Before coding, write one line in your reply: the screen, its canonical files, and what will look different afterwards.
+- Check live five-hour usage at the start, after substantial work and before a new large batch/archive. Remaining = 100 minus used percent. Helpers share the allowance. If unavailable, say `not exposed`; do not estimate.
+- Near 5% remaining, stop starting new work and reserve capacity for focused verification, commit, handover and the authorized TestFlight upload. Start archiving early enough to preserve that reserve. Never redeem reset credits without explicit confirmation.
+- Commit one coherent finished change with its board update: `[<existing-card>] <result> (codex|claude, model: <actual or not exposed>, effort: <actual or not exposed>)`; use `[OWNER]` for this request where no card applies. No record-only/handover-only commits unless documentation itself is the requested deliverable.
+- Work on `main`; no branch/worktree per task. A single `codex/<section>` branch is allowed for multi-session work. Never force-push, rewrite history or delete another agent's work. Retained unused code need not be deleted as part of UX cleanup.
+- Keep one handover per session in `docs/PROGRESS.md`, at most seven bullets: **Works now**, **Verified**, **Differences left**, **Not verified**, **Next**, **Model/effort**, **Usage**. Keep the newest three; archive older handovers. The newest current-work section wins over stale next steps in old handovers.
 
-### 2. Visual acceptance — the main gate for screens
+## Deferred work and repository map
 
-- Each screen card names its canonical files (`screens/<room>/NN-<board>.jpg` and its `-s1` scrolled file). The screen is built to match them in layout, order of elements, spacing, type sizes and weights, shapes and ornament, and colour. Working code with a different look is not done.
-- Take default-size screenshots (L, light unless the canonical is dark) of the same states as the canonical, then run `python3 Madar/scripts/compare-screens.py <board> <shot.png> [<scrolled.png>]` and open `Madar/Artifacts/compare/<board>.html`. Fix differences until none remain that you can name, and list any that remain in the handover.
-- Each card has a **Do not copy** list: prototype-only elements, sample numbers, and anything a fix overrides (fixes and schema defaults win over screenshots, RL10). Respect it. Everything else on the screen is copied.
-- An agent may set a screen to `matched — awaiting owner`. Only the owner sets `approved`. Self-graded "screenshots inspected" is not acceptance.
-- Test and screenshot at the default text size only. Owner decision, 13 October 2026: no AX3/AX5 or other enlarged-text runs or screenshots. Keep the Dynamic Type code paths you touch working, but do not spend sessions testing them.
-- Room flows use the room's own look (paper background, Madar cards, room typography). A stock grey grouped `Form`/`List` sheet is a mismatch unless the canonical shows a system sheet.
-- Reuse existing code that is closer to the design before writing new drawing code.
-
-### 3. Checks — the smallest that proves the change
-
-- Engines: pure-Swift tests with expected values taken from the spec, never from the engine's output.
-- Screens: the app builds, the changed flow's UI test passes (add or extend one when the flow is new), plus the screenshots above. Do not rerun unrelated suites.
-- Before each commit: the changed code builds, the tests for the changed flow pass, and `git diff --check` is clean. The two script checks (`check-review-contracts.py`, `check-shipping-sources.py`) run only at a milestone gate, not on every commit. Before native builds in a fresh checkout: `python3 Madar/scripts/prepare-workspace.py`.
-- Never claim a check you did not run. A simulator pass is not an owner-iPhone pass, and neither is distribution.
-
-### 4. What not to do
-
-- No new reports, plans, traces, source maps, inventories or review documents. The card row and one handover are the record. Exception: the owner asks for a document.
-- **Frozen** until the owner unfreezes them: M0-T06, M0-T09 (privacy matrix only), M0-T12, app-switcher privacy, sync, and accessibility-inspector audits. The app-wide Face ID/iPhone-passcode gate is optional and off by default (`core.faceIDLock=none`); the owner enables it in Settings. When enabled, keep every room open after that single unlock, with no per-room or notebook-idle gate. The iPhone passcode is the fallback only when Face ID is unavailable (permission off, no enrolled face, lockout) (owner, 1–2 November 2026). The owner unfroze encrypted backup on 21 October 2026; build it. Keep all other frozen work unchanged. A confirmed privacy or data-loss defect in a route you are changing is still fixed before that route is accepted.
-- No reviews. Owner decision, 13 October 2026: no reviewer agents, review passes, review documents or re-reviews for any change. Exceptions, each one review pass that fixes Critical/High findings and moves on:
-  - A change that migrates or could delete the owner's stored records.
-  - **Money cards (owner, 16 October 2026):** after each money engine or data card, and before money screens build on it, review the work, fix Critical/High findings with tests, and note the review in the card row. Max effort is not required; the review is what matters.
-  - **UX review after each section (owner, 16 October 2026):** when a room or section is finished (for example each M5 block), one reviewer on the strongest model checks it against UX principles: smart, clear, useful, free of complexity, and "wow". Apply its high-value findings and log them in `docs/DECISIONS.md`.
-- No branch or worktree per task. Commit a finished card on `main` once it builds and its checks pass. Use a single `codex/<section>` branch only for work that spans sessions, and merge it when the card is done. Never force-push, rewrite history, or delete another agent's branch or work.
-- Don't delete unused code you didn't write (for example the old `PrayerRoom.swift`). Port what is useful; the owner decides what to remove.
-
-### 5. Commits and handover
-
-- One commit per finished card, with the board row update in the same commit: `[M1-V01] <visible result> (codex|claude, model: <actual or not exposed>, effort: <actual or not exposed>)`. No separate "Record/Claim/Preserve/handover" commits.
-- One handover per session in `docs/PROGRESS.md`, at most 7 lines: **Works now**, **Verified** (command and result), **Differences left** (visual), **Not verified**, **Next**, **Model/effort**, **Usage**. Keep the last three handovers; move older ones to `docs/archive/`.
-
-### 6. Model, usage and failure
-
-- GPT-6 Luna max may write production code. Escalate a narrow problem to Sol only after two evidence-based repairs fail, or for an unresolved rule conflict.
-- **Money (M5) gets our full strength — owner, 15 October 2026.** The owner sees money as the hardest room. Before its first card, read §7.5 (mal), §8 money definitions, the money data dictionary and every mal fix item end to end, and write the money engine with golden fixtures for every number before any screen. Use the strongest model and effort available for the money engine and its data model (Codex: Sol at its highest effort; Claude: the session's model at its highest effort). Every money number has one definition (§8), `Int` minor units, and a test from the spec.
-- **Continuous improvement is the principle — owner, 15 October 2026.** Nothing built is final. Every session, after its cards, spends a share of its time going back to an earlier room and making it clearly better (the «Go deeper and improve» rule above), with a DECISIONS row and before/after screenshots.
-- Usage: stop starting new work near 95% of the five-hour allowance, and keep a 3–5% reserve for the commit and handover. Never invent a usage number; say "not exposed". **Owner, 21 October 2026:** when about 5% of the allowance is left, stop, commit, and write the handover so the other agent (Codex or Claude) can take the rest: say exactly what remains and where.
-- **Cheaper helper agents, always (owner, 21 October 2026).** While a long build, test or download runs, use cheaper subagents (Claude: Sonnet and Haiku; Codex: its smaller models) for parallel read-only work: searches, audits against these rules, finding unreachable states, reading logs, user-journey walks per room. Owner, 26 October 2026: there is no fixed cap on how many; launch as many as the work needs. They never touch the simulator, never edit, build or commit. The main agent checks each finding in the code, applies the ones that are right, and keeps writing production code itself. **Owner, 29 October 2026:** hunting for errors (bug hunts, dead ends, crashes, wrong conditions, copy and grammar audits) is always done by the cheapest helpers (Claude: Haiku, one per room in parallel; Codex: its smallest model), never by the main agent reading the code itself. The main agent only verifies and fixes what they report. **Owner, 29 October 2026 («خل هذا شي دايم»):** the main agent never sits waiting on a run. The moment a build, test or download starts, it launches helpers on areas not yet covered and keeps fixing files that run does not depend on.
-- When something fails: diagnose once, try at most two evidence-based repairs, then record the blocker in the card and move on. Never mark a failed or unrun check as passed.
-
-### 7. Map of the repository
-
-- `AGENTS.md` = `CLAUDE.md` (root) is the protocol; `Madar/AGENTS.md` = `Madar/CLAUDE.md` points here. Keep each pair byte-identical.
-- `docs/PROGRESS.md` is the board and the only status file. `docs/DECISIONS.md` holds owner decisions and conflicts. `docs/reports/M<n>.md` holds only the milestone gate table, filled at the milestone gate.
-- `docs/HANDOFF/` is the approved spec (screens, JSON, `sections/` extracts, review fixes). `Madar/Specification/` is the working copy the generators and scripts read; keep them consistent.
-- `docs/design/` holds architecture notes, `docs/journeys/` the journey register, and `docs/archive/` history only.
-- `Madar/` holds the app: `App/` screens, `Packages/` engines and data, `Tests/`, `scripts/`. `Madar/Artifacts/` (screenshots, xcresults), `output/` and `tmp/` are local and not in Git.
+- CloudKit/sync, M0-T06 paperwork, M0-T09 privacy matrix, M0-T12 contrast inspector and app-switcher privacy remain deferred unless explicitly reopened. Encrypted backup is already unfrozen. Fix a confirmed privacy/data-loss defect in any touched route.
+- App lock is optional and off by default (`core.faceIDLock=none`); one unlock opens all rooms. Passcode fallback is used when Face ID is unavailable. No per-room/notebook idle gate.
+- `Madar/AGENTS.md` and `Madar/CLAUDE.md` point to this protocol and stay byte-identical.
+- `docs/HANDOFF/` holds the approved original spec. Keep changed spec contracts consistent with `Madar/Specification/` when relevant. `docs/reports/M<n>.md` is milestone-gate evidence only; `docs/archive/` is history.
+- `Madar/App/`, `Packages/`, `Tests/`, `scripts/` hold implementation and verification. `Madar/Artifacts/`, `output/`, `tmp/` are ignored local evidence. Do not add new status/report documents when the current board and handover suffice.

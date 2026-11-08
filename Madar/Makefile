@@ -1,5 +1,8 @@
 .DEFAULT_GOAL := generate
-SIMULATOR ?= 412F4437-7BD7-44D1-AA3D-2B7158090E14
+SIMULATOR := 390840AD-4FF0-476F-8E1D-E0C521A58E45
+ifneq ($(SIMULATOR),390840AD-4FF0-476F-8E1D-E0C521A58E45)
+$(error Only the approved Madar 15 Pro Max iOS 27.0 simulator may be used)
+endif
 .PHONY: fonts generate build preview test test-ios test-links cloud-device
 fonts:
 	python3 scripts/prepare-workspace.py
@@ -21,6 +24,8 @@ test-ios: generate
 	xcodebuild -project Madar.xcodeproj -scheme Madar -destination 'platform=iOS Simulator,id=$(SIMULATOR)' -derivedDataPath DerivedData -resultBundlePath Artifacts/M0-tests-$$(date +%s).xcresult CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES test
 test-links: generate
 	SIMULATOR=$(SIMULATOR) python3 scripts/deep-link-test.py
-# Paid team only: signs with iCloud/CloudKit and turns on the gated mirror. Needs TEAM=<id> and a connected device.
-cloud-device: generate
+# Deferred under RA1. Retained command is guarded against accidental activation.
+cloud-device:
+	@test "$(CLOUDKIT_OWNER_AUTHORIZED)" = "YES" || (echo "CloudKit is deferred under RA1; explicit owner authorization required."; exit 1)
+	$(MAKE) generate
 	xcodebuild -project Madar.xcodeproj -scheme Madar -destination 'generic/platform=iOS' -derivedDataPath DerivedData -allowProvisioningUpdates DEVELOPMENT_TEAM=$(TEAM) MADAR_CLOUDKIT_CONTAINER=iCloud.com.alqzan.madar2 MADAR_APP_ENTITLEMENTS=App/Madar-CloudKit.entitlements build
