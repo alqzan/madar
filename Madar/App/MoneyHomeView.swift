@@ -14,6 +14,7 @@ struct MoneyHomeView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.roomVisit) private var roomVisit
     @Environment(\.isFrontRoom) private var isFrontRoom
@@ -21,6 +22,7 @@ struct MoneyHomeView: View {
     @State private var cardCount = 0
     @State private var hawlKey: String?
     @State private var failure: String?
+    @State private var isAccruingPlans = false
     @State private var revealed = false
     @State private var basisOpen = false
     @State private var pendingRootRequest = false
@@ -142,13 +144,28 @@ struct MoneyHomeView: View {
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task(id: roomVisit) {
             await app.seedMoneyDefaults()
+            // Show the saved reading before the bounded accrual command; refresh it when that write settles.
+            load()
             // Opening the room must not write on every visit (hangs on tab switches): accrue at most once every 5 minutes.
             if Date().timeIntervalSince(Self.lastAccrual) > 300 {
-                do { try await app.executeMoneyCommand("money.accruePlans"); Self.lastAccrual = Date() }
+                isAccruingPlans = true
+                defer { isAccruingPlans = false }
+                do {
+                    #if DEBUG
+                    let environment = ProcessInfo.processInfo.environment
+                    if UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+                       let milliseconds = environment["MADAR_UI_MONEY_ACCRUAL_HOLD_MS"].flatMap(Int.init),
+                       (1...5_000).contains(milliseconds) {
+                        try await Task.sleep(for: .milliseconds(milliseconds))
+                    }
+                    #endif
+                    try await app.executeMoneyCommand("money.accruePlans")
+                    Self.lastAccrual = Date()
+                }
                 catch is CancellationError { return }
                 catch { app.errorMessage = "تعذّر تحديث الخطط اليوم: " + madarUserMessage(error) }
+                load()
             }
-            load()
             if app.moneyOpensMessages { app.moneyOpensMessages = false; messagesOpen = true; return }
             if app.moneyOpensSettings { app.moneyOpensSettings = false; settingsOpen = true; return }
             // §7.5 «بعد غياب»: «منذ آخر زيارة» opens first; otherwise this visit is the new mark.
@@ -184,14 +201,23 @@ struct MoneyHomeView: View {
     private var homeContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
-            if let reading {
-                dashboard(reading)
-            } else if let failure {
-                readFailure(failure)
-            } else {
-                ProgressView().frame(maxWidth: .infinity, minHeight: 300)
+            if isAccruingPlans {
+                Text("جارٍ تحديث الخطط")
+                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    .accessibilityIdentifier("money-accrual-progress")
+                    .transition(.opacity)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isAccruingPlans)
             }
-        }.padding(.horizontal, 16).padding(.top, 0).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
+            if let reading {
+                dashboard(reading).transition(.opacity)
+            } else if let failure {
+                readFailure(failure).transition(.opacity)
+            } else {
+                ProgressView().frame(maxWidth: .infinity, minHeight: 300).transition(.opacity)
+            }
+        }
+        .padding(.horizontal, 16).padding(.top, 0).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: reading != nil || failure != nil)
     }
     @ViewBuilder private func dashboard(_ reading: MoneyHomeReading) -> some View {
         let blocks = RoomHomeLayout(session: app, key: "mal.layout").visible

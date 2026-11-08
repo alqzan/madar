@@ -173,6 +173,23 @@ import XCTest
         app.buttons["money-back"].tap(); XCTAssertTrue(app.buttons["money-open"].waitForExistence(timeout: 5))
         app.terminate(); app.launch(); open(app); XCTAssertTrue(app.staticTexts["money-available"].label.contains("١٬٣٦٠"))
     }
+    func testSavedHomeAppearsWhileDailyPlansAreRefreshing() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00",
+            "MADAR_UI_MONEY_ACCRUAL_HOLD_MS": "5000"]
+        app.launch(); open(app)
+        let available = app.staticTexts["money-available"]
+        let updating = app.staticTexts["money-accrual-progress"]
+        XCTAssertTrue(available.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(updating.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(available.label.contains("١٬٣٦٠"), available.label)
+        shot(app, "M5-V01-home-accruing-L")
+        XCTAssertTrue(updating.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(available.label.contains("١٬٣٦٠"), available.label)
+        app.terminate()
+    }
     func testEmptyAndHiddenAmountsAreHonest() throws {
         continueAfterFailure = false; var app = app("empty"); open(app)
         XCTAssertTrue(app.descendants(matching: .any)["money-empty"].exists); XCTAssertFalse(app.staticTexts["money-available"].exists)
