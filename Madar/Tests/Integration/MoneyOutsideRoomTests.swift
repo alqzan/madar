@@ -46,7 +46,7 @@ import MadarSnapshots
         let payment = MoneyTransaction(); payment.kind = "cardPayment"; payment.amountMinor = 10000; payment.homeAmountMinor = 10000; payment.dayKey = today.description; payment.eventAt = now; payment.reviewState = "ok"; c.insert(payment)
         try c.save()
         let facts = try DiaryLineRenderer.live(day: today, context: ModelContext(container)).filter { $0.kind == "mal" }
-        XCTAssertEqual(facts.count, 1); XCTAssertEqual(facts.first?.id, "mal." + expense.id.uuidString); XCTAssertTrue(facts.first?.text.contains("١٨٫٠٠") == true)
+        XCTAssertEqual(facts.count, 1); XCTAssertEqual(facts.first?.id, "mal." + expense.id.uuidString); XCTAssertTrue(facts.first?.text.contains("\u{2068}١٨\u{2069}") == true, facts.first?.text ?? "nil"); XCTAssertFalse(facts.first?.text.contains("٫") == true, "A whole amount drops its zero halalas on the diary page")
         try app.publishRoomWidgetSnapshots(at: now)
         let hidden = try XCTUnwrap(app.snapshotStore.read("money", as: RoomWidgetSnapshot.self, now: now))
         XCTAssertTrue(hidden.privacy.moneyHidden); XCTAssertTrue(hidden.payload.periods.isEmpty); XCTAssertTrue(hidden.payload.rows.allSatisfy { $0.value == "•••" && $0.share == 0 })

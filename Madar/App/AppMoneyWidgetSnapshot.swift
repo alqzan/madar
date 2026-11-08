@@ -20,7 +20,7 @@ extension AppSession {
         guard let reading = try? service.load(at: now) else { snapshot.emptyTitle = "افتح المال للتحديث"; return snapshot }
         guard reading.hasAccounts || reading.cycle != nil else { return snapshot }
         if let cycle = reading.cycle {
-            snapshot.rows += [.init(id: "salary", title: "دخل الدورة", value: service.amount(cycle.incomeMinor), route: "madar://mal"), .init(id: "now", title: "لك الآن", value: service.amount(cycle.headline.availableNowMinor), route: "madar://mal"), .init(id: "daily", title: "يومك", value: service.amount(cycle.headline.todayAllowanceMinor), route: "madar://mal")]
+            snapshot.rows += [.init(id: "salary", title: "دخل الدورة", value: service.amount(cycle.incomeMinor), route: "madar://mal"), .init(id: "now", title: "لك الآن", value: service.amount(cycle.headline.availableNowMinor), route: "madar://mal"), .init(id: "daily", title: "يومك", value: service.amount(cycle.headline.todayAllowanceMinor), detail: service.amount(cycle.headline.todaySpentMinor), share: cycle.headline.todayAllowanceMinor > 0 ? Double(cycle.headline.todaySpentMinor) / Double(cycle.headline.todayAllowanceMinor) : (cycle.headline.todaySpentMinor > 0 ? 1.01 : 0), route: "madar://mal")]
             let actual = cycle.curve.filter { $0.day <= cycle.elapsedDays }
             let high = max(1, actual.map { abs($0.accruedMinor + cycle.input.carryMinor - $0.spentMinor) }.max() ?? 1)
             snapshot.periods = actual.map { .init(id: String($0.day), title: "", value: "", share: Double($0.accruedMinor + cycle.input.carryMinor - $0.spentMinor) / Double(high), route: "madar://mal") }

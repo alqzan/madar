@@ -134,7 +134,10 @@ public struct DiaryAutoLineVisibility: Sendable {
         for row in try money.confirmedTransactions() where days.contains(row.dayKey) && row.showInDiary && visible(row.id) {
             let charge = try money.effect(of: row, includingExcluded: true, in: effects).budgetChargeMinor
             guard charge != 0, let exponent = CurrencyExponents.specified.exponent(row.homeCurrency) else { continue }
-            let amount = digits.amount(minorUnits: Int64(abs(charge)), fractionDigits: exponent, signed: false)
+            // A whole amount reads «١٤٠ ر.س», not «١٤٠٫٠٠ ر.س»: the zero halalas say nothing on a diary page.
+            let scale = (0..<exponent).reduce(1) { acc, _ in acc * 10 }
+            let whole = abs(charge) % scale == 0
+            let amount = digits.amount(minorUnits: Int64(whole ? abs(charge) / scale : abs(charge)), fractionDigits: whole ? 0 : exponent, signed: false)
             let currency = row.homeCurrency == "SAR" ? "ر.س" : row.homeCurrency
             lines[row.dayKey, default: []].append(.init(id: "mal." + row.id.uuidString, at: row.eventAt,
                                                         text: (charge > 0 ? "صرفت " : "استعدت ") + amount + " " + currency, kind: "mal",

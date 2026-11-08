@@ -21,9 +21,14 @@ struct MoneyWidgetContent: View {
             let expanded = all.filter { ["now", "basis", "reserved"].contains($0.id) } + all.filter { $0.id.hasPrefix("env-") } + all.filter { $0.id.hasPrefix("limit-") } + all.filter { $0.id == "reserve" }
             return extraLargePortrait ? Array(expanded.prefix(7)) : expanded
         }
-        let ids = template == "basis" ? ["basis", "reserved", "salary"] : ["now", "daily"]
+        // The small card names «يومك» inside its spend line, so the row is not repeated above it.
+        let ids = template == "basis" ? ["basis", "reserved", "salary"] : todayLine != nil ? ["now"] : ["now", "daily"]
         let selected = ids.compactMap { id in all.first { $0.id == id } }
         return Array(selected.prefix(type.isAccessibilitySize ? 2 : 3))
+    }
+    private var todayLine: RoomWidgetSnapshot.Row? {
+        guard !hidden, family == .systemSmall, template != "basis", let daily = snapshot?.rows.first(where: { $0.id == "daily" }), !daily.detail.isEmpty else { return nil }
+        return daily
     }
     var body: some View {
         Group {
@@ -54,12 +59,27 @@ struct MoneyWidgetContent: View {
                         }
                         // A row of dots says nothing by itself: name why the amounts are hidden and where they are.
                         if hidden { Text("المبالغ مخفية، افتح المال لتراها").font(MadarTypography.fine()).foregroundStyle(color("ink2")).fixedSize(horizontal: false, vertical: true) }
-                        if !hidden && !type.isAccessibilitySize && template != "basis", let points = snapshot?.periods, points.count > 1 {
+                        // A bare balance curve with no axis said nothing on the small card; today's spend against «يومك» does.
+                        if let daily = todayLine {
+                            Spacer(minLength: 4)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("صرفت \(Text(figure: daily.detail).foregroundStyle(color("ink")))\(daily.share > 1 ? " فوق يومك " : " من يومك ")\(Text(figure: daily.value).foregroundStyle(color("ink")))")
+                                    .font(MadarTypography.fine()).foregroundStyle(color("ink2")).lineLimit(2).minimumScaleFactor(0.8)
+                                GeometryReader { proxy in
+                                    HStack(spacing: 0) {
+                                        Capsule().fill(daily.share > 1 ? color("ink") : color("accent"))
+                                            .frame(width: max(daily.share > 0 ? 5 : 0, proxy.size.width * min(1, daily.share)))
+                                        Spacer(minLength: 0)
+                                    }.background(color("accent").opacity(0.18), in: .capsule)
+                                }.frame(height: 5).accessibilityHidden(true)
+                            }.accessibilityElement(children: .combine)
+                        }
+                        if !hidden && !type.isAccessibilitySize && template != "basis" && family != .systemSmall, let points = snapshot?.periods, points.count > 1 {
                             GeometryReader { proxy in Path { path in
                                 for (index, point) in points.enumerated() { let p = CGPoint(x: proxy.size.width * Double(index) / Double(max(1, points.count - 1)), y: proxy.size.height * (1 - min(1, max(-1, point.share))) / 2); if index == 0 { path.move(to: p) } else { path.addLine(to: p) } }
                             }.stroke(color("accent"), lineWidth: 1.5) }.frame(height: family == .systemSmall ? 20 : extraLargePortrait ? 44 : 32).accessibilityHidden(true)
                         }
-                        Spacer(minLength: 0)
+                        if todayLine == nil { Spacer(minLength: 0) }
                     }
                     if family != .systemSmall || rows.isEmpty { VStack(alignment: .leading, spacing: 2) { Text(snapshot?.datePrimary ?? ""); Text(snapshot?.dateSecondary ?? "") }.font(MadarTypography.fine()).foregroundStyle(color("ink2")) }
                 }.foregroundStyle(color("ink")).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).privacySensitive()

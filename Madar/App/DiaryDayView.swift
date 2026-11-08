@@ -650,6 +650,17 @@ struct DiaryDayView: View {
                 markdown: line.text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
                 ?? AttributedString(line.text))
             : AttributedString(line.text)
+        // Thmanyah has no «٬» or «٫», so the fallback font draws them wide («١٤٠ , ٠٠»); use its own shapes, as displayFigure does.
+        if thmanyahBundled {
+            for (mark, shape, scale, raise) in [("٬", "،", 0.65, 0.23), ("٫", ",", 0.9, 0.0)] {
+                while let range = content.range(of: mark) {
+                    var glyph = AttributedString(shape)
+                    glyph.font = .custom("thmanyahseriftext-Regular", size: (auto ? 17 : 19) * scale, relativeTo: .body)
+                    if raise > 0 { glyph.baselineOffset = (auto ? 17 : 19) * raise }
+                    content.replaceSubrange(range, with: glyph)
+                }
+            }
+        }
         if auto {
             var suffix = AttributedString(roomSuffix(line))
             suffix.font = .custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)
