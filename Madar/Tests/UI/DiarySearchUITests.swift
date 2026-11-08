@@ -28,7 +28,9 @@ import XCTest
         continueAfterFailure=false
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"editor","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00"]
         app.launch();XCTAssertTrue(app.buttons["diary-search"].waitForExistence(timeout:25));app.buttons["diary-search"].tap()
-        let field=app.textFields["diary-search-query"];XCTAssertTrue(field.waitForExistence(timeout:10));capture(app,"M3-V08-search-L")
+        let field=app.textFields["diary-search-query"];XCTAssertTrue(field.waitForExistence(timeout:10))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "Ordinary search opens ready to type")
+        capture(app,"M3-V08-search-L")
         field.tap();field.typeText("#سفر\n")
         XCTAssertTrue(app.buttons["diary-search-edit-#سفر"].waitForExistence(timeout:5))
         XCTAssertTrue(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'diary-search-result-'" )).firstMatch.waitForExistence(timeout:5));capture(app,"M3-V08-tag-results-L")
@@ -38,7 +40,7 @@ import XCTest
         app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'diary-search-result-'")).firstMatch.tap();XCTAssertTrue(app.buttons["diary-day-write"].waitForExistence(timeout:5));app.buttons["diary-day-close"].tap()
         app.buttons["diary-search-edit-العام الماضي"].tap();let edit=app.alerts.textFields.firstMatch;XCTAssertTrue(edit.waitForExistence(timeout:5));edit.tap();edit.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:30)+"2024")
         // The keyboard moves the alert after typing; a tap using the previous frame misses Apply.
-        let apply = app.alerts.buttons["تطبيق"]
+        let apply = app.alerts.buttons["ابحث"]
         var lastFrame = CGRect.zero
         var stableSince = Date()
         let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
@@ -49,12 +51,53 @@ import XCTest
         XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed)
         apply.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(app.buttons["diary-search-remove-2024"].waitForExistence(timeout:5), app.debugDescription);app.buttons["diary-search-remove-2024"].tap()
-        app.buttons["مسح البحث"].tap();field.tap();field.typeText("ما معنى حياتي؟\n");XCTAssertTrue(app.staticTexts["diary-search-empty"].waitForExistence(timeout:5));capture(app,"M3-V08-empty-L")
+        XCTAssertTrue(app.buttons["diary-search-remove-2024"].waitForExistence(timeout:5), app.debugDescription)
+        XCTAssertEqual(field.value as? String, "2024", "The field reflects the edited filter")
+        capture(app, "OWNER-search-edited-year-L")
+        app.buttons["diary-search-remove-2024"].tap()
+        XCTAssertEqual(field.value as? String, "ابحث في مذكراتك: كلمة، أو تاريخ")
+        field.tap();field.typeText("ما معنى حياتي؟\n");XCTAssertTrue(app.staticTexts["diary-search-empty"].waitForExistence(timeout:5));capture(app,"M3-V08-empty-L")
         app.buttons["diary-search-restart"].tap()
         XCTAssertEqual(field.value as? String, "ابحث في مذكراتك: كلمة، أو تاريخ")
         field.typeText("العام الماضي\n")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'diary-search-result-'")).firstMatch.waitForExistence(timeout:5))
+    }
+    func testRemovedFilterStaysRemovedAfterEditingItsSource() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "editor",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+        app.launch()
+        XCTAssertTrue(app.buttons["diary-search"].waitForExistence(timeout: 25)); app.buttons["diary-search"].tap()
+        let field = app.textFields["diary-search-query"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText("#سفر العام الماضي\n")
+        let removeYear = app.buttons["diary-search-remove-العام الماضي"]
+        XCTAssertTrue(removeYear.waitForExistence(timeout: 8))
+        XCTAssertGreaterThanOrEqual(removeYear.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(removeYear.frame.height, 44)
+        let editTag = app.buttons["diary-search-edit-#سفر"]
+        XCTAssertGreaterThanOrEqual(editTag.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(editTag.frame.height, 44)
+        removeYear.tap()
+        XCTAssertEqual(field.value as? String, "#سفر")
+        XCTAssertTrue(editTag.exists)
+        capture(app, "OWNER-search-filter-removed-L")
+        let result = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'diary-search-result-'")).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 8)); result.tap()
+        let write = app.buttons["diary-day-write"]
+        XCTAssertTrue(write.waitForExistence(timeout: 8)); write.tap()
+        let editor = app.textViews["diary-editor-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 8)); editor.tap(); editor.typeText("\nذكرى سفر جديدة")
+        app.buttons["diary-editor-save"].tap()
+        XCTAssertTrue(app.buttons["diary-day-close"].waitForExistence(timeout: 10)); app.buttons["diary-day-close"].tap()
+        XCTAssertTrue(result.waitForExistence(timeout: 10))
+        XCTAssertEqual(field.value as? String, "#سفر")
+        XCTAssertTrue(editTag.exists)
+        XCTAssertFalse(removeYear.exists, "Refreshing after a saved edit must not resurrect a removed filter")
+        capture(app, "OWNER-search-source-refreshed-L")
+        app.buttons["مسح البحث"].tap(); field.tap(); field.typeText("صور\n")
+        XCTAssertTrue(app.buttons["diary-search-edit-صور"].waitForExistence(timeout: 8))
+        XCTAssertFalse(editTag.exists, "A new typed query replaces the adjusted selection")
     }
     private func capture(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
 }

@@ -7,6 +7,10 @@ struct DiarySearchView: View {
         let indexGeneration: Int
         let chips: [DiarySearchChip]
     }
+    private struct AdjustedSearch {
+        let query: String
+        let chips: [DiarySearchChip]
+    }
     @Bindable var app: AppSession
     var initialQuery: String? = nil
     var initialQueryRequestID: UUID? = nil
@@ -15,6 +19,7 @@ struct DiarySearchView: View {
     @State private var query=""
     @State private var index:DiarySearchIndex?
     @State private var chips:[DiarySearchChip]=[]
+    @State private var adjustedSearch: AdjustedSearch?
     @State private var results:[DiarySearchDocument]=[]
     @State private var searching=false
     @State private var indexGeneration=0
@@ -36,7 +41,18 @@ struct DiarySearchView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment:.leading,spacing:18) {
-                    HStack { Image(systemName:"magnifyingglass"); TextField("ابحث في مذكراتك: كلمة، أو تاريخ",text:$query).font(DiaryType.writing).focused($focused).submitLabel(.search).onSubmit{focused=false}.accessibilityIdentifier("diary-search-query"); if !query.isEmpty { Button {query="";chips=[]} label:{Image(systemName:"xmark.circle.fill")}.accessibilityLabel("مسح البحث") } }.padding(16).background(theme.surface,in:.capsule).overlay{Capsule().stroke(theme.line)}
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                        TextField("ابحث في مذكراتك: كلمة، أو تاريخ", text: Binding(get: { query }, set: { adjustedSearch = nil; query = $0 }))
+                            .font(DiaryType.writing).focused($focused).submitLabel(.search).onSubmit { focused = false }
+                            .accessibilityIdentifier("diary-search-query")
+                        if !query.isEmpty {
+                            Button { beginSearch(""); chips = [] } label: {
+                                Image(systemName: "xmark.circle.fill").frame(minWidth: 44, minHeight: 44).contentShape(.rect)
+                            }.buttonStyle(.madarPlain).accessibilityLabel("مسح البحث")
+                        }
+                    }.padding(.horizontal, 16).padding(.vertical, 8).frame(minHeight: 56)
+                        .background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line) }
                     if let failure {
                         VStack(alignment:.leading,spacing:10) {
                             Text(failure).font(DiaryType.writing).accessibilityIdentifier("diary-search-read-error")
@@ -46,19 +62,31 @@ struct DiarySearchView: View {
                     }
                     let found = results
                     if !chips.isEmpty {
-                        ScrollView(.horizontal) {HStack { ForEach(chips) { chip in HStack(spacing:8) {
-                            Button(chip.label) {editing=chip;replacement=chip.label}.accessibilityIdentifier("diary-search-edit-"+chip.label)
-                            Button {chips.removeAll{$0.id==chip.id}} label:{Image(systemName:"xmark")}.accessibilityLabel("حذف فلتر "+chip.label).accessibilityIdentifier("diary-search-remove-"+chip.label)
-                        }.font(DiaryType.label).padding(.horizontal,12).frame(minHeight:44).background(theme.surface,in:.capsule).overlay{Capsule().stroke(theme.line)} } }}.scrollIndicators(.hidden)
+                        ScrollView(.horizontal) {
+                            HStack(spacing: 8) {
+                                ForEach(chips) { chip in
+                                    HStack(spacing: 0) {
+                                        Button { focused = false; editing = chip; replacement = chip.label } label: {
+                                            Label(chip.label, systemImage: "pencil")
+                                                .padding(.leading, 12).frame(minWidth: 44, minHeight: 44).contentShape(.rect)
+                                        }.accessibilityLabel("عدّل الفلتر " + chip.label).accessibilityIdentifier("diary-search-edit-" + chip.label)
+                                        Button { adjustFilters(chips.filter { $0.id != chip.id }) } label: {
+                                            Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44).contentShape(.rect)
+                                        }.accessibilityLabel("حذف فلتر " + chip.label).accessibilityIdentifier("diary-search-remove-" + chip.label)
+                                    }.buttonStyle(.madarPlain).font(DiaryType.label)
+                                        .background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line) }
+                                }
+                            }
+                        }.scrollIndicators(.hidden)
                         if chips.contains(where:{if case .words=$0.rule {true}else{false}}) { Text("بحثت عن الكلمات: "+chips.compactMap{if case .words(let words)=$0.rule {words}else{nil}}.joined(separator:"، ")).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                         if !found.isEmpty { Text(arabicCount(found.count,["نتيجة واحدة","نتيجتان","نتائج","نتيجة"],service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                         if searching {
                             ProgressView("نبحث في مذكراتك…").font(DiaryType.label).accessibilityIdentifier("diary-search-loading")
                         } else if found.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("لا أيام تطابق هذا البحث").font(DiaryType.heading).accessibilityIdentifier("diary-search-empty")
+                                Text("لا نتائج لهذا البحث").font(DiaryType.heading).accessibilityIdentifier("diary-search-empty")
                                 Text("جرّب كلمة أقصر، أو احذف أحد الفلاتر لتوسيع البحث.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text"))
-                                Button { query = ""; chips = []; focused = true } label: {
+                                Button { beginSearch("", focus: true); chips = [] } label: {
                                     Label("ابدأ بحثًا جديدًا", systemImage: "arrow.counterclockwise").font(DiaryType.label).padding(.horizontal, 16).frame(minHeight: 44)
                                         .background(theme.surface, in: Capsule()).glassEffect(.regular.interactive(), in: .capsule)
                                 }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-search-restart")
@@ -69,10 +97,10 @@ struct DiarySearchView: View {
                         }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-search-result-"+row.id) }
                     } else if let index {
                         if index.documents.isEmpty { Text("لم تكتب شيئًا بعد. تظهر هنا نتائج بحثك حين تكتب أول يوم.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 12) }
-                        else { ForEach(["العام الماضي","صور","هوامش"],id:\.self) { example in Button {query=example;focused=false} label:{Text(example).font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).padding(16).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}}.buttonStyle(.madarPlain) } }
+                        else { ForEach(["العام الماضي","صور","هوامش"],id:\.self) { example in Button {beginSearch(example)} label:{Text(example).font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).padding(16).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}}.buttonStyle(.madarPlain) } }
                         Text("فهرس الكتاب").font(DiaryType.heading).foregroundStyle(theme.accent).padding(.top,12)
                         if index.terms.isEmpty {Text("تظهر هنا الأماكن والوسوم التي استخدمتها.").font(DiaryType.writing)}
-                        ForEach(index.terms,id:\.1) { name,filter,count in Button {query=filter;focused=false} label:{HStack{Text(name).font(DiaryType.writing);Rectangle().fill(theme.line).frame(height:1);Text(PrayerCopy.days(count, digits: service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.frame(minHeight:44)}.buttonStyle(.madarPlain) }
+                        ForEach(index.terms,id:\.1) { name,filter,count in Button {beginSearch(filter)} label:{HStack{Text(name).font(DiaryType.writing);Rectangle().fill(theme.line).frame(height:1);Text(PrayerCopy.days(count, digits: service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.frame(minHeight:44)}.buttonStyle(.madarPlain) }
                     } else if failure == nil {
                         ProgressView("نجهّز فهرس مذكراتك…").font(DiaryType.label).padding(.vertical, 12).accessibilityIdentifier("diary-search-index-loading")
                     }
@@ -92,8 +120,10 @@ struct DiarySearchView: View {
                 .onChange(of: initialQueryRequestID, initial: true) { _, _ in applyInitialQuery() }
                 .onChange(of: app.prayerRevision) { _, _ in if failure == nil { Task { await loadIndex() } } }
                 .task(id:query) {
+                    guard adjustedSearch?.query != query else { return }
                     // Typing waits a moment so a long diary is filtered once per word, not once per key.
                     if !query.isEmpty { try? await Task.sleep(for:.milliseconds(220)); guard !Task.isCancelled else {return} }
+                    guard adjustedSearch?.query != query else { return }
                     chips=index?.parser.parse(query) ?? []
                 }
                 .onChange(of: chips) { _, _ in
@@ -117,7 +147,18 @@ struct DiarySearchView: View {
                         searching = false
                     }
                 }
-                .alert("تعديل الفلتر",isPresented:Binding(get:{editing != nil},set:{if !$0{editing=nil}})){TextField("الكلمة أو التاريخ",text:$replacement);Button("تطبيق"){if let old=editing,let i=chips.firstIndex(where:{$0.id==old.id}),let parser=index?.parser {chips.replaceSubrange(i...i,with:parser.parse(replacement))};editing=nil};Button("إلغاء",role:.cancel){editing=nil}}
+                .alert("تعديل البحث", isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } }), presenting: editing) { chip in
+                    TextField("الكلمة أو التاريخ", text: $replacement)
+                    Button("ابحث") {
+                        if let i = chips.firstIndex(where: { $0.id == chip.id }), let parser = index?.parser {
+                            var updated = chips
+                            updated.replaceSubrange(i...i, with: parser.parse(replacement))
+                            adjustFilters(updated)
+                        }
+                        editing = nil
+                    }
+                    Button("إلغاء", role: .cancel) { editing = nil }
+                }
                 .sheet(isPresented:Binding(get:{reader != nil},set:{if !$0{reader=nil;readerEntryID=nil;readerEntryRouteID=nil}})){if let reader {DiaryDayView(app:app,day:reader,initialEntryID:readerEntryID,initialEntryRouteID:readerEntryRouteID).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}}
                 .fullScreenCover(isPresented: $letterHubOpen, onDismiss: { routedLetterID = nil }) {
                     DiaryHubView(app: app, initialTab: "letters", initialLetterID: routedLetterID).environment(\.roomTheme, theme).madarSheetErrorAlert(app)
@@ -136,13 +177,26 @@ struct DiarySearchView: View {
             #endif
             index=try await service.searchIndexOffMain()
             indexGeneration += 1
-            chips=index?.parser.parse(query) ?? []
+            if let adjustedSearch, adjustedSearch.query == query { chips = adjustedSearch.chips }
+            else { chips=index?.parser.parse(query) ?? [] }
             failure=nil
         } catch { index=nil; chips=[]; failure="تعذّر فتح فهرس المذكرات. أعد المحاولة." }
     }
     private func applyInitialQuery() {
-        query = initialQuery ?? ""
+        beginSearch(initialQuery ?? "", focus: initialQuery?.isEmpty ?? true)
         chips = index?.parser.parse(query) ?? []
+    }
+    private func beginSearch(_ text: String, focus: Bool = false) {
+        adjustedSearch = nil
+        query = text
+        focused = focus
+    }
+    private func adjustFilters(_ updated: [DiarySearchChip]) {
+        let text = updated.map(\.label).joined(separator: " ")
+        // Keep the selected rules: reparsing joined labels could reinterpret adjacent month/year filters.
+        adjustedSearch = AdjustedSearch(query: text, chips: updated)
+        chips = updated
+        query = text
         focused = false
     }
     private func open(_ row: DiarySearchDocument) {
