@@ -171,7 +171,7 @@ import XCTest
         attachScreenshot(app, named: "M1-F01-friday-scrolled-L")
         // §7.2 «سطر الكهف» leads to the Quran: the pill opens the mushaf where Al-Kahf begins.
         let pill = app.descendants(matching: .any).matching(identifier: "prayer-friday-pill").firstMatch
-        for _ in 0..<6 where !pill.isHittable { app.swipeDown() }
+        for _ in 0..<6 where !pill.isHittable { swipeVisibleContent(in: app, down: true) }
         pill.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "quran-mushaf-page").firstMatch.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertTrue(app.staticTexts["٢٩٣"].waitForExistence(timeout: 5), app.debugDescription)
@@ -1708,7 +1708,7 @@ import XCTest
     private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<12 {
             if element.isHittable { break }
-            app.swipeUp()
+            swipeVisibleContent(in: app)
         }
         // The undo toast, glass accessory and tab bar float over the lowest ~200 pt; XCUITest still calls a row
         // under them hittable, so its tap lands on the toast. Lift such a row above that band before tapping.
@@ -1718,6 +1718,13 @@ import XCTest
             start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -(element.frame.maxY - floor + 60))))
         }
         XCTAssertTrue(element.isHittable, app.debugDescription)
+    }
+    private func swipeVisibleContent(in app: XCUIApplication, down: Bool = false) {
+        // App-wide swipe discovery can pick the retained lobby's hidden ScrollView.
+        // Drag the visible content, above the native tab bar, instead.
+        let top = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.28))
+        let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.72))
+        (down ? top : bottom).press(forDuration: 0.05, thenDragTo: down ? bottom : top)
     }
     private func attachScreenshot(_ app: XCUIApplication, named name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())

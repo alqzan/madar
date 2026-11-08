@@ -36,7 +36,19 @@ import XCTest
         field.tap();field.typeText("ماذا كتبت العام الماضي؟\n")
         XCTAssertTrue(app.buttons["diary-search-edit-العام الماضي"].waitForExistence(timeout:5));XCTAssertTrue(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'diary-search-result-'")).firstMatch.waitForExistence(timeout:5));capture(app,"M3-V08-results-L")
         app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'diary-search-result-'")).firstMatch.tap();XCTAssertTrue(app.buttons["diary-day-write"].waitForExistence(timeout:5));app.buttons["diary-day-close"].tap()
-        app.buttons["diary-search-edit-العام الماضي"].tap();let edit=app.alerts.textFields.firstMatch;XCTAssertTrue(edit.waitForExistence(timeout:5));edit.tap();edit.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:30)+"2024");app.alerts.buttons["تطبيق"].tap()
+        app.buttons["diary-search-edit-العام الماضي"].tap();let edit=app.alerts.textFields.firstMatch;XCTAssertTrue(edit.waitForExistence(timeout:5));edit.tap();edit.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:30)+"2024")
+        // The keyboard moves the alert after typing; a tap using the previous frame misses Apply.
+        let apply = app.alerts.buttons["تطبيق"]
+        var lastFrame = CGRect.zero
+        var stableSince = Date()
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let frame = apply.frame
+            if frame != lastFrame { lastFrame = frame; stableSince = Date() }
+            return apply.isHittable && Date().timeIntervalSince(stableSince) >= 0.5
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed)
+        apply.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(app.buttons["diary-search-remove-2024"].waitForExistence(timeout:5), app.debugDescription);app.buttons["diary-search-remove-2024"].tap()
         app.buttons["مسح البحث"].tap();field.tap();field.typeText("ما معنى حياتي؟\n");XCTAssertTrue(app.staticTexts["diary-search-empty"].waitForExistence(timeout:5));capture(app,"M3-V08-empty-L")
         app.buttons["diary-search-restart"].tap()

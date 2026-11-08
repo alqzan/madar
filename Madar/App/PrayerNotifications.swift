@@ -1062,15 +1062,20 @@ extension PrayerNotificationCoordinator {
         }
         guard logged else { throw NotificationScenarioFailure(message: session.errorMessage ?? "Fajr log did not commit") }
 
-        pending = await center.pendingNotificationRequests()
-        guard !pending.contains(where: { $0.identifier == cancellationID }),
-              pending.contains(where: { $0.identifier == snoozeID }) else {
-            throw NotificationScenarioFailure(message: "Prayer logging did not cancel only the matching Fajr request")
-        }
-        let ledgerRows = try ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>())
-            .filter { $0.deletedAt == nil && $0.requestID == cancellationID }
-        guard ledgerRows.max(by: { $0.updatedAt < $1.updatedAt })?.state == "cancelled" else {
-            throw NotificationScenarioFailure(message: "The Fajr cancellation was not recorded in NotificationLedger")
+        // A foreground save commits before the coalesced notification refresh. Observe its
+        // outcome instead of treating the write completion as a planning completion.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+        while true {
+            pending = await center.pendingNotificationRequests()
+            let ledgerRows = try ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>())
+                .filter { $0.deletedAt == nil && $0.requestID == cancellationID }
+            if !pending.contains(where: { $0.identifier == cancellationID }),
+               pending.contains(where: { $0.identifier == snoozeID }),
+               ledgerRows.max(by: { $0.updatedAt < $1.updatedAt })?.state == "cancelled" { break }
+            guard ContinuousClock.now < deadline else {
+                throw NotificationScenarioFailure(message: "Prayer refresh did not cancel Fajr, retain Maghrib snooze and record cancellation")
+            }
+            try await Task.sleep(for: .milliseconds(100))
         }
 
         for identifier in cleanupIDs { try updateLedger(requestID: identifier, state: "cancelled") }

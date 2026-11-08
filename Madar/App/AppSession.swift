@@ -1359,7 +1359,7 @@ final class AppSession {
         Task { [weak self, coordinator] in
             guard let self else { return }
             do { notificationTestResult = try await coordinator.runSimulatorAcceptanceScenarioForTesting() }
-            catch { notificationTestResult = "FAIL — \(madarUserMessage(error))" }
+            catch { notificationTestResult = "FAIL — \(error.localizedDescription)" }
         }
     }
 #endif
