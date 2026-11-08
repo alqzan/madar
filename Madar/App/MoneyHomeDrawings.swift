@@ -104,25 +104,27 @@ struct MoneyScrollChart: View {
     }
 }
 
+/// Owner 8 Nov: the 540-cell grid read as noise. Twelve rods, one per month of a year, filled for the months the
+/// reserve covers (the last one partly), in the room's own turned-rod shape. Right to left, like the year.
 struct MoneyReserveSquares: View {
     let days: Int
     @Environment(\.roomTheme) private var theme
     var body: some View {
-        Canvas { context, size in
-            let columns = 30, shown = min(540, max(0, days)), rows = max(8, Int(ceil(Double(shown) / 30)))
-            let gap: CGFloat = 1, cellW = (size.width - CGFloat(columns - 1) * gap) / CGFloat(columns)
-            let cellH = min(cellW, (size.height - CGFloat(rows - 1) * gap) / CGFloat(rows))
-            for index in 0..<shown {
-                let x = size.width - cellW - CGFloat(index % columns) * (cellW + gap), y = CGFloat(index / columns) * (cellH + gap)
-                let path = Path(CGRect(x: x, y: y, width: cellW, height: cellH))
-                context.fill(path, with: .color(theme.color("reserve")))
-                context.stroke(path, with: .color(theme.color("reserveText")), lineWidth: 1)
+        let months = Double(max(0, days)) / 30
+        HStack(alignment: .bottom, spacing: 4) {
+            ForEach(0..<12, id: \.self) { index in
+                let fill = min(1, max(0, months - Double(index)))
+                GeometryReader { proxy in
+                    ZStack(alignment: .bottom) {
+                        Capsule().stroke(theme.color("reserveText").opacity(fill > 0 ? 0.9 : 0.35), lineWidth: 0.8)
+                        if fill > 0 {
+                            Capsule().fill(LinearGradient(colors: [theme.color("rod2"), theme.color("reserve"), theme.color("rod2")], startPoint: .leading, endPoint: .trailing))
+                                .frame(height: max(proxy.size.width, proxy.size.height * fill))
+                        }
+                    }
+                }.frame(height: index % 3 == 2 ? 40 : 34)
             }
-            if shown == 0 {
-                let p = Path(CGRect(x: size.width - 12, y: size.height / 2 - 6, width: 12, height: 12))
-                context.stroke(p, with: .color(theme.color("reserveText")), style: .init(lineWidth: 1, dash: [2, 2]))
-            }
-        }.accessibilityHidden(true)
+        }.environment(\.layoutDirection, .rightToLeft).accessibilityHidden(true)
     }
 }
 struct MoneyWaterfall: View {

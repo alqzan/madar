@@ -355,7 +355,7 @@ struct MoneyHomeView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 7) {
                         Text(figure: amountsVisible && reading.envelopes.isEmpty && reading.reserveMinor == 0 ? "لم يبدأ بعد" : amount(reading.reserveMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-reserve")
                         if amountsVisible, let runway = reading.reserveRunway {
-                            Text(service.days(runway.days)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            Text(Self.runwayPhrase(runway.days, digits: service.digits, days: service.days)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2)
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
@@ -402,6 +402,13 @@ struct MoneyHomeView: View {
     private func limits(_ reading: MoneyHomeReading) -> some View {
         Button { categoriesOpen = true } label: { limitsList(reading).contentShape(Rectangle()) }
             .buttonStyle(.madarPlain).accessibilityIdentifier("money-categories-open")
+    }
+    /// «يكفيك ٦ أشهر و١١ يومًا» matches the month rods; under a month it stays in days.
+    static func runwayPhrase(_ total: Int, digits: MadarNumberFormatter, days: (Int) -> String) -> String {
+        let m = total / 30, rest = total % 30
+        guard m > 0 else { return "يكفيك " + days(total) }
+        let months = m == 1 ? "شهرًا" : m == 2 ? "شهرين" : digits.string(m) + ((3...10).contains(m % 100) ? " أشهر" : " شهرًا")
+        return "يكفيك " + months + (rest > 0 ? " و" + days(rest) : "")
     }
     private func limitsList(_ reading: MoneyHomeReading) -> some View {
         VStack(alignment: .leading, spacing: 10) {
