@@ -4,7 +4,7 @@ The owner requests a full cleanup: reconcile AGENTS/CLAUDE/PROGRESS first, then 
 
 ## Verified baseline and delivery
 
-- M0–M6 software is integrated on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (15)**, diary-search source `e0578d9d`; Xcode 27.2 Release archive and `xcodebuild -exportArchive` internal-only upload succeeded. Upload log confirms Apple processing **started**, not completed. Installation on the owner's iPhone has not been checked. Builds 13–14 remain historical evidence.
+- M0–M6 software is integrated on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (16)**, source `f38d8381` (Claude sweep batch 4); previous 0.1.0 (15) diary-search `e0578d9d`; Xcode 27.2 Release archive and `xcodebuild -exportArchive` internal-only upload succeeded. Upload log confirms Apple processing **started**, not completed. Installation on the owner's iPhone has not been checked. Builds 13–14 remain historical evidence.
 - Build 15 adds the diary-search usability batch: five affected UI cases passed (4 search + 1 routed query); app/widget versions and archive signature verified. Artifacts: `Madar/Artifacts/Madar-0.1.0-15.xcarchive`, `OWNER-TestFlight-15-archive.log`, `OWNER-TestFlight-15-upload.log`. Source changes are committed; owner visual/device acceptance remains separate.
 - Previous build 14 includes `18472ddd` copy/wrapping changes and this cleanup batch; its Release build/archive succeeded. The 17 focused cases below cover this batch; they are not a claim of every-screen acceptance.
 - Host checked 8 Nov: installed **Xcode 27.2 (27B52)**; approved **iOS 27.0** runtime and sole simulator `390840AD-4FF0-476F-8E1D-E0C521A58E45` are available. No project setting pins Xcode 27.1; the old wait for that patch is superseded. Check actual build/signing errors rather than assuming incompatibility.
@@ -138,6 +138,7 @@ Historical pre-first-TestFlight queue. The first upload has happened; the old fr
 | PERF-05 | لكوديكس — بقية صيد الأداء ٧ نوفمبر | (١) `PrayerRepository.snapshot` يخزن حسب `prayerRevision` والدقيقة. (٢) ملخص البهو صار يقرأ اليوم المحدد والهامش النشط فقط، دون تحميل بيانات الصور؛ وجلب صفحة اليوم يحدد الهامش وسجل التجميد. (٣) فُحص مسار `habit.complete`: `HabitRepository.reading(id:)` يستعمل `onlyHabitID` ويجلب العادة وسجلاتها المحددة؛ تقرير «قراءة كل العادات عند كل ضغطة» لا يطابق هذا المسار الحالي، فلا تغيير مطلوب. قِس قبل وبعد (مخزن PERF-OWNER المعزول + `sample`). | قياس قبل/بعد؛ اختبارات المحركات المعنية تنجح. | done — PERF-OWNER sample في الغرفة المخفية 10 ثوانٍ: TimelineView ‏36→0، وPrayerRepository.snapshot ‏20→0، وAppSession.prayerSnapshot ‏26→0؛ HabitPersistence 17/17، DiaryTravel integration 1/1؛ `RoomGlyphUITests` مشى كل الغرف 1/1. لا قياس على iPhone. |
 | TF-12 | طلب المالك ٧ نوفمبر «ارفع النسخه في تست فلايت» | رُفع البناء 0.1.0 (12) إلى App Store Connect من commit 82c458de (PERF-03): أرشيف Release ثم `xcodebuild -exportArchive` بـ«Upload succeeded». | يظهر في TestFlight بعد معالجة Apple؛ لم يُجرَّب على iPhone المالك بعد. | done |
 | TF-13 | طلب المالك رفع نسخة TestFlight (٨ نوفمبر) | أُرشف 0.1.0 (13) من commit `4d994ec5`؛ `xcodebuild -exportArchive` سجّل «Upload succeeded» و«Uploaded Madar». | Apple بدأت معالجة الحزمة؛ ظهورها في TestFlight وتثبيتها على iPhone المالك لم يُتحققا بعد. | uploaded — processing |
+| TF-16 | نفضة Claude الشاملة (٨ نوفمبر) | أُرشف 0.1.0 (16) من تصدير نظيف لـ`f38d8381` (دون ملفات كوديكس غير الملتزمة)؛ `xcodebuild -exportArchive` سجّل «Upload succeeded» و«Uploaded Madar». | Apple تعالج الحزمة؛ إصلاح الأوراق `5c89ed4c` ليس فيها. |
 
 ## Owner follow-up — 1 Nov 2026
 
@@ -569,14 +570,14 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 # Handovers
 
-## Handover — نفضة شاملة (جارية) + دمج الجسر بالورد — 2026-11-08 — Claude
-- **Works now:** الجسر = ورد أمس إذا كان متصلًا ببداية ورد اليوم (وإلا ثلاث آيات)، وخطوة واحدة «الورد» بسطر «يبدأ بورد أمس: ١٨–٢٧»، والمدرّب «ورد أمس» ثم «ورد اليوم». البهو يسمّي الصلاة غير المسجلة والكمية الباقية ومقطع الورد، و«الفجر غدًا» بعد العشاء، و«باقية» بدل «اليوم»، ولا يكرر سطر العادة الحلقة. المال: «صافي رصيدك» بدل «لك فعلًا» بجانب «لك الآن»، وخرزة المظروف على سكتها. زر تقويم المذكرات بدائرته، و«السجل كاملًا» في القرآن زر واضح. اختبارات التخصيص الخمسة وفحص السنة تطابق التطبيق الحالي. الالتزامات: `01f89246`، `07737847`، `444b4ca5`، `01a18847`.
-- **Verified:** `DailyPlanningTests` 16/16 (منها حالة قاعدة المالك الجديدة)، اختبارات أوامر القرآن 14/14، `CLAUDE-lobby-sweep-20261108-r1` 3/3، `CLAUDE-quran-wird-merge-20261108-r1` 2/2 و`-r2` 1/1، `BahwCustomizeUITests` 5/5 موزعة، `BahwYearUITests` 1/1، `DiarySearchUITests` 4/4، `MoneyHomeUITests` حالة 1/1. مخازن اصطناعية، المحاكي المعتمد وحده.
-- **Differences left:** تحسينات مقصودة مسجلة في DECISIONS؛ لا canonical لسطر «يبدأ بورد أمس». لا قبول بصري من المالك.
-- **Not verified:** `MoneyEnvelopesUITests` 4 حالات تفشل على توقعات أقدم بعد إصلاح التنقل (2 ناجحة). لم يُرفع بناء TestFlight في هذه الجلسة: كوديكس يعدّل `PrayerRepository`/`PrayerMutationHandler`/`HabitMutationHandler` دون التزام في نفس النسخة، فالأرشفة من شجرة العمل كانت ستضم عمله غير المكتمل — ارفع بعد أن يلتزم أو من نسخة نظيفة لـ HEAD.
-- **Next:** أكمل النفضة: غرفة الصلاة والمحبرة والعادات وبقية المال (لم تُمشَ بعد)، ثم السرعة. فراغات كبيرة في بطاقتي الصلاة والسنة في البهو تستحق محتوى ذكيًا.
+## Handover — نفضة شاملة (جارية) — 2026-11-08 — Claude
+- **Works now:** الجسر = ورد أمس داخل خطوة «الورد». البهو: بطاقة المال الصغيرة «صرفت ١٤٠ من يومك ٤٠٠» بشريط من اليمين، بطاقة المذكرات تقتبس آخر سطر، الاقتراحات تسمّي الشيء الحقيقي. المال: الفائض السالب أحمر، الاحتياطي ١٢ عمودًا شهريًا و«يكفيك ٦ أشهر و١١ يومًا»، حدود الصرف «من X» وتحمرّ عند التجاوز، ٥٦ مبلغًا بعلامتي «٬/٫» من ثمانية، ورقتا الادخار وهدف الاحتياطي بطول كامل كي لا تخفي لوحة الأرقام زر الحفظ. سطر المال في المذكرات بلا هللات صفرية (وأُصلح خطأ قسمة كشفه الاختبار).
+- **Verified:** `MoneyOutsideRoomTests` 2/2، `sweep4-lobby` 2/2 و`lobby2` 2/2، `sweep4-money2/3/4` (حالتا المال الرئيسية)، `MoneyEnvelopesUITests` كلها ١٠/١٠ موزعة على `sweep4-env…env6`، و`DailyPlanningTests` 16/16 سابقًا. TestFlight 0.1.0 (16) رُفع من `f38d8381`.
+- **Differences left:** الأعمدة الشهرية وبطاقات البهو تصميم جديد — built، لم يرها المالك؛ لم تُلتقط صور بطلب المالك («لعاد تصور الشاشه»).
+- **Not verified:** معالجة Apple للبناء 16 وقبوله على iPhone المالك. فراغ بطاقة الصلاة العريضة في البهو باقٍ (تكبير الأقواس صغّر الأوقات فأُلغي).
+- **Next:** بقية النفضة: غرفة الصلاة، المحبرة، العادات، مراجعة القرآن؛ ثم السرعة. ملفات كوديكس الثلاثة (`PrayerRepository`/`PrayerMutationHandler`/`HabitMutationHandler`) ما زالت غير ملتزمة — لا تُلمس.
 - **Model/effort:** Claude Opus 5.5؛ الجهد غير مكشوف؛ بلا مساعدين.
-- **Usage:** الخمس ساعات ~٧٦٪ متاحة عند آخر فحص؛ الأسبوعي ٢٢٪ متاح.
+- **Usage:** الخمس ساعات ٣٩٪ متاحة عند آخر فحص؛ الأسبوعي ١٧٪.
 
 ## Handover — تسهيل بحث المذكرات والتحقق المتبقي — 2026-11-08 — Codex
 - **Works now:** البحث العادي جاهز للكتابة فور فتحه؛ تعديل/حذف الفلتر يحدّث النص الظاهر ويحافظ على بقية القواعد، ولا يرجع الفلتر بعد تحديث الفهرس إثر حفظ مصدر. لكل تعديل/حذف/مسح مساحة لمس ٤٤ نقطة على الأقل، مع إشارة قلم واضحة. التغيير في `e0578d9d`؛ إصلاح تحقق PERF-04 في `7731e1ff`. رُفع 0.1.0 (15) داخليًا؛ نجحت الأرشفة والتصدير والرفع وبدأت معالجة Apple.
