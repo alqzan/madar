@@ -94,7 +94,7 @@ struct MoneyAccountsView: View {
                 Path { p in p.move(to: .init(x: 7, y: 105)); p.addLine(to: .init(x: 18, y: 0)); p.addLine(to: .init(x: 28, y: 105)); p.closeSubpath() }.fill(theme.color("reserveText")).frame(width: 36, height: 80).offset(y: 85)
             }
             VStack(spacing: 5) {
-                Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                Text("صافي رصيدك").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 displayFigure(r.basis.flatMap { b in r.rows.contains { $0.side == .cash && $0.amountMinor == nil } && !r.rows.contains { $0.side == .cash && $0.amountMinor != nil } ? nil : amount(b.netMinor) } ?? "—", "thmanyahserifdisplay-Black", size: 42, relativeTo: .largeTitle).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-accounts-net")
                 Text("الجذور تغذّي، والديون تسحب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }.padding(15).frame(maxWidth: 240).background(theme.background).clipShape(.rect(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) }
@@ -163,7 +163,7 @@ struct MoneyAccountsView: View {
                 if case .messageDiffers(_, let printed, let difference) = s { Text(figure: "ورد في الرسالة " + amount(printed, currency: r.currency) + "؛ الفرق عن الدفتر " + amount(abs(difference), currency: r.currency)).font(MadarTypography.body()) }
             } else { Text("من دفتر الحركات والكشوف؛ لا نضع رصيدًا بدلًا عن البنك.").font(MadarTypography.body()) }
             if r.amountMinor == nil { Text("الرصيد مجهول؛ الحركات محفوظة، والحساب خارج مجموع الأرصدة حتى المطابقة مع البنك.").font(MadarTypography.body()) }
-            else if !r.counted { Text("هذا الجذر خارج النقد ولك فعلًا والزكاة. رسائله لا تدخل المصروفات.").font(MadarTypography.body()) }
+            else if !r.counted { Text("هذا الجذر خارج النقد وصافي رصيدك والزكاة. رسائله لا تدخل المصروفات.").font(MadarTypography.body()) }
         }.padding(24) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium, .large])
     }
     private func sourceTitle(_ source: AccountBalanceSource) -> String { switch source { case .entered: "رصيد بداية أدخلته"; case .reconciled: "من مطابقة اعتمدتها"; case .message: "رصيد رسالة يطابق الدفتر"; case .messageDiffers: "رصيد رسالة يختلف عن الدفتر" } }

@@ -169,7 +169,11 @@ struct MoneyEnvelopeLine: View {
                         } else {
                             Rectangle().fill(color).frame(width: proxy.size.width * progress, height: 5)
                         }
-                        Capsule().fill(LinearGradient(colors: [theme.color("rod2"), theme.color("rod"), theme.color("rod2")], startPoint: .leading, endPoint: .trailing)).frame(width: 6, height: 18).offset(x: -proxy.size.width * progress)
+                        // Placed by layout, not `.offset`: an offset is mirrored in Arabic and pushed the bead past the rail onto the name.
+                        HStack(spacing: 0) {
+                            Color.clear.frame(width: max(0, proxy.size.width * progress - 3))
+                            Capsule().fill(LinearGradient(colors: [theme.color("rod2"), theme.color("rod"), theme.color("rod2")], startPoint: .leading, endPoint: .trailing)).frame(width: 6, height: 18)
+                        }
                         Rectangle().fill(theme.color("reserveText")).frame(width: 1, height: 17)
                     }.frame(height: proxy.size.height)
                 }.frame(height: 23).accessibilityHidden(true)

@@ -26,7 +26,7 @@ struct MoneyBasisView: View {
                                 MoneyCashView(app: app, reading: reading, revealed: $revealed)
                             } label: {
                                 VStack(alignment: .leading, spacing: 0) {
-                                    Text(reading.home.hasKnownBalance ? "لك فعلًا، في حسابك " + amount(reading.home.basis.inAccountMinor) : "لم يُعرف رصيد الحسابات بعد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                    Text(reading.home.hasKnownBalance ? "صافي رصيدك، في حسابك " + amount(reading.home.basis.inAccountMinor) : "لم يُعرف رصيد الحسابات بعد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                                         Text(figure: visible && !reading.home.hasKnownBalance ? "—" : amount(reading.home.basis.netMinor)).font(.custom("thmanyahserifdisplay-Black", size: 44, relativeTo: .largeTitle)).accessibilityIdentifier("money-basis-net")
                                         Image(systemName: "arrow.up.left").font(.caption)

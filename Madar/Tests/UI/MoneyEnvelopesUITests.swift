@@ -7,10 +7,8 @@ import XCTest
         app.launch(); return app
     }
     func open(_ app: XCUIApplication) {
-        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
-        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 10))
-        for _ in 0..<12 where !money.isHittable { app.swipeUp(velocity: .slow) }
-        XCTAssertTrue(money.isHittable); money.tap(); let envelopes = app.buttons["money-envelopes-open"]; XCTAssertTrue(envelopes.waitForExistence(timeout: 10)); envelopes.tap()
+        // Money sits in the tab bar (owner, 3 Nov); Customize no longer lists «افتح المال» on its home.
+        let money = app.buttons["tab-money"]; XCTAssertTrue(money.waitForExistence(timeout: 20)); money.tap(); let envelopes = app.buttons["money-envelopes-open"]; XCTAssertTrue(envelopes.waitForExistence(timeout: 10)); envelopes.tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-envelopes"].waitForExistence(timeout: 10))
     }
     func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
