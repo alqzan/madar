@@ -414,12 +414,14 @@ struct MoneyHomeView: View {
                         ZStack {
                             Circle().stroke(theme.line, lineWidth: 4)
                             Circle().trim(from: 0, to: limit.limitMinor > 0 ? min(1, Double(max(0, limit.spentMinor)) / Double(limit.limitMinor)) : limit.spentMinor > 0 ? 1 : 0)
-                                .stroke(theme.color("surplus"), style: .init(lineWidth: 4, lineCap: .round)).rotationEffect(.degrees(-90))
+                                .stroke(theme.color(limit.limitMinor > 0 && limit.spentMinor > limit.limitMinor ? "debt" : "surplus"), style: .init(lineWidth: 4, lineCap: .round)).rotationEffect(.degrees(-90))
                         }.frame(width: 26, height: 26).accessibilityHidden(true)
                     }
                     VStack(alignment: .leading, spacing: 0) {
                         Text(limit.title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         Text(figure: amount(limit.spentMinor)).font(MadarTypography.section())
+                        // The bare figure did not say spent or left; the limit beside it does.
+                        if limit.limitMinor > 0 { Text(figure: "من " + amount(limit.limitMinor)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.8) }
                     }
                 }.accessibilityElement(children: .combine)
             }
