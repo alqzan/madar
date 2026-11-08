@@ -43,7 +43,7 @@ struct DiarySearchView: View {
                 LazyVStack(alignment:.leading,spacing:18) {
                     HStack {
                         Image(systemName: "magnifyingglass")
-                        TextField("ابحث في مذكراتك: كلمة، أو تاريخ", text: Binding(get: { query }, set: { adjustedSearch = nil; query = $0 }))
+                        TextField("ابحث في مذكراتك: كلمة، أو تاريخ", text: Binding(get: { query }, set: { if $0 != query { adjustedSearch = nil; query = $0 } }))
                             .font(DiaryType.writing).focused($focused).submitLabel(.search).onSubmit { focused = false }
                             .accessibilityIdentifier("diary-search-query")
                         if !query.isEmpty {

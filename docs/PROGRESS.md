@@ -19,7 +19,7 @@ The owner requests a full cleanup: reconcile AGENTS/CLAUDE/PROGRESS first, then 
 | 3 | Run affected focused checks and default-size captures; commit; archive/export/upload the next internal TestFlight build. | done — 0.1.0 (14), archive/export/upload succeeded from `ca023720`. Artifacts: `Madar/Artifacts/Madar-0.1.0-14.xcarchive`, `OWNER-TestFlight-14-archive.log`, `OWNER-TestFlight-14-upload.log`. Processing, visual approval and owner-device acceptance remain separate. |
 | 4 | Resume `PERF-04` unfinished focused verification in batches below five minutes. | done for the original remaining cases — six distinct passes: diary filter + real notifications 2/2 (`PERF04-filter-notifications-fixed-20261108-r1`), home/day-night 2/2 (`PERF04-foundation-home-20261108-r1`), Friday + tracking 2/2 inside the mixed `PERF04-foundation-friday-tracking-year-20261108-r1` bundle (2 passed, 1 failed). Supplemental selected-year check failed before settings opened; both experimental route/tap repairs were reverted after failing. No production change in this validation batch. |
 | 5 | Owner 8 Nov: prioritize ease of use; simplify the diary search flow, preserve edited filters and enlarge their touch targets. | source complete — search opens ready to type; edited/removed chips update the field and survive index refresh after a source edit; edit/remove/clear touch targets are at least 44 pt. `DiarySearchUITests` 4/4 in `OWNER-search-clarity-20261108-r1.xcresult`; routed-query regression 1/1 in `OWNER-search-route-20261108-r1.xcresult` (5/5 affected UX cases total); Release archive/export/upload of 0.1.0 (15) succeeded, Apple processing started. Built — awaiting owner visual/device acceptance. No search-rule or stored-model change. |
-| 6 | Continue concrete usability improvements under FB-39; diagnose the supplemental synthetic lobby → Customize entry mismatch before using it as UX evidence. | ready for a fresh diagnostic; no production cause established, and both failed test-only repairs were reverted. Avoid repeating broad reviews. |
+| 6 | Continue concrete usability improvements under FB-39; diagnose the supplemental synthetic lobby → Customize entry mismatch before using it as UX evidence. | diagnosed and fixed (Claude, 8 Nov) — **test-only cause, no product defect**: the year test's onboarding helper skipped the city step, so the first-run «موقعك» cover stayed over the lobby and every tap resolved to hit point {-1,-1} (screenshot evidence in `CLAUDE-year-diag-20261108-r3.xcresult`). Helper now chooses الرياض like `BahwLobbyUITests`, and the test enters Customize through the visible «خصّص مدار» lobby door. `testSelectedYearStillShowsItsOtherCalendar` 1/1 (both hijri and gregorian modes) in `CLAUDE-year-diag-20261108-r4.xcresult`. Same helper copied to `BahwCustomizeUITests`; there onboarding now completes, but `testBlocksSizeHideAndReset` (no `bahw-custom-blocks` after the hidden handle) and `testHabitWidgetScopeLabelsUndoAndRelaunch` (no `undo-button`) still fail on older expectations — `CLAUDE-bahw-customize-20261108-r1.xcresult`, 0/2, **not passing**, ready for a fresh diagnosis. |
 
 ## Changes and remaining findings — this request
 
@@ -31,6 +31,8 @@ The owner requests a full cleanup: reconcile AGENTS/CLAUDE/PROGRESS first, then 
 | Quran | Switching index unit removes old rows; read errors show retry without stale selectable rows. Ask-policy chart is labelled as an example. First visit shows three steps. | Index failure/retry and first-visit guide each 1/1 in mixed `OWNER-routes-clarity-20261108-r2.xcresult` (that full run failed elsewhere); chart 1/1 in final-flows. |
 | Diary | Questions disclose recent-excerpt scope; source/generated questions clear on background/disappearance, and stale completions are rejected. | Compilation succeeded; adjacent diary read/write flow 1/1 in final-flows. Actual on-device model generation/background lifecycle is **not verified**. |
 | Final affected-flow batch | Diary source/write, PDF drawing persistence/undo/zoom/clear, expense no-source guidance, Quran missed-day chart. | **4/4**, `OWNER-final-flows-20261108-r1.xcresult`, `TEST SUCCEEDED`. Together with the focused results above: **17 distinct passing cases (4 queue + 13 UI)** across the named bundles; no claim that mixed failed bundles passed. |
+
+Search follow-up hardening (Claude, 8 Nov): the query field no longer drops the kept filter rules when the system writes back unchanged text (focus/keyboard commit); only a real edit re-parses. `DiarySearchUITests` 4/4 in `CLAUDE-search-guard-20261108-r1.xcresult`.
 
 Search ease-of-use follow-up (owner, 8 Nov): four focused search UI cases plus one routed-query case passed, including a synthetic source edit/save/reload after removing a filter. Captures: `OWNER-search-clarity-20261108-r1-shots`; the search screen has no independent canonical. Intended differences are clearer edit affordances, larger touch areas, automatic initial focus and query text that follows the chosen filters. Supplemental Bahw selected-year check remains unresolved: settings search never appeared via the test handle, visible header or header-coordinate attempt; the experimental test changes were reverted. This is a diagnostic gap, not proof of a production defect.
 
@@ -564,6 +566,15 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 # Handovers
 
+## Handover — تشخيص فحص السنة وتقوية البحث — 2026-11-08 — Claude
+- **Works now:** فحص «أي سنة» الإضافي يعمل: السبب كان في الاختبار نفسه (لم يختر مدينة، فبقيت شاشة «موقعك» فوق البهو)، لا في التطبيق. حقل بحث المذكرات لا يُسقط الفلاتر المحفوظة إذا أعاد النظام كتابة النص نفسه.
+- **Verified:** `BahwYearUITests/testSelectedYearStillShowsItsOtherCalendar` 1/1 (الوضعان) في `CLAUDE-year-diag-20261108-r4.xcresult`؛ `DiarySearchUITests` 4/4 في `CLAUDE-search-guard-20261108-r1.xcresult`؛ المخازن اصطناعية والمحاكي المعتمد وحده.
+- **Differences left:** لا تغيير بصري؛ لا لقطات جديدة مطلوبة.
+- **Not verified:** حالتا `BahwCustomizeUITests` (`testBlocksSizeHideAndReset`، `testHabitWidgetScopeLabelsUndoAndRelaunch`) ما زالتا تفشلان على توقعات أقدم بعد تجاوز التعريف الأول، 0/2 في `CLAUDE-bahw-customize-20261108-r1.xcresult`. لم يُرفع بناء جديد: التغيير اختبارات + حارس صغير، يُضمّ لأول دفعة تسليم قادمة.
+- **Next:** شخّص حالتي التخصيص (هل انتقل قسم المربعات خلف بحث/باب؟ هل الإيصال صار بلا زر تراجع؟) ثم أكمل التسهيل الملموس.
+- **Model/effort:** Claude Opus 5.5؛ الجهد غير مكشوف؛ بلا مساعدين.
+- **Usage:** 96% متاحة من الخمس ساعات عند البدء؛ الأسبوعي 25% متاح.
+
 ## Handover — تسهيل بحث المذكرات والتحقق المتبقي — 2026-11-08 — Codex
 - **Works now:** البحث العادي جاهز للكتابة فور فتحه؛ تعديل/حذف الفلتر يحدّث النص الظاهر ويحافظ على بقية القواعد، ولا يرجع الفلتر بعد تحديث الفهرس إثر حفظ مصدر. لكل تعديل/حذف/مسح مساحة لمس ٤٤ نقطة على الأقل، مع إشارة قلم واضحة. التغيير في `e0578d9d`؛ إصلاح تحقق PERF-04 في `7731e1ff`. رُفع 0.1.0 (15) داخليًا؛ نجحت الأرشفة والتصدير والرفع وبدأت معالجة Apple.
 - **Verified:** `DiarySearchUITests` 4/4 في `OWNER-search-clarity-20261108-r1.xcresult`، ومنها حذف فلتر ثم فتح مصدر وتعديله وحفظه؛ الرابط الوارد وتحديث البحث المفتوح 1/1 في `OWNER-search-route-20261108-r1.xcresult`. بناء الاختبار نجح، والمخازن اصطناعية. أرشيف Release للبناء 15 نجح، ونسخة التطبيق/الودجت وتوقيعهما صحيحان، ثم `Upload succeeded` و`EXPORT SUCCEEDED` في `OWNER-TestFlight-15-upload.log`. PERF-04: ست حالات مميزة ناجحة، موزعة 2/2 + 2/2 + حالتي الجمعة/التتبّع داخل حزمة 2 passed/1 failed، كما في Current work؛ لا ادعاء بنجاح الحزمة المختلطة كاملة.
@@ -581,11 +592,3 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - **Next:** بعد معالجة Apple يجرّب المالك البناء 14؛ لا حاجة لإعادة رفع الكود نفسه. مسار FX العام مؤجل: رجع اختبارُه إلى خطأ قراءة عام، وأُزيل التعديل غير المثبت؛ لا تدّعِ نجاحه. مصدر سعر عام يحتاج قرار قاعدة/نموذج بيانات مستقلًا.
 - **Model/effort:** Codex؛ غير مكشوف؛ ثلاثة مساعدي GPT-6 Luna للقراءة فقط. مراجعة واحدة لمسار فقد الحبر كشفت رابط الجذر، وأُصلح واختُبر.
 - **Usage:** 12% متاحة من الخمس ساعات عند فحص ما بعد الرفع؛ لا عمل جديد ولا مهام اختبار باقية في هذه الجلسة. لم تُستخدم أرصدة إعادة ضبط.
-## Handover — تنظيف النصوص والقصّ — 2026-11-08 — Codex
-- **Works now:** اختصارات الأشهر والعدّ المفيد في شريط السنة؛ حذف الشروح المكررة؛ التفاف الأسماء والمقتطفات والأسباب وملخصات الإعدادات بدل قصّها في البهو والعادات واليوميات والمال والتخصيص.
-- **Verified:** `git diff --check` نظيف. بناء Debug نجح تحت Xcode 27.2، لكنه لا يطابق إعداد المشروع. أوقفت محاولة Release archive قبل اكتمالها، ولم يُنشأ أرشيف.
-- **Differences left:** لا لقطة بعد ولا مقارنة `W3-Sana`؛ الأرشفة المعتمدة توقفت قبل إنتاج ملف.
-- **Not verified:** بناء Release المعتمد، اختبارات الواجهات، iPhone المالك، ورفع TestFlight.
-- **Next:** بمجرد توفر Xcode 27.1 محليًا، أكمل الأرشفة والرفع تلقائيًا دون موافقة إضافية.
-- **Model/effort:** Codex؛ النموذج والجهد غير مكشوفين.
-- **Usage:** غير مكشوف.

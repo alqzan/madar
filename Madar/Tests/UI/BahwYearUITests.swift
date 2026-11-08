@@ -43,7 +43,8 @@ import XCTest
                 "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
                 "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light", "MADAR_UI_UNDO_SECONDS": "2"]
             app.launch(); finishOnboarding(app)
-            let customize = app.buttons["tab-customize"]
+            // The lobby's own «خصّص مدار» door: the path a person takes.
+            let customize = app.buttons["bahw-customize"]
             XCTAssertTrue(customize.waitForExistence(timeout: 10), app.debugDescription)
             customize.tap()
             let search = app.textFields["settings-search"]
@@ -140,6 +141,18 @@ import XCTest
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
         if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
+        // This store reaches the location step: without a city the first-run cover stays over the lobby and every tap below is lost.
+        let city = app.buttons["first-run-city"]
+        guard city.waitForExistence(timeout: 2) else { return }
+        city.tap()
+        let field = app.textFields["city-search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), app.debugDescription); field.tap(); field.typeText("الرياض")
+        let hit = app.buttons["city-hit-الرياض"]
+        XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
+        if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
+        let later = app.buttons["first-run-continue"]
+        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
+        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
     }
     private func capture(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
 }
