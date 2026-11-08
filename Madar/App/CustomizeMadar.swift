@@ -44,7 +44,7 @@ struct CustomizeMadar: View {
                                  resetAll: { confirmReset = true }, changes: changesLabel)
                 } else {
                 if query.isEmpty || normalized("المحبرة").contains(normalized(query)) {
-                    Button { session.mihbaraOpen = true } label: {
+                    Button { session.selectedTab = "mihbara" } label: {
                         HStack { Text("افتح المحبرة").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }.padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-open")
                 }

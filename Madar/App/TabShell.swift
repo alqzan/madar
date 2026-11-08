@@ -84,7 +84,11 @@ struct TabShell<Content: View>: View {
             }
             #endif
             .tint(theme.accent)
-            .onChange(of: selection, initial: true) { _, tab in remember(tab) }
+            .onChange(of: selection, initial: true) { _, tab in
+                // Retained rooms keep drafts, but their keyboard must not cover the destination.
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                remember(tab)
+            }
     }
 
     private var rooms: some View {

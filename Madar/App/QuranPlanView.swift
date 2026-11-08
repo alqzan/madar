@@ -184,7 +184,7 @@ struct QuranPlanView: View {
             Text("لو فاتك ورد واحد").font(quranFont(14, bold: true))
             Text("وردك المعتاد: " + overview.habitualAmount).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-plan-example-amount")
             if policy == "ask" {
-                Text("تختار التوزيع عند الفوات.").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+                Text("هذا مثال لتوزيعه على " + service.numerals.string(3) + " أيام؛ تختار الطريقة إذا فاتك الورد.").font(quranFont(11)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-plan-ask-preview-note")
             }
             HStack(alignment: .top, spacing: 8) {
                 ForEach(days) { day in

@@ -87,7 +87,14 @@ import XCTest
         func bar(_ day: String) -> XCUIElement { app.descendants(matching: .any)["quran-plan-miss-preview-" + day] }
         app.launch(); openPlan()
         let forecast = app.staticTexts["quran-plan-forecast"].label
-        let spread = app.buttons["quran-plan-miss-spread"]; reveal(spread); spread.tap()
+        let ask = app.buttons["quran-plan-miss-ask"]; reveal(ask); ask.tap()
+        let example = app.staticTexts["quran-plan-ask-preview-note"]
+        reveal(example)
+        XCTAssertTrue(example.label.contains("هذا مثال"), example.label)
+        capture(app, "OWNER-quran-ask-policy-example-L")
+        let spread = app.buttons["quran-plan-miss-spread"]
+        for _ in 0..<6 where !spread.isHittable { app.swipeDown() }
+        XCTAssertTrue(spread.isHittable, app.debugDescription); spread.tap()
         XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: spread)], timeout: 10) == .completed)
         reveal(bar("2026-10-19"))
         for day in ["2026-10-15", "2026-10-17", "2026-10-18"] {

@@ -1,6 +1,66 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func testPrayerHomeReadFailureOffersRetryWithoutChangingSettings() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light",
+            "MADAR_UI_PRAYER_HOME_READ_FAILURE_ONCE": "1"
+        ]
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
+        let error = app.staticTexts["prayer-home-read-error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(error.label.contains("المدينة"), "A read failure does not diagnose invalid city settings.")
+        let retry = app.buttons["prayer-home-retry"]
+        attachScreenshot(app, named: "OWNER-prayer-home-read-failure-L")
+        XCTAssertTrue(retry.exists, app.debugDescription)
+        // A real touch verifies recovery; native cross-fade hosts can report false AX hittability.
+        retry.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.descendants(matching: .any)["prayer-arch-maghrib"].firstMatch.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(error.exists)
+        XCTAssertFalse(retry.exists)
+        attachScreenshot(app, named: "OWNER-prayer-home-recovered-L")
+        app.terminate()
+    }
+
+    func testPrayerCustomizationSearchFindsTrackingStart() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
+        let customize = app.buttons["prayer-customize"]
+        XCTAssertTrue(customize.waitForExistence(timeout: 10)); customize.tap()
+        let search = app.textFields["prayer-customize-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("بداية التتبع\n")
+        XCTAssertTrue(app.descendants(matching: .any)["prayer-tracking-start"].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.buttons["prayer-customize-clear-search"].exists)
+        attachScreenshot(app, named: "OWNER-prayer-tracking-search-L")
+        app.terminate()
+    }
+
+    func testFirstQuranVisitExplainsItsThreeStepsAndOpensTheRoom() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_THEME": "light", "MADAR_UI_INTRO": "1"]
+        app.launch(); finishOnboarding(app); app.buttons["tab-quran"].tap()
+        let start = app.buttons["intro-start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10), app.debugDescription)
+        for number in 1...3 {
+            XCTAssertTrue(app.descendants(matching: .any)["intro-step-\(number)"].firstMatch.exists, app.debugDescription)
+        }
+        attachScreenshot(app, named: "OWNER-quran-first-visit-guide-L")
+        start.tap()
+        XCTAssertTrue(start.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["quran-home"].firstMatch.waitForExistence(timeout: 10))
+        app.terminate()
+    }
+
     func testPrayerHomeShowsLoadingWhileSnapshotReadsOffMain() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

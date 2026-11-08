@@ -33,7 +33,7 @@ struct SettingsHome: View {
                 if session.roomEnabled(.quran) { door("القرآن", "مكتبة التفاسير", "book", openTafsir) }
                 if session.roomEnabled(.notes) { link("المذكرات", "الصفحة والتقويم والهامش والنقل", "book.closed") { DiaryCustomizeView(app: session) } }
                 if session.roomEnabled(.mal) { door("المال", "اليوم والحدود والتذكيرات والسفر", "banknote") { session.moneyOpensSettings = true; session.moneyOpen = true } }
-                if session.roomEnabled(.mihbara) { door("المحبرة", "إعدادات المحبرة داخل القسم", "books.vertical") { session.mihbaraOpen = true } }
+                if session.roomEnabled(.mihbara) { door("المحبرة", "إعدادات المحبرة داخل القسم", "books.vertical") { session.selectedTab = "mihbara" } }
                 if !hasRoomSettings { Text("أضف قسمًا من «أقسامك والبهو» لتظهر إعداداته هنا.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
             }
             group("عام") {

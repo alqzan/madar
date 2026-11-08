@@ -6,6 +6,61 @@ import MadarCore
 import MadarData
 import MadarDesign
 
+/// Keeps each page's latest unsaved bytes until its serial write succeeds.
+/// A failed older write cannot discard a newer drawing or revive a cleared page.
+@MainActor final class MihbaraInkSaveQueue {
+    private struct Snapshot {
+        let id = UUID()
+        let data: Data
+    }
+    private var pending: [Int: Snapshot] = [:]
+    private var chain: Task<Void, Never>?
+    private var generation = 0
+    private let save: (Int, Data) async throws -> Void
+    var hasPending: Bool { !pending.isEmpty }
+
+    init(save: @escaping (Int, Data) async throws -> Void) { self.save = save }
+
+    func enqueue(page: Int, data: Data) {
+        let snapshot = Snapshot(data: data)
+        pending[page] = snapshot
+        append(page: page, snapshot: snapshot)
+    }
+
+    private func append(page: Int, snapshot: Snapshot) {
+        let previous = chain
+        generation += 1
+        chain = Task {
+            await previous?.value
+            // Coalesce a page that changed again before this attempt began.
+            guard pending[page]?.id == snapshot.id else { return }
+            do {
+                try await save(page, snapshot.data)
+                if pending[page]?.id == snapshot.id { pending[page] = nil }
+            } catch {
+                // Preserve the latest bytes, including an empty drawing (clear).
+            }
+        }
+    }
+
+    func waitForCurrentAttempt() async -> Bool {
+        while let current = chain {
+            let observedGeneration = generation
+            await current.value
+            if observedGeneration == generation { break }
+        }
+        return !hasPending
+    }
+
+    func retryAndWait() async -> Bool {
+        _ = await waitForCurrentAttempt()
+        for page in pending.keys.sorted() {
+            if let snapshot = pending[page] { append(page: page, snapshot: snapshot) }
+        }
+        return await waitForCurrentAttempt()
+    }
+}
+
 /// Owner, 30 Oct 2026 («الرسم على صفحات PDF»): the reader draws, underlines and circles on a PDF page with a finger
 /// (or a Pencil where one exists). Each page's drawing is kept beside the book (`ink.savePage`, a Media row keyed
 /// `pdf-ink:<book>:<page>`) and never written into the PDF, whose bytes are pinned by `fileHash`. Drawings are stored
@@ -109,21 +164,20 @@ final class MihbaraInkCanvas: PKCanvasView {
     private var drawings: [Int: PKDrawing]
     private var canvases: [Int: MihbaraInkCanvas] = [:]
     private var pending: [Int: DispatchWorkItem] = [:]
-    private let save: (Int, Data) async -> Void
+    private let saves: MihbaraInkSaveQueue
     /// Pages whose saved drawing could not be read: shown untouched and never drawn over, so nothing overwrites them.
     private let unreadable: Set<Int>
-    /// Saves run one after another, so a cleared page never comes back from an earlier save finishing late.
-    private var chain: Task<Void, Never>?
     var onChange: () -> Void = {}
     var drawing = false { didSet { canvases.values.forEach { $0.isUserInteractionEnabled = drawing && !unreadable.contains($0.pageIndex) } } }
     var tool: MihbaraInkTool = .pen { didSet { canvases.values.forEach { $0.tool = tool.tool } } }
 
-    init(saved: [Int: Data], save: @escaping (Int, Data) async -> Void) {
+    init(saved: [Int: Data], save: @escaping (Int, Data) async throws -> Void) {
         drawings = saved.compactMapValues { try? PKDrawing(data: $0) }
         unreadable = Set(saved.keys).subtracting(drawings.keys)
-        self.save = save
+        self.saves = MihbaraInkSaveQueue(save: save)
     }
 
+    var hasPendingWrites: Bool { !pending.isEmpty || saves.hasPending }
     var drawnPages: Int { drawings.values.filter { !$0.strokes.isEmpty }.count }
 
     func pdfView(_ view: PDFView, overlayViewFor page: PDFPage) -> UIView? {
@@ -169,10 +223,15 @@ final class MihbaraInkCanvas: PKCanvasView {
         if let canvas = canvases[index] { drawings[index] = canvas.capture() }
         guard !unreadable.contains(index) else { return }
         let drawing = drawings[index] ?? PKDrawing()
-        let data = drawing.strokes.isEmpty ? Data() : drawing.dataRepresentation(), previous = chain, save = save
-        chain = Task { await previous?.value; await save(index, data) }
+        let data = drawing.strokes.isEmpty ? Data() : drawing.dataRepresentation()
+        saves.enqueue(page: index, data: data)
     }
     func flushAll() { for index in Array(pending.keys) { flush(index) } }
+    func flushAllAndWait(retry: Bool = false) async -> Bool {
+        flushAll()
+        if retry { return await saves.retryAndWait() }
+        return await saves.waitForCurrentAttempt()
+    }
 
     func undo(page: Int) { canvases[page]?.undoManager?.undo() }
     func canUndo(page: Int) -> Bool { canvases[page]?.undoManager?.canUndo ?? false }

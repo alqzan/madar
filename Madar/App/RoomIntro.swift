@@ -1,6 +1,7 @@
 import SwiftUI
 import MadarDesign
 import MadarData
+import MadarCore
 import SwiftData
 
 extension BahwBlock: Identifiable { var id: String { rawValue } }
@@ -25,7 +26,14 @@ extension AppSession {
         Task { do { try await applySettingsAndWait(["bahw.layout": layout.json]) } catch { errorMessage = "لم يُضف القسم. \(madarUserMessage(error))" } }
     }
 
-    private func introKey(_ block: BahwBlock) -> String { "Madar.introSeen." + block.rawValue }
+    private func introKey(_ block: BahwBlock) -> String {
+        #if DEBUG
+        if let store = ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"], UUID(uuidString: store) != nil {
+            return "Madar.UITest." + store + ".introSeen." + block.rawValue
+        }
+        #endif
+        return "Madar.introSeen." + block.rawValue
+    }
     func introNeeded(_ block: BahwBlock) -> Bool {
         #if DEBUG
         // UI tests that are not about the intro open rooms directly; MADAR_UI_INTRO=1 brings the sheet back.
@@ -91,11 +99,11 @@ extension BahwBlock {
     /// One sentence a person can understand, the three things done there, and the few settings worth choosing on day one.
     var intro: (sentence: String, steps: [String], toggles: [(key: String, title: String)]) {
         switch self {
-        case .salah: ("سجّل صلواتك في وقتها وشاهد الصلاة القادمة.", ["اضغط على الصلاة لتسجّلها", "اطّلع على المواقيت", "تابع التزامك"], [("salah.askReminder", "اسألني عن الصلاة بعد الأذان")])
+        case .salah: ("سجّل ما صلّيت وشاهد الصلاة القادمة.", ["اضغط على الصلاة لتسجّلها", "اطّلع على المواقيت", "تابع التزامك"], [("salah.askReminder", "اسألني عن الصلاة بعد الأذان")])
         case .quran: ("ورد يومي من القرآن بمقدار يناسبك.", ["اختر ورد اليوم", "سجّل ما قرأت", "تابع تقدّمك"], [("quran.lateReminder", "ذكّرني بالورد المتأخر")])
         case .habits: ("عادات صغيرة تتابعها كل يوم.", ["أضف عادة", "علّمها حين تنجزها", "شاهد سلسلتك"], [])
         case .notes: ("صفحة تكتب فيها يومك بصوتك أو بقلمك.", ["اكتب أو سجّل صوتك", "أضف صورة من يومك", "ارجع لذكرياتك"], [("notes.morningNiyya", "نيّة الصباح")])
-        case .mal: ("سجّل مصروفك واعرف ما بقي لك.", ["سجّل مصروفًا", "اضبط راتبك", "شاهد ما بقي"], [("mal.alert80", "نبّهني عند ٨٠٪ من الحد")])
+        case .mal: ("سجّل مصروفك واعرف ما بقي لك.", ["أضف حسابك وبطاقاتك", "اضبط راتبك", "سجّل مصروفك وشاهد ما بقي"], [("mal.alert80", "نبّهني عند ٨٠٪ من الحد")])
         case .mihbara: ("مكتبتك وقراءاتك في مكان واحد.", ["أضف كتابًا", "اقرأ وعلّم ما يعجبك", "ارجع لاقتباساتك"], [])
         case .year: ("سنتك أمامك أيامًا أيامًا.", ["شاهد أيام السنة", "أضف حدثًا", "تابع ما مضى"], [])
         case .upcoming: ("الأيام القادمة التي تنتظرها.", ["أضف موعدًا", "شاهد العدّ التنازلي"], [])
@@ -116,6 +124,18 @@ struct RoomIntroSheet: View {
                 MadarGlyph(block.symbol, size: 44).foregroundStyle(theme.accent).accessibilityHidden(true)
                 Text(block.title).font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
                 Text(content.sentence).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(content.steps.enumerated()), id: \.offset) { index, step in
+                        HStack(alignment: .top, spacing: 10) {
+                            Text(MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi).string(index + 1))
+                                .font(MadarTypography.caption()).foregroundStyle(theme.accent)
+                                .frame(width: 26, height: 26).background(theme.surface, in: .circle)
+                                .accessibilityHidden(true)
+                            Text(step).font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
+                        }.accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("intro-step-\(index + 1)")
+                    }
+                }
                 if !content.toggles.isEmpty {
                     VStack(spacing: 0) {
                         ForEach(content.toggles, id: \.key) { item in

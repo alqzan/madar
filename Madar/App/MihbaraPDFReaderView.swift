@@ -28,8 +28,10 @@ struct MihbaraPDFReaderView: View {
     @State private var sessionDayStamp: String?
     @State private var lastClockSample: Date?
     @State private var closing = false
+    @State private var rootRouteBlockerID = UUID()
     @State private var pendingSaveAlert: String?
     @State private var isPendingSaveAlert = false
+    @State private var closeAfterPendingSave = true
     @State private var searching = false
     @State private var flowing = false
     @State private var inkLayer: MihbaraInkOverlay?
@@ -65,6 +67,7 @@ struct MihbaraPDFReaderView: View {
                 if let document {
                     MihbaraPDFPage(document: document, pageIndex: pageIndex, paper: paper, ink: inkLayer, inking: inking, onPageChange: pageChanged)
                         .accessibilityIdentifier("mihbara-pdf-content")
+                        .allowsHitTesting(!closing)
                 } else {
                     VStack(spacing: 18) {
                         if let error {
@@ -93,6 +96,11 @@ struct MihbaraPDFReaderView: View {
                 advanceClock(to: now)
             }
         }
+        .onAppear { app.setMihbaraRootDraftBlocker(rootRouteBlockerID, active: true) }
+        .onChange(of: app.mihbaraRoute) { _, route in
+            guard let route, route.path.isEmpty || route.path.first == "desk" else { return }
+            finishAndClose()
+        }
         .task { await openPDF() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { resume(at: Date()) } else { pause(at: Date()) }
@@ -114,14 +122,30 @@ struct MihbaraPDFReaderView: View {
                 .environment(\.roomTheme, readerTheme).madarSheetErrorAlert(app)
         }
         .onChange(of: inkTool) { _, tool in inkLayer?.tool = tool }
-        .onDisappear { inkLayer?.flushAll(); pause(at: Date()) }
+        .onDisappear {
+            inkLayer?.flushAll(); pause(at: Date())
+            app.setMihbaraRootDraftBlocker(rootRouteBlockerID, active: false)
+        }
         .toolbarVisibility(.hidden, for: .navigationBar)
+        #if DEBUG
+        .overlay(alignment: .topLeading) {
+            if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] == "1",
+               UUID(uuidString: ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] ?? "") != nil {
+                Button("اختبار رابط المحبرة") { app.open(URL(string: "madar://mihbara")!) }
+                    .font(.caption).padding(8).background(paper)
+                    .padding(.top, 60).accessibilityIdentifier("mihbara-pdf-root-route")
+            }
+        }
+        #endif
         .alert("قارئ PDF", isPresented: Binding(get: { pendingSaveAlert != nil }, set: { if !$0 { pendingSaveAlert = nil; isPendingSaveAlert = false } })) {
-            if isPendingSaveAlert && saveCoordinator.canRetryPendingWritesNow {
+            if isPendingSaveAlert && (inkLayer?.hasPendingWrites == true || saveCoordinator.canRetryPendingWritesNow) {
                 Button("إعادة المحاولة") { retryPendingSaveAndClose() }
                     .accessibilityIdentifier("mihbara-reading-save-retry")
             }
-            Button("حسنًا", role: .cancel) { pendingSaveAlert = nil; isPendingSaveAlert = false }
+            Button(isPendingSaveAlert ? "أكمل القراءة" : "حسنًا", role: .cancel) {
+                pendingSaveAlert = nil; isPendingSaveAlert = false
+                if canRead, scenePhase == .active { resume(at: Date()) }
+            }
         } message: { Text(pendingSaveAlert ?? "") }
     }
 
@@ -167,7 +191,7 @@ struct MihbaraPDFReaderView: View {
     private var footer: some View {
         VStack(spacing: 8) {
             if pageCount > 0, book.shelf != "finished", Double(pageIndex + 1) >= max(1, (Double(pageCount) * 0.98).rounded(.up)) {
-                MihbaraFinishPrompt(app: app, book: book, tint: readerTheme.accentFill, ink: ink, prepareToFinish: prepareToFinish, resumeReading: { resume(at: Date()) }) { close() }
+                MihbaraFinishPrompt(app: app, book: book, tint: readerTheme.accentFill, ink: ink, prepareToFinish: prepareToFinish, resumeReading: { resume(at: Date()) }) { closeReader() }
             }
             if pageCount > 0 {
                 ProgressView(value: Double(pageIndex + 1), total: Double(pageCount))
@@ -360,9 +384,7 @@ struct MihbaraPDFReaderView: View {
     @MainActor private func makeInkLayer(saved: [Int: Data]) -> MihbaraInkOverlay {
         let bookID = book.id
         let layer = MihbaraInkOverlay(saved: saved) { page, data in
-            do {
-                try await app.executeBookCommand("ink.savePage", payload: ["bookID": .string(bookID.uuidString), "page": .number(Double(page)), "drawing": .string(data.base64EncodedString())])
-            } catch { app.errorMessage = madarUserMessage(error) }
+            try await app.executeBookCommand("ink.savePage", payload: ["bookID": .string(bookID.uuidString), "page": .number(Double(page)), "drawing": .string(data.base64EncodedString())])
         }
         layer.tool = inkTool
         // One turn later, so PencilKit has registered the stroke with its undo manager before the bar asks it.
@@ -377,9 +399,17 @@ struct MihbaraPDFReaderView: View {
     }
 
     @MainActor private func prepareToFinish() async -> Bool {
+        closeAfterPendingSave = false
+        defer { inkLayer?.drawing = inking }
         app.armMihbaraLocatorFailureOnReaderCloseForUITest()
-        inkLayer?.flushAll()
+        inkLayer?.drawing = false
         pause(at: Date())
+        if let inkLayer, !(await inkLayer.flushAllAndWait()) {
+            inkLayer.drawing = inking
+            isPendingSaveAlert = true
+            pendingSaveAlert = pendingSaveMessage
+            return false
+        }
         await saveCoordinator.waitForCurrentAttempt()
         guard !saveCoordinator.hasPending else {
             saveCoordinator.dismissPendingWriteError()
@@ -392,25 +422,47 @@ struct MihbaraPDFReaderView: View {
 
     @MainActor private func finishAndClose() {
         guard !closing else { return }
+        closeAfterPendingSave = true
         closing = true
         app.armMihbaraLocatorFailureOnReaderCloseForUITest()
-        inkLayer?.flushAll()
+        inkLayer?.drawing = false
         pause(at: Date())
         Task { @MainActor in
+            if let inkLayer, !(await inkLayer.flushAllAndWait()) {
+                closing = false
+                resume(at: Date())
+                inkLayer.drawing = inking
+                isPendingSaveAlert = true
+                pendingSaveAlert = pendingSaveMessage
+                return
+            }
             await saveCoordinator.waitForCurrentAttempt()
             guard !saveCoordinator.hasPending else {
                 closing = false
+                resume(at: Date())
+                inkLayer?.drawing = inking
                 saveCoordinator.dismissPendingWriteError()
                 isPendingSaveAlert = true
                 pendingSaveAlert = pendingSaveMessage
                 return
             }
-            close()
+            closeReader()
         }
     }
 
+    @MainActor private func closeReader() {
+        // The guarded exit has fulfilled this root request; a later shelf refresh must not replay it.
+        if let route = app.mihbaraRoute, route.path.isEmpty || route.path.first == "desk" {
+            app.mihbaraRoute = nil
+        }
+        close()
+    }
+
     private var pendingSaveMessage: String {
-        saveCoordinator.canRetryPendingWritesNow
+        if inkLayer?.hasPendingWrites == true {
+            return "لم يُحفظ الرسم بعد. يبقى على الصفحة؛ أعد المحاولة لحفظه قبل إغلاق القارئ."
+        }
+        return saveCoordinator.canRetryPendingWritesNow
             ? "لم يُحفظ موضع القراءة بعد. أعد المحاولة الآن لإكمال الحفظ قبل مغادرة القارئ."
             : "لم يُحفظ موضع القراءة بعد. أبقِ مدار مفتوحًا حتى يعود الإذن أو ينتهي التحديث، ثم أعد المحاولة."
     }
@@ -420,17 +472,33 @@ struct MihbaraPDFReaderView: View {
         closing = true
         pendingSaveAlert = nil
         isPendingSaveAlert = false
-        saveCoordinator.retryPendingWritesNow()
+        inkLayer?.drawing = false
         Task { @MainActor in
+            if let inkLayer, !(await inkLayer.flushAllAndWait(retry: true)) {
+                closing = false
+                resume(at: Date())
+                inkLayer.drawing = inking
+                isPendingSaveAlert = true
+                pendingSaveAlert = pendingSaveMessage
+                return
+            }
+            saveCoordinator.retryPendingWritesNow()
             await saveCoordinator.waitForCurrentAttempt()
             guard !saveCoordinator.hasPending else {
                 closing = false
+                resume(at: Date())
+                inkLayer?.drawing = inking
                 saveCoordinator.dismissPendingWriteError()
                 isPendingSaveAlert = true
                 pendingSaveAlert = pendingSaveMessage
                 return
             }
-            close()
+            if closeAfterPendingSave { closeReader() }
+            else {
+                closing = false
+                inkLayer?.drawing = inking
+                resume(at: Date())
+            }
         }
     }
 }

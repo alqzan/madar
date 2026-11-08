@@ -272,7 +272,7 @@ struct MoneyExpenseView: View {
     private func payment(_ r: MoneyExpenseReading) -> some View {
         VStack(spacing: 7) {
             ScrollView(.horizontal) { HStack(spacing: 7) { ForEach(r.methods) { m in Button { methodID = m.id; if m.kind == .cash && r.cashCountedAtWithdrawal { share = .daily } } label: { chip(m.title, selected: methodID == m.id) }.disabled(m.kind != .credit && m.currency != r.currency && m.currency != inputCurrency).accessibilityIdentifier("money-expense-method-" + m.title) } } }.scrollIndicators(.hidden)
-            if r.methods.isEmpty { Text("أضف حسابًا أو بطاقة من رسائل البنك أولًا.").font(MadarTypography.body()) }
+            if r.methods.isEmpty { Text("أضف حسابًا من «الحسابات» أو بطاقة من «البطاقات» أولًا.").font(MadarTypography.body()) }
             else if let m = method {
                 if m.kind == .credit {
                     Text("يُحسب من يومك يوم الشراء، ويخرج النقد عند سداد البطاقة.").font(MadarTypography.fine()).foregroundStyle(theme.color("accentText"))

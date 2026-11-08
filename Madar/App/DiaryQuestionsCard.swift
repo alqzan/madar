@@ -59,6 +59,7 @@ struct DiaryQuestionsCard: View {
 
     @State private var availability: MadarAIAvailability = .checking
     @State private var phase: Phase = .idle
+    @State private var requestID = UUID()
     @State private var kind: MadarAIQuestionKind = .aboutDiary
     @State private var source = ""
     @State private var english: [String] = []
@@ -70,12 +71,13 @@ struct DiaryQuestionsCard: View {
     private var available: Bool { availability == .ready || availability == .needsDownload }
 
     var body: some View {
+        let currentRequestID = requestID
         Group {
             if available {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("أسئلة من مذكراتك").font(DiaryType.heading)
                     if phase == .done || !questions.isEmpty { list } else {
-                        Text("تُعالَج كتابتك على هذا الجهاز وحده.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        Text("مقتطفات من مذكراتك خلال الشهر الأخير، تُعالَج على جهازك وحده.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     }
                     HStack(spacing: 10) {
                         ForEach(MadarAIQuestionKind.allCases) { option in
@@ -99,6 +101,7 @@ struct DiaryQuestionsCard: View {
             }
         }
         .translationTask(configuration, action: Self.action(phase: phase, kind: kind, source: source, english: english) { outcome in
+            guard requestID == currentRequestID else { return }
             switch outcome {
             case .generated(let items):
                 guard phase == .loading else { return }
@@ -150,6 +153,7 @@ struct DiaryQuestionsCard: View {
         guard size >= 120 else {
             note = "اكتب بضعة أسطر أولًا، ثم أسألك عنها."; return
         }
+        requestID = UUID()
         kind = option; questions = []
         source = picked.reversed().joined(separator: "\n\n")
         phase = .loading
@@ -158,8 +162,9 @@ struct DiaryQuestionsCard: View {
     }
 
     private func reset() {
-        configuration = nil; source = ""; english = []
-        if phase == .loading || phase == .translatingOut { phase = .idle }
+        requestID = UUID()
+        configuration = nil; source = ""; english = []; questions = []; note = nil
+        phase = .idle
     }
 
     nonisolated private static func action(phase: Phase, kind: MadarAIQuestionKind, source: String, english: [String],

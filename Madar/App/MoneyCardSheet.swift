@@ -30,6 +30,7 @@ struct MoneyCardSheet: View {
     @State private var senders = ""
     @State private var accounts: [(id: UUID, name: String, bank: String)] = []
     @State private var saving = false
+    @State private var confirmDiscard = false
     @State private var failure: String?
     @State private var rootBlockerID = UUID()
     @FocusState private var editing: Bool
@@ -58,7 +59,7 @@ struct MoneyCardSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack { Text(editingID == nil ? "بطاقة جديدة" : "عدّل البطاقة").font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-card-editor-close") }
+                    HStack { Text(editingID == nil ? "بطاقة جديدة" : "عدّل البطاقة").font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق", action: requestClose).madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-card-editor-close") }
                     rootRouteTestButton
                     field("اسم البطاقة") { TextField("مثل: بطاقة المشتريات", text: $name).focused($editing).accessibilityIdentifier("money-card-name") }
                     field("البنك") { TextField("اسم البنك", text: $bank).focused($editing).accessibilityIdentifier("money-card-bank") }
@@ -101,8 +102,22 @@ struct MoneyCardSheet: View {
                 .onChange(of: kind) { _, value in if value != "credit", accountID == nil, accounts.count == 1 { accountID = accounts[0].id } }
                 .madarSheetLock(saving: saving, draft: hasUnsavedInput)
         }
+        .confirmationDialog("تترك التعديلات دون حفظ؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
+            Button("اترك التعديلات", role: .destructive) { guard !saving else { return }; dismiss() }
+                .buttonStyle(.automatic)
+                .accessibilityIdentifier("money-card-discard")
+            Button("أكمل التعديل") {}
+                .buttonStyle(.automatic)
+                .accessibilityIdentifier("money-card-keep-editing")
+        } message: { Text("تبقى بياناتك المحفوظة كما هي.") }
         .onChange(of: blocksRootRoute, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
         .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }
+    }
+
+    private func requestClose() {
+        guard !saving else { return }
+        if hasUnsavedInput { editing = false; confirmDiscard = true }
+        else { dismiss() }
     }
 
     @ViewBuilder private var rootRouteTestButton: some View {

@@ -15,6 +15,7 @@ struct MoneyAccountSheet: View {
     @State private var balance: String
     @State private var senders: String
     @State private var saving = false
+    @State private var confirmDiscard = false
     @State private var failure: String?
     @State private var confirmingRemoval = false
     @State private var rootBlockerID = UUID()
@@ -61,7 +62,7 @@ struct MoneyAccountSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack { Text(original.isNew ? "حساب جديد" : draft.name).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-account-editor-close") }
+                    HStack { Text(original.isNew ? "حساب جديد" : draft.name).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق", action: requestClose).madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-account-editor-close") }
                     rootRouteTestButton
                     field("اسم الحساب") { TextField("مثل: حساب الراتب", text: $draft.name).focused($editing).accessibilityIdentifier("money-account-name") }
                     field("البنك أو المحفظة") { TextField("اسم البنك", text: $draft.bank).focused($editing).accessibilityIdentifier("money-account-bank") }
@@ -110,8 +111,22 @@ struct MoneyAccountSheet: View {
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-account-keyboard-done") } }
                 .madarSheetLock(saving: saving, draft: hasUnsavedInput)
         }
+        .confirmationDialog("تترك التعديلات دون حفظ؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
+            Button("اترك التعديلات", role: .destructive) { guard !saving else { return }; dismiss() }
+                .buttonStyle(.automatic)
+                .accessibilityIdentifier("money-account-discard")
+            Button("أكمل التعديل") {}
+                .buttonStyle(.automatic)
+                .accessibilityIdentifier("money-account-keep-editing")
+        } message: { Text("تبقى بياناتك المحفوظة كما هي.") }
         .onChange(of: blocksRootRoute, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
         .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }
+    }
+
+    private func requestClose() {
+        guard !saving else { return }
+        if hasUnsavedInput { editing = false; confirmDiscard = true }
+        else { dismiss() }
     }
 
     @ViewBuilder private var rootRouteTestButton: some View {

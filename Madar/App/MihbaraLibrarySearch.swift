@@ -115,8 +115,13 @@ struct MihbaraTextSearchSection: View {
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-text-search")
                 }
                 if let hits, searchedFor == trimmed, running == nil {
+                    if readable.contains(where: { $0.isReadablePDF }) {
+                        Text("يشمل بحث PDF النص المضمّن فقط. للصفحات المصوّرة، افتح الكتاب واختر البحث.")
+                            .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            .accessibilityIdentifier("mihbara-text-search-pdf-scope")
+                    }
                     if hits.isEmpty {
-                        Text("لم أجد «" + trimmed + "» في نصوص كتبك.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Text("لم أجد «" + trimmed + "» في النصوص القابلة للبحث.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                             .accessibilityIdentifier("mihbara-text-search-none")
                     }
                     ForEach(hits) { hit in

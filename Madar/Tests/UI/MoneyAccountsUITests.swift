@@ -16,6 +16,32 @@ import XCTest
         else { XCTAssertTrue(app.staticTexts["money-accounts-net"].waitForExistence(timeout: 10)) }
         return app
     }
+    func testAccountCloseConfirmsDiscardAndCanKeepEditing() {
+        continueAfterFailure = false
+        let app = open("accounts")
+        app.buttons["money-accounts-add"].tap()
+        let name = app.textFields["money-account-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 8), app.debugDescription)
+        name.tap(); name.typeText("مسودة اختبار")
+        app.buttons["money-account-keyboard-done"].firstMatch.tap()
+        let close = app.buttons["money-account-editor-close"]
+        close.tap()
+        let keep = app.buttons["money-account-keep-editing"].firstMatch
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), app.debugDescription)
+        shot(app, "OWNER-account-discard-confirmation-L")
+        keep.tap()
+        XCTAssertEqual(name.value as? String, "مسودة اختبار")
+        close.tap()
+        app.buttons["money-account-discard"].firstMatch.tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 5), app.debugDescription)
+        app.buttons["money-accounts-add"].tap()
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        XCTAssertNotEqual(name.value as? String, "مسودة اختبار")
+        close.tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 5), "An untouched editor closes directly.")
+        app.terminate()
+    }
+
     func testAccountsReadFailureOffersRetry() {
         continueAfterFailure = false
         let app = open("accounts", failReadOnce: true)

@@ -23,6 +23,32 @@ import XCTest
         for _ in 0..<8 where !cards.isHittable { app.swipeUp(velocity: .slow) }; cards.tap()
         XCTAssertTrue(app.buttons["money-cards-close"].waitForExistence(timeout: 10))
     }
+    func testCardCloseConfirmsDiscardAndCanKeepEditing() {
+        continueAfterFailure = false
+        let app = XCUIApplication(); open(app, fixture: "zero")
+        app.buttons["money-cards-add"].tap()
+        let name = app.textFields["money-card-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 8), app.debugDescription)
+        name.tap(); name.typeText("مسودة اختبار")
+        app.buttons["money-card-keyboard-done"].firstMatch.tap()
+        let close = app.buttons["money-card-editor-close"]
+        close.tap()
+        let keep = app.buttons["money-card-keep-editing"].firstMatch
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), app.debugDescription)
+        shot(app, "OWNER-card-discard-confirmation-L")
+        keep.tap()
+        XCTAssertEqual(name.value as? String, "مسودة اختبار")
+        close.tap()
+        app.buttons["money-card-discard"].firstMatch.tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 5), app.debugDescription)
+        app.buttons["money-cards-add"].tap()
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        XCTAssertNotEqual(name.value as? String, "مسودة اختبار")
+        close.tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 5), "An untouched editor closes directly.")
+        app.terminate()
+    }
+
     func testFourTabsSourcesAndDebit() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); open(app, fixture: "cards")

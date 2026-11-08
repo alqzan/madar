@@ -8,6 +8,7 @@ private struct PrayerHomeSnapshotKey: Equatable {
     let revision: Int
     let generation: Int
     let visit: Int
+    let retry: Int
     let active: Bool
 }
 struct PrayerTodayMinuteTimelineSchedule: TimelineSchedule, Equatable, Sendable {
@@ -49,14 +50,34 @@ struct PrayerTodayView: View {
     @State private var homeSnapshot: PrayerSnapshot?
     @State private var loadedHomeSnapshotKey: PrayerHomeSnapshotKey?
     @State private var homeReadFailed = false
+    @State private var homeReadRetry = 0
+    #if DEBUG
+    @State private var injectedHomeReadFailure = false
+    #endif
     @State private var onTrip = false
     /// On a trip the home takes the calm-paper palette (cooler sand, same gold ornaments) so travel looks different at a glance.
     private var theme: RoomTheme { RoomTheme(room: "salah", dark: inheritedTheme.dark, calmPaper: inheritedTheme.calmPaper || onTrip) }
 
     private func snapshotKey(at instant: Date) -> PrayerHomeSnapshotKey {
         PrayerHomeSnapshotKey(minute: Int(instant.timeIntervalSince1970 / 60), revision: session.prayerRevision,
-                              generation: session.storeGeneration, visit: roomVisit,
+                              generation: session.storeGeneration, visit: roomVisit, retry: homeReadRetry,
                               active: isFrontRoom && scenePhase == .active)
+    }
+
+    private var retryHomeRead: some View {
+        Button {
+            guard homeReadFailed else { return }
+            homeReadFailed = false
+            homeReadRetry += 1
+        } label: {
+            Label("حاول مرة أخرى", systemImage: "arrow.clockwise")
+                .frame(minHeight: 44)
+                .contentShape(.rect)
+        }
+        .font(MadarTypography.body())
+        .foregroundStyle(theme.accent)
+        .buttonStyle(.madarPlain)
+        .accessibilityIdentifier("prayer-home-retry")
     }
 
     private func loadHomeSnapshot(at instant: Date, key: PrayerHomeSnapshotKey) async {
@@ -64,6 +85,12 @@ struct PrayerTodayView: View {
         do {
             #if DEBUG
             let environment = ProcessInfo.processInfo.environment
+            if !injectedHomeReadFailure,
+               UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+               environment["MADAR_UI_PRAYER_HOME_READ_FAILURE_ONCE"] == "1" {
+                injectedHomeReadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
             if UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
                let milliseconds = environment["MADAR_UI_PRAYER_SNAPSHOT_HOLD_MS"].flatMap(Int.init),
                (1...5_000).contains(milliseconds) {
@@ -97,9 +124,11 @@ struct PrayerTodayView: View {
                         header(day: snapshot.today.day)
                             .padding(.top, 8)
                         if homeReadFailed {
-                            Text("تعذّر التحديث؛ معروض آخر سجل محفوظ")
-                                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                                .padding(.top, 8)
+                            VStack(spacing: 4) {
+                                Text("تعذّر التحديث؛ معروض آخر سجل محفوظ")
+                                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                retryHomeRead
+                            }.padding(.top, 8)
                         } else if !homeSnapshotIsCurrent {
                             Text("يُحدّث سجل الصلاة…")
                                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -147,11 +176,12 @@ struct PrayerTodayView: View {
                     } else {
                         header(day: nil)
                         PrayerPaperCard {
-                            Text(homeReadFailed
-                                 ? "تعذّر حساب صلاة اليوم. راجع المدينة وطريقة الحساب في خصّص مدار."
-                                 : "تُجهّز صلوات اليوم…")
-                                .font(MadarTypography.body())
-                                .accessibilityIdentifier(homeReadFailed ? "prayer-home-read-error" : "prayer-home-loading")
+                            VStack(spacing: 12) {
+                                Text(homeReadFailed ? "تعذّر تحميل صلوات اليوم." : "تُجهّز صلوات اليوم…")
+                                    .font(MadarTypography.body())
+                                    .accessibilityIdentifier(homeReadFailed ? "prayer-home-read-error" : "prayer-home-loading")
+                                if homeReadFailed { retryHomeRead }
+                            }.frame(maxWidth: .infinity)
                         }
                         .padding(.top, 24)
                         .transition(.opacity)

@@ -54,7 +54,7 @@ import XCTest
     func testEmptyStoreExplainsPaymentSource() {
         continueAfterFailure = false
         let app = openExpense("empty")
-        XCTAssertTrue(app.staticTexts["أضف حسابًا أو بطاقة من رسائل البنك أولًا."].exists)
+        XCTAssertTrue(app.staticTexts["أضف حسابًا من «الحسابات» أو بطاقة من «البطاقات» أولًا."].exists)
         app.buttons["money-expense-key-4"].tap(); XCTAssertFalse(app.buttons["money-expense-save"].isEnabled)
         shot(app, "M5-V17-empty-L")
     }

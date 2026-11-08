@@ -89,6 +89,9 @@ struct PrayerCustomizeView: View {
         group.keys.compactMap { key in AppSession.supportedKeys.contains(key) ? session.schema.settings.first { $0.key == key } : nil }
             .filter { query.isEmpty || normalized($0.title + " " + group.title).contains(normalized(query)) }
     }
+    private var showsTrackingStart: Bool {
+        query.isEmpty || normalized("بداية التتبع بداية التتبّع التسجيل أول يوم").contains(normalized(query))
+    }
     private func label(_ key: String) -> String {
         session.schema.settings.first { $0.key == key }?.options.first { $0.value == session.values[key] }?.label ?? ""
     }
@@ -116,14 +119,16 @@ struct PrayerCustomizeView: View {
                 if query.isEmpty || normalized("ترتيب الرئيسية").contains(normalized(query)) { layoutCard }
                 ForEach(groups) { group in
                     let items = definitions(group)
-                    if !items.isEmpty { groupCard(group, items) }
+                    if !items.isEmpty || (group.id == "log" && showsTrackingStart) { groupCard(group, items) }
                 }
                 // AU-26: a search with no match explains itself instead of leaving a blank page.
-                if !query.isEmpty, !normalized("ترتيب الرئيسية").contains(normalized(query)), groups.allSatisfy({ definitions($0).isEmpty }) {
+                if !query.isEmpty, !showsTrackingStart, !normalized("ترتيب الرئيسية").contains(normalized(query)), groups.allSatisfy({ definitions($0).isEmpty }) {
                     Text("لا إعداد يطابق «\(query)». جرّب «المواقيت» أو «التذكير».").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
                     Button("امسح البحث") { query = "" }.font(PrayerHomeType.body.bold()).frame(minHeight: 44).accessibilityIdentifier("prayer-customize-clear-search")
                 }
-                Text("من الأذان حتى انقضاء الصلاة لا يرسل مدار شيئًا، وهذا لا يُطفأ.")
+                Text("تصمت تنبيهات مدار " + MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi).string(30)
+                     + " دقيقة بعد كل أذان، و" + MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi).string(20)
+                     + " دقيقة بعد أذان المغرب. لا يمكن إيقاف هذه الحرمة.")
                     .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 4)
             }
             .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 40)
@@ -335,7 +340,7 @@ struct PrayerCustomizeView: View {
                     Divider().overlay(theme.ink.opacity(0.1))
                     SettingControl(definition: definition, session: session)
                 }
-                if group.id == "log", query.isEmpty { Divider().overlay(theme.ink.opacity(0.1)); trackingStartBlock }
+                if group.id == "log", showsTrackingStart { Divider().overlay(theme.ink.opacity(0.1)); trackingStartBlock }
                 if group.id == "times" && query.isEmpty && session.bool("salah.travelShortenCombine") && session.string("core.travelMode") != "manual" && !askedLocation && travelLocator.canAskForLocation {
                     Divider().overlay(theme.ink.opacity(0.1))
                     Text("يقارن موقعك بمدينتك عند فتح الصلاة ليعرف أنك سافرت، ولا يحفظه. وبدونه يبقى السفر اليدوي.").font(PrayerHomeType.body)

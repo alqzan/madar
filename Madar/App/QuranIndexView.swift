@@ -16,6 +16,10 @@ struct QuranIndexView: View {
     @State private var query = ""
     @State private var error: String?
     @State private var attempt = 0
+    @State private var isLoading = true
+    #if DEBUG
+    @State private var injectedReadFailure = false
+    #endif
     @State private var appliedInitialSelection = false
     init(
         service: AppQuranService, initialUnit: QuranUIIndexUnit = .surah, initialItemID: String? = nil,
@@ -34,6 +38,8 @@ struct QuranIndexView: View {
                 HStack(spacing: 4) {
                     ForEach(QuranUIIndexUnit.allCases) { option in
                         Button {
+                            guard unit != option else { return }
+                            items = []; selected = nil; error = nil; isLoading = true
                             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                                 unit = option; query = ""
                             }
@@ -48,6 +54,10 @@ struct QuranIndexView: View {
                             .accessibilityAddTraits(unit == option ? .isSelected : [])
                     }
                 }.padding(4).background(theme.color("track"), in: Capsule())
+                if isLoading {
+                    ProgressView("تُجهّز الفهرس…").frame(maxWidth: .infinity, minHeight: 80)
+                        .accessibilityIdentifier("quran-index-loading")
+                } else if error == nil {
                 HStack {
                     let held = items.filter(\.memorized).count, form = unit.counted(held);
                     Text("في صدرك").font(quranFont(12));
@@ -89,9 +99,10 @@ struct QuranIndexView: View {
                         theme.secondaryInk
                     ).accessibilityIdentifier("quran-index-no-results")
                 }
+                }
                 if let error {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(error).font(quranFont(13));
+                        Text(error).font(quranFont(13)).accessibilityIdentifier("quran-index-read-error");
                         Button("أعد المحاولة") {
                             self.error = nil; attempt += 1
                         }.font(quranFont(13, bold: true)).frame(minHeight: 44).accessibilityIdentifier(
@@ -107,18 +118,35 @@ struct QuranIndexView: View {
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review"))
             .accessibilityIdentifier("quran-index-screen")
             .task(id: "\(unit.id)-\(attempt)") {
+                let requestedUnit = unit, requestedAttempt = attempt
+                items = []; error = nil; isLoading = true
+                defer {
+                    if unit == requestedUnit, attempt == requestedAttempt, !Task.isCancelled { isLoading = false }
+                }
                 do {
-                    let result = try await service.index(unit); try Task.checkCancellation(); items = result;
-                    self.error = nil
+                    #if DEBUG
+                    let environment = ProcessInfo.processInfo.environment
+                    if !injectedReadFailure,
+                       UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+                       environment["MADAR_UI_QURAN_INDEX_FAIL_UNIT_ONCE"] == requestedUnit.id {
+                        injectedReadFailure = true
+                        throw CocoaError(.fileReadUnknown)
+                    }
+                    #endif
+                    let result = try await service.index(requestedUnit)
+                    try Task.checkCancellation()
+                    guard unit == requestedUnit, attempt == requestedAttempt else { return }
+                    items = result
                     if !appliedInitialSelection {
                         appliedInitialSelection = true
                         if unit == initialUnit, let initialItemID,
-                            let target = result.first(where: { $0.id == initialItemID })
-                        {
-                            selected = target
-                        }
+                           let target = result.first(where: { $0.id == initialItemID }) { selected = target }
                     }
-                } catch is CancellationError {} catch { self.error = quranUserMessage(error) }
+                } catch is CancellationError {
+                } catch {
+                    guard !Task.isCancelled, unit == requestedUnit, attempt == requestedAttempt else { return }
+                    self.error = quranUserMessage(error)
+                }
             }
             .sheet(item: $selected) { item in
                 VStack(alignment: .leading, spacing: 15) {

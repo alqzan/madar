@@ -979,6 +979,61 @@ import UIKit
         shot(app, "M6-SIRI-continue-L")
     }
 
+    func testPDFDrawingFailureKeepsReaderOpenUntilRetrySavesTheInk() {
+        assertDrawingFailureRecovers(rootRoute: false)
+    }
+
+    func testPDFRootRouteWaitsForInkSaveAndRetry() {
+        assertDrawingFailureRecovers(rootRoute: true)
+    }
+
+    private func assertDrawingFailureRecovers(rootRoute: Bool) {
+        continueAfterFailure = false
+        let app = app("missingFile", storeID: UUID().uuidString, pdf: fixturePDF())
+        app.launchEnvironment["MADAR_UI_MIHBARA_PDF_READY"] = "1"
+        app.launchEnvironment["MADAR_UI_MIHBARA_INK_SAVE_FAIL_ONCE"] = "1"
+        if rootRoute { app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1" }
+        app.launch(); open(app)
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "The settings search keyboard must not cover the room.")
+        let continueBook = app.buttons["mihbara-book-continue"]
+        func openVisibleBook() {
+            XCTAssertTrue(continueBook.waitForExistence(timeout: 10), app.debugDescription)
+            for _ in 0..<12 {
+                let frame = continueBook.frame
+                if frame.height > 0, frame.midY > 100, frame.midY < app.frame.maxY - 160 { break }
+                if frame.midY <= 100 { app.swipeDown(velocity: .slow) }
+                else { app.swipeUp(velocity: .slow) }
+            }
+            shot(app, "OWNER-pdf-visible-book-before-open-L")
+            XCTAssertGreaterThan(continueBook.frame.midY, 100)
+            XCTAssertLessThan(continueBook.frame.midY, app.frame.maxY - 160)
+            // Verify the real touch; retained native navigation hosts can report false AX hittability.
+            continueBook.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        openVisibleBook()
+        let pen = app.buttons["mihbara-pdf-ink"]
+        XCTAssertTrue(pen.waitForExistence(timeout: 15), app.debugDescription)
+        pen.tap()
+        let content = app.descendants(matching: .any)["mihbara-pdf-content"]
+        let start = content.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.35))
+        start.press(forDuration: 0.05, thenDragTo: content.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.45)))
+        app.buttons["mihbara-pdf-ink-done"].tap()
+        app.buttons[rootRoute ? "mihbara-pdf-root-route" : "mihbara-pdf-close"].tap()
+        let retry = app.alerts["قارئ PDF"].buttons["mihbara-reading-save-retry"].firstMatch
+        XCTAssertTrue(retry.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لم يُحفظ الرسم")).firstMatch.exists)
+        shot(app, "OWNER-pdf-ink-save-failure-L")
+        retry.tap()
+        XCTAssertTrue(pen.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(continueBook.waitForExistence(timeout: 10), app.debugDescription)
+        if rootRoute { shot(app, "OWNER-pdf-root-returned-to-shelf-L") }
+        openVisibleBook()
+        XCTAssertTrue(pen.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(pen.value as? String, "١", "Retry persists the drawing before the reader closes.")
+        shot(app, "OWNER-pdf-ink-save-recovered-L")
+        app.terminate()
+    }
+
     func testDrawingOnAPDFPageStaysWithTheBook() {
         continueAfterFailure = false
         let storeID = UUID().uuidString
