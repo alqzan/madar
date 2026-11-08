@@ -171,8 +171,10 @@ struct MoneySettingsView: View {
                         }.padding(20).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface).overlay
                         { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) }
                     }
-                    Text(page == .daily || page == .cycle ? "معاينة أولًا، ثم حفظ واحد وتراجع" : "كل تغيير له تراجع")
-                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    if page == .daily || page == .cycle {
+                        Text("عاين الرقم أولًا، ولا يتغير شيء حتى تحفظ")
+                            .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    }
                 }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 28).frame(maxWidth: 620).frame(
                     maxWidth: .infinity)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(
@@ -221,7 +223,7 @@ struct MoneySettingsView: View {
                     nudge("−", id: "minus", delta: -1); Spacer()
                     VStack(spacing: 0) {
                         Text(
-                            proposed.map { amount($0.dailyMinor) } ?? cycle.map {
+                            figure: proposed.map { amount($0.dailyMinor) } ?? cycle.map {
                                 amount($0.headline.todayAllowanceMinor)
                             } ?? "—"
                         ).font(.custom("thmanyahserifdisplay-Black", size: 44, relativeTo: .largeTitle))

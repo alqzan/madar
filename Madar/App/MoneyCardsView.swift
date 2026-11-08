@@ -179,9 +179,9 @@ struct MoneyCardsView: View {
                     Text("تقدير تقريبي بفائدة بسيطة: النسبة السنوية × \(service.digits.string(interestDays)) ÷ \(service.digits.string(365))، دون الرسوم أو التركيب. كشف البنك هو المرجع.")
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         .accessibilityIdentifier("money-card-interest-formula")
-                } else { Label("سداد كامل المتبقي: " + amount(c.billedMinor), systemImage: "checkmark.circle.fill").font(MadarTypography.body()).foregroundStyle(theme.color("surplusText")) }
+                } else { Label { Text(figure: "سداد كامل المتبقي: " + amount(c.billedMinor)) } icon: { Image(systemName: "checkmark.circle.fill") }.font(MadarTypography.body()).foregroundStyle(theme.color("surplusText")) }
             }
-            HStack { Text(c.kind == "credit" ? "في الكشف القادم" : "المشتريات المسجلة").font(MadarTypography.cardTitle()); Spacer(); if c.kind == "credit" { Button("غير المفوتر " + amount(c.unbilledMinor)) { source = c.sources["unbilled"] }.font(MadarTypography.fine()).buttonStyle(.madarPlain) } }
+            HStack { Text(c.kind == "credit" ? "في الكشف القادم" : "المشتريات المسجلة").font(MadarTypography.cardTitle()); Spacer(); if c.kind == "credit" { Button { source = c.sources["unbilled"] } label: { Text(figure: "غير المفوتر " + amount(c.unbilledMinor)) }.font(MadarTypography.fine()).buttonStyle(.madarPlain) } }
             if c.purchases.isEmpty { Text("لا حركات مؤكّدة في هذه الفترة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
             ForEach(c.purchases) { movement($0) }
             if let best = reading?.cards.filter({ $0.kind == "credit" && $0.graceDays != nil }).max(by: { ($0.graceDays ?? 0) < ($1.graceDays ?? 0) }), let grace = best.graceDays {

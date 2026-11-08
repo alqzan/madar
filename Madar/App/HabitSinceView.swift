@@ -164,7 +164,7 @@ struct HabitPastDaySheet:View {
                         .datePickerStyle(.graphical).environment(\.timeZone,.gmt).padding(8).background(theme.surface,in:.rect(cornerRadius:20)).accessibilityIdentifier("habit-past-date")
                     MadarDateLabel(session.dateLabels(day,weekday:true))
                     if !hasSelectedTarget {
-                        Text("لا يوجد هدف لهذه العادة في هذا اليوم.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Text("هذا اليوم ليس من أيام العادة، اختر يومًا آخر.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                             .accessibilityIdentifier("habit-past-unavailable")
                     }
                     let lines = dayLines

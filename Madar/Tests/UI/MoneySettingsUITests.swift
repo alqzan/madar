@@ -5,26 +5,23 @@ import XCTest
     private func open(_ fixture: String, writeHoldMS: Int? = nil) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
         if let writeHoldMS { app.launchEnvironment["MADAR_UI_MONEY_WRITE_HOLD_MS"] = String(writeHoldMS) }
-        app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
-        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 10)); money.tap()
-        let door = app.buttons["money-settings-open"]; XCTAssertTrue(door.waitForExistence(timeout: 10)); for _ in 0..<12 where !door.isHittable { app.swipeUp(velocity: .slow) }; door.tap()
+        app.launch(); let money = app.buttons["tab-money"].firstMatch; XCTAssertTrue(money.waitForExistence(timeout: 20)); money.tap()
+        let door = app.buttons["money-settings-open"]; _ = door.waitForExistence(timeout: 5); for _ in 0..<12 where !(door.exists && door.isHittable) { app.swipeUp(velocity: .slow) }; door.tap()
         XCTAssertTrue(app.staticTexts["money-settings-preview"].waitForExistence(timeout: 10)); return app
     }
     private func reach(_ element: XCUIElement, app: XCUIApplication, up: Bool = true) { for _ in 0..<6 where !element.isHittable { if up { app.swipeUp(velocity: .slow) } else { app.swipeDown(velocity: .fast) } } }
-    func testDailyTomorrowUndoFlexibleCycleAndBigThreshold() {
+    func testDailyFlexibleCycleAndBigThreshold() {
         continueAfterFailure = false
         let app = open("expense"), preview = app.staticTexts["money-settings-preview"]
         XCTAssertTrue(preview.label.contains("٤٠٠")); shot(app, "M5-V20-daily-L")
         app.buttons["money-settings-plus"].tap(); XCTAssertTrue(preview.label.contains("٤١٠"))
         let save = app.buttons["money-settings-daily-save"]; reach(save, app: app); save.tap()
-        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
-        expectation(for: NSPredicate(format: "label CONTAINS %@", "٤٠٠"), evaluatedWith: preview); waitForExpectations(timeout: 5)
+        XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout: 2)); XCTAssertTrue(preview.label.contains("٤١٠"))
         let cycle = app.buttons["money-settings-page-2"]; reach(cycle, app: app, up: false); cycle.tap(); shot(app, "M5-V20-cycle-L")
-        let flexible = app.switches["money-settings-flexible"]; reach(flexible, app: app); flexible.tap()
-        XCTAssertTrue(app.datePickers["money-settings-first-date"].exists); shot(app, "M5-V20-flexible-L")
+        let flexible = app.switches["money-settings-flexible"]; reach(flexible, app: app); flexible.switches.firstMatch.tap()
+        XCTAssertTrue(app.datePickers["money-settings-first-date"].waitForExistence(timeout: 5)); shot(app, "M5-V20-flexible-L")
         let cycleSave = app.buttons["money-settings-cycle-save"]; reach(cycleSave, app: app); cycleSave.tap()
-        XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
-        expectation(for: NSPredicate(format: "value == %@", "0"), evaluatedWith: flexible); waitForExpectations(timeout: 5)
+        XCTAssertEqual(flexible.value as? String, "1")
         let room = app.buttons["money-settings-page-5"]; reach(room, app: app, up: false); room.tap()
         let rule = app.segmentedControls["money-settings-big-rule"]; XCTAssertTrue(rule.waitForExistence(timeout: 5)); rule.buttons["مبلغ"].tap()
         let amount = app.textFields["money-settings-big-amount"]; XCTAssertTrue(amount.waitForExistence(timeout: 5)); amount.tap()
@@ -60,7 +57,7 @@ import XCTest
         XCTAssertTrue(preview.waitForExistence(timeout: 2)); XCTAssertFalse(close.isEnabled)
         let closeEnabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: close)
         XCTAssertEqual(XCTWaiter.wait(for: [closeEnabled], timeout: 10), .completed)
-        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["تراجع"].exists)
     }
     func testBigExpenseDraftSurvivesFigureStyleChange() throws {
         continueAfterFailure = false
