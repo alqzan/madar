@@ -114,6 +114,7 @@ Codex takes these first, in order, before any other queue. Feature freeze until 
 | PERF-04 | لكوديكس — طلب المالك ٧ نوفمبر «اكتبها عشان كوديكس يسويها» | تشغيل الاختبارات التي لم تُشغَّل بعد PERF-03، **دفعات صغيرة لا تتجاوز ٥ دقائق للدفعة** (المالك: المهام الطويلة والوكلاء الفرعيون تتعطل): (١) `FoundationUITests` على ٣–٤ دفعات بـ`-only-testing:MadarUITests/FoundationUITests/<test>`؛ صحّح الاختبارين القديمين اللذين ينتظران تراجع الصلاة وزر الإعدادات القديم (أي فشل آخر: افحص أولًا هل سببه تأجيل تخطيط التنبيهات ١٫٢ ث في PERF-03، واجعل الاختبار ينتظر بدل أن يقرأ فورًا). (٢) `NotificationBudgetUITests` و`RoomWidgetsUITests` وتدفق `MADAR_NOTIFICATION_TEST_FLOW`. (٣) شخّص فشل اختبار تعديل فلتر السنة مع تنبيه «تطبيق» (من PERF-01). | كل دفعة تنجح أو يُسجَّل سببها؛ لا تغيير في القواعد. | partial — اختبارات Foundation المحددة نجحت، وRoomWidgets 11/11 وNotificationBudget 1/1؛ أربعة اختبارات تمرير ما زالت تصطدم بعناصر البهو المخفية في شجرة الوصول؛ MADAR_NOTIFICATION_TEST_FLOW فشل في تحقق الإلغاء/بقاء الغفوة؛ اختبار فلتر السنة بقي في نافذة «تطبيق» عند السطر 40 بعد محاولتين، وأُعيد التغيير التجريبي. |
 | PERF-05 | لكوديكس — بقية صيد الأداء ٧ نوفمبر | (١) `PrayerRepository.snapshot` يخزن حسب `prayerRevision` والدقيقة. (٢) ملخص البهو صار يقرأ اليوم المحدد والهامش النشط فقط، دون تحميل بيانات الصور؛ وجلب صفحة اليوم يحدد الهامش وسجل التجميد. (٣) فُحص مسار `habit.complete`: `HabitRepository.reading(id:)` يستعمل `onlyHabitID` ويجلب العادة وسجلاتها المحددة؛ تقرير «قراءة كل العادات عند كل ضغطة» لا يطابق هذا المسار الحالي، فلا تغيير مطلوب. قِس قبل وبعد (مخزن PERF-OWNER المعزول + `sample`). | قياس قبل/بعد؛ اختبارات المحركات المعنية تنجح. | done — PERF-OWNER sample في الغرفة المخفية 10 ثوانٍ: TimelineView ‏36→0، وPrayerRepository.snapshot ‏20→0، وAppSession.prayerSnapshot ‏26→0؛ HabitPersistence 17/17، DiaryTravel integration 1/1؛ `RoomGlyphUITests` مشى كل الغرف 1/1. لا قياس على iPhone. |
 | TF-12 | طلب المالك ٧ نوفمبر «ارفع النسخه في تست فلايت» | رُفع البناء 0.1.0 (12) إلى App Store Connect من commit 82c458de (PERF-03): أرشيف Release ثم `xcodebuild -exportArchive` بـ«Upload succeeded». | يظهر في TestFlight بعد معالجة Apple؛ لم يُجرَّب على iPhone المالك بعد. | done |
+| TF-13 | طلب المالك رفع نسخة TestFlight (٨ نوفمبر) | أُرشف 0.1.0 (13) من commit `4d994ec5`؛ `xcodebuild -exportArchive` سجّل «Upload succeeded» و«Uploaded Madar». | Apple بدأت معالجة الحزمة؛ ظهورها في TestFlight وتثبيتها على iPhone المالك لم يُتحققا بعد. | uploaded — processing |
 
 ## Owner follow-up — 1 Nov 2026
 
@@ -623,11 +624,10 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Model/effort:** Claude Opus 5.5؛ الجهد غير مكشوف.
 - **Usage:** ٢٤٪ من الخمس ساعات و٧٤٪ أسبوعيًا عند آخر فحص.
 
-## Handover — PERF-04 استجابة الغرف وسجل الصلاة — 2026-11-08 — Codex
-- **Works now:** تحسينات استجابة القرآن واليوميات والمحبرة والمال والبهو والصلاة؛ لا يُنشأ سجل قبل أداء الصلاة، وتُسجّل الصلاة المؤداة بعد وقتها كـ`qada` بلا دين أو تذكير؛ سجل القرآن يتبع `core.firstCalendar`.
-- **Verified:** `swift test` MadarPrayer 38/38 وPrayerHistoryMaintenance 1/1؛ `xcodebuild -quiet build` نجح؛ Xcode iOS 27.0 7/7 (`codex-prayer-retirement-20261108-r2.xcresult`)، `git diff --check`، وفحص JSON و`plutil`.
+- **Works now:** تحسينات استجابة القرآن واليوميات والمحبرة والمال والبهو والصلاة؛ لا يُنشأ سجل قبل أداء الصلاة، وتُسجّل الصلاة المؤداة بعد وقتها كـ`qada` بلا دين أو تذكير؛ سجل القرآن يتبع `core.firstCalendar`. رُفع 0.1.0 (13) إلى App Store Connect وبدأت معالجته.
+- **Verified:** `swift test` MadarPrayer 38/38 وPrayerHistoryMaintenance 1/1؛ `xcodebuild -quiet build` نجح؛ Xcode iOS 27.0 7/7 (`codex-prayer-retirement-20261108-r2.xcresult`)، `git diff --check`، وفحص JSON و`plutil`؛ أرشيف 0.1.0 (13) من `4d994ec5`، والتصدير: `Upload succeeded`.
 - **Differences left:** لم تُشغّل مقارنة `compare-screens.py` لهذه الدفعة؛ التغيير المقصود هو حذف مدخل الفوائت، ولا توجد قياسات زمنية على iPhone المالك.
-- **Not verified:** أرشفة/رفع البناء 0.1.0 (13)، ومعالجة Apple وفتح نسخة TestFlight على جهاز المالك.
-- **Next:** أرشفة ورفع البناء 13 من commit نظيف؛ ثم تأكيد Apple والجهاز منفصلان.
+- **Not verified:** اكتمال معالجة Apple، وظهور النسخة في TestFlight أو تثبيتها على جهاز المالك.
+- **Next:** بعد اكتمال المعالجة، يثبت المالك نسخة TestFlight على iPhone ويجربها؛ القبول على الجهاز منفصل عن المحاكي.
 - **Model/effort:** Codex؛ النموذج والجهد غير مكشوفين؛ مراجعة Sol Ultra للقراءة فقط واكتملت إصلاحاتها.
-- **Usage:** ١٦٪ باقية عند آخر فحص.
+- **Usage:** ١٤٪ باقية عند آخر فحص.
