@@ -233,6 +233,12 @@ private struct MihbaraRoomWidgetContent:View {
                         if !book.author.isEmpty {Text(book.author).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}
                         if let pageLine {Text(pageLine).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}
                     }
+                    // The small card had room to spare: show where you are in the book, filling from the right.
+                    if family == .systemSmall,let progress=bookProgress {
+                        Spacer(minLength:4)
+                        GeometryReader{proxy in HStack(spacing:0){Capsule().fill(theme.accent).frame(width:max(5,proxy.size.width*progress));Spacer(minLength:0)}.background(theme.line,in:.capsule)}
+                            .frame(height:5).environment(\.layoutDirection,.rightToLeft).accessibilityHidden(true)
+                    }
                 } else if let hadith=snapshot?.hadithToday {
                     Text("حديث اليوم").font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).foregroundStyle(theme.accent)
                     Text(hadith.title).font(.custom("thmanyahserifdisplay-Bold",size:20,relativeTo:.title3)).lineLimit(3)
