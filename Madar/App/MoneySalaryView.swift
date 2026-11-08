@@ -195,7 +195,6 @@ struct MoneySalaryView: View {
                 let w = proxy.size.width * CGFloat(max(0, r.plan.leftoverMinor)) / CGFloat(salary)
                 Rectangle().fill(theme.color("reserve")).frame(width: visible ? w : 0, height: 26).frame(maxWidth: .infinity, alignment: .leading)
             }.frame(height: 26).environment(\.layoutDirection, .leftToRight)
-            Text("اضغط أي قيد، يشرح لك.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity)
         }
     }
     private func split(_ title: String, _ minor: Int) -> some View {

@@ -254,7 +254,7 @@ struct SettingsSection: View {
                     MadarGlyph(symbol, size: 22).foregroundStyle(theme.ink).frame(width: 48, height: 48).background(theme.background, in: .rect(cornerRadius: 14)).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title).font(MadarTypography.section()).foregroundStyle(theme.ink)
-                        if !summary.isEmpty { Text(summary).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).lineLimit(1) }
+                        if !summary.isEmpty { Text(summary).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true) }
                     }
                 }
             }

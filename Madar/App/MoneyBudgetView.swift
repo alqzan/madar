@@ -94,7 +94,7 @@ struct MoneyBudgetView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(row.merchant).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(row.excluded ? theme.secondaryInk : theme.ink)
                     Text(row.category).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                    if let reason = row.reason { Text("لأن: " + reason).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).lineLimit(1) }
+                    if let reason = row.reason { Text("لأن: " + reason).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).fixedSize(horizontal: false, vertical: true) }
                 }
                 Spacer(minLength: 4)
                 if row.excluded {

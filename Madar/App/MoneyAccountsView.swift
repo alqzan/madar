@@ -112,7 +112,7 @@ struct MoneyAccountsView: View {
             } }
         } else {
         VStack(spacing: 0) {
-            HStack { Text("الحساب").frame(maxWidth: .infinity, alignment: .leading); Text("المبلغ").frame(width: 90); Text("ملكي؟").frame(width: 38); Text("في المجموع").frame(width: 55).lineLimit(1).minimumScaleFactor(0.85) }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.vertical, 8)
+            HStack { Text("الحساب").frame(maxWidth: .infinity, alignment: .leading); Text("المبلغ").frame(width: 90); Text("ملكي؟").frame(width: 38); Text("في المجموع").multilineTextAlignment(.center).lineLimit(2).frame(width: 55) }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.vertical, 8)
             ForEach(r.rows) { row in
                 HStack(spacing: 5) {
                     Circle().fill(tint(row)).frame(width: 7, height: 7)

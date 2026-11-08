@@ -66,10 +66,10 @@ struct MoneyObligationsView: View {
                     if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44) }
                     thread(reading)
                     if let due = current(reading) { detail(due, reading) }
-                    if reading.ladder.contains(where: { $0.total > 0 }) { ladder(reading) } else { Text("لا أقساط ولا فواتير في الأشهر القادمة؛ يظهر سلّمها هنا حين تضيف التزامًا.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-ladder-empty") }
+                    if reading.ladder.contains(where: { $0.total > 0 }) { ladder(reading) } else { Text("لا التزامات قادمة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-ladder-empty") }
                     ForEach(reading.subscriptionSuggestions) { suggestion in subscriptionSuggestion(suggestion) }
                     Button { obligationSheet = .new } label: {
-                        Text("+ أضف التزامًا، وشاهد أثره على السلّم").font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).foregroundStyle(theme.background)
+                        Text("أضف التزامًا").font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).foregroundStyle(theme.background)
                             .frame(maxWidth: .infinity, minHeight: 60).background(theme.ink).shadow(color: theme.ink.opacity(0.18), radius: 8, y: 4)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("money-obligations-add")
                     shelves(reading)

@@ -30,6 +30,16 @@ You are building **Madar**, a native iPhone app (SwiftUI, Arabic RTL). The appro
 - **RP1:** an unlogged prayer never becomes "missed" or qada automatically.
 - **RU1:** never put "·" next to a digit.
 
+## Owner override — automatic commit and TestFlight upload (8 Nov 2026)
+
+The owner authorizes every directly requested Madar app change to be completed, committed, and uploaded to internal TestFlight without asking again. This supersedes the card queue, feature freeze, and any wait for a separate owner upload approval for those requests.
+
+- Keep the marketing version unchanged unless requested; increment `CURRENT_PROJECT_VERSION` for each upload.
+- Use the matching board card when one exists. Do not invent cards; for a direct request without a card, make one descriptive `[OWNER] ...` commit and record it in the decisions log and handover.
+- Run the applicable build and focused checks, then archive, export, and upload to App Store Connect/TestFlight. This authorizes internal TestFlight delivery only, not public App Store release or App Review submission.
+- Apple account access, signing, provisioning, and processing remain technical requirements. If one blocks upload, finish and commit the validated change, record the exact blocker, and continue when the external state allows; do not ask the owner to re-authorize.
+- This workflow change does not relax local-only storage, migration, privacy, data-loss, licensing, or other product rules.
+
 ## What to read: per task, never everything
 
 Do not load the whole handoff into context. Each task card in `docs/PROGRESS.md` lists the spec sections and fix IDs it needs. Read those and nothing else, and use `grep` to find a section instead of reading the spec end to end.

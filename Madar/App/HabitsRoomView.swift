@@ -270,7 +270,8 @@ struct HabitsRoomView: View {
                     } else { detail = next }
                 } label: {
                     // FB-39: the button names the habit it logs; a bare «سجّل» logged a habit the card never showed.
-                    Text((next.source == nil ? "سجّل " : "افتح ") + next.name).font(MadarTypography.caption()).lineLimit(1)
+                    Text((next.source == nil ? "سجّل " : "افتح ") + next.name).font(MadarTypography.caption())
+                        .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 14).frame(minHeight: 44)
                         .background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent)
                 }
@@ -294,7 +295,7 @@ struct HabitsRoomView: View {
                     // The next step is one tap from the top: it logs, as the row's own button does; a linked habit opens its sheet.
                     Button {
                         if next.source == nil, let p = next.summary.current { complete(next, delta: p.rule.measure == .duration ? 15 : 1) } else { detail = next }
-                    } label: { Text(heroAction(next)).font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.8).padding(.horizontal,14).frame(minHeight:44).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
+                    } label: { Text(heroAction(next)).font(MadarTypography.caption()).multilineTextAlignment(.center).fixedSize(horizontal:false,vertical:true).padding(.horizontal,14).frame(minHeight:44).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
                         .buttonStyle(.madarPlain).disabled(completionInFlight.contains(next.id)).padding(.top,4).accessibilityIdentifier("habits-next")
                 }
             }

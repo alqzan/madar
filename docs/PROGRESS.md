@@ -1,5 +1,7 @@
 # Current milestone
 
+Owner update — 8 Nov 2026: every directly requested Madar app change is authorized for automatic commit and internal TestFlight upload; no separate approval or wait for the old queue/feature freeze. Increment the build number per upload. Apple signing and processing remain external requirements; record an exact blocker if they prevent delivery. Public App Store release remains outside this authorization.
+
 As of 2 Nov 2026: the goal is the first internal TestFlight build; Codex works the «قبل TestFlight» cards. The paragraph below is the 27 Oct state.
 
 As of 27 Oct 2026: M0–M6 software is integrated on main (M5 has its bounded gate report) and M7 final integration is open. The owner reviewed 105 screens on 26 Oct (51 «موافق», 54 change requests) → rows OR-01…OR-32 in «Owner review page — 26 Oct» below, the current queue.
@@ -9,7 +11,7 @@ CloudKit: owner clarified 31 Oct that v1 stays local-only under RA1. Keep CloudK
 
 # How to use this board
 
-- **Now (owner, 2 Nov): «قبل TestFlight» (TF-01…TF-08) is the only queue, in order, under a feature freeze.** Take its first `ready` card; when TF-01…TF-07 are done, wait for TF-08 (Apple). Other sections (Owner review page OR-…, Next work, CN-…) are history or wait until after the first TestFlight build; do not start them now. CN-05 (signed local run on the owner's iPhone) is folded into TF-08.
+- **Owner-requested work (8 Nov):** the owner authorizes direct app changes to proceed immediately, with a commit and internal TestFlight upload per request. The earlier TF queue and feature freeze remain historical gate records; they do not block a direct request. Do not invent cards; use a descriptive `[OWNER]` commit and a handover when no existing card applies. CN-05 (signed local run on the owner's iPhone) remains separate from upload.
 - Status values and the visual-acceptance rule are under «# Board»; only the owner sets `approved`. Owner decisions and conflicts: `docs/DECISIONS.md`; open questions: «Waiting on the owner» and «Ideas».
 - Finished sections (every row approved, done or deferred) live in `docs/archive/PROGRESS-2026-10-27-finished-sections.md`; the index «Finished sections (archived 27 Oct)» below lists their card IDs.
 - Older «Last checked» lines are in `docs/archive/progress-last-checked.md`; older handovers in `docs/archive/handovers-2026-10-26.md`.
@@ -46,7 +48,7 @@ Codex takes these first, in order, before any other queue. Feature freeze until 
 | TF-05 | Release gate: Release build on iOS 27, shipping-source and review-contract checks, prayer sanctity window and widget snapshots. | Command output in the row; docs/reports/M7.md gate table filled. | done for this gate (device and signed checks go to TF-08): recorded command: xcodebuild -project Madar/Madar.xcodeproj -scheme Madar -configuration Release -destination generic/platform=iOS -derivedDataPath Madar/DerivedData -resultBundlePath Madar/Artifacts/TF-05-iOS-27.1-Release-20261102.xcresult CODE_SIGNING_ALLOWED=NO build → BUILD SUCCEEDED in TF-05-iOS-27.1-Release-20261102.xcresult; this run predates the TF-02 MoneyHomeView CancellationError guard; a current-source Release build remains unrun. python3 Madar/scripts/check-review-contracts.py → 86 passed; python3 Madar/scripts/check-shipping-sources.py → static pass for 450 Swift files and 38 token pairs, with manual trace of 6,091 lines required. On the final iPhone 15 Pro Max / iOS 27.0 simulator, TF-03-05-iOS-27.0-targeted-20261102.xcresult passed 5/5, including prayer sanctity and widget snapshots (1/1 each). The full no-notification/Live-Activity prohibition and manual source trace remain open; see docs/reports/M7.md. Claude 3 Nov on current source: `xcodebuild … -configuration Release -destination generic/platform=iOS … CODE_SIGNING_ALLOWED=NO build` → `BUILD SUCCEEDED` (`TF-05-Release-current-20261103.xcresult`); `check-review-contracts.py` → 86 passed; `check-shipping-sources.py` → STATIC PASS 450 files, 38 token pairs. The no-notification trace was done by a read-only audit of 33 alert paths: every release notification and Live Activity path goes through `SanctityGuard` (producer clamp, arbiter clamp, activity reservation); the only unguarded add is inside `#if DEBUG` (`PrayerNotifications.swift:954`). Gaps recorded, not fixed: the guard runs when scheduling, so a pending request is only re-checked on the next refresh; Friday and Ramadan windows described in the docs are not in code (fixed 30 min, Maghrib 20); a context Live Activity started before a window stays on screen through it (not an alert). The script's «manual trace of 6,091 lines» is its generic reminder for string/colour claims, not a gate criterion. |
 | TF-06 | Haiku bug hunt per room on everything changed since 25 Oct, especially new payload keys a command validator does not allow yet and silent save rejections. | Verified findings fixed with tests. | done: fixed `money.logExpense` accepting category source without a category, legacy-moved expense categories missing `rule` provenance, past-day habit completion before its real start date, and diary day reads swallowing retryable errors. Added focused command/UI regressions; the Prayer, Quran, and Mihbara hunts found no additional actionable defect. Verified: HabitCommands 1/1, MoneyCommands 1/1, iOS 27.0 targeted UI 4/4, and legacy-move integration 1/1. |
 | TF-07 | Store prep without Apple: privacy label answers, encryption export-compliance answer (backup uses standard encryption), App Review notes current, `privacy.html`/`support.html` ready to publish. Owner 2 Nov: host both pages on GitHub Pages; support email `alqazan.u@gmail.com` belongs in both pages and metadata. | Text ready in `Madar/Distribution/`; Pages URLs filled after publishing (publishing is outward-facing and needs owner approval). | deferred until Apple approves (owner, 3 Nov: the Pages links are for publishing later, not needed now; do not list as an owner task): Arabic privacy/support text and contact email are prepared; public Pages URLs stay null until then. Backup encryption is documented. `ITSAppUsesNonExemptEncryption` is decided in App Store Connect at upload and does not block the current work. Privacy-label answers still need review against the exact release build. |
-| TF-08 | After Apple approves and the owner signs in to Xcode: app and widget profiles with `group.com.alqzan.madar2`, CloudKit entitlement empty, signed archive from a clean `main` commit, upload to App Store Connect, internal TestFlight. | Build processed in App Store Connect; build number and commit in the row. | waiting for Apple's approval (owner, 3 Nov: he will say «جاتني الموافقة» and ask what to do; give him the ordered steps then; nothing here is on him before). Xcode stays 27.1 + iOS 27.0 simulator; no 27.2. App lock is optional and off by default; the owner enables it in Settings if wanted. General lock/Face ID/passcode acceptance is outside this gate; only the specific TF-02 prompt-source investigation is authorized now. |
+| TF-08 | Signed archive from a clean `main` commit with app and widget profiles and `group.com.alqzan.madar2`; upload to App Store Connect, internal TestFlight. | Build processed in App Store Connect; build number and commit in the row. | owner grants standing upload authorization on 8 Nov, so no separate approval is needed. Blocked on the host: only Xcode 27.2 is installed, while this project requires Xcode 27.1 + iOS 27.0; the archive attempt was stopped before producing an archive. Resume automatically when Xcode 27.1 is available. Apple signing and processing remain technical requirements. App lock acceptance remains outside this gate. |
 
 **Owner only (no agent can do these):** (1) wait for Apple's account approval; (2) accept the App Store Connect agreements; (3) sign in to Xcode with the Apple ID on this Mac once; (4) create the «مدار» app record in App Store Connect, or approve agent-prepared fields; (5) done 2 Nov: iPhone prepared and Apple Intelligence on; (6) install TestFlight and accept the invite; (7) old-app data already sent ~22 Oct (owner, 2 Nov); a fresh export only for the final move to the phone; (8) make the first encrypted backup on the phone and keep its passphrase; (9) done 2 Nov: GitHub Pages, support email `alqazan.u@gmail.com`; (10) «Waiting on the owner» answered 2 Nov. Items 5 and 7 do not wait on Apple.
 
@@ -606,15 +608,6 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
-## Handover — PERF-02 بداية التطبيق وTestFlight — 2026-11-07 — Codex
-- **Works now:** نشر الودجات يشارك قراءة العادات خلال النشر الواحد ويحتفظ بفشل القراءة؛ رقم البناء 11.
-- **Verified:** `xcodebuild test` أربع حالات الودجات والخصوصية 4/4، `codex-startup-focused-20261107.xcresult`، على Madar 15 Pro Max/iOS 27.0؛ `git diff --check`.
-- **Differences left:** لا تغيير مرئي مقصود.
-- **Not verified:** تعليق البداية على iPhone المالك، أو أن التعديل وحده أزاله؛ الاتصال بالجهاز تجاوز المهلة. اختبار البهو القديم فشل متوقعًا تبويبًا باسم «البهو»؛ المجموعة الواسعة أُوقفت عند حالة طويلة.
-- **Next:** أرشفة ورفع 0.1.0 (11) ثم تجربة المالك للبداية؛ إن استمر التعليق فقِس فتح المخزن ولقطات الودجات ومهام البهو على الجهاز.
-- **Model/effort:** Codex؛ النموذج والجهد غير مكشوفين؛ مساعدون للبحث.
-- **Usage:** ٨٥٪ من نافذة الخمس ساعات عند آخر فحص.
-
 ## Handover — PERF-03 سبب تعليق الفتح — 2026-11-07 — Claude
 - **Works now:** الفتح لا يخطط التنبيهات ولا يجهّز الودجات قبل أول شاشة؛ دمج السجلات بعد الفتح بفهرس، ولا يُعاد إن لم يتغير نموذج متزامن؛ قراءات المال للتنبيهات محفوظة ببصمة الجداول؛ سحب البهو للأسفل يحدّث (`refreshFromPull`)؛ أربع إصلاحات من صيد المساعدين ونصوص أقصر في المحبرة والصلاة.
 - **Verified:** مخزن معزول PERF-OWNER على المحاكي بنسخة بيانات المالك، `sample` أول ١٠ ث (Debug، مقارنة فقط): التخطيط قبل الشاشة ٢٤٥٣←٠، لقطات init ٧٠٥←٥٨، الدمج ٢٨٧٩←غائب، الخمول ١٣٧←٨٧٨ عيّنة. `swift test`: MadarData 114/114، MadarCommands 268/268، MadarSync 10/10. `xcodebuild test`: RoomNotificationsIntegrationTests 17/17 (`claude-perf03-notif-r4`)، BahwLobbyUITests 14/14 (12 في `claude-perf03-lobby` + 2 بعد تصحيحهما في `-r2`).
@@ -624,6 +617,7 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Model/effort:** Claude Opus 5.5؛ الجهد غير مكشوف.
 - **Usage:** ٢٤٪ من الخمس ساعات و٧٤٪ أسبوعيًا عند آخر فحص.
 
+## Handover — استقرار ما قبل TestFlight — 2026-11-08 — Codex
 - **Works now:** تحسينات استجابة القرآن واليوميات والمحبرة والمال والبهو والصلاة؛ لا يُنشأ سجل قبل أداء الصلاة، وتُسجّل الصلاة المؤداة بعد وقتها كـ`qada` بلا دين أو تذكير؛ سجل القرآن يتبع `core.firstCalendar`. رُفع 0.1.0 (13) إلى App Store Connect وبدأت معالجته.
 - **Verified:** `swift test` MadarPrayer 38/38 وPrayerHistoryMaintenance 1/1؛ `xcodebuild -quiet build` نجح؛ Xcode iOS 27.0 7/7 (`codex-prayer-retirement-20261108-r2.xcresult`)، `git diff --check`، وفحص JSON و`plutil`؛ أرشيف 0.1.0 (13) من `4d994ec5`، والتصدير: `Upload succeeded`.
 - **Differences left:** لم تُشغّل مقارنة `compare-screens.py` لهذه الدفعة؛ التغيير المقصود هو حذف مدخل الفوائت، ولا توجد قياسات زمنية على iPhone المالك.
@@ -631,3 +625,12 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Next:** بعد اكتمال المعالجة، يثبت المالك نسخة TestFlight على iPhone ويجربها؛ القبول على الجهاز منفصل عن المحاكي.
 - **Model/effort:** Codex؛ النموذج والجهد غير مكشوفين؛ مراجعة Sol Ultra للقراءة فقط واكتملت إصلاحاتها.
 - **Usage:** ١٤٪ باقية عند آخر فحص.
+
+## Handover — تنظيف النصوص والقصّ — 2026-11-08 — Codex
+- **Works now:** اختصارات الأشهر والعدّ المفيد في شريط السنة؛ حذف الشروح المكررة؛ التفاف الأسماء والمقتطفات والأسباب وملخصات الإعدادات بدل قصّها في البهو والعادات واليوميات والمال والتخصيص.
+- **Verified:** `git diff --check` نظيف. بناء Debug نجح تحت Xcode 27.2، لكنه لا يطابق إعداد المشروع. أوقفت محاولة Release archive قبل اكتمالها، ولم يُنشأ أرشيف.
+- **Differences left:** لا لقطة بعد ولا مقارنة `W3-Sana`؛ الأرشفة المعتمدة توقفت قبل إنتاج ملف.
+- **Not verified:** بناء Release المعتمد، اختبارات الواجهات، iPhone المالك، ورفع TestFlight.
+- **Next:** بمجرد توفر Xcode 27.1 محليًا، أكمل الأرشفة والرفع تلقائيًا دون موافقة إضافية.
+- **Model/effort:** Codex؛ النموذج والجهد غير مكشوفين.
+- **Usage:** غير مكشوف.

@@ -31,6 +31,7 @@ extension AppBahwService {
     static let hijriMonths = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"]
     static let hijriShort = ["محرم", "صفر", "ربيع ١", "ربيع ٢", "جمادى ١", "جمادى ٢", "رجب", "شعبان", "رمضان", "شوال", "القعدة", "الحجة"]
     static let gregorianMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+    static let gregorianShort = ["ينا", "فبر", "مار", "أبر", "ماي", "يون", "يول", "أغس", "سبم", "أكت", "نوف", "ديس"]
 
     var weekStart: MadarWeekStart { MadarWeekStart(rawValue: session.string("core.weekStart")) ?? .saturday }
 
@@ -195,11 +196,10 @@ struct BahwYearView: View {
                 }
                 yearStrip(period: period, month: monthIndex, landmarks: model.landmarks)
             }.accessibilityElement(children: .combine).accessibilityIdentifier("bahw-year-strip")
-            let nextMonth = names[(monthIndex + 1) % 12]
             row("الشهر", detail: names[monthIndex], share: Double(month.elapsed) / Double(max(1, month.length)), segments: 1, tone: "sepia",
-                caption: "بقي " + service.daysPhrase(month.remaining) + "، و" + nextMonth + " بعد " + service.daysPhrase(month.remaining, afterPreposition: true), id: "month")
-            row("الأسبوع", detail: (service.weekStart == .saturday ? "الجمعة" : "السبت") + " آخره", share: Double(week.elapsed) / 7, segments: 7, tone: "green",
-                caption: week.remaining == 1 ? "آخر يوم في الأسبوع، وأسبوع جديد غدًا" : "بقي " + service.daysPhrase(week.remaining) + " من الأسبوع", id: "week")
+                caption: "بقي " + service.daysPhrase(month.remaining), id: "month")
+            row("الأسبوع", detail: nil, share: Double(week.elapsed) / 7, segments: 7, tone: "green",
+                caption: "بقي " + service.daysPhrase(week.remaining), id: "week")
             if let day = service.dayModel() {
                 row("اليوم", detail: boundary == "midnight" ? "من منتصف الليل" : boundary == "maghrib" ? "من المغرب" : "من الفجر", share: day.share, marks: day.marks, tone: "clay", caption: day.next, id: "day")
             }
@@ -211,7 +211,7 @@ struct BahwYearView: View {
         let fill = lobby.color(hijri ? "amber" : "lapis")
         let marks = landmarks.filter { [.ramadan, .eidAlFitr, .arafah].contains($0.name) && $0.daysLeft < period.remaining }
             .map { (mark: $0, at: Double(MadarCalendarDays.distance(from: period.start, to: $0.day)) / Double(max(1, period.length))) }
-        let shorts = hijri ? AppBahwService.hijriShort : AppBahwService.gregorianMonths
+        let shorts = hijri ? AppBahwService.hijriShort : AppBahwService.gregorianShort
         return VStack(spacing: 6) {
             GeometryReader { geometry in
                 ForEach(Array(marks.enumerated()), id: \.offset) { index, item in
@@ -238,12 +238,12 @@ struct BahwYearView: View {
             }
         }
     }
-    private func row(_ title: String, detail: String, share: Double, segments: Int = 1, marks: [Double] = [], tone: String, caption: String, id: String) -> some View {
+    private func row(_ title: String, detail: String?, share: Double, segments: Int = 1, marks: [Double] = [], tone: String, caption: String, id: String) -> some View {
         let cuts = segments > 1 ? (1..<segments).map { Double($0) / Double(segments) } : marks
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(title).font(MadarTypography.section())
-                Text(detail).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
+                if let detail { Text(detail).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk) }
                 Spacer()
                 Text(digits.string(Int(share * 100)) + "٪\u{061C}").font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .title3)).foregroundStyle(lobby.ink)
             }
@@ -306,7 +306,7 @@ struct BahwYearView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Image(systemName: "seal.fill").font(.system(size: 10)).foregroundStyle(lobby.color(item.tone)).accessibilityHidden(true)
-                    Text(item.title).font(MadarTypography.section()).lineLimit(1)
+                    Text(item.title).font(MadarTypography.section()).fixedSize(horizontal: false, vertical: true)
                 }
                 MadarDateLabel(session.dateLabels(item.day)).foregroundStyle(lobby.secondaryInk)
                 if let approximation = service.approx(item.count) { Text((item.elapsedDays == nil ? "" : "مضى ") + approximation).font(MadarTypography.fine()).foregroundStyle(lobby.secondaryInk) }

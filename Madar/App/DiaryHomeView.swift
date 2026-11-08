@@ -479,7 +479,7 @@ struct DiaryHomeView: View {
         HStack(spacing: 8) {
             HStack(spacing: 0) {
                 Button { reader = day.day } label: {
-                    VStack(alignment: .leading, spacing: 3) { Text("صفحة اليوم").font(MadarTypography.section()); Text(day.excerpt).font(DiaryType.label).lineLimit(1) }
+                    VStack(alignment: .leading, spacing: 3) { Text("صفحة اليوم").font(MadarTypography.section()); Text(day.excerpt).font(DiaryType.label).lineLimit(2) }
                         .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-today")
                 Button { editor = .init(margin: nil) } label: { Image(systemName: "plus").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }

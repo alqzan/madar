@@ -53,7 +53,6 @@ struct DiaryHubView: View {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("أيامك").font(DiaryType.title);
-                    Text("السنة على الجدار، والشهر ورقة").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                 }.padding(.horizontal, 18).padding(.bottom, 12)
                 ScrollView(.horizontal) {
                     HStack(spacing: 16) {
