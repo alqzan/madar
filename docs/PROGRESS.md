@@ -4,8 +4,8 @@ The owner requests a full cleanup: reconcile AGENTS/CLAUDE/PROGRESS first, then 
 
 ## Verified baseline and delivery
 
-- M0–M6 software is integrated on `main`; M7 owner-device/system acceptance remains open. Uploaded build: **0.1.0 (13)** from `4d994ec5`, recorded under TF-13. Upload succeeded; Apple processing and installation on the owner's iPhone have not been checked in this session.
-- `18472ddd` adds copy/wrapping corrections after build 13; these still need the applicable focused UI checks and the next upload.
+- M0–M6 software is integrated on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (14)** from `ca023720`; Xcode 27.2 Release archive and `xcodebuild -exportArchive` internal-only upload succeeded. Apple processing and installation on the owner's iPhone have not been checked. TF-13 remains historical build-13 evidence.
+- Build 14 includes `18472ddd` copy/wrapping changes and this cleanup batch; its Release build/archive succeeded. The 17 focused cases below cover this batch; they are not a claim of every-screen acceptance.
 - Host checked 8 Nov: installed **Xcode 27.2 (27B52)**; approved **iOS 27.0** runtime and sole simulator `390840AD-4FF0-476F-8E1D-E0C521A58E45` are available. No project setting pins Xcode 27.1; the old wait for that patch is superseded. Check actual build/signing errors rather than assuming incompatibility.
 - Storage remains local-only (RA1). Claude is the other coding agent; CloudKit is deferred sync work, unrelated to organizing its instructions. No real owner/family store access, migration/deletion or owner-device run is authorized by this cleanup request.
 
@@ -15,7 +15,7 @@ The owner requests a full cleanup: reconcile AGENTS/CLAUDE/PROGRESS first, then 
 |---|---|---|
 | 1 | Reconcile root/nested agent instructions, board, build entry points and stale blockers. | done — paired instructions, one active queue, archived historical commands, corrected Makefile/README and guarded deferred cloud entry point. `cmp`, path checks, Make dry run and `git diff --check` passed. |
 | 2 | Inspect the visible flows in Prayer, Quran, Diary, Lobby/Habits, Money and Mihbara with bounded read-only helpers; apply concrete high-value simplifications and defects. | done for this batch — read-only coverage across rooms, concrete fixes below, 17 distinct focused passing cases; AI model/device and general FX remain explicitly open. |
-| 3 | Run affected focused checks and default-size captures; commit; archive/export/upload the next internal TestFlight build. | focused checks complete; preparing 0.1.0 (14) archive/upload. Apple processing, visual approval and owner-device acceptance remain separate. |
+| 3 | Run affected focused checks and default-size captures; commit; archive/export/upload the next internal TestFlight build. | done — 0.1.0 (14), archive/export/upload succeeded from `ca023720`. Artifacts: `Madar/Artifacts/Madar-0.1.0-14.xcarchive`, `OWNER-TestFlight-14-archive.log`, `OWNER-TestFlight-14-upload.log`. Processing, visual approval and owner-device acceptance remain separate. |
 
 ## Changes and remaining findings — this request
 
@@ -577,10 +577,10 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - **Usage:** غير مكشوف.
 
 ## Handover — ترتيب القواعد وتنظيف التطبيق — 2026-11-08 — Codex
-- **Works now:** قواعد Codex/Claude موحدة وطابور نشط واحد؛ انتهت شروط الانتظار القديمة للإصدار/المحاكي/الموافقة؛ إعادة المحاولة والبحث في الصلاة، حماية مسودات الحساب والبطاقة، حفظ حبر PDF عند فشل الخروج ورابط الجذر، ومحبرة واحدة من الإعدادات والتبويب؛ لا تبقى لوحة مفاتيح غرفة فوق التالية. الفهرس لا يعرض عناصر وحدة سابقة، والورد «اسألني» واضح أنه مثال، والتعريف الأول يعرض ثلاث خطوات.
-- **Verified:** 17 حالة مميزة ناجحة (4 طابور + 13 واجهة) موزعة بالعدد وأسماء الحزم في Current work؛ آخر دفعة `OWNER-final-flows-20261108-r1.xcresult` 4/4. `git diff --check` وتطابق زوجي التعليمات؛ فحص Make يقبل المحاكي المعتمد ويرفض غيره، وأمر الكلاود المؤجل يرفض التفعيل افتراضيًا. Build 14 سيُؤرشف من الالتزام التالي.
+- **Works now:** قواعد Codex/Claude موحدة وطابور نشط واحد؛ انتهت شروط الانتظار القديمة للإصدار/المحاكي/الموافقة؛ إعادة المحاولة والبحث في الصلاة، حماية مسودات الحساب والبطاقة، حفظ حبر PDF عند فشل الخروج ورابط الجذر، ومحبرة واحدة من الإعدادات والتبويب؛ لا تبقى لوحة مفاتيح غرفة فوق التالية. رُفع البناء 0.1.0 (14) داخليًا. الفهرس لا يعرض عناصر وحدة سابقة، والورد «اسألني» واضح أنه مثال، والتعريف الأول يعرض ثلاث خطوات.
+- **Verified:** 17 حالة مميزة ناجحة (4 طابور + 13 واجهة) موزعة بالعدد وأسماء الحزم في Current work؛ آخر دفعة `OWNER-final-flows-20261108-r1.xcresult` 4/4. `git diff --check` وتطابق زوجي التعليمات؛ فحص Make يقبل المحاكي المعتمد ويرفض غيره، وأمر الكلاود المؤجل يرفض التفعيل افتراضيًا. أرشيف Release تحت Xcode 27.2 من `ca023720` للبناء 0.1.0 (14)، والتحقق من التوقيع ونسخة التطبيق/الودجت، ثم `xcodebuild -exportArchive` → `Upload succeeded`.
 - **Differences left:** تحسينات مقصودة في رسائل الفشل والخروج والتعريف الأول؛ لقطات L/light محلية. مقارنة الصلاة تضم أعلى الصفحة فقط؛ لا قبول بصري شامل أو مطابقة جديدة لكل شاشة.
-- **Not verified:** نموذج أسئلة اليوميات على الجهاز ودورة خلفيته، iPhone المالك، قياس الأداء الحقيقي، معالجة Apple والنسخة الجديدة قبل اكتمال الرفع.
-- **Next:** الأرشفة والرفع الداخلي للبناء 14 تلقائيًا؛ لا موافقة إضافية. مسار FX العام مؤجل: رجع اختبارُه إلى خطأ قراءة عام، وأُزيل التعديل غير المثبت؛ لا تدّعِ نجاحه. مصدر سعر عام يحتاج قرار قاعدة/نموذج بيانات مستقلًا.
+- **Not verified:** نموذج أسئلة اليوميات على الجهاز ودورة خلفيته، iPhone المالك، قياس الأداء الحقيقي، اكتمال معالجة Apple وظهور البناء 14 في TestFlight وتثبيته على iPhone.
+- **Next:** بعد معالجة Apple يجرّب المالك البناء 14؛ لا حاجة لإعادة رفع الكود نفسه. مسار FX العام مؤجل: رجع اختبارُه إلى خطأ قراءة عام، وأُزيل التعديل غير المثبت؛ لا تدّعِ نجاحه. مصدر سعر عام يحتاج قرار قاعدة/نموذج بيانات مستقلًا.
 - **Model/effort:** Codex؛ غير مكشوف؛ ثلاثة مساعدي GPT-6 Luna للقراءة فقط. مراجعة واحدة لمسار فقد الحبر كشفت رابط الجذر، وأُصلح واختُبر.
-- **Usage:** 31% متاحة عند فحص ما قبل إغلاق باب الإضافات؛ سيُعاد الفحص قبل/بعد الرفع. لم تُستخدم أرصدة إعادة ضبط.
+- **Usage:** 12% متاحة من الخمس ساعات عند فحص ما بعد الرفع؛ لا عمل جديد ولا مهام اختبار باقية في هذه الجلسة. لم تُستخدم أرصدة إعادة ضبط.
