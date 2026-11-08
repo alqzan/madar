@@ -24,6 +24,7 @@ The owner requests a full cleanup: reconcile AGENTS/CLAUDE/PROGRESS first, then 
 | 8 | Owner 8 Nov: «الفائض ليه اخضر وهو تحت» — a cycle that went over sat below the line in the gains green. | done (Claude) — below-line surplus bars now use the debt red; with batch 4: money card «صرفت ١٤٠ من يومك ٤٠٠», diary card quotes the latest line, 56 money amounts drawn with Thmanyah's own «٬/٫» (`sweep4-money2` 2/2, `sweep4-lobby`/`lobby2` 4/4, `MoneyOutsideRoomTests` 2/2). |
 | 9 | Owner 8 Nov: «مربعات الاحتياطي ماش مهب زينه… بالامكان تكون أحسن». | built — awaiting owner (Claude): the 540-cell grid became 12 gold month rods (a year), filled for the months covered; label «يكفيك ٦ أشهر و١١ يومًا». Spending limits also show «من X» and turn red past the limit. `sweep4-money4` 2/2; not visually re-checked (owner asked for no screenshots). |
 | 10 | Sweep 8 Nov (Claude) | built: money settings no longer promise «تراجع» after save (undo is removal-only since 5 Nov) — line now «عاين الرقم أولًا، ولا يتغير شيء حتى تحفظ»; 44pt daily preview and card payoff/unbilled amounts use Thmanyah's own separators; habit past-day line «هذا اليوم ليس من أيام العادة، اختر يومًا آخر.»; stale MoneySettings UI test updated (money tab, no undo). `sweep7-settings3/4` 4/4. |
+| 11 | Owner 8 Nov: «يمدي اجرب آخلي مدار آحادي اللون… ابي اشوف نموذج» ثم «اسود وابيض بس» ثم «كنسل». | dropped by owner: two mockups shown (ink+gold / grey; then pure black-and-white light/dark); owner cancelled, nothing built. |
 
 ## Changes and remaining findings — this request
 
@@ -571,16 +572,17 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 # Handovers
 
-## Handover — نفضة شاملة (جارية) — 2026-11-08 — Claude
+## Handover — نفضة شاملة (مقفلة بطلب المالك) — 2026-11-08 — Claude
 - **Works now:** الجسر = ورد أمس داخل خطوة «الورد». البهو: بطاقة المال الصغيرة «صرفت ١٤٠ من يومك ٤٠٠» بشريط من اليمين، بطاقة المذكرات تقتبس آخر سطر، الاقتراحات تسمّي الشيء الحقيقي. المال: الفائض السالب أحمر، الاحتياطي ١٢ عمودًا شهريًا و«يكفيك ٦ أشهر و١١ يومًا»، حدود الصرف «من X» وتحمرّ عند التجاوز، ٥٦ مبلغًا بعلامتي «٬/٫» من ثمانية، ورقتا الادخار وهدف الاحتياطي بطول كامل كي لا تخفي لوحة الأرقام زر الحفظ. سطر المال في المذكرات بلا هللات صفرية (وأُصلح خطأ قسمة كشفه الاختبار).
 - **Verified:** `MoneyOutsideRoomTests` 2/2، `sweep4-lobby` 2/2 و`lobby2` 2/2، `sweep4-money2/3/4` (حالتا المال الرئيسية)، `MoneyEnvelopesUITests` كلها ١٠/١٠ موزعة على `sweep4-env…env6`، و`DailyPlanningTests` 16/16 سابقًا. TestFlight 0.1.0 (16) رُفع من `f38d8381`.
 - **Differences left:** الأعمدة الشهرية وبطاقات البهو تصميم جديد — built، لم يرها المالك؛ لم تُلتقط صور بطلب المالك («لعاد تصور الشاشه»).
 - **After build 16:** `5c89ed4c` الأوراق بطول كامل؛ `6ebb6589` علامتا ثمانية في تنبيه المطابقة وملخصات الإعدادات وسطر المذكرات المقتبس (`sweep5-a` 2/2)؛ `801c51c1` سطر الأسبوع يقول «تمّت» للعادة المنجزة (`sweep5-b` حالة العريضة ناجحة). `4d60e25d` شريط تقدّم الكتاب في بطاقة المحبرة الصغيرة (`sweep5-c` 1/1).
 - **Fixed after diagnosis:** اختيار فترة العادات في بطاقة البهو الكبيرة كان يرجع لـ«اليومية» إذا ضُغط مباشرة بعد «رتّب» (الحفظ يعيد بناء البطاقة فيمسح الحالة)؛ صار الاختيار محفوظًا في الجلسة (`sweep6-ring` 2/2، والمسبار بتأخير ثانيتين أكّد السبب).
-- **Not verified:** معالجة Apple للبناء 16 وقبوله على iPhone المالك. فراغ بطاقة الصلاة العريضة في البهو باقٍ (تكبير الأقواس صغّر الأوقات فأُلغي).
-- **Next:** بقية النفضة: غرفة الصلاة، المحبرة، العادات، مراجعة القرآن؛ ثم السرعة. ملفات كوديكس الثلاثة (`PrayerRepository`/`PrayerMutationHandler`/`HabitMutationHandler`) ما زالت غير ملتزمة — لا تُلمس.
+- **Sweep, last part:** `680d390a` إعدادات المال لا تعد بـ«تراجع» بعد الحفظ (التراجع للحذف فقط منذ ٥ نوفمبر)، فواصل ثمانية في معاينة اليوم وبطاقات السداد، سطر العادة لليوم غير المستحق (`sweep7-settings3/4` 4/4). بعده: بطاقة الصلوات المعلّقة لا تقول «ثم تُحسب فائتة» (الحالة الفعلية «غير محسومة»، RP1) وتصريف العدد صحيح (صلاة واحدة/صلاتان/٣ صلوات/١١ صلاة)؛ «رواق مصغّر» صار «آخر ٢٥ فرضًا»؛ حذف العادة لا يعد بعشر دقائق (الشريط يختفي بعد ٤ ثوانٍ).
+- **Not verified:** معالجة Apple للبناء 16 وقبوله على iPhone المالك. فراغ بطاقة الصلاة العريضة في البهو باقٍ (تكبير الأقواس صغّر الأوقات فأُلغي). اختبار `PrayerFirstDayUITests/testPolarDayLetsMeRecordAPrayerManually` حُذفت منه خطوات «تراجع» القديمة لكنه ما زال يفشل عند `reveal(streaks)` (السطر ١٦٥): بطاقة السلاسل أسفل الشاشة (y 665–936) والصفحة لا تتمرّر في الاختبار بعد محاولتين — شخّص هل المحتوى يحتاج هامشًا سفليًا فوق شريط التبويب. الاختباران الآخران في الملف ناجحان (`sweep7-prayer6`). فكرة اللون الواحد/الأسود والأبيض عُرضت كنموذج وألغاها المالك.
+- **Next:** المالك أقفل النفضة. ابدأ بفشل اختبار السلاسل أعلاه؛ ثم المحبرة ومراجعة القرآن والسرعة إن طُلب. ملفات كوديكس الثلاثة (`PrayerRepository`/`PrayerMutationHandler`/`HabitMutationHandler`) ما زالت غير ملتزمة — لا تُلمس.
 - **Model/effort:** Claude Opus 5.5؛ الجهد غير مكشوف؛ بلا مساعدين.
-- **Usage:** الخمس ساعات ٣٤٪ متاحة عند آخر فحص؛ الأسبوعي ١٦٪.
+- **Usage:** الخمس ساعات ١٩٪ متاحة عند آخر فحص؛ الأسبوعي ١٤٪.
 
 ## Handover — تسهيل بحث المذكرات والتحقق المتبقي — 2026-11-08 — Codex
 - **Works now:** البحث العادي جاهز للكتابة فور فتحه؛ تعديل/حذف الفلتر يحدّث النص الظاهر ويحافظ على بقية القواعد، ولا يرجع الفلتر بعد تحديث الفهرس إثر حفظ مصدر. لكل تعديل/حذف/مسح مساحة لمس ٤٤ نقطة على الأقل، مع إشارة قلم واضحة. التغيير في `e0578d9d`؛ إصلاح تحقق PERF-04 في `7731e1ff`. رُفع 0.1.0 (15) داخليًا؛ نجحت الأرشفة والتصدير والرفع وبدأت معالجة Apple.

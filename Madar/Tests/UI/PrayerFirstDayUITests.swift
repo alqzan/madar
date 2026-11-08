@@ -69,7 +69,6 @@ import XCTest
         let alone = app.buttons["prayer-status-alone"]
         XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription)
         alone.tap()
-        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
         // With the heart question switched on, it keeps the log sheet open after the prayer is saved.
         // Finish that real flow before checking or scrolling the home behind it.
         let skipHeart = app.buttons["prayer-heart-skip"]
@@ -83,21 +82,6 @@ import XCTest
         XCTAssertTrue(noTimes.exists, app.debugDescription)
         XCTAssertFalse(app.alerts["لم تكتمل العملية"].exists, "A missing prayer boundary must not surface as a reminder refresh failure.")
         attachScreenshot(app, named: "M1-polar-no-times-logged-L")
-
-        let undo = app.buttons["undo-button"]
-        XCTAssertTrue(undo.waitForExistence(timeout: 10), app.debugDescription); undo.tap()
-        XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(fajr.label.contains("سجّلها يدويًا"), fajr.label)
-        fajr.tap()
-        let relogAlone = app.buttons["prayer-status-alone"]
-        XCTAssertTrue(relogAlone.waitForExistence(timeout: 10), app.debugDescription); relogAlone.tap()
-        XCTAssertTrue(undo.waitForExistence(timeout: 10), app.debugDescription)
-        let relogHeartSkip = app.buttons["prayer-heart-skip"]
-        XCTAssertTrue(relogHeartSkip.waitForExistence(timeout: 10), app.debugDescription); relogHeartSkip.tap()
-        XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(fajr.label.contains("وحدي"), fajr.label)
-        XCTAssertFalse(app.alerts["لم تكتمل العملية"].exists, app.debugDescription)
-        attachScreenshot(app, named: "AU96-prayer-relog-after-undo-L")
 
         let streaks = app.buttons["prayer-streaks"]
         reveal(streaks, in: app)
@@ -113,7 +97,7 @@ import XCTest
         XCTAssertTrue(historicalManualLog.isEnabled, app.debugDescription)
         attachScreenshot(app, named: "M1-polar-history-edit-L")
         historicalManualLog.tap()
-        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.alerts["لم تكتمل العملية"].waitForExistence(timeout: 3), app.debugDescription)
         XCTAssertFalse(app.alerts["لم تكتمل العملية"].exists, app.debugDescription)
     }
 

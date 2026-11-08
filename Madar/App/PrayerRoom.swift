@@ -226,9 +226,18 @@ struct PrayerRoom: View {
             }
         }
     }
+    /// «صلاة واحدة» / «صلاتان» / «٣ صلوات» / «١١ صلاة» تنتظر التسجيل.
+    static func pendingTitle(_ n: Int, _ number: (Int) -> String) -> String {
+        switch n {
+        case 1: "صلاة واحدة تنتظر التسجيل"
+        case 2: "صلاتان تنتظران التسجيل"
+        case 3...10: number(n) + " صلوات تنتظر التسجيل"
+        default: number(n) + " صلاة تنتظر التسجيل"
+        }
+    }
     @ViewBuilder private func pendingCard(_ state: PrayerRoomState) -> some View {
         if !state.pending.isEmpty {
-            Button { sheet = .pending } label: { MadarCard { VStack(alignment: .leading, spacing: 8) { Text("\(number(state.pending.count, state)) صلوات تنتظر التسجيل").font(MadarTypography.section()); Text("تظل معلّقة \(number(state.pendingDays, state)) أيام صلاة، ثم تُحسب فائتة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Text("سجّلها").foregroundStyle(theme.accent) } } }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-pending")
+            Button { sheet = .pending } label: { MadarCard { VStack(alignment: .leading, spacing: 8) { Text(Self.pendingTitle(state.pending.count) { number($0, state) }).font(MadarTypography.section()); Text("بعد " + number(state.pendingDays, state) + ((3...10).contains(state.pendingDays) ? " أيام" : " يومًا") + " تصير «غير محسومة»، ولا تُحسب فائتة إلا إن سجّلتها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Text("سجّلها").foregroundStyle(theme.accent) } } }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-pending")
         }
         if let entry = state.pendingHeart.first { Button { sheet = .log(entry) } label: { MadarCard { Label("بقي سؤال القلب عن " + entry.title, systemImage: "sparkle").font(MadarTypography.section()) } }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-pending-heart") }
     }
@@ -505,7 +514,7 @@ private struct PrayerBalance: View {
             }
         } else if style == "miniRiwaq" {
             VStack(alignment: .leading, spacing: 10) {
-                Text("آخر الفروض · رواق مصغّر").font(MadarTypography.caption())
+                Text(summary.beads.count >= 25 ? "آخر " + number(25) + " فرضًا" : "آخر الفروض").font(MadarTypography.caption())
                 if size.isAccessibilitySize { ForEach(summary.beads.suffix(25)) { Text($0.accessibilityLabel) } }
                 else { LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 12) { ForEach(summary.beads.suffix(25)) { bead in PrayerHorseshoe().fill(bead.status == .jamaah ? theme.accent : bead.status == .alone ? theme.color("goldMid") : .clear).overlay { PrayerHorseshoe().stroke(bead.status == .missed ? theme.color("missed") : theme.line, style: StrokeStyle(lineWidth: 1, dash: bead.status == .pending ? [3, 2] : [])) }.frame(height: 35).accessibilityLabel(bead.accessibilityLabel) } } }
             }

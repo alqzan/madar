@@ -128,7 +128,7 @@ struct HabitsRoomView: View {
         .confirmationDialog("حذف العادة وسجلها؟",isPresented:Binding(get:{deletingArchived != nil},set:{if !$0{deletingArchived=nil}}),titleVisibility:.visible) {
             Button("احذف",role:.destructive) {if let row=deletingArchived{perform("habit.deleteArchived",["id":.string(row.id.uuidString)])};deletingArchived=nil}
             Button("إلغاء",role:.cancel){deletingArchived=nil}
-        } message:{Text("تختفي العادة وسياساتها وتسجيلاتها. يتاح التراجع لعشر دقائق.")}
+        } message:{Text("تختفي العادة وسياساتها وتسجيلاتها، ويمكنك التراجع فورًا من زر «تراجع» أسفل الشاشة.")}
         .sheet(item:$editor, onDismiss: { applyPendingBahwRootIfReady() }) { value in HabitEditorView(session:session,reading:value.reading,id:value.id,initialSource:value.source).madarSheetErrorAlert(session) }
         .sheet(item:$pastDay, onDismiss: { applyPendingBahwRootIfReady() }) { row in HabitPastDaySheet(session:session,reading:row) { reload() }.madarSheetErrorAlert(session) }
         .sheet(item:$detail,onDismiss:{
