@@ -34,6 +34,7 @@ struct DiaryDisplayDay: Identifiable, Sendable {
 }
 struct DiaryLobbySummary {
     let count: Int
+    var lastText: String? = nil
     let last: Date?
     let lastTZID: String?
     let photo: Data?
@@ -465,7 +466,11 @@ private struct DiaryDayReadConfiguration: Sendable {
                 }
             }
         }
-        return DiaryLobbySummary(count: countedEntries.count + margins.count, last: latest?.0, lastTZID: lastTZID, photo: photo)
+        // The lobby card quotes the day's latest written line instead of only counting it.
+        let lastText = countedEntries.filter { $0.mediaID == nil }.max { $0.eventAt < $1.eventAt }
+            .map { ($0.textFormat == "markdown" ? DayOneMarkdown.plain($0.text) : $0.text).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .flatMap { $0.isEmpty ? nil : $0 }
+        return DiaryLobbySummary(count: countedEntries.count + margins.count, lastText: lastText, last: latest?.0, lastTZID: lastTZID, photo: photo)
     }
 
     /// Authored text for a user-requested, temporary AI analysis.

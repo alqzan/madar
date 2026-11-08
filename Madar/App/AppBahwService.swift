@@ -35,6 +35,7 @@ struct BahwQuranModel: Equatable {
 }
 struct BahwDiaryModel: Equatable {
     let count: Int
+    var lastText: String? = nil
     let last: Date?
     let lastTZID: String?
     let photo: Data?
@@ -189,7 +190,7 @@ struct BahwUpcomingItem: Identifiable, Equatable {
     private func readDiary() -> BahwDiaryModel? {
         let service = AppDiaryService(app: session)
         guard let summary = try? service.lobbySummary(today) else { return nil }
-        return .init(count: summary.count, last: summary.last, lastTZID: summary.lastTZID, photo: summary.photo)
+        return .init(count: summary.count, lastText: summary.lastText, last: summary.last, lastTZID: summary.lastTZID, photo: summary.photo)
     }
     func year() -> BahwYearModel {
         let days = calendarDays, day = today
@@ -314,7 +315,9 @@ extension AppBahwService {
         }
         if includesToday, session.roomEnabled(.quran), let quran = try? AppQuranService(session: session).widgetSnapshot().payload,
            quran.done < quran.total {
-            result.append(.init(id: "quran", title: quran.nextTitle, detail: quran.nextDetail, symbol: "MadarQuran", destination: .quran))
+            // Same shape as the habit row above («الماء / بقي ٨ أكواب»): the step's name, then the passage.
+            let title = quran.nextTitle.hasPrefix("التالي: ") ? String(quran.nextTitle.dropFirst("التالي: ".count)) : quran.nextTitle
+            result.append(.init(id: "quran", title: title, detail: quran.nextDetail, symbol: "MadarQuran", destination: .quran))
         }
         if level == "present" {
             if session.roomEnabled(.notes), let diary = diary(), diary.count == 0 {

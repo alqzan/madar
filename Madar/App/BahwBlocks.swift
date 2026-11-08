@@ -518,6 +518,11 @@ struct BahwBlockView: View {
                 title(room.accent)
                 Text(count == 0 ? "اكتب سطر اليوم" : service.lineCount(count)).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).lineLimit(2).minimumScaleFactor(0.7).accessibilityIdentifier("bahw-notes-count")
                 if let last = model?.last { Text("آخرها " + service.time(last, zone: model?.lastTZID) + (model?.photo != nil ? "، وصورة" : "")).font(small).foregroundStyle(room.secondaryInk).lineLimit(1) }
+                if model?.photo == nil, size != .wide, let line = model?.lastText {
+                    Text(line).font(.custom("thmanyahseriftext-Regular", size: 15, relativeTo: .body)).foregroundStyle(room.ink)
+                        .lineLimit(size == .large ? 6 : 3).lineSpacing(3).padding(.top, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("bahw-notes-last-line")
+                }
                 if model?.photo == nil { Spacer(minLength: 0) }
             }
         }
