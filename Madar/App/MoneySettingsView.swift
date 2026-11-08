@@ -231,7 +231,7 @@ struct MoneySettingsView: View {
                     Spacer(); nudge("+", id: "plus", delta: 1)
                 }.padding(.vertical, 12)
                 if let p = proposed {
-                    Text("للخطط " + amount(p.allowanceMinor - p.dailyMinor)).font(MadarTypography.caption())
+                    Text(figure: "للخطط " + amount(p.allowanceMinor - p.dailyMinor)).font(MadarTypography.caption())
                         .foregroundStyle(theme.secondaryInk)
                 }
             }.padding(18).background(theme.background).overlay {
@@ -256,8 +256,8 @@ struct MoneySettingsView: View {
                     }.clipShape(.capsule)
                 }.frame(height: 12).accessibilityHidden(true)
                 HStack {
-                    Text("يوميات الدورة " + amount(dailiesTotal ?? 0)); Spacer();
-                    Text("باقي الدخل " + amount(c.incomeMinor - (dailiesTotal ?? 0)))
+                    Text(figure: "يوميات الدورة " + amount(dailiesTotal ?? 0)); Spacer();
+                    Text(figure: "باقي الدخل " + amount(c.incomeMinor - (dailiesTotal ?? 0)))
                 }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }
             note("أي تغيير يبدأ غدًا؛ ما مضى من يومياتك والترحيل والخطط محفوظ.")
@@ -477,7 +477,7 @@ struct MoneySettingsView: View {
                 }
             }
             if let threshold = service.bigExpenseThreshold(cycle: cycle) {
-                Text("يفتح موجّه التوزيع من " + amount(threshold)).font(MadarTypography.caption()).foregroundStyle(
+                Text(figure: "يفتح موجّه التوزيع من " + amount(threshold)).font(MadarTypography.caption()).foregroundStyle(
                     theme.secondaryInk
                 ).accessibilityIdentifier("money-settings-big-threshold")
             } else {

@@ -104,7 +104,7 @@ struct MoneySalaryView: View {
                     Text(figure: amount(r.plan.rate.dailyRateMinor)).font(.custom("thmanyahserifdisplay-Black", size: 52, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.5)
                         .accessibilityIdentifier("money-salary-daily")
                     if let previous = r.opening.previousDailyMinor {
-                        Text("السابقة " + amount(previous) + "، " + (r.opening.previousMode == "percent" ? "نسبة" : "ثابتة")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        Text(figure: "السابقة " + amount(previous) + "، " + (r.opening.previousMode == "percent" ? "نسبة" : "ثابتة")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     }
                 }
             }.frame(width: 150)

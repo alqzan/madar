@@ -29,7 +29,7 @@ struct MoneyCashView: View {
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("يومك وحدودك يسجّلان الشراء يومه، ولو بالائتمان؛ والسداد ينقص النقد والدين معًا، فلا يُحسب مصروفًا مرة أخرى.")
-                    Text(reading.home.hasKnownBalance ? "من «صافي رصيدك» محجوز " + amount(reading.home.basis.reservedMinor) + "، وغير مخصّص " + amount(reading.home.basis.unallocatedMinor) + "." : "المحجوز المسجّل " + amount(reading.home.basis.reservedMinor) + "؛ يتضح غير المخصّص بعد معرفة رصيد البنك.")
+                    Text(figure: reading.home.hasKnownBalance ? "من «صافي رصيدك» محجوز " + amount(reading.home.basis.reservedMinor) + "، وغير مخصّص " + amount(reading.home.basis.unallocatedMinor) + "." : "المحجوز المسجّل " + amount(reading.home.basis.reservedMinor) + "؛ يتضح غير المخصّص بعد معرفة رصيد البنك.")
                 }.font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true).padding(16).frame(maxWidth: .infinity, alignment: .leading)
                     .background(theme.surface).overlay(alignment: .leading) { Rectangle().fill(theme.color("surplusText")).frame(width: 3) }
                 Text("مصادر النقد").font(MadarTypography.cardTitle())

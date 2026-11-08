@@ -26,7 +26,7 @@ struct MoneyBasisView: View {
                                 MoneyCashView(app: app, reading: reading, revealed: $revealed)
                             } label: {
                                 VStack(alignment: .leading, spacing: 0) {
-                                    Text(reading.home.hasKnownBalance ? "صافي رصيدك، في حسابك " + amount(reading.home.basis.inAccountMinor) : "لم يُعرف رصيد الحسابات بعد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                    Text(figure: reading.home.hasKnownBalance ? "صافي رصيدك، في حسابك " + amount(reading.home.basis.inAccountMinor) : "لم يُعرف رصيد الحسابات بعد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                                         Text(figure: visible && !reading.home.hasKnownBalance ? "—" : amount(reading.home.basis.netMinor)).font(.custom("thmanyahserifdisplay-Black", size: 44, relativeTo: .largeTitle)).accessibilityIdentifier("money-basis-net")
                                         Image(systemName: "arrow.up.left").font(.caption)
@@ -189,7 +189,7 @@ struct MoneySourceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 MoneyPageHeader(title: detail.title, close: { dismiss() })
-                Text(visible ? detail.valueText ?? AppMoneyService(app: app).amount(detail.amountMinor) : "•••").font(.custom("thmanyahserifdisplay-Black", size: 38, relativeTo: .largeTitle))
+                Text(figure: visible ? detail.valueText ?? AppMoneyService(app: app).amount(detail.amountMinor) : "•••").font(.custom("thmanyahserifdisplay-Black", size: 38, relativeTo: .largeTitle))
                 if detail.estimated { Text("تقريبًا، تاريخ القفل مقدّر").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                 Text(detail.explanation).font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
                 if let date = detail.date { MadarDateLabel(app.dateLabels(date)).foregroundStyle(theme.secondaryInk) }

@@ -153,7 +153,7 @@ private struct MoneyBudgetReceipt: View {
                     effect("من يومك", value: row.dailyMinor)
                     if row.categoryMinor > 0 { effect("من حدّ «" + row.category + "»", value: row.categoryMinor) }
                     HStack { Text("في السجل"); Spacer(); Text("يبقى دائمًا").bold() }.font(MadarTypography.body())
-                    if row.netMinor != row.amountMinor { Text("بعد الردود: " + amount(row.netMinor)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+                    if row.netMinor != row.amountMinor { Text(figure: "بعد الردود: " + amount(row.netMinor)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     // M5-X00 (owner 16 Oct): an optional reason, written on the receipt while the stamp stays.
                     if let stamped = row.reason {
                         HStack(alignment: .firstTextBaseline) { Text("السبب"); Spacer(); Text(stamped).bold().multilineTextAlignment(.trailing) }
@@ -183,7 +183,7 @@ private struct MoneyBudgetReceipt: View {
             .presentationDetents([.height(600), .large]).presentationDragIndicator(.visible).madarSheetLock(saving: saving).onChange(of: saving, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }.onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }.accessibilityIdentifier("money-budget-receipt")
     }
     private func effect(_ title: String, value: Int) -> some View {
-        HStack { Text(title); Spacer(); Text((row.excluded ? "يعود " : "لا يُخصم ") + amount(value)).bold().foregroundStyle(theme.color("surplusText")) }.font(MadarTypography.body())
+        HStack { Text(title); Spacer(); Text(figure: (row.excluded ? "يعود " : "لا يُخصم ") + amount(value)).bold().foregroundStyle(theme.color("surplusText")) }.font(MadarTypography.body())
     }
     private func save() {
         guard !saving else { return }; saving = true

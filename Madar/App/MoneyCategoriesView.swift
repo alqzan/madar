@@ -148,14 +148,14 @@ struct MoneyCategoriesView: View {
             HStack {
                 step("minus") { if percentMode { draftBp = max(100, draftBp - 100) } else { draftMinor = max(0, draftMinor - 10_000) } }
                 Spacer()
-                Text(percentMode ? percentLabel(draftBp) : amount(draftMinor)).font(.custom("thmanyahserifdisplay-Black", size: 52, relativeTo: .largeTitle))
+                Text(figure: percentMode ? percentLabel(draftBp) : amount(draftMinor)).font(.custom("thmanyahserifdisplay-Black", size: 52, relativeTo: .largeTitle))
                     .lineLimit(1).minimumScaleFactor(0.5).accessibilityIdentifier("money-limit-value")
                 Spacer()
                 step("plus") { if percentMode { draftBp = min(10_000, draftBp + 100) } else { draftMinor += 10_000 } }
             }.environment(\.layoutDirection, .leftToRight)
-            Text(percentMode ? "= " + amount(limit) + " هذه الدورة" : r.incomeMinor > 0 && visible ? "= " + service.percent(draftMinor, of: r.incomeMinor) + " من راتبك" : "")
+            Text(figure: percentMode ? "= " + amount(limit) + " هذه الدورة" : r.incomeMinor > 0 && visible ? "= " + service.percent(draftMinor, of: r.incomeMinor) + " من راتبك" : "")
                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-            Text(left >= 0 ? "باقي " + amount(left) + "، يكفيك " + amount(left / max(1, r.daysLeft)) + " في اليوم" : "تجاوزت الحد بـ" + amount(-left))
+            Text(figure: left >= 0 ? "باقي " + amount(left) + "، يكفيك " + amount(left / max(1, r.daysLeft)) + " في اليوم" : "تجاوزت الحد بـ" + amount(-left))
                 .font(MadarTypography.caption()).foregroundStyle(left >= 0 && limit > 0 && s.spentMinor * 100 / max(1, limit) < 80 ? theme.color("surplusText") : theme.color("dueText"))
                 .accessibilityIdentifier("money-limit-left")
             HStack(spacing: 10) {

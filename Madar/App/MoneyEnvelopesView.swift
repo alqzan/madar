@@ -93,7 +93,7 @@ struct MoneyEnvelopesView: View {
     private func dailySplit(_ cycle: MoneyCycleReading) -> some View {
         let day = CycleEngine.day(cycle.elapsedDays, cycle.input), plans = day.allowanceMinor - day.dailyMinor
         return VStack(alignment: .leading, spacing: 8) {
-            HStack { Text("قسمة يومك"); Spacer(); Text("من " + amount(day.allowanceMinor) + ": لك " + amount(day.dailyMinor) + " ولمظاريفك " + amount(plans)) }
+            HStack { Text("قسمة يومك"); Spacer(); Text(figure: "من " + amount(day.allowanceMinor) + ": لك " + amount(day.dailyMinor) + " ولمظاريفك " + amount(plans)) }
                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-envelope-daily-split")
             if visible && !dynamicType.isAccessibilitySize {
                 GeometryReader { proxy in
@@ -118,7 +118,7 @@ struct MoneyEnvelopesView: View {
                 VStack(alignment: .leading, spacing: 8) { reserveTitle(reading); reserveModes(reading) }
             }
             if visible, let whole = reading.reserve.wholeDailies {
-                Text(service.dailies(whole) + (reading.reserve.partialDailyMinor.map { $0 > 0 ? "، وباقي " + amount($0) : "" } ?? ""))
+                Text(figure: service.dailies(whole) + (reading.reserve.partialDailyMinor.map { $0 > 0 ? "، وباقي " + amount($0) : "" } ?? ""))
                     .font(MadarTypography.body()).accessibilityIdentifier("money-reserve-dailies")
             } else if visible {
                 Text(reading.reserve.dailyMinor == 0 ? "اليومية صفر؛ المدة من الالتزامات المسجّلة وحدها." : "تظهر اليوميات والمدة بعد ضبط اليومية.")
@@ -133,7 +133,7 @@ struct MoneyEnvelopesView: View {
             if visible, let daily = reading.reserve.dailyMinor, daily > 0 {
                 HStack(spacing: 8) {
                     Rectangle().fill(theme.color("reserve")).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) }.frame(width: 8, height: 8)
-                    Text("مربع = يومية " + amount(daily))
+                    Text(figure: "مربع = يومية " + amount(daily))
                     Spacer(minLength: 0)
                     Text("السطر = " + service.dailies(30))
                 }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
@@ -159,7 +159,7 @@ struct MoneyEnvelopesView: View {
             }
             }
             if previewMinor > 0 && visible {
-                HStack { Text("يبقى " + amount(after.balanceMinor)); Spacer(); Text("معاينة فقط") }
+                HStack { Text(figure: "يبقى " + amount(after.balanceMinor)); Spacer(); Text("معاينة فقط") }
                     .font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityElement(children: .combine).accessibilityIdentifier("money-reserve-after")
             }
             Rectangle().fill(theme.line).frame(height: 1)

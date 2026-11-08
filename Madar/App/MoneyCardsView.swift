@@ -146,7 +146,7 @@ struct MoneyCardsView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         HStack { Text("الكشف المستحق").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Spacer(); if let due = c.due { Text(due == reading!.today ? "اليوم" : due < reading!.today ? "حلّ موعده" : "بعد " + service.days(MadarCalendarDays.distance(from: reading!.today, to: due))).font(MadarTypography.fine()).foregroundStyle(theme.color("dueText")).padding(.horizontal, 10).padding(.vertical, 5).background(theme.color("dueText").opacity(0.1), in: Capsule()) } }
                         HStack(alignment: .lastTextBaseline) {
-                            Text(c.close == nil ? "لم يصل كشف" : amount(c.billedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 40, relativeTo: .largeTitle)).foregroundStyle(c.close == nil ? theme.ink : theme.color("debt")).accessibilityIdentifier("money-card-billed")
+                            Text(figure: c.close == nil ? "لم يصل كشف" : amount(c.billedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 40, relativeTo: .largeTitle)).foregroundStyle(c.close == nil ? theme.ink : theme.color("debt")).accessibilityIdentifier("money-card-billed")
                             Spacer()
                             if let due = c.due { dates(due) }
                         }
@@ -168,11 +168,11 @@ struct MoneyCardsView: View {
                 }.clipShape(Capsule()).glassEffect(.regular.interactive(), in: .capsule).accessibilityElement(children: .contain).accessibilityLabel("كيف تسدّد").accessibilityIdentifier("money-card-payment-choice") }
                 if minimum {
                     let unpaid = max(0, c.billedMinor - (c.minimumMinor ?? 0))
-                    Text("يبقى عليك " + amount(unpaid)).font(MadarTypography.body())
+                    Text(figure: "يبقى عليك " + amount(unpaid)).font(MadarTypography.body())
                     let interestDays = 30
                     if let interest = CardPlanning.interestEstimate(unpaidMinor: unpaid, annualRateBp: c.aprBp, days: interestDays) {
                         Button { source = c.sources["aprBp"] } label: {
-                            Text("تقدير فائدة " + service.digits.string(interestDays) + " يومًا: " + amount(interest))
+                            Text(figure: "تقدير فائدة " + service.digits.string(interestDays) + " يومًا: " + amount(interest))
                                 .font(MadarTypography.body()).foregroundStyle(theme.color("reserveText"))
                         }.buttonStyle(.madarPlain).accessibilityIdentifier("money-card-interest-estimate")
                     } else { Text("نسبة الفائدة غير معروفة؛ لا يمكن تقديرها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
@@ -305,7 +305,7 @@ struct MoneyCardsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack { Text(selected.name).font(MadarTypography.cardTitle()); Spacer(); Text(figure: amount(-selected.amountMinor)).font(MadarTypography.cardTitle()) }
                     dates(selected.day)
-                    Text("النقد بعد الالتزامات المعروفة حتى هذا الموعد: " + amount(selected.cashAfterMinor)).font(MadarTypography.body())
+                    Text(figure: "النقد بعد الالتزامات المعروفة حتى هذا الموعد: " + amount(selected.cashAfterMinor)).font(MadarTypography.body())
                     Label(visible ? selected.cashAfterMinor >= 0 ? "يكفي من النقد الحالي" : "النقد الحالي لا يغطي المواعيد المعروفة" : "•••", systemImage: !visible ? "eye.slash" : selected.cashAfterMinor >= 0 ? "checkmark.circle" : "exclamationmark.triangle").font(MadarTypography.caption()).foregroundStyle(theme.color(visible && selected.cashAfterMinor < 0 ? "dueText" : "surplusText"))
                 }.padding(16).background(theme.surface, in: RoundedRectangle(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) }.accessibilityIdentifier("money-card-due-detail")
             } else { Text("لا مبالغ مستحقة معروفة بعد.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
@@ -353,7 +353,7 @@ struct MoneyCardsView: View {
                     Text("مقارنة للمصادر المسجّلة في فترة الكشف؛ قد يشمل كشف البنك رصيدًا سابقًا أو رسومًا أو ردودًا لا تمثّلها هذه المشتريات.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 } else { Text("لا توجد فترة كشف بمشتريات مسجّلة تكفي لمقارنة هذا السداد. لا نفترض مطابقة كاملة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
             } else { Text("لا سداد مؤكّد لهذه البطاقة بعد").font(MadarTypography.cardTitle()); Text("عند وصول رسالة السداد واعتمادها تظهر هنا كتحويل، وتبقى مشترياتك في أيامها.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
-            Text("الكشف الحالي: " + amount(c.billedMinor) + "؛ غير المفوتر: " + amount(c.unbilledMinor)).font(MadarTypography.caption())
+            Text(figure: "الكشف الحالي: " + amount(c.billedMinor) + "؛ غير المفوتر: " + amount(c.unbilledMinor)).font(MadarTypography.caption())
             Text("إذا كان السداد أقل من الكشف يبقى الباقي ضمن «عليك». الفائدة تُقدّر من النسبة المدخلة؛ كشف البنك هو المرجع.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
         }.accessibilityElement(children: .contain).accessibilityIdentifier("money-card-match")
     }
@@ -379,7 +379,7 @@ struct MoneyCardsView: View {
                     if let sd = statementDays {
                         Capsule().fill(red).frame(width: max(2, x(0) - x(sd)), height: 4).position(x: (x(0) + x(sd)) / 2, y: 17)
                         Circle().fill(red).frame(width: 12, height: 12).position(x: x(sd), y: 17)
-                        Text("كشف " + amount(c.billedMinor)).font(MadarTypography.fine()).foregroundStyle(red).position(x: max(70, min(w - 70, x(sd) + 60)), y: 5)
+                        Text(figure: "كشف " + amount(c.billedMinor)).font(MadarTypography.fine()).foregroundStyle(red).position(x: max(70, min(w - 70, x(sd) + 60)), y: 5)
                     }
                     Rectangle().fill(gold).frame(width: 1.5, height: 22).position(x: closeX, y: 40)
                     Text("يقفل").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).position(x: closeX, y: 27)

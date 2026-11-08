@@ -35,7 +35,7 @@ struct MoneyEnvelopeDetailView: View {
                         }
                         if let target = reading.envelope.targetMinor, visible {
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text("الهدف " + amount(target) + (reading.envelope.due == nil ? "" : " قبل")).font(MadarTypography.caption())
+                                Text(figure: "الهدف " + amount(target) + (reading.envelope.due == nil ? "" : " قبل")).font(MadarTypography.caption())
                                 if let due = reading.envelope.due { MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine()) }
                             }.foregroundStyle(theme.secondaryInk)
                         }
@@ -60,7 +60,7 @@ struct MoneyEnvelopeDetailView: View {
                     }
                     if visible, let short = shortfall(reading), let due = reading.envelope.due {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("بحسب خطتك، يوم"); MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.body(), secondaryFont: MadarTypography.fine()); Text("ينقصه " + service.amount(short))
+                            Text("بحسب خطتك، يوم"); MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.body(), secondaryFont: MadarTypography.fine()); Text(figure: "ينقصه " + service.amount(short))
                         }.font(MadarTypography.body()).fontWeight(.semibold).foregroundStyle(theme.color("dueText")).accessibilityElement(children: .combine).accessibilityIdentifier("money-detail-shortfall")
                     }
                     HStack { Text("السجل").font(MadarTypography.cardTitle()); Rectangle().fill(theme.line).frame(height: 1); Text("الرصيد بعدها").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }.padding(.top, 8)
@@ -98,9 +98,9 @@ struct MoneyEnvelopeDetailView: View {
             MoneyHatch().frame(width: 16, height: 16)
             VStack(alignment: .leading, spacing: 2) {
                 if let plan = reading.repayment, let next = plan.nextMinor {
-                    Text("الدين " + service.amount(debt) + "، يُسدّد " + service.amount(next) + " من الراتب القادم")
+                    Text(figure: "الدين " + service.amount(debt) + "، يُسدّد " + service.amount(next) + " من الراتب القادم")
                     Text(plan.remainingMinor.count == 1 ? "آخر دفعة في الخطة" : "باقي " + salariesText(plan.remainingMinor.count) + " في الخطة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                } else { Text("الدين " + service.amount(debt) + " بلا خطة سداد") }
+                } else { Text(figure: "الدين " + service.amount(debt) + " بلا خطة سداد") }
             }.font(MadarTypography.body()).foregroundStyle(theme.color("debt")).accessibilityIdentifier("money-detail-debt")
             Spacer(minLength: 8)
             Button(reading.repayment?.nextMinor != nil ? "غيّر الخطة" : "سدّه على " + salariesText(suggestedSalaries(reading))) { repayOpen = true }
@@ -167,15 +167,15 @@ struct MoneyRepaymentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Text(reading.envelope.name + " عليه " + service.amount(debt)).font(MadarTypography.title()).foregroundStyle(theme.color("debt"))
+                    Text(figure: reading.envelope.name + " عليه " + service.amount(debt)).font(MadarTypography.title()).foregroundStyle(theme.color("debt"))
                     Spacer()
                     Button { dismiss() } label: { Image(systemName: "xmark").font(.body).frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-repay-close").foregroundStyle(theme.secondaryInk).madarWaitsForSave()
                 }
                 if let cause {
                     HStack(alignment: .firstTextBaseline, spacing: 0) {
-                        Text(cause.title + " " + service.amount(-cause.amountMinor) + " في ")
+                        Text(figure: cause.title + " " + service.amount(-cause.amountMinor) + " في ")
                         MadarDateLabel(app.dateLabels(.containing(cause.at, in: app.activePlace.timeZone), compact: true), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
-                        Text("، وكان في المظروف " + service.amount(cause.balanceMinor - cause.amountMinor) + ".")
+                        Text(figure: "، وكان في المظروف " + service.amount(cause.balanceMinor - cause.amountMinor) + ".")
                     }.font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }
                 // Design: the question and its six answers on one row, so the choices below stay in view.
@@ -208,7 +208,7 @@ struct MoneyRepaymentView: View {
                     }
                     Text("المواعيد متوقعة بطول الدورة الحالية؛ آخر راتب يدفع الباقي بالهللة، ويومك الحالي لا يتغيّر.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     Button { adopt() } label: {
-                        Text("اعتمد " + service.amount(preview.installmentsMinor[0]) + " من كل راتب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).frame(minHeight: 60)
+                        Text(figure: "اعتمد " + service.amount(preview.installmentsMinor[0]) + " من كل راتب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).frame(minHeight: 60)
                             .foregroundStyle(theme.background).background(theme.ink)
                     }.buttonStyle(.madarPlain).disabled(working).accessibilityIdentifier("money-repay-adopt")
                 } else { Text("تظهر اليومية ومواعيد الرواتب بعد بدء الدورة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
@@ -311,7 +311,7 @@ private struct MoneyEnvelopeRoad: View {
             HStack {
                 Text("كل مُعيّن راتب قادم متوقع")
                 Spacer()
-                if let target = reading.envelope.targetMinor { Text("الهدف " + service.amount(target)) }
+                if let target = reading.envelope.targetMinor { Text(figure: "الهدف " + service.amount(target)) }
             }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }
     }
@@ -387,7 +387,7 @@ private struct MoneyEnvelopeMoveView: View {
                 TextField("المبلغ", text: $input).keyboardType(.decimalPad).font(MadarTypography.cardTitle()).padding(14)
                     .overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.line, lineWidth: 1) }.accessibilityIdentifier("money-move-amount")
                 HStack {
-                    Text("المتاح " + service.amount(available)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text(figure: "المتاح " + service.amount(available)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     Spacer()
                     Button("انقل الكل") { input = plain(available) }.disabled(available <= 0 || (!outward && chosen == nil)).frame(minHeight: 44).accessibilityIdentifier("money-move-all")
                 }
@@ -432,7 +432,7 @@ private struct MoneySavingChangeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             MoneyPageHeader(title: add ? "زد الادخار" : "قلّل الادخار", close: { dismiss() }, closeDisabled: working)
-            Text("الآن " + service.amount(currentMinor) + " من كل راتب. التعديل للرواتب القادمة.").font(MadarTypography.body())
+            Text(figure: "الآن " + service.amount(currentMinor) + " من كل راتب. التعديل للرواتب القادمة.").font(MadarTypography.body())
             TextField("مقدار التغيير", text: $input).keyboardType(.decimalPad).font(MadarTypography.cardTitle()).padding(14).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) }.accessibilityIdentifier("money-saving-change-amount")
             Text("خطة السداد والحركات السابقة تبقى كما هي.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }

@@ -300,7 +300,7 @@ struct MoneyReconcileView: View {
                     Image(systemName: "text.magnifyingglass").foregroundStyle(theme.color("reserveText")).padding(.top, 2)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("الفرق يساوي حركة تنتظر قرارك").font(MadarTypography.caption()).bold()
-                        HStack(spacing: 6) { Text(match.title + "، " + service.amount(match.amountMinor)); inlineDate(match.day) }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        HStack(spacing: 6) { Text(figure: match.title + "، " + service.amount(match.amountMinor)); inlineDate(match.day) }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         Text("اعتمدها من رسائل البنك بدل تسجيلها مرتين").font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText"))
                     }
                     Spacer(minLength: 0)
@@ -368,7 +368,7 @@ struct MoneyReconcileView: View {
         return HStack(spacing: 4) {
             Text(item.name).font(MadarTypography.body()).lineLimit(1).minimumScaleFactor(0.79).frame(maxWidth: .infinity, alignment: .leading)
             Text(figure: amount(item.expectedMinor)).font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.85).frame(width: 70)
-            Text(l.map { amount($0.observedMinor) } ?? "—").font(MadarTypography.caption()).bold().lineLimit(1).minimumScaleFactor(0.85).frame(width: 70)
+            Text(figure: l.map { amount($0.observedMinor) } ?? "—").font(MadarTypography.caption()).bold().lineLimit(1).minimumScaleFactor(0.85).frame(width: 70)
                 .foregroundStyle(l.map { $0.deltaMinor == 0 ? theme.ink : theme.color("dueText") } ?? theme.secondaryInk)
             Text(l.map { $0.deltaMinor == 0 ? "—" : signed($0.deltaMinor) } ?? "").font(MadarTypography.caption()).bold().lineLimit(1).minimumScaleFactor(0.85).frame(width: 52)
                 .foregroundStyle(l.map { $0.deltaMinor < 0 ? theme.color("dueText") : $0.deltaMinor > 0 ? theme.color("accentText") : theme.secondaryInk } ?? theme.secondaryInk)

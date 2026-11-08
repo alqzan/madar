@@ -117,8 +117,8 @@ struct MoneyBigExpenseView: View {
     private func effect(_ p: BigExpense.Plan, reading r: MoneyBigExpenseReading) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("الأثر").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-            Text(p.repaymentMinor > 0 ? "يومك في الدورات القادمة لا يقل عن " + amount(p.lowestDailyMinor) + "." : "يبقى لك في الدورة " + amount((r.home.cycle?.headline.availableNowMinor ?? 0) - p.dailyMinor) + ".").font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .title2)).contentTransition(.numericText()).accessibilityIdentifier("money-big-effect")
-            Text("يبقى في الفائض " + amount(r.home.surplusMinor - p.surplusMinor) + "، وفي الاحتياطي " + amount(r.home.reserveMinor - p.reserveMinor)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            Text(figure: p.repaymentMinor > 0 ? "يومك في الدورات القادمة لا يقل عن " + amount(p.lowestDailyMinor) + "." : "يبقى لك في الدورة " + amount((r.home.cycle?.headline.availableNowMinor ?? 0) - p.dailyMinor) + ".").font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .title2)).contentTransition(.numericText()).accessibilityIdentifier("money-big-effect")
+            Text(figure: "يبقى في الفائض " + amount(r.home.surplusMinor - p.surplusMinor) + "، وفي الاحتياطي " + amount(r.home.reserveMinor - p.reserveMinor)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             if p.repaymentMinor > 0 { Text("يبدأ مع الراتب الفعلي؛ تقدير على طول دورتك الحالي.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
         }.padding(12).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface).overlay(alignment: .leading) { Rectangle().fill(theme.color("reserveText")).frame(width: 3) }.padding(.vertical, 8)
     }

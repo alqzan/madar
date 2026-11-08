@@ -119,12 +119,12 @@ struct MoneyLogView: View {
                         let y = 35 + 124 * (1 - min(1, Double(max(0, daily)) / Double(scale)))
                         ZStack(alignment: .bottomTrailing) {
                             Rectangle().fill(theme.color("reserveText")).frame(height: 1)
-                            Text("خط " + amount(daily)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).padding(.horizontal, 4).background(theme.background).offset(y: -3)
+                            Text(figure: "خط " + amount(daily)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).padding(.horizontal, 4).background(theme.background).offset(y: -3)
                                 .accessibilityIdentifier("money-log-limit-label")
                         }.padding(.horizontal, -6).offset(y: y).allowsHitTesting(false)
                     }
                 }
-            if visible, shared == nil, let daily = (days.first { $0.day == chosen?.day } ?? days.first)?.dailyMinor { Text("خط " + amount(daily)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("money-log-limit-label") }
+            if visible, shared == nil, let daily = (days.first { $0.day == chosen?.day } ?? days.first)?.dailyMinor { Text(figure: "خط " + amount(daily)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("money-log-limit-label") }
             Text("الخط الذهبي يومك الفعلي؛ الرسم ليومك كاملًا، والتصفية للحركات أدناه.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }.padding(.top, 10).padding(.bottom, 6).accessibilityElement(children: .contain).accessibilityIdentifier("money-log-arcade")
     }

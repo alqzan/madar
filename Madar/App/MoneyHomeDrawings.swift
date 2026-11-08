@@ -137,7 +137,7 @@ struct MoneyWaterfall: View {
             for (index, value) in values.enumerated() {
                 let height = max(2, CGFloat(abs(value)) / CGFloat(maxValue) * size.height * 0.65)
                 let x = size.width - CGFloat(index + 1) * step
-                context.fill(Path(CGRect(x: x, y: value >= 0 ? size.height * 0.8 - height : size.height * 0.8, width: width, height: value >= 0 ? height : min(height, size.height * 0.18))), with: .color(theme.color("surplus")))
+                context.fill(Path(CGRect(x: x, y: value >= 0 ? size.height * 0.8 - height : size.height * 0.8, width: width, height: value >= 0 ? height : min(height, size.height * 0.18))), with: .color(theme.color(value >= 0 ? "surplus" : "debt")))
             }
         }.accessibilityHidden(true)
     }
@@ -178,7 +178,7 @@ struct MoneyEnvelopeLine: View {
                     }.frame(height: proxy.size.height)
                 }.frame(height: 23).accessibilityHidden(true)
             }
-            Text(visible ? AppMoneyService(app: app).amount(envelope.balanceMinor) : "•••").font(MadarTypography.section())
+            Text(figure: visible ? AppMoneyService(app: app).amount(envelope.balanceMinor) : "•••").font(MadarTypography.section())
                 .foregroundStyle(envelope.balanceMinor < 0 ? theme.color("debt") : theme.ink).frame(minWidth: 46, alignment: .trailing)
         }.accessibilityElement(children: .combine)
         .accessibilityLabel(envelope.name + (envelope.balanceMinor < 0 ? "، دين، " : "، ") + (visible ? AppMoneyService(app: app).amount(envelope.balanceMinor) : "المبلغ مخفي"))

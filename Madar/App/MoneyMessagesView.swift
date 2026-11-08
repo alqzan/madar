@@ -152,7 +152,7 @@ struct MoneyMessagesView: View {
                 }
             }
             if let difference = s.differenceMinor, s.cardName != nil {
-                Text((difference > 0 ? "يزيد " : "ينقص ") + amount(abs(difference)) + " عن المسجّل على البطاقة منذ الكشف السابق")
+                Text(figure: (difference > 0 ? "يزيد " : "ينقص ") + amount(abs(difference)) + " عن المسجّل على البطاقة منذ الكشف السابق")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-statement-difference")
             }
             if s.cardName == nil {
@@ -239,7 +239,7 @@ struct MoneyMessagesView: View {
             }
             Spacer(minLength: 6)
             VStack(alignment: .trailing, spacing: 6) {
-                Text(visible ? sign + amount(d.amountMinor, currency: d.currency) : "•••").font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .title3))
+                Text(figure: visible ? sign + amount(d.amountMinor, currency: d.currency) : "•••").font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .title3))
                     .foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
                 HStack(spacing: 8) {
                     if d.isIncomingBankDraft {

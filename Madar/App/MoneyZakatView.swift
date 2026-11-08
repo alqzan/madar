@@ -75,7 +75,7 @@ struct MoneyZakatView: View {
                     Button { editor = true } label: { Label("بيانات الحساب والحول", systemImage: "slider.horizontal.3").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.accessibilityIdentifier("money-zakat-edit")
                     VStack(alignment: .leading, spacing: 8) {
                         Text("ما يدخل في الوعاء").font(MadarTypography.section())
-                        ForEach(r.accounts) { a in HStack { Text(a.name); Spacer(); Text(a.included ? amount(a.homeMinor) : "مستبعد").foregroundStyle(a.included ? theme.ink : theme.secondaryInk) }.font(MadarTypography.caption()) }
+                        ForEach(r.accounts) { a in HStack { Text(a.name); Spacer(); Text(figure: a.included ? amount(a.homeMinor) : "مستبعد").foregroundStyle(a.included ? theme.ink : theme.secondaryInk) }.font(MadarTypography.caption()) }
                         Text("المظاريف والاحتياطي أجزاء من أرصدة الحسابات؛ لا تُضاف مرة ثانية.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     }
                     Text("حساب تقريبي بلا ترجيح. التاريخ الذي تختاره لا يُثبت أن المال بقي فوق النصاب طوال الحول.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)

@@ -248,7 +248,7 @@ struct MoneyObligationsView: View {
                     }
                 }.environment(\.layoutDirection, .rightToLeft).accessibilityLabel("دفعت " + service.digits.string(paid) + " من " + service.counted(total, ("دفعة واحدة", "دفعتين", "دفعات", "دفعة")))
                 HStack(spacing: 4) {
-                    Text((paid == 0 ? "لم تدفع بعد من " : "دفعت " + service.digits.string(paid) + " من ") + service.counted(total, ("دفعة واحدة", "دفعتين", "دفعات", "دفعة")) + (due.remainingMinor.map { "، يبقى " + amount($0) } ?? "، والمتبقي غير معروف") + (due.lastDue == nil ? "" : "، وآخر دفعة"))
+                    Text(figure: (paid == 0 ? "لم تدفع بعد من " : "دفعت " + service.digits.string(paid) + " من ") + service.counted(total, ("دفعة واحدة", "دفعتين", "دفعات", "دفعة")) + (due.remainingMinor.map { "، يبقى " + amount($0) } ?? "، والمتبقي غير معروف") + (due.lastDue == nil ? "" : "، وآخر دفعة"))
                     if let last = due.lastDue { MadarDateLabel(app.dateLabels(last, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) }
                 }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-obligation-progress")
             } else if let schedule = due.schedule {
@@ -257,7 +257,7 @@ struct MoneyObligationsView: View {
             } else if let day = due.dueDay {
                 Text("فاتورة تتكرر يوم " + service.digits.string(day) + " من كل شهر").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             } else if let minimum = due.minimumMinor, minimum > 0 {
-                Text("الحد الأدنى " + amount(minimum) + (due.estimated ? "، الموعد تقريبي" : "")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                Text(figure: "الحد الأدنى " + amount(minimum) + (due.estimated ? "، الموعد تقريبي" : "")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }
         }.padding(14).background(theme.surface).overlay(alignment: .trailing) { Rectangle().fill(color(due.group)).frame(width: 4) }
             .environment(\.layoutDirection, .rightToLeft).accessibilityElement(children: .contain).accessibilityIdentifier("money-obligation-detail")
@@ -272,7 +272,7 @@ struct MoneyObligationsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("سلّم الأقساط").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
                 Spacer()
-                if let first = r.ladder.first { Text(first.label + "، " + first.hijri + " " + amount(first.total)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+                if let first = r.ladder.first { Text(figure: first.label + "، " + first.hijri + " " + amount(first.total)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
             }
             HStack(spacing: 12) {
                 key("القرض", theme.color("accent")); key("التقسيط", theme.color("bills")); key("الفواتير", theme.color("surplus"))
@@ -337,7 +337,7 @@ struct MoneyObligationsView: View {
                 Image(systemName: "sparkle").foregroundStyle(theme.color("reserve"))
                 Text(title).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline))
                 Spacer()
-                Text(dues.isEmpty ? "—" : amount(dues.reduce(0) { $0 + $1.amountMinor })).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                Text(figure: dues.isEmpty ? "—" : amount(dues.reduce(0) { $0 + $1.amountMinor })).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }.padding(.vertical, 8).overlay(alignment: .bottom) { DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.6).frame(height: 3) }
             if dues.isEmpty {
                 Text("لا شيء على هذا الرفّ.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.vertical, 10)

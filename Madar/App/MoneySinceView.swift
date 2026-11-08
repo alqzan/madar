@@ -182,7 +182,7 @@ struct MoneySinceView: View {
                     HStack(alignment: .firstTextBaseline) {
                         MadarDateLabel(app.dateLabels(day.day, compact: true, weekday: true), primaryFont: MadarTypography.cardTitle(), secondaryFont: MadarTypography.fine())
                         Spacer()
-                        if let allowance = day.allowanceMinor { Text("حد يومك " + amount(allowance)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")) }
+                        if let allowance = day.allowanceMinor { Text(figure: "حد يومك " + amount(allowance)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")) }
                     }
                     detailRow("صرفت من يومك", day.allowanceMinor.map { amount(day.spentMinor) + " من " + amount($0) } ?? amount(day.spentMinor), tint: day.over ? theme.color("dueText") : theme.color("surplusText"))
                     if day.salaryMinor > 0 { detailRow("نزل الراتب", "+" + amount(day.salaryMinor), tint: theme.color("surplusText")) }

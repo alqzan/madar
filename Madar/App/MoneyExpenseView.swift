@@ -88,7 +88,7 @@ struct MoneyExpenseView: View {
                     if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-expense-reveal") }
                     if let code = reading.tripCurrency, code != reading.currency {
                         Picker("عملة المصروف", selection: $foreign) { Text(service.currencyName(code)).tag(true); Text(service.currencyName(reading.currency)).tag(false) }.pickerStyle(.segmented).accessibilityIdentifier("money-expense-currency")
-                        if foreign { Text(reading.tripRate == nil ? "أدخل سعر الرحلة أولًا" : "بعملة البيت " + service.amount(homeMinor)).font(MadarTypography.caption()) }
+                        if foreign { Text(figure: reading.tripRate == nil ? "أدخل سعر الرحلة أولًا" : "بعملة البيت " + service.amount(homeMinor)).font(MadarTypography.caption()) }
                     }
                     if !raw.isEmpty, MoneyAmountInput.minor(raw, exponent: CurrencyExponents.specified.exponent(inputCurrency) ?? 2) == nil {
                         Text("اكتب مبلغًا صحيحًا، مثل ١٢ أو ١٢٫٥").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
@@ -105,9 +105,9 @@ struct MoneyExpenseView: View {
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                     if let h = nextHeadline {
                         VStack(spacing: 3) {
-                            Text(h.availableNowMinor >= 0 ? "يبقى لك الآن " + amount(h.availableNowMinor) : "تتجاوز الدورة بـ" + amount(-h.availableNowMinor))
+                            Text(figure: h.availableNowMinor >= 0 ? "يبقى لك الآن " + amount(h.availableNowMinor) : "تتجاوز الدورة بـ" + amount(-h.availableNowMinor))
                                 .font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color("surplusText")).contentTransition(.numericText()).accessibilityIdentifier("money-expense-after")
-                            Text("اليوم: صرفت " + amount(h.todaySpentMinor) + " من " + amount(h.todayAllowanceMinor)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            Text(figure: "اليوم: صرفت " + amount(h.todaySpentMinor) + " من " + amount(h.todayAllowanceMinor)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }.padding(.top, 12)
                     }
                     Button(action: save) {
@@ -234,7 +234,7 @@ struct MoneyExpenseView: View {
             }
             if share != .daily {
                 Menu { ForEach(r.envelopes) { e in Button(e.name) { envelopeID = e.id } } } label: {
-                    HStack { Text(r.envelopes.first { $0.id == envelopeID }?.name ?? "اختر المظروف"); Spacer(); Text("منه " + amount(split.envelopeMinor)); Image(systemName: "chevron.down") }.font(MadarTypography.caption()).frame(minHeight: 44)
+                    HStack { Text(r.envelopes.first { $0.id == envelopeID }?.name ?? "اختر المظروف"); Spacer(); Text(figure: "منه " + amount(split.envelopeMinor)); Image(systemName: "chevron.down") }.font(MadarTypography.caption()).frame(minHeight: 44)
                 }.accessibilityIdentifier("money-expense-envelope")
             }
         }
@@ -265,7 +265,7 @@ struct MoneyExpenseView: View {
         Button { showInDiary.toggle() } label: {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Image(systemName: showInDiary ? "pencil.line" : "eye.slash")
-                Text(r.diaryOn ? (showInDiary ? "يدخل صفحة اليوم: «صرفت " + service.amount(minor) + (merchant.isEmpty ? "»" : " في " + merchant + "»") : "لن يظهر في صفحة اليوم") : "سطور المال مخفية من المذكرات في الإعدادات")
+                Text(figure: r.diaryOn ? (showInDiary ? "يدخل صفحة اليوم: «صرفت " + service.amount(minor) + (merchant.isEmpty ? "»" : " في " + merchant + "»") : "لن يظهر في صفحة اليوم") : "سطور المال مخفية من المذكرات في الإعدادات")
             }.font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity, minHeight: 30)
         }.accessibilityIdentifier("money-expense-diary").accessibilityValue(showInDiary ? "ظاهر" : "مخفي")
     }

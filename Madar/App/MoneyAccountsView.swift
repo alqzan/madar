@@ -236,7 +236,7 @@ private struct MoneyTransferView: View {
                 if let problem { Text(problem).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                 else if let from, let to, let minor = amountMinor, let fromBalance = from.amountMinor, let toBalance = to.amountMinor {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("يصير «" + from.name + "» " + service.amount(fromBalance - minor, currency: from.currency) + "، و«" + to.name + "» " + service.amount(toBalance + minor, currency: to.currency) + ".").font(MadarTypography.body())
+                        Text(figure: "يصير «" + from.name + "» " + service.amount(fromBalance - minor, currency: from.currency) + "، و«" + to.name + "» " + service.amount(toBalance + minor, currency: to.currency) + ".").font(MadarTypography.body())
                         Text(withdrawal ? (app.bool("mal.cashWithdrawalAsSpend") ? "سحب نقدي: يُحتسب من يومك الآن، ولا يُحتسب ما تصرفه من النقد مرة أخرى." : "سحب نقدي: لا يمسّ يومك؛ يُحتسب ما تصرفه من النقد حين تسجّله.") : "تحويل بين حساباتك؛ لا يمسّ يومك ولا مظاريفك.")
                             .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     }.accessibilityElement(children: .combine).accessibilityIdentifier("money-transfer-preview")

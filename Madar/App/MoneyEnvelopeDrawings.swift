@@ -105,7 +105,7 @@ struct MoneyGoalOverview: View {
             HStack {
                 Text(envelope.name).font(MadarTypography.cardTitle())
                 Spacer()
-                Text(visible ? service.amount(envelope.balanceMinor) : "•••").font(MadarTypography.cardTitle()).foregroundStyle(envelope.balanceMinor < 0 ? theme.color("debt") : theme.ink)
+                Text(figure: visible ? service.amount(envelope.balanceMinor) : "•••").font(MadarTypography.cardTitle()).foregroundStyle(envelope.balanceMinor < 0 ? theme.color("debt") : theme.ink)
             }
             if visible && !dynamicType.isAccessibilitySize {
                 GeometryReader { proxy in
