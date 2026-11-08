@@ -222,7 +222,7 @@ struct BahwBlockView: View {
         let progress = habitProgress(row)
         let amount: String = {
             guard let current, !row.paused else { return progress }
-            if current.rule.measure == .once || current.target <= 1 { return done ? "تمّت" : current.rule.frequency == .daily ? "اليوم" : current.rule.frequency.arabic }
+            if current.rule.measure == .once || current.target <= 1 { return done ? "تمّت" : current.rule.frequency == .daily ? "باقية" : current.rule.frequency.arabic }
             return digits.string(current.value) + " من " + digits.string(current.target)
         }()
         let ringTheme: RoomTheme = switch row.source {
@@ -375,7 +375,8 @@ struct BahwBlockView: View {
                         ForEach(Array(shown.prefix(6))) { row in wideHabitRing(row, shown6: shown.count > 4) }
                     }
                     Spacer(minLength: 0)
-                    if let next = shown.first(where: { !$0.paused && $0.summary.atRisk }) ?? shown.first(where: { !$0.paused && $0.summary.current?.met != true }) {
+                    // The rings already say «٠ من ٨»; the line speaks only when a habit is at risk, so it never repeats a ring.
+                    if let next = shown.first(where: { !$0.paused && $0.summary.atRisk && $0.summary.current?.met != true }) {
                         Label { Text(wideHabitStep(next)) } icon: { Image(systemName: next.summary.atRisk ? "circle.lefthalf.filled" : "circle.dotted").font(.system(size: 11, weight: .semibold)) }
                             .font(MadarTypography.fine()).foregroundStyle(room.accent)
                             .lineLimit(1).accessibilityIdentifier("bahw-habits-wide-step")

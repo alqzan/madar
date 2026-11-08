@@ -385,6 +385,10 @@ struct QuranHomeView: View {
                     Text(step.title).font(bodyFont(12, bold: true)).foregroundStyle(color)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(step.detail).font(serif(19)).foregroundStyle(theme.ink).fixedSize(horizontal: false, vertical: true)
+                        if let lead = step.lead {
+                            Text(lead).font(bodyFont(12)).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("quran-step-lead")
+                        }
                         // DA-07: the step in hand says where it starts and what it is for, as R18 Home does.
                         if step.id == next?.id, let range = step.range, step.kind == .bridge || step.kind == .hifz {
                             Text("من الوجه " + service.numerals.string(range.fromPage) + (step.kind == .bridge ? "، تمهيد للورد" : ""))
@@ -420,7 +424,7 @@ struct QuranHomeView: View {
     private func log(_ state: QuranRoomState) -> some View {
         card {
             VStack(alignment: .leading, spacing: 14) {
-                HStack { Text("سجلّك").font(serif(22)); Spacer(); Button("الأسبوع") { showWeek = true }.font(bodyFont(13, bold: true)).frame(minHeight: 44).accessibilityIdentifier("quran-week-open") }
+                HStack { Text("سجلّك").font(serif(22)); Spacer(); Button { showWeek = true } label: { Label("السجل كاملًا", systemImage: "chevron.left").labelStyle(.titleAndIcon) }.font(bodyFont(13, bold: true)).foregroundStyle(theme.accent).frame(minHeight: 44).accessibilityIdentifier("quran-week-open") }
                 Text(state.history.weekSummary.first ?? "آخر أربعة عشر يومًا").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
                 if state.recentDays.isEmpty {
                     Text("سجّل جلسة اليوم، فتظهر هنا أيام حفظك ومراجعتك.").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)

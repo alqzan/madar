@@ -270,6 +270,8 @@ import XCTest
         let next = app.descendants(matching: .any).matching(identifier: "bahw-salah-next").firstMatch
         XCTAssertTrue(next.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertTrue(next.label.contains("الفجر"), next.label)
+        // After Isha the next Fajr is tomorrow's: it says so beside today's earlier Fajr arch.
+        XCTAssertTrue(next.label.contains("الفجر غدًا"), next.label)
         XCTAssertTrue(next.label.contains("بعد"), next.label)
         capture(app, "UX-03-next-fajr-L")
     }

@@ -162,7 +162,7 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         let arches = snapshot.today.cells.map { cell in
             BahwPrayerModel.Arch(id: cell.reference.prayer.rawValue, name: name(cell.reference) ?? "", time: clock(cell.prayerTime), clock24: clock24(cell.prayerTime), done: [.jamaah, .alone, .qada].contains(cell.status), next: cell.reference == upcoming?.reference)
         }
-        return .init(arches: arches, done: arches.filter(\.done).count, nextName: upcoming.flatMap { name($0.reference) }, nextAt: upcoming?.time, nextTime: clock(upcoming?.time),
+        return .init(arches: arches, done: arches.filter(\.done).count, nextName: upcoming.flatMap { up in name(up.reference).map { snapshot.today.cells.contains { $0.reference == up.reference } ? $0 : $0 + " غدًا" } }, nextAt: upcoming?.time, nextTime: clock(upcoming?.time),
                      nextAfter: upcoming.map { $0.time }.map { PrayerCopy.after(seconds: $0.timeIntervalSince(instant), digits: digits) })
     }
     /// FB-32 (owner: no freezes): the lobby body asks for these on every render; the Quran snapshot and the diary day
@@ -173,8 +173,13 @@ struct BahwUpcomingItem: Identifiable, Equatable {
     func quran() -> BahwQuranModel? {
         let key = cacheKey
         if let cached = Self.quranCache, cached.key == key { return cached.value }
-        let value = (try? AppQuranService(session: session).widgetSnapshot().payload).map { BahwQuranModel(coverage: $0.coverage, next: $0.nextTitle, days: $0.days) }
+        let value = (try? AppQuranService(session: session).widgetSnapshot().payload).map { BahwQuranModel(coverage: $0.coverage, next: Self.quranNextLine($0.nextTitle, $0.nextDetail), days: $0.days) }
         Self.quranCache = (key, value); return value
+    }
+    /// «الورد: الإسراء ٢٨–٣٨» names the passage; «التالي: الورد» alone said nothing the card could not.
+    static func quranNextLine(_ title: String, _ detail: String) -> String {
+        guard title.hasPrefix("التالي: "), !detail.isEmpty else { return title }
+        return String(title.dropFirst("التالي: ".count)) + ": " + detail
     }
     func diary() -> BahwDiaryModel? {
         let key = cacheKey
@@ -291,14 +296,21 @@ extension AppBahwService {
         let level = session.string("bahw.smartPresence")
         let includesToday = ["medium", "present"].contains(level)
         var result: [BahwSuggestion] = []
-        if let snapshot = try? session.prayerSnapshot(at: now),
-           snapshot.today.cells.contains(where: { snapshot.pending.contains($0.reference) && $0.canLog }) {
-            result.append(.init(id: "prayer", title: "كيف صلّيت؟", detail: "صلاة تنتظر تسجيلك، متى كنت مستعدًا", symbol: "MadarPrayer", destination: .prayer))
+        if let snapshot = try? session.prayerSnapshot(at: now) {
+            // Name the prayers themselves: «كيف صلّيت العشاء؟», not an anonymous «صلاة تنتظر».
+            let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
+            let waiting = snapshot.today.cells.filter { snapshot.pending.contains($0.reference) && $0.canLog }
+                .compactMap { $0.isFriday && $0.reference.prayer == .dhuhr ? "الجمعة" : names[$0.reference.prayer] }
+            if waiting.count == 1 {
+                result.append(.init(id: "prayer", title: "كيف صلّيت " + waiting[0] + "؟", detail: "سجّلها متى كنت مستعدًا", symbol: "MadarPrayer", destination: .prayer))
+            } else if !waiting.isEmpty {
+                result.append(.init(id: "prayer", title: "كيف صلّيت؟", detail: waiting.joined(separator: "، ") + " لم تُسجَّل بعد", symbol: "MadarPrayer", destination: .prayer))
+            }
         }
         let readings = session.habitReadings(at: now)
         let due = readings.filter { !$0.paused && $0.summary.current?.met != true && ($0.summary.current?.target ?? 0) > 0 && $0.summary.current?.dueDays.contains(today) == true }
         if session.roomEnabled(.habits), let habit = due.first(where: \.isNow) ?? (includesToday ? due.first : nil) {
-            result.append(.init(id: "habit", title: habit.name, detail: habit.isNow ? "وقتها الآن" : "خطوة صغيرة مما تبقّى اليوم", symbol: "MadarHabits", destination: .habit(habit.id)))
+            result.append(.init(id: "habit", title: habit.name, detail: habit.isNow ? "وقتها الآن" : habitRemainingPhrase(habit), symbol: "MadarHabits", destination: .habit(habit.id)))
         }
         if includesToday, session.roomEnabled(.quran), let quran = try? AppQuranService(session: session).widgetSnapshot().payload,
            quran.done < quran.total {
@@ -316,5 +328,11 @@ extension AppBahwService {
             }
         }
         return result
+    }
+    /// The amount itself («بقي ٥ أكواب»), never a generic «خطوة صغيرة».
+    private func habitRemainingPhrase(_ habit: HabitReading) -> String {
+        guard let period = habit.summary.current else { return "باقية اليوم" }
+        if period.rule.measure == .once || period.target <= 1 { return "باقية اليوم" }
+        return "بقي " + habitUnitCount(max(0, period.target - period.value), period.rule.unit, digits) + " اليوم"
     }
 }

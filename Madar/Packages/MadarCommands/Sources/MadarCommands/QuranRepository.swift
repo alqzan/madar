@@ -231,7 +231,7 @@ public final class QuranRepository {
         let consolidation = previous?.grades.contains { $0.rating == .needsMastery } == true ? previous?.ayahs : nil
         let hifz = try plan.map { try QuranDailyPlanEngine.hifz(plan: $0.plan, day: today, restDay: restDay, level: hifzLevel,
             forceNewHifz: dayState?.forceNewHifz ?? false, balanceDecides: settings.value(for: "quran.balanceDecides") == .bool(true),
-            consolidation: consolidation, savedHifzToday: sessions.contains { $0.kind == .hifz && $0.dayKey == today },
+            consolidation: consolidation, savedHifzToday: sessions.contains { $0.kind == .hifz && $0.dayKey == today }, previousWird: previous?.ayahs,
             need: need, allotments: allotments, coverage: coverage, catalog: catalog) }
         let mistakeSessions = sessions.map { QuranMistakeSession(id: $0.id, dayKey: $0.dayKey) }
         let mistakeEvents = try context.fetch(FetchDescriptor<MistakeEvent>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.compactMap { row -> QuranMistakeEvent? in

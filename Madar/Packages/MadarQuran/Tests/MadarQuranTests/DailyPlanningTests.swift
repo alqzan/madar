@@ -91,6 +91,24 @@ final class DailyPlanningTests: XCTestCase {
         XCTAssertEqual(result.bridge, try QuranAyahRange(first: 48, last: 50))
     }
 
+    func testBridgeIsYesterdaysWirdWhenItEndsRightBeforeToday() throws {
+        // Owner, 8 Nov 2026: «الجسر يكون ورد امس والورد ورد اليوم».
+        let c = try QuranResourceCatalog.bundled(), p = try QuranPlan(id: UUID(), unit: .ayah, amount: 10)
+        let yesterday = try QuranAyahRange(first: 21, last: 30)
+        let sessions = [QuranCoverageSession(id: "a", kind: .hifz, ayahs: try QuranAyahRange(first: 1, last: 20), endedAt: Date()),
+                        QuranCoverageSession(id: "b", kind: .hifz, ayahs: yesterday, endedAt: Date())]
+        let coverage = try QuranCoverageEngine.summarize(sessions: sessions, catalog: c)
+        let need = QuranReviewNeed(steadyNeed: 10, todayNeed: 10)
+        let result = try QuranDailyPlanEngine.hifz(plan: p, day: day("2026-10-15"), restDay: .none, previousWird: yesterday,
+            need: need, coverage: coverage, catalog: c)
+        XCTAssertEqual(result.portion, try QuranAyahRange(first: 31, last: 40))
+        XCTAssertEqual(result.bridge, yesterday)
+        // A last wird that does not touch today's start (a filled gap elsewhere) keeps the three-ayah bridge.
+        let apart = try QuranDailyPlanEngine.hifz(plan: p, day: day("2026-10-15"), restDay: .none,
+            previousWird: try QuranAyahRange(first: 1, last: 20), need: need, coverage: coverage, catalog: c)
+        XCTAssertEqual(apart.bridge, try QuranAyahRange(first: 28, last: 30))
+    }
+
     func testReviewServesAllDueAboveMinimumAndOrdersWeakestAfterRecentWithTestLast() throws {
         let pages = try (1...30).map { try page($0, grade: $0 == 9 ? .needsMastery : .mastered) }
         let result = QuranDailyPlanEngine.review(pages: pages, recent: [2, 1], level: .simple,

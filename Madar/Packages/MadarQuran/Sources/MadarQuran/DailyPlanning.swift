@@ -99,7 +99,7 @@ public enum QuranDailyPlanEngine {
     public static func hifz(
         plan: QuranPlan, day: GregorianDay, restDay: QuranRestDay = .friday,
         level: QuranDayLevel = .medium, forceNewHifz: Bool = false, balanceDecides: Bool = true,
-        consolidation: QuranAyahRange? = nil, savedHifzToday: Bool = false,
+        consolidation: QuranAyahRange? = nil, savedHifzToday: Bool = false, previousWird: QuranAyahRange? = nil,
         need: QuranReviewNeed, allotments: [QuranDailyAllotment] = [],
         coverage: QuranCoverage, catalog: QuranResourceCatalog
     ) throws -> QuranDailyHifz {
@@ -122,11 +122,19 @@ public enum QuranDailyPlanEngine {
         let limit = (start...6236).first(where: { coverage.coveredAyahs.contains($0) }).map { $0 - 1 } ?? 6236
         let portion = try QuranPortionEngine.portion(from: start, through: limit,
             unit: plan.unit, amount: amount, catalog: catalog)
-        var bridgeStart = start
-        while bridgeStart > plan.startAyah && start - bridgeStart < 3 && coverage.coveredAyahs.contains(bridgeStart - 1) {
-            bridgeStart -= 1
+        // Owner, 8 Nov 2026: the bridge is yesterday's wird, recited before today's. When the last wird ends right before
+        // today's start it is the bridge; otherwise (first day, a gap) up to three covered ayahs before the start remain.
+        let bridge: QuranAyahRange?
+        if let previousWird, previousWird.last == start - 1, previousWird.first >= plan.startAyah,
+           (previousWird.first...previousWird.last).allSatisfy({ coverage.coveredAyahs.contains($0) }) {
+            bridge = previousWird
+        } else {
+            var bridgeStart = start
+            while bridgeStart > plan.startAyah && start - bridgeStart < 3 && coverage.coveredAyahs.contains(bridgeStart - 1) {
+                bridgeStart -= 1
+            }
+            bridge = bridgeStart < start ? try QuranAyahRange(first: bridgeStart, last: start - 1) : nil
         }
-        let bridge = bridgeStart < start ? try QuranAyahRange(first: bridgeStart, last: start - 1) : nil
         return QuranDailyHifz(amount: amount, balance: half ? .half : .full, portion: portion, bridge: bridge)
     }
 

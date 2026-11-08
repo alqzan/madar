@@ -35,7 +35,7 @@ extension AppQuranService {
         let reviewedFaces = Set(value.sessions.filter { $0.dayKey == today && [.review, .free, .qiyam].contains($0.kind) }.flatMap { $0.grades.map(\.page) })
         let reviewFaces = reviewedFaces.union(value.review.allPages).union(value.partialRecent.map(\.page))
         let reviewProgress = reviewFaces.isEmpty ? nil : numerals.string(reviewedFaces.count) + " من " + numerals.string(reviewFaces.count)
-        let hifzSteps = hasHifz ? (value.hifz?.bridge == nil ? 1 : 2) : 0
+        let hifzSteps = hasHifz ? 1 : 0
         let reviewDone = reviewed(today) > 0 && !hasReview
         let drillDone = value.drillBoard.drilledToday > 0 && !drill
         let done = (saved ? hifzSteps : 0) + (reviewDone ? 1 : 0) + (drillDone ? 1 : 0), total = hifzSteps + (hasReview || reviewDone ? 1 : 0) + (drill || drillDone ? 1 : 0)

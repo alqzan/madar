@@ -276,7 +276,7 @@ extension AppQuranService {
             let pages = Set(try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }).sorted()
             let isBridge = coach.bridgePending
             if isBridge, let id = coach.bridgeAyahs.last, let bridge = catalog.ayah(id: id) { state.page = try await page(bridge.page) }
-            state.title = isBridge ? "الجسر" : "الحفظ الجديد · الورد"
+            state.title = isBridge ? "ورد أمس" : "ورد اليوم"
             state.segmentTitle = MadarInlineText.joined([portionTitle(try QuranAyahRange(first: ids.min()!, last: ids.max()!), catalog: catalog), QuranLearningMethod(rawValue: value.method)?.title ?? "المدرّب الموجّه"])
             let stageTitle: String = switch draft.coachStage { case .repetition: "التكرار"; case .lineStarts: "أوائل الأسطر"; case .promptedRecall: "استرجاع بالتلقين"; case .blindRecitation: "تسميع مستور"; case .rating: "تقييمك" }
             var caption: String = switch draft.coachStage {
@@ -286,11 +286,7 @@ extension AppQuranService {
             case .blindRecitation: "سمّع الورد مستورًا؛ اللمس يسجّل تعثّرًا"
             case .rating: "تقييم مقترح من تعثّرك؛ يمكنك تغييره"
             }
-            if isBridge { caption = switch coach.bridgeAyahs.count {
-            case 1: "اقرأ الآية المحفوظة السابقة، ثم ابدأ الورد"
-            case 2: "اقرأ الآيتين المحفوظتين السابقتين، ثم ابدأ الورد"
-            default: "اقرأ آخر " + numerals.string(coach.bridgeAyahs.count) + ((3...10).contains(coach.bridgeAyahs.count % 100) ? " آيات محفوظة" : " آيةً محفوظةً") + "، ثم ابدأ الورد"
-            } }
+            if isBridge { caption = "اقرأ ورد أمس من حفظك، ثم ابدأ ورد اليوم" }
             else if draft.coachStage == .repetition {
                 switch value.method {
                 case "completeAyah": caption = "أكمل الآية من كلمتيها الأوليين؛ اللمس تلقين"

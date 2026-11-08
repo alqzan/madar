@@ -270,7 +270,7 @@ struct DiaryHomeView: View {
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
             Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
-            Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("التقويم").accessibilityIdentifier("diary-days")
+            Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("التقويم").accessibilityIdentifier("diary-days")
             Button { customizing = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                 .buttonStyle(.madarPlain).accessibilityLabel("خصّص المذكرات").accessibilityIdentifier("diary-customize")
         }.padding(.vertical, 4)

@@ -111,14 +111,20 @@ import MadarPrayer
         let streak = QuranProgressEngine.streak(activities: snapshot.activities, through: today, restDay: snapshot.restDay)
         let alreadyHifz = snapshot.sessions.contains { $0.kind == .hifz && $0.dayKey == today }
         var steps: [QuranUIStep] = []
-        if let bridge = snapshot.hifz?.bridge {
-            steps.append(QuranUIStep(id: "bridge", title: "الجسر", detail: portionTitle(bridge, catalog: catalog), kind: .bridge,
-                completed: alreadyHifz, available: true, range: try range(bridge, catalog: catalog), ayahRange: bridge))
-        }
+        // Owner, 8 Nov 2026: one «الورد» step — yesterday's wird (the bridge) is recited first, then today's; the hifz
+        // session already carries the bridge, so a separate «الجسر» row only repeated the same tap.
         if let portion = snapshot.hifz?.portion {
+            let bridge = snapshot.hifz?.bridge
+            let today = portionTitle(portion, catalog: catalog)
+            let whole = bridge.map { try? QuranAyahRange(first: $0.first, last: portion.last) } ?? portion
             steps.append(QuranUIStep(id: "hifz", title: snapshot.hifz?.balance == .consolidation ? "تثبيت الورد" : "الورد",
-                detail: portionTitle(portion, catalog: catalog), kind: .hifz,
-                completed: alreadyHifz, available: true, range: try range(portion, catalog: catalog), ayahRange: portion))
+                detail: today, kind: .hifz,
+                completed: alreadyHifz, available: true, range: try range(whole ?? portion, catalog: catalog), ayahRange: portion,
+                lead: bridge.map { b in
+                    // Same sura as today's: the numbers alone («١٨–٢٧») keep it on one line.
+                    let title = portionTitle(b, catalog: catalog), surah = (catalog.ayah(id: portion.first)?.surahNameArabic ?? "") + " "
+                    return "يبدأ بورد أمس: " + (surah.count > 1 && title.hasPrefix(surah) && catalog.ayah(id: b.first)?.surahID == catalog.ayah(id: portion.first)?.surahID ? String(title.dropFirst(surah.count)) : title)
+                }))
         }
         if !snapshot.review.allPages.isEmpty || !snapshot.partialRecent.isEmpty {
             let all = snapshot.review.allPages + snapshot.partialRecent.map(\.page)
