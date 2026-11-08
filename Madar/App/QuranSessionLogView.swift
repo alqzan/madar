@@ -17,6 +17,7 @@ struct QuranSessionLogView: View {
     @State private var error: String?
     @State private var pendingSessionID: UUID?
     @State private var routeUnavailableID: UUID?
+    @State private var reloadAttempt = 0
 #if DEBUG
     @State private var injectedReadFailure = false
 #endif
@@ -83,11 +84,15 @@ struct QuranSessionLogView: View {
                         }
                     }
                     Text("تعديل التقييم يعيد حساب الموعد. حذف الحفظ قد يعيد موضع الورد إلى فجوة؛ الجلسات الأخرى تبقى.").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
+                } else if error == nil {
+                    ProgressView("نجهّز السجلّ…")
+                        .font(quranFont(13)).frame(maxWidth: .infinity, minHeight: 120)
+                        .accessibilityIdentifier("quran-history-loading")
                 }
                 if let error {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(error).font(quranFont(13))
-                        Button("حاول مرة أخرى") { load() }
+                        Button("حاول مرة أخرى") { reloadAttempt &+= 1 }
                             .font(quranFont(13, bold: true)).frame(minHeight: 44)
                             .accessibilityIdentifier("quran-history-retry")
                     }
@@ -106,9 +111,13 @@ struct QuranSessionLogView: View {
             }
             .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy)
             .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app).accessibilityIdentifier("quran-history-undo") } }
-            .task { load() }.onChange(of: app.undoToken?.id) { load() }
+            .task(id: reloadAttempt) { await load() }
+            .onChange(of: app.prayerRevision) { _, _ in
+                guard error == nil else { return }
+                reloadAttempt &+= 1
+            }
             .alert("احذف هذه الجلسة؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { id in
-                Button("احذف", role: .destructive) { deleting = nil; run { try await service.perform(.deleteSession(id)); expanded = nil; load() } }
+                Button("احذف", role: .destructive) { deleting = nil; run { try await service.perform(.deleteSession(id)); expanded = nil } }
                 Button("أبقِ الجلسة", role: .cancel) { deleting = nil }
             } message: { _ in Text("ستُزال آثارها من الحفظ والمواعيد والأخطاء. يمكنك التراجع فور الحذف من الشريط أسفل الشاشة.") }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { app.errorMessage != nil }, set: { if !$0 { app.errorMessage = nil } })) { Button("تمّ") { app.errorMessage = nil } } message: { Text(app.errorMessage ?? "") }
@@ -161,7 +170,7 @@ struct QuranSessionLogView: View {
                         ForEach(QuranUIGrade.allCases) { grade in
                             let current = record.grades.first { $0.page == page }?.grade == grade
                             let colours = palette(grade)
-                            Button { run { try await service.perform(.editSessionGrade(sessionID: record.id, page: page, grade: grade)); load() } } label: {
+                            Button { run { try await service.perform(.editSessionGrade(sessionID: record.id, page: page, grade: grade)) } } label: {
                                 Text(grade.title).font(quranFont(12, bold: current))
                                     .foregroundStyle(theme.color(colours.ink))
                                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -191,7 +200,7 @@ struct QuranSessionLogView: View {
             }
         }
     }
-    private func load() {
+    private func load() async {
 #if DEBUG
         let environment = ProcessInfo.processInfo.environment
         if !injectedReadFailure,
@@ -204,7 +213,8 @@ struct QuranSessionLogView: View {
         }
 #endif
         do {
-            let loaded = try service.sessionLog()
+            let loaded = try await service.sessionLogOffMain()
+            try Task.checkCancellation()
             value = loaded; error = nil
             guard let target = pendingSessionID else { return }
             filter = "all"
@@ -213,7 +223,11 @@ struct QuranSessionLogView: View {
                 page = record.grades.first?.page ?? 1
             } else { routeUnavailableID = target }
             pendingSessionID = nil
-        } catch { value = nil; self.error = quranUserMessage(error) }
+        } catch is CancellationError { return }
+        catch {
+            guard !Task.isCancelled else { return }
+            value = nil; self.error = quranUserMessage(error)
+        }
     }
-    private func run(_ work: @escaping @MainActor () async throws -> Void) { guard !busy else { return }; busy = true; Task { defer { busy = false }; do { try await work() } catch { self.error = quranUserMessage(error) } } }
+    private func run(_ work: @escaping @MainActor () async throws -> Void) { guard !busy else { return }; busy = true; Task { defer { busy = false }; do { try await work() } catch { app.errorMessage = quranUserMessage(error) } } }
 }

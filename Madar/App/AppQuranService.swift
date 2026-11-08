@@ -217,7 +217,7 @@ import MadarPrayer
             percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), hifzAmounts: amounts, streakDays: streak.days, balanceTitle: balance,
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: (QuranUILevel(rawValue: snapshot.hifzLevel.rawValue) ?? .simple),
             reviewLevel: (QuranUILevel(rawValue: snapshot.reviewLevel.rawValue) ?? .simple), steps: steps, recentDays: heat, plan: plan, surahs: surahs, draft: draft,
-            missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "فاتك وِرد " + app.dateLabels($0, first: .hijri, compact: true, weekday: true).combined },
+            missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "فاتك وِرد " + app.dateLabels($0, compact: true, weekday: true).combined },
             summary: ["في صدرك " + coverageTitle], history: QuranUIHistory(weekSummary: [weeklySummary], yearSummary: [], allSummary: [], days: heat, coverage: [], sessions: historySessions),
             strengthTitle: "مؤشر وصفي من تقييمك ومواعيد المراجعة", strength: strength,
             recovery: QuranUIRecovery(distantLabel: { n in faceCount(n) + (n == 1 ? " بعيد" : n == 2 ? " بعيدان" : " بعيدة") }(snapshot.pages.filter(\.isFar).count), activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
@@ -290,7 +290,7 @@ import MadarPrayer
         case .complete: title = snapshot.coverage.isKhatm ? "ختمت" : "اكتمل نطاق خطّتك"; estimatedDays = nil
         case .unavailable: title = "لم تتضح الوتيرة بعد"; estimatedDays = nil
         case .estimated(let day):
-            let dates = app.dateLabels(day, first: .hijri); title = dates.primary; secondaryDate = dates.secondary
+            let dates = app.dateLabels(day); title = dates.primary; secondaryDate = dates.secondary
             estimatedDays = startingOn.quranDistance(to: day) + 1
         }
         return QuranUIForecast(title: title, assumptions: "تقدير بافتراض إتمام أيام الحفظ بلا فوت أو تثبيت، حُسب في " + displayDate(snapshot.day.date),

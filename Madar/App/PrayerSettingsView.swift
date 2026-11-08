@@ -77,7 +77,7 @@ struct PrayerSettingsView: View {
                 }
                 Section("بداية التتبّع") {
                     Text(state.tracking.title)
-                    Text("ما قبل هذا اليوم لا يُعدّ معلّقًا أو فائتًا. يمكنك تعديل البداية مرة واحدة، حتى ثلاثين يومًا قبل أول تشغيل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text("يبدأ السجل من اليوم الذي تختاره؛ ما قبله لا يدخل في سجل الصلاة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     if state.tracking.canEdit {
                         Button("عدّل بداية التتبّع") { trackingDate = state.tracking.date; editingTracking = true }.accessibilityIdentifier("prayer-tracking-edit")
                         if editingTracking { DatePicker("البداية", selection: $trackingDate, in: state.tracking.earliestDate...state.tracking.latestDate, displayedComponents: .date).environment(\.timeZone, TimeZone(identifier: state.timeZoneID) ?? .gmt).accessibilityIdentifier("prayer-tracking-date"); Button("احفظ التعديل الوحيد") { confirmTracking = true }.accessibilityIdentifier("prayer-tracking-save") }
@@ -108,7 +108,7 @@ struct PrayerSettingsView: View {
         case "الرواق والميزان": keys = ["salah.pool", "salah.balanceView", "salah.fridayTallArch", "salah.showMosqueStreak"]
         case "التسجيل": keys = ["salah.askHeart", "salah.pendingDays"]
         case "المواقيت": keys = ["salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "salah.travelShortenCombine"]
-        default: keys = ["salah.beforeReminder", "salah.beforeAdhanMin", "salah.askAfterAdhanMin", "salah.askReminder", "salah.qadaReminder", "salah.liveActivity"]
+        default: keys = ["salah.beforeReminder", "salah.beforeAdhanMin", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity"]
         }
         return keys.compactMap { key in state.supportedKeys.contains(key) ? state.definitions.first(where: { $0.key == key }) : nil }
     }
@@ -123,5 +123,5 @@ struct PrayerSettingsView: View {
     }
     private func offset(_ prayer: String, definition: SettingDefinition) -> Int { if case .object(let map) = model.value(definition), case .number(let n) = map[prayer] { return Int(n) }; return 0 }
     private func optionCode(_ value: MadarData.JSONValue) -> String { if case .string(let code) = value { return code }; return "value" }
-    private func blockTitle(_ key: String) -> String { switch key { case "next": "الصلاة القادمة"; case "riwaq": "الرواق"; case "pending": "غير المسجّلة"; case "hali": "حالي"; case "qada": "القضاء"; case "qiyam": "قيام الليل"; default: key } }
+    private func blockTitle(_ key: String) -> String { switch key { case "next": "الصلاة القادمة"; case "riwaq": "الرواق"; case "pending": "غير المسجّلة"; case "hali": "حالي"; case "qiyam": "قيام الليل"; default: key } }
 }

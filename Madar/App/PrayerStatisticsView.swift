@@ -44,7 +44,7 @@ struct PrayerStatisticsView: View {
     /// The Mizan's own count over the last 25 prayers: on time ÷ prayers whose time came (pending and unrecorded stay out).
     private var mizan: (onTime: Int, due: Int, pending: Int) {
         let cells = snapshot.statistics.last25
-        let due = cells.filter { [.jamaah, .alone, .qada, .missed].contains($0.status) }
+        let due = cells.filter { [.jamaah, .alone, .qada].contains($0.status) }
         return (due.filter { $0.status == .jamaah || $0.status == .alone }.count, due.count, cells.filter { $0.status == .pending }.count)
     }
     private func serif(_ size: CGFloat) -> Font { .custom("thmanyahserifdisplay-Bold", size: size, relativeTo: .title) }
@@ -114,11 +114,6 @@ struct PrayerStatisticsView: View {
                 VStack(spacing: 10) { metricCards }
             } else {
                 HStack(alignment: .top, spacing: 10) { metricCards }
-            }
-            // AU-24: «قُضيت ٠، عليك ٠» says nothing; the line appears once there is qada.
-            if snapshot.statistics.madeUp + snapshot.statistics.owed > 0 {
-                Text("قُضيت \(formatter.string(snapshot.statistics.madeUp))، عليك \(formatter.string(snapshot.statistics.owed))")
-                    .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("prayer-stat-qada")
             }
         }
     }
@@ -425,7 +420,7 @@ private struct PrayerDayEditSheet: View {
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 8)
                 // AU-24: a day with nothing recorded is not «٠ من ٥ جماعة».
-                if summary.cells.contains(where: { [.jamaah, .alone, .qada, .missed, .excused].contains($0.status) }) {
+                if summary.cells.contains(where: { [.jamaah, .alone, .qada].contains($0.status) }) {
                     Text("\(digits.string(together)) من \(digits.string(summary.cells.count)) جماعة").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
                 }
             }
@@ -456,13 +451,13 @@ private struct PrayerDayEditSheet: View {
     }
 
     private func options(_ cell: PrayerCell) -> [PrayerStoredStatus] {
-        [.jamaah, .alone] + (cell.canMakeUp || cell.status == .qada ? [.qada] : []) + (cell.canMarkMissed || cell.status == .missed ? [.missed] : [])
+        [.jamaah, .alone] + (cell.canMakeUp || cell.status == .qada ? [.qada] : [])
     }
 
     private func pill(_ option: PrayerStoredStatus, _ cell: PrayerCell) -> some View {
         let on = cell.status.rawValue == option.rawValue
         let tint = statusOutline(option)
-        let title: String = switch option { case .jamaah: "جماعة"; case .alone: "وحدي"; case .qada: "قضاء"; default: "فاتتني" }
+        let title: String = switch option { case .jamaah: "جماعة"; case .alone: "وحدي"; case .qada: "قضاء"; default: "" }
         return Button {
             guard !session.prayerWriteInProgress, !on else { return }
             // Friday noon carries its kind explicitly (RP5): the full sheet asks for it.

@@ -7,12 +7,12 @@ import MadarCommands
 
 /// `mal.analysisDefault`: the two periods the spec names («التقرير المخطوط، الدورة والأسبوع»).
 /// FB-39 (owner, 6 Nov): also the calendar month and year, each compared with the one before.
-enum MoneyAnalysisPeriod: String, CaseIterable, Identifiable {
+enum MoneyAnalysisPeriod: String, CaseIterable, Identifiable, Sendable {
     case cycle, week, month, year
     var id: String { rawValue }
 }
 
-struct MoneyAnalysisCategory: Identifiable, Equatable {
+struct MoneyAnalysisCategory: Identifiable, Equatable, Sendable {
     var id: String
     var name: String
     /// V10's one definition: − Σ spend/refund allocations of the confirmed movements in this category for the period.
@@ -23,19 +23,19 @@ struct MoneyAnalysisCategory: Identifiable, Equatable {
     var tint: Int?
 }
 
-struct MoneyAnalysisMerchant: Identifiable, Equatable {
+struct MoneyAnalysisMerchant: Identifiable, Equatable, Sendable {
     var id: String { name }
     var name: String
     var amountMinor: Int
     var count: Int
 }
 
-struct MoneyAnalysisComparison: Equatable {
+struct MoneyAnalysisComparison: Equatable, Sendable {
     var percent: Int
     var label: String
 }
 
-struct MoneyAnalysisReading {
+struct MoneyAnalysisReading: Sendable {
     var period: MoneyAnalysisPeriod
     var offset: Int
     var canGoBack: Bool
@@ -332,6 +332,202 @@ struct MadarAIMoneySnapshot: Sendable {
     }
 }
 
+struct MoneyAnalysisReadRequest: Sendable {
+    let log: MoneyLogReadRequest
+    let period: MoneyAnalysisPeriod
+    let offset: Int
+    let firstWeekday: Int
+    let cycleCalendarIdentifier: String
+}
+
+@ModelActor private actor MoneyAnalysisReadActor {
+    func read(_ request: MoneyAnalysisReadRequest) async throws -> MoneyAnalysisReading? {
+        try Task.checkCancellation()
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_ANALYSIS_READ_FAIL_PERIOD"] == request.period.rawValue {
+            throw BackupOperationError.busy
+        }
+        if let raw = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_ANALYSIS_READ_HOLD_MS"],
+           let milliseconds = UInt64(raw), milliseconds > 0 {
+            try await Task.sleep(for: .milliseconds(min(5_000, milliseconds)))
+        }
+        #endif
+        try Task.checkCancellation()
+        return try MoneyAnalysisReadingBuilder.load(context: modelContext, request: request)
+    }
+}
+
+enum MoneyAnalysisReadingBuilder {
+    static func weekStart(_ day: GregorianDay, request: MoneyAnalysisReadRequest) -> GregorianDay {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = request.log.timeZone
+        let leading = (calendar.component(.weekday, from: day.date(in: calendar.timeZone).addingTimeInterval(43_200)) - request.firstWeekday + 7) % 7
+        return day.adding(days: -leading)
+    }
+
+    static func calendarSpan(_ period: MoneyAnalysisPeriod, today: GregorianDay, offset: Int, request: MoneyAnalysisReadRequest) -> (first: GregorianDay, last: GregorianDay, title: String) {
+        let digits = MadarNumberFormatter(style: request.log.numerals)
+        if period == .year {
+            let year = today.year + offset
+            let first = (try? GregorianDay(year: year, month: 1, day: 1)) ?? today, last = (try? GregorianDay(year: year, month: 12, day: 31)) ?? today
+            return (first, last, "سنة " + digits.string(year))
+        }
+        var year = today.year, month = today.month + offset
+        while month < 1 { month += 12; year -= 1 }
+        while month > 12 { month -= 12; year += 1 }
+        let first = (try? GregorianDay(year: year, month: month, day: 1)) ?? today
+        let next = month == 12 ? (try? GregorianDay(year: year + 1, month: 1, day: 1)) : (try? GregorianDay(year: year, month: month + 1, day: 1))
+        let formatter = DateFormatter(); formatter.calendar = Calendar(identifier: .gregorian); formatter.locale = Locale(identifier: "ar"); formatter.timeZone = .gmt; formatter.dateFormat = "MMMM"
+        return (first, (next ?? first.adding(days: 31)).adding(days: -1), formatter.string(from: first.date(in: .gmt).addingTimeInterval(43_200)) + " " + digits.string(year))
+    }
+
+    static func cycleMonthName(start: GregorianDay, end: GregorianDay, request: MoneyAnalysisReadRequest) -> String {
+        let calendarID: Calendar.Identifier = request.cycleCalendarIdentifier == "hijri" ? .islamicUmmAlQura : .gregorian
+        let middle = start.adding(days: MadarCalendarDays.distance(from: start, to: end) / 2).date(in: request.log.timeZone)
+        let formatter = DateFormatter(); formatter.calendar = Calendar(identifier: calendarID); formatter.locale = Locale(identifier: "ar"); formatter.timeZone = request.log.timeZone; formatter.dateFormat = "MMMM"
+        return formatter.string(from: middle)
+    }
+
+    static func load(context: ModelContext, request: MoneyAnalysisReadRequest) throws -> MoneyAnalysisReading? {
+        let period = request.period, offset = request.offset
+        let ledger = try MoneyLogReadingBuilder.makeLedger(context: context, request: request.log, retainAllLiveTransactionsForAnalysis: true)
+        let today = ledger.today, starts = ledger.starts
+        guard let current = starts.lastIndex(where: { $0.1 <= today }) else { return nil }
+        func span(_ index: Int) -> (first: GregorianDay, last: GregorianDay, length: Int)? {
+            guard starts.indices.contains(index), let reading = ledger.reading(of: starts[index].0) else { return nil }
+            let first = starts[index].1, length = max(1, reading.input.expectedLengthDays)
+            var last = index + 1 < starts.count ? starts[index + 1].1.adding(days: -1) : first.adding(days: length - 1)
+            if index + 1 == starts.count && starts[index].0.end == nil { last = max(last, today) }
+            return (first, max(first, last), length)
+        }
+        func range(_ first: GregorianDay, _ last: GregorianDay) -> [GregorianDay] { (0...max(0, MadarCalendarDays.distance(from: first, to: last))).map { first.adding(days: $0) } }
+
+        // The period.
+        let target: Int, first: GregorianDay, last: GregorianDay, title: String, canGoBack: Bool
+        switch period {
+        case .cycle:
+            target = max(0, current + min(0, offset))
+            guard let s = span(target) else { return nil }
+            first = s.first; last = s.last; title = "دورة " + cycleMonthName(start: s.first, end: s.last.adding(days: 1), request: request)
+            canGoBack = target > 0 && span(target - 1) != nil
+        case .week:
+            target = min(0, offset)
+            first = weekStart(today, request: request).adding(days: 7 * target); last = first.adding(days: 6)
+            title = target == 0 ? "هذا الأسبوع" : target == -1 ? "الأسبوع الماضي" : "أسبوع"
+            canGoBack = starts[0].1 < first
+        case .month, .year:
+            target = min(0, offset)
+            let span = calendarSpan(period, today: today, offset: target, request: request)
+            first = span.first; last = span.last; title = span.title
+            canGoBack = starts[0].1 < first
+        }
+        let days = ledger.days(range(first, last))
+        let elapsed = days.filter { $0.day <= today }
+        let known = elapsed.filter { $0.dailyMinor != nil }
+        let spent = elapsed.reduce(0) { $0 + $1.spentMinor }, allowance = known.reduce(0) { $0 + ($1.dailyMinor ?? 0) }
+        let running = last >= today
+
+        // Like for like: the earlier period's first N days against this period's N elapsed days.
+        var comparison: MoneyAnalysisComparison?
+        let previous: (first: GregorianDay, last: GregorianDay, name: String)? = switch period {
+            case .cycle: span(target - 1).map { ($0.first, $0.last, "دورة " + cycleMonthName(start: $0.first, end: $0.last.adding(days: 1), request: request)) }
+            case .week: (first.adding(days: -7), first.adding(days: -1), target == 0 ? "الأسبوع الماضي" : "الأسبوع الذي قبله")
+            case .month, .year: { let s = calendarSpan(period, today: today, offset: target - 1, request: request); return (s.first, s.last, s.title) }()
+        }
+        if let previous, !elapsed.isEmpty {
+            let aligned = Array(ledger.days(range(previous.first, previous.last)).prefix(elapsed.count))
+            if aligned.count == elapsed.count, aligned.allSatisfy({ $0.dailyMinor != nil }),
+               let percent = AnalysisEngine.percentChange(currentMinor: spent, previousMinor: aligned.reduce(0) { $0 + $1.spentMinor }) {
+                comparison = .init(percent: percent, label: running ? "عن الأيام نفسها من " + previous.name : "عن " + previous.name)
+            }
+        }
+
+        // Categories and merchants: V10's definition, on the period's movements.
+        let allocations = ledger.allocations.filter { ["spend", "refund"].contains($0.kind) }
+        let charges = Dictionary(grouping: allocations.compactMap { a in a.transactionID.map { ($0, a.amountMinor) } }, by: \.0).mapValues { -$0.reduce(0) { $0 + $1.1 } }
+        let liveTransactions = try ledger.allLiveTransactionsForAnalysis ?? ledger.repo.confirmedTransactions()
+        let confirmed = liveTransactions.filter { $0.reviewState == "ok" }
+        let byID = Dictionary(confirmed.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var rows: [MoneyTransaction] = []
+        rows.reserveCapacity(confirmed.count)
+        for (index, row) in confirmed.enumerated() {
+            if index.isMultiple(of: 64) { try Task.checkCancellation() }
+            switch period {
+            case .cycle:
+                if row.cycleID == starts[target].0.id { rows.append(row) }
+            case .week, .month, .year:
+                let key = row.kind == "refund" ? row.relatedTransactionID.flatMap { byID[$0]?.dayKey } ?? row.dayKey : row.dayKey
+                guard let day = try? GregorianDay(key), day >= first, day <= last else { continue }
+                rows.append(row)
+            }
+        }
+        let ordered = ledger.categories.filter { $0.mergedInto == nil }.sorted { $0.order == $1.order ? $0.name < $1.name : $0.order < $1.order }
+        let limits = try context.fetch(FetchDescriptor<CategoryLimit>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let latestLimitByCategory = limits.reduce(into: [UUID: CategoryLimit]()) { latest, limit in
+            guard let categoryID = limit.categoryID else { return }
+            guard let current = latest[categoryID] else { latest[categoryID] = limit; return }
+            if current.updatedAt < limit.updatedAt { latest[categoryID] = limit }
+        }
+        func mode(_ category: UUID) -> CategoryLimitMode? {
+            guard let limit = latestLimitByCategory[category] else { return nil }
+            switch limit.mode {
+            case "fixed": return .fixed(limitMinor: limit.limitMinor)
+            case "percent": return .percent(basisPoints: limit.percentBp ?? 0, base: limit.base == "allowance" ? .allowance : .income)
+            default: return nil
+            }
+        }
+        func cycleLimit(_ category: UUID, _ index: Int) -> (limit: Int, length: Int)? {
+            guard let mode = mode(category), let reading = ledger.reading(of: starts[index].0) else { return nil }
+            let length = max(1, reading.input.expectedLengthDays)
+            return LimitEngine.effectiveLimit(mode, cycleIncomeMinor: starts[index].0.incomeMinor, cycleAllowanceMinor: CycleEngine.accruedDaily(through: length, reading.input)).map { ($0, length) }
+        }
+        func cap(_ category: UUID) -> Int? {
+            switch period {
+            case .cycle: return cycleLimit(category, target)?.limit
+            case .week, .month, .year:
+                // Each day takes its own cycle's even share of that cycle's limit.
+                var total: Int?
+                for index in starts.indices {
+                    guard let s = span(index), s.last >= first, s.first <= last, let limit = cycleLimit(category, index) else { continue }
+                    let from = MadarCalendarDays.distance(from: s.first, to: max(first, s.first)) + 1, through = MadarCalendarDays.distance(from: s.first, to: min(last, s.last)) + 1
+                    total = (total ?? 0) + AnalysisEngine.limitShare(limitMinor: limit.limit, cycleLengthDays: limit.length, fromDay: from, throughDay: through)
+                }
+                return total
+            }
+        }
+        let filed = Set(ordered.map(\.id))
+        var categoryTotals: [UUID: Int] = [:], loose = 0, merchantTotals: [String: (Int, Int)] = [:]
+        for (index, row) in rows.enumerated() {
+            if index.isMultiple(of: 64) { try Task.checkCancellation() }
+            let charge = charges[row.id] ?? 0
+            if let categoryID = row.categoryID, filed.contains(categoryID) { categoryTotals[categoryID, default: 0] += charge }
+            else { loose += charge }
+            guard let name = row.merchant ?? row.counterparty, charge != 0 else { continue }
+            merchantTotals[name, default: (0, 0)].0 += charge
+            if charge > 0 { merchantTotals[name, default: (0, 0)].1 += 1 }
+        }
+        var categories: [MoneyAnalysisCategory] = ordered.enumerated().compactMap { index, category in
+            let spent = categoryTotals[category.id, default: 0]
+            guard spent != 0 else { return nil }
+            return .init(id: category.id.uuidString, name: category.name, spentMinor: spent, capMinor: cap(category.id), tint: index)
+        }
+        if loose != 0 { categories.append(.init(id: "none", name: "بلا تصنيف", spentMinor: loose, capMinor: nil, tint: nil)) }
+        categories.sort { $0.spentMinor == $1.spentMinor ? $0.name < $1.name : $0.spentMinor > $1.spentMinor }
+
+        var top: [MoneyAnalysisMerchant] = []
+        for (name, value) in merchantTotals where value.0 > 0 { top.append(MoneyAnalysisMerchant(name: name, amountMinor: value.0, count: value.1)) }
+        top.sort { (a: MoneyAnalysisMerchant, b: MoneyAnalysisMerchant) -> Bool in a.amountMinor == b.amountMinor ? a.name < b.name : a.amountMinor > b.amountMinor }
+
+        let judged = elapsed.filter { $0.within == .met || $0.within == .missed }
+        let remaining = period == .cycle && running ? days.filter { $0.day > today }.count : 0
+        return .init(period: period, offset: period == .cycle ? target - current : target, canGoBack: canGoBack, title: title, first: first, last: last, today: today,
+                     days: days, spentMinor: spent, allowanceMinor: allowance, running: running, comparison: comparison,
+                     categories: categories, merchants: Array(top.prefix(5)), metDays: judged.filter { $0.within == .met }.count, judgedDays: judged.count,
+                     pendingDays: elapsed.filter { $0.within == .pending }.count,
+                     pace: AnalysisEngine.pace(spentMinor: known.reduce(0) { $0 + $1.spentMinor }, allowanceMinor: allowance, knownDays: known.count, remainingDays: remaining))
+    }
+
+}
+
 extension AppMoneyService {
     /// A read-only summary using the same confirmed spend/refund allocations as M5-V14.
     /// Refunds stay on their original purchase day, matching the existing report.
@@ -433,126 +629,42 @@ extension AppMoneyService {
 
     /// nil when there is no cycle yet: the screen then explains where its numbers will come from.
     func loadAnalysis(period: MoneyAnalysisPeriod, offset: Int = 0, at instant: Date? = nil) throws -> MoneyAnalysisReading? {
-        let ledger = try moneyLedger(at: instant ?? app.prayerNow()), today = ledger.today, starts = ledger.starts
-        guard let current = starts.lastIndex(where: { $0.1 <= today }) else { return nil }
-        func span(_ index: Int) -> (first: GregorianDay, last: GregorianDay, length: Int)? {
-            guard starts.indices.contains(index), let reading = ledger.reading(of: starts[index].0) else { return nil }
-            let first = starts[index].1, length = max(1, reading.input.expectedLengthDays)
-            var last = index + 1 < starts.count ? starts[index + 1].1.adding(days: -1) : first.adding(days: length - 1)
-            if index + 1 == starts.count && starts[index].0.end == nil { last = max(last, today) }
-            return (first, max(first, last), length)
-        }
-        func range(_ first: GregorianDay, _ last: GregorianDay) -> [GregorianDay] { (0...max(0, MadarCalendarDays.distance(from: first, to: last))).map { first.adding(days: $0) } }
+        try requireReadableStore()
+        let now = instant ?? app.prayerNow(), request = analysisReadRequest(period: period, offset: offset, at: now)
+        return try MoneyAnalysisReadingBuilder.load(context: ModelContext(app.container), request: request)
+    }
 
-        // The period.
-        let target: Int, first: GregorianDay, last: GregorianDay, title: String, canGoBack: Bool
-        switch period {
-        case .cycle:
-            target = max(0, current + min(0, offset))
-            guard let s = span(target) else { return nil }
-            first = s.first; last = s.last; title = "دورة " + cycleMonthName(start: s.first, end: s.last.adding(days: 1))
-            canGoBack = target > 0 && span(target - 1) != nil
-        case .week:
-            target = min(0, offset)
-            first = analysisWeekStart(today).adding(days: 7 * target); last = first.adding(days: 6)
-            title = target == 0 ? "هذا الأسبوع" : target == -1 ? "الأسبوع الماضي" : "أسبوع"
-            canGoBack = starts[0].1 < first
-        case .month, .year:
-            target = min(0, offset)
-            let span = calendarSpan(period, today: today, offset: target)
-            first = span.first; last = span.last; title = span.title
-            canGoBack = starts[0].1 < first
-        }
-        let days = ledger.days(range(first, last))
-        let elapsed = days.filter { $0.day <= today }
-        let known = elapsed.filter { $0.dailyMinor != nil }
-        let spent = elapsed.reduce(0) { $0 + $1.spentMinor }, allowance = known.reduce(0) { $0 + ($1.dailyMinor ?? 0) }
-        let running = last >= today
-
-        // Like for like: the earlier period's first N days against this period's N elapsed days.
-        var comparison: MoneyAnalysisComparison?
-        let previous: (first: GregorianDay, last: GregorianDay, name: String)? = switch period {
-            case .cycle: span(target - 1).map { ($0.first, $0.last, "دورة " + cycleMonthName(start: $0.first, end: $0.last.adding(days: 1))) }
-            case .week: (first.adding(days: -7), first.adding(days: -1), target == 0 ? "الأسبوع الماضي" : "الأسبوع الذي قبله")
-            case .month, .year: { let s = calendarSpan(period, today: today, offset: target - 1); return (s.first, s.last, s.title) }()
-        }
-        if let previous, !elapsed.isEmpty {
-            let aligned = Array(ledger.days(range(previous.first, previous.last)).prefix(elapsed.count))
-            if aligned.count == elapsed.count, aligned.allSatisfy({ $0.dailyMinor != nil }),
-               let percent = AnalysisEngine.percentChange(currentMinor: spent, previousMinor: aligned.reduce(0) { $0 + $1.spentMinor }) {
-                comparison = .init(percent: percent, label: running ? "عن الأيام نفسها من " + previous.name : "عن " + previous.name)
-            }
-        }
-
-        // Categories and merchants: V10's definition, on the period's movements.
-        let allocations = ledger.allocations.filter { ["spend", "refund"].contains($0.kind) }
-        let charges = Dictionary(grouping: allocations.compactMap { a in a.transactionID.map { ($0, a.amountMinor) } }, by: \.0).mapValues { -$0.reduce(0) { $0 + $1.1 } }
-        let confirmed = try ledger.repo.confirmedTransactions()
-        let byID = Dictionary(confirmed.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let rows: [MoneyTransaction] = switch period {
-            case .cycle: confirmed.filter { $0.cycleID != nil && $0.cycleID == starts[target].0.id }
-            case .week, .month, .year: confirmed.filter { row in
-                let key = row.kind == "refund" ? row.relatedTransactionID.flatMap { byID[$0]?.dayKey } ?? row.dayKey : row.dayKey
-                guard let day = try? GregorianDay(key) else { return false }
-                return day >= first && day <= last
-            }
-        }
-        let ordered = ledger.categories.filter { $0.mergedInto == nil }.sorted { $0.order == $1.order ? $0.name < $1.name : $0.order < $1.order }
-        let limits = try ModelContext(app.container).fetch(FetchDescriptor<CategoryLimit>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        func mode(_ category: UUID) -> CategoryLimitMode? {
-            let limit = limits.filter { $0.categoryID == category }.max { $0.updatedAt < $1.updatedAt }
-            return switch limit?.mode {
-                case "fixed": .fixed(limitMinor: limit?.limitMinor ?? 0)
-                case "percent": .percent(basisPoints: limit?.percentBp ?? 0, base: limit?.base == "allowance" ? .allowance : .income)
-                default: nil
-            }
-        }
-        func cycleLimit(_ category: UUID, _ index: Int) -> (limit: Int, length: Int)? {
-            guard let mode = mode(category), let reading = ledger.reading(of: starts[index].0) else { return nil }
-            let length = max(1, reading.input.expectedLengthDays)
-            return LimitEngine.effectiveLimit(mode, cycleIncomeMinor: starts[index].0.incomeMinor, cycleAllowanceMinor: CycleEngine.accruedDaily(through: length, reading.input)).map { ($0, length) }
-        }
-        func cap(_ category: UUID) -> Int? {
-            switch period {
-            case .cycle: return cycleLimit(category, target)?.limit
-            case .week, .month, .year:
-                // Each day takes its own cycle's even share of that cycle's limit.
-                var total: Int?
-                for index in starts.indices {
-                    guard let s = span(index), s.last >= first, s.first <= last, let limit = cycleLimit(category, index) else { continue }
-                    let from = MadarCalendarDays.distance(from: s.first, to: max(first, s.first)) + 1, through = MadarCalendarDays.distance(from: s.first, to: min(last, s.last)) + 1
-                    total = (total ?? 0) + AnalysisEngine.limitShare(limitMinor: limit.limit, cycleLengthDays: limit.length, fromDay: from, throughDay: through)
+    func loadAnalysisOffMain(period: MoneyAnalysisPeriod, offset: Int = 0, at instant: Date? = nil) async throws -> MoneyAnalysisReading? {
+        let session = app, now = instant ?? app.prayerNow()
+        for attempt in 0..<4 {
+            do {
+                try requireReadableStore()
+                guard !session.settingsWriteInProgress else { throw BackupOperationError.busy }
+                let revision = session.prayerRevision, generation = session.storeGeneration, container = session.container
+                let request = analysisReadRequest(period: period, offset: offset, at: now)
+                let readTask = Task.detached(priority: .userInitiated) {
+                    let worker = MoneyAnalysisReadActor(modelContainer: container)
+                    return try await worker.read(request)
                 }
-                return total
+                let reading = try await withTaskCancellationHandler { try await readTask.value } onCancel: { readTask.cancel() }
+                try Task.checkCancellation()
+                try requireReadableStore()
+                guard !session.settingsWriteInProgress, session.prayerRevision == revision,
+                      session.storeGeneration == generation, session.container === container else { throw CancellationError() }
+                return reading
+            } catch is CancellationError {
+                try Task.checkCancellation()
+                guard attempt < 3 else { throw CancellationError() }
+            } catch BackupOperationError.busy where attempt < 3 {
             }
+            try await Task.sleep(for: .milliseconds(200))
         }
-        var categories: [MoneyAnalysisCategory] = ordered.enumerated().compactMap { index, category in
-            let spent = rows.filter { $0.categoryID == category.id }.reduce(0) { $0 + (charges[$1.id] ?? 0) }
-            guard spent != 0 else { return nil }
-            return .init(id: category.id.uuidString, name: category.name, spentMinor: spent, capMinor: cap(category.id), tint: index)
-        }
-        let filed = Set(ordered.map(\.id))
-        let loose = rows.filter { $0.categoryID.map { !filed.contains($0) } ?? true }.reduce(0) { $0 + (charges[$1.id] ?? 0) }
-        if loose != 0 { categories.append(.init(id: "none", name: "بلا تصنيف", spentMinor: loose, capMinor: nil, tint: nil)) }
-        categories.sort { $0.spentMinor == $1.spentMinor ? $0.name < $1.name : $0.spentMinor > $1.spentMinor }
+        throw BackupOperationError.busy
+    }
 
-        var merchants: [String: (Int, Int)] = [:]
-        for row in rows {
-            guard let name = row.merchant ?? row.counterparty, let charge = charges[row.id], charge != 0 else { continue }
-            merchants[name, default: (0, 0)].0 += charge
-            if charge > 0 { merchants[name, default: (0, 0)].1 += 1 }
-        }
-        var top: [MoneyAnalysisMerchant] = []
-        for (name, value) in merchants where value.0 > 0 { top.append(MoneyAnalysisMerchant(name: name, amountMinor: value.0, count: value.1)) }
-        top.sort { (a: MoneyAnalysisMerchant, b: MoneyAnalysisMerchant) -> Bool in a.amountMinor == b.amountMinor ? a.name < b.name : a.amountMinor > b.amountMinor }
-
-        let judged = elapsed.filter { $0.within == .met || $0.within == .missed }
-        let remaining = period == .cycle && running ? days.filter { $0.day > today }.count : 0
-        return .init(period: period, offset: period == .cycle ? target - current : target, canGoBack: canGoBack, title: title, first: first, last: last, today: today,
-                     days: days, spentMinor: spent, allowanceMinor: allowance, running: running, comparison: comparison,
-                     categories: categories, merchants: Array(top.prefix(5)), metDays: judged.filter { $0.within == .met }.count, judgedDays: judged.count,
-                     pendingDays: elapsed.filter { $0.within == .pending }.count,
-                     pace: AnalysisEngine.pace(spentMinor: known.reduce(0) { $0 + $1.spentMinor }, allowanceMinor: allowance, knownDays: known.count, remainingDays: remaining))
+    func analysisReadRequest(period: MoneyAnalysisPeriod, offset: Int, at now: Date) -> MoneyAnalysisReadRequest {
+        .init(log: logReadRequest(at: now), period: period, offset: offset,
+              firstWeekday: analysisFirstWeekday, cycleCalendarIdentifier: app.string("mal.cycleCalendar"))
     }
 
     /// The Gregorian month or year `offset` steps back from today's: «نوفمبر ٢٠٢٦»، «سنة ٢٠٢٦».

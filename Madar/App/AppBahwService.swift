@@ -160,7 +160,7 @@ struct BahwUpcomingItem: Identifiable, Equatable {
             snapshot.today.cells.contains { $0.reference == reference && $0.isFriday && reference.prayer == .dhuhr } ? "الجمعة" : names[reference.prayer]
         }
         let arches = snapshot.today.cells.map { cell in
-            BahwPrayerModel.Arch(id: cell.reference.prayer.rawValue, name: name(cell.reference) ?? "", time: clock(cell.prayerTime), clock24: clock24(cell.prayerTime), done: [.jamaah, .alone].contains(cell.status), next: cell.reference == upcoming?.reference)
+            BahwPrayerModel.Arch(id: cell.reference.prayer.rawValue, name: name(cell.reference) ?? "", time: clock(cell.prayerTime), clock24: clock24(cell.prayerTime), done: [.jamaah, .alone, .qada].contains(cell.status), next: cell.reference == upcoming?.reference)
         }
         return .init(arches: arches, done: arches.filter(\.done).count, nextName: upcoming.flatMap { name($0.reference) }, nextAt: upcoming?.time, nextTime: clock(upcoming?.time),
                      nextAfter: upcoming.map { $0.time }.map { PrayerCopy.after(seconds: $0.timeIntervalSince(instant), digits: digits) })

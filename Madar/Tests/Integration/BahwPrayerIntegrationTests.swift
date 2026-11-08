@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 import MadarData
 import MadarCore
 import MadarPrayer
@@ -6,6 +7,31 @@ import SwiftData
 @testable import Madar
 
 @MainActor final class BahwPrayerIntegrationTests: XCTestCase {
+    func testPrayerTodayTimelineStopsTickingWhenRoomIsHidden() {
+        let start = Date(timeIntervalSince1970: 1_760_000_123)
+        let hidden = PrayerTodayMinuteTimelineSchedule(isActive: false)
+        XCTAssertTrue(Array(hidden.entries(from: start, mode: .normal)).isEmpty)
+
+        let visible = PrayerTodayMinuteTimelineSchedule(isActive: true)
+        let entries = Array(visible.entries(from: start, mode: .normal).prefix(3))
+        XCTAssertEqual(entries.count, 3)
+        XCTAssertEqual(entries[1].timeIntervalSince(entries[0]), 60, accuracy: 0.001)
+        XCTAssertEqual(entries[2].timeIntervalSince(entries[1]), 60, accuracy: 0.001)
+    }
+
+    func testLegacyPrayerLayoutDropsRetiredQadaBacklogBlock() {
+        let legacy = MadarData.JSONValue.object([
+            "blocks": .array(["next", "riwaq", "pending", "hali", "qada", "qiyam"].map(MadarData.JSONValue.string)),
+            "pinned": .array(["next", "riwaq"].map(MadarData.JSONValue.string)),
+            "hidden": .array([.string("qada")]),
+            "sizes": .object([:])
+        ])
+        let layout = PrayerHomeLayout(legacy)
+        XCTAssertFalse(layout.order.contains("qada"))
+        XCTAssertFalse(layout.visible.contains("qada"))
+        XCTAssertFalse(layout.payload.object?["blocks"]?.array?.compactMap(\.string).contains("qada") ?? false)
+    }
+
     func testHabitOrbitClockUsesTheSelectedDayBoundaryAndCalendar() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "HabitOrbitClock-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

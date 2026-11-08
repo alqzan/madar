@@ -80,7 +80,7 @@ struct LegacyMoveUndo {
         }
     }
 
-    static let models: [String: Set<String>] = ["prayer": ["PrayerLog", "QadaItem"], "quran": ["HifzSession", "MistakeSpot", "HifzPlan"],
+    static let models: [String: Set<String>] = ["prayer": ["PrayerLog"], "quran": ["HifzSession", "MistakeSpot", "HifzPlan"],
         "habits": ["Habit", "HabitEvent"], "personal": ["Letter", "UpcomingDay"], "money": ["MoneyTransaction", "Account", "Card"]]
 
     func open(_ url: URL) throws -> LegacyMovePreview {
@@ -96,13 +96,13 @@ struct LegacyMoveUndo {
 
     func counted(_ n: Int, _ forms: [String]) -> String { arabicCount(n, forms, digits) }
     static let nouns: [(model: String, forms: [String])] = [
-        ("PrayerLog", ["صلاة واحدة", "صلاتان", "صلوات", "صلاة"]), ("QadaItem", ["قضاء واحد", "قضاءان", "قضاءات", "قضاءً"]),
+        ("PrayerLog", ["صلاة واحدة", "صلاتان", "صلوات", "صلاة"]),
         ("HifzPlan", ["خطة الحفظ", "خطتان", "خطط", "خطة"]), ("HifzSession", ["جلسة واحدة", "جلستان", "جلسات", "جلسة"]),
         ("MistakeSpot", ["موضع خطأ واحد", "موضعا خطأ", "مواضع خطأ", "موضع خطأ"]), ("Habit", ["عادة واحدة", "عادتان", "عادات", "عادة"]),
         ("HabitEvent", ["مرة واحدة", "مرتان", "مرات", "مرة"]), ("Letter", ["رسالة واحدة", "رسالتان", "رسائل", "رسالة"]),
         ("UpcomingDay", ["يوم مهم واحد", "يومان مهمان", "أيام مهمة", "يومًا مهمًا"]), ("Account", ["حساب واحد", "حسابان", "حسابات", "حسابًا"]),
         ("Card", ["بطاقة واحدة", "بطاقتان", "بطاقات", "بطاقة"]), ("MoneyTransaction", ["حركة واحدة", "حركتان", "حركات", "حركة"])]
-    /// «١٢ صلاة، قضاءان» for what one room added.
+    /// Counts only records the room still imports.
     func phrase(_ parts: [String: Int]) -> String {
         Self.nouns.compactMap { noun in parts[noun.model].flatMap { $0 > 0 ? counted($0, noun.forms) : nil } }.joined(separator: "، ")
     }
@@ -114,7 +114,6 @@ struct LegacyMoveUndo {
         var prayer = LegacyMoveRoom(id: "prayer", title: "الصلاة", symbol: "moon.stars", lines: [])
         if let plan = try? LegacyPrayerImport.plan(backup: data, home: place, uuid: uuid) {
             if !plan.logs.isEmpty { prayer.lines.append(counted(plan.logs.count, ["صلاة واحدة مسجّلة", "صلاتان مسجّلتان", "صلوات مسجّلة", "صلاة مسجّلة"])) }
-            if !plan.qada.isEmpty { prayer.lines.append(counted(plan.qada.count, ["قضاء واحد", "قضاءان", "قضاءات", "قضاءً"])) }
         }
         rooms.append(prayer)
         var quran = LegacyMoveRoom(id: "quran", title: "القرآن", symbol: "book", lines: [])

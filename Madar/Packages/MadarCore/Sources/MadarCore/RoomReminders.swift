@@ -1,21 +1,9 @@
 import Foundation
 
-/// Room reminder candidates and fixed copy for the built rooms (§8 item 8, §7.2 qada, §7.1 habits).
+/// Room reminder candidates and fixed copy for the built rooms (§8 item 8, §7.1 habits).
 /// Pure: the app supplies room state; the arbiter then applies sanctity, quiet, budget and digest.
 public enum RoomReminders {
-    public enum QadaTime: String, Sendable { case afterFajr, afterIsha, off }
-
-    /// One qada reminder per prayer day while something is owed, at the end of the chosen prayer's
-    /// sanctity window. Its own `qada.` prefix keeps it apart from the prayer asks under `salah.`.
-    public static func qada(days: [PrayerDay], time: QadaTime, owed: Int, now: Date) -> [NotificationCandidate] {
-        guard time != .off, owed > 0 else { return [] }
-        return days.compactMap { day in
-            let proposed = time == .afterIsha ? day.isha : day.fajr
-            let due = SanctityGuard(prayerDays: days).clamp(proposed)
-            guard due > now, due <= now.addingTimeInterval(48 * 3600) else { return nil }
-            return .init(id: "qada.\(day.day)", room: .salah, dueAt: due, dayKey: day.day.description)
-        }
-    }
+    public enum PrayerReminderTime: String, Sendable { case afterFajr, afterIsha, off }
 
     /// §7.1: a gentle habit reminder falls at the start of its window; without a window there is none.
     public static func habit(id: UUID, windowStart: Date?, dayKey: String, prayerDays: [PrayerDay], now: Date) -> NotificationCandidate? {
@@ -28,7 +16,7 @@ public enum RoomReminders {
     /// V12 diary kinds (§8 item 8 ids `notes.<dayKey>.<kind>`). Each falls when the anchor prayer's
     /// sanctity ends; the arbiter applies the shared budget and `notes.dailyCap`. The copy never carries diary text.
     public enum DiaryKind: String, Sendable { case niyya, onThisDay, letter, line }
-    public static func diary(_ kind: DiaryKind, day: PrayerDay, time: QadaTime, prayerDays: [PrayerDay], now: Date) -> NotificationCandidate? {
+    public static func diary(_ kind: DiaryKind, day: PrayerDay, time: PrayerReminderTime, prayerDays: [PrayerDay], now: Date) -> NotificationCandidate? {
         guard time != .off else { return nil }
         let due = SanctityGuard(prayerDays: prayerDays).clamp(time == .afterIsha ? day.isha : day.fajr)
         guard due > now, due <= now.addingTimeInterval(48 * 3600) else { return nil }
@@ -114,7 +102,6 @@ public enum RoomReminders {
     /// The kind a request stands for in a digest: named, never its content.
     public static func kindLabel(for id: String) -> String? {
         if id.hasPrefix("quran.") { return id.hasSuffix(".late") ? "المراجعة" : "الورد" }
-        if id.hasPrefix("qada.") { return "القضاء" }
         if id.hasPrefix("habits.") { return "عادة" }
         if id.hasPrefix("mal.alert80.") { return "حدود الصرف" }
         if id.hasPrefix("mal.card") { return "سداد البطاقة" }

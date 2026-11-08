@@ -12,7 +12,6 @@
 		009585AD9F1CD6C65381F9BF /* MoneyTravelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE5C27BA15849E4C802EBAC /* MoneyTravelView.swift */; };
 		00B99DBAF9E8E3D289962E54 /* MoneyAnalysisModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D5DA39DDD31B6E747BE357E /* MoneyAnalysisModels.swift */; };
 		00F6A0B661F6917B9725035E /* MoneyCategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8265DEB75EC6FB6E7BBCA1D /* MoneyCategoriesView.swift */; };
-		02513070494B4312F415494B /* PrayerQadaListSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D987FDE73C46EF6D320A153 /* PrayerQadaListSheet.swift */; };
 		02847A3999DE84747D2F606D /* MihbaraPDFFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323D5DC1291D1FF524D61D0D /* MihbaraPDFFlowView.swift */; };
 		043FC0C00F30B850EC288BE4 /* QuranStrengthUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCC1A35E2703C1EBE5AD46C5 /* QuranStrengthUITests.swift */; };
 		04660B832A00D65310A93F43 /* HabitRhythmBands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9CCE045BAC0B101E4D7B737 /* HabitRhythmBands.swift */; };
@@ -560,7 +559,6 @@
 		0B1B530A57CB78A0BD45F0ED /* PrayerActivityIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerActivityIntegrationTests.swift; sourceTree = "<group>"; };
 		0B7247D7F044DA8DC2E72929 /* DiaryEchoesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryEchoesUITests.swift; sourceTree = "<group>"; };
 		0C9A92BA15E9DD05DF1BA621 /* TapCrawlUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapCrawlUITests.swift; sourceTree = "<group>"; };
-		0D987FDE73C46EF6D320A153 /* PrayerQadaListSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerQadaListSheet.swift; sourceTree = "<group>"; };
 		0E36D536EB0E0A89852F2AA6 /* MihbaraQuoteCardSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraQuoteCardSheet.swift; sourceTree = "<group>"; };
 		0E84CCAE8F551CE20CBE2B23 /* CommandIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandIntegrationTests.swift; sourceTree = "<group>"; };
 		0EB9694CAD2A3BA244684584 /* AppDiaryDayAppearanceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiaryDayAppearanceService.swift; sourceTree = "<group>"; };
@@ -1321,7 +1319,6 @@
 				1D2B7534A65CA14B25771639 /* PrayerNotifications.swift */,
 				24C800DB76AE4D8973AA298C /* PrayerPaperCard.swift */,
 				8051E5425FAD913A445F3DC2 /* PrayerPillToggleStyle.swift */,
-				0D987FDE73C46EF6D320A153 /* PrayerQadaListSheet.swift */,
 				C1541C81F328C40D5A683888 /* PrayerRoom.swift */,
 				0A7D4FC457636377F6EF5D76 /* PrayerSettingsView.swift */,
 				2120D9CCB35FD19F23C35DD4 /* PrayerSnapshotSheet.swift */,
@@ -2279,7 +2276,6 @@
 				6A0993283286BFD137A6421F /* PrayerNotifications.swift in Sources */,
 				2FD916F67042E38B0EC471BB /* PrayerPaperCard.swift in Sources */,
 				32BEB6D2550283317E219DC3 /* PrayerPillToggleStyle.swift in Sources */,
-				02513070494B4312F415494B /* PrayerQadaListSheet.swift in Sources */,
 				CFF94239BC342BA772C26E44 /* PrayerRoom.swift in Sources */,
 				74FD6AB907A73C84CA714668 /* PrayerSettingsView.swift in Sources */,
 				41AC9AB0B28D9D3EF795414E /* PrayerSnapshotSheet.swift in Sources */,
@@ -2432,7 +2428,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = V8YZL4R65K;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -2526,7 +2522,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = V8YZL4R65K;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

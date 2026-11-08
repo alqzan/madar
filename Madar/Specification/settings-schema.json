@@ -1121,7 +1121,6 @@
      "riwaq",
      "pending",
      "hali",
-     "qada",
      "qiyam"
     ],
     "pinned": [
@@ -1142,7 +1141,6 @@
      "riwaq",
      "pending",
      "hali",
-     "qada",
      "qiyam"
     ],
     "pinnedSubsetOfBlocks": true,
@@ -1479,31 +1477,6 @@
    "range": [
     5,
     30
-   ],
-   "storage": "Setting (synced)",
-   "preset": false
-  },
-  {
-   "key": "salah.qadaReminder",
-   "owner": "salah",
-   "section": "التذكير",
-   "title": "تذكير القضاء",
-   "type": "choice",
-   "default": "off",
-   "scope": "sync",
-   "options": [
-    {
-     "value": "afterFajr",
-     "label": "بعد الفجر"
-    },
-    {
-     "value": "afterIsha",
-     "label": "بعد العشاء"
-    },
-    {
-     "value": "off",
-     "label": "بلا"
-    }
    ],
    "storage": "Setting (synced)",
    "preset": false

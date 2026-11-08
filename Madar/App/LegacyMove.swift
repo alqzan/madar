@@ -20,10 +20,8 @@ extension AppSession {
         var counts = plan.counts
         let context = ModelContext(container)
         let logs = try context.fetch(FetchDescriptor<PrayerLog>())
-        let qadas = try context.fetch(FetchDescriptor<QadaItem>())
-        let logIDs = Set(logs.map(\.id)), qadaIDs = Set(qadas.map(\.id))
+        let logIDs = Set(logs.map(\.id))
         let native = Set(logs.filter { $0.deletedAt == nil }.map { $0.dayKey + "|" + $0.prayer })
-        let nativeQada = Set(qadas.filter { $0.deletedAt == nil }.map { $0.originalDayKey + "|" + $0.prayer })
         let linkIDs = Set(try context.fetch(FetchDescriptor<ImportLink>()).map(\.id))
         for log in plan.logs where !logIDs.contains(log.id) {
             guard !native.contains(log.dayKey + "|" + log.prayer.rawValue) else { counts["logs.keptNative", default: 0] += 1; continue }
@@ -32,14 +30,6 @@ extension AppSession {
             row.tzID = home.timeZoneID; row.dayPolicy = "legacy@0"; row.source = "import"
             row.createdAt = log.loggedAt ?? log.eventAt; row.updatedAt = row.createdAt; row.writerID = writer; context.insert(row)
             counts["logs.created", default: 0] += 1
-        }
-        for item in plan.qada where !qadaIDs.contains(item.id) {
-            // A prayer the owner logged here, or a qada they already keep for it, is never owed twice (RP1).
-            let natural = item.dayKey + "|" + item.prayer.rawValue
-            guard !native.contains(natural), !nativeQada.contains(natural) else { counts["qada.keptNative", default: 0] += 1; continue }
-            let row = QadaItem(); row.id = item.id; row.prayer = item.prayer.rawValue; row.originalDayKey = item.dayKey; row.madeUpAt = item.madeUpAt
-            row.createdAt = item.madeUpAt ?? now; row.updatedAt = row.createdAt; row.writerID = writer; context.insert(row)
-            counts["qada.created", default: 0] += 1
         }
         for archive in plan.archives {
             let id = StableIdentity.uuid(for: "myDream:ImportLink:PrayerDay:\(archive.dayKey)")

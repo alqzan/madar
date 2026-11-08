@@ -107,6 +107,8 @@ import UIKit
         frozen.createdAt = now; frozen.updatedAt = now; context.insert(frozen)
         try context.save()
         let service = AppDiaryService(app: app, clock: { now })
+        let offMainToday = try await service.currentDayOffMain()
+        XCTAssertEqual(offMainToday, try service.currentDay())
         let synchronous = try service.home(), background = try await service.homeOffMain()
         XCTAssertEqual(background.today, synchronous.today)
         XCTAssertEqual(background.selection.days, synchronous.selection.days)
@@ -133,6 +135,43 @@ import UIKit
         XCTAssertEqual(yesterdayPage.media.first?.assetID, "synthetic")
         XCTAssertTrue(background.todayPage.lines.contains(where: { $0.text.contains("ردّ اليوم") }))
         XCTAssertEqual(background.todayPage.lines.map(\.text), synchronous.todayPage.lines.map(\.text))
+    }
+    func testPreparingClosedDaysWritesEachMissingFrozenKeyOnlyOnce() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryClosedDays-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        let now = ISO8601DateFormatter().date(from: "2026-10-15T12:00:00+03:00")!
+        let today = GregorianDay.containing(now, in: app.activePlace.timeZone)
+        let earlier = today.adding(days: -1), service = AppDiaryService(app: app, clock: { now })
+        let first = try await service.prepareClosedDays([earlier, today])
+        let second = try await service.prepareClosedDays([earlier, today])
+        XCTAssertTrue(first)
+        XCTAssertFalse(second)
+        let keys = try ModelContext(container).fetch(FetchDescriptor<DeviceSetting>())
+            .filter { $0.key == "sys.diaryAutoLines." + earlier.description && $0.deletedAt == nil && $0.mergedInto == nil }
+        XCTAssertEqual(keys.count, 1)
+    }
+    func testPreparingClosedDaysUsesTheLivePrayerDayBoundary() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryClosedDayBoundary-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        var now = ISO8601DateFormatter().date(from: "2026-10-15T12:00:00+03:00")!
+        let service = AppDiaryService(app: app, clock: { now })
+        let previousDay = try service.currentDay()
+
+        now = now.addingTimeInterval(24 * 60 * 60)
+        let changed = try await service.prepareClosedDays([previousDay])
+        XCTAssertTrue(changed)
+
+        let key = "sys.diaryAutoLines." + previousDay.description
+        let frozen = try ModelContext(container).fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate {
+            $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil
+        }))
+        XCTAssertEqual(frozen.count, 1, "The old snapshot's current day is closed after the prayer-day boundary advances.")
     }
     func testWelcomePersistsLocallyWithoutDiaryFacts() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "DiaryWelcome-\(UUID())")

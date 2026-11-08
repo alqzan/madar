@@ -81,46 +81,21 @@ import MadarPrayer
         let secondCommand = UUID()
         #expect(try await bus.execute(log(secondCommand), now: now.addingTimeInterval(3)).status == .applied)
         let row = try #require(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first)
-        let qada = try #require(try ModelContext(container).fetch(FetchDescriptor<QadaItem>()).first)
         #expect(row.status == "qada" && row.deletedAt == nil && row.restoredAt! > row.deletionBarrierAt!)
-        #expect(qada.madeUpAt != nil && qada.deletedAt == nil)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<QadaItem>()).isEmpty)
     }
-    @Test func test_M1T09_OldMissedFridayReplayMakeUpUndoAndRestoration() async throws {
+    @Test func retiredBacklogCommandsCannotCreatePrayerOrDebtRows() async throws {
         let now = date("2026-10-08T09:00:00+03:00")
         let (container, bus, directory) = try fixture(at: now)
-        // Fixture tracks Oct 2 Friday; Sep 25 is explicitly older, also Friday.
-        func old(_ day: String = "2026-09-25", restore: Bool = false, source: CommandSource = .app, kind: MadarCore.JSONValue = .string("jumuah")) -> CommandEnvelope {
-            .init(name: "prayer.addOldMissed", payload: .object(["dayKey": .string(day), "prayer": .string("dhuhr"), "fridayKind": kind, "restoreDeleted": .bool(restore)]), source: source, issuedAt: now)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let payload: [String: MadarCore.JSONValue] = ["dayKey": .string("2026-10-02"), "prayer": .string("dhuhr"), "status": .string("missed")]
+        for name in ["prayer.addOldMissed", "prayer.makeUp", "prayer.markUnrecorded", "prayer.addOldMissedRun", "prayer.makeUpOldest", "prayer.resolveGap"] {
+            let result = try await bus.execute(.init(name: name, payload: .object(payload), source: .app, issuedAt: now), now: now)
+            #expect(result.status == .rejected, "Retired prayer backlog command was accepted: \(name)")
         }
-        #expect(try await bus.execute(old(kind: .null), now: now).status == .rejected)
-        #expect(try await bus.execute(old(source: .widget), now: now).status == .needsApp)
-        #expect(try await bus.execute(old("2026-10-02"), now: now).status == .rejected)
-        let envelope = old(); let first = try await bus.execute(envelope, now: now)
-        #expect(first.status == .applied && first.undoToken != nil)
-        #expect(try await bus.execute(envelope, now: now) == first)
-        _ = try await bus.execute(old(), now: now)
-        let fresh = CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: directory, transactionClock: { $0 }))
-        var logs = try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()); var debts = try ModelContext(container).fetch(FetchDescriptor<QadaItem>())
-        #expect(logs.count == 1 && debts.count == 1 && logs[0].fridayKind == "jumuah" && logs[0].status == "missed")
-        let snapshot = try PrayerRepository(context: ModelContext(container)).snapshot(now: now)
-        #expect(snapshot.statistics.denominator == 0 && snapshot.statistics.owed == 1)
-        func undo(_ token: UUID) -> CommandEnvelope { .init(name: "system.undo", payload: .object(["undoToken": .string(token.uuidString)]), issuedAt: now) }
-        #expect(try await fresh.execute(undo(try #require(first.undoToken)), now: now).status == .applied)
-        #expect(try await fresh.execute(old(), now: now).reason == "explicitRestoreRequired")
-        #expect(try await fresh.execute(old(restore: true), now: now).status == .applied)
-        logs = try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()); debts = try ModelContext(container).fetch(FetchDescriptor<QadaItem>())
-        #expect(logs.count == 1 && debts.count == 1 && logs[0].deletedAt == nil && debts[0].deletedAt == nil)
-        #expect(try #require(logs[0].restoredAt) > #require(logs[0].deletionBarrierAt))
-        #expect(try #require(debts[0].restoredAt) > #require(debts[0].deletionBarrierAt))
-        let makeup = CommandEnvelope(name: "prayer.makeUp", payload: .object(["dayKey": .string("2026-09-25"), "prayer": .string("dhuhr"), "at": .string(iso(now)), "fridayKind": .string("jumuah")]), issuedAt: now)
-        let madeUp = try await fresh.execute(makeup, now: now)
-        #expect(madeUp.status == .applied)
-        #expect(try await fresh.execute(undo(try #require(madeUp.undoToken)), now: now).status == .applied)
-        logs = try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()); debts = try ModelContext(container).fetch(FetchDescriptor<QadaItem>())
-        #expect(logs[0].status == "missed" && debts[0].madeUpAt == nil)
-
+        #expect(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).isEmpty)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<QadaItem>()).isEmpty)
     }
-
     @Test func test_M1T07_QiyamMidnightReplayUndoAndExplicitRestoration() async throws {
         // P05 golden: Oct 7 at 23:30 and Oct 8 at 02:10 belong to night 2026-10-07.
         let late = date("2026-10-07T23:30:00+03:00"), early = date("2026-10-08T02:10:00+03:00")
@@ -259,35 +234,26 @@ import MadarPrayer
         #expect(try await bus.execute(dhuhrAlone, now: now).status == .applied)
         #expect(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first(where: { $0.dayKey == friday.description && $0.prayer == "dhuhr" })?.fridayKind == "dhuhr")
     }
-    @Test func test_M1T02_makeUpCommandIsAtomicIdempotentAndUndoable() async throws {
+    @Test func performedLatePrayerCommandLogsQadaWithoutDebtAndUndoRemovesIt() async throws {
         let now = date("2026-10-13T09:00:00+03:00")
-        let (container, bus, _) = try fixture(at: now)
-        let context = ModelContext(container), dayKey = "2026-10-12"
-        let missed = CommandEnvelope(name: "prayer.log", payload: .object([
-            "dayKey": .string(dayKey), "prayer": .string("fajr"), "status": .string("missed")
+        let (container, bus, directory) = try fixture(at: now)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let context = ModelContext(container)
+        let command = CommandEnvelope(name: "prayer.log", payload: .object([
+            "dayKey": .string("2026-10-12"), "prayer": .string("fajr"), "status": .string("qada")
         ]), source: .app, issuedAt: now)
-        #expect(try await bus.execute(missed, now: now).status == .applied)
-        #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt == nil)
+        let applied = try await bus.execute(command, now: now)
+        #expect(applied.status == .applied && applied.undoToken == command.commandID)
+        let row = try #require(context.fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(row.status == "qada" && row.eventAt == now && row.loggedAt == now)
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).isEmpty)
+        #expect(try await bus.execute(command, now: now.addingTimeInterval(1)).status == .duplicate)
 
-        let makeUp = CommandEnvelope(name: "prayer.makeUp", payload: .object([
-            "dayKey": .string(dayKey), "prayer": .string("fajr"), "at": .string(iso(now)), "fridayKind": .null
-        ]), source: .app, issuedAt: now)
-        let applied = try await bus.execute(makeUp, now: now)
-        #expect(applied.status == .applied && applied.undoToken == makeUp.commandID)
-        let log = try #require(context.fetch(FetchDescriptor<PrayerLog>()).first)
-        let debt = try #require(context.fetch(FetchDescriptor<QadaItem>()).first)
-        #expect(log.status == "qada" && debt.madeUpAt == now)
-        let logStamp = log.updatedAt, debtStamp = debt.updatedAt
-
-        let duplicate = CommandEnvelope(name: "prayer.makeUp", payload: makeUp.payload, source: .app, issuedAt: now.addingTimeInterval(1))
-        #expect(try await bus.execute(duplicate, now: now.addingTimeInterval(1)).status == .duplicate)
-        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).first?.updatedAt == logStamp)
-        #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.updatedAt == debtStamp)
-
-        let undo = CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(makeUp.commandID.uuidString)]), issuedAt: now.addingTimeInterval(2))
+        let undo = CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(command.commandID.uuidString)]), issuedAt: now.addingTimeInterval(2))
         #expect(try await bus.execute(undo, now: now.addingTimeInterval(2)).status == .applied)
-        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).first?.status == "missed")
-        #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt == nil)
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).allSatisfy { $0.deletedAt != nil })
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).isEmpty)
+        let retiredMakeUp = CommandEnvelope(name: "prayer.makeUp", payload: .object(["dayKey": .string("2026-10-12"), "prayer": .string("fajr")]), issuedAt: now.addingTimeInterval(3))
+        #expect(try await bus.execute(retiredMakeUp, now: now.addingTimeInterval(3)).status == .rejected)
     }
-
 }

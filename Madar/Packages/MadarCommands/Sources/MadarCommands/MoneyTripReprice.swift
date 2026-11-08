@@ -21,7 +21,7 @@ public struct MoneyTripReprice {
 extension MoneyRepository {
     /// Preview only. Bank-priced rows, closed reports and adopted repayment plans keep their fixed figures.
     /// Linked refunds travel with their original, even if they arrived after the return.
-    public func previewTripReprice(id: UUID, rate: String, at now: Date) throws -> MoneyTripReprice {
+    @MainActor public func previewTripReprice(id: UUID, rate: String, at now: Date) throws -> MoneyTripReprice {
         _ = try FX.parseRate(rate)
         let trips = try context.fetch(FetchDescriptor<Trip>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         guard let trip = trips.first(where: { $0.id == id && !$0.dismissed }), let code = trip.currency,

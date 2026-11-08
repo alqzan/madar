@@ -7,7 +7,7 @@ import MadarPrayer
 
 /// Read model shared by money screens; never rewrites checkpoints or stored day keys.
 /// Foreign account balances require an explicit manual home rate, never an assumed 1:1 rate.
-@MainActor public struct MoneyRepository {
+public struct MoneyRepository {
     public let context: ModelContext
     public init(context: ModelContext) { self.context = context }
 
@@ -18,21 +18,35 @@ import MadarPrayer
         let cards: [Card]
         let obligations: [Obligation]
         let reconciliations: [Reconciliation]
+        let accountsByID: [UUID: Account]
+        let cardsByID: [UUID: Card]
+        let obligationsByID: [UUID: Obligation]
+        let reconciliationsByAdjustmentID: [UUID: Reconciliation]
     }
     public func effectContext() throws -> EffectContext {
-        .init(cashAsSpend: try SettingsStore(context: context).value(for: "mal.cashWithdrawalAsSpend") == .bool(true),
-              accounts: try liveAccounts(),
-              cards: try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil },
-              obligations: try context.fetch(FetchDescriptor<Obligation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil },
-              reconciliations: try context.fetch(FetchDescriptor<Reconciliation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil })
+        let accounts = try liveAccounts()
+        let cards = try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let obligations = try context.fetch(FetchDescriptor<Obligation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let reconciliations = try context.fetch(FetchDescriptor<Reconciliation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        var reconciliationsByAdjustmentID: [UUID: Reconciliation] = [:]
+        for reconciliation in reconciliations {
+            guard let id = reconciliation.adjustmentTransactionID, reconciliationsByAdjustmentID[id] == nil else { continue }
+            reconciliationsByAdjustmentID[id] = reconciliation
+        }
+        return .init(cashAsSpend: try SettingsStore(context: context).value(for: "mal.cashWithdrawalAsSpend") == .bool(true),
+            accounts: accounts, cards: cards, obligations: obligations, reconciliations: reconciliations,
+            accountsByID: Dictionary(accounts.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
+            cardsByID: Dictionary(cards.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
+            obligationsByID: Dictionary(obligations.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
+            reconciliationsByAdjustmentID: reconciliationsByAdjustmentID)
     }
     public func effect(of row: MoneyTransaction, includingExcluded: Bool = false) throws -> MovementEffect {
         try effect(of: row, includingExcluded: includingExcluded, in: try effectContext())
     }
     public func effect(of row: MoneyTransaction, includingExcluded: Bool = false, in lookup: EffectContext) throws -> MovementEffect {
-        let cashAsSpend = lookup.cashAsSpend, accounts = lookup.accounts, cards = lookup.cards
-        let card = cards.first { $0.id == row.cardID }
-        let from = accounts.first { $0.id == row.fromAccountID }, to = accounts.first { $0.id == row.toAccountID }
+        let cashAsSpend = lookup.cashAsSpend
+        let card = row.cardID.flatMap { lookup.cardsByID[$0] }
+        let from = row.fromAccountID.flatMap { lookup.accountsByID[$0] }, to = row.toAccountID.flatMap { lookup.accountsByID[$0] }
         func owned(_ account: Account?) -> Bool { account?.ownership == "mine" && account?.tracked == true }
         let movement: Movement
         var amount = row.homeAmountMinor
@@ -52,13 +66,13 @@ import MadarPrayer
         case "cashback": movement = .cashbackRedeemed(card?.kind == "credit" ? .creditCard : .account)
         case "billPayment": movement = .billPayment(linkedToObligation: row.obligationID != nil)
         case "repayment":
-            let obligation = lookup.obligations.first { $0.id == row.obligationID }
+            let obligation = row.obligationID.flatMap { lookup.obligationsByID[$0] }
             guard let obligation else { throw MoneyCommandError.invalidReference }
             movement = obligation.kind == "loan" ? .loanInstalment : .bnplInstalment
         case "adjustment":
             // M5-V15 / F03: the reconciliation record holds the signed difference and its name; the movement is linked
             // from `Reconciliation.adjustmentTransactionID` (the dictionary's relation). Accounts also carry the sign in from/to.
-            let record = lookup.reconciliations.first { $0.adjustmentTransactionID == row.id }
+            let record = lookup.reconciliationsByAdjustmentID[row.id]
             let spend = record?.resolution == "unrecordedSpend"
             if row.cardID != nil {
                 movement = .cardAdjustment(unrecordedSpend: spend); amount = record?.deltaMinor ?? 0
@@ -92,7 +106,7 @@ import MadarPrayer
     }
 
     /// The merchant's live rule, by the same normalized pattern the intake uses (M5-V07).
-    public func merchantRule(for merchant: String?) throws -> MerchantRule? { try MoneyMutationHandler.rule(for: merchant, in: context) }
+    @MainActor public func merchantRule(for merchant: String?) throws -> MerchantRule? { try MoneyMutationHandler.rule(for: merchant, in: context) }
 
     public func confirmedTransactions() throws -> [MoneyTransaction] {
         try context.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.reviewState == "ok" }

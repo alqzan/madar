@@ -51,15 +51,15 @@ public enum RouteRegistry {
                 case (.bahw, "year", 3): guard path[1] == "day" else { throw CoreError.invalidRoute }; room = .year; try uuid(path[2])
                 case (.bahw, "widget-maker", 1): allowed = ["template"]; if let t = p["template"], Room(rawValue: t) == nil { throw CoreError.invalidRoute }
                 case (.salah, "day", 2), (.salah, "qiyam", 2), (.notes, "day", 2): try date(path[1])
-                case (.salah, "hali", 1), (.salah, "qada", 1), (.notes, "today", 1), (.notes, "letters", 1), (.quran, "fihris", 1), (.mal, "now", 1), (.mal, "messages", 1), (.mal, "categories", 1), (.mal, "reconcile", 1), (.mal, "zakat", 1), (.mihbara, "desk", 1), (.mihbara, "continue", 1): break
+                case (.salah, "hali", 1), (.notes, "today", 1), (.notes, "letters", 1), (.quran, "fihris", 1), (.mal, "now", 1), (.mal, "messages", 1), (.mal, "categories", 1), (.mal, "reconcile", 1), (.mal, "zakat", 1), (.mihbara, "desk", 1), (.mihbara, "continue", 1): break
                 case (.salah, "log", 1):
                     allowed = ["prayer", "day", "status", "heart"]; mode = .prefill
                     guard let value = p["prayer"], Prayer(rawValue: value) != nil else { throw CoreError.invalidRoute }
                     if let day = p["day"] { try date(day) }
-                    if let status = p["status"], !["jamaah", "alone", "qada", "missed"].contains(status) { throw CoreError.invalidRoute }
+                    if let status = p["status"], !["jamaah", "alone", "qada"].contains(status) { throw CoreError.invalidRoute }
                     if let heart = p["heart"], !["distracted", "present", "khashi"].contains(heart) { throw CoreError.invalidRoute }
                 case (.notes, "write", 1): allowed = ["day"]; mode = .prefill; if let day = p["day"], !["today", "yesterday"].contains(day) { throw CoreError.invalidRoute }
-                case (.salah, "qada", 2), (.notes, "entry", 2), (.notes, "letter", 2), (.notes, "project", 2), (.quran, "history", 2), (.mal, "tx", 2), (.mal, "envelope", 2), (.mihbara, "notebook", 2): try uuid(path[1])
+                case (.notes, "entry", 2), (.notes, "letter", 2), (.notes, "project", 2), (.quran, "history", 2), (.mal, "tx", 2), (.mal, "envelope", 2), (.mihbara, "notebook", 2): try uuid(path[1])
                 case (.quran, "page", 2): try integer(path[1], range: 1...604)
                 case (.quran, "juz", 2): try integer(path[1], range: 1...30)
                 case (.quran, "session", 2): guard ["hifz", "review", "drill", "bridge", "wird", "qiyam"].contains(path[1]) else { throw CoreError.invalidRoute }; mode = .prefill

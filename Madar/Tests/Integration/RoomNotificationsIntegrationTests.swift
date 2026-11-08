@@ -60,7 +60,7 @@ import MadarCore
         XCTAssertEqual(app.quranRoute?.path, ["session", "review"])
 
         RoomNotificationContent.open("qada.\(day)", userInfo: ["dayKey": day], session: app)
-        XCTAssertEqual(app.prayerRoute?.path, ["qada"])
+        XCTAssertNil(app.prayerRoute, "An already-delivered legacy debt reminder lands on the prayer home.")
         XCTAssertEqual(app.selectedTab, "prayer")
 
         app.prayerRoute = nil
@@ -244,14 +244,16 @@ import MadarCore
         return (try AppSession(container: container, groupDirectory: root), root, now, day)
     }
 
-    func testQadaOffAndNothingOwedScheduleNothing() async throws {
-        let (off, _, now, day) = try fixture(["salah.qadaReminder": .string("off")])
-        let offCandidates = try await RoomNotificationContent.candidates(session: off, prayerDays: [day], now: now)
-        XCTAssertFalse(offCandidates.contains { $0.id.hasPrefix("qada.") })
-        let (fresh, _, _, _) = try fixture(["salah.qadaReminder": .string("afterFajr")])
-        // A fresh store owes nothing (RP1: an unlogged prayer never becomes qada).
-        let freshCandidates = try await RoomNotificationContent.candidates(session: fresh, prayerDays: [day], now: now)
-        XCTAssertFalse(freshCandidates.contains { $0.id.hasPrefix("qada.") })
+    func testLegacyQadaReminderSettingHasNoSchemaEntryOrScheduledWork() async throws {
+        let schema = try SettingsSchema.bundled()
+        XCTAssertThrowsError(try schema.definition(for: "salah.qadaReminder"))
+        let (fresh, _, now, day) = try fixture([:])
+        let context = ModelContext(fresh.container), legacy = Setting()
+        legacy.id = UUID(); legacy.key = "salah.qadaReminder"; legacy.valueJSON = Data("\"afterFajr\"".utf8)
+        legacy.createdAt = now; legacy.updatedAt = now; legacy.writerID = "legacy-test"
+        context.insert(legacy); try context.save()
+        let candidates = try await RoomNotificationContent.candidates(session: fresh, prayerDays: [day], now: now)
+        XCTAssertFalse(candidates.contains { $0.id.hasPrefix("qada.") })
     }
 
     func testHabitReminderUsesTheActiveTripCivilDay() async throws {
@@ -309,31 +311,16 @@ import MadarCore
     func testProtectedAppShowsGenericCopyAndTapsOpenTheRoom() throws {
         let (app, _, _, day) = try fixture(["core.faceIDLock": .string("app")])
         let habit = UUID()
-        let qada = NotificationCandidate(id: "qada.2026-10-15", room: .salah, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
         let reminder = NotificationCandidate(id: "habits.2026-10-15.\(habit.uuidString)", room: .habits, dueAt: day.asr.addingTimeInterval(1800), dayKey: "2026-10-15")
         let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
-        let q = RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:])
         let h = RoomNotificationContent.content(for: reminder, plan: plan, session: app, habitNames: [habit.uuidString: "المشي"])
-        XCTAssertFalse(q.body.contains("قضاء")); XCTAssertEqual(q.title, "مدار"); XCTAssertFalse(h.title.contains("المشي"))
+        XCTAssertFalse(h.title.contains("المشي"))
         let digest = RoomNotificationContent.content(for: NotificationCandidate(id: "digest.2026-10-15", room: .habits, dueAt: day.asr, dayKey: "2026-10-15"), plan: plan, session: app, habitNames: [:])
         XCTAssertEqual(digest.title, "مدار"); XCTAssertTrue(digest.body.hasSuffix("في مدار"), digest.body)
         RoomNotificationContent.open(reminder.id, userInfo: h.userInfo, session: app)
         XCTAssertEqual(app.selectedTab, "foundation"); XCTAssertTrue(app.habitsOpen); XCTAssertEqual(app.habitRouteID, habit)
-        RoomNotificationContent.open(qada.id, userInfo: q.userInfo, session: app)
+        RoomNotificationContent.open("qada.2026-10-15", userInfo: [:], session: app)
         XCTAssertEqual(app.selectedTab, "prayer")
-    }
-
-    func testQadaCopyNeverCarriesTheDebtCount() throws {
-        let (app, _, _, day) = try fixture(["core.faceIDLock": .string("none")])
-        let qada = NotificationCandidate(id: "qada.2026-10-15", room: .salah, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
-        let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
-        XCTAssertTrue(RoomNotificationContent.qadaLines.contains(RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:]).body))
-        // OR-06: fifteen lines that change from day to day, none with a digit.
-        XCTAssertEqual(RoomNotificationContent.qadaLines.count, 15)
-        XCTAssertGreaterThan(Set((10...24).map { RoomNotificationContent.qadaLine("2026-10-\($0)") }).count, 5)
-        XCTAssertTrue(RoomNotificationContent.qadaLines.allSatisfy { $0.rangeOfCharacter(from: .decimalDigits) == nil })
-        let body = RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:]).body
-        XCTAssertNil(body.rangeOfCharacter(from: .decimalDigits), "RU2: no prayer-debt count outside the app")
     }
 
     func testHabitAndZakatCopySayWhenAndNeverPromiseAMissingStreak() throws {

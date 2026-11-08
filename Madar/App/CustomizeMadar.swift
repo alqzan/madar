@@ -209,8 +209,8 @@ func sectionFor(_ key: String) -> String {
     if key == "core.homeCity" { return "مدينتك" }
     if ["salah.showMosqueStreak", "salah.askHeart"].contains(key) { return "الصلاة" }
     if key == "core.faceIDLock" { return "الخصوصية" }
-    // FB-39: these prayer keys used to fall through to «المظهر», so travel method, qada reminder and pending days were never on the prayer page.
-    if ["salah.pendingDays", "salah.tripMethod", "salah.travelShortenCombine", "salah.qadaReminder", "salah.pool", "salah.fridayTallArch"].contains(key) { return "الصلاة" }
+    // FB-39: these prayer keys used to fall through to «المظهر», so travel method and pending days were never on the prayer page.
+    if ["salah.pendingDays", "salah.tripMethod", "salah.travelShortenCombine", "salah.pool", "salah.fridayTallArch"].contains(key) { return "الصلاة" }
     if key == "core.spotlightIndex" { return "البحث" }
     if ["salah.beforeReminder", "salah.beforeAdhanMin", "notes.eveningLine", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil"].contains(key) { return "الإشعارات" }
     return "المظهر"

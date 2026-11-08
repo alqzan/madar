@@ -43,4 +43,20 @@ import XCTest
         app.buttons[currentID].tap()
         XCTAssertTrue(app.buttons["money-log-day-2026-10-16"].waitForExistence(timeout: 5))
     }
+
+    func testSearchHidesAmountsUntilTheUserRevealsThem() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "cardsHidden", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let settingsSearch = app.textFields["settings-search"]; XCTAssertTrue(settingsSearch.waitForExistence(timeout: 10)); settingsSearch.tap(); settingsSearch.typeText("المال")
+        app.buttons["money-open"].tap()
+        let log = app.buttons["money-log-open"]; XCTAssertTrue(log.waitForExistence(timeout: 10)); for _ in 0..<8 where !log.isHittable { app.swipeUp(velocity: .slow) }; log.tap()
+        XCTAssertTrue(app.otherElements["money-log-arcade"].waitForExistence(timeout: 10))
+        app.buttons["money-log-search-open"].tap()
+        let field = app.textFields["money-log-search"]; XCTAssertTrue(field.waitForExistence(timeout: 5)); field.tap(); field.typeText("2300\n")
+        XCTAssertTrue(app.staticTexts["money-log-search-empty"].waitForExistence(timeout: 5))
+        app.buttons["money-log-reveal"].tap()
+        let result = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-log-search-result-")).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 5), app.debugDescription)
+    }
 }

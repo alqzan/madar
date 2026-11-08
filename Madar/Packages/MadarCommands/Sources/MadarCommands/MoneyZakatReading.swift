@@ -18,6 +18,7 @@ public struct MoneyZakatReading {
     public var accounts: [AccountLine]
 }
 extension MoneyRepository {
+    @MainActor
     public func zakat(at now: Date) throws -> MoneyZakatReading {
         let profile = try context.fetch(FetchDescriptor<ZakatProfile>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.sorted { $0.id.uuidString < $1.id.uuidString }.first
         let accounts = try homeAccountBalances(at: now)
@@ -46,7 +47,7 @@ extension MoneyRepository {
         return .init(input: input, signature: try Self.zakatSignature(profile), hasProfile: profile != nil,
             accounts: accounts.map { .init(id: $0.account.id, name: $0.account.name, homeMinor: $0.homeMinor, included: $0.account.zakatInclude) })
     }
-    public static func zakatSignature(_ profile: ZakatProfile?) throws -> String {
+    @MainActor public static func zakatSignature(_ profile: ZakatProfile?) throws -> String {
         guard let profile else { return "none" }
         let e = JSONEncoder(); e.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         return SHA256.hash(data: try e.encode(profile.record())).map { String(format: "%02x", $0) }.joined()

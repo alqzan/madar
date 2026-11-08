@@ -70,6 +70,24 @@ import CoreSpotlight
 }
 
 @MainActor final class MihbaraHomeIntegrationTests: XCTestCase {
+    func testCancellingEPUBLinkScanAlsoCancelsItsDetachedWorker() async {
+        let worker = Task.detached(priority: .utility) { () throws -> String? in
+            try await Task.sleep(for: .seconds(30))
+            return "should not finish"
+        }
+        let caller = Task { try await MihbaraEPUBLinkScanWorker.value(of: worker) }
+        caller.cancel()
+
+        do {
+            _ = try await caller.value
+            XCTFail("A canceled shelf read must not await the detached EPUB scan")
+        } catch is CancellationError {
+            XCTAssertTrue(worker.isCancelled)
+        } catch {
+            XCTFail("Unexpected scan cancellation error: \(error)")
+        }
+    }
+
     func testRoutedPDFLocatorIsBoundToTheExactFile() {
         let locator = #"{"fileHash":"file-a","pdfPageIndex":4}"#
         XCTAssertEqual(MihbaraPDFLocator.pageIndex(locatorJSON: locator, fileHash: "file-a"), 4)
@@ -143,6 +161,49 @@ import CoreSpotlight
         // Both instants are inside the trip. London MWL is 04:10 ±3 min; the selected Egyptian method opens earlier.
         XCTAssertFalse(try service.load(at: beforeTripFajr).opensAfterFajr)
         XCTAssertTrue(try service.load(at: afterTripFajr).opensAfterFajr)
+    }
+
+    func testOffMainShelfReadDiscoversColdConvertedEPUBLinksAndCachesPlainEPUB() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraColdEPUBLinks-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let context = ModelContext(container)
+        func hash(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+        func insertFile(title: String, format: String, contentType: String, bytes: Data) -> UUID {
+            let media = Media(); media.kind = "doc"; media.contentType = contentType
+            media.data = bytes; media.sizeBytes = bytes.count; media.sha256 = hash(bytes)
+            context.insert(media)
+            let book = Book(); book.title = title; book.kind = "file"; book.format = format
+            book.mediaID = media.id; book.fileHash = media.sha256; book.shelf = "reading"
+            context.insert(book)
+            return book.id
+        }
+
+        let pdfBytes = Data("synthetic source PDF".utf8)
+        let pdfHash = hash(pdfBytes)
+        let pdfID = insertFile(title: "الأصل", format: "pdf", contentType: "com.adobe.pdf", bytes: pdfBytes)
+        let convertedEPUB = Data("EPUB fixture urn:madar:pdf:\(pdfHash) end".utf8)
+        let convertedID = insertFile(title: "نسخة منسابة", format: "epub", contentType: "org.idpf.epub-container", bytes: convertedEPUB)
+        let ordinaryEPUB = Data("ordinary EPUB fixture".utf8)
+        let ordinaryID = insertFile(title: "كتاب عادي", format: "epub", contentType: "org.idpf.epub-container", bytes: ordinaryEPUB)
+        try context.save()
+
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        MihbaraConversions.save([:], app: app)
+        let service = AppMihbaraService(app: app)
+        let instant = ISO8601DateFormatter().date(from: "2026-11-08T12:00:00+03:00")!
+
+        let reading = try await service.loadOffMain(at: instant)
+        XCTAssertEqual(Set(reading.originals.map(\.id)), [pdfID])
+        XCTAssertEqual(Set(reading.books.map(\.id)), [convertedID, ordinaryID])
+        let cached = MihbaraConversions.links(app)
+        XCTAssertEqual(cached[hash(convertedEPUB)], pdfHash)
+        XCTAssertEqual(cached[hash(ordinaryEPUB)], "", "A plain EPUB should keep its empty sentinel to avoid another cold scan.")
+
+        let reloaded = try await service.loadOffMain(at: instant)
+        XCTAssertEqual(Set(reloaded.originals.map(\.id)), [pdfID])
+        XCTAssertEqual(Set(reloaded.books.map(\.id)), [convertedID, ordinaryID])
     }
 
     func testReadingSavesRetryAfterStoreMaintenanceEnds() async throws {

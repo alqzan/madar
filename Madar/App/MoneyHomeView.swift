@@ -1,6 +1,5 @@
 import SwiftUI
 import Combine
-import SwiftData
 import MadarCore
 import MadarData
 import MadarDesign
@@ -19,6 +18,8 @@ struct MoneyHomeView: View {
     @Environment(\.roomVisit) private var roomVisit
     @Environment(\.isFrontRoom) private var isFrontRoom
     @State private var reading: MoneyHomeReading?
+    @State private var readingLoadTask: Task<Void, Never>?
+    @State private var readingLoadID = UUID()
     @State private var cardCount = 0
     @State private var hawlKey: String?
     @State private var failure: String?
@@ -145,7 +146,8 @@ struct MoneyHomeView: View {
         .task(id: roomVisit) {
             await app.seedMoneyDefaults()
             // Show the saved reading before the bounded accrual command; refresh it when that write settles.
-            load()
+            await loadAndWait()
+            guard !Task.isCancelled else { return }
             // Opening the room must not write on every visit (hangs on tab switches): accrue at most once every 5 minutes.
             if Date().timeIntervalSince(Self.lastAccrual) > 300 {
                 isAccruingPlans = true
@@ -164,7 +166,8 @@ struct MoneyHomeView: View {
                 }
                 catch is CancellationError { return }
                 catch { app.errorMessage = "تعذّر تحديث الخطط اليوم: " + madarUserMessage(error) }
-                load()
+                await loadAndWait()
+                guard !Task.isCancelled else { return }
             }
             if app.moneyOpensMessages { app.moneyOpensMessages = false; messagesOpen = true; return }
             if app.moneyOpensSettings { app.moneyOpensSettings = false; settingsOpen = true; return }
@@ -173,7 +176,7 @@ struct MoneyHomeView: View {
             visitChecked = true
             if service.sinceDue(today: reading.cycle?.today ?? GregorianDay.containing(app.prayerNow(), in: app.activePlace.timeZone)) { sinceOpen = true }
             else { try? await app.executeMoneyCommand("money.markVisit") }
-        }.onChange(of: app.prayerRevision) { load() }
+        }.onChange(of: app.prayerRevision) { if isFrontRoom { load() } }
         .onChange(of: app.moneyRoute, initial: true) { _, route in if let route { openMoneyRoute(route) } }
         .onChange(of: app.moneyRootRequestID) { _, requestID in
             guard requestID != nil else { return }
@@ -193,9 +196,10 @@ struct MoneyHomeView: View {
         .onChange(of: messagesOpen) { if !messagesOpen { load() } }
         .onChange(of: app.bool("core.hideMoneyUntilTouch")) { revealed = false }
         .onChange(of: app.selectedTab) { revealed = false }
-        .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } else if isFrontRoom { load() } }
+        .onChange(of: scenePhase) { if scenePhase != .active { revealed = false; cancelReadingLoad() } else if isFrontRoom { load() } }
+        .onChange(of: isFrontRoom) { _, front in if !front { cancelReadingLoad() } }
         // Left open past midnight, «اليوم» and the cycle day follow the day it is now.
-        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in load() }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in if isFrontRoom { load() } }
         .accessibilityIdentifier("money-home")
     }
     private var homeContent: some View {
@@ -458,21 +462,48 @@ struct MoneyHomeView: View {
         }.padding(16).background(theme.surface, in: .rect(cornerRadius: 16))
     }
     private func amount(_ value: Int) -> String { amountsVisible ? service.amount(value) : "•••" }
+    private func beginReadingLoad() -> UUID {
+        readingLoadTask?.cancel()
+        let id = UUID()
+        readingLoadID = id
+        return id
+    }
     private func load() {
-        let context = ModelContext(app.container)
-        cardCount = ((try? context.fetch(FetchDescriptor<Card>())) ?? []).filter { $0.deletedAt == nil && $0.mergedInto == nil }.count
-        hawlKey = ((try? context.fetch(FetchDescriptor<ZakatProfile>())) ?? []).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-            .sorted { $0.id.uuidString < $1.id.uuidString }.first?.hawlStartHijri
+        let id = beginReadingLoad()
+        readingLoadTask = Task { await applyReadingLoad(id) }
+    }
+    private func loadAndWait() async {
+        let id = beginReadingLoad()
+        let task = Task { await applyReadingLoad(id) }
+        readingLoadTask = task
+        await task.value
+    }
+    private func applyReadingLoad(_ id: UUID) async {
         do {
-            reading = try service.load()
+            let value = try await service.loadOffMain()
+            guard !Task.isCancelled, readingLoadID == id else { return }
+            reading = value
+            cardCount = value.cardCount
+            hawlKey = value.hawlKey
             failure = nil
             if let route = app.moneyRoute { openMoneyRoute(route) }
         }
-        catch MoneyCommandError.missingRate { failure = "عندك حساب بعملة غير عملة البيت بلا سعر تحويل، ومدار لا يخمّن الأرقام. افتح «الحسابات» وصحّح عملة الحساب إن كانت خطأ، أو أدخل سعر الصرف من «السفر»."; reading = nil }
+        catch is CancellationError { return }
+        catch MoneyCommandError.missingRate {
+            guard !Task.isCancelled, readingLoadID == id else { return }
+            failure = "عندك حساب بعملة غير عملة البيت بلا سعر تحويل، ومدار لا يخمّن الأرقام. افتح «الحسابات» وصحّح عملة الحساب إن كانت خطأ، أو أدخل سعر الصرف من «السفر»."
+            reading = nil
+        }
         catch {
             // A passing failure (busy store, locked data) keeps the last good reading on screen; only a first load shows the failure page.
+            guard !Task.isCancelled, readingLoadID == id else { return }
             if reading == nil { failure = "تعذّرت قراءة البيانات الآن. أعد المحاولة." }
         }
+    }
+    private func cancelReadingLoad() {
+        readingLoadID = UUID()
+        readingLoadTask?.cancel()
+        readingLoadTask = nil
     }
     private func closeForMoneyRootIfSafe() {
         guard pendingRootRequest, app.moneyRootDraftBlockers.isEmpty else { return }

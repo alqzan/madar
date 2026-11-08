@@ -42,6 +42,8 @@ struct MihbaraHomeView: View {
     @State private var restoreFileAfterSheet = false
     @State private var offerConversion: MihbaraBook?
     @State private var shelfReadFailed = false
+    @State private var shelfReadTask: Task<Void, Never>?
+    @State private var shelfReadRequestID = UUID()
     @State private var readingGoal: MihbaraReadingGoal?
     @State private var goalEditor: MihbaraGoalEditor?
     @State private var shelfReadError: String?
@@ -96,6 +98,7 @@ struct MihbaraHomeView: View {
             MihbaraConversions.shared.onFinished = { load() }
             await MihbaraCoverStore.shared.reload(app.container)
         }
+        .onDisappear { cancelShelfRead() }
         .modifier(MihbaraConversionOffer(app: app, book: $offerConversion))
         .onChange(of: app.mihbaraBookToOpen) { _, _ in openSpotlightBookIfNeeded() }
         .onChange(of: app.mihbaraRoute, initial: true) { _, route in
@@ -277,31 +280,45 @@ struct MihbaraHomeView: View {
     }
     private func load(retryingAfterFailure: Bool = false) {
         guard !shelfReadFailed || retryingAfterFailure else { return }
-        do {
-            #if DEBUG
-            let environment = ProcessInfo.processInfo.environment
-            if !injectedShelfReadFailure,
-               environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
-               environment["MADAR_UI_MIHBARA_HOME_READ_FAILURE_ONCE"] == "1" {
-                injectedShelfReadFailure = true
-                throw CocoaError(.fileReadUnknown)
+        shelfReadTask?.cancel()
+        let requestID = UUID()
+        shelfReadRequestID = requestID
+        shelfReadTask = Task { @MainActor in
+            do {
+                #if DEBUG
+                let environment = ProcessInfo.processInfo.environment
+                if !injectedShelfReadFailure,
+                   environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+                   environment["MADAR_UI_MIHBARA_HOME_READ_FAILURE_ONCE"] == "1" {
+                    injectedShelfReadFailure = true
+                    throw CocoaError(.fileReadUnknown)
+                }
+                #endif
+                let loaded = try await service.loadOffMain()
+                guard !Task.isCancelled, shelfReadRequestID == requestID else { return }
+                reading = loaded
+                // A failed read keeps the last card; a nil card would offer to create a habit that may already exist.
+                do { readingGoal = try service.readingGoal(today: loaded.day, book: MihbaraStand.pick(from: loaded.books, preferred: tableID)) } catch { app.errorMessage = madarUserMessage(error) }
+                shelfReadFailed = false
+                shelfReadError = nil
+                let books = loaded.books
+                MihbaraConversions.shared.resume(books, app: app)
+                Task { shapes = await service.bookShapes(books) }
+                if let route = app.mihbaraRoute { openRoute(route, using: loaded) }
+                else { openSpotlightBookIfNeeded(using: loaded) }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled, shelfReadRequestID == requestID else { return }
+                shelfReadFailed = true
+                shelfReadError = "تعذّرت قراءة المحبرة الآن. كتبك محفوظة في مكانها؛ حاول مرة أخرى."
             }
-            #endif
-            let loaded = try service.load()
-            reading = loaded
-            // A failed read keeps the last card; a nil card would offer to create a habit that may already exist.
-            do { readingGoal = try service.readingGoal(today: loaded.day, book: MihbaraStand.pick(from: loaded.books, preferred: tableID)) } catch { app.errorMessage = madarUserMessage(error) }
-            shelfReadFailed = false
-            shelfReadError = nil
-            let books = loaded.books
-            MihbaraConversions.shared.resume(books, app: app)
-            Task { shapes = await service.bookShapes(books) }
-            if let route = app.mihbaraRoute { openRoute(route, using: loaded) }
-            else { openSpotlightBookIfNeeded(using: loaded) }
-        } catch {
-            shelfReadFailed = true
-            shelfReadError = "تعذّرت قراءة المحبرة الآن. كتبك محفوظة في مكانها؛ حاول مرة أخرى."
         }
+    }
+    private func cancelShelfRead() {
+        shelfReadRequestID = UUID()
+        shelfReadTask?.cancel()
+        shelfReadTask = nil
     }
     #if DEBUG
     private func injectRouteForUITestIfNeeded() {
@@ -1142,6 +1159,11 @@ struct MihbaraHomeView: View {
     }
     private func library(_ r: MihbaraHomeReading) -> some View {
         let leathers = MihbaraBookCovers.leatherIndices(for: r.books)
+        let query = foldedForSearch(libraryQuery.trimmingCharacters(in: .whitespacesAndNewlines))
+        let matchingBookIDs = Set(r.books.lazy.filter { book in
+            let matchesText = query.isEmpty || foldedForSearch(book.title + " " + book.author).contains(query)
+            return matchesText && (libraryShelf == "all" || libraryShelf == book.shelf)
+        }.map(\.id))
         return ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
@@ -1175,11 +1197,11 @@ struct MihbaraHomeView: View {
                     sheet = nil
                     readerRoute = MihbaraReaderRoute(bookID: hit.bookID, page: hit.pdfPage, locatorJSON: hit.locatorJSON)
                 }
-                libraryStatus(r)
+                libraryStatus(r, matchingBookCount: matchingBookIDs.count)
                 // Owner, 21 Oct 2026: the «قديمًا» cabinet is a section here now, after the three shelves.
                 ForEach(Self.librarySections, id: \.shelf) { section in
                     // A search or shelf filter leaves only what matches; a grid of dimmed covers is still in the way.
-                    let books = r.books.filter { $0.shelf == section.shelf && libraryMatches($0) }
+                    let books = r.books.filter { $0.shelf == section.shelf && matchingBookIDs.contains($0.id) }
                     if !books.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(section.title).font(MadarTypography.section())
@@ -1226,7 +1248,7 @@ struct MihbaraHomeView: View {
         .contextMenu { bookMenu(b) }
         .accessibilityIdentifier("mihbara-library-book-" + b.id.uuidString)
     }
-    private func libraryRow(_ b: MihbaraBook) -> some View {
+    private func libraryRow(_ b: MihbaraBook, matchingBookIDs: Set<UUID>) -> some View {
                     Button { openBook(b) } label: {
                         HStack(spacing: 12) {
                             Image(systemName: b.isReadablePDF ? "doc.text" : b.isReadableEPUB ? "book" : "book.closed").font(.title3).foregroundStyle(theme.secondaryInk).frame(width: 28)
@@ -1241,18 +1263,13 @@ struct MihbaraHomeView: View {
                                 if let p = MihbaraCopy.progressPercent(b.progress), b.shelf != "finished" { Text(service.digits.string(p) + "٪").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             }
                         }.padding(16).background(theme.surface, in: .rect(cornerRadius: 14))
-                    }.buttonStyle(.madarPlain).opacity(libraryMatches(b) ? 1 : 0.3)
+                    }.buttonStyle(.madarPlain).opacity(matchingBookIDs.contains(b.id) ? 1 : 0.3)
                         .contextMenu { bookMenu(b) }
                         .accessibilityIdentifier("mihbara-library-book-" + b.id.uuidString)
     }
 
     private func foldedForSearch(_ text: String) -> String {
         text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "ar"))
-    }
-    private func libraryMatches(_ b: MihbaraBook) -> Bool {
-        let query = libraryQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        let byText = query.isEmpty || foldedForSearch(b.title + " " + b.author).contains(foldedForSearch(query))
-        return byText && (libraryShelf == "all" || libraryShelf == b.shelf)
     }
     private func libraryShelfName(_ shelf: String) -> String {
         switch shelf { case "reading": "أقرؤه"; case "want": "أبي أقرأه"; case "old": "قديمًا"; default: "أنهيته" }
@@ -1263,13 +1280,12 @@ struct MihbaraHomeView: View {
         guard let pages = b.pages, pages > 0 else { return kind }
         return kind + "، " + MihbaraCopy.pages(pages, service.digits)
     }
-    @ViewBuilder private func libraryStatus(_ r: MihbaraHomeReading) -> some View {
+    @ViewBuilder private func libraryStatus(_ r: MihbaraHomeReading, matchingBookCount: Int) -> some View {
         let query = libraryQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         if r.books.isEmpty {
             Text("لم تضف كتبًا بعد. أضف أول كتاب من الرف، فتجده هنا.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
         } else if !query.isEmpty || libraryShelf != "all" {
-            let count = r.books.filter(libraryMatches).count
-            Text(count == 0 ? "لا كتاب يطابق بحثك، وكل كتبك باقية في مكانها." : "المطابق: " + MihbaraCopy.books(count, service.digits) + "، وكل كتبك باقية في مكانها.")
+            Text(matchingBookCount == 0 ? "لا كتاب يطابق بحثك، وكل كتبك باقية في مكانها." : "المطابق: " + MihbaraCopy.books(matchingBookCount, service.digits) + "، وكل كتبك باقية في مكانها.")
                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("mihbara-library-status")
         } else {
             Text(MihbaraCopy.books(r.books.count, service.digits) + " في مكتبتك.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)

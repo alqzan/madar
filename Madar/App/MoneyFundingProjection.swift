@@ -5,7 +5,7 @@ import MadarData
 import MadarMoney
 import MadarCommands
 
-struct MoneyGoalFundingProjection {
+struct MoneyGoalFundingProjection: Sendable {
     var today: GregorianDay
     var through: GregorianDay
     var points: [FundingProjectionPoint]
@@ -16,10 +16,10 @@ struct MoneyGoalFundingProjection {
     }
 }
 
-extension AppMoneyService {
-    func salaryForecastDays(cycle: MoneyCycleReading?, today: GregorianDay, zone: TimeZone) throws -> [GregorianDay] {
+enum MoneyHomeProjectionBuilder {
+    static func salaryForecastDays(context: ModelContext, cycle: MoneyCycleReading?, today: GregorianDay, zone: TimeZone) throws -> [GregorianDay] {
         guard let cycle else { return [] }
-        let settings = try SettingsStore(context: ModelContext(app.container))
+        let settings = try SettingsStore(context: context)
         let schedule = try settings.value(for: "mal.salarySchedule").object ?? [:]
         let hijri = try settings.value(for: "mal.cycleCalendar").string == "hijri"
         let recurrence: SalaryRecurrence? = {
@@ -45,12 +45,12 @@ extension AppMoneyService {
 
     /// Conditional, read-only projection for the small goal rails. An unsupported daily repayment leaves its rail
     /// without a forecast rather than silently treating the stored first payment as a permanent saving rate.
-    func fundingProjections(cycle: MoneyCycleReading?, today: GregorianDay, now: Date, zone: TimeZone,
-                            envelopes: [Envelope], plans: [EnvelopePlan], allocations: [Allocation],
-                            balances: [UUID: Int], surplus: Int, reserve: Int) throws -> [UUID: MoneyGoalFundingProjection] {
+    static func fundingProjections(context: ModelContext, cycle: MoneyCycleReading?, today: GregorianDay, now: Date, zone: TimeZone,
+                                   envelopes: [Envelope], plans: [EnvelopePlan], allocations: [Allocation],
+                                   balances: [UUID: Int], surplus: Int, reserve: Int) throws -> [UUID: MoneyGoalFundingProjection] {
         guard let cycle else { return [:] }
-        let context = ModelContext(app.container), settings = try SettingsStore(context: context)
-        let dates = try salaryForecastDays(cycle: cycle, today: today, zone: zone)
+        let settings = try SettingsStore(context: context)
+        let dates = try salaryForecastDays(context: context, cycle: cycle, today: today, zone: zone)
         guard let last = dates.last else { return [:] }
         let currentLast = MadarCalendarDays.distance(from: cycle.startDay, to: dates[0])
         // The actual salary closes the old cycle before funding plans. A known remaining deficit may consume
@@ -111,5 +111,18 @@ extension AppMoneyService {
             guard !unsupported.contains(envelope.id), let points = result.points[envelope.id.uuidString] else { return nil }
             return (envelope.id, MoneyGoalFundingProjection(today: today, through: last, points: points))
         })
+    }
+}
+
+extension AppMoneyService {
+    func salaryForecastDays(cycle: MoneyCycleReading?, today: GregorianDay, zone: TimeZone) throws -> [GregorianDay] {
+        try MoneyHomeProjectionBuilder.salaryForecastDays(context: ModelContext(app.container), cycle: cycle, today: today, zone: zone)
+    }
+
+    func fundingProjections(cycle: MoneyCycleReading?, today: GregorianDay, now: Date, zone: TimeZone,
+                            envelopes: [Envelope], plans: [EnvelopePlan], allocations: [Allocation],
+                            balances: [UUID: Int], surplus: Int, reserve: Int) throws -> [UUID: MoneyGoalFundingProjection] {
+        try MoneyHomeProjectionBuilder.fundingProjections(context: ModelContext(app.container), cycle: cycle, today: today, now: now, zone: zone,
+            envelopes: envelopes, plans: plans, allocations: allocations, balances: balances, surplus: surplus, reserve: reserve)
     }
 }

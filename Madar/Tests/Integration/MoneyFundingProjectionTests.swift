@@ -23,6 +23,20 @@ import MadarCommands
         let app = try AppSession(container: container, groupDirectory: root); app.authorizeProtectedData()
         try body(c, app, AppMoneyService(app: app), cycle)
     }
+    private func runAsync(_ body: (ModelContext, AppSession, AppMoneyService, Cycle) async throws -> Void) async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "FundingForecast-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container)
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"),
+            "mal.dailyAllowance": .object(["mode": .string("fixed"), "amountMinor": .number(40_000), "percentBp": .null]), "mal.salaryDay": .number(27),
+            "mal.cycleCalendar": .string("gregorian")])
+        let cycle = Cycle(); cycle.start = try GregorianDay("2026-10-01").date(in: zone)
+        cycle.expectedEnd = try GregorianDay("2026-10-27").date(in: zone); cycle.incomeMinor = 1_500_000; c.insert(cycle)
+        let policy = CyclePolicy(); policy.cycleID = cycle.id; policy.effectiveFromDayKey = "2026-10-01"; policy.allowanceMinor = 40_000; policy.dailyRateMinor = 40_000; c.insert(policy)
+        try c.save()
+        let app = try AppSession(container: container, groupDirectory: root); app.authorizeProtectedData()
+        try await body(c, app, AppMoneyService(app: app), cycle)
+    }
     private func project(_ c: ModelContext, _ app: AppSession, _ service: AppMoneyService, today: String = "2026-10-16", surplus: Int = 0) throws -> [UUID: MoneyGoalFundingProjection] {
         let envelopes = try c.fetch(FetchDescriptor<Envelope>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let plans = try c.fetch(FetchDescriptor<EnvelopePlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
@@ -99,6 +113,93 @@ import MadarCommands
             _ = try SettingsStore(context: c).stage(["mal.autoOffset": .bool(false)]); try c.save()
             let result = try XCTUnwrap(project(c, app, service, surplus: 20_000)[envelope.id])
             XCTAssertEqual(result.balance(on: try .init("2026-10-27")), 20_000)
+        }
+    }
+    func testHomeReadingCarriesCardAndHawlDoorFacts() throws {
+        try run { c, _, service, _ in
+            c.insert(Card())
+            let deletedCard = Card(); deletedCard.deletedAt = at("2026-10-02"); c.insert(deletedCard)
+            let mergedCard = Card(); mergedCard.mergedInto = UUID(); c.insert(mergedCard)
+
+            let first = ZakatProfile(); first.id = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+            first.hawlStartHijri = "1447-09-01"; c.insert(first)
+            let later = ZakatProfile(); later.id = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+            later.hawlStartHijri = "1447-10-01"; c.insert(later)
+            let merged = ZakatProfile(); merged.id = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+            merged.mergedInto = first.id; merged.hawlStartHijri = "1447-08-15"; c.insert(merged)
+            let deleted = ZakatProfile(); deleted.id = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+            deleted.deletedAt = at("2026-10-02"); deleted.hawlStartHijri = "1447-08-01"; c.insert(deleted)
+            try c.save()
+
+            let reading = try service.load(at: at("2026-10-16"))
+            XCTAssertEqual(reading.cardCount, 1)
+            XCTAssertEqual(reading.hawlKey, "1447-09-01")
+        }
+    }
+    func testHomeReadingUsesEachRecurringBillsLinkedPayments() throws {
+        try run { c, _, service, _ in
+            let weekly = Obligation(); weekly.kind = "subscription"; weekly.name = "اشتراك أسبوعي"
+            weekly.amountMinor = 30_000; weekly.currency = "SAR"; weekly.repeatEvery = 1
+            weekly.repeatUnit = "week"; weekly.firstDueDayKey = "2026-10-01"; c.insert(weekly)
+            let fortnightly = Obligation(); fortnightly.kind = "subscription"; fortnightly.name = "اشتراك نصف شهري"
+            fortnightly.amountMinor = 50_000; fortnightly.currency = "SAR"; fortnightly.repeatEvery = 2
+            fortnightly.repeatUnit = "week"; fortnightly.firstDueDayKey = "2026-10-01"; c.insert(fortnightly)
+
+            for (billID, day) in [(weekly.id, "2026-10-01"), (weekly.id, "2026-10-08"),
+                                  (fortnightly.id, "2026-10-15")] {
+                let payment = MoneyTransaction(); payment.obligationID = billID
+                payment.eventAt = at(day); payment.reviewState = "ok"; c.insert(payment)
+            }
+            try c.save()
+
+            let reading = try service.load(at: at("2026-10-16"))
+            let dues = Dictionary(uniqueKeysWithValues: reading.obligations.map { ($0.name, $0.due) })
+            let weeklyNext = try GregorianDay("2026-10-15"), fortnightlyOverdue = try GregorianDay("2026-10-01")
+            XCTAssertEqual(dues["اشتراك أسبوعي"], weeklyNext)
+            XCTAssertEqual(dues["اشتراك نصف شهري"], fortnightlyOverdue)
+        }
+    }
+    func testOffMainHomeReadingMatchesTheMainActorReadingWithoutWriting() async throws {
+        try await runAsync { c, _, service, _ in
+            let envelope = goal(c, balance: 12_000)
+            let plan = EnvelopePlan(); plan.id = envelope.id; plan.envelopeID = envelope.id; plan.source = "daily"
+            plan.period = "perDay"; plan.perPaycheckMinor = 400; plan.startDayKey = "2026-10-01"; c.insert(plan)
+            let account = Account(); account.name = "حساب تجريبي"; account.currency = "SAR"; account.ownership = "mine"; account.tracked = true
+            account.balanceMinor = 250_000; account.balanceAt = at("2026-10-01"); c.insert(account)
+            try c.save()
+
+            let now = at("2026-10-16"), expected = try service.load(at: now)
+            let allocationsBefore = try c.fetchCount(FetchDescriptor<Allocation>())
+            let actual = try await service.loadOffMain(at: now)
+
+            XCTAssertEqual(actual.salaryDates, expected.salaryDates)
+            XCTAssertEqual(actual.basis, expected.basis)
+            XCTAssertEqual(actual.currency, expected.currency)
+            XCTAssertEqual(actual.cardCount, expected.cardCount)
+            XCTAssertEqual(actual.hawlKey, expected.hawlKey)
+            XCTAssertEqual(actual.pendingCount, expected.pendingCount)
+            XCTAssertEqual(actual.reserveMinor, expected.reserveMinor)
+            XCTAssertEqual(actual.surplusMinor, expected.surplusMinor)
+            XCTAssertEqual(actual.envelopes.map(\.id), expected.envelopes.map(\.id))
+            XCTAssertEqual(actual.envelopes.map(\.balanceMinor), expected.envelopes.map(\.balanceMinor))
+            XCTAssertEqual(actual.envelopes.map(\.fundingProjection?.points.count), expected.envelopes.map(\.fundingProjection?.points.count))
+            XCTAssertEqual(actual.limits.map(\.spentMinor), expected.limits.map(\.spentMinor))
+            XCTAssertEqual(actual.obligations, expected.obligations)
+            XCTAssertEqual(try c.fetchCount(FetchDescriptor<Allocation>()), allocationsBefore)
+        }
+    }
+    func testOffMainHomeReadingHonorsCancellation() async throws {
+        try await runAsync { c, _, service, _ in
+            let allocationsBefore = try c.fetchCount(FetchDescriptor<Allocation>())
+            let now = at("2026-10-16")
+            let task = Task { try await service.loadOffMain(at: now) }
+            task.cancel()
+            do {
+                _ = try await task.value
+                XCTFail("A cancelled home read must not return a reading")
+            } catch is CancellationError {
+                XCTAssertEqual(try c.fetchCount(FetchDescriptor<Allocation>()), allocationsBefore)
+            }
         }
     }
 }

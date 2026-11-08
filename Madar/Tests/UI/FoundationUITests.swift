@@ -1,6 +1,43 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func testPrayerHomeShowsLoadingWhileSnapshotReadsOffMain() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light",
+            "MADAR_UI_PRAYER_SNAPSHOT_HOLD_MS": "5000"
+        ]
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
+        let loading = app.staticTexts["prayer-home-loading"]
+        XCTAssertTrue(loading.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["prayer-today-header"].firstMatch.exists, app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["prayer-arch-maghrib"].firstMatch.exists, app.debugDescription)
+        attachScreenshot(app, named: "M1-V01-home-loading-L")
+        let maghrib = app.descendants(matching: .any)["prayer-arch-maghrib"].firstMatch
+        XCTAssertTrue(maghrib.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(loading.waitForNonExistence(timeout: 5), app.debugDescription)
+        let fajr = app.descendants(matching: .any)["prayer-arch-fajr"].firstMatch
+        XCTAssertTrue(fajr.waitForExistence(timeout: 5), app.debugDescription)
+        fajr.tap()
+        let jamaah = app.buttons["prayer-status-jamaah"]
+        XCTAssertTrue(jamaah.waitForExistence(timeout: 5), app.debugDescription)
+        jamaah.tap()
+        let skipHeartQuestion = app.buttons["prayer-heart-skip"]
+        if skipHeartQuestion.waitForExistence(timeout: 3) { skipHeartQuestion.tap() }
+        let refreshing = app.staticTexts["prayer-home-refreshing"]
+        XCTAssertTrue(refreshing.waitForExistence(timeout: 5), app.debugDescription)
+        attachScreenshot(app, named: "M1-V01-home-refreshing-L")
+        maghrib.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertFalse(app.buttons["prayer-status-jamaah"].exists, "A prayer from an older snapshot cannot open its action sheet.")
+        let refreshed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: refreshing)
+        wait(for: [refreshed], timeout: 10)
+        XCTAssertFalse(refreshing.exists, app.debugDescription)
+        app.terminate()
+    }
+
     /// M1-V01: the prayer home with canonical-like data, for comparison with screens/salah/01-S1-Home(-s1).jpg.
     func test_M1V01_HomeMatchesCanonical() throws {
         continueAfterFailure = false
@@ -26,9 +63,9 @@ import XCTest
             let pending = app.buttons["prayer-pending-review"]
             XCTAssertTrue(pending.exists, app.debugDescription)
             XCTAssertTrue(pending.label.contains("العشاء") && pending.label.contains("أمس"), pending.label)
-            let makeup = app.buttons["prayer-qada-makeup"]; scrollTo(makeup, in: app)
+            scrollTo(streaks, in: app)
             attachScreenshot(app, named: "M1-V01-home-scrolled-\(size)")
-            let qiyam = app.buttons["prayer-qiyam"]; scrollTo(qiyam, in: app)
+            app.swipeUp(velocity: .slow)
             attachScreenshot(app, named: "M1-V01-home-bottom-\(size)")
             app.terminate()
         }
@@ -46,7 +83,9 @@ import XCTest
         XCTAssertTrue(header.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "prayer-arch-maghrib").firstMatch.exists)
         attachScreenshot(app, named: "M1-V08-night-L")
-        let qiyam = app.buttons["prayer-qiyam"]; scrollTo(qiyam, in: app)
+        let streaks = app.buttons["prayer-streaks"]
+        XCTAssertTrue(streaks.waitForExistence(timeout: 5), app.debugDescription)
+        scrollTo(streaks, in: app)
         attachScreenshot(app, named: "M1-V08-night-bottom-L")
         app.terminate()
     }
@@ -66,7 +105,9 @@ import XCTest
         let noon = app.descendants(matching: .any).matching(identifier: "prayer-arch-dhuhr").firstMatch
         XCTAssertTrue(noon.label.contains("الجمعة"), noon.label)
         attachScreenshot(app, named: "M1-F01-friday-L")
-        let qada = app.buttons["prayer-qada-makeup"]; scrollTo(qada, in: app)
+        let streaks = app.buttons["prayer-streaks"]
+        XCTAssertTrue(streaks.waitForExistence(timeout: 5), app.debugDescription)
+        scrollTo(streaks, in: app)
         attachScreenshot(app, named: "M1-F01-friday-scrolled-L")
         // §7.2 «سطر الكهف» leads to the Quran: the pill opens the mushaf where Al-Kahf begins.
         let pill = app.descendants(matching: .any).matching(identifier: "prayer-friday-pill").firstMatch
@@ -291,9 +332,8 @@ import XCTest
         back.tap()
         XCTAssertTrue(any("prayer-today-header").waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["prayer-streaks"].exists, "A hidden block leaves the home")
-        let qiyam = app.buttons["prayer-qiyam"], qada = app.buttons["prayer-qada-makeup"]
-        XCTAssertTrue(qiyam.exists && qada.exists, app.debugDescription)
-        XCTAssertLessThan(qiyam.frame.minY, qada.frame.minY, "Qiyam moved above qada")
+        XCTAssertFalse(app.buttons["prayer-qiyam"].exists, app.debugDescription)
+        XCTAssertFalse(app.buttons["prayer-qada-makeup"].exists, "The prayer room no longer has a backlog entry point.")
         app.terminate()
     }
 
@@ -336,31 +376,34 @@ import XCTest
         app.terminate()
     }
 
-    /// M1-V03: «فاتتني» opens the make-up panel and saves nothing until a choice, for screens/salah/03-S2b-Missed.jpg.
-    func test_M1V03_MissedPanelOpensWithoutSaving() throws {
+    /// RP1: an unperformed prayer stays unrecorded; after its window, recording qada marks the completed act.
+    func test_M1V03_LatePrayerRecordsQadaOnlyAfterPerformed() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00"]
         app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-        let fajr = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "الفجر")).firstMatch
+        let fajr = app.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
         XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(fajr.label.contains("قُضيت"), fajr.label)
         fajr.tap()
-        let missed = app.buttons["prayer-status-missed"]
-        XCTAssertTrue(missed.waitForExistence(timeout: 10), "Fajr's window has ended, so «فاتتني» is offered (RP2)")
-        missed.tap()
-        XCTAssertTrue(app.buttons["prayer-makeup-now"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(app.buttons["prayer-missed-later"].exists)
-        XCTAssertFalse(app.buttons["undo-button"].exists, "Nothing is saved until «قضيتُها الآن» or «لاحقًا»")
-        attachScreenshot(app, named: "M1-V03-missed-L")
-        // Companion -s1: the sheet scrolled to «قضيتُها الآن» / «لاحقًا» / «امسح التسجيل».
-        app.buttons["prayer-makeup-now"].swipeUp()
-        XCTAssertTrue(app.buttons["prayer-missed-later"].isHittable, app.debugDescription)
-        attachScreenshot(app, named: "M1-V03-missed-L-s1")
+        XCTAssertFalse(app.buttons["prayer-status-missed"].exists, "No missed state is recorded or offered.")
+        let qada = app.buttons["prayer-status-qada"]
+        XCTAssertTrue(qada.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(qada.isSelected, "Before the user records performance, no qada log exists.")
+        attachScreenshot(app, named: "M1-V03-late-prayer-log-L")
+        qada.tap()
+        XCTAssertTrue(qada.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["undo-button"].exists, "A performed prayer is logged in place.")
+        let completed = app.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
+        XCTAssertTrue(completed.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(completed.label.contains("قُضيت"), completed.label)
+        completed.tap()
+        XCTAssertTrue(app.buttons["prayer-status-qada"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["prayer-status-qada"].isSelected)
+        XCTAssertFalse(app.buttons["prayer-status-missed"].exists)
         app.terminate()
     }
-
-    /// M1-V04: «حالي», for comparison with screens/salah/04-S3-Hali(-s1).jpg.
     func test_M1V04_HaliMatchesCanonical() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -471,55 +514,37 @@ import XCTest
         app.terminate()
     }
 
-    /// M1-V06: the qada sheet, for comparison with screens/salah/06-S5-Qada.jpg; also choosing a specific one (T10).
-    func test_M1V06_QadaSheetChoosesSpecificPrayerAndMakesItUp() throws {
+    /// Legacy qada links return to the prayer room; they cannot open a retired backlog screen.
+    func test_M1V06_LegacyQadaRouteFallsBackToPrayerHome() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
-            "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
-            "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_THEME": "light",
             "MADAR_UI_PRAYER_ROUTE": "madar://salah/qada"]
         app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-        XCTAssertTrue(app.staticTexts["prayer-qada-title"].waitForExistence(timeout: 10), app.debugDescription)
-        let isha = app.buttons["prayer-qada-row-2026-10-06-isha"]
-        XCTAssertTrue(isha.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(app.buttons["prayer-qada-row-2026-10-06-maghrib"].exists)
-        attachScreenshot(app, named: "M1-V06-qada-L")
-        // Companion -s1: the sheet scrolled to its rows and the two actions.
-        app.staticTexts["prayer-qada-title"].swipeUp()
-        XCTAssertTrue(app.buttons["prayer-qada-makeup-chosen"].waitForExistence(timeout: 5), app.debugDescription)
-        attachScreenshot(app, named: "M1-V06-qada-L-s1")
-        isha.tap()
-        XCTAssertTrue(isha.isSelected)
-        app.buttons["prayer-qada-makeup-chosen"].tap()
-        let confirm = app.buttons["prayer-makeup-confirm"]
-        XCTAssertTrue(confirm.waitForExistence(timeout: 10), app.debugDescription)
-        confirm.tap()
-        XCTAssertFalse(app.buttons["undo-button"].waitForExistence(timeout: 1), "Making up a prayer is saved in place without the global removal undo toast.")
+        XCTAssertTrue(app.descendants(matching: .any)["prayer-today-header"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["prayer-qada-title"].exists)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "prayer-qada-row-")).firstMatch.exists)
+        XCTAssertFalse(app.buttons["prayer-qada-makeup"].exists)
         app.terminate()
     }
-
-    func testPrayerSheetReadFailureRetriesIntoTheRealQiyamFlow() throws {
+    func testPrayerSnapshotSheetReadFailureRetriesIntoHistory() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-08T02:10:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07",
-            "MADAR_UI_THEME": "light", "MADAR_UI_PRAYER_READ_FAILURE_ONCE": "1"]
+            "MADAR_UI_THEME": "light", "MADAR_UI_PRAYER_READ_FAILURE_ONCE": "1",
+            "MADAR_UI_PRAYER_ROUTE": "madar://salah/hali"]
         app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-        let qiyam = app.buttons["prayer-qiyam"]; scrollTo(qiyam, in: app); qiyam.tap()
         let retry = app.buttons["prayer-snapshot-retry"]
         XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons["prayer-snapshot-close"].exists)
-        XCTAssertFalse(app.buttons["prayer-qiyam-save"].exists)
-        attachScreenshot(app, named: "M1-read-failure-L")
+        XCTAssertFalse(app.staticTexts["prayer-history-month"].exists)
+        attachScreenshot(app, named: "M1-history-read-failure-L")
         retry.tap()
-        let plus = app.buttons["prayer-qiyam-plus"]
-        XCTAssertTrue(plus.waitForExistence(timeout: 10), app.debugDescription)
-        plus.tap(); XCTAssertEqual(app.staticTexts["prayer-qiyam-count"].label, "٢")
-        attachScreenshot(app, named: "M1-read-recovered-qiyam-L")
-        app.buttons["prayer-qiyam-save"].tap()
-        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
-        app.buttons["undo-button"].tap()
+        XCTAssertTrue(app.staticTexts["prayer-history-month"].waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "M1-history-read-recovered-L")
+        app.terminate()
     }
 
     func testPrayerCaptureRequestSurvivesReadFailureAndRetry() throws {
@@ -539,8 +564,38 @@ import XCTest
         XCTAssertTrue(alone.isSelected, "Retry opens Asr's existing log, without recording a guessed status")
         attachScreenshot(app, named: "M1-request-read-recovered-L")
         app.buttons["prayer-status-jamaah"].tap()
-        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
-        app.buttons["undo-button"].tap()
+        XCTAssertTrue(alone.waitForNonExistence(timeout: 10), "A successful prayer log closes its sheet")
+        let asrArch = app.descendants(matching: .any).matching(identifier: "prayer-arch-asr").firstMatch
+        XCTAssertTrue(asrArch.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(asrArch.label.contains("جماعة"), asrArch.label)
+        asrArch.tap()
+        let jamaah = app.buttons["prayer-status-jamaah"]
+        XCTAssertTrue(jamaah.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(jamaah.isSelected, "The retried Capture request saves the selected status")
+    }
+
+    func testPrayerCaptureRequestWaitsUntilPrayerRoomIsFront() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light",
+            "MADAR_UI_PRAYER_OPEN_REQUEST": "asr", "MADAR_UI_PRAYER_SHEET_READ_HOLD_MS": "5000"]
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
+        let notes = app.buttons["tab-notes"]
+        XCTAssertTrue(notes.waitForExistence(timeout: 10), app.debugDescription)
+        notes.tap()
+        let notesSelected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: notes)
+        XCTAssertEqual(XCTWaiter.wait(for: [notesSelected], timeout: 5), .completed)
+        XCTAssertFalse(app.buttons["prayer-status-alone"].waitForExistence(timeout: 3), "Capture must not present a prayer sheet over another room")
+        XCTAssertFalse(app.alerts["تعذّر فتح تسجيل الصلاة"].exists)
+
+        app.buttons["tab-prayer"].tap()
+        let alone = app.buttons["prayer-status-alone"]
+        XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(alone.isSelected, "The queued Capture request opens when the prayer room returns")
+        attachScreenshot(app, named: "FB25-request-deferred-until-front-L")
+        app.terminate()
     }
 
     func testPrayerDeepLinkSurvivesReadFailureAndRetry() throws {
@@ -560,102 +615,14 @@ import XCTest
         app.terminate()
     }
 
-    func testPrayerQadaListReadFailureRetriesInPlace() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
-            "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
-            "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light",
-            "MADAR_UI_PRAYER_READ_FAILURE_ONCE": "1"]
-        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-        let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
-        let retry = app.buttons["prayer-qada-retry"]
-        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["prayer-qada-read-error"].exists)
-        retry.tap()
-        XCTAssertTrue(app.buttons["prayer-qada-row-2026-10-06-isha"].waitForExistence(timeout: 10), app.debugDescription)
-        app.terminate()
-    }
-
-    /// M1-V07: the qiyam sheet, for comparison with screens/salah/07-S6-Qiyam(-s1).jpg.
-    func test_M1V07_QiyamSheetMatchesCanonical() throws {
+    func test_M1V07_RetiredQiyamEntryIsHidden() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
             "MADAR_UI_NOW": "2026-10-08T02:10:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-        let qiyam = app.buttons["prayer-qiyam"]; scrollTo(qiyam, in: app); qiyam.tap()
-        XCTAssertTrue(app.buttons["prayer-qiyam-plus"].waitForExistence(timeout: 10), app.debugDescription)
-        let nightPicker = app.buttons["prayer-qiyam-night"]
-        XCTAssertTrue(nightPicker.exists, app.debugDescription)
-        XCTAssertTrue(nightPicker.label.contains("،"), nightPicker.label)
-        XCTAssertTrue(nightPicker.label.contains("ربيع") && nightPicker.label.contains("أكتوبر"), nightPicker.label)
-        XCTAssertFalse(nightPicker.label.contains("-"), "Night labels use words rather than ISO: \(nightPicker.label)")
-        XCTAssertFalse(app.buttons["ورد القيام من محفوظك"].exists, "The Quran room is not built, so it has no entry point")
-        attachScreenshot(app, named: "M1-V07-qiyam-L")
+        XCTAssertFalse(app.buttons["prayer-qiyam"].exists, app.debugDescription)
         app.terminate()
-    }
-
-    /// FB-39 (owner, 6 Nov): qada by count. Tracking starts 3 Oct, so «٥ فجر» ending on the default last day (2 Oct)
-    /// are 28 Sep … 2 Oct; «قضيتُ ٢» then makes up the two oldest (28 and 29 Sep). Days worked by hand.
-    func test_FB39_QadaByCountAddsRunAndMakesUpOldest() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
-            "MADAR_UI_NOW": "2026-10-08T09:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-03", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app)
-        let prayerTab = app.buttons["tab-prayer"]; XCTAssertTrue(prayerTab.waitForExistence(timeout: 15)); prayerTab.tap()
-        // The button sits low in the room and appears only once scrolled to, as in the M1-T09 test.
-        let add = app.buttons["prayer-old-missed"]; scrollTo(add, in: app); add.tap()
-        let mode = app.segmentedControls["prayer-old-mode"].buttons["بالعدد"]
-        XCTAssertTrue(mode.waitForExistence(timeout: 10), app.debugDescription); mode.tap()
-        let count = app.textFields["prayer-old-count"]; XCTAssertTrue(count.waitForExistence(timeout: 5)); count.tap(); count.typeText("5")
-        XCTAssertTrue(app.descendants(matching: .any)["prayer-old-count-preview"].waitForExistence(timeout: 5), app.debugDescription)
-        attachScreenshot(app, named: "FB39-qada-by-count-L")
-        let save = app.buttons["prayer-old-count-save"]; scrollTo(save, in: app); save.tap()
-        XCTAssertTrue(save.waitForNonExistence(timeout: 10), app.debugDescription)
-        let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
-        func row(_ day: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: "prayer-qada-row-\(day)-fajr").firstMatch }
-        XCTAssertTrue(row("2026-09-28").waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(row("2026-10-02").exists, app.debugDescription)
-        XCTAssertFalse(row("2026-09-27").exists)
-        let bulk = app.buttons["prayer-qada-bulk-open"]; scrollTo(bulk, in: app); bulk.tap()
-        let made = app.textFields["prayer-qada-bulk-count"]; XCTAssertTrue(made.waitForExistence(timeout: 8), app.debugDescription); made.tap(); made.typeText("2")
-        attachScreenshot(app, named: "FB39-qada-bulk-makeup-L")
-        app.buttons["prayer-qada-bulk-save"].tap()
-        XCTAssertTrue(row("2026-09-28").waitForNonExistence(timeout: 10), app.debugDescription)
-        XCTAssertFalse(row("2026-09-29").exists)
-        XCTAssertTrue(row("2026-09-30").exists, app.debugDescription)
-        app.terminate()
-    }
-
-    func test_M1T09_OldMissedSaveUndoRestoreMakeUpAndRelaunch() throws {
-        continueAfterFailure = false
-        for size in ["L"] {
-            let app = XCUIApplication()
-            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
-                "MADAR_UI_NOW": "2026-10-08T09:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-03", "MADAR_UI_THEME": "light"]
-            app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-            let add = app.buttons["prayer-old-missed"]; scrollTo(add, in: app); add.tap()
-            let save = app.buttons["prayer-old-save"]; scrollTo(save, in: app)
-            attachScreenshot(app, named: "M1-T09-old-missed-\(size)"); save.tap()
-            let undo = app.buttons["undo-button"]; XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
-            scrollTo(add, in: app); add.tap()
-            let restore = app.buttons["prayer-old-restore"]; scrollTo(restore, in: app)
-            XCTAssertFalse(save.exists); restore.tap(); app.buttons["أعد التسجيل"].firstMatch.tap()
-            XCTAssertTrue(undo.waitForExistence(timeout: 15))
-            app.terminate(); app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-            let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
-            let row = app.descendants(matching: .any).matching(identifier: "prayer-qada-row-2026-10-02-fajr").firstMatch
-            XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
-            let sheetTitle = app.staticTexts["prayer-qada-title"]
-            sheetTitle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.99)))
-            let makeup = app.buttons["prayer-qada-makeup"]; scrollTo(makeup, in: app); makeup.tap()
-            let confirm = app.buttons["prayer-makeup-confirm"]; scrollTo(confirm, in: app); confirm.tap()
-            XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
-            scrollTo(makeup, in: app); XCTAssertTrue(makeup.isEnabled)
-            app.terminate()
-        }
     }
 
     func test_M1T08_OffsetsAffectBothClockScreensResetUndoAndRelaunch() throws {
@@ -690,45 +657,6 @@ import XCTest
             XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
             scrollTo(search, in: app); search.tap(); search.typeText("salah.offsets\n")
             XCTAssertTrue(value.waitForExistence(timeout: 10)); XCTAssertEqual(value.label, "٥")
-            app.terminate()
-        }
-    }
-
-    func test_M1T07_QiyamSaveRelaunchUndoRestore() throws {
-        continueAfterFailure = false
-        for size in ["L"] {
-            let app = XCUIApplication()
-            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
-                "MADAR_UI_NOW": "2026-10-08T02:10:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07", "MADAR_UI_THEME": "light"]
-            app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-            let qiyam = app.buttons["prayer-qiyam"]
-            scrollTo(qiyam, in: app); qiyam.tap()
-            let plus = app.buttons["prayer-qiyam-plus"]
-            scrollTo(plus, in: app); for _ in 0..<4 { plus.tap() }
-            let count = app.staticTexts["prayer-qiyam-count"]
-            XCTAssertEqual(count.label, "٨")
-            let witr = app.switches["prayer-qiyam-witr"]
-            scrollTo(witr, in: app); witr.tap()
-            attachScreenshot(app, named: "M1-T07-qiyam-\(size)")
-            let save = app.buttons["prayer-qiyam-save"]
-            scrollTo(save, in: app); save.tap()
-            let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: save)
-            XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 15), .completed)
-            let undo = app.buttons["undo-button"]
-            XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
-            scrollTo(qiyam, in: app); qiyam.tap()
-            let restore = app.buttons["prayer-qiyam-restore"]
-            XCTAssertFalse(save.exists, "Undo must require explicit restoration")
-            scrollTo(plus, in: app); for _ in 0..<4 { plus.tap() }
-            scrollTo(witr, in: app); witr.tap()
-            scrollTo(restore, in: app); restore.tap(); app.buttons["أعد التسجيل"].tap()
-            XCTAssertTrue(undo.waitForExistence(timeout: 15))
-            app.terminate(); app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-            scrollTo(qiyam, in: app); qiyam.tap()
-            XCTAssertTrue(count.waitForExistence(timeout: 10)); XCTAssertEqual(count.label, "٨")
-            XCTAssertEqual(witr.value as? String, "1")
-            let list = app.descendants(matching: .any).matching(identifier: "prayer-qiyam-footprint-list").firstMatch
-            XCTAssertTrue(list.exists)
             app.terminate()
         }
     }
@@ -814,10 +742,8 @@ import XCTest
             openHali(app)
             let ratio = app.staticTexts["prayer-stat-percentage"]
             XCTAssertTrue(ratio.waitForExistence(timeout: 10), app.debugDescription)
-            XCTAssertEqual(ratio.label, "٨٧٪")
-            let qada = app.staticTexts["prayer-stat-qada"]
-            scrollTo(qada, in: app)
-            XCTAssertEqual(qada.label.filter { $0 != "\u{2068}" && $0 != "\u{2069}" }, "قُضيت ٢، عليك ٢")
+            XCTAssertEqual(ratio.label, "٩٣٪")
+            XCTAssertFalse(app.staticTexts["prayer-stat-qada"].exists, "The monthly summary no longer shows qada debt.")
             attachScreenshot(app, named: "M1-T05-hali-\(size)")
             let day = app.buttons["prayer-history-day-2026-10-06"]
             scrollTo(day, in: app); attachScreenshot(app, named: "M1-T05-history-\(size)"); day.tap()
@@ -826,7 +752,7 @@ import XCTest
             let undo = app.buttons["undo-button"]
             XCTAssertTrue(undo.waitForExistence(timeout: 10), app.debugDescription)
             XCTAssertTrue(alone.isSelected, "The edited prayer shows its new state in the day sheet")
-            XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٩٠٪", "The figures follow the edit without reopening")
+            XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٩٦٪", "The figures follow the edit without reopening")
             let header = app.descendants(matching: .any).matching(identifier: "prayer-day-header").firstMatch
             let grabber = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.width / 2, dy: header.frame.minY - 24))
             grabber.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.width / 2, dy: app.frame.height - 10)))
@@ -836,10 +762,10 @@ import XCTest
             back.tap()
             undo.tap()
             openHali(app)
-            XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٨٧٪")
+            XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٩٣٪")
             app.terminate(); app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
             openHali(app)
-            XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٨٧٪")
+            XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٩٣٪")
             app.terminate()
         }
     }
@@ -1409,194 +1335,48 @@ import XCTest
         XCTAssertTrue(fajrArch(app).label.contains("وحدي"), fajrArch(app).label)
         app.terminate()
     }
-    func test_M1T02_MissedPrayerPersistsAndAppearsInQadaAfterRelaunch() throws {
+    func test_M1T02_PerformedLatePrayerPersistsAsQadaAfterRelaunch() throws {
         continueAfterFailure = false
         let storeID = UUID().uuidString
         let app = XCUIApplication()
-        app.launchEnvironment = [
-            "MADAR_UI_STORE_ID": storeID,
-            "MADAR_UI_SIZE": "L",
-            "MADAR_UI_THEME": "light",
-            "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00"
-        ]
-        app.launch(); finishOnboarding(app)
-        func fajrArch(_ target: XCUIApplication) -> XCUIElement {
-            target.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
-        }
-        let prayerTab = app.buttons["tab-prayer"]
-        XCTAssertTrue(prayerTab.waitForExistence(timeout: 10), app.debugDescription)
-        prayerTab.tap()
-        let fajr = fajrArch(app)
-        XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription)
-        fajr.tap()
-        app.buttons["prayer-status-missed"].tap()
-        let later = app.buttons["prayer-missed-later"]
-        scrollTo(later, in: app)
-        XCTAssertTrue(later.waitForExistence(timeout: 10), app.debugDescription)
-        later.tap()
-        XCTAssertFalse(app.buttons["undo-button"].waitForExistence(timeout: 1), "A missed-prayer choice is saved in place without the global removal undo toast.")
-        attachScreenshot(app, named: "M1-T02-missed-explicit-L")
-
-        app.terminate()
-        app.launchEnvironment["MADAR_UI_PRAYER_ROUTE"] = "madar://salah/qada"
-        app.launch(); finishOnboarding(app)
-        let reopenedTab = app.buttons["tab-prayer"]
-        XCTAssertTrue(reopenedTab.waitForExistence(timeout: 10), app.debugDescription)
-        reopenedTab.tap()
-        let reopenedFajr = fajrArch(app)
-        XCTAssertTrue(reopenedFajr.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(reopenedFajr.label.contains("فاتتني"), reopenedFajr.label)
-        XCTAssertTrue(app.staticTexts["prayer-qada-title"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "prayer-qada-row-")).firstMatch.exists, "The saved missed prayer appears in the qada list after relaunch.")
-        app.terminate()
-    }
-    func test_M1T02_BulkPendingRecovery() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = [
-            "MADAR_UI_STORE_ID": UUID().uuidString,
-            "MADAR_UI_SIZE": "L",
-            "MADAR_UI_THEME": "light",
-            "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00",
-            "MADAR_UI_TRACKING_START": "2026-10-01"
-        ]
-        app.launch(); finishOnboarding(app)
-        let prayerTab = app.buttons["tab-prayer"]
-        XCTAssertTrue(prayerTab.waitForExistence(timeout: 10), app.debugDescription)
-        prayerTab.tap()
-        let recovery = app.buttons["prayer-recovery"]
-        scrollTo(recovery, in: app)
-        recovery.tap()
-        let bulkUnrecorded = app.buttons["prayer-gap-unrecorded-all"]
-        XCTAssertTrue(bulkUnrecorded.waitForExistence(timeout: 10), app.debugDescription)
-        attachScreenshot(app, named: "M1-T02-recovery-sheet-L")
-        let fajr = app.buttons["prayer-gap-status-2026-10-01-fajr"]
-        XCTAssertTrue(fajr.exists, app.debugDescription)
-        XCTAssertFalse(app.buttons["prayer-gap-save"].isEnabled, "Nothing chosen yet, nothing to save")
-        // One tap settles the whole gap and closes the sheet (RP1: only by explicit choice).
-        bulkUnrecorded.tap()
-        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
-        let removed = NSPredicate(format: "exists == false")
-        expectation(for: removed, evaluatedWith: app.buttons["prayer-recovery"])
-        waitForExpectations(timeout: 15)
-        app.terminate()
-    }
-    func testPrayerRootWaitsForUnresolvedChoiceThenReturnsAfterSave() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = [
-            "MADAR_UI_STORE_ID": UUID().uuidString,
-            "MADAR_UI_SIZE": "L",
-            "MADAR_UI_THEME": "light",
-            "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00",
-            "MADAR_UI_TRACKING_START": "2026-10-01",
-            "MADAR_UI_PRAYER_ROOT_ROUTE_HARNESS": "1"
-        ]
-        app.launch(); finishOnboarding(app)
-        app.buttons["tab-prayer"].tap()
-        let recovery = app.buttons["prayer-recovery"]
-        scrollTo(recovery, in: app); recovery.tap()
-        let fajr = app.buttons["prayer-gap-status-2026-10-01-fajr"]
-        XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription)
-        fajr.tap()
-        let choice = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND NOT (label CONTAINS %@)", "وحدي", "صلّيتها كلها")).firstMatch
-        XCTAssertTrue(choice.waitForExistence(timeout: 5), app.debugDescription); choice.tap()
-        XCTAssertTrue(app.buttons["prayer-gap-save"].isEnabled, app.debugDescription)
-        XCTAssertTrue(fajr.label.contains("وحدي"), fajr.label)
-        app.swipeDown()
-        XCTAssertTrue(fajr.waitForExistence(timeout: 5), "The unrecorded-prayer sheet must keep its pending choice after a swipe.")
-        XCTAssertTrue(fajr.label.contains("وحدي"), "The unsaved prayer state must survive the attempted swipe: " + fajr.label)
-        XCTAssertTrue(app.buttons["prayer-gap-save"].isEnabled, app.debugDescription)
-
-        let root = app.buttons["prayer-root-test-route"]
-        XCTAssertTrue(root.waitForExistence(timeout: 5), app.debugDescription); root.tap()
-        XCTAssertTrue(fajr.exists, "A root request must leave the unresolved choice visible.")
-        XCTAssertTrue(app.buttons["prayer-gap-save"].isEnabled, app.debugDescription)
-
-        app.buttons["prayer-gap-save"].tap()
-        XCTAssertTrue(app.staticTexts["prayer-today-summary"].waitForExistence(timeout: 15), app.debugDescription)
-        XCTAssertFalse(app.buttons["prayer-gap-save"].exists, app.debugDescription)
-        app.terminate()
-    }
-    func testPrayerDeepLinkWaitsForRecoveryChoiceThenResumesAfterSave() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = [
-            "MADAR_UI_STORE_ID": UUID().uuidString,
-            "MADAR_UI_SIZE": "L",
-            "MADAR_UI_THEME": "light",
-            "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00",
-            "MADAR_UI_TRACKING_START": "2026-10-01",
-            "MADAR_UI_PRAYER_ROOT_ROUTE_HARNESS": "1"
-        ]
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": storeID, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00"]
         app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-        let recovery = app.buttons["prayer-recovery"]
-        scrollTo(recovery, in: app); recovery.tap()
-        let fajr = app.buttons["prayer-gap-status-2026-10-01-fajr"]
-        XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription); fajr.tap()
-        let choice = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND NOT (label CONTAINS %@)", "وحدي", "صلّيتها كلها")).firstMatch
-        XCTAssertTrue(choice.waitForExistence(timeout: 5), app.debugDescription); choice.tap()
-        XCTAssertTrue(app.buttons["prayer-gap-save"].isEnabled, app.debugDescription)
-
-        app.buttons["prayer-deep-route-test"].tap()
-        XCTAssertTrue(fajr.exists, "A prayer destination must wait while recovery has an unsaved choice.")
-        XCTAssertTrue(app.buttons["prayer-gap-save"].isEnabled, app.debugDescription)
-        app.buttons["prayer-gap-save"].tap()
-        XCTAssertTrue(app.buttons["prayer-hali-back"].waitForExistence(timeout: 15), app.debugDescription)
+        let fajr = app.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
+        XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription)
+        fajr.tap()
+        let qada = app.buttons["prayer-status-qada"]
+        XCTAssertTrue(qada.waitForExistence(timeout: 10), app.debugDescription)
+        qada.tap()
+        let completed = app.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
+        XCTAssertTrue(completed.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(completed.label.contains("قُضيت"), completed.label)
+        app.terminate()
+        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
+        let reopenedFajr = app.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
+        XCTAssertTrue(reopenedFajr.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(reopenedFajr.label.contains("قُضيت"), reopenedFajr.label)
+        XCTAssertFalse(app.staticTexts["prayer-qada-title"].exists)
+        XCTAssertFalse(app.buttons["prayer-recovery"].exists)
         app.terminate()
     }
     func testPrayerRouteWaitsForCurrentSheetDismissCallback() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchEnvironment = [
-            "MADAR_UI_STORE_ID": UUID().uuidString,
-            "MADAR_UI_SIZE": "L",
-            "MADAR_UI_THEME": "light",
-            "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00",
-            "MADAR_UI_TRACKING_START": "2026-10-01",
-            "MADAR_UI_PRAYER_ROUTE_DISMISSAL_RACE": "1"
-        ]
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00",
+            "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_PRAYER_ROUTE_DISMISSAL_RACE": "1"]
         app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-        let recovery = app.buttons["prayer-recovery"]
-        scrollTo(recovery, in: app); recovery.tap()
+        let fajr = app.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
+        XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription); fajr.tap()
+        XCTAssertTrue(app.buttons["prayer-status-qada"].waitForExistence(timeout: 8), app.debugDescription)
         let trigger = app.buttons["prayer-test-route-during-dismissal"]
         XCTAssertTrue(trigger.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(trigger.isHittable, app.debugDescription); trigger.tap()
-
         XCTAssertTrue(app.buttons["prayer-hali-back"].waitForExistence(timeout: 15), app.debugDescription)
         let order = app.staticTexts["prayer-route-open-after-dismiss"]
         XCTAssertTrue(order.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertEqual(order.label, "بعد إغلاق الورقة", app.debugDescription)
-        app.terminate()
-    }
-    func testPrayerRootPreservesSelectedQadaThroughConfirmation() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = [
-            "MADAR_UI_STORE_ID": UUID().uuidString,
-            "MADAR_UI_SIZE": "L",
-            "MADAR_UI_THEME": "light",
-            "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00",
-            "MADAR_UI_TRACKING_START": "2026-10-01",
-            "MADAR_UI_PRAYER_FIXTURE": "ratio26of30",
-            "MADAR_UI_PRAYER_ROOT_ROUTE_HARNESS": "1"
-        ]
-        app.launch(); finishOnboarding(app); app.buttons["tab-prayer"].tap()
-        let places = app.buttons["prayer-qada-places"]
-        scrollTo(places, in: app); places.tap()
-        let isha = app.buttons["prayer-qada-row-2026-10-06-isha"]
-        XCTAssertTrue(isha.waitForExistence(timeout: 10), app.debugDescription); isha.tap()
-
-        let root = app.buttons["prayer-root-test-route"]
-        XCTAssertTrue(root.waitForExistence(timeout: 5), app.debugDescription); root.tap()
-        XCTAssertTrue(isha.exists, "The selected missed prayer must remain visible until its action is resolved.")
-        let makeUp = app.buttons["prayer-qada-makeup-chosen"]
-        for _ in 0..<5 where !makeUp.isHittable { app.swipeUp(velocity: .slow) }
-        XCTAssertTrue(makeUp.isHittable, app.debugDescription); makeUp.tap()
-        let confirm = app.buttons["prayer-makeup-confirm"]
-        XCTAssertTrue(confirm.waitForExistence(timeout: 8), app.debugDescription)
-        confirm.tap()
-        XCTAssertTrue(app.staticTexts["prayer-today-summary"].waitForExistence(timeout: 15), app.debugDescription)
         app.terminate()
     }
     func testLightDarkAndAccessibilityScreenshots() throws {

@@ -5,7 +5,7 @@ import MadarData
 import MadarMoney
 import MadarCommands
 
-struct MoneySourceDetail: Identifiable {
+struct MoneySourceDetail: Identifiable, Sendable {
     var id: String
     var title: String
     var amountMinor: Int

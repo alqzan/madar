@@ -55,7 +55,7 @@ import XCTest
 
         let remind = app.buttons["prayer-customize-card-remind"]
         reveal(remind, in: app); remind.tap()
-        XCTAssertTrue(app.buttons["option-salah.qadaReminder-afterIsha"].exists, app.debugDescription)
+        XCTAssertFalse(app.buttons["option-salah.qadaReminder-afterIsha"].exists, "The old qada-debt reminder is retired.")
         XCTAssertFalse(app.descendants(matching: .any)["setting-salah.balanceView"].exists, "RA8 keeps the v2 balance view out of v1.")
 
         app.terminate(); app.launch()

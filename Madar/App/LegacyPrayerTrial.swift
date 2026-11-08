@@ -18,8 +18,6 @@ extension AppSession {
             counts = try importLegacyPrayer(Data(contentsOf: URL(fileURLWithPath: path)), writer: "madar.app.trial", now: Date())
             let check = ModelContext(container)
             counts["store.logs"] = try check.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil }.count
-            counts["store.qadaOpen"] = try check.fetch(FetchDescriptor<QadaItem>()).filter { $0.deletedAt == nil && $0.madeUpAt == nil }.count
-            counts["store.qadaMadeUp"] = try check.fetch(FetchDescriptor<QadaItem>()).filter { $0.deletedAt == nil && $0.madeUpAt != nil }.count
             try reload(); try publishSnapshot()
         } catch { counts["failed"] = 1; counts["failed." + String(String(describing: error).prefix(80))] = 1 }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

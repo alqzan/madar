@@ -12,7 +12,7 @@ import MadarCore
         return UUID(uuidString: String(format: "%08X-%04X-%04X-%04X-%012llX", UInt32(a >> 32), UInt16((a >> 16) & 0xFFFF), UInt16(a & 0xFFFF), UInt16(b >> 48), b & 0xFFFFFFFFFFFF))!
     }
     let fixture: [String: Any] = [
-        "qadaBacklog": 0,
+        "qadaBacklog": 37,
         "prayerLogs": [
             ["date": "2026-07-02", "prayers": ["الفجر": "جماعة", "الظهر": "منفردة", "العصر": "فائتة", "المغرب": "قضاء", "العشاء": "لم"],
              "khushu": ["الفجر": 3, "الظهر": 2, "المغرب": 1], "prayerUpdatedAt": ["المغرب": 1783090800000]],
@@ -25,32 +25,37 @@ import MadarCore
     }
     func row(_ plan: LegacyPrayerImport.Plan, _ day: String, _ prayer: Prayer) -> LegacyPrayerImport.LogRow? { plan.logs.first { $0.dayKey == day && $0.prayer == prayer } }
 
-    @Test func statusesHeartsAndDebts() throws {
+    @Test func importsOnlyPerformedPrayerRecordsAndStripsUnperformedArchiveFields() throws {
         let plan = try run()
         #expect(row(plan, "2026-07-02", .fajr)?.status == .jamaah && row(plan, "2026-07-02", .fajr)?.heart == .khashi)
         #expect(row(plan, "2026-07-02", .dhuhr)?.status == .alone && row(plan, "2026-07-02", .dhuhr)?.heart == .present)
-        #expect(row(plan, "2026-07-02", .asr)?.status == .missed && row(plan, "2026-07-02", .asr)?.heart == nil)
-        #expect(row(plan, "2026-07-02", .maghrib)?.status == .qada && row(plan, "2026-07-02", .maghrib)?.heart == .distracted)
-        // «لم» on a past legacy day is history, never a debt (RP1).
-        #expect(row(plan, "2026-07-02", .isha)?.status == .unrecordedHistory)
-        let owed = plan.qada.first { $0.dayKey == "2026-07-02" && $0.prayer == .asr }
-        let madeUp = plan.qada.first { $0.dayKey == "2026-07-02" && $0.prayer == .maghrib }
-        #expect(owed != nil && owed?.madeUpAt == nil)
-        #expect(madeUp?.madeUpAt == Date(timeIntervalSince1970: 1_783_090_800))
-        #expect(plan.qada.count == 2)
+        for prayer in [Prayer.asr, .maghrib, .isha] {
+            #expect(row(plan, "2026-07-02", prayer) == nil)
+        }
+        #expect(plan.logs.count == 4)
+        #expect(plan.counts["prayer.oldQadaSkipped"] == 1)
+        #expect((plan.counts["prayer.unperformedSkipped"] ?? 0) > 0)
+        let archive = try #require(plan.archives.first { $0.dayKey == "2026-07-02" })
+        let archived = try #require(JSONSerialization.jsonObject(with: archive.json) as? [String: Any])
+        let prayers = try #require(archived["prayers"] as? [String: String])
+        #expect(prayers == ["الفجر": "جماعة", "الظهر": "منفردة"])
+        let hearts = try #require(archived["khushu"] as? [String: Int])
+        #expect(hearts == ["الفجر": 3, "الظهر": 2])
+        let stamps = try #require(archived["prayerUpdatedAt"] as? [String: Int])
+        #expect(stamps.isEmpty)
     }
 
     @Test func historyGapsFridayAndTracking() throws {
         let plan = try run()
         #expect(plan.trackingStart?.description == "2026-07-02")
         #expect(plan.counts["skipped.day"] == 1)
-        // 07-03 has no legacy record inside the history: all five prayers are unrecorded history.
-        #expect(Prayer.allCases.allSatisfy { row(plan, "2026-07-03", $0)?.status == .unrecordedHistory })
+        // 07-03 has no legacy record inside the history and imports no placeholder rows.
+        #expect(Prayer.allCases.allSatisfy { row(plan, "2026-07-03", $0) == nil })
         #expect(plan.counts["day.absentInsideHistory"] == 1)
         // Days after the last legacy day are not invented.
         #expect(plan.logs.contains { $0.dayKey > "2026-07-04" } == false)
-        #expect(plan.logs.count == 15)
-        #expect(row(plan, "2026-07-03", .dhuhr)?.fridayKind == nil)
+        #expect(plan.logs.count == 4)
+        #expect(plan.counts["prayer.oldQadaSkipped"] == 1)
     }
 
     @Test func fridayNoonAloneIsDhuhrOtherwiseJumuah() throws {
@@ -74,7 +79,7 @@ import MadarCore
     @Test(.enabled(if: ProcessInfo.processInfo.environment["MADAR_TRIAL_PRAYER"] != nil)) func ownerBackupPlans() throws {
         let path = try #require(ProcessInfo.processInfo.environment["MADAR_TRIAL_PRAYER"])
         let plan = try LegacyPrayerImport.plan(backup: Data(contentsOf: URL(fileURLWithPath: path)), home: .riyadh, uuid: { uuid($0) })
-        print("OWNER-PRAYER-COUNTS", plan.counts.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: " "), "qada=\(plan.qada.count) open=\(plan.qada.filter { $0.madeUpAt == nil }.count) start=\(plan.trackingStart?.description ?? "-")")
+        print("OWNER-PRAYER-COUNTS", plan.counts.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: " "), "logs=\(plan.logs.count) start=\(plan.trackingStart?.description ?? "-")")
         #expect(plan.counts.keys.contains { $0.hasPrefix("skipped.") || $0.hasPrefix("archived.unknown") } == false)
     }
 }

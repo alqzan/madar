@@ -56,7 +56,7 @@ import MadarCommands
         let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
         let context = ModelContext(container)
         var now = ISO8601DateFormatter().date(from: "2026-10-15T23:59:00+03:00")!
-        _ = try SettingsStore(context: context).stage(["core.dayStart": .string("midnight"), "quran.restDay": .string("none"), "quran.hifzLevel": .string("medium")], now: now)
+        _ = try SettingsStore(context: context).stage(["core.dayStart": .string("midnight"), "core.firstCalendar": .string("gregorian"), "quran.restDay": .string("none"), "quran.hifzLevel": .string("medium")], now: now)
         let plan = HifzPlan(); plan.startAyah = 1; plan.unit = "page"; plan.amount = 1; plan.rhythm = "balanced"; plan.missPolicy = "ask"; plan.activeFrom = now
         context.insert(plan)
         try context.save()
@@ -70,7 +70,8 @@ import MadarCommands
         XCTAssertEqual(service.forecastDay(at: now), firstDay)
         let firstBackgroundDay = try await service.forecastDayOffMain(at: now)
         XCTAssertEqual(firstBackgroundDay, firstDay)
-        XCTAssertEqual(first.title, app.dateLabels(firstFinish, first: .hijri).primary)
+        XCTAssertEqual(first.title, app.dateLabels(firstFinish).primary)
+        XCTAssertEqual(first.secondaryDate, app.dateLabels(firstFinish).secondary)
         XCTAssertEqual(first.estimatedDays, 604)
         let firstOverview = try await service.planOverview(at: now)
         XCTAssertEqual(firstOverview.day, firstDay)
@@ -81,7 +82,8 @@ import MadarCommands
         XCTAssertEqual(service.forecastDay(at: now), nextDay)
         let nextBackgroundDay = try await service.forecastDayOffMain(at: now)
         XCTAssertEqual(nextBackgroundDay, nextDay)
-        XCTAssertEqual(next.title, app.dateLabels(nextFinish, first: .hijri).primary)
+        XCTAssertEqual(next.title, app.dateLabels(nextFinish).primary)
+        XCTAssertEqual(next.secondaryDate, app.dateLabels(nextFinish).secondary)
         XCTAssertEqual(next.estimatedDays, 604)
         let nextOverview = try await service.planOverview(at: now)
         XCTAssertEqual(nextOverview.day, nextDay)

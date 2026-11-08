@@ -3,6 +3,25 @@ import UIKit
 import MadarDesign
 import MadarData
 
+@MainActor private final class StoreSettleBackgroundTask {
+    private var identifier: UIBackgroundTaskIdentifier = .invalid
+    private var endRequested = false
+    private var ended = false
+
+    func install(_ identifier: UIBackgroundTaskIdentifier) {
+        self.identifier = identifier
+        if endRequested { endOnce() }
+    }
+
+    func endOnce() {
+        guard !ended else { return }
+        guard identifier != .invalid else { endRequested = true; return }
+        ended = true
+        UIApplication.shared.endBackgroundTask(identifier)
+        identifier = .invalid
+    }
+}
+
 struct FoundationTab: Identifiable, Hashable {
     let id: String
     let title: String
@@ -81,8 +100,8 @@ struct TabShell<Content: View>: View {
                     .zIndex(front ? 1 : 0)
                     // The room arriving lifts through opacity, a small scale and an 8-point offset; the compact transform keeps the
                     // retained room subtree inexpensive to composite while each switch stays settled and direct.
-                    .animation(reduceMotion ? .easeInOut(duration: 0.12) : .spring(response: 0.32, dampingFraction: 0.86)) {
-                        $0.opacity(front ? 1 : 0)
+                    .animation(reduceMotion ? .easeInOut(duration: 0.12) : .spring(response: 0.32, dampingFraction: 0.86)) { room in
+                        room.opacity(front ? 1 : 0)
                             .scaleEffect(front || reduceMotion ? 1 : 0.98)
                             .offset(y: front || reduceMotion ? 0 : 8)
                     }
@@ -434,13 +453,19 @@ struct MadarRootView: View {
             // The crash log from the owner's iPhone (3 Nov, termination 0xDEAD10CC) shows the app suspended while a SwiftData read
             // held the store's file lock. Asking the system for a few seconds when the app leaves the screen lets that work finish first.
             if phase != .active {
-                var task = UIBackgroundTaskIdentifier.invalid
-                task = UIApplication.shared.beginBackgroundTask(withName: "madar.store.settle") { UIApplication.shared.endBackgroundTask(task) }
+                let task = StoreSettleBackgroundTask()
+                let identifier = UIApplication.shared.beginBackgroundTask(withName: "madar.store.settle") {
+                    Task { @MainActor in task.endOnce() }
+                }
+                task.install(identifier)
                 // Inside the background grant, so the store write never races suspension (0xDEAD10CC).
                 session.flushPendingSnapshot()
                 // A reminder plan still waiting for saves to settle runs now, so leaving the app never strands an old request.
                 if phase == .background { Task { await session.prayerNotifications?.flushPendingRefresh() } }
-                Task { try? await Task.sleep(for: .seconds(8)); UIApplication.shared.endBackgroundTask(task) }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(8))
+                    task.endOnce()
+                }
             }
             if phase == .active && !session.maintenanceInProgress {
                 // Returning to the app used to reload, rebuild every widget and drain the inbox before the first frame moved.

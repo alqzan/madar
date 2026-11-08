@@ -197,7 +197,7 @@ final class AppSession {
     @ObservationIgnored private var spotlightReconciliationTask: Task<Void, Never>?
     @ObservationIgnored private let spotlightIndexOperation: AppSpotlightIndexOperation
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.spotlightIndex", "salah.pool", "salah.fridayTallArch", "salah.pendingDays", "salah.tripMethod", "salah.travelShortenCombine", "salah.qadaReminder", "salah.askAfterAdhanMin", "salah.askReminder", "salah.beforeReminder", "salah.beforeAdhanMin", "notes.eveningLine", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.reminder", "bahw.travelFreezesHome", "bahw.smartPresence", "bahw.widgetScope"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.spotlightIndex", "salah.pool", "salah.fridayTallArch", "salah.pendingDays", "salah.tripMethod", "salah.travelShortenCombine", "salah.askAfterAdhanMin", "salah.askReminder", "salah.beforeReminder", "salah.beforeAdhanMin", "notes.eveningLine", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.reminder", "bahw.travelFreezesHome", "bahw.smartPresence", "bahw.widgetScope"]
 
     init(
         container: ModelContainer,
@@ -248,6 +248,7 @@ final class AppSession {
         bus = CommandBus(adapter: commandAdapter)
         schema = try SettingsSchema.bundled()
         store = SettingsStore(context: container.mainContext, schema: schema)
+        _ = try PrayerHistoryMaintenance.removeUnperformedPrayerHistory(in: container.mainContext, now: prayerNow())
         #if DEBUG
         try preparePrayerUITestTrackingStart()
         try preparePrayerPolarNoTimesFixture()
@@ -261,6 +262,12 @@ final class AppSession {
         try prepareHabitFixture(group: group)
         try prepareMoneyFixture(group: group)
         try prepareMihbaraFixture(group: group)
+        let uiTestEnvironment = ProcessInfo.processInfo.environment
+        if uiTestEnvironment["MADAR_UI_STORE_ID"] == group.lastPathComponent,
+           group.deletingLastPathComponent().lastPathComponent == "UITestStores",
+           let prayer = uiTestEnvironment["MADAR_UI_PRAYER_OPEN_REQUEST"].flatMap(Prayer.init(rawValue:)) {
+            prayerLogRequest = prayer
+        }
         #endif
         try reload()
         let devices = try container.mainContext.fetch(FetchDescriptor<DeviceSetting>())
@@ -278,6 +285,14 @@ final class AppSession {
         values = try store.allValues()
         prayerRevision &+= 1
     }
+#if DEBUG
+    func advancePrayerRevisionForUITest() {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["MADAR_UI_PRAYER_SNAPSHOT_REVISION_HARNESS"] == "1",
+              environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil else { return }
+        prayerRevision &+= 1
+    }
+#endif
     /// Records an authorized app visit. The state lives in a local DeviceSetting and is never sent to CloudKit.
     func recordBahwReturnVisit() {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { return }
@@ -496,7 +511,7 @@ final class AppSession {
     }
 #endif
     func recordPrayer(_ reference: PrayerReference, status: PrayerStoredStatus, fridayKind: FridayPrayerKind? = nil, completion: ((Bool) -> Void)? = nil) {
-        guard [.jamaah, .alone, .missed].contains(status) else { completion?(false); return }
+        guard [.jamaah, .alone, .qada].contains(status) else { completion?(false); return }
         let payload: MadarCore.JSONValue = .object([
             "dayKey": .string(reference.day.description),
             "prayer": .string(reference.prayer.rawValue),
@@ -504,28 +519,7 @@ final class AppSession {
             "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null
         ])
         sendPrayerCommand(name: "prayer.log", payload: payload,
-            undoMessage: status == .missed ? "سُجّلت فائتة" : "سُجّلت الصلاة", completion: completion)
-    }
-    func oldMissedRequiresRestore(_ reference: PrayerReference) throws -> Bool {
-        try PrayerRepository(context: ModelContext(container)).oldMissedRequiresRestore(reference)
-    }
-    func addOldMissedPrayer(_ reference: PrayerReference, fridayKind: FridayPrayerKind?, restoreDeleted: Bool = false, completion: ((Bool) -> Void)? = nil) {
-        sendPrayerCommand(name: "prayer.addOldMissed", payload: .object([
-            "dayKey": .string(reference.day.description), "prayer": .string(reference.prayer.rawValue),
-            "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null, "restoreDeleted": .bool(restoreDeleted)
-        ]), undoMessage: "أُضيفت الفائتة القديمة", completion: completion)
-    }
-    /// FB-39: «أضف ٣٠٠ فجر» — one old missed prayer per day, counting back from `lastDay`.
-    func addOldMissedRun(prayer: Prayer, count: Int, lastDay: GregorianDay, completion: ((Bool) -> Void)? = nil) {
-        sendPrayerCommand(name: "prayer.addOldMissedRun", payload: .object([
-            "prayer": .string(prayer.rawValue), "count": .number(Double(count)), "lastDayKey": .string(lastDay.description)
-        ]), undoMessage: "أُضيفت الفوائت القديمة", completion: completion)
-    }
-    /// FB-39: «قضيتُ ٥ من الفجر» — the oldest debts of that prayer, made up now.
-    func makeUpOldest(prayer: Prayer, count: Int, completion: ((Bool) -> Void)? = nil) {
-        sendPrayerCommand(name: "prayer.makeUpOldest", payload: .object([
-            "prayer": .string(prayer.rawValue), "count": .number(Double(count))
-        ]), undoMessage: "سُجّل القضاء", completion: completion)
+            undoMessage: status == .qada ? "سُجّلت الصلاة قضاءً" : "سُجّلت الصلاة", completion: completion)
     }
     func qiyamRequiresRestore(_ night: GregorianDay) throws -> Bool {
         try PrayerRepository(context: ModelContext(container)).nightRequiresRestore(night)
@@ -569,28 +563,13 @@ final class AppSession {
             undoMessage: "سُجّلت الصلاتان", completion: completion)
     }
     func makeUpPrayer(_ reference: PrayerReference, fridayKind: FridayPrayerKind? = nil, completion: ((Bool) -> Void)? = nil) {
-        let at = prayerNow()
-        let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let payload: MadarCore.JSONValue = .object([
             "dayKey": .string(reference.day.description),
             "prayer": .string(reference.prayer.rawValue),
-            "at": .string(formatter.string(from: at)),
+            "status": .string(PrayerStoredStatus.qada.rawValue),
             "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null
         ])
-        sendPrayerCommand(name: "prayer.makeUp", payload: payload, undoMessage: "قُضيت الصلاة", completion: completion)
-    }
-    func resolvePrayerGap(_ resolutions: [PrayerGapResolution], completion: ((Bool) -> Void)? = nil) {
-        guard !resolutions.isEmpty else { completion?(false); return }
-        let values = resolutions.map { item in
-            MadarCore.JSONValue.object([
-                "dayKey": .string(item.reference.day.description),
-                "prayer": .string(item.reference.prayer.rawValue),
-                "status": .string(item.status.rawValue),
-                "fridayKind": item.fridayKind.map { .string($0.rawValue) } ?? .null
-            ])
-        }
-        sendPrayerCommand(name: "prayer.resolveGap", payload: .object(["resolutions": .array(values)]),
-            undoMessage: "حُلّت الفترة", completion: completion)
+        sendPrayerCommand(name: "prayer.log", payload: payload, undoMessage: "سُجّلت الصلاة قضاءً", completion: completion)
     }
     /// Capture's prayer report uses the same command, undo and refresh as a tap on the arch.
     @discardableResult
@@ -688,25 +667,20 @@ final class AppSession {
         // Seed only once in an explicitly isolated DEBUG UI-test store. Values come
         // from the hand-authored §7.2 example, never from engine output.
         guard try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty else { return }
-        for index in 0..<30 {
+        for index in 0..<28 {
             let row = PrayerLog()
             row.dayKey = String(format: "2026-10-%02d", index / 5 + 1)
             row.prayer = Prayer.allCases[index % 5].rawValue
-            row.status = index < 26 ? "jamaah" : index < 28 ? "qada" : "missed"
+            row.status = index < 26 ? "jamaah" : "qada"
             row.tzID = "Asia/Riyadh"
             row.eventAt = try GregorianDay(row.dayKey).date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(12 * 3600)
             row.source = "user"
             context.insert(row)
-            if index >= 26 {
-                let debt = QadaItem(); debt.originalDayKey = row.dayKey; debt.prayer = row.prayer
-                if index < 28 { debt.madeUpAt = row.eventAt }
-                context.insert(debt)
-            }
         }
         try context.save()
     }
     /// DEBUG-only S1 showcase in an isolated UI-test store: a week shaped like the canonical
-    /// home (three prayers recorded today, last night's Isha unrecorded, three owed prayers).
+    /// home (three prayers recorded today, last night's Isha unrecorded, three performed qada prayers).
     /// Hand-authored rows, never engine output; use with MADAR_UI_NOW 2026-10-07T16:20+03:00.
     private func preparePrayerHomeShowcaseFixture() throws {
         guard ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
@@ -716,7 +690,7 @@ final class AppSession {
         let context = ModelContext(container)
         guard try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty else { return }
         let alone: Set<String> = ["2026-10-03.dhuhr", "2026-10-05.fajr", "2026-10-07.asr"]
-        let missed: Set<String> = ["2026-10-02.asr", "2026-10-03.fajr", "2026-10-04.isha"]
+        let qada: Set<String> = ["2026-10-02.asr", "2026-10-03.fajr", "2026-10-04.isha"]
         for day in 1...lastDay {
             let dayKey = String(format: "2026-10-%02d", day)
             for prayer in Prayer.allCases {
@@ -726,16 +700,12 @@ final class AppSession {
                 let row = PrayerLog()
                 row.dayKey = dayKey
                 row.prayer = prayer.rawValue
-                row.status = missed.contains(key) ? "missed" : alone.contains(key) ? "alone" : "jamaah"
+                row.status = qada.contains(key) ? "qada" : alone.contains(key) ? "alone" : "jamaah"
                 if prayer == .dhuhr && (day == 2 || day == 9) { row.fridayKind = row.status == "jamaah" ? "jumuah" : "dhuhr" }
                 row.tzID = "Asia/Riyadh"
                 row.eventAt = try GregorianDay(dayKey).date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(12 * 3600)
                 row.source = "user"
                 context.insert(row)
-                if missed.contains(key) {
-                    let debt = QadaItem(); debt.originalDayKey = dayKey; debt.prayer = prayer.rawValue
-                    context.insert(debt)
-                }
             }
         }
         for (night, rakaat, witr) in [("2026-10-01", 8, true), ("2026-10-02", 4, false), ("2026-10-04", 2, true), ("2026-10-05", 8, true)] {
@@ -752,7 +722,7 @@ final class AppSession {
               let fixture = ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_FIXTURE"], ["streakShowcase", "streakShowcaseMonth"].contains(fixture) else { return }
         let context = ModelContext(container)
         guard try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty else { return }
-        // `streakShowcaseMonth` (tracking start 2026-09-12): Asr missed on 13 Sep, Fajr made up on 21 Sep,
+        // `streakShowcaseMonth` (tracking start 2026-09-12): Asr was performed late on 13 Sep, Fajr qada on 21 Sep,
         // Dhuhr alone on 28 Sep. Expected: congregation 9, on time 16, completion 24.
         let month = fixture == "streakShowcaseMonth"
         let keys = month ? (12...30).map { String(format: "2026-09-%02d", $0) } + (1...8).map { String(format: "2026-10-%02d", $0) }
@@ -767,18 +737,13 @@ final class AppSession {
                 let row = PrayerLog()
                 row.dayKey = dayKey
                 row.prayer = prayer.rawValue
-                row.status = month && dayKey == "2026-09-13" && prayer == .asr ? "missed"
+                row.status = month && dayKey == "2026-09-13" && prayer == .asr ? "qada"
                     : dayKey == qadaDay && prayer == .fajr ? "qada" : dayKey == aloneDay && prayer == aloneSlot ? "alone" : "jamaah"
                 if prayer == .dhuhr && fridays.contains(dayKey) && row.status == "jamaah" { row.fridayKind = "jumuah" }
                 row.tzID = "Asia/Riyadh"
                 row.eventAt = try GregorianDay(dayKey).date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(12 * 3600)
                 row.source = "user"
                 context.insert(row)
-                if row.status == "qada" || row.status == "missed" {
-                    let debt = QadaItem(); debt.originalDayKey = dayKey; debt.prayer = prayer.rawValue
-                    if row.status == "qada" { debt.madeUpAt = row.eventAt }
-                    context.insert(debt)
-                }
             }
         }
         try context.save()
@@ -1126,7 +1091,8 @@ final class AppSession {
             return result
         }
         if let id = result.undoToken, let receipt = try ModelContext(container).fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }), let deadline = receipt.undoExpiresAt {
-            showUndo(AppUndoToken(id: id, expiresAt: deadline), message: "حُفظ التغيير")
+            let message = name == "quran.deleteSession" ? "حُذفت جلسة القرآن" : "حُفظ التغيير"
+            showUndo(AppUndoToken(id: id, expiresAt: deadline), message: message)
         }
         return result
     }
@@ -1432,7 +1398,11 @@ final class AppSession {
     }
     func authorizeProtectedData() { protectedDataAuthorized = true }
     func bindContainer(_ replacement: ModelContainer) {
-        container = replacement; store = SettingsStore(context: ModelContext(replacement), schema: schema)
+        container = replacement
+        let context = ModelContext(replacement)
+        store = SettingsStore(context: context, schema: schema)
+        do { _ = try PrayerHistoryMaintenance.removeUnperformedPrayerHistory(in: context, now: prayerNow()) }
+        catch { errorMessage = "لم يكتمل تنظيف سجلات الصلاة القديمة. \(madarUserMessage(error))" }
         undoToken = nil; setUndoToast(false); expiryTask?.cancel()
     }
     /// Owner, 5 Nov 2026: «زر التراجع الغبي ذا شله، خله باماكن بسيطه بس لاشياء تستحق التراجع مهب في كل مكان». Every save used to raise

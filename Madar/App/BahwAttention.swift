@@ -3,20 +3,12 @@ import SwiftData
 import MadarCore
 import MadarData
 import MadarDesign
-import MadarPrayer
 import MadarCommands
 
-/// What waits for the owner when Madar opens: prayers whose window closed without a record, and bank messages that need sorting.
-/// Neither is time-critical, so this is a sheet over the lobby (never a notification); the prayer room and the money room stay for details.
+/// What waits for the owner when Madar opens: bank messages and balance differences that need a decision.
+/// Neither is time-critical, so this is a sheet over the lobby (never a notification); the money room stays for details.
 struct BahwAttention: Equatable, Identifiable {
     var id: String { signature }
-    struct PrayerItem: Identifiable, Equatable {
-        let reference: PrayerReference
-        let name: String
-        let dayWord: String
-        let fridayNoon: Bool
-        var id: String { reference.day.description + "." + reference.prayer.rawValue }
-    }
     /// An account whose newest bank message printed a balance: the owner confirms that Madar's book agrees, or sees the difference.
     struct ReconcileItem: Identifiable, Equatable {
         let id: UUID
@@ -26,14 +18,12 @@ struct BahwAttention: Equatable, Identifiable {
         let at: Date
         var matches: Bool { expectedMinor == observedMinor }
     }
-    var prayers: [PrayerItem] = []
     var moneyCount = 0
     var reconcile: [ReconcileItem] = []
-    var isEmpty: Bool { prayers.isEmpty && moneyCount == 0 && reconcile.isEmpty }
+    var isEmpty: Bool { moneyCount == 0 && reconcile.isEmpty }
     /// The same day with the same waiting items is shown once; a new day or a changed set shows it again.
     var signature: String {
-        prayers.map(\.id).sorted().joined(separator: ",") + "|m\(moneyCount)"
-            + "|r" + reconcile.map { "\($0.id.uuidString):\($0.observedMinor)" }.sorted().joined(separator: ",")
+        "m\(moneyCount)|r" + reconcile.map { "\($0.id.uuidString):\($0.observedMinor)" }.sorted().joined(separator: ",")
     }
 }
 
@@ -44,22 +34,6 @@ extension AppBahwService {
     func attention(includeReconcile: Bool = false, ignoringThrottle: Bool = false) -> BahwAttention {
         guard session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized else { return .init() }
         var result = BahwAttention()
-        if session.roomEnabled(.salah), let snapshot = try? session.prayerSnapshot(at: now) {
-            let pending = Set(snapshot.pending)
-            // Only prayers whose window has really ended are listed (`canMarkMissed`: Fajr until sunrise, the others until the next adhan; RP1/RP2: nothing becomes «missed» by itself).
-            let closed = snapshot.history.flatMap(\.cells).filter { pending.contains($0.reference) && $0.canLog && $0.canMarkMissed && $0.time != nil }
-            var references = snapshot.unconfirmed
-            for cell in closed where !references.contains(cell.reference) { references.append(cell.reference) }
-            let fridays = snapshot.unconfirmedFridayNoon.union(closed.filter { $0.isFriday && $0.reference.prayer == .dhuhr }.map(\.reference))
-            let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
-            let today = snapshot.today.day
-            let order: [Prayer: Int] = [.fajr: 0, .dhuhr: 1, .asr: 2, .maghrib: 3, .isha: 4]
-            result.prayers = references.sorted { ($0.day, order[$0.prayer] ?? 0) < ($1.day, order[$1.prayer] ?? 0) }.map { reference in
-                let friday = fridays.contains(reference)
-                let dayWord = reference.day == today ? "اليوم" : reference.day == today.adding(days: -1) ? "أمس" : session.dateLabels(reference.day, compact: true).combined
-                return .init(reference: reference, name: friday ? "الجمعة" : names[reference.prayer] ?? "", dayWord: dayWord, fridayNoon: friday)
-            }
-        }
         if session.roomEnabled(.mal) { result.moneyCount = pendingBankDecisions() }
         // The whole-ledger reading is heavy for a pop-up, so the lobby asks at most once every few hours.
         if includeReconcile, session.roomEnabled(.mal), (ignoringThrottle || BahwAttentionMemory.reconcileDue(now: now)) { result.reconcile = reconcileOffers() }
@@ -88,55 +62,29 @@ struct BahwAttentionSheet: View {
     @State var attention: BahwAttention
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
-    @State private var choices: [String: Option] = [:]
-    /// FB-39: «صلّيتها وحدي» for a whole gap writes many records at once; it asks first, naming the count.
-    @State private var confirmGapAlone = false
     @State private var moneyOpen = false
     @State private var reconcileOpen = false
     @State private var revealed = false
     @State private var saving = false
     @State private var reconcileFailure: String?
 
-    enum Option: Hashable {
-        case jamaah, alone, skip, jumuah, dhuhr
-        var title: String {
-            switch self { case .jamaah: "في جماعة"; case .alone: "وحدي"; case .skip: "لم أسجّل"; case .jumuah: "الجمعة"; case .dhuhr: "ظهرًا" }
-        }
-        var resolution: (status: PrayerStoredStatus, friday: FridayPrayerKind?) {
-            switch self {
-            case .jamaah: (.jamaah, nil)
-            case .alone: (.alone, nil)
-            case .skip: (.unrecordedHistory, nil)
-            case .jumuah: (.jamaah, .jumuah)
-            case .dhuhr: (.alone, .dhuhr)
-            }
-        }
-    }
-
     private var theme: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var service: AppBahwService { .init(session: session) }
     private var digits: MadarNumberFormatter { service.digits }
-    /// A long gap is settled in one tap, as in the prayer room (RP1: never counted as missed).
-    private var longGap: Bool { attention.prayers.count > 6 }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("شيء ينتظرك").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
-                if !attention.prayers.isEmpty { prayersSection }
                 if attention.moneyCount > 0 { moneySection }
                 if !attention.reconcile.isEmpty { reconcileSection }
                 Button { later() } label: {
-                    Text(saveEnabled ? "احفظ" : "لاحقًا").font(MadarTypography.body().bold())
-                        .foregroundStyle(saveEnabled ? theme.onAccent : theme.ink)
+                    Text("لاحقًا").font(MadarTypography.body().bold())
+                        .foregroundStyle(theme.ink)
                         .frame(maxWidth: .infinity, minHeight: 50)
-                        .background(saveEnabled ? theme.accentFill : theme.surface, in: .capsule)
-                        .overlay { if !saveEnabled { Capsule().stroke(theme.line) } }
+                        .background(theme.surface, in: .capsule)
+                        .overlay { Capsule().stroke(theme.line) }
                 }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("bahw-attention-primary")
-                if saveEnabled {
-                    Button("لاحقًا") { markSeen(); dismiss() }.font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                        .frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("bahw-attention-later")
-                }
             }
             .padding(.horizontal, 20).padding(.top, 28).padding(.bottom, 20)
         }
@@ -144,51 +92,13 @@ struct BahwAttentionSheet: View {
         .environment(\.roomTheme, theme)
         .presentationDetents([.medium, .large]).presentationDragIndicator(.visible).presentationBackground(theme.background)
         // FB-39: a swipe-down used to leave the sheet unseen, so it came back on every return to the app, and it dropped chosen chips silently.
-        .interactiveDismissDisabled(saveEnabled || saving)
+        .interactiveDismissDisabled(saving)
         .onDisappear { markSeen() }
-        .confirmationDialog(gapAloneTitle, isPresented: $confirmGapAlone, titleVisibility: .visible) {
-            Button("نعم، سجّلها") { apply(.alone, to: attention.prayers.filter { !$0.fridayNoon }) }
-            Button("ليس الآن", role: .cancel) {}
-        } message: { Text("تُسجَّل كل واحدة «وحدي» في وقتها، وتصحّح أيًّا منها من صفحة الصلاة.") }
         .sheet(isPresented: $reconcileOpen, onDismiss: refreshReconcile) {
             NavigationStack { MoneyReconcileView(app: session, revealed: $revealed) }
         }
         .sheet(isPresented: $moneyOpen, onDismiss: { attention.moneyCount = service.pendingBankDecisions(); if attention.isEmpty { dismiss() } }) {
             NavigationStack { MoneyMessagesView(app: session, revealed: $revealed) }
-        }
-    }
-
-    private var saveEnabled: Bool { !choices.isEmpty }
-    private var gapAloneTitle: String {
-        let n = attention.prayers.filter { !$0.fridayNoon }.count
-        return "تسجيل " + WidgetCopy.agree(n, digits, one: "صلاة واحدة", two: "صلاتين", few: "صلوات", many: "صلاة") + " وحدك؟"
-    }
-
-    private var prayersSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(WidgetCopy.agree(attention.prayers.count, digits, one: "صلاة واحدة لم تُسجَّل", two: "صلاتان لم تُسجَّلا", few: "صلوات لم تُسجَّل", many: "صلاة لم تُسجَّل"))
-                .font(MadarTypography.section())
-            if longGap {
-                Text("لا يلزمك واحدة واحدة. لا يُحسب عليك شيء.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                HStack(spacing: 10) {
-                    chip("صلّيتها وحدي", on: false, id: "bahw-attention-gap-alone") { confirmGapAlone = true }
-                    chip("لم أسجّل الفترة", on: false, id: "bahw-attention-gap-skip") { apply(.skip, to: attention.prayers) }
-                }
-            } else {
-                ForEach(attention.prayers) { item in
-                    HStack(spacing: 8) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.name).font(MadarTypography.body().bold())
-                            Text(item.dayWord).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                        }.frame(minWidth: 52, alignment: .leading)
-                        ForEach(options(for: item), id: \.self) { option in
-                            chip(option.title, on: choices[item.id] == option, id: "bahw-attention-\(item.id)-\(option)") {
-                                choices[item.id] = choices[item.id] == option ? nil : option
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 
@@ -269,46 +179,7 @@ struct BahwAttentionSheet: View {
         if attention.isEmpty { dismiss() }
     }
 
-    private func options(for item: BahwAttention.PrayerItem) -> [Option] { item.fridayNoon ? [.jumuah, .dhuhr, .skip] : [.jamaah, .alone, .skip] }
-
-    private func chip(_ title: String, on: Bool, id: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title).font(MadarTypography.caption().bold()).lineLimit(1).minimumScaleFactor(0.8)
-                .foregroundStyle(on ? theme.onAccent : theme.ink)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(on ? theme.accentFill : theme.surface, in: .capsule)
-                .overlay { if !on { Capsule().stroke(theme.line) } }
-                .contentShape(.capsule)
-        }.buttonStyle(.madarPlain).accessibilityIdentifier(id).accessibilityAddTraits(on ? .isSelected : [])
-    }
-
-    /// Settles the chosen items and saves at once (the «وحدي» gap choice is confirmed first).
-    private func apply(_ option: Option, to items: [BahwAttention.PrayerItem]) {
-        for item in items { choices[item.id] = option }
-        save()
-    }
-
-    private func later() {
-        if saveEnabled { save() } else { markSeen(); dismiss() }
-    }
-
-    private func save() {
-        let resolutions = attention.prayers.compactMap { item -> PrayerGapResolution? in
-            guard let option = choices[item.id] else { return nil }
-            let value = option.resolution
-            return PrayerGapResolution(reference: item.reference, status: value.status, fridayKind: value.friday)
-        }
-        guard !resolutions.isEmpty else { return }
-        saving = true
-        session.resolvePrayerGap(resolutions) { ok in
-            saving = false
-            guard ok else { return }   // a failed save keeps the choices on screen
-            let settled = Set(resolutions.map { $0.reference })
-            attention.prayers.removeAll { settled.contains($0.reference) }
-            choices = [:]
-            if attention.isEmpty { markSeen(); dismiss() }
-        }
-    }
+    private func later() { markSeen(); dismiss() }
 
     private func markSeen() { UserDefaults.standard.set(attention.signature, forKey: BahwAttentionMemory.key) }
 }

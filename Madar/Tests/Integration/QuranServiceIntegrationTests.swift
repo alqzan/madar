@@ -125,6 +125,23 @@ import MadarCommands
         XCTAssertEqual(events.map(\.wordIndex), [1], "one slip on the exact word")
         let board = try service.drillBoard()
         XCTAssertEqual(board.today, ["2:1"])
+
+        let reference = try service.sessionLog()
+        let background = try await service.sessionLogOffMain()
+        XCTAssertEqual(background.coverage, reference.coverage)
+        XCTAssertEqual(background.fraction, reference.fraction)
+        XCTAssertEqual(background.nextDue, reference.nextDue)
+        XCTAssertEqual(background.gap, reference.gap)
+        XCTAssertEqual(background.records.map(\.id), reference.records.map(\.id))
+        XCTAssertEqual(background.records.map(\.day), reference.records.map(\.day))
+        XCTAssertEqual(background.records.map(\.relative), reference.records.map(\.relative))
+        XCTAssertEqual(background.records.map(\.title), reference.records.map(\.title))
+        XCTAssertEqual(background.records.map(\.detail), reference.records.map(\.detail))
+        XCTAssertEqual(background.records.map(\.kind), reference.records.map(\.kind))
+        XCTAssertEqual(background.records.map { $0.grades.map(\.grade) }, reference.records.map { $0.grades.map(\.grade) })
+        XCTAssertEqual(background.records.flatMap { $0.mistakes.map(\.id) }, reference.records.flatMap { $0.mistakes.map(\.id) })
+        XCTAssertEqual(background.records.flatMap { $0.mistakes.map(\.title) }, reference.records.flatMap { $0.mistakes.map(\.title) })
+        XCTAssertEqual(background.records.flatMap { $0.mistakes.map(\.detail) }, reference.records.flatMap { $0.mistakes.map(\.detail) })
     }
     func testPartialHifzCommitContainsOnlyThePageBlindRecited() async throws {
         let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }

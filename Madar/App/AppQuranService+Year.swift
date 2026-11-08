@@ -5,19 +5,17 @@ import MadarCommands
 import MadarQuran
 
 struct QuranUIYearDay: Identifiable, Sendable {
-    var id: String; var date: String; var monthID: String; var month: String; var hifz: Int; var review: Int
-    /// Both calendars always (owner, 15 Oct): the Gregorian month under the Hijri one.
-    var gregorianMonth: String = ""
+    var id: String; var date: String; var monthID: String; var month: String; var secondaryMonth: String; var hifz: Int; var review: Int
 }
 struct QuranUIYearMonth: Identifiable, Sendable {
     var id: String; var title: String; var hifz: Int; var review: Int
-    /// The Gregorian months the Hijri month spans, e.g. «سبتمبر–أكتوبر ٢٠٢٦».
-    var gregorian: String = ""
+    var secondary: String = ""
 }
 struct QuranUIYear: Sendable {
     var days: [QuranUIYearDay]; var months: [QuranUIYearMonth]; var activeDays: Int; var title: String
 }
 private struct QuranYearProjectionConfiguration: Sendable {
+    let firstCalendar: FirstCalendar
     let hijriSource: HijriSource
     let sightingOffset: Int
     let displayTimeZone: TimeZone
@@ -25,7 +23,7 @@ private struct QuranYearProjectionConfiguration: Sendable {
 }
 
 extension AppQuranService {
-    func displayDate(_ day: GregorianDay) -> String { app.dateLabels(day, first: .hijri).combined }
+    func displayDate(_ day: GregorianDay) -> String { app.dateLabels(day).combined }
     func yearLog(at instant: Date? = nil) throws -> QuranUIYear {
         try yearLog(from: repository().snapshot(at: instant ?? clock()))
     }
@@ -66,6 +64,7 @@ extension AppQuranService {
 
     private var yearProjectionConfiguration: QuranYearProjectionConfiguration {
         QuranYearProjectionConfiguration(
+            firstCalendar: FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri,
             hijriSource: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura,
             sightingOffset: Int(app.number("core.hijriOffset")),
             displayTimeZone: app.activePlace.timeZone,
@@ -89,16 +88,19 @@ extension AppQuranService {
             let key = today.adding(days: offset)
             let hijri = HijriCalendar.date(for: key.date(in: zone).addingTimeInterval(43_200), timeZone: zone,
                 source: configuration.hijriSource, sightingOffset: configuration.sightingOffset)
+            let gregorianMonth = gregorianNames[key.month - 1] + " " + configuration.numerals.string(key.year) + " م"
+            let hijriMonth = names[hijri.month - 1] + " " + configuration.numerals.string(hijri.year) + " هـ"
+            let month = configuration.firstCalendar == .hijri ? hijriMonth : gregorianMonth
+            let secondaryMonth = configuration.firstCalendar == .hijri ? gregorianMonth : hijriMonth
             let displayed = DualDate(
                 instant: key.date(in: configuration.displayTimeZone).addingTimeInterval(43_200),
                 timeZone: configuration.displayTimeZone, source: configuration.hijriSource,
                 sightingOffset: configuration.sightingOffset)
-                .labels(firstCalendar: .hijri, numerals: configuration.numerals.style).combined
+                .labels(firstCalendar: configuration.firstCalendar, numerals: configuration.numerals.style).combined
             return QuranUIYearDay(
-                id: key.description, date: displayed, monthID: "\(hijri.year)-\(hijri.month)",
-                month: names[hijri.month - 1] + " " + configuration.numerals.string(hijri.year),
-                hifz: hifz[key] ?? 0, review: review[key] ?? 0,
-                gregorianMonth: gregorianNames[key.month - 1] + " " + configuration.numerals.string(key.year))
+                id: key.description, date: displayed, monthID: "\(hijri.year)-\(hijri.month)", month: month, secondaryMonth: secondaryMonth,
+                hifz: hifz[key] ?? 0, review: review[key] ?? 0
+            )
         }
     }
 
@@ -112,7 +114,7 @@ extension AppQuranService {
         var months: [QuranUIYearMonth] = [], spans: [String: (first: GregorianDay, last: GregorianDay)] = [:]
         for (offset, day) in days.enumerated() {
             let key = today.adding(days: offset - 370)
-            if months.last?.id != day.monthID { months.append(QuranUIYearMonth(id: day.monthID, title: day.month, hifz: 0, review: 0)) }
+            if months.last?.id != day.monthID { months.append(QuranUIYearMonth(id: day.monthID, title: day.month, hifz: 0, review: 0, secondary: day.secondaryMonth)) }
             months[months.count - 1].hifz += day.hifz
             months[months.count - 1].review += day.review
             spans[day.monthID] = (spans[day.monthID]?.first ?? key, key)
@@ -120,16 +122,18 @@ extension AppQuranService {
         for index in months.indices {
             guard let span = spans[months[index].id] else { continue }
             let a = span.first, b = span.last
-            months[index].gregorian = a.month == b.month ? gregorianNames[a.month - 1] + " " + configuration.numerals.string(a.year)
+            let gregorianSpan = (a.month == b.month ? gregorianNames[a.month - 1] + " " + configuration.numerals.string(a.year)
                 : a.year == b.year ? gregorianNames[a.month - 1] + "–" + gregorianNames[b.month - 1] + " " + configuration.numerals.string(b.year)
-                : gregorianNames[a.month - 1] + " " + configuration.numerals.string(a.year) + "–" + gregorianNames[b.month - 1] + " " + configuration.numerals.string(b.year)
+                : gregorianNames[a.month - 1] + " " + configuration.numerals.string(a.year) + "–" + gregorianNames[b.month - 1] + " " + configuration.numerals.string(b.year)) + " م"
+            if configuration.firstCalendar == .gregorian { months[index].title = gregorianSpan }
+            else { months[index].secondary = gregorianSpan }
         }
         let active = Set(value.activities.filter { $0.countsForStreak && $0.dayKey <= today && $0.dayKey >= today.adding(days: -364) }.map(\.dayKey)).count
         let titleDate = DualDate(
             instant: today.date(in: configuration.displayTimeZone).addingTimeInterval(43_200),
             timeZone: configuration.displayTimeZone, source: configuration.hijriSource,
             sightingOffset: configuration.sightingOffset)
-            .labels(firstCalendar: .hijri, numerals: configuration.numerals.style).combined
+            .labels(firstCalendar: configuration.firstCalendar, numerals: configuration.numerals.style).combined
         return QuranUIYear(days: days, months: Array(months.suffix(12)), activeDays: active, title: "آخر سنة حتى " + titleDate)
     }
 }

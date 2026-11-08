@@ -42,7 +42,7 @@ extension AppQuranService {
         let complete = !today.isEmpty && before.plan != nil && hifzComplete && reviewComplete && drillsComplete
         let streak = QuranProgressEngine.streak(activities: after.activities, through: day, restDay: after.restDay)
         let dayInstant = day.date(in: calendar.timeZone).addingTimeInterval(12 * 3600)
-        let firstCalendar = FirstCalendar.hijri // Quran room: Hijri always first (owner, 16 Oct)
+        let firstCalendar = FirstCalendar(rawValue: app.values["core.firstCalendar"]?.string ?? "hijri") ?? .hijri
         let date = DualDate(instant: dayInstant, timeZone: calendar.timeZone,
             source: HijriSource(rawValue: app.values["core.hijriSource"]?.string ?? "ummAlQura") ?? .ummAlQura,
             sightingOffset: Int(app.values["core.hijriOffset"]?.number ?? 0))

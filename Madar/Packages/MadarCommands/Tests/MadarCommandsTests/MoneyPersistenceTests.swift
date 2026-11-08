@@ -41,6 +41,52 @@ import MadarInbox
 }
 
 @MainActor struct MoneyPersistenceTests {
+    @Test func effectContextIndexesKeepTheFirstFetchedReference() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let context = ModelContext(f.container)
+
+        let duplicateAccount = Account(); duplicateAccount.id = f.bank; duplicateAccount.name = "نسخة لاحقة"
+        duplicateAccount.kind = "cash"; duplicateAccount.ownership = "notMine"; duplicateAccount.tracked = false
+        context.insert(duplicateAccount)
+        let duplicateCard = Card(); duplicateCard.id = f.credit; duplicateCard.kind = "debit"; duplicateCard.name = "بطاقة لاحقة"
+        context.insert(duplicateCard)
+
+        let obligationID = UUID(), firstObligation = Obligation(), laterObligation = Obligation()
+        firstObligation.id = obligationID; firstObligation.kind = "loan"
+        laterObligation.id = obligationID; laterObligation.kind = "installment"
+        context.insert(firstObligation); context.insert(laterObligation)
+        let adjustmentID = UUID(), firstRecord = Reconciliation(), laterRecord = Reconciliation()
+        firstRecord.adjustmentTransactionID = adjustmentID; firstRecord.resolution = "unrecordedSpend"; firstRecord.deltaMinor = -1200
+        laterRecord.adjustmentTransactionID = adjustmentID; laterRecord.resolution = "adjust"; laterRecord.deltaMinor = 1200
+        context.insert(firstRecord); context.insert(laterRecord)
+        try context.save()
+
+        let repository = MoneyRepository(context: ModelContext(f.container))
+        let lookup = try repository.effectContext()
+        let chosenCard = try #require(lookup.cards.first { $0.id == f.credit })
+        let cardFee = MoneyTransaction(); cardFee.kind = "fee"; cardFee.cardID = f.credit; cardFee.homeAmountMinor = 700
+        #expect(try repository.effect(of: cardFee, in: lookup) == MovementEngine.effect(.fee(onCard: chosenCard.kind == "credit"), amountMinor: 700))
+
+        let chosenBank = try #require(lookup.accounts.first { $0.id == f.bank })
+        let chosenCash = try #require(lookup.accounts.first { $0.id == f.cash })
+        let transfer = MoneyTransaction(); transfer.kind = "transfer"; transfer.source = "bank"
+        transfer.fromAccountID = f.bank; transfer.toAccountID = f.cash; transfer.homeAmountMinor = 900
+        let ownsBoth = [chosenBank, chosenCash].allSatisfy { $0.ownership == "mine" && $0.tracked }
+        let transferKind: Movement = ownsBoth ? .ownTransfer : .externalTransfer(notSpend: false)
+        #expect(try repository.effect(of: transfer, in: lookup) == MovementEngine.effect(transferKind, amountMinor: 900))
+
+        let chosenObligation = try #require(lookup.obligations.first { $0.id == obligationID })
+        let repayment = MoneyTransaction(); repayment.kind = "repayment"; repayment.obligationID = obligationID; repayment.homeAmountMinor = 500
+        let repaymentKind: Movement = chosenObligation.kind == "loan" ? .loanInstalment : .bnplInstalment
+        #expect(try repository.effect(of: repayment, in: lookup) == MovementEngine.effect(repaymentKind, amountMinor: 500))
+
+        let adjustment = MoneyTransaction(); adjustment.id = adjustmentID; adjustment.kind = "adjustment"
+        adjustment.toAccountID = f.bank; adjustment.homeAmountMinor = 1200
+        let chosenRecord = try #require(lookup.reconciliations.first { $0.adjustmentTransactionID == adjustmentID })
+        #expect(try repository.effect(of: adjustment, in: lookup) == MovementEngine.effect(
+            .adjustment(unrecordedSpend: chosenRecord.resolution == "unrecordedSpend"), amountMinor: chosenRecord.deltaMinor))
+    }
+
     /// F06/F02: 100 halalas split 33/33/34, with 40 then 30 refunded. The stamp
     /// changes budgets only, survives relaunch, restores the split, and is undoable.
     @Test func budgetStampRestoresSplitAndRefundsWithoutChangingCashOrDebt() async throws {

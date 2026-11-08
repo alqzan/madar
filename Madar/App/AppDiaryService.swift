@@ -109,6 +109,27 @@ private struct DiaryDayReadConfiguration: Sendable {
         try authorizeRead()
         return try diaryDay()
     }
+    func currentDayOffMain() async throws -> GregorianDay {
+        try authorizeRead()
+        let container = app.container, revision = app.prayerRevision, generation = app.storeGeneration
+        let now = clock(), boundary = DayBoundary(rawValue: app.string("core.dayStart")) ?? .fajr
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let repository = try PrayerRepository(context: ModelContext(container))
+            let place = repository.place(at: now), options = repository.calculationOptions(at: now)
+            let civil = GregorianDay.containing(now, in: place.timeZone)
+            let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: options) }
+            try Task.checkCancellation()
+            return try MadarDay.resolve(instant: now, place: place, boundary: boundary, prayerDays: days).date
+        }
+        let day = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+        try Task.checkCancellation()
+        guard app.prayerRevision == revision, app.storeGeneration == generation, app.container === container else {
+            throw CancellationError()
+        }
+        try authorizeRead()
+        return day
+    }
     /// V12: the diary's day without a read authorization; reminder scheduling runs while the notes are locked.
     func diaryDay() throws -> GregorianDay {
         let repository = try PrayerRepository(context: ModelContext(app.container)), now = clock(), place = repository.place(at: now), options = repository.calculationOptions(at: now)
@@ -126,7 +147,7 @@ private struct DiaryDayReadConfiguration: Sendable {
     }
     func homeOffMain(match: FirstCalendar? = nil) async throws -> DiaryHomeSnapshot {
         try authorizeRead()
-        let today = try currentDay(), facts = try await memoryFactsOffMain()
+        let today = try await currentDayOffMain(), facts = try await memoryFactsOffMain()
         let configuration = homePlanConfiguration(match: match)
         let worker = Task.detached(priority: .userInitiated) {
             try Task.checkCancellation()
@@ -524,11 +545,32 @@ private struct DiaryDayReadConfiguration: Sendable {
     }
 
     func prepareClosedDay(_ day: GregorianDay) async throws {
+        _ = try await prepareClosedDays([day])
+    }
+    @discardableResult func prepareClosedDays(_ days: Set<GregorianDay>) async throws -> Bool {
         try authorizeRead()
-        guard day < (try currentDay()) else { return }
-        let key = "sys.diaryAutoLines." + day.description
-        let exists = try ModelContext(app.container).fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil })).first != nil
-        if !exists { try await app.executeDiaryCommand("diary.freezeDay", payload: ["dayKey": .string(day.description)]) }
+        guard !days.isEmpty else { return false }
+        // The page snapshot may have crossed a prayer-day or settings boundary before this write begins.
+        // Resolve the live boundary here so a stale snapshot cannot freeze the current day.
+        let today = try await currentDayOffMain()
+        let closed = days.filter { $0 < today }
+        guard !closed.isEmpty else { return false }
+        let prefix = "sys.diaryAutoLines."
+        let keys = closed.map { prefix + $0.description }
+        let descriptor = FetchDescriptor<DeviceSetting>(predicate: #Predicate {
+            keys.contains($0.key) && $0.deletedAt == nil && $0.mergedInto == nil
+        })
+        let existing = Set(try ModelContext(app.container).fetch(descriptor).map(\.key))
+        var changed = false
+        for day in closed.sorted() {
+            try Task.checkCancellation()
+            let key = prefix + day.description
+            if !existing.contains(key) {
+                try await app.executeDiaryCommand("diary.freezeDay", payload: ["dayKey": .string(day.description)])
+                changed = true
+            }
+        }
+        return changed
     }
     func time(_ at: Date, zone: String? = nil) -> String {
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: app.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
@@ -559,7 +601,7 @@ private struct DiaryDayReadConfiguration: Sendable {
         }
         if metrics.contains("fajrJamaah") {
             let first = try PrayerRepository(context: context).tracking(at: clock()).day
-            let logs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.prayer == "fajr" && ["jamaah", "alone", "qada", "missed"].contains($0.status) }
+            let logs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.prayer == "fajr" && ["jamaah", "alone", "qada"].contains($0.status) }
             func ratio(through end: GregorianDay) -> String {
                 guard end >= first else { return "لم يكن مدار يسجّل هذا بعد" }
                 let start = max(first, end.adding(days: -29))

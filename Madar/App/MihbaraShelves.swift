@@ -62,7 +62,8 @@ struct MihbaraReadingNow: View {
                 if let left = stats.left { Text(left).font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.75)) }
                 if let margin = margins[b.id] {
                     Label(margin, systemImage: "text.quote").font(MadarTypography.fine()).foregroundStyle(theme.color("goldUnderstand"))
-                        .lineLimit(2).accessibilityIdentifier("mihbara-shelf-margin-" + b.id.uuidString)
+                        .lineLimit(2).accessibilityElement(children: .ignore).accessibilityLabel(margin)
+                        .accessibilityIdentifier("mihbara-shelf-margin-" + b.id.uuidString)
                 }
                 Button { open(b) } label: {
                     Text(stats.action).font(MadarTypography.caption()).bold()
@@ -107,17 +108,21 @@ struct MihbaraReadingNow: View {
 
     /// The smart margin: the note at or just ahead of where you stand («حاشيتك في صفحة ٥٢»); with none ahead, the latest.
     private func loadMargins() {
-        let ids = Set(reading.map(\.id))
-        guard !ids.isEmpty, let rows = try? ModelContext(app.container).fetch(FetchDescriptor<NotebookNote>()) else { margins = [:]; return }
-        let live = rows.filter { row in
-            guard let target = row.targetID else { return false }
-            return ids.contains(target) && row.link == "page" && !row.isPrivate && row.deletedAt == nil && row.mergedInto == nil
-                && !row.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let ids: [UUID?] = reading.map { $0.id }
+        guard !ids.isEmpty else { margins = [:]; return }
+        let descriptor = FetchDescriptor<NotebookNote>(predicate: #Predicate {
+            ids.contains($0.targetID) && $0.link == "page" && !$0.isPrivate && $0.deletedAt == nil && $0.mergedInto == nil
+        })
+        guard let rows = try? ModelContext(app.container).fetch(descriptor) else { margins = [:]; return }
+        var notesByBook: [UUID: [NotebookNote]] = [:]
+        for row in rows {
+            guard let target = row.targetID,
+                  !row.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            notesByBook[target, default: []].append(row)
         }
         var next: [UUID: String] = [:]
         for book in reading {
-            let notes = live.filter { $0.targetID == book.id }
-            guard !notes.isEmpty else { continue }
+            guard let notes = notesByBook[book.id], !notes.isEmpty else { continue }
             let here = (book.isReadableEPUB || book.isReadablePDF ? MihbaraCopy.pagesRead(book) : book.page) ?? 0
             if let ahead = notes.filter({ ($0.page ?? -1) >= here }).min(by: { ($0.page ?? 0) < ($1.page ?? 0) }), let page = ahead.page {
                 next[book.id] = "حاشيتك في صفحة " + digits.string(page)

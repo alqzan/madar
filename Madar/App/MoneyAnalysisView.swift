@@ -19,6 +19,9 @@ struct MoneyAnalysisView: View {
     @State private var reading: MoneyAnalysisReading?
     @State private var empty = false
     @State private var failure: String?
+    @State private var isRefreshing = false
+    @State private var loadTask: Task<Void, Never>?
+    @State private var activeLoadID = UUID()
     @State private var selected: GregorianDay?
     @State private var grown = false
     @State private var aiComposerOpen = false
@@ -45,6 +48,18 @@ struct MoneyAnalysisView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
+                if isRefreshing {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("نحدّث التحليل…").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            .accessibilityIdentifier("money-analysis-refreshing")
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 8).background(theme.surface, in: Capsule())
+                    .transition(reduceMotion ? .identity : .opacity)
+                } else if let failure, reading != nil {
+                    Text(failure).font(MadarTypography.fine()).foregroundStyle(theme.color("dueText"))
+                        .accessibilityIdentifier("money-analysis-refresh-failed")
+                }
                 if !empty { periodPicker }
                 if let reading {
                     summary(reading)
@@ -72,7 +87,10 @@ struct MoneyAnalysisView: View {
                     cards(reading)
                     merchants(reading)
                 } else if empty { emptyPage }
-                else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
+                else if let failure {
+                    Text(failure).font(MadarTypography.body()).accessibilityIdentifier("money-analysis-refresh-failed")
+                    Button("أعِد المحاولة", action: load).frame(minHeight: 44)
+                }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
@@ -108,6 +126,7 @@ struct MoneyAnalysisView: View {
                 if !canRead { aiComposerOpen = false }
                 else { Task { aiAvailability = await MadarAIAvailabilityChecker.check() } }
             }
+            .onDisappear { loadTask?.cancel() }
             .accessibilityIdentifier("money-analysis")
     }
 
@@ -249,6 +268,8 @@ struct MoneyAnalysisView: View {
                 Rectangle().fill(theme.ink).frame(height: 1.5).offset(y: labelBand + plot).allowsHitTesting(false)
             }
         }.onAppear { if reduceMotion { grown = true } else { withAnimation(.easeOut(duration: 0.55)) { grown = true } } }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: selected)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: r.first)
             .accessibilityElement(children: .contain).accessibilityIdentifier("money-analysis-chart")
     }
     private func bar(_ d: MoneyLogDay, index: Int, r: MoneyAnalysisReading, scale: Double, plot: CGFloat, labelBand: CGFloat, axis: CGFloat, line: Int?) -> some View {
@@ -480,13 +501,37 @@ struct MoneyAnalysisView: View {
         }.padding(20).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface).accessibilityIdentifier("money-analysis-empty")
     }
 
-    private func load() {
+    @MainActor private func load() {
         aiComposerOpen = false
-        do {
-            let next = try service.loadAnalysis(period: current, offset: offset)
-            reading = next; empty = next == nil; failure = nil
-            if let next { offset = next.offset }
-        } catch { reading = nil; empty = false; failure = "لم تكتمل قراءة التحليل. حاول مرة أخرى." }
+        loadTask?.cancel()
+        let requestID = UUID(), requestedPeriod = current, requestedOffset = offset
+        activeLoadID = requestID
+        failure = nil
+        if reduceMotion { isRefreshing = true }
+        else { withAnimation(.easeInOut(duration: 0.18)) { isRefreshing = true } }
+        loadTask = Task {
+            do {
+                let next = try await service.loadAnalysisOffMain(period: requestedPeriod, offset: requestedOffset)
+                guard !Task.isCancelled, activeLoadID == requestID else { return }
+                if reduceMotion { reading = next }
+                else { withAnimation(.easeInOut(duration: 0.18)) { reading = next } }
+                empty = next == nil
+                failure = nil
+                if let next { offset = next.offset }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard activeLoadID == requestID else { return }
+                let displayedRequestMatches = reading.map { $0.period == requestedPeriod && $0.offset == requestedOffset } ?? false
+                if !displayedRequestMatches { reading = nil }
+                failure = "لم تكتمل قراءة التحليل. حاول مرة أخرى."
+                if reading == nil { empty = false }
+            }
+            guard activeLoadID == requestID else { return }
+            if reduceMotion { isRefreshing = false }
+            else { withAnimation(.easeInOut(duration: 0.18)) { isRefreshing = false } }
+            loadTask = nil
+        }
     }
 }
 

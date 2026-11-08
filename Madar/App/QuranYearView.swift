@@ -56,7 +56,7 @@ struct QuranYearView: View {
                             Text("الأشهر الهجرية").font(quranFont(17, bold: true))
                             Text(value.title).font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                             if let best = value.months.max(by: { $0.hifz < $1.hifz }), best.hifz > 0 {
-                                Text("أكثر شهر حفظًا: " + best.title + (best.gregorian.isEmpty ? "" : "، " + best.gregorian) + " (" + service.faceCount(best.hifz) + ")").font(quranFont(13)).accessibilityIdentifier("quran-year-best")
+                                Text("أكثر شهر حفظًا: " + best.title + (best.secondary.isEmpty ? "" : "، " + best.secondary) + " (" + service.faceCount(best.hifz) + ")").font(quranFont(13)).accessibilityIdentifier("quran-year-best")
                             }
                             monthBars(value.months, review: false)
                             Divider().overlay(theme.line)
@@ -96,7 +96,7 @@ struct QuranYearView: View {
             .sheet(item: $month) { item in
                 ScrollView { VStack(alignment: .leading, spacing: 14) {
                     Text(item.title).font(quranSerif(25))
-                    if !item.gregorian.isEmpty { Text(item.gregorian).font(quranFont(13)).foregroundStyle(theme.secondaryInk) }
+                    if !item.secondary.isEmpty { Text(item.secondary).font(quranFont(13)).foregroundStyle(theme.secondaryInk) }
                     ForEach(value?.days.filter { $0.monthID == item.id && ($0.hifz > 0 || $0.review > 0) } ?? []) { day in
                         MadarDateLabel(day.date); Text("حفظ " + service.faceCount(day.hifz) + "، مراجعة " + service.faceCount(day.review)).font(quranFont(13))
                     }
@@ -106,13 +106,13 @@ struct QuranYearView: View {
             }
     }
     private func edgeMonth(_ day: QuranUIYearDay?) -> some View {
-        VStack(spacing: 1) { Text(day?.month ?? "").font(quranFont(11)); Text(day?.gregorianMonth ?? "").font(quranFont(11)).opacity(0.8) }
+        VStack(spacing: 1) { Text(day?.month ?? "").font(quranFont(11)); Text(day?.secondaryMonth ?? "").font(quranFont(11)).opacity(0.8) }
     }
     private func monthRow(_ m: QuranUIYearMonth) -> some View {
         Button { month = m } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(m.title + "، حفظ " + service.faceCount(m.hifz) + "، مراجعة " + service.faceCount(m.review)).font(quranFont(14))
-                if !m.gregorian.isEmpty { Text(m.gregorian).font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
+                if !m.secondary.isEmpty { Text(m.secondary).font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
             }.frame(minHeight: 44)
         }
     }
@@ -140,7 +140,14 @@ struct QuranYearView: View {
         }
     }
     private func shortMonth(_ title: String) -> String {
-        let abbreviations = [("جمادى الأولى", "جم١"), ("جمادى الآخرة", "جم٢"), ("ربيع الأول", "رب١"), ("ربيع الآخر", "رب٢"), ("ذو القعدة", "قع"), ("ذو الحجة", "حج"), ("محرم", "مح"), ("صفر", "صف"), ("رجب", "رج"), ("شعبان", "شع"), ("رمضان", "رم"), ("شوال", "شو")]
+        let abbreviations = [("يناير", "ينا"), ("فبراير", "فبر"), ("مارس", "مار"), ("أبريل", "أبر"), ("مايو", "ماي"), ("يونيو", "يون"), ("يوليو", "يول"), ("أغسطس", "أغس"), ("سبتمبر", "سبت"), ("أكتوبر", "أكت"), ("نوفمبر", "نوف"), ("ديسمبر", "ديس"),
+            ("جمادى الأولى", "جم١"), ("جمادى الآخرة", "جم٢"), ("ربيع الأول", "رب١"), ("ربيع الآخر", "رب٢"), ("ذو القعدة", "قع"), ("ذو الحجة", "حج"), ("محرم", "مح"), ("صفر", "صف"), ("رجب", "رج"), ("شعبان", "شع"), ("رمضان", "رم"), ("شوال", "شو")]
+        if let range = title.components(separatedBy: "–").first, title.contains("–"),
+           let start = abbreviations.first(where: { range.hasPrefix($0.0) })?.1,
+           let endText = title.components(separatedBy: "–").dropFirst().first,
+           let end = abbreviations.first(where: { endText.trimmingCharacters(in: .whitespaces).hasPrefix($0.0) })?.1 {
+            return start + "–" + end
+        }
         return abbreviations.first { title.hasPrefix($0.0) }?.1 ?? title
     }
     @MainActor private func reload() {

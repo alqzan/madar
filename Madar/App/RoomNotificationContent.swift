@@ -13,10 +13,9 @@ import MadarPrayer
     static let roomPrefixes = ["quran.", "digest.", "qada.", "habits.", "notes.", "nudge.", "mal.alert80.", "mal.cardDue.", "mal.cardCash.", "mal.billDue.", "mal.reconcile.", "mal.zakat."]
     static func isRoomRequest(_ id: String) -> Bool { roomPrefixes.contains { id.hasPrefix($0) } }
 
-    /// Qada while something is owed, and each push habit's window start today (custom, due, unmet, not paused).
+    /// Push habit window starts today (custom, due, unmet, not paused).
     static func candidates(session: AppSession, prayerDays: [PrayerDay], now: Date) async throws -> [NotificationCandidate] {
-        var result = RoomReminders.qada(days: prayerDays, time: RoomReminders.QadaTime(rawValue: session.string("salah.qadaReminder")) ?? .afterFajr,
-                                        owed: try session.prayerSnapshot(at: now).statistics.owed, now: now)
+        var result: [NotificationCandidate] = []
         let service = AppBahwService(session: session, evaluationDate: now), today = service.today
         let place = try PrayerRepository(context: ModelContext(session.container)).place(at: now)
         let civil = GregorianDay.containing(now, in: place.timeZone)
@@ -199,37 +198,13 @@ import MadarPrayer
             if letterDue, let candidate = RoomReminders.diary(.letter, day: day, time: .afterFajr, prayerDays: prayerDays, now: now) { result.append(candidate) }
         }
         // «في مثل هذا اليوم» only when today truly has a memory on its date, not an echo or a random page.
-        let time = RoomReminders.QadaTime(rawValue: session.string("notes.onThisDay")) ?? .afterIsha
+        let time = RoomReminders.PrayerReminderTime(rawValue: session.string("notes.onThisDay")) ?? .afterIsha
         if time != .off, let day = prayerDays.first(where: { $0.day == today }),
            [.gregorian, .hijri].contains(diary.memorySelection(facts: try diary.memoryFacts(), today: today).match),
            let candidate = RoomReminders.diary(.onThisDay, day: day, time: time, prayerDays: prayerDays, now: now) { result.append(candidate) }
         return result
     }
 
-    /// Fixed copy chosen at scheduling time. Whole-app protection keeps every body generic (§8 item 10); RU2: never a prayer-debt count.
-    /// Owner, 26 Oct (OR-06): a different qada line each day instead of one repeated sentence. Never a count (RU2).
-    static let qadaLines = [
-        "حان وقت القضاء. «مَنْ نَسِيَ صَلَاةً فَلْيُصَلِّ إِذَا ذَكَرَهَا»",
-        "صلاة واحدة تقضيها الآن خير من تأجيلها إلى الغد",
-        "«وَأَقِمِ الصَّلَاةَ لِذِكْرِي» — وقت مناسب لصلاة تقضيها",
-        "دقائق قليلة تكفي لصلاة من القضاء",
-        "ما زال الباب مفتوحًا؛ اقضِ صلاة الآن",
-        "قبل أن يشغلك يومك: صلاة من القضاء",
-        "خطوة صغيرة اليوم تخفّف ما عليك",
-        "صلِّ ما فاتك بهدوء، واحدة تكفي الآن",
-        "هذا وقتك الذي اخترته للقضاء",
-        "اقضِ صلاة، ثم أكمل يومك مطمئنًا",
-        "القليل الدائم يقضي الكثير؛ صلاة واحدة الآن",
-        "تذكير لطيف: صلاة من القضاء تنتظرك",
-        "لا تحمل همّ الكل؛ ابدأ بصلاة واحدة",
-        "وقت مناسب لتقضي صلاة قبل أن يمضي",
-        "كل صلاة تقضيها تقرّبك من إتمام ما عليك",
-    ]
-    static func qadaLine(_ dayKey: String) -> String {
-        // Stable per day (no Swift hash seeding): the same day always reads the same line.
-        let sum = dayKey.unicodeScalars.reduce(0) { ($0 * 31 + Int($1.value)) % 1_000_003 }
-        return qadaLines[sum % qadaLines.count]
-    }
     static func content(for candidate: NotificationCandidate, plan: NotificationPlan, session: AppSession, habitNames: [String: String]) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent(), id = candidate.id, digits = MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)
         let protected = session.string("core.faceIDLock") == "app"
@@ -241,16 +216,11 @@ import MadarPrayer
             content.body = protected ? "لديك تذكير في مدار" : late ? NudgeWording.body(.quranReview, dayKey: candidate.dayKey) : NudgeWording.body(.quranWird, dayKey: candidate.dayKey)
             content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
         } else if id.hasPrefix("digest.") {
-            // Audit 28 Oct: under whole-app protection the digest named its kinds («القضاء، الزكاة…») on the lock screen.
+            // Under whole-app protection the digest names no room kinds on the lock screen.
             content.title = protected ? "مدار" : "ملخّص تذكيراتك"
             let members = plan.digestMembers[id] ?? [], kinds = protected ? [] : RoomReminders.digestKinds(memberIDs: members)
             content.body = "لديك " + reminderCount(members.count, digits) + (protected ? " في مدار" : kinds.isEmpty ? "" : ": " + kinds.joined(separator: "، "))
             content.userInfo = ["dayKey": candidate.dayKey, "room": "bahw"]
-        } else if id.hasPrefix("qada.") {
-            // AU-31: under the whole-app lock the title must not reveal missed prayers either.
-            content.title = protected ? "مدار" : "القضاء"
-            content.body = protected ? "لديك تذكير في مدار" : qadaLine(candidate.dayKey)
-            content.userInfo = ["dayKey": candidate.dayKey, "room": "salah"]
         } else if id.hasPrefix("habits.") {
             let habitID = String(id.split(separator: ".").last ?? "")
             content.title = protected ? "مدار" : habitNames[habitID] ?? "عادتك"
@@ -329,8 +299,7 @@ import MadarPrayer
                 : (session.string("quran.wirdReminder") != "off" && AppQuranService.needsWird(value))
         }
         if id.hasPrefix("qada.") {
-            guard session.string("salah.qadaReminder") != "off" else { return false }
-            return try session.prayerSnapshot(at: now).statistics.owed > 0
+            return false
         }
         if id.hasPrefix("habits."), let habitID = UUID(uuidString: String(id.split(separator: ".").last ?? "")) {
             let reading = try HabitRepository(context: ModelContext(session.container)).readings(at: now).first { $0.id == habitID }
@@ -402,7 +371,7 @@ import MadarPrayer
             let sessionKind = id.hasSuffix(".late") ? "review" : "wird"
             session.open(URL(string: "madar://quran/session/\(sessionKind)")!)
         }
-        else if id.hasPrefix("qada.") { session.open(URL(string: "madar://salah/qada")!) }
+        else if id.hasPrefix("qada.") { session.selectedTab = "prayer" }
         else if id.hasPrefix("mal.cardDue.") || id.hasPrefix("mal.cardCash.") {
             let components = id.split(separator: ".")
             if components.count == 4, let cardID = UUID(uuidString: String(components[2])) {

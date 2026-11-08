@@ -51,6 +51,53 @@ public struct QuranDataSnapshot: Sendable {
     public let testPages: [Int]
 }
 
+struct QuranPageHistoryIndex: Sendable {
+    struct CompletionKey: Hashable {
+        let page: Int
+        let endedAt: Date
+    }
+
+    struct ReviewFact: Sendable {
+        let sessionIndex: Int
+        let session: QuranSessionFact
+        let grade: QuranDraftGrade
+    }
+
+    struct CompletionFact: Sendable {
+        let session: QuranSessionFact
+        let rating: QuranReviewRating?
+    }
+
+    private(set) var completionSessions: [CompletionKey: CompletionFact] = [:]
+    private(set) var reviewsByPage: [Int: [ReviewFact]] = [:]
+
+    /// Input sessions are chronological. Keep the first matching hifz session and the last grade per page,
+    /// matching the old sorted-session searches while paying the indexing cost once per snapshot.
+    init(sessions: [QuranSessionFact]) {
+        for (index, session) in sessions.enumerated() {
+            if session.kind == .hifz {
+                var firstGradeByPage: [Int: QuranReviewRating] = [:]
+                for grade in session.grades where firstGradeByPage[grade.page] == nil {
+                    firstGradeByPage[grade.page] = grade.rating
+                }
+                for page in session.pages {
+                    let key = CompletionKey(page: page, endedAt: session.endedAt)
+                    if completionSessions[key] == nil {
+                        completionSessions[key] = CompletionFact(session: session, rating: firstGradeByPage[page])
+                    }
+                }
+            }
+
+            guard [.review, .free, .qiyam].contains(session.kind) else { continue }
+            var lastGradeByPage: [Int: QuranDraftGrade] = [:]
+            for grade in session.grades { lastGradeByPage[grade.page] = grade }
+            for (page, grade) in lastGradeByPage {
+                reviewsByPage[page, default: []].append(.init(sessionIndex: index, session: session, grade: grade))
+            }
+        }
+    }
+}
+
 public final class QuranRepository {
     public let context: ModelContext
     public let catalog: QuranResourceCatalog
@@ -108,6 +155,7 @@ public final class QuranRepository {
                 endedAt: row.endedAt, ayahs: range, pages: row.pages, grades: grades, mistakes: row.mistakes)
         }
         sessions.sort { $0.endedAt == $1.endedAt ? $0.id.uuidString < $1.id.uuidString : $0.endedAt < $1.endedAt }
+        let pageHistory = QuranPageHistoryIndex(sessions: sessions)
         let coverage = try QuranCoverageEngine.summarize(sessions: sessions.map {
             QuranCoverageSession(id: $0.id.uuidString, kind: $0.kind, ayahs: $0.ayahs, endedAt: $0.endedAt)
         }, catalog: catalog)
@@ -118,19 +166,19 @@ public final class QuranRepository {
         var memories: [Int: QuranPageMemory] = [:]
         var pages: [QuranPlanningPage] = [], completedOn: [Int: GregorianDay] = [:], intervals: [Int] = []
         for page in coverage.completedPages.sorted() {
-            guard let completedAt = coverage.memorizedAt[page], let completing = sessions.first(where: { $0.kind == .hifz && $0.endedAt == completedAt && $0.pages.contains(page) }) else {
+            guard let completedAt = coverage.memorizedAt[page],
+                  let completion = pageHistory.completionSessions[.init(page: page, endedAt: completedAt)] else {
                 throw DataError.invalidValue("Quran completion provenance")
             }
+            let completing = completion.session
             completedOn[page] = completing.dayKey
             var events = [QuranReviewEvent(pages: try QuranPageRange(first: page, last: page), day: completing.dayKey,
-                rating: completing.grades.first(where: { $0.page == page })?.rating ?? .good, occurredAt: Int64(completing.endedAt.timeIntervalSince1970 * 1000))]
+                rating: completion.rating ?? .good, occurredAt: Int64(completing.endedAt.timeIntervalSince1970 * 1000))]
             var lastGrade = events[0].rating
-            for (index, session) in sessions.enumerated() where [.review, .free, .qiyam].contains(session.kind) && session.endedAt > completedAt {
-                if let grade = session.grades.last(where: { $0.page == page }) {
-                    events.append(QuranReviewEvent(pages: try QuranPageRange(first: page, last: page), day: session.dayKey,
-                        rating: grade.rating, occurredAt: Int64(session.endedAt.timeIntervalSince1970 * 1000), inputOrder: index))
-                    lastGrade = grade.rating
-                }
+            for review in pageHistory.reviewsByPage[page] ?? [] where review.session.endedAt > completedAt {
+                events.append(QuranReviewEvent(pages: try QuranPageRange(first: page, last: page), day: review.session.dayKey,
+                    rating: review.grade.rating, occurredAt: Int64(review.session.endedAt.timeIntervalSince1970 * 1000), inputOrder: review.sessionIndex))
+                lastGrade = review.grade.rating
             }
             let memory = QuranReviewEngine.memory(forPage: page, events: events, through: today, preset: plan?.plan.intensity.preset ?? .balanced)
             guard let last = memory.lastReviewed else { continue }

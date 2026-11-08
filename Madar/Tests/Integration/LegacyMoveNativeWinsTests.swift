@@ -225,17 +225,18 @@ import CryptoKit
         let settings = try SettingsStore(context: context)
         _ = try settings.stage(["salah.trackingStart": .object(["dayKey": .string("2026-06-01"), "edits": .number(0)])])
         try context.save()
-        // Old: Fajr in congregation, Asr «فائتة» (would be owed), Maghrib «قضاء», Isha «لم».
+        // Old: Fajr in congregation, Asr «فائتة», Maghrib «قضاء», Isha «لم»; only the performed Fajr/Dhuhr import.
         let backup = try JSONSerialization.data(withJSONObject: ["prayerLogs": [["date": "2026-07-02", "prayers": ["الفجر": "جماعة", "الظهر": "منفردة", "العصر": "فائتة", "المغرب": "قضاء", "العشاء": "لم"], "prayerUpdatedAt": ["المغرب": 1783090800000]]]])
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-25T12:00:00+03:00"))
         let counts = try session.importLegacyPrayer(backup, now: now)
-        XCTAssertEqual(counts["logs.keptNative"], 2); XCTAssertEqual(counts["qada.keptNative"], 1)
+        XCTAssertEqual(counts["logs.keptNative"], 1); XCTAssertEqual(counts["logs.created"], 1)
+        XCTAssertEqual(counts["prayer.oldQadaSkipped"], 1)
         let check = ModelContext(store.container)
         let logs = try check.fetch(FetchDescriptor<PrayerLog>()).filter { $0.dayKey == "2026-07-02" && $0.deletedAt == nil }
         XCTAssertEqual(Dictionary(logs.map { ($0.prayer, $0.status) }, uniquingKeysWith: { a, b in a + "+" + b }),
-                       ["fajr": "alone", "dhuhr": "alone", "asr": "jamaah", "maghrib": "qada", "isha": "unrecordedHistory"])
+                       ["fajr": "alone", "dhuhr": "alone", "asr": "jamaah"])
         let qada = try check.fetch(FetchDescriptor<QadaItem>()).filter { $0.deletedAt == nil }
-        XCTAssertEqual(qada.map(\.prayer), ["maghrib"], "Asr was prayed here in congregation; it must not be owed")
+        XCTAssertTrue(qada.isEmpty, "Legacy backlog rows are never reintroduced.")
         XCTAssertEqual(try SettingsStore(context: check).value(for: "salah.trackingStart").object?["dayKey"]?.string, "2026-06-01")
         let before = try RecordBridge.all(check).count
         let again = try session.importLegacyPrayer(backup, now: now.addingTimeInterval(60))

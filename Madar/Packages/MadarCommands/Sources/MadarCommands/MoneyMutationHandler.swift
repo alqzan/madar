@@ -1411,7 +1411,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
     }
     private static func recordKey(_ row: DataRecord) -> String { row.model + ":" + row.id.uuidString }
-    static func sum(_ values: [Int]) throws -> Int {
+    nonisolated static func sum(_ values: [Int]) throws -> Int {
         try values.reduce(0) { total, next in
             let result = total.addingReportingOverflow(next); guard !result.overflow else { throw MoneyCommandError.invalidAmount }; return result.partialValue
         }

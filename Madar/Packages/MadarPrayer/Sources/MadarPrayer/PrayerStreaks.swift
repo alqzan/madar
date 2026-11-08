@@ -21,7 +21,7 @@ public enum PrayerStreakMark: Equatable, Sendable {
     case brokeAlone
     /// Broken by a made-up prayer (congregation and on time).
     case brokeQada
-    /// Broken by a missed prayer that is not made up yet.
+    /// Legacy marker. New prayer logs cannot use the missed status.
     case brokeMissed
     /// Older than the break: outside the current streak.
     case outside
@@ -33,7 +33,7 @@ public enum PrayerStreaks {
     /// The single definition every streak number and mark comes from.
     public static func classify(_ day: PrayerDaySummary, level: PrayerStreakLevel, madeUp: Set<String>) -> PrayerStreakMark {
         func paid(_ cell: PrayerCell) -> Bool { madeUp.contains(cell.reference.naturalKey) }
-        if day.cells.contains(where: { $0.status == .missed || ($0.status == .qada && !paid($0)) }) { return .brokeMissed }
+        if day.cells.contains(where: { $0.status == .missed }) { return .brokeMissed }
         let hasQada = day.cells.contains { $0.status == .qada }
         if hasQada && level != .completion { return .brokeQada }
         let settled = day.cells.filter { [.jamaah, .alone, .qada].contains($0.status) }

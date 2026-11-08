@@ -27,10 +27,7 @@ public enum PrayerMutation: Codable, Equatable, Sendable {
     case makeUp(PrayerReference, at: Date? = nil, fridayKind: FridayPrayerKind? = nil)
     case addOldMissed(PrayerReference, fridayKind: FridayPrayerKind? = nil)
     case restoreOldMissed(PrayerReference, fridayKind: FridayPrayerKind? = nil)
-    /// FB-39 (owner, 6 Nov): «أضف ٣٠٠ فجر». One old missed prayer per real day, counting back from `lastDay`
-    /// (before the tracking start); days already owed or recorded are skipped, never doubled.
     case addOldMissedRun(prayer: Prayer, count: Int, lastDay: GregorianDay)
-    /// FB-39: «قضيتُ ٥ من الفجر». Makes up the oldest `count` open debts of that prayer, now.
     case makeUpOldest(prayer: Prayer, count: Int)
     case markUnrecorded([PrayerReference])
     case resolveGap([PrayerGapResolution])
@@ -49,8 +46,6 @@ public enum PrayerMutation: Codable, Equatable, Sendable {
 }
 
 extension PrayerMutation {
-    /// Ten years of one prayer in a single command.
-    public static let maximumRun = 3660
     static func parse(name: String, payload: [String: JSONValue]) throws -> (Self, String?) {
         func string(_ key: String) throws -> String { guard case .string(let value) = payload[key] else { throw CoreError.invalidCommand }; return value }
         func ref(_ object: [String: JSONValue]) throws -> PrayerReference {
@@ -72,64 +67,14 @@ extension PrayerMutation {
         case "prayer.clear":
             let value = try ref(payload)
             return (.clear(value), "prayer." + value.naturalKey)
-        case "prayer.addOldMissed":
-            guard Set(payload.keys).isSubset(of: ["dayKey", "prayer", "fridayKind", "restoreDeleted"]) else { throw CoreError.invalidCommand }
-            let value = try ref(payload.filter { $0.key != "fridayKind" && $0.key != "restoreDeleted" })
-            let kind: FridayPrayerKind?
-            if let raw = payload["fridayKind"], raw != .null {
-                guard case .string(let text) = raw, let parsed = FridayPrayerKind(rawValue: text) else { throw CoreError.invalidCommand }; kind = parsed
-            } else { kind = nil }
-            var restoring = false
-            if let raw = payload["restoreDeleted"] { guard case .bool(let flag) = raw else { throw CoreError.invalidCommand }; restoring = flag }
-            return (restoring ? .restoreOldMissed(value, fridayKind: kind) : .addOldMissed(value, fridayKind: kind), "prayer." + value.naturalKey)
-        case "prayer.makeUp":
-            guard Set(payload.keys).isSubset(of: ["dayKey", "prayer", "fridayKind", "at"]) else { throw CoreError.invalidCommand }
-            let value = try ref(payload.filter { $0.key != "fridayKind" && $0.key != "at" })
-            let fridayKind: FridayPrayerKind?
-            if let raw = payload["fridayKind"], raw != .null {
-                guard case .string(let value) = raw, let parsed = FridayPrayerKind(rawValue: value) else { throw CoreError.invalidCommand }
-                fridayKind = parsed
-            } else { fridayKind = nil }
-            let at: Date?
-            if let raw = payload["at"] {
-                guard case .string(let text) = raw else { throw CoreError.invalidCommand }
-                let formatter = ISO8601DateFormatter()
-                at = formatter.date(from: text) ?? { formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return formatter.date(from: text) }()
-                guard at != nil else { throw CoreError.invalidCommand }
-            } else { at = nil }
-            let command: Self = name == "prayer.makeUp" ? .makeUp(value, at: at, fridayKind: fridayKind) : .addOldMissed(value, fridayKind: fridayKind)
-            return (command, "prayer." + value.naturalKey)
-        case "prayer.resolveGap":
-            guard Set(payload.keys) == ["resolutions"], case .array(let values) = payload["resolutions"],
-                  !values.isEmpty, values.count <= 10_000 else { throw CoreError.invalidCommand }
-            let resolutions = try values.map { value -> PrayerGapResolution in
-                guard case .object(let object) = value,
-                      Set(object.keys).isSubset(of: ["dayKey", "prayer", "status", "fridayKind"]),
-                      case .string(let statusRaw) = object["status"],
-                      let status = PrayerStoredStatus(rawValue: statusRaw),
-                      [.jamaah, .alone, .missed, .unrecordedHistory, .excused].contains(status) else { throw CoreError.invalidCommand }
-                let reference = try ref(object.filter { $0.key != "status" && $0.key != "fridayKind" })
-                let fridayKind: FridayPrayerKind?
-                if let raw = object["fridayKind"], raw != .null {
-                    guard case .string(let value) = raw, let parsed = FridayPrayerKind(rawValue: value) else { throw CoreError.invalidCommand }
-                    fridayKind = parsed
-                } else { fridayKind = nil }
-                return .init(reference: reference, status: status, fridayKind: fridayKind)
-            }
-            guard Set(resolutions.map(\.reference)).count == resolutions.count else { throw CoreError.invalidCommand }
-            let naturalKey = "prayer.gap." + resolutions.map { $0.reference.naturalKey }.sorted().joined(separator: "|")
-            return (.resolveGap(resolutions), naturalKey)
+        case "prayer.addOldMissed", "prayer.makeUp", "prayer.markUnrecorded", "prayer.addOldMissedRun", "prayer.makeUpOldest", "prayer.resolveGap":
+            throw CoreError.invalidCommand
         case "prayer.answerHeart":
             guard Set(payload.keys) == ["dayKey", "prayer", "heart"] else { throw CoreError.invalidCommand }
             let value = try ref(payload.filter { $0.key != "heart" }); let heart: PrayerHeart?
             if payload["heart"] == .null { heart = nil }
             else { guard let parsed = PrayerHeart(rawValue: try string("heart")) else { throw CoreError.invalidCommand }; heart = parsed }
             return (.answerHeart(value, heart), "prayer.heart." + value.naturalKey)
-        case "prayer.markUnrecorded":
-            guard Set(payload.keys) == ["prayers"], case .array(let values) = payload["prayers"], !values.isEmpty, values.count <= 70 else { throw CoreError.invalidCommand }
-            let refs = try values.map { value in guard case .object(let object) = value else { throw CoreError.invalidCommand }; return try ref(object) }
-            guard Set(refs).count == refs.count else { throw CoreError.invalidCommand }
-            return (.markUnrecorded(refs), nil)
         case "prayer.logPair":
             guard Set(payload.keys) == ["dayKey", "pair", "status", "shortened", "mode"], let pair = PrayerPair(rawValue: try string("pair")), let status = PrayerStoredStatus(rawValue: try string("status")), [.jamaah, .alone].contains(status), case .bool(let shortened) = payload["shortened"], let mode = PrayerPairMode(rawValue: try string("mode")) else { throw CoreError.invalidCommand }
             let day = try GregorianDay(string("dayKey"))
@@ -144,15 +89,6 @@ extension PrayerMutation {
         case "prayer.editTrackingStart":
             guard Set(payload.keys) == ["dayKey"] else { throw CoreError.invalidCommand }
             return (.editTrackingStart(try GregorianDay(string("dayKey"))), "salah.trackingStart")
-        case "prayer.addOldMissedRun":
-            guard Set(payload.keys) == ["prayer", "count", "lastDayKey"], let prayer = Prayer(rawValue: try string("prayer")),
-                  case .number(let raw) = payload["count"], raw.rounded() == raw, (1...PrayerMutation.maximumRun).contains(Int(raw)) else { throw CoreError.invalidCommand }
-            let last = try GregorianDay(string("lastDayKey"))
-            return (.addOldMissedRun(prayer: prayer, count: Int(raw), lastDay: last), "prayer.run.\(prayer.rawValue).\(last).\(Int(raw))")
-        case "prayer.makeUpOldest":
-            guard Set(payload.keys) == ["prayer", "count"], let prayer = Prayer(rawValue: try string("prayer")),
-                  case .number(let raw) = payload["count"], raw.rounded() == raw, (1...PrayerMutation.maximumRun).contains(Int(raw)) else { throw CoreError.invalidCommand }
-            return (.makeUpOldest(prayer: prayer, count: Int(raw)), nil)
         case "prayer.agePending", "prayer.initializeTracking":
             guard payload.isEmpty else { throw CoreError.invalidCommand }
             return (name == "prayer.agePending" ? .agePending : .initializeTracking, nil)

@@ -11,6 +11,19 @@ import XCTest
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
         if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
+        let city = app.buttons["first-run-city"]
+        if city.waitForExistence(timeout: 2) {
+            city.tap()
+            let field = app.textFields["city-search"]
+            XCTAssertTrue(field.waitForExistence(timeout: 5), app.debugDescription)
+            field.tap(); field.typeText("الرياض")
+            let hit = app.buttons["city-hit-الرياض"]
+            XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
+            if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
+            let later = app.buttons["first-run-continue"]
+            XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
+            XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
+        }
         app.buttons["tab-prayer"].tap()
 
         let streaks = app.buttons["prayer-streaks"]

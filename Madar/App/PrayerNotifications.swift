@@ -563,8 +563,8 @@ final class PrayerNotificationCoordinator {
 
     static func isRecorded(_ status: PrayerDisplayStatus) -> Bool {
         switch status {
-        case .jamaah, .alone, .qada, .missed, .excused: true
-        case .unrecordedHistory, .unconfirmed, .pending, .future: false
+        case .jamaah, .alone, .qada: true
+        case .missed, .unrecordedHistory, .unconfirmed, .excused, .pending, .future: false
         }
     }
 

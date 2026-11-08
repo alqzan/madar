@@ -138,6 +138,9 @@ import UIKit
         XCTAssertTrue(want.exists && finished.exists, app.debugDescription)
         XCTAssertLessThan(reading.frame.minY, want.frame.minY); XCTAssertLessThan(want.frame.minY, finished.frame.minY)
         app.swipeUp(velocity: .slow)
+        let note = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-shelf-margin-")).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(note.label.contains("حاشيتك في صفحة ١٢"), note.label)
         shot(app, "FB34-shelves-s1-L")
         app.buttons["mihbara-library"].tap()
         let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-library-book-' AND label CONTAINS 'ملف قابل للتعديل'")).firstMatch

@@ -20,6 +20,64 @@ import MadarQuran
     private func repo(_ container: ModelContainer) throws -> QuranRepository {
         try QuranRepository(context: ModelContext(container), catalog: QuranResources.catalog())
     }
+
+    @Test func pageHistoryIndexGroupsLargeChronologicalHistoryByPage() throws {
+        let day = try GregorianDay("2026-10-15")
+        let base = date("2026-10-15T10:00:00Z")
+        let ayahs = try QuranAyahRange(first: 1, last: 7)
+        func id(_ value: Int) -> UUID {
+            UUID(uuidString: "00000000-0000-0000-0000-\(String(format: "%012d", value))")!
+        }
+
+        var sessions: [QuranSessionFact] = (1...604).map { page in
+            QuranSessionFact(id: id(page), commitID: nil, kind: .hifz, dayKey: day,
+                endedAt: base.addingTimeInterval(Double(page)), ayahs: ayahs, pages: [page],
+                grades: [QuranDraftGrade(page: page, rating: .good)], mistakes: 0)
+        }
+        sessions.append(contentsOf: (0..<10_000).map { index in
+            let page = index % 604 + 1
+            let rating: QuranReviewRating = index.isMultiple(of: 2) ? .good : .needsMastery
+            return QuranSessionFact(id: id(1_000 + index), commitID: nil, kind: .review, dayKey: day,
+                endedAt: base.addingTimeInterval(Double(1_000 + index)), ayahs: ayahs, pages: [page],
+                grades: [QuranDraftGrade(page: page, rating: rating)], mistakes: 0)
+        })
+        sessions.sort { $0.endedAt < $1.endedAt }
+
+        let index = QuranPageHistoryIndex(sessions: sessions)
+        #expect(index.completionSessions.count == 604)
+        #expect(index.reviewsByPage.values.reduce(0) { $0 + $1.count } == 10_000)
+        #expect(index.reviewsByPage[1]?.first?.sessionIndex == 604)
+        #expect(index.reviewsByPage[1]?.last?.sessionIndex == 10_268)
+        #expect(index.reviewsByPage[1]?.last?.grade.rating == .good)
+    }
+
+    @Test func pageHistoryIndexKeepsFirstCompletionAndLastGradeWithinEachSession() throws {
+        let day = try GregorianDay("2026-10-15")
+        let base = date("2026-10-15T10:00:00Z")
+        let ayahs = try QuranAyahRange(first: 1, last: 7)
+        func id(_ value: Int) -> UUID {
+            UUID(uuidString: "00000000-0000-0000-0000-\(String(format: "%012d", value))")!
+        }
+
+        let firstCompletion = QuranSessionFact(id: id(1), commitID: nil, kind: .hifz, dayKey: day,
+            endedAt: base, ayahs: ayahs, pages: [1],
+            grades: [QuranDraftGrade(page: 1, rating: .good), QuranDraftGrade(page: 1, rating: .mastered)], mistakes: 0)
+        let tiedCompletion = QuranSessionFact(id: id(2), commitID: nil, kind: .hifz, dayKey: day,
+            endedAt: base, ayahs: ayahs, pages: [1],
+            grades: [QuranDraftGrade(page: 1, rating: .needsMastery)], mistakes: 0)
+        let review = QuranSessionFact(id: id(3), commitID: nil, kind: .review, dayKey: day,
+            endedAt: base.addingTimeInterval(1), ayahs: ayahs, pages: [1],
+            grades: [QuranDraftGrade(page: 1, rating: .good), QuranDraftGrade(page: 1, rating: .needsMastery)], mistakes: 0)
+
+        let index = QuranPageHistoryIndex(sessions: [firstCompletion, tiedCompletion, review])
+        let completion = index.completionSessions[.init(page: 1, endedAt: base)]
+        #expect(completion?.session.id == id(1))
+        #expect(completion?.rating == .good)
+        #expect(index.reviewsByPage[1]?.count == 1)
+        #expect(index.reviewsByPage[1]?.first?.sessionIndex == 2)
+        #expect(index.reviewsByPage[1]?.first?.grade.rating == .needsMastery)
+    }
+
     private func envelope(_ name: String, _ payload: [String: MadarCore.JSONValue], at: Date? = nil) -> CommandEnvelope {
         CommandEnvelope(name: name, payload: .object(payload), issuedAt: at ?? now)
     }
@@ -184,7 +242,9 @@ import MadarQuran
         _ = try await bus.execute(envelope("system.undo", ["undoToken": .string(token.uuidString)], at: now.addingTimeInterval(180)), now: now.addingTimeInterval(180))
         #expect(try repo(container).snapshot(at: now.addingTimeInterval(240)).coverage.completedPages == [1])
         _ = try await bus.execute(envelope("quran.editSessionGrade", ["sessionID": .string(session.id.uuidString), "page": .number(1), "grade": .string("needs")], at: now.addingTimeInterval(240)), now: now.addingTimeInterval(240))
-        #expect(try repo(container).snapshot(at: now.addingTimeInterval(300)).memories[1]?.intervalDays == 1)
+        let updated = try repo(container).snapshot(at: now.addingTimeInterval(300))
+        #expect(updated.memories[1]?.intervalDays == 1)
+        #expect(updated.pages.first { $0.page == 1 }?.grade == .needsMastery)
         let staleToken = try #require(committed.undoToken)
         await #expect(throws: (any Error).self) { try await bus.execute(envelope("system.undo", ["undoToken": .string(staleToken.uuidString)], at: now.addingTimeInterval(300)), now: now.addingTimeInterval(300)) }
         #expect(try repo(container).snapshot(at: now.addingTimeInterval(300)).coverage.completedPages == [1])

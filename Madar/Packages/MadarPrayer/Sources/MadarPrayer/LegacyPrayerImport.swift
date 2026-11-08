@@ -3,26 +3,21 @@ import MadarCore
 
 /// Owner prayer trial (item 19, dev-only): plans the old Madar backup's `prayerLogs` as native rows (§17).
 /// Pure: the caller supplies the home place and the stable-identity function, and inserts the rows in one transaction.
-/// Statuses map through `LegacyPrayerStatusPreview`. Nothing becomes missed or qada unless the old app said so (RP1):
-/// a prayer the old app never logged inside its own history is `unrecordedHistory`, never pending or missed.
+/// Only completed prayers are imported. Old backlog, qada, unperformed, and unrecorded states stay out of the live store.
 public enum LegacyPrayerImport {
     public struct LogRow: Equatable, Sendable {
         public let id: UUID, dayKey: String, prayer: Prayer, status: PrayerStoredStatus
         public let heart: PrayerHeart?, eventAt: Date, loggedAt: Date?, fridayKind: FridayPrayerKind?
     }
-    public struct QadaRow: Equatable, Sendable {
-        public let id: UUID, dayKey: String, prayer: Prayer, madeUpAt: Date?
-    }
     public struct Plan: Equatable, Sendable {
         public var logs: [LogRow] = []
-        public var qada: [QadaRow] = []
         /// The first legacy day: history before it was never kept, so tracking starts there.
         public var trackingStart: GregorianDay?
         /// Raw legacy day records, kept whole (khushu stamps, unknown fields) for ImportLink.unmappedJSON.
         public var archives: [(dayKey: String, json: Data)] = []
         public var counts: [String: Int] = [:]
         public static func == (l: Plan, r: Plan) -> Bool {
-            l.logs == r.logs && l.qada == r.qada && l.trackingStart == r.trackingStart && l.counts == r.counts
+            l.logs == r.logs && l.trackingStart == r.trackingStart && l.counts == r.counts
                 && l.archives.map(\.dayKey) == r.archives.map(\.dayKey) && l.archives.map(\.json) == r.archives.map(\.json)
         }
     }
@@ -39,7 +34,6 @@ public enum LegacyPrayerImport {
         func count(_ key: String, _ n: Int = 1) { result.counts[key, default: 0] += n }
         guard let root = try JSONSerialization.jsonObject(with: backup) as? [String: Any],
               let days = root["prayerLogs"] as? [[String: Any]] else { return result }
-        if let backlog = root["qadaBacklog"] as? NSNumber, backlog.intValue != 0 { count("archived.qadaBacklog", backlog.intValue) }
         var byDay: [GregorianDay: [String: Any]] = [:]
         for row in days {
             guard let text = row["date"] as? String, let day = try? GregorianDay(text) else { count("skipped.day"); continue }
@@ -53,13 +47,29 @@ public enum LegacyPrayerImport {
             guard let value = value as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID(), value.doubleValue > 0 else { return nil }
             return Date(timeIntervalSince1970: value.doubleValue / 1000)
         }
+        func safeArchive(_ row: [String: Any], day: GregorianDay) -> Data? {
+            var safe = row
+            let rawStatuses = row["prayers"] as? [String: Any] ?? [:]
+            let completed = rawStatuses.filter { name, raw in
+                guard names[name] != nil, let text = raw as? String else { return false }
+                let status = LegacyPrayerStatusPreview.preview(text, legacyDay: day, trackingStart: first).status
+                return status.map { [.jamaah, .alone].contains($0) } ?? false
+            }
+            safe["prayers"] = completed
+            for key in ["khushu", "prayerUpdatedAt"] {
+                if let values = row[key] as? [String: Any] {
+                    safe[key] = values.filter { completed[$0.key] != nil }
+                }
+            }
+            return try? JSONSerialization.data(withJSONObject: safe, options: [.sortedKeys])
+        }
         var day = first
         while day <= last {
             defer { day = day.adding(days: 1) }
             guard let times = PrayerTimesEngine.calculate(day: day, place: home, options: options) else { count("skipped.noTimes"); continue }
             let row = byDay[day] ?? [:]
             if row.isEmpty { count("day.absentInsideHistory") }
-            else if let json = try? JSONSerialization.data(withJSONObject: row, options: [.sortedKeys]) { result.archives.append((day.description, json)) }
+            else if let json = safeArchive(row, day: day) { result.archives.append((day.description, json)) }
             let statuses = (row["prayers"] as? [String: Any]) ?? [:]
             for key in statuses.keys where names[key] == nil { count("archived.unknownPrayer") }
             let hearts = (row["khushu"] as? [String: Any]) ?? [:], stamps = (row["prayerUpdatedAt"] as? [String: Any]) ?? [:]
@@ -67,7 +77,7 @@ public enum LegacyPrayerImport {
             for (name, prayer) in names.sorted(by: { Prayer.allCases.firstIndex(of: $0.value)! < Prayer.allCases.firstIndex(of: $1.value)! }) {
                 let raw = statuses[name] as? String
                 let stamp = millis(stamps[name])
-                var status: PrayerStoredStatus
+                let status: PrayerStoredStatus
                 if let raw, raw != "لم" {
                     let preview = LegacyPrayerStatusPreview.preview(raw, legacyDay: day, trackingStart: first)
                     guard let mapped = preview.status else { count("archived.unknownStatus"); continue }
@@ -76,11 +86,14 @@ public enum LegacyPrayerImport {
                     // Never logged in the old app's own history (or explicitly «لم»): history, not a debt.
                     status = .unrecordedHistory; count(raw == nil ? "unlogged.toHistory" : "lam.toHistory")
                 }
-                let prayed = [.jamaah, .alone, .qada].contains(status)
+                guard [.jamaah, .alone].contains(status) else {
+                    count(status == .qada ? "prayer.oldQadaSkipped" : "prayer.unperformedSkipped")
+                    continue
+                }
+                let prayed = [.jamaah, .alone].contains(status)
                 let heart = prayed ? heart(legacy: hearts[name]) : nil
                 if prayed && hearts[name] != nil && heart == nil { count("archived.unknownHeart") }
-                // Friday noon: «منفردة» cannot be Jumu'ah, so it is Dhuhr. Owner, 24 Oct 2026: every other recorded
-                // Friday noon in the old app (جماعة/فائتة/قضاء) was Jumu'ah.
+                // Friday noon: «منفردة» cannot be Jumu'ah, so it is Dhuhr; a recorded congregation was Jumu'ah.
                 var friday: FridayPrayerKind?
                 if isFriday && prayer == .dhuhr && status != .unrecordedHistory {
                     if status == .alone { friday = .dhuhr; count("friday.dhuhrFromAlone") } else { friday = .jumuah; count("friday.jumuahByOwner") }
@@ -88,13 +101,6 @@ public enum LegacyPrayerImport {
                 result.logs.append(LogRow(id: uuid("myDream:PrayerLog:\(day):\(prayer.rawValue)"), dayKey: day.description, prayer: prayer,
                     status: status, heart: heart, eventAt: times.time(for: prayer), loggedAt: status == .unrecordedHistory ? nil : stamp, fridayKind: friday))
                 count("status." + status.rawValue)
-                if status == .missed {
-                    result.qada.append(QadaRow(id: uuid("myDream:QadaItem:\(day):\(prayer.rawValue)"), dayKey: day.description, prayer: prayer, madeUpAt: nil))
-                } else if status == .qada {
-                    // The old app turned «فائتة» into «قضاء» when it was made up; that edit's stamp is the make-up time.
-                    if let stamp { result.qada.append(QadaRow(id: uuid("myDream:QadaItem:\(day):\(prayer.rawValue)"), dayKey: day.description, prayer: prayer, madeUpAt: stamp)) }
-                    else { count("qada.madeUpTimeUnknown") }
-                }
             }
         }
         return result

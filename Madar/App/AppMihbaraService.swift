@@ -6,6 +6,23 @@ import MadarData
 import MadarCommands
 import MadarPrayer
 
+private struct MihbaraEPUBLinkScanRequest: Sendable {
+    let bookID: UUID
+    let mediaID: UUID
+    let epubHash: String
+}
+
+enum MihbaraEPUBLinkScanWorker {
+    nonisolated static func value<T: Sendable>(of worker: Task<T, Error>) async throws -> T {
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            return try await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
+    }
+}
+
 struct MihbaraBook: Identifiable, Equatable {
     var id: UUID; var title: String; var author: String; var shelf: String; var pages: Int?; var page: Int?; var finished: Date?; var updated: Date
     var kind: String = "paper"; var format: String? = nil; var mediaID: UUID? = nil; var fileHash: String? = nil; var locatorJSON: Data? = nil
@@ -56,26 +73,64 @@ struct MihbaraMotivationCue: Identifiable {
     unowned let app: AppSession
     var digits: MadarNumberFormatter { .init(style: app.string("core.numerals") == "western" ? .western : .hindi) }
     func load(at instant: Date? = nil) throws -> MihbaraHomeReading {
+        let reading = try loadHome(at: instant)
+        var links = MihbaraConversions.links(app)
+        let before = links
+        for book in reading.books where book.isReadableEPUB {
+            guard let hash = book.fileHash else { continue }
+            if links[hash] == nil {
+                _ = MihbaraConversions.sourcePDFHash(of: book, app: app, cache: &links)
+            }
+        }
+        if links != before { MihbaraConversions.save(links, app: app) }
+        return Self.filterConvertedPDFs(in: reading, links: links)
+    }
+
+    /// Builds the same shelf while verifying uncached EPUBs away from the UI actor.
+    /// Only small identifiers cross into the detached file check; the book bytes stay there.
+    func loadOffMain(at instant: Date? = nil) async throws -> MihbaraHomeReading {
+        let reading = try loadHome(at: instant)
+        var links = MihbaraConversions.links(app)
+        let container = app.container, generation = app.storeGeneration
+
+        for book in reading.books where book.isReadableEPUB {
+            try Task.checkCancellation()
+            guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+            guard let epubHash = book.fileHash else { continue }
+            if links[epubHash] == nil, let mediaID = book.mediaID {
+                let request = MihbaraEPUBLinkScanRequest(bookID: book.id, mediaID: mediaID, epubHash: epubHash)
+                let sourcePDFHash = try await Self.sourcePDFHashOffMain(container: container, request: request)
+                try Task.checkCancellation()
+                guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+                links[epubHash] = sourcePDFHash ?? ""
+                MihbaraConversions.link(epub: epubHash, toPDF: sourcePDFHash ?? "", app: app)
+            }
+        }
+
+        try Task.checkCancellation()
+        guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+        return Self.filterConvertedPDFs(in: reading, links: links)
+    }
+
+    private func loadHome(at instant: Date?) throws -> MihbaraHomeReading {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
         guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         let c = ModelContext(app.container), now = instant ?? app.prayerNow(), day = try DiaryLineRenderer.today(context: c, now: now)
-        let storedBooks = try c.fetch(FetchDescriptor<Book>())
+        let storedBooks = try c.fetch(FetchDescriptor<Book>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil
+        }))
         var books: [MihbaraBook] = []
-        for row in storedBooks where row.deletedAt == nil && row.mergedInto == nil {
+        for row in storedBooks {
             var page = row.currentPage
             if row.kind == "paper", let data = row.locatorJSON, let position = try? JSONDecoder().decode(PaperBookPosition.self, from: data) { page = position.page }
             books.append(MihbaraBook(id: row.id, title: row.title, author: row.author, shelf: row.shelf, pages: row.pages, page: page, finished: row.finishedAt, updated: row.updatedAt, kind: row.kind, format: row.format, mediaID: row.mediaID, fileHash: row.fileHash, locatorJSON: row.kind == "file" ? row.locatorJSON : nil, isbn13: row.isbn13, tocJSON: row.tocJSON, turathID: row.turathID, language: row.language))
         }
         books.sort { $0.updated == $1.updated ? $0.id.uuidString < $1.id.uuidString : $0.updated > $1.updated }
-        // Owner, 25 Oct 2026 («الكتاب تكرر مرتين في مكتبتي»): a converted book stands for its PDF.
-        var links = MihbaraConversions.links(app)
-        let before = links
-        let converted = Set(books.compactMap { MihbaraConversions.sourcePDFHash(of: $0, app: app, cache: &links) })
-        if links != before { MihbaraConversions.save(links, app: app) }
-        let originals = books.filter { $0.isReadablePDF && $0.fileHash.map(converted.contains) == true }
-        books.removeAll { book in originals.contains { $0.id == book.id } }
         let collection = try MihbaraCollection.load()
-        let rows = try c.fetch(FetchDescriptor<HadithProgress>()).filter { $0.collectionID == collection.collectionID && $0.deletedAt == nil && $0.mergedInto == nil }
+        let collectionID = collection.collectionID
+        let rows = try c.fetch(FetchDescriptor<HadithProgress>(predicate: #Predicate {
+            $0.collectionID == collectionID && $0.deletedAt == nil && $0.mergedInto == nil
+        }))
         let read = Set(rows.filter { $0.readAt != nil }.map(\.number))
         let today = Set(try rows.filter { row in
             guard let readAt = row.readAt else { return false }
@@ -85,7 +140,61 @@ struct MihbaraMotivationCue: Identifiable {
         let prayer = try PrayerRepository(context: c), place = prayer.place(at: now)
         let civil = GregorianDay.containing(now, in: place.timeZone), options = prayer.calculationOptions(at: now)
         let fajr = PrayerTimesEngine.calculate(day: civil, place: place, options: options)?.fajr
-        return .init(books: books, collection: collection, todayHadiths: collection.hadiths.filter { numbers.contains($0.number) }, readCount: read.count, completedToday: today.count, opensAfterFajr: fajr.map { now >= $0 } ?? false, day: day, originals: originals)
+        return .init(books: books, collection: collection, todayHadiths: collection.hadiths.filter { numbers.contains($0.number) }, readCount: read.count, completedToday: today.count, opensAfterFajr: fajr.map { now >= $0 } ?? false, day: day)
+    }
+
+    private static func filterConvertedPDFs(in reading: MihbaraHomeReading, links: [String: String]) -> MihbaraHomeReading {
+        let converted = Set(reading.books.compactMap { book -> String? in
+            guard book.isReadableEPUB, let hash = book.fileHash, let sourceHash = links[hash], !sourceHash.isEmpty else { return nil }
+            return sourceHash
+        })
+        let originals = reading.books.filter { $0.isReadablePDF && $0.fileHash.map(converted.contains) == true }
+        var books = reading.books
+        books.removeAll { book in originals.contains { $0.id == book.id } }
+        var result = reading
+        result.books = books
+        result.originals = originals
+        return result
+    }
+
+    private nonisolated static func sourcePDFHashOffMain(
+        container: ModelContainer,
+        request: MihbaraEPUBLinkScanRequest
+    ) async throws -> String? {
+        let worker = Task.detached(priority: .utility) { () throws -> String? in
+            try Task.checkCancellation()
+            let data = try? Self.verifiedBookData(
+                container: container,
+                bookID: request.bookID,
+                mediaID: request.mediaID,
+                expectedHash: request.epubHash,
+                allowedFormats: ["epub"],
+                cancellationAware: true
+            )
+            // A canceled verification is never cached as the «ordinary EPUB» sentinel.
+            try Task.checkCancellation()
+            guard let data else { return nil }
+            return try Self.embeddedPDFHash(in: data)
+        }
+        return try await MihbaraEPUBLinkScanWorker.value(of: worker)
+    }
+
+    private nonisolated static func embeddedPDFHash(in data: Data) throws -> String? {
+        let marker = Data("urn:madar:pdf:".utf8)
+        let windowSize = 1_048_576
+        var offset = 0
+        while offset < data.count {
+            try Task.checkCancellation()
+            let end = min(data.count, offset + windowSize + marker.count - 1 + 64)
+            if let range = data.range(of: marker, in: offset..<end) {
+                guard data.count >= range.upperBound + 64,
+                      let text = String(data: data[range.upperBound..<range.upperBound + 64], encoding: .ascii),
+                      text.allSatisfy(\.isHexDigit) else { return nil }
+                return text
+            }
+            offset += windowSize
+        }
+        return nil
     }
 
     func hasLocalFile(for book: MihbaraBook) -> Bool {
@@ -213,21 +322,53 @@ struct MihbaraMotivationCue: Identifiable {
               let mediaID = book.mediaID, let expectedHash = book.fileHash, expectedHash.count == 64 else {
             throw DataError.invalidValue("هذا الكتاب لا يملك ملفًا صالحًا للقراءة")
         }
+        return try verifiedBookData(container: container, bookID: book.id, mediaID: mediaID, expectedHash: expectedHash, allowedFormats: allowedFormats)
+    }
+
+    nonisolated private static func verifiedBookData(
+        container: ModelContainer,
+        bookID: UUID,
+        mediaID: UUID,
+        expectedHash: String,
+        allowedFormats: Set<String>,
+        cancellationAware: Bool = false
+    ) throws -> Data {
+        guard expectedHash.count == 64 else { throw DataError.invalidValue("هذا الكتاب لا يملك ملفًا صالحًا للقراءة") }
         let context = ModelContext(container)
-        let books = try context.fetch(FetchDescriptor<Book>())
-        guard let currentBook = books.first(where: { $0.id == book.id && $0.deletedAt == nil && $0.mergedInto == nil }),
+        let currentBook = try context.fetch(FetchDescriptor<Book>(predicate: #Predicate {
+            $0.id == bookID && $0.deletedAt == nil && $0.mergedInto == nil
+        })).first
+        guard let currentBook,
               currentBook.kind == "file", allowedFormats.contains(currentBook.format ?? ""),
               currentBook.mediaID == mediaID, currentBook.fileHash == expectedHash else { throw DataError.invalidValue("تغيّر ملف الكتاب؛ افتح مكتبته مجددًا") }
-        let mediaRows = try context.fetch(FetchDescriptor<Media>())
-        if let media = mediaRows.first(where: { $0.id == mediaID && $0.deletedAt == nil && $0.mergedInto == nil }), media.state == "missing" {
+        let media = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate {
+            $0.id == mediaID && $0.deletedAt == nil && $0.mergedInto == nil
+        })).first
+        if let media, media.state == "missing" {
             // RD4: a backup restored on another device may leave a large book file out.
             throw DataError.invalidValue(currentBook.turathID != nil ? "ملف هذا الكتاب لم يدخل النسخة الاحتياطية. نزّله من تراث مجددًا." : "ملف هذا الكتاب لم يدخل النسخة الاحتياطية. استورد الملف الأصلي مجددًا.")
         }
-        guard let media = mediaRows.first(where: { $0.id == mediaID && $0.deletedAt == nil && $0.mergedInto == nil }),
+        guard let media,
               media.kind == "doc", media.state == "ok", let data = media.data,
               data.count == media.sizeBytes, data.count <= 500 * 1024 * 1024,
-              media.sha256 == expectedHash,
-              SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == expectedHash else { throw DataError.invalidValue("تعذر التحقق من ملف الكتاب المحلي") }
+              media.sha256 == expectedHash else { throw DataError.invalidValue("تعذر التحقق من ملف الكتاب المحلي") }
+        if cancellationAware {
+            try Task.checkCancellation()
+            var hasher = SHA256()
+            var offset = 0
+            while offset < data.count {
+                try Task.checkCancellation()
+                let end = min(data.count, offset + 1_048_576)
+                hasher.update(data: data[offset..<end])
+                offset = end
+            }
+            let actualHash = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+            guard actualHash == expectedHash else { throw DataError.invalidValue("تعذر التحقق من ملف الكتاب المحلي") }
+        } else {
+            guard SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == expectedHash else {
+                throw DataError.invalidValue("تعذر التحقق من ملف الكتاب المحلي")
+            }
+        }
         return data
     }
 }

@@ -51,7 +51,7 @@ import MadarDesign
     static let rooms = [("salah", "الصلاة"), ("quran", "القرآن"), ("mal", "المال"), ("notes", "المذكرات"), ("mihbara", "المحبرة")]
     static func title(_ id: String, room: String) -> String {
         let titles: [String: String] = switch room {
-        case "salah": ["next": "الصلاة القادمة", "riwaq": "رواق الصلوات", "pending": "ما ينتظر تسجيلك", "hali": "حالي", "qada": "القضاء", "qiyam": "قيام الليل"]
+        case "salah": ["next": "الصلاة القادمة", "riwaq": "رواق الصلوات", "pending": "ما ينتظر تسجيلك", "hali": "حالي", "qiyam": "قيام الليل"]
         case "quran": ["sadr": "في صدرك", "path": "مسار اليوم", "log14": "آخر أربعة عشر يومًا", "tools": "أدوات القرآن"]
         case "mal": ["curve": "منحنى الدورة", "now": "مالك الآن", "envelopes": "المظاريف", "limits": "حدود الصرف", "obligations": "الالتزامات"]
         case "notes": ["memory": "نافذة الذكريات", "thatDay": "ذاك اليوم", "sinceThatDay": "منذ ذاك اليوم", "days": "أيامك", "todayBar": "اكتب اليوم"]

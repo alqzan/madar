@@ -6,6 +6,27 @@ import MadarMoney
 @testable import Madar
 
 @MainActor final class MoneyLogIntegrationTests: XCTestCase {
+    func testPendingMoneyLogRouteSurvivesAReplacementReadUntilApplied() {
+        var tracker = MoneyLogRouteRequestTracker()
+        let first = UUID()
+        tracker.stage(first)
+        XCTAssertTrue(tracker.hasPendingRequest)
+
+        // A prayerRevision refresh starts another read while the same route is still pending.
+        tracker.stage(first)
+        XCTAssertEqual(tracker.pendingRequestID, first)
+        XCTAssertTrue(tracker.hasPendingRequest)
+
+        tracker.markApplied(first)
+        XCTAssertFalse(tracker.hasPendingRequest)
+        XCTAssertEqual(tracker.appliedRequestID, first)
+
+        let next = UUID()
+        tracker.stage(next)
+        XCTAssertTrue(tracker.hasPendingRequest)
+        XCTAssertEqual(tracker.pendingRequestID, next)
+    }
+
     func testPastedBankParserKeepsAllBlocksAndReportsOversizedOnes() {
         let valid = "شراء مدى\n*3333\n18.00 SAR\nلدى: Coffee\n2026-10-16 12:00"
         let tooLong = String(repeating: "x", count: 2001)
@@ -18,7 +39,7 @@ import MadarMoney
         XCTAssertEqual(parsed.oversizedCount, 1)
     }
 
-    func testLogUsesOriginalRefundDayActualDripsAndNeutralPayments() throws {
+    func testLogUsesOriginalRefundDayActualDripsAndNeutralPayments() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MoneyLog-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container)
@@ -50,7 +71,27 @@ import MadarMoney
         }
         try c.save()
         let app = try AppSession(container: container, groupDirectory: root); app.authorizeProtectedData()
-        let reading = try AppMoneyService(app: app).loadLog(at: now)
+        let service = AppMoneyService(app: app)
+        let reading = try service.loadLog(at: now)
+        let background = try await service.loadLogOffMain(at: now)
+        XCTAssertEqual(background.today, reading.today)
+        XCTAssertEqual(background.monthStart, reading.monthStart)
+        XCTAssertEqual(background.monthStarts, reading.monthStarts)
+        XCTAssertEqual(background.neutralTransfersMinor, reading.neutralTransfersMinor)
+        XCTAssertEqual(background.filters.map { $0.id + "|" + $0.title }, reading.filters.map { $0.id + "|" + $0.title })
+        func daySignature(_ day: MoneyLogDay) -> String {
+            [day.day.description, String(describing: day.dailyMinor), String(day.spentMinor), String(day.otherMinor),
+             String(describing: day.cashOutMinor), String(day.pending), String(describing: day.within)].joined(separator: "|")
+        }
+        XCTAssertEqual(background.days.map(daySignature), reading.days.map(daySignature))
+        XCTAssertEqual(background.arcadeDays.map(daySignature), reading.arcadeDays.map(daySignature))
+        func movementSignature(_ row: MoneyLogMovement) -> String {
+            [row.id.uuidString, row.day.description, String(row.at.timeIntervalSince1970), row.title, row.category, row.payment, row.kind,
+             row.cardID?.uuidString ?? "", String(row.cash), String(row.bnpl), String(row.amountMinor), String(row.confirmed), row.budgetLabel,
+             row.detail.id, row.detail.title, String(row.detail.amountMinor), row.detail.explanation, row.detail.message ?? "", row.detail.date?.description ?? "",
+             row.searchIndex, row.searchIndexWithAmount].joined(separator: "|")
+        }
+        XCTAssertEqual(background.movements.map(movementSignature), reading.movements.map(movementSignature))
         let yesterday = try XCTUnwrap(reading.days.first { $0.day.description == "2026-10-15" }), today = try XCTUnwrap(reading.days.first { $0.day.description == "2026-10-16" })
         XCTAssertEqual(yesterday.spentMinor, 36, "60 − 24: refund returns to original day")
         XCTAssertEqual(yesterday.otherMinor, 524, "40 − 16 + 500 ignored")

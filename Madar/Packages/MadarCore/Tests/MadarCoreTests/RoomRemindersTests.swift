@@ -3,7 +3,7 @@ import Testing
 @testable import MadarCore
 
 /// Expected values come from §8 item 8 (sanctity = adhan + 30 min, digest names kinds, B − 1 + digest),
-/// §7.1 (habit reminder at window start, none without a window) and the salah.qadaReminder options.
+/// §7.1 (habit reminder at window start, none without a window).
 @Suite struct RoomRemindersTests {
     let day = try! #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
     var dawn: Date { day.fajr.addingTimeInterval(-3 * 3600) }
@@ -98,17 +98,7 @@ import Testing
         return calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day.date(in: zone))!
     }
 
-    @Test func qadaFallsAtTheEndOfTheChosenPrayersSanctity() {
-        let fajr = RoomReminders.qada(days: [day], time: .afterFajr, owed: 3, now: dawn)
-        #expect(fajr == [.init(id: "qada.2026-10-09", room: .salah, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-09")])
-        let isha = RoomReminders.qada(days: [day], time: .afterIsha, owed: 1, now: dawn)
-        #expect(isha.first?.dueAt == day.isha.addingTimeInterval(1800))
-    }
 
-    @Test func qadaIsSilentWhenNothingIsOwedOrTheKindIsOff() {
-        #expect(RoomReminders.qada(days: [day], time: .afterFajr, owed: 0, now: dawn).isEmpty)
-        #expect(RoomReminders.qada(days: [day], time: .off, owed: 4, now: dawn).isEmpty)
-    }
 
     @Test func habitReminderStartsWithItsWindowAndLeavesSanctity() {
         let id = UUID()
@@ -149,16 +139,14 @@ import Testing
     }
 
     @Test func digestNamesKindsNeverContent() {
-        #expect(RoomReminders.digestKinds(memberIDs: ["quran.2026-10-09.wird", "qada.2026-10-09", "habits.2026-10-09.\(UUID())"]) == ["الورد", "القضاء", "عادة"])
+        #expect(RoomReminders.digestKinds(memberIDs: ["quran.2026-10-09.wird", "habits.2026-10-09.\(UUID())"]) == ["الورد", "عادة"])
         #expect(RoomReminders.digestKinds(memberIDs: (0..<11).map { "habits.d.\($0)" }) == ["عادة"])
     }
 
     @Test func budgetOfFourSendsThreeAndOneDigestThatKnowsItsMembers() {
-        // Five room requests on one Madar day, B = 4: the first B − 1 by priority then time, the rest in a digest.
-        // Default priority (owner, 4 Nov 2026): Quran, habits, diary, prayer, money, Mihbara — what is lost with time first, so the qada reminder waits in the digest.
+        // Four room requests on one Madar day, B = 4: the first B − 1 by priority then time, the last one in a digest.
         let at = { (minutes: Double) in day.dhuhr.addingTimeInterval(3600 + minutes * 60) }
         let candidates: [NotificationCandidate] = [
-            RoomReminders.qada(days: [day], time: .afterFajr, owed: 2, now: dawn)[0],
             .init(id: "quran.2026-10-09.wird", room: .quran, dueAt: at(0), dayKey: "2026-10-09"),
             .init(id: "quran.2026-10-09.late", room: .quran, dueAt: at(10), dayKey: "2026-10-09"),
             .init(id: "habits.2026-10-09.a", room: .habits, dueAt: at(20), dayKey: "2026-10-09"),
@@ -168,7 +156,7 @@ import Testing
                                             policy: .init(dailyBudget: 4, staleNudgeEnabled: false))
         #expect(plan.scheduled.filter { $0.kind == .reminder }.map(\.id) == ["quran.2026-10-09.wird", "quran.2026-10-09.late", "habits.2026-10-09.a"])
         #expect(plan.scheduled.filter { $0.kind == .digest }.map(\.id) == ["digest.2026-10-09"])
-        #expect(plan.digestMembers["digest.2026-10-09"] == ["habits.2026-10-09.b", "qada.2026-10-09"])
+        #expect(plan.digestMembers["digest.2026-10-09"] == ["habits.2026-10-09.b"])
     }
 
     // §7.3: the intention card after Fajr, «في مثل هذا اليوم» after Isha by default; §8 item 8 ids and the notes cap of 2.

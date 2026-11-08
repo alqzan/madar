@@ -13,8 +13,6 @@ final class PrayerCopyTests: XCTestCase {
         for (count, expected) in days { XCTAssertEqual(plain(PrayerCopy.days(count, digits: hindi)), expected) }
         let remaining: [(Int, String)] = [(0, "اكتمل تسجيل اليوم"), (1, "بقيت صلاة واحدة"), (2, "بقيت صلاتان"), (3, "بقيت ٣ صلوات")]
         for (count, expected) in remaining { XCTAssertEqual(plain(PrayerCopy.remaining(count, digits: hindi)), expected) }
-        let owed: [(Int, String)] = [(1, "فائتة عليك، لم تُقضَ بعد"), (2, "فائتتان عليك، لم تُقضيا بعد"), (3, "فوائت عليك، لم تُقضَ بعد"), (12, "فائتةً عليك، لم تُقضَ بعد")]
-        for (count, expected) in owed { XCTAssertEqual(PrayerCopy.owed(count), expected) }
         XCTAssertEqual(plain(PrayerCopy.rakaat(8, digits: hindi)), "٨ ركعات")
         XCTAssertEqual(plain(PrayerCopy.rakaat(2, digits: hindi)), "ركعتان")
         XCTAssertEqual(plain(PrayerCopy.pending(3, digits: hindi)), "٣ صلوات لم تُسجَّل")

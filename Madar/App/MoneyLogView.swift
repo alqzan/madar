@@ -12,6 +12,7 @@ struct MoneyLogView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reading: MoneyLogReading?
     @State private var selected: GregorianDay?
     @State private var month: GregorianDay?
@@ -23,9 +24,12 @@ struct MoneyLogView: View {
     @State private var source: MoneySourceDetail?
     @State private var messagesOpen = false
     @State private var failure: String?
+    @State private var isRefreshing = false
     @State private var initialRouteApplied = false
     @State private var initialRouteMissing = false
-    @State private var appliedRouteRequestID: UUID?
+    @State private var routeRequestTracker = MoneyLogRouteRequestTracker()
+    @State private var readingLoadTask: Task<Void, Never>?
+    @State private var activeReadingLoadID: UUID?
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -40,6 +44,15 @@ struct MoneyLogView: View {
                     Spacer()
                     Button { calendarMode.toggle() } label: { Image(systemName: calendarMode ? "book.pages" : "calendar").frame(width: 44, height: 44).background(calendarMode ? theme.ink : Color.clear, in: Circle()).foregroundStyle(calendarMode ? theme.background : theme.ink).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel(calendarMode ? "رواق الأيام" : "الشهر أقواسًا").accessibilityIdentifier("money-log-mode")
                 }.padding(.top, 8)
+                if isRefreshing, reading != nil {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("نحدّث السجل…").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("money-log-refreshing")
+                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+                }
                 if let reading {
                     if initialRouteMissing {
                         Text("هذه الحركة لم تعد موجودة في السجل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -77,11 +90,13 @@ struct MoneyLogView: View {
                         searchResults(reading)
                     }
                     monthSummary(reading)
-                } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة") { load(applyIncomingRoute: true) }.frame(minHeight: 44) }
+                } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة") { load() }.frame(minHeight: 44) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 220) }
             }.padding(.horizontal, 20).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
-            .task(id: initialRouteRequestID) { load(applyIncomingRoute: true) }.onChange(of: app.prayerRevision) { load() }
+            .task(id: initialRouteRequestID) { load() }
+            .onChange(of: app.prayerRevision) { load() }
+            .onDisappear { readingLoadTask?.cancel(); readingLoadTask = nil }
             .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $messagesOpen) { MoneyMessagesView(app: app, revealed: $revealed) }.accessibilityIdentifier("money-log")
     }
@@ -248,8 +263,8 @@ struct MoneyLogView: View {
         let needle = normalizedSearch(query)
         guard !needle.isEmpty else { return [] }
         return r.movements.filter { row in
-            let searchable = row.title + row.category + row.payment + (visible ? service.amount(row.amountMinor) : "")
-            return matchesFilter(row) && normalizedSearch(searchable).contains(needle)
+            let searchable = visible ? row.searchIndexWithAmount : row.searchIndex
+            return matchesFilter(row) && searchable.contains(needle)
         }
     }
     @ViewBuilder private func searchResults(_ r: MoneyLogReading) -> some View {
@@ -277,62 +292,76 @@ struct MoneyLogView: View {
             }.accessibilityElement(children: .contain).accessibilityIdentifier("money-log-search-results")
         }
     }
-    private func load(applyIncomingRoute: Bool = false) {
-        do {
-            let requestID = applyIncomingRoute ? initialRouteRequestID : nil
-            let appliesNewRoute = requestID != nil && requestID != appliedRouteRequestID
-            if appliesNewRoute {
-                source = nil
-                initialRouteMissing = false
-                filter = "all"
-                query = ""
-                searching = false
-                month = nil
-                selected = nil
-            }
-            let loaded = try service.loadLog(month: appliesNewRoute ? nil : month)
-            if appliesNewRoute {
-                month = loaded.monthStart
-                selected = loaded.days.last { $0.day <= loaded.today }?.day ?? loaded.days.first?.day
-            }
-            let firstTransactionRoute = !initialRouteApplied && initialTransactionID != nil
-            if (appliesNewRoute || firstTransactionRoute), let initialTransactionID {
-                if let movement = loaded.movements.first(where: { $0.id == initialTransactionID }) {
-                    let targetMonth = service.logMonthStart(movement.day)
-                    let routed = targetMonth == loaded.monthStart ? loaded : try service.loadLog(month: targetMonth)
-                    month = targetMonth
-                    selected = movement.day
-                    filter = "all"
-                    query = ""
-                    searching = false
-                    reading = routed
-                    source = movement.detail
-                    initialRouteApplied = true
+    private func load() {
+        readingLoadTask?.cancel()
+        let loadID = UUID()
+        activeReadingLoadID = loadID
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { isRefreshing = true }
+        routeRequestTracker.stage(initialRouteRequestID)
+        let requestID = routeRequestTracker.pendingRequestID
+        let appliesNewRoute = routeRequestTracker.hasPendingRequest
+        if appliesNewRoute {
+            source = nil
+            initialRouteMissing = false
+            filter = "all"
+            query = ""
+            searching = false
+            month = nil
+            selected = nil
+        }
+        let requestedMonth = appliesNewRoute ? nil : month
+        let service = self.service
+        readingLoadTask = Task { @MainActor in
+            do {
+                let loaded = try await service.loadLogOffMain(month: requestedMonth)
+                try Task.checkCancellation()
+                guard activeReadingLoadID == loadID else { return }
+                if appliesNewRoute {
+                    month = loaded.monthStart
+                    selected = loaded.days.last { $0.day <= loaded.today }?.day ?? loaded.days.first?.day
+                }
+                let firstTransactionRoute = !initialRouteApplied && initialTransactionID != nil
+                if (appliesNewRoute || firstTransactionRoute), let initialTransactionID {
+                    if let movement = loaded.movements.first(where: { $0.id == initialTransactionID }) {
+                        let targetMonth = service.logMonthStart(movement.day)
+                        let routed = targetMonth == loaded.monthStart ? loaded : try await service.loadLogOffMain(month: targetMonth)
+                        try Task.checkCancellation()
+                        guard activeReadingLoadID == loadID else { return }
+                        month = targetMonth
+                        selected = movement.day
+                        filter = "all"
+                        query = ""
+                        searching = false
+                        reading = routed
+                        source = movement.detail
+                        initialRouteApplied = true
+                    } else {
+                        reading = loaded
+                        initialRouteMissing = true
+                        initialRouteApplied = true
+                    }
                 } else {
                     reading = loaded
-                    initialRouteMissing = true
-                    initialRouteApplied = true
-                }
-                if appliesNewRoute { appliedRouteRequestID = requestID }
-            } else {
-                reading = loaded
-                if appliesNewRoute {
-                    query = initialQuery ?? ""
-                    searching = initialQuery != nil
-                    initialRouteMissing = false
-                    initialRouteApplied = true
-                    appliedRouteRequestID = requestID
-                } else if !initialRouteApplied {
-                    if let initialQuery {
-                        query = initialQuery
-                        searching = true
+                    if appliesNewRoute {
+                        query = initialQuery ?? ""
+                        searching = initialQuery != nil
+                        initialRouteMissing = false
+                        initialRouteApplied = true
+                    } else if !initialRouteApplied {
+                        if let initialQuery { query = initialQuery; searching = true }
+                        initialRouteApplied = true
                     }
-                    initialRouteApplied = true
+                    if selected == nil { selected = loaded.days.last { $0.day <= loaded.today }?.day ?? loaded.days.first?.day }
                 }
-                if selected == nil { selected = loaded.days.last { $0.day <= loaded.today }?.day ?? loaded.days.first?.day }
+                if appliesNewRoute { routeRequestTracker.markApplied(requestID) }
+                failure = nil
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { isRefreshing = false }
+            } catch {
+                guard !Task.isCancelled, activeReadingLoadID == loadID else { return }
+                reading = nil
+                failure = "لم تكتمل قراءة السجل. حاول مرة أخرى."
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { isRefreshing = false }
             }
-            failure = nil
         }
-        catch { reading = nil; failure = "لم تكتمل قراءة السجل. حاول مرة أخرى." }
     }
 }

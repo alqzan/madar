@@ -5,7 +5,7 @@ import MadarData
 import MadarMoney
 import MadarCommands
 
-struct MoneyHomeEnvelope: Identifiable {
+struct MoneyHomeEnvelope: Identifiable, Sendable {
     var id: UUID
     var name: String
     var balanceMinor: Int
@@ -15,24 +15,26 @@ struct MoneyHomeEnvelope: Identifiable {
     var dailyFundingMinor: Int
     var fundingProjection: MoneyGoalFundingProjection? = nil
 }
-struct MoneyHomeLimit: Identifiable {
+struct MoneyHomeLimit: Identifiable, Sendable {
     var id: UUID
     var title: String
     var spentMinor: Int
     var limitMinor: Int
 }
-struct MoneyHomeObligation: Identifiable, Equatable {
+struct MoneyHomeObligation: Identifiable, Equatable, Sendable {
     var id: UUID
     var name: String
     var amountMinor: Int
     var due: GregorianDay
 }
-struct MoneyHomeReading {
+struct MoneyHomeReading: Sendable {
     var salaryDates: [GregorianDay] = []
     var cycle: MoneyCycleReading?
     var basis: Basis
     var currency: String
     var hasAccounts: Bool
+    var cardCount: Int
+    var hawlKey: String?
     var unknownBalanceCount: Int
     var knownBalanceCount: Int
     /// Empty cash is zero; accounts without any bank checkpoint are unknown.
@@ -96,9 +98,58 @@ struct MoneyHomeReading {
     }
     func load(at instant: Date? = nil) throws -> MoneyHomeReading {
         try requireReadableStore()
-        let context = ModelContext(app.container), repo = MoneyRepository(context: context), now = instant ?? app.prayerNow()
-        let currency = app.string("core.currency"), cycle = try repo.cycle(at: now), basis = try repo.basis(at: now)
+        let now = instant ?? app.prayerNow()
+        return try MoneyHomeReadingBuilder.load(context: ModelContext(app.container), now: now,
+            currency: app.string("core.currency"), zone: app.activePlace.timeZone)
+    }
+
+    func loadOffMain(at instant: Date? = nil) async throws -> MoneyHomeReading {
+        let session = app
+        try requireReadableStore()
+        guard !session.settingsWriteInProgress else { throw BackupOperationError.busy }
+        let revision = session.prayerRevision, generation = session.storeGeneration, container = session.container
+        let request = MoneyHomeReadRequest(now: instant ?? session.prayerNow(), currency: session.string("core.currency"),
+            timeZoneIdentifier: session.activePlace.timeZone.identifier)
+        let readTask = Task.detached(priority: .userInitiated) {
+            let worker = MoneyHomeReadActor(modelContainer: container)
+            return try await worker.read(request)
+        }
+        let reading = try await withTaskCancellationHandler { try await readTask.value } onCancel: { readTask.cancel() }
+        try Task.checkCancellation()
+        try requireReadableStore()
+        guard !session.settingsWriteInProgress, session.prayerRevision == revision,
+              session.storeGeneration == generation, session.container === container else { throw CancellationError() }
+        return reading
+    }
+
+}
+
+
+struct MoneyHomeReadRequest: Sendable {
+    let now: Date
+    let currency: String
+    let timeZoneIdentifier: String
+}
+
+@ModelActor private actor MoneyHomeReadActor {
+    func read(_ request: MoneyHomeReadRequest) throws -> MoneyHomeReading {
+        try Task.checkCancellation()
+        let zone = TimeZone(identifier: request.timeZoneIdentifier) ?? .current
+        let reading = try MoneyHomeReadingBuilder.load(context: modelContext, now: request.now, currency: request.currency, zone: zone)
+        try Task.checkCancellation()
+        return reading
+    }
+
+}
+
+enum MoneyHomeReadingBuilder {
+    static func load(context: ModelContext, now: Date, currency: String, zone: TimeZone) throws -> MoneyHomeReading {
+        let repo = MoneyRepository(context: context)
+        let cycle = try repo.cycle(at: now), basis = try repo.basis(at: now)
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let cardCount = try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.count
+        let hawlKey = try context.fetch(FetchDescriptor<ZakatProfile>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            .sorted { $0.id.uuidString < $1.id.uuidString }.first?.hawlStartHijri
         let allocations = try context.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let envelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let plans = try context.fetch(FetchDescriptor<EnvelopePlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
@@ -106,52 +157,83 @@ struct MoneyHomeReading {
         var balanceByTarget: [UUID: Int] = [:]
         for allocation in allocations { if let id = allocation.targetID { balanceByTarget[id, default: 0] += allocation.amountMinor } }
         func envelopeBalance(_ id: UUID) -> Int { balanceByTarget[id] ?? 0 }
-        func roleBalance(_ role: String) -> Int {
-            let ids = Set(envelopes.filter { $0.role == role }.map(\.id))
-            return allocations.filter { ($0.target == role && $0.targetID == nil) || $0.targetID.map(ids.contains) == true }.reduce(0) { $0 + $1.amountMinor }
+        var rolesByEnvelopeID: [UUID: Set<String>] = [:]
+        for envelope in envelopes where ["reserve", "surplus"].contains(envelope.role) {
+            rolesByEnvelopeID[envelope.id, default: []].insert(envelope.role)
         }
-        let reserve = roleBalance("reserve"), surplus = roleBalance("surplus")
-        let zone = app.activePlace.timeZone, today = try DiaryLineRenderer.today(context: context, now: now)
+        var reserve = 0, surplus = 0
+        for allocation in allocations {
+            if let id = allocation.targetID {
+                let roles = rolesByEnvelopeID[id, default: []]
+                if roles.contains("reserve") { reserve += allocation.amountMinor }
+                if roles.contains("surplus") { surplus += allocation.amountMinor }
+            } else if allocation.target == "reserve" {
+                reserve += allocation.amountMinor
+            } else if allocation.target == "surplus" {
+                surplus += allocation.amountMinor
+            }
+        }
+        let activePlansByEnvelope = Dictionary(grouping: plans.filter {
+            $0.source != "daily" && ($0.untilDate == nil || $0.untilDate! >= now)
+        }, by: \.envelopeID)
+        let today = try DiaryLineRenderer.today(context: context, now: now)
         let balances = Dictionary(uniqueKeysWithValues: envelopes.map { ($0.id, envelopeBalance($0.id)) })
-        let projections = try fundingProjections(cycle: cycle, today: today, now: now, zone: zone, envelopes: envelopes,
+        let projections = try MoneyHomeProjectionBuilder.fundingProjections(context: context, cycle: cycle, today: today, now: now, zone: zone, envelopes: envelopes,
                                                 plans: plans, allocations: allocations, balances: balances, surplus: surplus, reserve: reserve)
         let goals = envelopes.filter { !["reserve", "surplus"].contains($0.role) }.sorted { $0.createdAt == $1.createdAt ? $0.id.uuidString < $1.id.uuidString : $0.createdAt < $1.createdAt }.map { envelope in
             MoneyHomeEnvelope(id: envelope.id, name: envelope.name, balanceMinor: envelopeBalance(envelope.id), targetMinor: envelope.targetMinor,
                 due: envelope.due.map { GregorianDay.containing($0, in: zone) },
-                perSalaryMinor: plans.filter { $0.envelopeID == envelope.id && $0.source != "daily" && ($0.untilDate == nil || $0.untilDate! >= now) }.reduce(0) { $0 + $1.perPaycheckMinor },
+                perSalaryMinor: (activePlansByEnvelope[envelope.id] ?? []).reduce(0) { $0 + $1.perPaycheckMinor },
                 dailyFundingMinor: cycle.map { reading in
                     CycleEngine.day(reading.elapsedDays, reading.input).dripsMinor.filter { reading.planEnvelopes[$0.key] == envelope.id }.values.reduce(0, +)
                 } ?? 0, fundingProjection: projections[envelope.id])
         }
         var limits: [MoneyHomeLimit] = []
         let categories = try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let categoriesByID = Dictionary(categories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let confirmed = try repo.confirmedTransactions()
         let movements = confirmed.filter { $0.cycleID == cycle?.id }
+        var categoryIDsByMovementID: [UUID: Set<UUID>] = [:]
+        for movement in movements {
+            if let categoryID = movement.categoryID { categoryIDsByMovementID[movement.id, default: []].insert(categoryID) }
+        }
+        var spentByCategory: [UUID: Int] = [:]
+        for allocation in allocations where ["spend", "refund"].contains(allocation.kind) {
+            guard let transactionID = allocation.transactionID,
+                  let categoryIDs = categoryIDsByMovementID[transactionID] else { continue }
+            for categoryID in categoryIDs { spentByCategory[categoryID, default: 0] -= allocation.amountMinor }
+        }
         let cycleRow = try context.fetch(FetchDescriptor<Cycle>()).first { $0.id == cycle?.id }
         for limit in try context.fetch(FetchDescriptor<CategoryLimit>()) where limit.deletedAt == nil && limit.mergedInto == nil {
-            guard let category = categories.first(where: { $0.id == limit.categoryID }), limit.mode != "none" else { continue }
+            guard let categoryID = limit.categoryID,
+                  let category = categoriesByID[categoryID], limit.mode != "none" else { continue }
             let mode: CategoryLimitMode = limit.mode == "percent" ? .percent(basisPoints: limit.percentBp ?? 0, base: limit.base == "allowance" ? .allowance : .income) : .fixed(limitMinor: limit.limitMinor)
             guard let actual = LimitEngine.effectiveLimit(mode, cycleIncomeMinor: cycleRow?.incomeMinor ?? 0,
                 cycleAllowanceMinor: cycle.map { CycleEngine.accruedDaily(through: $0.input.expectedLengthDays, $0.input) } ?? 0) else { continue }
-            let ids = Set(movements.filter { $0.categoryID == category.id }.map(\.id))
-            let spent = -allocations.filter { $0.transactionID.map(ids.contains) == true && ["spend", "refund"].contains($0.kind) }.reduce(0) { $0 + $1.amountMinor }
+            let spent = spentByCategory[category.id] ?? 0
             limits.append(.init(id: category.id, title: category.name, spentMinor: spent, limitMinor: actual))
         }
         let obligations = try context.fetch(FetchDescriptor<Obligation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let obligationsByID = Dictionary(obligations.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let items = try context.fetch(FetchDescriptor<InstallmentItem>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.paidMinor < $0.amountMinor }
         var due: [MoneyHomeObligation] = []
         for item in items {
-            guard let obligation = obligations.first(where: { $0.id == item.obligationID }), obligation.currency == currency else { continue }
+            guard let obligationID = item.obligationID,
+                  let obligation = obligationsByID[obligationID], obligation.currency == currency else { continue }
             due.append(.init(id: item.id, name: obligation.name, amountMinor: item.amountMinor - item.paidMinor, due: .containing(item.dueDate, in: zone)))
         }
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
-        let linked = confirmed.filter { $0.obligationID != nil }
+        var paymentDatesByObligation: [UUID: [Date]] = [:]
+        for transaction in confirmed {
+            guard let obligationID = transaction.obligationID else { continue }
+            paymentDatesByObligation[obligationID, default: []].append(transaction.eventAt)
+        }
         var flexibleExtraMinor = 0
         for bill in obligations where bill.isRecurring && bill.currency == currency {
+            let payments = paymentDatesByObligation[bill.id] ?? []
             // M5-X00: a free schedule shows its next unpaid due day (from this cycle's start), the same rule as the obligations room.
             // The list shows the next one; a schedule due several times this cycle (weekly) adds the others to the cycle total.
             if let schedule = bill.recurrence {
-                let payments = linked.filter { $0.obligationID == bill.id }.map(\.eventAt)
                 let from = cycle?.startDay ?? today, cycleEnd = max(cycle?.expectedEndDay ?? today.adding(days: cycle?.input.expectedLengthDays ?? 30), today.adding(days: 1))
                 let unpaid = try repo.unpaidRecurring(schedule, from: from, before: max(today, from).adding(days: 400), payments: payments, zone: zone)
                 if let next = unpaid.first {
@@ -167,16 +249,20 @@ struct MoneyHomeReading {
             guard let date = calendar.date(from: parts) else { continue }
             // A bill paid early (rent due the 1st, paid the 30th, maybe in the last cycle) counts for that due date.
             let earliest = calendar.date(byAdding: .day, value: -15, to: date) ?? date
-            let paid = linked.contains { $0.obligationID == bill.id && (calendar.isDate($0.eventAt, equalTo: date, toGranularity: .month) || ($0.eventAt >= earliest && $0.eventAt < date)) }
+            let paid = payments.contains { calendar.isDate($0, equalTo: date, toGranularity: .month) || ($0 >= earliest && $0 < date) }
             if !paid { due.append(.init(id: bill.id, name: bill.name, amountMinor: bill.amountMinor, due: .containing(date, in: zone))) }
         }
         due.sort { $0.due == $1.due ? $0.id.uuidString < $1.id.uuidString : $0.due < $1.due }
         let length = cycle?.input.expectedLengthDays ?? 30
         let cycleObligations = due.filter { $0.due < max(cycle?.expectedEndDay ?? today.adding(days: length), today.adding(days: 1)) }.reduce(0) { $0 + $1.amountMinor } + flexibleExtraMinor
-        let history = Dictionary(grouping: allocations.filter { !$0.idempotencyKey.hasPrefix("move:") }.filter { $0.target == "surplus" || $0.targetID.map { id in envelopes.contains { $0.id == id && $0.role == "surplus" } } == true }, by: { $0.cycleID })
+        let surplusEnvelopeIDs = Set(envelopes.filter { $0.role == "surplus" }.map(\.id))
+        let history = Dictionary(grouping: allocations.filter {
+            !$0.idempotencyKey.hasPrefix("move:") && ($0.target == "surplus" || $0.targetID.map(surplusEnvelopeIDs.contains) == true)
+        }, by: { $0.cycleID })
             .sorted { ($0.value.map(\.createdAt).min() ?? .distantPast) < ($1.value.map(\.createdAt).min() ?? .distantPast) }.suffix(6).map { $0.value.reduce(0) { $0 + $1.amountMinor } }
         let reserveReading = ReserveEngine.read(balanceMinor: reserve, dailyMinor: cycle?.headline.todayAllowanceMinor, cycleLengthDays: length, obligationsPerCycleMinor: cycleObligations)
-        return .init(salaryDates: try salaryForecastDays(cycle: cycle, today: today, zone: zone), cycle: cycle, basis: basis, currency: currency, hasAccounts: !accounts.isEmpty,
+        return .init(salaryDates: try MoneyHomeProjectionBuilder.salaryForecastDays(context: context, cycle: cycle, today: today, zone: zone), cycle: cycle, basis: basis, currency: currency, hasAccounts: !accounts.isEmpty,
+            cardCount: cardCount, hawlKey: hawlKey,
             unknownBalanceCount: accounts.filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt == nil }.count,
             knownBalanceCount: accounts.filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt != nil }.count,
             pendingCount: try repo.pendingDecisionCount(), reserveMinor: reserve, surplusMinor: surplus, reserveRunway: reserveReading.runway, reserveDailies: reserveReading.wholeDailies, obligationsPerCycleMinor: cycleObligations,

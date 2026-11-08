@@ -407,64 +407,6 @@
         }
       }
     },
-    "prayer.owed": {
-      "comment": "Prayer home: argument 1 chooses the Arabic plural. Shown beside the large owed count, so it carries no digits.",
-      "extractionState": "manual",
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%#@count@"
-          },
-          "substitutions": {
-            "count": {
-              "argNum": 1,
-              "formatSpecifier": "lld",
-              "variations": {
-                "plural": {
-                  "zero": {
-                    "stringUnit": {
-                      "state": "translated",
-                      "value": "لا فوائت عليك"
-                    }
-                  },
-                  "one": {
-                    "stringUnit": {
-                      "state": "translated",
-                      "value": "فائتة عليك، لم تُقضَ بعد"
-                    }
-                  },
-                  "two": {
-                    "stringUnit": {
-                      "state": "translated",
-                      "value": "فائتتان عليك، لم تُقضيا بعد"
-                    }
-                  },
-                  "few": {
-                    "stringUnit": {
-                      "state": "translated",
-                      "value": "فوائت عليك، لم تُقضَ بعد"
-                    }
-                  },
-                  "many": {
-                    "stringUnit": {
-                      "state": "translated",
-                      "value": "فائتةً عليك، لم تُقضَ بعد"
-                    }
-                  },
-                  "other": {
-                    "stringUnit": {
-                      "state": "translated",
-                      "value": "فائتة عليك، لم تُقضَ بعد"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "notif.reminders": {
       "comment": "Digest count. Argument 1 selects the Arabic plural; argument 2 follows core.numerals.",
       "extractionState": "manual",

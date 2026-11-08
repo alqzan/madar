@@ -67,6 +67,7 @@ struct DiaryHomeView: View {
     @State private var routedSearchRequestID: UUID?
     @State private var readerEntryRouteID: UUID?
     @State private var failure: String?
+    @State private var defaultMemoryDay: GregorianDay?
 #if DEBUG
     @State private var injectedReadFailure = false
 #endif
@@ -74,13 +75,14 @@ struct DiaryHomeView: View {
     private var service: AppDiaryService { AppDiaryService(app: app) }
     private var memory: DiaryDisplayDay? {
         guard let snapshot else { return nil }
-        return snapshot.days.first { $0.day == (selected ?? opening(snapshot)) }
+        guard let day = selected ?? defaultMemoryDay ?? snapshot.selection.days.first else { return nil }
+        return snapshot.days.first { $0.day == day }
     }
     /// Tour 25 Oct on the owner's data: the nearest year was a page with neither words nor a moved photo, so the
     /// memory opened on «صورة هذا اليوم لم تُنقل». It now opens on the nearest year that has something to show.
-    private func opening(_ snapshot: DiaryHomeSnapshot) -> GregorianDay? {
+    private func preferredOpeningDay(in snapshot: DiaryHomeSnapshot, pages: [String: DiaryDisplayDay]) -> GregorianDay? {
         snapshot.selection.days.first { day in
-            snapshot.days.first { $0.day == day }.map { page in page.photo != nil || page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } } ?? false
+            pages[day.description].map { page in page.photo != nil || page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } } ?? false
         } ?? snapshot.selection.days.first
     }
     var body: some View {
@@ -148,10 +150,12 @@ struct DiaryHomeView: View {
             }
             #endif
         }
-        .task {
+        .task(id: isFrontRoom) {
+            guard isFrontRoom else { return }
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(30)) } catch { break }
-                if let previous = snapshot?.today, let current = try? service.currentDay(), current != previous {
+                guard isFrontRoom, !Task.isCancelled else { break }
+                if let previous = snapshot?.today, let current = try? await service.currentDayOffMain(), current != previous {
                     try? await service.prepareClosedDay(previous)
                     await refresh()
                 }
@@ -349,7 +353,7 @@ struct DiaryHomeView: View {
     private func years(_ snapshot: DiaryHomeSnapshot) -> some View {
         let pages = snapshot.selection.days.compactMap { day in snapshot.days.first { $0.day == day } }
             .filter { page in page.photo != nil || page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
-        return VStack(alignment: .leading, spacing: 0) {
+        return LazyVStack(alignment: .leading, spacing: 0) {
             if pages.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("صفحتك الأولى").font(DiaryType.heading)
@@ -369,7 +373,6 @@ struct DiaryHomeView: View {
         }
     }
     private func yearCard(_ page: DiaryDisplayDay, snapshot: DiaryHomeSnapshot) -> some View {
-        let image = page.photo.flatMap(UIImage.init(data:))
         return Button { reader = page.day } label: {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 7) {
@@ -381,9 +384,13 @@ struct DiaryHomeView: View {
                     Text(page.excerpt).font(.custom("thmanyahseriftext-Regular", size: 18, relativeTo: .body)).lineSpacing(6).lineLimit(3).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                     if let place = page.place { Label(place, systemImage: "mappin").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                     // Owner trial, 22 Oct: a photo the import did not carry is named, never invented.
-                    if image == nil, page.missingPhotos > 0 { Label(page.missingPhotos == 1 ? "صورة هذا اليوم لم تُنقل" : page.missingPhotos == 2 ? "صورتا هذا اليوم لم تُنقلا" : "صور هذا اليوم لم تُنقل", systemImage: "photo.on.rectangle.angled").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
+                    if page.photo == nil, page.missingPhotos > 0 { Label(page.missingPhotos == 1 ? "صورة هذا اليوم لم تُنقل" : page.missingPhotos == 2 ? "صورتا هذا اليوم لم تُنقلا" : "صور هذا اليوم لم تُنقل", systemImage: "photo.on.rectangle.angled").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-                if let image, !typeSize.isAccessibilitySize { Image(uiImage: image).resizable().scaledToFill().frame(width: 76, height: 96).clipShape(.rect(cornerRadius: 14)).accessibilityHidden(true) }
+                if let data = page.photo, !typeSize.isAccessibilitySize {
+                    DiaryDataThumbnail(data: data, maxPixel: 192) { image in
+                        image.resizable().scaledToFill().frame(width: 76, height: 96).clipShape(.rect(cornerRadius: 14)).accessibilityHidden(true)
+                    }.id(page.photoID?.uuidString ?? page.id).frame(width: 76, height: 96)
+                }
             }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 .background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line) }
                 .contentShape(.rect(cornerRadius: 22))
@@ -453,7 +460,7 @@ struct DiaryHomeView: View {
                                 Text(service.weekday(day.day)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text"))
                             }.frame(minWidth: 35)
                             Text(day.excerpt).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).frame(maxWidth: .infinity, alignment: .leading).multilineTextAlignment(.leading)
-                            if let data = day.photo { DiaryDataThumbnail(data: data, maxPixel: 120) { $0.resizable().scaledToFill().frame(width: 38, height: 38).clipShape(.rect(cornerRadius: 8)) }.frame(width: 38, height: 38) }
+                            if let data = day.photo { DiaryDataThumbnail(data: data, maxPixel: 120) { $0.resizable().scaledToFill().frame(width: 38, height: 38).clipShape(.rect(cornerRadius: 8)) }.id(day.photoID?.uuidString ?? day.id).frame(width: 38, height: 38) }
                         }.padding(16)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-recent-" + day.day.description)
                     if day.id != days.last?.id { Divider().overlay(theme.line) }
@@ -536,18 +543,20 @@ struct DiaryHomeView: View {
 #endif
             var value = try await service.homeOffMain()
             let shape = app.string("notes.homeShape")
-            let displayed = shape == "echoes" ? value.echoes.compactMap(\.day) : shape == "margin" ? [selected ?? opening(value)].compactMap { $0 } : value.selection.days
-            for day in Set(displayed) {
+            let initialPages = Dictionary(value.days.map { ($0.day.description, $0) }, uniquingKeysWith: { first, _ in first })
+            let displayed = shape == "echoes" ? value.echoes.compactMap(\.day) : shape == "margin" ? [selected ?? preferredOpeningDay(in: value, pages: initialPages)].compactMap { $0 } : value.selection.days
+            let changed = try await service.prepareClosedDays(Set(displayed))
+            guard generation == refreshGeneration, !Task.isCancelled else { return }
+            if changed {
+                value = try await service.homeOffMain()
                 guard generation == refreshGeneration, !Task.isCancelled else { return }
-                try await service.prepareClosedDay(day)
             }
-            guard generation == refreshGeneration, !Task.isCancelled else { return }
-            value = try await service.homeOffMain()
-            guard generation == refreshGeneration, !Task.isCancelled else { return }
-            snapshot = value; failure = nil
+            let pages = Dictionary(value.days.map { ($0.day.description, $0) }, uniquingKeysWith: { first, _ in first })
+            snapshot = value; defaultMemoryDay = preferredOpeningDay(in: value, pages: pages); failure = nil
         } catch {
             guard generation == refreshGeneration, !Task.isCancelled else { return }
             snapshot = nil
+            defaultMemoryDay = nil
             failure = madarUserMessage(error)
         }
     }

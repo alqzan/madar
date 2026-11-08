@@ -59,7 +59,7 @@ public struct SalaryCloseReport: Codable, Equatable, Sendable {
 extension MoneyRepository {
     /// Throws `missingRow` when the movement is not an unconfirmed salary, `salaryNeedsCycleConfirmation` when it falls on
     /// the open cycle's first day (the salary-or-extra-income question), `invalidAmount` while «يومك» was never set.
-    public func salaryOpening(salaryID: UUID, newCycleID: UUID, remainderOverride: SalaryRemainder? = nil) throws -> SalaryOpeningReading {
+    @MainActor public func salaryOpening(salaryID: UUID, newCycleID: UUID, remainderOverride: SalaryRemainder? = nil) throws -> SalaryOpeningReading {
         func live<T: MadarRecordModel>(_ row: T) -> Bool { (try? row.record().isLive) == true }
         func whole(_ value: Double?) -> Int? { value.flatMap { $0.isFinite && abs($0) <= 9_007_199_254_740_991 ? Int($0) : nil } }
         let transactions = try context.fetch(FetchDescriptor<MoneyTransaction>())

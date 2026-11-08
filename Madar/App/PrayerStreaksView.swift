@@ -15,16 +15,16 @@ extension PrayerStreakLevel {
     var meaning: String {
         switch self {
         case .congregation: "الخمس كلها في جماعة"
-        case .onTime: "الخمس في وقتها، بلا قضاء"
-        case .completion: "صليتَ الخمس، ولو قضيتَ منها"
+        case .onTime: "الخمس كلها في أوقاتها"
+        case .completion: "أدّيتَ الفروض الخمسة"
         }
     }
     /// The legend line under the name on the home card.
     var short: String {
         switch self {
         case .congregation: "الخمس في جماعة"
-        case .onTime: "بلا قضاء"
-        case .completion: "ولو بقضاء"
+        case .onTime: "كلها في وقتها"
+        case .completion: "الخمس مؤداة"
         }
     }
     func count(_ stats: PrayerStatistics) -> Int {
@@ -292,7 +292,7 @@ struct PrayerStreaksSheet: View {
         switch hit.mark {
         case .brokeAlone: return "انقطعت \(when): صليتَ فرضًا وحدك."
         case .brokeQada: return "انقطعت \(when): قضيتَ فرضًا."
-        default: return "انقطعت \(when): فاتك فرض لم يُقضَ بعد."
+        default: return "انقطعت \(when): صلّيتَ فرضًا بعد وقته."
         }
     }
 }

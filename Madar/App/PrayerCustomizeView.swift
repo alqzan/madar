@@ -10,7 +10,7 @@ struct PrayerHomeLayout: Equatable {
     static let pinned = ["next", "riwaq"]
     /// Owner, 5 Nov 2026: «احذف حق القيام». The night-prayer card left the home and the editor, but its key stays in the stored
     /// layout (the schema lists it) and is always hidden, so a reorder still saves a valid layout.
-    static let movable = ["pending", "hali", "qada", "qiyam"]
+    static let movable = ["pending", "hali", "qiyam"]
     var order: [String]
     var hidden: Set<String>
 
@@ -45,14 +45,14 @@ struct PrayerHomeLayout: Equatable {
     static func title(_ key: String) -> String {
         switch key {
         case "next": "الصلاة القادمة"; case "riwaq": "الرواق"; case "pending": "تنبيه غير المسجّلة"
-        case "hali": "حالي"; case "qada": "القضاء"; default: "قيام الليل"
+        case "hali": "حالي"; default: "قيام الليل"
         }
     }
     static func detail(_ key: String) -> String {
         switch key {
         case "next": "الاسم والوقت وكم بقي"; case "riwaq": "خمسة أقواس تمتلئ بحالها"
         case "pending": "يظهر حين تنتظر صلاة"; case "hali": "السبحة ونسبة الشهر والسلسلتان"
-        case "qada": "الفوائت والتذكير بالنص"; default: "الركعات والوتر وأثر ٣٠ ليلة"
+        default: "الركعات والوتر وأثر ٣٠ ليلة"
         }
     }
 }
@@ -83,7 +83,7 @@ struct PrayerCustomizeView: View {
         .init(id: "riwaq", title: "الرواق والميزان", symbol: "paintpalette", keys: ["salah.pool", "salah.fridayTallArch", "salah.showMosqueStreak"]),
         .init(id: "log", title: "التسجيل", symbol: "checkmark", keys: ["salah.askHeart", "salah.pendingDays"]),
         .init(id: "times", title: "المواقيت", symbol: "clock", keys: ["salah.method", "salah.tripMethod", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "salah.travelShortenCombine"]),
-        .init(id: "remind", title: "التذكير", symbol: "bell", keys: ["salah.beforeReminder", "salah.beforeAdhanMin", "salah.askReminder", "salah.askAfterAdhanMin", "salah.qadaReminder", "salah.liveActivity"]),
+        .init(id: "remind", title: "التذكير", symbol: "bell", keys: ["salah.beforeReminder", "salah.beforeAdhanMin", "salah.askReminder", "salah.askAfterAdhanMin", "salah.liveActivity"]),
     ]
     private func definitions(_ group: CustomizeGroup) -> [SettingDefinition] {
         group.keys.compactMap { key in AppSession.supportedKeys.contains(key) ? session.schema.settings.first { $0.key == key } : nil }
@@ -210,7 +210,7 @@ struct PrayerCustomizeView: View {
     private var searchField: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass").foregroundStyle(theme.secondaryInk)
-            TextField("ابحث: المواقيت، القلب، القضاء…", text: $query).font(PrayerHomeType.lead)
+            TextField("ابحث: المواقيت، القلب، التذكير…", text: $query).font(PrayerHomeType.lead)
                 .submitLabel(.search).accessibilityIdentifier("prayer-customize-search")
         }
         .padding(.horizontal, 18).frame(minHeight: 52)
@@ -298,7 +298,7 @@ struct PrayerCustomizeView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("بداية التتبّع").font(PrayerHomeType.strong)
                 MadarDateLabel(session.dateLabels(tracking.day), primaryFont: PrayerHomeType.body).accessibilityIdentifier("prayer-tracking-start")
-                Text("ما قبل هذا اليوم لا يُعدّ معلّقًا ولا فائتًا أبدًا. يمكنك تقديم البداية مرة واحدة، حتى ثلاثين يومًا قبل أول تشغيل.")
+                Text("يبدأ السجل من اليوم الذي تختاره؛ ما قبله لا يدخل في سجل الصلاة.")
                     .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
                 if tracking.edits == 0 {
                     if editingStart {

@@ -5,7 +5,7 @@ import MadarData
 import MadarMoney
 import MadarPrayer
 
-public struct MoneyCycleReading {
+public struct MoneyCycleReading: Sendable {
     public var id: UUID
     public var startDay: GregorianDay
     public var today: GregorianDay

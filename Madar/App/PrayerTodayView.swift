@@ -3,6 +3,24 @@ import MadarCore
 import MadarDesign
 import MadarPrayer
 
+private struct PrayerHomeSnapshotKey: Equatable {
+    let minute: Int
+    let revision: Int
+    let generation: Int
+    let visit: Int
+    let active: Bool
+}
+struct PrayerTodayMinuteTimelineSchedule: TimelineSchedule, Equatable, Sendable {
+    let isActive: Bool
+
+    func entries(from startDate: Date, mode: Mode) -> AnySequence<Date> {
+        guard isActive else { return AnySequence(EmptyCollection<Date>()) }
+        let minuteStart = Date(timeIntervalSince1970: floor(startDate.timeIntervalSince1970 / 60) * 60)
+        let schedule = PeriodicTimelineSchedule(from: minuteStart, by: 60)
+        return AnySequence(schedule.entries(from: startDate, mode: mode))
+    }
+}
+
 /// S1 · Prayer home («الرواق والبركة»), matched to `screens/salah/01-S1-Home.jpg` and `-s1`.
 /// Not copied from the canonical: the day/night button (prototype only), sample numbers,
 /// the heart label under the arches (RP6), and the «تُحسب فائتة» line (RP1).
@@ -10,15 +28,17 @@ struct PrayerTodayView: View {
     @Bindable var session: AppSession
     @Environment(\.roomTheme) private var inheritedTheme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedSheet: PrayerTodaySheet?
     @State private var prayerSheetIsVisible = false
     @State private var locator = TravelLocator()
     @State private var requestReadFailed = false
+    @State private var prayerRequestReadTask: Task<Void, Never>?
+    @State private var prayerRequestReadID = UUID()
     @State private var pendingPrayerRoute: Route?
     @State private var pendingPrayerRootRequestID: UUID?
     #if DEBUG
     @State private var injectedReadFailure = false
-    @State private var injectedRequest = false
     @State private var injectedRoute = false
     @State private var debugPrayerRouteOpenedAfterDismissal: Bool?
     #endif
@@ -26,25 +46,75 @@ struct PrayerTodayView: View {
     @Environment(\.roomVisit) private var roomVisit
     @Environment(\.isFrontRoom) private var isFrontRoom
 
+    @State private var homeSnapshot: PrayerSnapshot?
+    @State private var loadedHomeSnapshotKey: PrayerHomeSnapshotKey?
+    @State private var homeReadFailed = false
     @State private var onTrip = false
     /// On a trip the home takes the calm-paper palette (cooler sand, same gold ornaments) so travel looks different at a glance.
     private var theme: RoomTheme { RoomTheme(room: "salah", dark: inheritedTheme.dark, calmPaper: inheritedTheme.calmPaper || onTrip) }
-    private func refreshTrip() { onTrip = (try? session.prayerSnapshot(at: session.prayerNow()))?.activeTrip != nil }
+
+    private func snapshotKey(at instant: Date) -> PrayerHomeSnapshotKey {
+        PrayerHomeSnapshotKey(minute: Int(instant.timeIntervalSince1970 / 60), revision: session.prayerRevision,
+                              generation: session.storeGeneration, visit: roomVisit,
+                              active: isFrontRoom && scenePhase == .active)
+    }
+
+    private func loadHomeSnapshot(at instant: Date, key: PrayerHomeSnapshotKey) async {
+        guard key.active else { return }
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+               let milliseconds = environment["MADAR_UI_PRAYER_SNAPSHOT_HOLD_MS"].flatMap(Int.init),
+               (1...5_000).contains(milliseconds) {
+                try await Task.sleep(for: .milliseconds(milliseconds))
+            }
+            #endif
+            if homeSnapshot == nil { homeReadFailed = false }
+            let snapshot = try await session.prayerSnapshotOffMain(at: instant)
+            try Task.checkCancellation()
+            guard key == snapshotKey(at: session.prayerNow()), isFrontRoom, scenePhase == .active else { return }
+            homeSnapshot = snapshot
+            loadedHomeSnapshotKey = key
+            homeReadFailed = false
+            onTrip = snapshot.activeTrip != nil
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled, key == snapshotKey(at: session.prayerNow()), isFrontRoom else { return }
+            homeReadFailed = true
+        }
+    }
 
     var body: some View {
-        TimelineView(.everyMinute) { timeline in
+        TimelineView(PrayerTodayMinuteTimelineSchedule(isActive: isFrontRoom && scenePhase == .active)) { timeline in
             let instant = session.prayerNow(timeline.date)
+            let requestKey = snapshotKey(at: instant)
+            let homeSnapshotIsCurrent = loadedHomeSnapshotKey == requestKey
             ScrollView {
                 VStack(spacing: 0) {
-                    if let snapshot = try? session.prayerSnapshot(at: instant) {
+                    if let snapshot = homeSnapshot {
                         header(day: snapshot.today.day)
                             .padding(.top, 8)
+                        if homeReadFailed {
+                            Text("تعذّر التحديث؛ معروض آخر سجل محفوظ")
+                                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                .padding(.top, 8)
+                        } else if !homeSnapshotIsCurrent {
+                            Text("يُحدّث سجل الصلاة…")
+                                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                .padding(.top, 8)
+                                .accessibilityIdentifier("prayer-home-refreshing")
+                        }
                         let pills = travelPillText(snapshot) != nil || snapshot.today.cells.contains(where: { $0.isFriday })
                         VStack(spacing: 10) {
                             if let text = travelPillText(snapshot) {
                                 PrayerTravelPill(text: text) { openTravel(snapshot) }
+                                    .disabled(!homeSnapshotIsCurrent)
                             }
-                            if snapshot.today.cells.contains(where: { $0.isFriday }) { fridayPill }
+                            if snapshot.today.cells.contains(where: { $0.isFriday }) {
+                                fridayPill.disabled(!homeSnapshotIsCurrent)
+                            }
                         }
                         .padding(.top, pills ? 16 : 0)
                         nextPrayer(snapshot, now: instant)
@@ -53,6 +123,7 @@ struct PrayerTodayView: View {
                             .padding(.top, 18)
                         riwaq(snapshot, now: instant)
                             .padding(.top, 18)
+                            .disabled(!homeSnapshotIsCurrent)
                         if snapshot.hasTimes {
                             Text(todaySummary(snapshot, now: instant))
                                 .font(PrayerHomeType.body)
@@ -65,10 +136,9 @@ struct PrayerTodayView: View {
                             ForEach(PrayerHomeLayout(session.values["salah.layout"]).visible, id: \.self) { block in
                                 switch block {
                                 case "pending":
-                                    if let pending = notice(snapshot, now: instant) { pending }
-                                    heartNotice(snapshot)
-                                case "hali": haliCard(snapshot)
-                                case "qada": qadaCard(snapshot)
+                                    if let pending = notice(snapshot, now: instant) { pending.disabled(!homeSnapshotIsCurrent) }
+                                    heartNotice(snapshot).disabled(!homeSnapshotIsCurrent)
+                                case "hali": haliCard(snapshot).disabled(!homeSnapshotIsCurrent)
                                 default: EmptyView()
                                 }
                             }
@@ -77,10 +147,15 @@ struct PrayerTodayView: View {
                     } else {
                         header(day: nil)
                         PrayerPaperCard {
-                            Text("تعذّر حساب صلاة اليوم. راجع المدينة وطريقة الحساب في خصّص مدار.")
+                            Text(homeReadFailed
+                                 ? "تعذّر حساب صلاة اليوم. راجع المدينة وطريقة الحساب في خصّص مدار."
+                                 : "تُجهّز صلوات اليوم…")
                                 .font(MadarTypography.body())
+                                .accessibilityIdentifier(homeReadFailed ? "prayer-home-read-error" : "prayer-home-loading")
                         }
                         .padding(.top, 24)
+                        .transition(.opacity)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: homeSnapshot != nil || homeReadFailed)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -91,30 +166,29 @@ struct PrayerTodayView: View {
             .madarTopClipped()
             .background(theme.background)
             .foregroundStyle(theme.ink)
+            .task(id: requestKey) { await loadHomeSnapshot(at: instant, key: requestKey) }
         }
         .environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .onChange(of: roomVisit, initial: true) {
-            detectTravel(); refreshTrip()
+            detectTravel()
+            reconcilePrayerRequestRead()
             #if DEBUG
             let env = ProcessInfo.processInfo.environment
-            if !injectedRequest, env["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
-               let prayer = env["MADAR_UI_PRAYER_OPEN_REQUEST"].flatMap(Prayer.init(rawValue:)) {
-                injectedRequest = true
-                session.prayerLogRequest = prayer
-            }
             if !injectedRoute, env["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
                let raw = env["MADAR_UI_PRAYER_ROUTE"], let url = URL(string: raw) {
                 injectedRoute = true
                 session.open(url)
             }
+            reconcilePrayerRequestRead()
             #endif
         }
-        .onChange(of: selectedSheet == nil) { _, _ in refreshTrip() }
-        .onChange(of: session.prayerLogRequest, initial: true) { _, prayer in
+        .onChange(of: session.prayerLogRequest) { _, prayer in
             // «صليت المغرب» from Capture: the state was not said, so its log sheet asks instead of guessing.
-            guard let prayer else { return }
-            openPrayerRequest(prayer)
+            prayerRequestReadTask?.cancel()
+            prayerRequestReadTask = nil
+            if prayer == nil { requestReadFailed = false }
+            reconcilePrayerRequestRead()
         }
         .onChange(of: session.prayerRoute, initial: true) { _, route in
             guard let route else { return }
@@ -142,7 +216,16 @@ struct PrayerTodayView: View {
             }
             Button("إلغاء", role: .cancel) { session.prayerLogRequest = nil; pendingPrayerRoute = nil }
         } message: { Text("تعذّرت قراءة بيانات الصلاة. يمكنك المحاولة مرة أخرى.") }
-        .onChange(of: scenePhase) { _, phase in if phase == .active, isFrontRoom { detectTravel() } }
+        .onChange(of: isFrontRoom, initial: true) { _, _ in reconcilePrayerRequestRead() }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            if phase == .active, isFrontRoom { detectTravel() }
+            reconcilePrayerRequestRead()
+        }
+        .onAppear { reconcilePrayerRequestRead() }
+        .onDisappear {
+            prayerRequestReadTask?.cancel()
+            prayerRequestReadTask = nil
+        }
         .sheet(item: $selectedSheet, onDismiss: {
             prayerSheetIsVisible = false
             dispatchPendingPrayerRoute()
@@ -158,62 +241,45 @@ struct PrayerTodayView: View {
                 PrayerTripSheet(session: session, trip: trip, fix: locator.fix, thresholdKm: travelThresholdKm, finished: { selectedSheet = nil })
             case .pair(let day, let pair, let cell, let timeZone):
                 PrayerTravelPairSheet(session: session, day: day, pair: pair, alone: { selectedSheet = .log(cell, timeZone) }, finished: { selectedSheet = nil }, rootDraftChanged: reportRootDraft)
-            case .oldMissed:
-                PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
-                    PrayerOldMissedSheet(session: session, trackingStart: snapshot.tracking.day, finished: { selectedSheet = nil }, rootDraftChanged: reportRootDraft)
-                }
             case .qiyam:
-                PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
+                PrayerSnapshotSheet(revision: session.prayerRevision, isActive: isFrontRoom && scenePhase == .active,
+                                    load: { try await sheetSnapshotOffMain() }, close: { selectedSheet = nil }) { snapshot in
                     PrayerNightLoggingSheet(session: session, snapshot: snapshot, finished: { selectedSheet = nil })
                 }
             case .qiyamNight(let night):
-                PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
+                PrayerSnapshotSheet(revision: session.prayerRevision, isActive: isFrontRoom && scenePhase == .active,
+                                    load: { try await sheetSnapshotOffMain() }, close: { selectedSheet = nil }) { snapshot in
                     PrayerNightLoggingSheet(session: session, snapshot: snapshot, initialNight: night, finished: { selectedSheet = nil })
                 }
             case .heart(let cell):
                 PrayerHeartAnswerSheet(session: session, cell: cell, finished: { selectedSheet = nil }, rootDraftChanged: reportRootDraft)
             case .streaks:
-                PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
+                PrayerSnapshotSheet(revision: session.prayerRevision, isActive: isFrontRoom && scenePhase == .active,
+                                    load: { try await sheetSnapshotOffMain() }, close: { selectedSheet = nil }) { snapshot in
                     PrayerStreaksSheet(snapshot: snapshot, levels: PrayerStreakLevel.shown(congregation: session.bool("salah.showMosqueStreak")),
                                        digits: digits, timeZone: session.activePlace.timeZone, openHali: { selectedSheet = .statistics })
                 }
             case .statistics:
                 NavigationStack {
-                    PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
-                        PrayerStatisticsView(session: session, snapshot: snapshot) { choose($0) }
+                    PrayerSnapshotSheet(revision: session.prayerRevision, isActive: isFrontRoom && scenePhase == .active,
+                                        load: { try await sheetSnapshotOffMain() }, close: { selectedSheet = nil }) { snapshot in
+                    PrayerStatisticsView(session: session, snapshot: snapshot) { choose($0, snapshot: snapshot) }
                     }
                 }
             case .day(let day):
                 NavigationStack {
-                    PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
-                        PrayerStatisticsView(session: session, snapshot: snapshot, initialDay: day) { choose($0) }
+                    PrayerSnapshotSheet(revision: session.prayerRevision, isActive: isFrontRoom && scenePhase == .active,
+                                        load: { try await sheetSnapshotOffMain() }, close: { selectedSheet = nil }) { snapshot in
+                    PrayerStatisticsView(session: session, snapshot: snapshot, initialDay: day) { choose($0, snapshot: snapshot) }
                     }
                 }
-            case .qadaList:
-                PrayerQadaListSheet(session: session, dateLabel: qadaDate, loadSnapshot: sheetSnapshot,
-                    rootDraftChanged: reportRootDraft,
-                    makeUp: { item in
-                        let continuationBlocker = UUID()
-                        reportRootDraft(continuationBlocker, true)
-                        selectedSheet = .makeUp(item, isFridayNoon: item.isFriday,
-                            dateLabel: qadaDate(item.reference.day), rootBlockerID: continuationBlocker)
-                    },
-                    addOld: { selectedSheet = .oldMissed })
             case .log(let cell, let timeZone):
                 PrayerTodayLogSheet(cell: cell,
                     clock: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: timeZone) } ?? "",
                     askHeart: session.bool("salah.askHeart"), isSaving: session.prayerWriteInProgress,
                     prefillStatus: nil, prefillHeart: nil,
-                    save: { status, fridayKind, makeUpNow, done in
-                        if status == .qada {
-                            session.makeUpPrayer(cell.reference, fridayKind: fridayKind, completion: done)
-                        } else if status == .missed && makeUpNow {
-                            session.recordPrayer(cell.reference, status: .missed, fridayKind: fridayKind) { succeeded in
-                                if succeeded { session.makeUpPrayer(cell.reference, fridayKind: fridayKind, completion: done) } else { done(false) }
-                            }
-                        } else {
-                            session.recordPrayer(cell.reference, status: status, fridayKind: fridayKind, completion: done)
-                        }
+                    save: { status, fridayKind, _, done in
+                        session.recordPrayer(cell.reference, status: status, fridayKind: fridayKind, completion: done)
                     },
                     answerHeart: { heart, done in session.answerPrayerHeart(cell.reference, heart: heart, completion: done) },
                     rootDraftChanged: reportRootDraft)
@@ -222,29 +288,11 @@ struct PrayerTodayView: View {
                     clock: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: timeZone) } ?? "",
                     askHeart: session.bool("salah.askHeart"), isSaving: session.prayerWriteInProgress,
                     prefillStatus: status, prefillHeart: heart,
-                    save: { status, fridayKind, makeUpNow, done in
-                        if status == .qada {
-                            session.makeUpPrayer(cell.reference, fridayKind: fridayKind, completion: done)
-                        } else if status == .missed && makeUpNow {
-                            session.recordPrayer(cell.reference, status: .missed, fridayKind: fridayKind) { succeeded in
-                                if succeeded { session.makeUpPrayer(cell.reference, fridayKind: fridayKind, completion: done) } else { done(false) }
-                            }
-                        } else {
-                            session.recordPrayer(cell.reference, status: status, fridayKind: fridayKind, completion: done)
-                        }
+                    save: { status, fridayKind, _, done in
+                        session.recordPrayer(cell.reference, status: status, fridayKind: fridayKind, completion: done)
                     },
                     answerHeart: { heart, done in session.answerPrayerHeart(cell.reference, heart: heart, completion: done) },
                     rootDraftChanged: reportRootDraft)
-            case .makeUp(let item, let isFridayNoon, let dateLabel, let rootBlockerID):
-                PrayerMakeUpSheet(item: item, isFridayNoon: isFridayNoon, dateLabel: dateLabel,
-                    isSaving: session.prayerWriteInProgress, rootBlockerID: rootBlockerID,
-                    rootDraftChanged: reportRootDraft) { kind, done in
-                    session.makeUpPrayer(item.reference, fridayKind: kind, completion: done)
-                }
-            case .recovery(let references, let fridayReferences, _):
-                PrayerGapResolutionSheet(references: references, fridayReferences: fridayReferences, dateLabel: qadaDate, digits: digits, rootDraftChanged: reportRootDraft) { resolutions, done in
-                    session.resolvePrayerGap(resolutions, completion: done)
-                }
             }
             }
             .onAppear { prayerSheetIsVisible = true }
@@ -254,12 +302,17 @@ struct PrayerTodayView: View {
 #if DEBUG
             .overlay(alignment: .topTrailing) {
                 if ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_ROOT_ROUTE_HARNESS"] == "1"
-                    || ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_ROUTE_DISMISSAL_RACE"] == "1" {
+                    || ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_ROUTE_DISMISSAL_RACE"] == "1"
+                    || ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_SNAPSHOT_REVISION_HARNESS"] == "1" {
                     VStack(alignment: .trailing, spacing: 8) {
                         Button("اختبار رابط جذر الصلاة") { session.open(URL(string: "madar://prayer")!) }
                             .accessibilityIdentifier("prayer-root-test-route")
                         Button("اختبر رابط الإحصاءات") { session.open(URL(string: "madar://salah/hali")!) }
                             .accessibilityIdentifier("prayer-deep-route-test")
+                        if ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_SNAPSHOT_REVISION_HARNESS"] == "1" {
+                            Button("اختبر تحديث بيانات الصلاة") { session.advancePrayerRevisionForUITest() }
+                                .accessibilityIdentifier("prayer-snapshot-test-revision")
+                        }
                         if ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_ROUTE_DISMISSAL_RACE"] == "1" {
                             Button("اختبر الرابط أثناء الإغلاق") {
                                 debugPrayerRouteOpenedAfterDismissal = nil
@@ -293,15 +346,84 @@ struct PrayerTodayView: View {
         return try session.prayerSnapshot(at: session.prayerNow())
     }
 
+    private func sheetSnapshotOffMain() async throws -> PrayerSnapshot {
+#if DEBUG
+        let env = ProcessInfo.processInfo.environment
+        if env["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+           let milliseconds = env["MADAR_UI_PRAYER_SHEET_READ_HOLD_MS"].flatMap(Int.init),
+           (1...5_000).contains(milliseconds) {
+            try await Task.sleep(for: .milliseconds(milliseconds))
+        }
+        if !injectedReadFailure, env["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+           env["MADAR_UI_PRAYER_READ_FAILURE_ONCE"] == "1" {
+            injectedReadFailure = true
+            throw CocoaError(.fileReadUnknown)
+        }
+#endif
+        return try await session.prayerSnapshotOffMain(at: session.prayerNow())
+    }
+
+    private func reconcilePrayerRequestRead() {
+        guard isFrontRoom, scenePhase == .active else {
+            prayerRequestReadTask?.cancel()
+            prayerRequestReadTask = nil
+            if session.prayerLogRequest != nil { requestReadFailed = false }
+            return
+        }
+        guard let prayer = session.prayerLogRequest else {
+            prayerRequestReadTask?.cancel()
+            prayerRequestReadTask = nil
+            return
+        }
+        // Keep a failed request pending until the user explicitly chooses to retry.
+        guard !requestReadFailed else { return }
+        if let prayerRequestReadTask, !prayerRequestReadTask.isCancelled { return }
+        openPrayerRequest(prayer)
+    }
+
     private func openPrayerRequest(_ prayer: Prayer) {
-        do {
-            guard let cell = try sheetSnapshot().today.cells.first(where: { $0.reference.prayer == prayer }) else {
-                requestReadFailed = true; return
+        guard isFrontRoom, scenePhase == .active else { return }
+        prayerRequestReadTask?.cancel()
+        let requestID = UUID(), revision = session.prayerRevision
+        prayerRequestReadID = requestID
+        requestReadFailed = false
+        prayerRequestReadTask = Task {
+            do {
+                let snapshot = try await sheetSnapshotOffMain()
+                guard !Task.isCancelled, prayerRequestReadID == requestID,
+                      session.prayerLogRequest == prayer else { return }
+                guard isFrontRoom, scenePhase == .active else {
+                    prayerRequestReadTask = nil
+                    return
+                }
+                guard session.prayerRevision == revision else {
+                    prayerRequestReadTask = nil
+                    openPrayerRequest(prayer)
+                    return
+                }
+                guard let cell = snapshot.today.cells.first(where: { $0.reference.prayer == prayer }) else {
+                    prayerRequestReadTask = nil
+                    requestReadFailed = true
+                    return
+                }
+                requestReadFailed = false
+                // Do not let the request-cleared observer cancel this task between resolving and presenting the sheet.
+                prayerRequestReadTask = nil
+                session.prayerLogRequest = nil
+                choose(cell, snapshot: snapshot)
+            } catch is CancellationError {
+                guard !Task.isCancelled else { return }
+                guard prayerRequestReadID == requestID, session.prayerLogRequest == prayer else { return }
+                prayerRequestReadTask = nil
+                if session.prayerRevision != revision, isFrontRoom, scenePhase == .active { openPrayerRequest(prayer) }
+            } catch {
+                guard !Task.isCancelled else { return }
+                guard prayerRequestReadID == requestID, session.prayerLogRequest == prayer else { return }
+                prayerRequestReadTask = nil
+                guard isFrontRoom, scenePhase == .active else { return }
+                requestReadFailed = true
             }
-            session.prayerLogRequest = nil
-            requestReadFailed = false
-            choose(cell)
-        } catch { requestReadFailed = true }
+        }
     }
 
     private func retryPrayerRead() {
@@ -358,28 +480,6 @@ struct PrayerTodayView: View {
             _ = rawNight // The night-prayer page left the app (owner, 5 Nov 2026); an old link opens the prayer room itself.
         case "hali" where route.path.count == 1:
             selectedSheet = .statistics
-        case "qada" where route.path.count == 1:
-            selectedSheet = .qadaList
-        case "qada" where route.path.count == 2:
-            let rawID = route.path[1]
-            guard let id = UUID(uuidString: rawID) else {
-                session.errorMessage = "لم تعد هذه الفائتة موجودة في سجل الصلاة."
-                pendingPrayerRoute = nil
-                return
-            }
-            do {
-                guard let item = try sheetSnapshot().qada.first(where: { $0.id == id && $0.madeUpAt == nil }) else {
-                    session.errorMessage = "لم تعد هذه الفائتة موجودة في سجل الصلاة."
-                    pendingPrayerRoute = nil
-                    return
-                }
-                pendingPrayerRoute = nil
-                requestReadFailed = false
-                selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day), rootBlockerID: nil)
-            } catch {
-                pendingPrayerRoute = route
-                requestReadFailed = true
-            }
         case "log" where route.path.count == 1:
             guard let prayer = route.parameters["prayer"].flatMap(Prayer.init(rawValue:)) else {
                 session.errorMessage = "تعذّر فتح تسجيل الصلاة المطلوب."
@@ -527,7 +627,7 @@ struct PrayerTodayView: View {
     }
 
     @ViewBuilder private func prayerEntry(_ cell: PrayerCell, snapshot: PrayerSnapshot, now: Date) -> some View {
-        let canEditStatus = [.pending, .jamaah, .alone, .missed].contains(cell.status)
+        let canEditStatus = [.pending, .jamaah, .alone, .qada].contains(cell.status)
             || (cell.time == nil && cell.status == .future)
         let canEdit = cell.canLog && canEditStatus
         let isNext = snapshot.next?.reference == cell.reference
@@ -538,7 +638,7 @@ struct PrayerTodayView: View {
             note: cell.time == nil && cell.status == .future ? "" : pairNote(cell, snapshot: snapshot),
             countdown: isNext && cell.status == .future ? cell.prayerTime.flatMap { PrayerCopy.countdown(until: $0, now: now, digits: digits) } : nil)
         if canEdit {
-            Button { choose(cell) } label: { arch }
+            Button { choose(cell, snapshot: snapshot) } label: { arch }
                 .buttonStyle(.madarPlain)
                 .accessibilityElement(children: dynamicType.isAccessibilitySize ? .combine : .ignore)
                 .accessibilityLabel(arch.accessibilityText)
@@ -555,7 +655,7 @@ struct PrayerTodayView: View {
     /// before a tail that already says the same thing.
     private func todaySummary(_ snapshot: PrayerSnapshot, now: Date) -> String {
         let cells = snapshot.today.cells.filter { $0.time != nil }
-        let recorded = cells.filter { [.jamaah, .alone, .qada, .missed, .excused].contains($0.status) }.count
+        let recorded = cells.filter { [.jamaah, .alone, .qada].contains($0.status) }.count
         let remaining = cells.count - recorded
         let afterLastAdhan = cells.compactMap(\.prayerTime).max().map { now >= $0 } ?? false
         let tail = afterLastAdhan && remaining > 0 ? PrayerCopy.pending(remaining, digits: digits) : PrayerCopy.remaining(remaining, digits: digits)
@@ -567,8 +667,7 @@ struct PrayerTodayView: View {
 
     // MARK: Notices
 
-    /// One quiet notice: an unrecorded prayer whose window has ended, or an older unresolved gap.
-    /// RP1: neither ever turns into a missed prayer by itself.
+    /// A quiet reminder to record an already-performed prayer. Leaving it alone never creates a record.
     private func notice(_ snapshot: PrayerSnapshot, now: Date) -> AnyView? {
         let pending = Set(snapshot.pending)
         let open = currentPrayer(snapshot, now: now)
@@ -579,20 +678,14 @@ struct PrayerTodayView: View {
         if gap.count == 1, let first = closed.first {
             return AnyView(PrayerNoticeRow(
                 title: "مضى وقت \(self.title(first.reference.prayer))\(dayWord(first.reference.day, today: snapshot.today.day)) ولم تُسجِّلها.",
-                detail: first.reference.day == snapshot.tracking.firstRun
-                    ? "إن صلّيتها قبل أن تفتح مدار فسجِّلها متى شئت؛ لا يُحسب عليك شيء."
-                    : "تبقى معلّقة حتى تختار حالها.",
-                action: "سجِّلها", identifier: "prayer-pending-review") { choose(first) })
+                detail: "إذا صلّيتها، سجّلها. ما لم تصلّه يبقى بلا سجل.",
+                action: "سجِّلها", identifier: "prayer-pending-review") { choose(first, snapshot: snapshot) })
         }
-        let historical = gap.filter { $0.day < snapshot.today.day && $0.day >= snapshot.tracking.day }
-        let fridays = snapshot.unconfirmedFridayNoon.union(closed.filter { $0.isFriday && $0.reference.prayer == .dhuhr }.map(\.reference))
+        let hasHistoricalGap = gap.contains { $0.day < snapshot.today.day }
         return AnyView(PrayerNoticeRow(
-            title: gap.count > 10 ? "فترة لم تُسجَّل فيها صلواتك: " + PrayerCopy.days(Set(gap.map(\.day)).count, digits: digits)
-                    : historical.isEmpty ? PrayerCopy.pending(gap.count, digits: digits) : PrayerCopy.unconfirmed(gap.count, digits: digits),
-            detail: gap.count > 10 ? "لا يلزمك تسجيلها واحدة واحدة: اختر «لم أسجّل هذه الفترة» وتبدأ من اليوم، ولا يُحسب عليك شيء." : "لا تُحسب فائتة إلا باختيارك.",
-            action: gap.count > 10 ? "ابدأ من اليوم" : "سجِّلها", identifier: historical.isEmpty ? "prayer-pending-review" : "prayer-recovery") {
-                selectedSheet = .recovery(gap, fridays, session.activePlace.timeZone)
-            })
+            title: hasHistoricalGap ? "يبدأ سجلّك من اليوم" : PrayerCopy.pending(gap.count, digits: digits),
+            detail: "سجّل الصلاة بعد أدائها. ما لم تصلّه يبقى بلا سجل.",
+            action: nil, identifier: "prayer-unconfirmed-note", perform: nil))
     }
 
     /// The prayer whose window is still open (its time has come and the next prayer has not).
@@ -603,7 +696,7 @@ struct PrayerTodayView: View {
     private func dayWord(_ day: GregorianDay, today: GregorianDay) -> String {
         if day == today { return "" }
         if day.adding(days: 1) == today { return " أمس" }
-        return " يوم " + qadaDate(day)
+        return " يوم " + dateLabel(day)
     }
 
     @ViewBuilder private func heartNotice(_ snapshot: PrayerSnapshot) -> some View {
@@ -626,7 +719,7 @@ struct PrayerTodayView: View {
         }
     }
 
-    // MARK: Hali, qada and qiyam
+    // MARK: Hali and qiyam
 
     /// «سلاسلك»: the three nested streaks as nested arches (owner decision, 13 October 2026). Tapping opens the details.
     private func haliCard(_ snapshot: PrayerSnapshot) -> some View {
@@ -651,66 +744,6 @@ struct PrayerTodayView: View {
         .accessibilityLabel("سلاسلك: " + summary)
         .accessibilityHint("افتح تفاصيل السلاسل")
         .accessibilityIdentifier("prayer-streaks")
-    }
-
-    @ViewBuilder private func qadaCard(_ snapshot: PrayerSnapshot) -> some View {
-        let outstanding = snapshot.qada.filter { $0.madeUpAt == nil }
-        if let first = outstanding.first {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    PrayerStar().fill(theme.color("missed")).frame(width: 15, height: 15)
-                    Text(digits.string(outstanding.count)).font(PrayerHomeType.number)
-                    Text(PrayerCopy.owed(outstanding.count)).font(PrayerHomeType.strong)
-                    Spacer(minLength: 0)
-                }
-                .accessibilityElement(children: .combine)
-                HStack(alignment: .top, spacing: 12) {
-                    Rectangle().fill(theme.color("missed")).frame(width: 2)
-                    PrayerQadaCitation()
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                buttonsRow(first: first)
-            }
-            .padding(20)
-            .background(theme.color("missed").opacity(0.05), in: .rect(cornerRadius: 22))
-            .background(theme.background, in: .rect(cornerRadius: 22))
-            .overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.color("missed").opacity(0.28), lineWidth: 1) }
-        } else {
-            Button { selectedSheet = .oldMissed } label: {
-                HStack {
-                    Text(snapshot.qada.isEmpty ? "لا فوائت مسجّلة عليك" : "قضيتَ ما سجّلتَه من الفوائت")
-                        .font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("أضف فائتة قديمة").font(PrayerHomeType.strong).foregroundStyle(theme.accent)
-                }
-                .padding(.horizontal, 18).frame(minHeight: 54)
-                .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
-                .contentShape(.rect(cornerRadius: 18))
-            }
-            .buttonStyle(.madarPlain)
-            .accessibilityIdentifier("prayer-old-missed")
-        }
-    }
-
-    @ViewBuilder private func buttonsRow(first: PrayerQada) -> some View {
-        let makeUp = Button { selectedSheet = .makeUp(first, isFridayNoon: first.isFriday, dateLabel: qadaDate(first.reference.day), rootBlockerID: nil) } label: {
-            Text("قضيتُ واحدة").font(PrayerHomeType.strong).frame(maxWidth: .infinity, minHeight: 54)
-                .foregroundStyle(theme.background).background(theme.ink, in: .rect(cornerRadius: 16))
-        }
-        .buttonStyle(.madarPlain).disabled(session.prayerWriteInProgress)
-        .accessibilityIdentifier("prayer-qada-makeup")
-        let places = Button { selectedSheet = .qadaList } label: {
-            Text("مواضعها").font(PrayerHomeType.strong).frame(minHeight: 54).padding(.horizontal, 26)
-                .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.ink.opacity(0.18), lineWidth: 1) }
-                .contentShape(.rect(cornerRadius: 16))
-        }
-        .buttonStyle(.madarPlain)
-        .accessibilityIdentifier("prayer-qada-places")
-        if dynamicType.isAccessibilitySize {
-            VStack(spacing: 10) { makeUp; places.frame(maxWidth: .infinity) }
-        } else {
-            HStack(spacing: 12) { makeUp; places }
-        }
     }
 
     private func qiyamCard(_ snapshot: PrayerSnapshot) -> some View {
@@ -750,13 +783,14 @@ struct PrayerTodayView: View {
     }
 
     /// «الثلاثاء ٢٥ ربيع الآخر» or «الثلاثاء ٦ أكتوبر», following `core.firstCalendar`; never ISO digits.
-    private func qadaDate(_ day: GregorianDay) -> String {
+    private func dateLabel(_ day: GregorianDay) -> String {
         session.dateLabels(day).combined
     }
 
-    private func choose(_ cell: PrayerCell) {
-        let timeZone = (try? session.prayerSnapshot(at: session.prayerNow()))?.activeTrip?.place.timeZone ?? session.activePlace.timeZone
-        if let pair = travelPair(for: cell), [.pending, .future].contains(cell.status) {
+    private func choose(_ cell: PrayerCell, snapshot: PrayerSnapshot? = nil) {
+        let activeSnapshot = snapshot ?? homeSnapshot
+        let timeZone = activeSnapshot?.activeTrip?.place.timeZone ?? session.activePlace.timeZone
+        if let pair = travelPair(for: cell, hasActiveTrip: activeSnapshot?.activeTrip != nil), [.pending, .future].contains(cell.status) {
             selectedSheet = .pair(cell.reference.day, pair, cell, timeZone)
         } else {
             selectedSheet = .log(cell, timeZone)
@@ -790,8 +824,8 @@ struct PrayerTodayView: View {
         if let trip = snapshot.activeTrip { selectedSheet = .trip(trip) }
         else if let fix = awayFix() { selectedSheet = .travelQuestion(fix, max(0, TravelRule.distanceKm(from: session.activePlace, to: fix.place) - TravelRule.homeRadiusKm)) }
     }
-    private func travelPair(for cell: PrayerCell) -> PrayerPair? {
-        guard session.bool("salah.travelShortenCombine"), (try? session.prayerSnapshot(at: session.prayerNow()))?.activeTrip != nil else { return nil }
+    private func travelPair(for cell: PrayerCell, hasActiveTrip: Bool) -> PrayerPair? {
+        guard session.bool("salah.travelShortenCombine"), hasActiveTrip else { return nil }
         switch cell.reference.prayer { case .dhuhr, .asr: return .dhuhrAsr; case .maghrib, .isha: return .maghribIsha; default: return nil }
     }
     /// Under the arch of a prayer that can be combined: «قصر · جمع» on the first Dhuhr, «مع الظهر» on Asr, and so on.
@@ -869,10 +903,6 @@ enum PrayerCopy {
         let formatted = digits.string(count)
         return String(localized: "prayer.rakaat", defaultValue: "\(count) \(formatted)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
     }
-    /// The count is shown large beside this phrase, so the phrase carries no digits.
-    static func owed(_ count: Int, bundle: Bundle = .main) -> String {
-        String(localized: "prayer.owed", defaultValue: "\(count)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
-    }
     /// «بعد ساعة و١٤ دقيقة».
     static func after(seconds: TimeInterval, digits: MadarNumberFormatter) -> String {
         let total = max(0, Int(seconds / 60))
@@ -905,17 +935,11 @@ private enum PrayerTodaySheet: Identifiable {
     case heart(PrayerCell)
     case qiyam
     case qiyamNight(GregorianDay)
-    case oldMissed
-    case qadaList
-    case makeUp(PrayerQada, isFridayNoon: Bool, dateLabel: String, rootBlockerID: UUID?)
-    case recovery([PrayerReference], Set<PrayerReference>, TimeZone)
     var id: String {
         switch self {
         case .travelQuestion: "travel-question"
         case .trip(let trip): "trip-\(trip.id.uuidString)"
         case .pair(let day, let pair, _, _): "pair-\(day)-\(pair.rawValue)"
-        case .oldMissed: "old-missed"
-        case .qadaList: "qada-list"
         case .qiyam: "qiyam"
         case .qiyamNight(let night): "qiyam-" + night.description
         case .statistics: "statistics"
@@ -924,15 +948,13 @@ private enum PrayerTodaySheet: Identifiable {
         case .heart(let cell): "heart-\(cell.reference.naturalKey)"
         case .log(let cell, _): "log-\(cell.reference.naturalKey)"
         case .prefilledLog(let cell, _, _, _): "prefilled-log-\(cell.reference.naturalKey)"
-        case .makeUp(let item, _, _, _): "makeup-\(item.id.uuidString)"
-        case .recovery(let references, _, _): "recovery-\(references.first?.naturalKey ?? "empty")"
         }
     }
 }
 
-/// S2 · the light log sheet, matched to `screens/salah/02-S2-Log.jpg` and `03-S2b-Missed.jpg`.
-/// One tap on a state records it (RP2: «فاتتني» is offered only once the window has ended and
-/// opens its make-up panel instead of saving); the heart question is inline and only when
+/// S2 · the light log sheet, matched to `screens/salah/02-S2-Log.jpg`.
+/// One tap records a performed prayer; qada is available only after the prayer window ends.
+/// The heart question is inline and only when
 /// `salah.askHeart` is on (RP6); Friday noon records its kind explicitly (RP5).
 /// Not built: «امسح التسجيل» (screenshot only; the spec defines no clear command, see DECISIONS).
 private struct PrayerTodayLogSheet: View {
@@ -965,7 +987,7 @@ private struct PrayerTodayLogSheet: View {
         self.cell = cell; self.clock = clock; self.askHeart = askHeart; self.isSaving = isSaving
         self.routePrefilled = prefillStatus != nil || prefillHeart != nil
         self.save = save; self.answerHeart = answerHeart; self.rootDraftChanged = rootDraftChanged
-        let initial: PrayerStoredStatus? = switch cell.status { case .jamaah: .jamaah; case .alone: .alone; case .qada: .qada; case .missed: .missed; default: nil }
+        let initial: PrayerStoredStatus? = switch cell.status { case .jamaah: .jamaah; case .alone: .alone; case .qada: .qada; default: nil }
         _selected = State(initialValue: prefillStatus ?? initial)
         _recorded = State(initialValue: prefillStatus == nil && initial != nil)
         _heart = State(initialValue: prefillHeart ?? cell.heart)
@@ -977,11 +999,11 @@ private struct PrayerTodayLogSheet: View {
     }
 
     private var options: [PrayerStoredStatus] {
-        [.jamaah, .alone] + (cell.canMakeUp || cell.status == .qada || selected == .qada ? [.qada] : []) + (cell.canMarkMissed || cell.status == .missed || selected == .missed ? [.missed] : [])
+        [.jamaah, .alone] + (cell.canMakeUp || cell.status == .qada || selected == .qada ? [.qada] : [])
     }
     /// Friday noon: everything but «وحدي» (always the noon prayer) waits for the kind.
     private func needsKind(_ option: PrayerStoredStatus) -> Bool { cell.isFriday && option != .alone && fridayKind == nil }
-    private var showsHeart: Bool { askHeart && recorded && [.jamaah, .alone, .qada].contains(selected ?? .missed) }
+    private var showsHeart: Bool { askHeart && recorded && [.jamaah, .alone, .qada].contains(selected ?? .jamaah) }
     private var hasUnsavedInput: Bool {
         selected != committedStatus || recorded != committedRecorded || heart != committedHeart || fridayKind != committedFridayKind
     }
@@ -991,15 +1013,14 @@ private struct PrayerTodayLogSheet: View {
             header
             if cell.isFriday { fridayKindRow.padding(.top, 16) }
             // AU-38: the dimmed options say why.
-            if cell.isFriday && fridayKind == nil { Text("اختر «جمعة» أو «ظهر» لتسجّلها في جماعة أو فائتة.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 8).accessibilityIdentifier("prayer-friday-kind-hint") }
+            if cell.isFriday && fridayKind == nil { Text("اختر «جمعة» أو «ظهر» لتسجّلها في جماعة أو قضاءً.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 8).accessibilityIdentifier("prayer-friday-kind-hint") }
             optionRow.padding(.top, 20)
-            if routePrefilled, !recorded, let selected, selected != .missed {
+            if routePrefilled, !recorded, let selected {
                 Button("احفظ التسجيل") { record(selected, kind: cell.isFriday ? (selected == .alone ? .dhuhr : fridayKind) : nil) }
                     .buttonStyle(.madarPlain).frame(maxWidth: .infinity, minHeight: 48)
                     .glassEffect(.regular.interactive(), in: .capsule)
                     .padding(.top, 10).accessibilityIdentifier("prayer-log-prefill-save")
             }
-            if selected == .missed { missedPanel.padding(.top, 14) }
             if showsHeart { heartSection.padding(.top, 22) }
         }
         .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 14)
@@ -1053,7 +1074,7 @@ private struct PrayerTodayLogSheet: View {
         }
     }
 
-    // MARK: The four states
+    // MARK: Prayer status
 
     private var optionRow: some View {
         HStack(spacing: 8) { ForEach(options, id: \.self) { optionPill($0) } }
@@ -1061,24 +1082,22 @@ private struct PrayerTodayLogSheet: View {
 
     private func optionPill(_ option: PrayerStoredStatus) -> some View {
         let on = selected == option
-        let missed = option == .missed
-        let tint = missed ? theme.color("missed") : theme.accent
+        let tint = theme.accent
         let (title, detail): (String, String) = switch option {
         case .jamaah: ("في جماعة", "مع الناس")
         case .alone: ("وحدي", "في وقتها")
-        case .qada: ("قضاءً", "بعد وقتها")
-        default: ("فاتتني", "تبقى لقضائها")
+        case .qada: ("قضاءً", "صلّيتها بعد وقتها")
+        case .missed, .unrecordedHistory, .excused: ("", "")
         }
         return Button {
             guard !isSaving else { return }
             if option == .alone, cell.isFriday { fridayKind = .dhuhr }
-            if missed { selected = .missed; return }
             record(option, kind: cell.isFriday ? (option == .alone ? .dhuhr : fridayKind) : nil)
         } label: {
             VStack(spacing: 4) {
                 Text(title).font(PrayerHomeType.strong)
-                    .foregroundStyle(on ? (missed ? theme.color("missedTextOnSurface") : theme.color("accentText")) : theme.ink)
-                Text(detail).font(PrayerHomeType.small).foregroundStyle(on && missed ? theme.color("missedTextOnSurface") : theme.secondaryInk)
+                    .foregroundStyle(on ? theme.color("accentText") : theme.ink)
+                Text(detail).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
             }
             .lineLimit(1).minimumScaleFactor(0.85)
             .frame(maxWidth: .infinity, minHeight: 62)
@@ -1104,41 +1123,6 @@ private struct PrayerTodayLogSheet: View {
             fridayKind = committedFridayKind
             if !askHeart { dismiss() }
         }
-    }
-
-    // MARK: «فاتتني»: explicit, never automatic (RP1, RP2)
-
-    private var missedPanel: some View {
-        let kind = cell.isFriday ? fridayKind : nil
-        return VStack(alignment: .leading, spacing: 12) {
-            Text("نزلت في القضاء، وهي عليك حتى تصلّيها.").font(PrayerHomeType.strong)
-            HStack(alignment: .top, spacing: 10) {
-                Rectangle().fill(theme.color("missed")).frame(width: 2)
-                PrayerQadaCitation()
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 10) {
-                Button {
-                    save(.missed, kind, true) { ok in if ok { dismiss() } }
-                } label: {
-                    Text("قضيتُها الآن").font(PrayerHomeType.strong).foregroundStyle(theme.background)
-                        .frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: .rect(cornerRadius: 18))
-                }
-                .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-makeup-now")
-                Button {
-                    save(.missed, kind, false) { ok in if ok { dismiss() } }
-                } label: {
-                    Text("لاحقًا").font(PrayerHomeType.strong)
-                        .padding(.horizontal, 22).frame(minHeight: 54)
-                        .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.ink.opacity(0.14), lineWidth: 1) }
-                }
-                .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-missed-later")
-            }
-            .disabled(isSaving || (cell.isFriday && fridayKind == nil))
-        }
-        .padding(16)
-        .background(theme.color("missed").opacity(0.07), in: .rect(cornerRadius: 22))
-        .overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.color("missed").opacity(0.35), lineWidth: 1) }
     }
 
     // MARK: Heart (RP6: only when `salah.askHeart` is on)
@@ -1181,244 +1165,6 @@ private struct PrayerTodayLogSheet: View {
         }
     }
 }
-
-/// «صلوات بلا تسجيل»: settle a gap in one tap, a day at a time, or prayer by prayer.
-/// RP1: nothing here is chosen for the user; what is left unchosen stays as it is.
-private struct PrayerGapResolutionSheet: View {
-    let references: [PrayerReference]
-    let fridayReferences: Set<PrayerReference>
-    let dateLabel: (GregorianDay) -> String
-    let digits: MadarNumberFormatter
-    let rootDraftChanged: (UUID, Bool) -> Void
-    let resolve: ([PrayerGapResolution], @escaping (Bool) -> Void) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.roomTheme) private var theme
-    @State private var choices: [PrayerReference: Choice] = [:]
-    @State private var rootBlockerID = UUID()
-    @State private var confirmClose = false
-    @State private var confirmAloneAll = false
-
-    /// One choice as the user reads it; Friday noon carries its kind explicitly (RP5).
-    struct Choice: Hashable {
-        let status: PrayerStoredStatus
-        var fridayKind: FridayPrayerKind? = nil
-    }
-
-    private var days: [GregorianDay] { Array(Set(references.map(\.day))).sorted() }
-    private var hasUnsavedInput: Bool { !choices.isEmpty }
-    private func prayers(on day: GregorianDay) -> [PrayerReference] {
-        references.filter { $0.day == day }.sorted { $0.prayer.rawValue.order < $1.prayer.rawValue.order }
-    }
-
-    var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18) {
-                header
-                quickActions
-                ForEach(days, id: \.self) { day in dayCard(day) }
-            }
-            .padding(.horizontal, 20).padding(.top, 24).padding(.bottom, 24)
-        }
-        .safeAreaInset(edge: .bottom) { saveBar }
-        .background(theme.background)
-        .foregroundStyle(theme.ink)
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .interactiveDismissDisabled(hasUnsavedInput)
-        .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
-        .onDisappear { rootDraftChanged(rootBlockerID, false) }
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("صلوات بلا تسجيل").font(PrayerHomeType.cardHead).accessibilityAddTraits(.isHeader)
-                Spacer()
-                Button("إغلاق") { if hasUnsavedInput { confirmClose = true } else { dismiss() } }.font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
-                    .frame(minHeight: 44)
-                    .confirmationDialog("تترك اختياراتك؟", isPresented: $confirmClose, titleVisibility: .visible) {
-                        Button("اترك الاختيارات", role: .destructive) { dismiss() }
-                        Button("أكمل التسجيل", role: .cancel) {}
-                    }
-            }
-            Text(references.count > 10 ? "فترة لم تُسجَّل فيها صلواتك: " + PrayerCopy.days(Set(references.map(\.day)).count, digits: digits) : PrayerCopy.unconfirmed(references.count, digits: digits))
-                .font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
-            if !rangeText.isEmpty {
-                Text(rangeText).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
-            }
-            Text("لا يُحسب شيء منها فائتة إلا باختيارك، وما تتركه يبقى كما هو.")
-                .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
-        }
-    }
-
-    private var rangeText: String {
-        guard let first = days.first, let last = days.last else { return "" }
-        return first == last ? dateLabel(first) : "من " + dateLabel(first) + " إلى " + dateLabel(last)
-    }
-
-    /// One tap settles the whole gap and closes. Undo is for removals only (FB-32), so «صلّيتها كلها» first asks with the count (FB-39).
-    private var quickActions: some View {
-        VStack(spacing: 10) {
-            Button { confirmAloneAll = true } label: {
-                quickLabel("صلّيتها كلها", detail: "تُسجَّل في وقتها، وحدي")
-            }
-            .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-gap-alone-all")
-            .confirmationDialog("تسجيل " + WidgetCopy.agree(references.count, digits, one: "صلاة واحدة", two: "صلاتين", few: "صلوات", many: "صلاة") + " وحدك في وقتها؟",
-                                isPresented: $confirmAloneAll, titleVisibility: .visible) {
-                Button("نعم، سجّلها") { apply(Choice(status: .alone, fridayKind: nil), to: references, saveNow: true) }
-                Button("ليس الآن", role: .cancel) {}
-            }
-            Button { apply(Choice(status: .unrecordedHistory), to: references, saveNow: true) } label: {
-                quickLabel("لم أسجّل هذه الفترة", detail: "لا قضاء ولا نسبة ولا سلسلة")
-            }
-            .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-gap-unrecorded-all")
-        }
-    }
-
-    private func quickLabel(_ title: String, detail: String) -> some View {
-        HStack {
-            Text(title).font(PrayerHomeType.strong)
-            Spacer(minLength: 8)
-            Text(detail).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
-        }
-        .padding(.horizontal, 18).frame(maxWidth: .infinity, minHeight: 56)
-        .background(theme.color("goldSoft"), in: .rect(cornerRadius: 18))
-        .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
-        .contentShape(.rect(cornerRadius: 18))
-    }
-
-    private func dayCard(_ day: GregorianDay) -> some View {
-        let refs = prayers(on: day)
-        return PrayerPaperCard {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(dateLabel(day)).font(PrayerHomeType.strong)
-                    Spacer(minLength: 8)
-                    Menu {
-                        ForEach(dayOptions, id: \.self) { choice in
-                            Button(title(choice, friday: false)) { apply(choice, to: refs, saveNow: false) }
-                        }
-                    } label: {
-                        Text("اليوم كله").font(PrayerHomeType.smallBold).foregroundStyle(theme.accent)
-                            .frame(minHeight: 44).contentShape(.rect)
-                    }
-                    .accessibilityIdentifier("prayer-gap-day-\(day)")
-                }
-                ForEach(refs, id: \.self) { ref in
-                    prayerRow(ref)
-                    if ref != refs.last { Divider().overlay(theme.line) }
-                }
-            }
-        }
-    }
-
-    private func prayerRow(_ ref: PrayerReference) -> some View {
-        let friday = fridayReferences.contains(ref)
-        let chosen = choices[ref]
-        return HStack {
-            Text(friday ? "الجمعة" : prayerTitle(ref.prayer)).font(PrayerHomeType.body)
-            Spacer(minLength: 8)
-            Menu {
-                ForEach(options(friday: friday), id: \.self) { choice in
-                    Button(title(choice, friday: friday)) { choices[ref] = choice }
-                }
-                if chosen != nil {
-                    Divider()
-                    Button("اتركها كما هي") { choices[ref] = nil }
-                }
-            } label: {
-                Text(chosen.map { title($0, friday: friday) } ?? "اختر")
-                    .font(chosen == nil ? PrayerHomeType.small : PrayerHomeType.smallBold)
-                    .foregroundStyle(chosen == nil ? theme.secondaryInk : chosenColor(chosen!))
-                    .padding(.horizontal, 14).frame(minHeight: 36)
-                    .overlay { Capsule().stroke(chosen == nil ? theme.ink.opacity(0.14) : theme.line, lineWidth: 1) }
-                    .frame(minHeight: 44).contentShape(.rect)
-            }
-            .accessibilityIdentifier("prayer-gap-status-\(ref.day)-\(ref.prayer.rawValue)")
-        }
-        .frame(minHeight: 48)
-    }
-
-    private var saveBar: some View {
-        let count = choices.count
-        return Button {
-            save()
-        } label: {
-            Text(count == 0 ? "اختر حال صلاة لتحفظها" : "احفظ ما اخترت")
-                .font(PrayerHomeType.strong).frame(maxWidth: .infinity, minHeight: 54)
-                .foregroundStyle(count == 0 ? theme.secondaryInk : theme.background)
-                .background(count == 0 ? theme.color("surface") : theme.ink, in: .rect(cornerRadius: 16))
-        }
-        .buttonStyle(.madarPlain).disabled(count == 0)
-        .padding(.horizontal, 20).padding(.vertical, 10)
-        .background(theme.background)
-        .accessibilityIdentifier("prayer-gap-save")
-    }
-
-    // MARK: Choices
-
-    private var dayOptions: [Choice] {
-        [.init(status: .jamaah, fridayKind: nil), .init(status: .alone), .init(status: .missed), .init(status: .unrecordedHistory), .init(status: .excused)]
-    }
-    private func options(friday: Bool) -> [Choice] {
-        guard friday else { return dayOptions }
-        return [.init(status: .jamaah, fridayKind: .jumuah), .init(status: .jamaah, fridayKind: .dhuhr), .init(status: .alone, fridayKind: .dhuhr),
-                .init(status: .missed, fridayKind: .jumuah), .init(status: .missed, fridayKind: .dhuhr), .init(status: .unrecordedHistory), .init(status: .excused)]
-    }
-
-    /// A whole-day or whole-gap choice; Friday noon gets the kind the choice implies, and
-    /// «في جماعة» or «فاتتني» on a Friday is left for the user to pick explicitly (RP5).
-    private func apply(_ choice: Choice, to refs: [PrayerReference], saveNow: Bool) {
-        for ref in refs {
-            guard fridayReferences.contains(ref) else { choices[ref] = Choice(status: choice.status); continue }
-            switch choice.status {
-            case .alone: choices[ref] = Choice(status: .alone, fridayKind: .dhuhr)
-            case .unrecordedHistory, .excused: choices[ref] = Choice(status: choice.status)
-            default: if saveNow { choices[ref] = nil }
-            }
-        }
-        if saveNow { save() }
-    }
-
-    private func save() {
-        let resolutions = references.compactMap { ref -> PrayerGapResolution? in
-            guard let choice = choices[ref] else { return nil }
-            return .init(reference: ref, status: choice.status, fridayKind: choice.fridayKind)
-        }
-        guard !resolutions.isEmpty else { return }
-        resolve(resolutions) { ok in if ok { dismiss() } } // AU-41: a failed save keeps the choices on screen.
-    }
-
-    private func title(_ choice: Choice, friday: Bool) -> String {
-        switch (choice.status, choice.fridayKind) {
-        case (.jamaah, .jumuah?): "صلّيت الجمعة"
-        case (.jamaah, .dhuhr?): "الظهر في جماعة"
-        case (.alone, .dhuhr?) where friday: "الظهر وحدي"
-        case (.missed, .jumuah?): "فاتتني الجمعة"
-        case (.missed, .dhuhr?): "فاتني الظهر"
-        case (.jamaah, _): "في جماعة"
-        case (.alone, _): "وحدي"
-        case (.missed, _): "فاتتني"
-        case (.unrecordedHistory, _): "لم أسجّل"
-        case (.excused, _): "لي عذر"
-        default: choice.status.rawValue
-        }
-    }
-    private func chosenColor(_ choice: Choice) -> Color {
-        switch choice.status {
-        case .missed: theme.color("missedTextOnSurface")
-        case .unrecordedHistory, .excused: theme.secondaryInk
-        default: theme.accent
-        }
-    }
-}
-
-private extension String {
-    /// Day order of the five prayers by raw value.
-    var order: Int { ["fajr", "dhuhr", "asr", "maghrib", "isha"].firstIndex(of: self) ?? 9 }
-}
-
-
 
 func heartTitle(_ heart: PrayerHeart) -> String {
     switch heart { case .distracted: "شارد"; case .present: "حاضر"; case .khashi: "خاشع" }
@@ -1624,128 +1370,4 @@ private struct PrayerNightLoggingSheet: View {
             source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(session.number("core.hijriOffset")))
             .labels(firstCalendar: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .hijri, numerals: formatter.style).combined
     }
-}
-
-private struct PrayerOldMissedSheet: View {
-    @Bindable var session: AppSession
-    let trackingStart: GregorianDay
-    let finished: () -> Void
-    let rootDraftChanged: (UUID, Bool) -> Void
-    @State private var date: Date
-    @State private var prayer: Prayer = .fajr
-    @State private var fridayKind: FridayPrayerKind? = nil
-    @State private var confirmRestore = false
-    @State private var rootBlockerID = UUID()
-    // FB-39 (owner, 6 Nov): «أضف ٣٠٠ فجر» — many old missed prayers at once, each on its own real day.
-    @State private var byCount = false
-    @State private var countText = ""
-    @Environment(\.roomTheme) private var theme
-    private var hasUnsavedInput: Bool {
-        GregorianDay.containing(date, in: session.activePlace.timeZone) != trackingStart.adding(days: -1)
-            || prayer != .fajr || fridayKind != nil || !countText.isEmpty
-    }
-    private var count: Int? {
-        let digits = countText.compactMap(\.wholeNumberValue)
-        guard !digits.isEmpty else { return nil }
-        // Stops growing past the maximum: a long paste of digits used to overflow Int and crash.
-        let value = digits.reduce(0) { $0 > PrayerMutation.maximumRun ? $0 : $0 * 10 + $1 }
-        return (1...PrayerMutation.maximumRun).contains(value) ? value : nil
-    }
-    private var lastDay: GregorianDay { .containing(date, in: session.activePlace.timeZone) }
-    init(session: AppSession, trackingStart: GregorianDay, finished: @escaping () -> Void,
-         rootDraftChanged: @escaping (UUID, Bool) -> Void) {
-        self.session = session; self.trackingStart = trackingStart; self.finished = finished; self.rootDraftChanged = rootDraftChanged
-        _date = State(initialValue: trackingStart.adding(days: -1).date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600))
-    }
-    private var reference: PrayerReference { .init(day: GregorianDay.containing(date, in: session.activePlace.timeZone), prayer: prayer) }
-    private var fridayNoon: Bool { var calendar = Calendar(identifier: .gregorian); calendar.timeZone = session.activePlace.timeZone; return prayer == .dhuhr && calendar.component(.weekday, from: date) == 6 }
-    private var restoring: Bool { (try? session.oldMissedRequiresRestore(reference)) ?? true }
-    private var calendar: Calendar { var c = Calendar(identifier: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .islamicUmmAlQura); c.timeZone = session.activePlace.timeZone; return c }
-    private var sightingOffset: Int {
-        session.string("core.firstCalendar") != "gregorian" && session.string("core.hijriSource") == "sighting" ? Int(session.number("core.hijriOffset")) : 0
-    }
-    private func shifted(_ value: Date, by days: Int) -> Date { calendar.date(byAdding: .day, value: days, to: value) ?? value }
-    private var pickerDate: Binding<Date> { Binding(get: { shifted(date, by: sightingOffset) }, set: { date = shifted($0, by: -sightingOffset) }) }
-    private var maximumDate: Date { shifted(trackingStart.date(in: session.activePlace.timeZone).addingTimeInterval(-1), by: sightingOffset) }
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text("الفوائت القديمة لا تُضاف إلا باختيارك؛ ما قبل بداية التتبّع يبقى بلا تسجيل.")
-                    Picker("الطريقة", selection: $byCount) {
-                        Text("يوم واحد").tag(false)
-                        Text("بالعدد").tag(true)
-                    }.pickerStyle(.segmented).accessibilityIdentifier("prayer-old-mode")
-                    if byCount {
-                        HStack {
-                            Text("كم فرضًا؟")
-                            Spacer()
-                            TextField("٣٠٠", text: $countText).keyboardType(.numberPad).multilineTextAlignment(.center)
-                                .frame(width: 96).accessibilityIdentifier("prayer-old-count")
-                        }
-                    }
-                    DatePicker(byCount ? "آخرها يوم" : "التاريخ", selection: pickerDate, in: ...maximumDate, displayedComponents: .date)
-                        .environment(\.calendar, calendar).environment(\.timeZone, session.activePlace.timeZone)
-                        .accessibilityIdentifier("prayer-old-date")
-                    MadarDateLabel(session.dateLabels(.containing(date, in: session.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
-                    Picker("الصلاة", selection: $prayer) {
-                        ForEach(Prayer.allCases, id: \.self) { Text(title($0)).tag($0) }
-                    }.accessibilityIdentifier("prayer-old-prayer")
-                    if byCount, let count {
-                        // Both calendars for the first and last day of the run.
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("يُضاف من \(title(prayer)) " + WidgetCopy.agree(count, MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi), one: "فرض واحد", two: "فرضان", few: "فروض", many: "فرضًا") + "، فرض لكل يوم:")
-                                .font(MadarTypography.caption())
-                            HStack(alignment: .top) {
-                                Text("من").font(MadarTypography.caption())
-                                MadarDateLabel(session.dateLabels(lastDay.adding(days: -(count - 1))), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
-                            }
-                            HStack(alignment: .top) {
-                                Text("إلى").font(MadarTypography.caption())
-                                MadarDateLabel(session.dateLabels(lastDay), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
-                            }
-                            Text("الأيام المسجّلة من قبل تبقى كما هي، ولا يتكرر فرض.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                        }.accessibilityElement(children: .combine).accessibilityIdentifier("prayer-old-count-preview")
-                    }
-                    if fridayNoon && !byCount {
-                        Picker("فرض ظهر الجمعة", selection: $fridayKind) {
-                            Text("اختر النوع").tag(Optional<FridayPrayerKind>.none)
-                            Text("الجمعة").tag(Optional(FridayPrayerKind.jumuah))
-                            Text("الظهر").tag(Optional(FridayPrayerKind.dhuhr))
-                        }.accessibilityIdentifier("prayer-old-friday")
-                    }
-                }
-                if byCount {
-                    Section {
-                        Button("أضف الفوائت") { saveRun() }.accessibilityIdentifier("prayer-old-count-save")
-                    }.disabled(session.prayerWriteInProgress || count == nil)
-                } else {
-                Section {
-                    if restoring {
-                        Text("حذفتَ هذا التسجيل أو تراجعتَ عنه؛ يمكنك إعادته من الزر أدناه.")
-                        Button("أعد تسجيل الفائتة") { confirmRestore = true }.accessibilityIdentifier("prayer-old-restore")
-                    } else {
-                        Button("أضف الفائتة") { save(false) }.accessibilityIdentifier("prayer-old-save")
-                    }
-                }.disabled(session.prayerWriteInProgress || (fridayNoon && fridayKind == nil))
-                }
-            }
-            .scrollContentBackground(.hidden).background(theme.background)
-            .navigationTitle(byCount ? "فوائت قديمة" : "فائتة قديمة").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إغلاق") { finished() } } }
-            .confirmationDialog("أعد تسجيل هذه الفائتة؟", isPresented: $confirmRestore, titleVisibility: .visible) {
-                Button("أعد التسجيل") { save(true) }
-            }
-            .onChange(of: date) { _, _ in fridayKind = nil }
-            .onChange(of: prayer) { _, _ in fridayKind = nil }
-            .onChange(of: hasUnsavedInput, initial: true) { _, dirty in rootDraftChanged(rootBlockerID, dirty) }
-            .onDisappear { rootDraftChanged(rootBlockerID, false) }
-        }
-    }
-    private func saveRun() {
-        guard let count else { return }
-        session.addOldMissedRun(prayer: prayer, count: count, lastDay: lastDay) { success in if success { finished() } }
-    }
-    private func save(_ restore: Bool) { session.addOldMissedPrayer(reference, fridayKind: fridayNoon ? fridayKind : nil, restoreDeleted: restore) { success in if success { finished() } } }
-    private func title(_ prayer: Prayer) -> String { switch prayer { case .fajr: "الفجر"; case .dhuhr: "الظهر"; case .asr: "العصر"; case .maghrib: "المغرب"; case .isha: "العشاء" } }
 }

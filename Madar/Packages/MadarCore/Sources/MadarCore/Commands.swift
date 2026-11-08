@@ -62,7 +62,6 @@ public enum CommandOperation: Codable, Equatable, Sendable {
     case continuePrayerTrip(city: String, country: String, place: ActivePlace, homeKm: Double?)
     case endPrayerTrip(UUID)
     case logPrayerPair(day: GregorianDay, pair: PrayerPair, status: PrayerStoredStatus, shortened: Bool, mode: PrayerPairMode)
-    /// FB-39: qada by count (`prayer.addOldMissedRun`, `prayer.makeUpOldest`), staged as one prayer mutation with one undo.
     case stagePrayerMutation(PrayerMutation)
 }
 public struct CoreCommandReceipt: Codable, Equatable, Sendable {
@@ -123,7 +122,7 @@ public protocol CommandStoreAdapter: Sendable {
 public struct CommandBus: Sendable {
     // Names implemented by this milestone. Unknown and later-room names are invalid
     // before authorization, so they cannot become indefinitely recoverable needsApp work.
-    public static let appOnlyCommandNames: Set<String> = Set(["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.addOldMissedRun", "prayer.makeUpOldest", "prayer.editTrackingStart", "prayer.startTrip", "prayer.continueTrip", "prayer.endTrip", "prayer.logPair"]).union(MoneyCommandPayload.names.subtracting(transportBlindWriteNames)).union(HabitCommand.names.subtracting(transportBlindWriteNames)).union(BookCommand.names).union(QuranCommandPayload.names).union(DiaryEditorCommand.names).union(["diary.appendLine", "diary.addMargin", "diary.freezeDay", "diary.completeWelcome"])
+    public static let appOnlyCommandNames: Set<String> = Set(["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.setHeart", "prayer.logQiyam", "prayer.editTrackingStart", "prayer.startTrip", "prayer.continueTrip", "prayer.endTrip", "prayer.logPair"]).union(MoneyCommandPayload.names.subtracting(transportBlindWriteNames)).union(HabitCommand.names.subtracting(transportBlindWriteNames)).union(BookCommand.names).union(QuranCommandPayload.names).union(DiaryEditorCommand.names).union(["diary.appendLine", "diary.addMargin", "diary.freezeDay", "diary.completeWelcome"])
     /// §16 blindWrite commands that Shortcuts, widgets and Controls may queue through the inbox.
     /// They reveal nothing and carry an explicit day or period, so a late drain cannot misdate them.
     public static let transportBlindWriteNames: Set<String> = ["prayer.log", "habit.complete", "money.ingestBankMessage", "money.logExpense"]
@@ -179,7 +178,7 @@ public struct CommandBus: Sendable {
             guard Set(payload.keys).isSubset(of: ["dayKey", "prayer", "status", "heart", "shortened", "fridayKind"]),
                   case .string(let dayKey) = payload["dayKey"], (try? GregorianDay(dayKey)) != nil,
                   case .string(let prayerRaw) = payload["prayer"], let prayer = Prayer(rawValue: prayerRaw),
-                  case .string(let status) = payload["status"], ["jamaah", "alone", "qada", "missed"].contains(status) else { return .init(status: .rejected, reason: "invalidPayload") }
+                  case .string(let status) = payload["status"], ["jamaah", "alone", "qada"].contains(status) else { return .init(status: .rejected, reason: "invalidPayload") }
             var heart: String?, shortened: Bool?
             if let value = payload["heart"], value != .null {
                 guard case .string(let h) = value, ["distracted", "present", "khashi"].contains(h) else { return .init(status: .rejected, reason: "invalidPayload") }
@@ -197,21 +196,6 @@ public struct CommandBus: Sendable {
             if shortened == true && (prayer == .fajr || prayer == .maghrib) { return .init(status: .rejected, reason: "invalidShortening") }
             operation = .logPrayer(dayKey: dayKey, prayer: prayer, status: status, heart: heart, shortened: shortened, fridayKind: fridayKind)
             semantics = .upsert; naturalKey = "prayer." + dayKey + "." + prayer.rawValue
-        case "prayer.addOldMissed":
-            do {
-                let (mutation, key) = try PrayerMutation.parse(name: envelope.name, payload: payload)
-                switch mutation {
-                case .addOldMissed(let ref, let kind): operation = .addOldMissedPrayer(ref, fridayKind: kind, restoreDeleted: false)
-                case .restoreOldMissed(let ref, let kind): operation = .addOldMissedPrayer(ref, fridayKind: kind, restoreDeleted: true)
-                default: return .init(status: .rejected, reason: "invalidPayload")
-                }
-                semantics = .upsert; naturalKey = key
-            } catch { return .init(status: .rejected, reason: "invalidPayload") }
-        case "prayer.addOldMissedRun", "prayer.makeUpOldest":
-            do {
-                let (mutation, key) = try PrayerMutation.parse(name: envelope.name, payload: payload)
-                operation = .stagePrayerMutation(mutation); semantics = key == nil ? .append : .upsert; naturalKey = key
-            } catch { return .init(status: .rejected, reason: "invalidPayload") }
         case "prayer.editTrackingStart":
             do {
                 let (mutation, key) = try PrayerMutation.parse(name: envelope.name, payload: payload)
@@ -247,43 +231,8 @@ public struct CommandBus: Sendable {
                 operation = .answerPrayerHeart(reference, heart)
                 semantics = .upsert; naturalKey = key
             } catch { return .init(status: .rejected, reason: "invalidPayload") }
-        case "prayer.makeUp":
-            guard Set(payload.keys).isSubset(of: ["dayKey", "prayer", "at", "fridayKind"]),
-                  case .string(let dayKey) = payload["dayKey"], (try? GregorianDay(dayKey)) != nil,
-                  case .string(let prayerRaw) = payload["prayer"], let prayer = Prayer(rawValue: prayerRaw),
-                  case .string(let atRaw) = payload["at"] else { return .init(status: .rejected, reason: "invalidPayload") }
-            let formatter = ISO8601DateFormatter()
-            let at = formatter.date(from: atRaw) ?? { formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return formatter.date(from: atRaw) }()
-            guard let at, at <= now else { return .init(status: .rejected, reason: "invalidPayload") }
-            var fridayKind: String?
-            if let value = payload["fridayKind"], value != .null {
-                guard case .string(let raw) = value, FridayPrayerKind(rawValue: raw) != nil else { return .init(status: .rejected, reason: "invalidPayload") }
-                fridayKind = raw
-            }
-            operation = .makeUpPrayer(dayKey: dayKey, prayer: prayer, at: at, fridayKind: fridayKind)
-            semantics = .upsert; naturalKey = "prayer." + dayKey + "." + prayer.rawValue
         case "prayer.resolveGap":
-            guard Set(payload.keys) == ["resolutions"], case .array(let values) = payload["resolutions"],
-                  !values.isEmpty, values.count <= 10_000 else { return .init(status: .rejected, reason: "invalidPayload") }
-            var resolutions: [PrayerGapResolution] = []
-            for value in values {
-                guard case .object(let item) = value,
-                      Set(item.keys).isSubset(of: ["dayKey", "prayer", "status", "fridayKind"]),
-                      case .string(let dayKey) = item["dayKey"], (try? GregorianDay(dayKey)) != nil,
-                      case .string(let prayerRaw) = item["prayer"], let prayer = Prayer(rawValue: prayerRaw),
-                      case .string(let statusRaw) = item["status"],
-                      let status = PrayerStoredStatus(rawValue: statusRaw),
-                      [.jamaah, .alone, .missed, .unrecordedHistory, .excused].contains(status) else { return .init(status: .rejected, reason: "invalidPayload") }
-                var fridayKind: FridayPrayerKind?
-                if let value = item["fridayKind"], value != .null {
-                    guard case .string(let raw) = value, let kind = FridayPrayerKind(rawValue: raw) else { return .init(status: .rejected, reason: "invalidPayload") }
-                    fridayKind = kind
-                }
-                resolutions.append(.init(reference: .init(day: try GregorianDay(dayKey), prayer: prayer), status: status, fridayKind: fridayKind))
-            }
-            guard Set(resolutions.map(\.reference)).count == resolutions.count else { return .init(status: .rejected, reason: "invalidPayload") }
-            operation = .resolvePrayerGap(resolutions)
-            semantics = .upsert; naturalKey = "prayer.gap." + resolutions.map { $0.reference.naturalKey }.sorted().joined(separator: "|")
+            return .init(status: .rejected, reason: "unavailableInM0")
         case "settings.set":
             guard Set(payload.keys) == ["settings"], case .object(let settings) = payload["settings"], !settings.isEmpty else { return .init(status: .rejected, reason: "invalidPayload") }
             operation = .replaceSettings(settings); semantics = .upsert

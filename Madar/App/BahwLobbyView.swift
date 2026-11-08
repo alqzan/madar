@@ -13,7 +13,7 @@ enum BahwBlock: String, CaseIterable {
         switch self { case .habits: "عاداتك"; case .salah: "الصلاة"; case .quran: "القرآن"; case .mal: "المال"; case .year: "السنة"; case .upcoming: "الأيام القادمة"; case .notes: "المذكرات"; case .mihbara: "المحبرة" }
     }
     var symbol: String {
-        switch self { case .habits: "MadarHabits"; case .salah: "MadarPrayer"; case .quran: "MadarQuran"; case .year: "MadarYear"; case .upcoming: "MadarUpcoming"; case .notes: "MadarDiary"; case .mihbara: "books.vertical"; case .mal: "banknote"; default: "circle" }
+        switch self { case .habits: "MadarHabits"; case .salah: "MadarPrayer"; case .quran: "MadarQuran"; case .year: "MadarYear"; case .upcoming: "MadarUpcoming"; case .notes: "MadarDiary"; case .mihbara: "books.vertical"; case .mal: "banknote" }
     }
     var tab: String? { switch self { case .salah: "prayer"; case .quran: "quran"; case .notes: "notes"; default: nil } }
 }
@@ -171,20 +171,11 @@ struct BahwLobbyView: View {
     private func presentAttention(force: Bool) {
         // Never over the first-run welcome (it opened on top of it and hid the welcome until dismissed).
         guard session.onboardingComplete, session.pendingIntro == nil, !arranging, !drawerOpen, attention == nil, session.selectedTab == "foundation" else { return }
-        var value = service.attention(includeReconcile: true, ignoringThrottle: force)
+        let value = service.attention(includeReconcile: true, ignoringThrottle: force)
         #if DEBUG
         // UI tests drive the lobby behind a fixed clock and a fresh store; the sheet is opened there only on request (`MADAR_UI_ATTENTION=1`).
         let environment = ProcessInfo.processInfo.environment
-        if !force, environment["MADAR_UI_STORE_ID"] != nil && environment["MADAR_UI_ATTENTION"] != "1" && environment["MADAR_UI_ATTENTION_SAMPLE"] != "1" { return }
-        // Screenshot sample for the simulator only (`SIMCTL_CHILD_MADAR_UI_ATTENTION_SAMPLE=1`); never reads or writes real data.
-        if ProcessInfo.processInfo.environment["MADAR_UI_ATTENTION_SAMPLE"] == "1" {
-            let today = service.today
-            func item(_ day: GregorianDay, _ prayer: Prayer, _ name: String, _ word: String, friday: Bool = false) -> BahwAttention.PrayerItem {
-                .init(reference: .init(day: day, prayer: prayer), name: name, dayWord: word, fridayNoon: friday)
-            }
-            value = BahwAttention(prayers: [item(today.adding(days: -1), .dhuhr, "الجمعة", "أمس", friday: true), item(today.adding(days: -1), .asr, "العصر", "أمس"),
-                                            item(today, .fajr, "الفجر", "اليوم")], moneyCount: 3)
-        }
+        if !force, environment["MADAR_UI_STORE_ID"] != nil && environment["MADAR_UI_ATTENTION"] != "1" { return }
         #endif
         guard !value.isEmpty, force || BahwAttentionMemory.isNew(value) else { return }
         attention = value
@@ -416,9 +407,8 @@ private struct BahwSuggestionsView: View {
     }
     private func open(_ destination: BahwSuggestion.Destination) {
         switch destination {
-        // Unlogged prayers and unsorted messages are settled in the pop-up over the lobby; the room is for details.
         case .prayer:
-            if AppBahwService(session: session).attention().prayers.isEmpty { session.selectedTab = "prayer" } else { session.attentionRequest += 1 }
+            session.selectedTab = "prayer"
         case .habit(let id): session.habitRouteID = id; session.habitsOpen = true
         case .quran: session.selectedTab = "quran"
         case .diary:

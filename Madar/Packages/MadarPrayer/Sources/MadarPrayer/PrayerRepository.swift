@@ -13,7 +13,6 @@ public final class PrayerRepository {
     public let placeName: String
     public let pendingDays: Int
     let logs: [PrayerLog]
-    let qadaRows: [QadaItem]
     let nightRows: [QiyamNight]
     let trips: [Trip]
     public init(context: ModelContext) throws {
@@ -28,7 +27,6 @@ public final class PrayerRepository {
         tripOptions = forTrip
         pendingDays = min(14, max(3, Int(try settings.value(for: "salah.pendingDays").number ?? 7)))
         logs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.mergedInto == nil }
-        qadaRows = try context.fetch(FetchDescriptor<QadaItem>()).filter { $0.mergedInto == nil }
         nightRows = try context.fetch(FetchDescriptor<QiyamNight>()).filter { $0.mergedInto == nil }
         trips = try context.fetch(FetchDescriptor<Trip>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && !$0.dismissed && $0.start != nil }
     }
@@ -83,9 +81,6 @@ public final class PrayerRepository {
         case .isha: return occurrence(.init(day: ref.day.adding(days: 1), prayer: .fajr))?.time
         }
     }
-    public func oldMissedRequiresRestore(_ ref: PrayerReference) -> Bool {
-        log(ref, includeDeleted: true)?.deletedAt != nil || qada(ref, includeDeleted: true)?.deletedAt != nil
-    }
     public func tracking(at now: Date) throws -> PrayerTracking {
         let value = try settings.value(for: "salah.trackingStart").object ?? [:]
         let start = value["dayKey"]?.string.flatMap { try? GregorianDay($0) } ?? prayerDay(at: now)
@@ -107,22 +102,9 @@ public final class PrayerRepository {
         }
         return index
     }()
-    private lazy var liveQadaIndex: [String: QadaItem] = {
-        var index: [String: QadaItem] = [:]
-        for row in qadaRows where row.deletedAt == nil {
-            let key = row.originalDayKey + "|" + row.prayer
-            if let existing = index[key], !(existing.updatedAt < row.updatedAt) { continue }
-            index[key] = row
-        }
-        return index
-    }()
     func log(_ ref: PrayerReference, includeDeleted: Bool = false) -> PrayerLog? {
         if reading && !includeDeleted { return liveLogIndex[ref.day.description + "|" + ref.prayer.rawValue] }
         return logs.filter { $0.dayKey == ref.day.description && $0.prayer == ref.prayer.rawValue && (includeDeleted || $0.deletedAt == nil) }.max { a, b in a.updatedAt == b.updatedAt ? a.id.uuidString > b.id.uuidString : a.updatedAt < b.updatedAt }
-    }
-    func qada(_ ref: PrayerReference, includeDeleted: Bool = false) -> QadaItem? {
-        if reading && !includeDeleted { return liveQadaIndex[ref.day.description + "|" + ref.prayer.rawValue] }
-        return qadaRows.filter { $0.originalDayKey == ref.day.description && $0.prayer == ref.prayer.rawValue && (includeDeleted || $0.deletedAt == nil) }.max { $0.updatedAt < $1.updatedAt }
     }
     public func day(_ day: GregorianDay, now: Date) throws -> PrayerDaySummary {
         try self.day(day, now: now, start: tracking(at: now).day, current: prayerDay(at: now))
@@ -130,7 +112,8 @@ public final class PrayerRepository {
     /// `start` and `current` are the same for every day of one snapshot, so the snapshot reads them once.
     private func day(_ day: GregorianDay, now: Date, start: GregorianDay, current: GregorianDay) throws -> PrayerDaySummary {
         return .init(day: day, cells: Prayer.allCases.map { prayer in
-            let ref = PrayerReference(day: day, prayer: prayer), occurrence = occurrence(ref), row = log(ref)
+            let ref = PrayerReference(day: day, prayer: prayer), occurrence = occurrence(ref)
+            let row = log(ref).flatMap { ["jamaah", "alone", "qada"].contains($0.status) ? $0 : nil }
             let due = occurrence.map { $0.time <= now } ?? false
             let expiredPending = due && day.adding(days: pendingDays) <= current
             let status = row.flatMap { PrayerDisplayStatus(rawValue: $0.status) } ?? (due && day >= start ? (expiredPending ? .unconfirmed : .pending) : .future)
@@ -138,9 +121,7 @@ public final class PrayerRepository {
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
             let friday = prayer == .dhuhr && calendar.component(.weekday, from: day.date(in: zone)) == 6 && row?.shortened != true
             let windowEnded = missedWindowEnd(ref).map { now >= $0 } ?? false
-            let canMarkMissed = day >= start && windowEnded
-            let debt = qada(ref)
-            return PrayerCell(reference: ref, status: status, heart: row?.heart.flatMap(PrayerHeart.init(rawValue:)), time: occurrence == nil ? nil : row?.eventAt ?? occurrence?.time, prayerTime: occurrence?.time, shortened: row?.shortened == true, fridayKind: row?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), pairID: row?.pairID, isFriday: friday, canLog: day >= start && (due || occurrence == nil), canMarkMissed: canMarkMissed, canMakeUp: windowEnded && (day >= start || debt != nil) && debt?.madeUpAt == nil)
+            return PrayerCell(reference: ref, status: status, heart: row?.heart.flatMap(PrayerHeart.init(rawValue:)), time: occurrence == nil ? nil : row?.eventAt ?? occurrence?.time, prayerTime: occurrence?.time, shortened: row?.shortened == true, fridayKind: row?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), pairID: row?.pairID, isFriday: friday, canLog: day >= start && (due || occurrence == nil), canMarkMissed: false, canMakeUp: day >= start && windowEnded)
         })
     }
     public func nightRequiresRestore(_ night: GregorianDay) -> Bool {
@@ -168,15 +149,8 @@ public final class PrayerRepository {
         guard cursor <= current else { throw PrayerDomainError.invalidTrackingStart }
         while cursor <= current { all.append(try day(cursor, now: now, start: track.day, current: current)); cursor = cursor.adding(days: 1) }
         let month = all.filter { $0.day >= monthStart }
-        let qada = qadaRows.filter { $0.deletedAt == nil }.compactMap { row -> PrayerQada? in
-            guard let day = try? GregorianDay(row.originalDayKey), let prayer = Prayer(rawValue: row.prayer) else { return nil }
-            let reference = PrayerReference(day: day, prayer: prayer)
-            let logRow = log(reference)
-            let zone = logRow.flatMap { TimeZone(identifier: $0.tzID) } ?? occurrence(reference)?.place.timeZone ?? home.timeZone
-            var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
-            let isFriday = prayer == .dhuhr && calendar.component(.weekday, from: day.date(in: zone)) == 6
-            return .init(id: row.id, reference: reference, madeUpAt: row.madeUpAt, fridayKind: logRow?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), isFriday: isFriday)
-        }.sorted { $0.reference.naturalKey < $1.reference.naturalKey }
+        // Qada is now a status on a completed prayer, not an outstanding-debt collection.
+        let qada: [PrayerQada] = []
         let nights = nightRows.filter { $0.deletedAt == nil }.compactMap { row -> PrayerNight? in guard let day = try? GregorianDay(row.nightKey) else { return nil }; return .init(night: day, rakaat: row.rakaat, witr: row.witr, quranSessionID: row.quranSessionID) }.sorted { $0.night < $1.night }
         let cells = all.flatMap(\.cells)
         let next = (0...1).flatMap { offset in Prayer.allCases.compactMap { occurrence(.init(day: current.adding(days: offset), prayer: $0)) } }.filter { $0.time > now }.min { $0.time < $1.time }
@@ -187,13 +161,13 @@ public final class PrayerRepository {
 }
 public enum PrayerAnalytics {
     public static func statistics(month: [PrayerDaySummary], all: [PrayerDaySummary], qada: [PrayerQada], currentDay: GregorianDay) -> PrayerStatistics {
-        let cells = month.flatMap(\.cells), counted = cells.filter { [.jamaah, .alone, .qada, .missed].contains($0.status) }
+        let cells = month.flatMap(\.cells), counted = cells.filter { [.jamaah, .alone, .qada].contains($0.status) }
         let onTime = counted.filter { [.jamaah, .alone].contains($0.status) }.count
         var heart: [PrayerHeart: Int] = [:]
         for cell in cells { if let value = cell.heart { heart[value, default: 0] += 1 } }
         func streak(_ level: PrayerStreakLevel) -> Int { PrayerStreaks.length(all, level: level, qada: qada, before: currentDay) }
         var commitment: [Prayer: (jamaah: Int, alone: Int, denominator: Int)] = [:]
         for prayer in Prayer.allCases { let rows = counted.filter { $0.reference.prayer == prayer }; commitment[prayer] = (rows.filter { $0.status == .jamaah }.count, rows.filter { $0.status == .alone }.count, rows.count) }
-        return .init(onTime: onTime, denominator: counted.count, madeUp: counted.filter { $0.status == .qada }.count, owed: qada.filter { $0.madeUpAt == nil }.count, prayerStreak: streak(.onTime), congregationStreak: streak(.congregation), completionStreak: streak(.completion), heartDistribution: heart, last25: Array(all.flatMap(\.cells).filter { $0.status != .future && $0.status != .unrecordedHistory }.suffix(25)), commitment: commitment)
+        return .init(onTime: onTime, denominator: counted.count, madeUp: counted.filter { $0.status == .qada }.count, owed: 0, prayerStreak: streak(.onTime), congregationStreak: streak(.congregation), completionStreak: streak(.completion), heartDistribution: heart, last25: Array(all.flatMap(\.cells).filter { $0.status != .future && $0.status != .unrecordedHistory }.suffix(25)), commitment: commitment)
     }
 }
