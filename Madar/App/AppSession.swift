@@ -50,6 +50,8 @@ final class AppSession {
     var moneyExpenseSeed: MoneyExpenseSeed?
     @ObservationIgnored private var queuedMoneyExpenseSeeds: [MoneyExpenseSeed] = []
     var habitsOpen = false
+    /// The lobby habits card's chosen period; kept here so a block rebuilt after a save (e.g. leaving «رتّب») keeps it.
+    var lobbyHabitPeriod: String?
     /// A lobby-root link waits for the habits editor to close so its local, unsaved fields stay visible.
     var bahwRootRequestID: UUID?
     /// A capture named a prayer without its state; the prayer home opens that prayer's log sheet.

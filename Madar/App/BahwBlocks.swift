@@ -17,7 +17,10 @@ struct BahwBlockView: View {
     var moneyRevealed = false
     @State private var mihbaraSnapshot: MihbaraSnapshot?
     @State private var mihbaraLocked = true
-    @State private var habitPeriod: HabitFrequency?
+    private var habitPeriod: HabitFrequency? {
+        get { service.session.lobbyHabitPeriod.flatMap(HabitFrequency.init(rawValue:)) }
+        nonmutating set { service.session.lobbyHabitPeriod = newValue?.rawValue }
+    }
     @State private var completionInFlight: Set<UUID> = []
     /// The lobby reads the full prayer history once per minute off the main actor, then reuses its projection for redraws.
     @State private var prayerModel: BahwPrayerModel?
