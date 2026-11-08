@@ -383,7 +383,7 @@ struct BahwBlockView: View {
                     }
                     let week = rows.filter { !$0.paused && $0.summary.current?.rule.frequency == .weekly && ($0.summary.current?.target ?? 0) > 0 }
                     if !week.isEmpty, !daily.isEmpty {
-                        Text("هذا الأسبوع: " + week.prefix(3).map { r in r.name + " " + digits.string(r.summary.current?.value ?? 0) + " من " + (r.summary.current?.rule.unit.map { u in habitUnitCount(r.summary.current?.target ?? 0, u, digits, genitive: true) } ?? digits.string(r.summary.current?.target ?? 0)) }.joined(separator: "، "))
+                        Text("هذا الأسبوع: " + week.prefix(3).map { r in r.summary.current?.met == true ? r.name + " تمّت" : r.name + " " + digits.string(r.summary.current?.value ?? 0) + " من " + (r.summary.current?.rule.unit.map { u in habitUnitCount(r.summary.current?.target ?? 0, u, digits, genitive: true) } ?? digits.string(r.summary.current?.target ?? 0)) }.joined(separator: "، "))
                             .font(MadarTypography.fine()).foregroundStyle(room.secondaryInk)
                             .lineLimit(1).accessibilityIdentifier("bahw-habits-wide-week")
                     }
