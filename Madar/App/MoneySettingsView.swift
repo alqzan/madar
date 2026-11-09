@@ -162,7 +162,7 @@ struct MoneySettingsView: View {
                             case .room: roomPage
                             case .reconciliation: reconciliationPage
                             }
-                            Button("أعد إعدادات هذا الباب إلى المتفق عليه") {
+                            Button("أعِد الافتراضي") {
                                 editing = false; app.reset(keys) { load() }
                             }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier(
                                 "money-settings-reset")

@@ -129,7 +129,7 @@ struct RoomHomeLayoutEditor: View {
                         }
                     }
                 }
-                Button("أعِد ترتيب الباب الافتراضي") { session.reset([layout.key]) }
+                Button("أعِد الترتيب الافتراضي") { session.reset([layout.key]) }
                     .font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("room-layout-reset")
             }.padding(16)
         }

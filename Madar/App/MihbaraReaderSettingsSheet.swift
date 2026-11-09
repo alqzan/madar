@@ -226,7 +226,7 @@ struct MihbaraReaderSettingsSheet: View {
                     segmented(MihbaraReaderFooter.allCases.map { ($0.title, $0.rawValue) }, selected: options.footer.rawValue, id: "footer") { set("footer", .string($0)) }
                 }
             }
-            Button("العودة إلى الإعدادات الافتراضية", action: reset)
+            Button("أعِد الافتراضي", action: reset)
                 .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
                 .glassEffect(.regular.interactive(), in: Capsule())
                 .accessibilityIdentifier("mihbara-reader-reset")

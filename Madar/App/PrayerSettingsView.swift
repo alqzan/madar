@@ -91,7 +91,7 @@ struct PrayerSettingsView: View {
                     if let message = state.notifications.liveActivityMessage { Text(message).font(MadarTypography.caption()) }
                     Text("لا يصدر تذكير قبل انتهاء حرمة الصلاة. إيقاف السؤال يلغي أسئلته المعلّقة؛ يبقى التسجيل من التطبيق متاحًا.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }
-                Button("أعِد إعدادات الصلاة المتفق عليها") { confirmReset = true }.accessibilityIdentifier("prayer-settings-reset")
+                Button("أعِد الافتراضي") { confirmReset = true }.accessibilityIdentifier("prayer-settings-reset")
             } else { ContentUnavailableView("إعدادات الصلاة", systemImage: "slider.horizontal.3", description: Text("تُقرأ الإعدادات المحفوظة من هذا الجهاز.")); Button("حاول مجددًا") { Task { await model.refresh() } } }
         }
         .font(MadarTypography.body()).navigationTitle("خصّص الصلاة")

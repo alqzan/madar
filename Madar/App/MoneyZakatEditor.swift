@@ -49,7 +49,7 @@ struct MoneyZakatEditor: View {
             if basisChosen { Text(selectedBasis == .gold ? "اخترت الذهب عيار ٢٤" : "اخترت الفضة").font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText")) }
             if selectedBasis == .gold { field("سعر غرام الذهب عيار ٢٤، بعملة البيت", $gold, "gold-price"); field("وزن النصاب بالغرام", $goldWeight, "gold-weight", placeholder: "٨٥") }
             else { field("سعر غرام الفضة، بعملة البيت", $silver, "silver-price"); field("وزن النصاب بالغرام", $silverWeight, "silver-weight", placeholder: "٥٩٥") }
-            Button("أعد وزني النصاب إلى المتفق عليهما") { goldWeight=service.moneyInput(85000,exponent:3);silverWeight=service.moneyInput(595000,exponent:3) }.font(MadarTypography.caption()).frame(minHeight:44)
+            Button("أعِد الوزنين الافتراضيين") { goldWeight=service.moneyInput(85000,exponent:3);silverWeight=service.moneyInput(595000,exponent:3) }.font(MadarTypography.caption()).frame(minHeight:44)
             Text("المظاريف داخل الحسابات أصلًا").font(MadarTypography.section())
             if numbersVisible { field("أموال أخرى تُزكّى، بعملة البيت", $other, "other", placeholder: "٠") }
             else {
