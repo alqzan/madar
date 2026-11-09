@@ -293,7 +293,8 @@ import MadarInbox
         #expect(try inbox.wasCommitted(commandID: first.command.commandID, generationID: generation))
     }
 
-    @Test func test_M1T02_recoveryCommandsStayAppOnlyAndUnknownCommandsQuarantine() async throws {
+    @Test func test_M1T02_retiredAndUnknownCommandsQuarantineAndAppOnlyStays() async throws {
+        // prayer.makeUp / prayer.resolveGap are retired (RP1, qada by count): like an unknown command they quarantine.
         let (container, adapter, inbox) = try fixture(), generation = UUID()
         for name in ["unknown.command", "prayer.makeUp", "prayer.resolveGap"] {
             _ = try inbox.enqueue(.init(expectedGenerationID: generation, command: .init(name: name, payload: .object([:]), source: .widget)))
@@ -309,11 +310,11 @@ import MadarInbox
             return command.commandID == locked.command.commandID && !unlocked ? .init(status: .needsUnlock) : nil
         })
         try await drainer.drain()
-        #expect(try inbox.processingFiles().count == 4)
+        #expect(try inbox.processingFiles().count == 2) // settings.set (app-only) + the locked prayer.log
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<PrayerLog>()) == 1)
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 1)
         let quarantined = try FileManager.default.contentsOfDirectory(at: inbox.directory.appending(path: "quarantine"), includingPropertiesForKeys: nil)
-        #expect(quarantined.filter { $0.pathExtension == "jsonl" }.count == 1)
+        #expect(quarantined.filter { $0.pathExtension == "jsonl" }.count == 3)
         for file in quarantined where file.pathExtension == "json" {
             let diagnostic = String(decoding: try Data(contentsOf: file), as: UTF8.self)
             #expect(diagnostic.contains("invalidCommand"))
@@ -321,7 +322,7 @@ import MadarInbox
         }
         unlocked = true
         try await drainer.drain()
-        #expect(try inbox.processingFiles().count == 3)
+        #expect(try inbox.processingFiles().count == 1) // only settings.set waits for the app
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 2)
         #expect(!((try adapter.hasReceipt(commandID: appOnly.commandID))))
     }

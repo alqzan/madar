@@ -144,19 +144,23 @@ import Testing
     }
 
     @Test func budgetOfFourSendsThreeAndOneDigestThatKnowsItsMembers() {
-        // Four room requests on one Madar day, B = 4: the first B − 1 by priority then time, the last one in a digest.
+        // Five room requests on one Madar day, B = 4 (§8 item 8: more than B → the first B − 1 by priority then time, the rest in one digest; B or fewer all go out).
         let at = { (minutes: Double) in day.dhuhr.addingTimeInterval(3600 + minutes * 60) }
         let candidates: [NotificationCandidate] = [
             .init(id: "quran.2026-10-09.wird", room: .quran, dueAt: at(0), dayKey: "2026-10-09"),
             .init(id: "quran.2026-10-09.late", room: .quran, dueAt: at(10), dayKey: "2026-10-09"),
             .init(id: "habits.2026-10-09.a", room: .habits, dueAt: at(20), dayKey: "2026-10-09"),
-            .init(id: "habits.2026-10-09.b", room: .habits, dueAt: at(30), dayKey: "2026-10-09")
+            .init(id: "habits.2026-10-09.b", room: .habits, dueAt: at(30), dayKey: "2026-10-09"),
+            .init(id: "habits.2026-10-09.c", room: .habits, dueAt: at(40), dayKey: "2026-10-09")
         ]
         let plan = NotificationArbiter.plan(candidates: candidates, prayerDays: [day], now: dawn, timeZone: ActivePlace.riyadh.timeZone,
                                             policy: .init(dailyBudget: 4, staleNudgeEnabled: false))
         #expect(plan.scheduled.filter { $0.kind == .reminder }.map(\.id) == ["quran.2026-10-09.wird", "quran.2026-10-09.late", "habits.2026-10-09.a"])
         #expect(plan.scheduled.filter { $0.kind == .digest }.map(\.id) == ["digest.2026-10-09"])
-        #expect(plan.digestMembers["digest.2026-10-09"] == ["habits.2026-10-09.b"])
+        #expect(plan.digestMembers["digest.2026-10-09"] == ["habits.2026-10-09.b", "habits.2026-10-09.c"])
+        // Exactly B requests: all four go out and no digest.
+        let exact = NotificationArbiter.plan(candidates: Array(candidates.prefix(4)), prayerDays: [day], now: dawn, timeZone: ActivePlace.riyadh.timeZone, policy: .init(dailyBudget: 4, staleNudgeEnabled: false))
+        #expect(exact.scheduled.filter { $0.kind == .reminder }.count == 4 && exact.scheduled.allSatisfy { $0.kind != .digest })
     }
 
     // §7.3: the intention card after Fajr, «في مثل هذا اليوم» after Isha by default; §8 item 8 ids and the notes cap of 2.

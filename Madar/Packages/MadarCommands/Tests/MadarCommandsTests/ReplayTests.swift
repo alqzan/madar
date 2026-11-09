@@ -247,7 +247,11 @@ import MadarPrayer
         let row = try #require(context.fetch(FetchDescriptor<PrayerLog>()).first)
         #expect(row.status == "qada" && row.eventAt == now && row.loggedAt == now)
         #expect(try context.fetch(FetchDescriptor<QadaItem>()).isEmpty)
-        #expect(try await bus.execute(command, now: now.addingTimeInterval(1)).status == .duplicate)
+        // The same envelope again replays its stored receipt; a fresh envelope with the same payload is a natural-key duplicate. Neither adds a row.
+        #expect(try await bus.execute(command, now: now.addingTimeInterval(1)).status == .applied)
+        let resent = CommandEnvelope(name: command.name, payload: command.payload, source: .app, issuedAt: now.addingTimeInterval(1))
+        #expect(try await bus.execute(resent, now: now.addingTimeInterval(1)).status == .duplicate)
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil }.count == 1)
 
         let undo = CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(command.commandID.uuidString)]), issuedAt: now.addingTimeInterval(2))
         #expect(try await bus.execute(undo, now: now.addingTimeInterval(2)).status == .applied)
