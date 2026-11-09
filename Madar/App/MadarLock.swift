@@ -86,8 +86,12 @@ struct PrivacyAuthorization {
     }
     func requiresProtection(_ feature: MadarProtectedFeature) -> Bool { requiredFeature(for: feature) != nil }
     func canPresent(_ feature: MadarProtectedFeature) -> Bool {
-        guard phase == .active, !disconnected, !covered, !redactionFailed, !scopeTransitionPending, !scopeReconciliationRequired else { return false }
-        return requiredFeature(for: feature).map { unlocked.contains($0) } ?? true
+        guard !disconnected, !scopeTransitionPending, !scopeReconciliationRequired else { return false }
+        // With the app lock disabled, temporary inactive/background scene phases do not
+        // turn the open room into a pseudo-locked state. OS file protection still applies.
+        guard let protectedFeature = requiredFeature(for: feature) else { return true }
+        guard phase == .active, !covered, !redactionFailed else { return false }
+        return unlocked.contains(protectedFeature)
     }
     func validate(_ ticket: PrivacyAuthorization) throws {
         guard !Task.isCancelled, ticket.owner == identity, ticket.generation == generation, ticket.epoch == epoch,

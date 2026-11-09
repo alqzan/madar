@@ -88,7 +88,7 @@ targets:
           - CFBundleURLName: com.alqzan.madar2
             CFBundleURLSchemes: [madar]
         ITSAppUsesNonExemptEncryption: false
-        NSCameraUsageDescription: امسح باركود الكتاب وصوّر صفحة الفهرس على هذا الجهاز.
+        NSCameraUsageDescription: التقط صورًا تضيفها إلى مذكراتك، وامسح باركود الكتاب أو فهرسه.
         NSFaceIDUsageDescription: افتح بيانات مدار المحمية بمصادقة الجهاز.
         NSLocationWhenInUseUsageDescription: يقرأ مدار موقعك مرة واحدة ليعرف مدينتك ويحسب مواقيت الصلاة بدقة، ويسألك إن كنت مسافرًا. يحفظ المدينة وإحداثياتها على جهازك فقط؛ ولمعرفة اسمها يرسل النظام الموقع إلى Apple مرة واحدة.
         NSHealthShareUsageDescription: يقرأ مدار الخطوات أو دقائق الحركة التي تختارها لحساب عادة المشي؛ لا يكتب في تطبيق الصحة.

@@ -1,6 +1,7 @@
 import SwiftUI
 import Photos
 import ImageIO
+import UIKit
 import UniformTypeIdentifiers
 import SwiftData
 import MadarCore
@@ -117,5 +118,34 @@ private struct DiaryDayPhotoThumb: View {
             }.frame(width: 64, height: 64).clipShape(.rect(cornerRadius: 8)).overlay { RoundedRectangle(cornerRadius: 8).stroke(theme.line) }
         }.buttonStyle(.madarPlain).accessibilityLabel("أضف هذه الصورة إلى صفحة اليوم").accessibilityIdentifier("diary-day-photo")
             .task { image = await DiaryPhotoLibrary.image(asset, side: 128) }
+    }
+}
+
+/// Opens the system camera directly from the diary. Captures are handed back as
+/// images and reduced to Madar's existing small local attachment copy.
+struct DiaryCameraCapture: UIViewControllerRepresentable {
+    let captured: (UIImage) -> Void
+    let cancelled: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(captured: captured, cancelled: cancelled) }
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.cameraCaptureMode = .photo
+        picker.delegate = context.coordinator
+        return picker
+    }
+    func updateUIViewController(_ picker: UIImagePickerController, context: Context) {}
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let captured: (UIImage) -> Void
+        let cancelled: () -> Void
+        init(captured: @escaping (UIImage) -> Void, cancelled: @escaping () -> Void) {
+            self.captured = captured; self.cancelled = cancelled
+        }
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage { captured(image) } else { cancelled() }
+        }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { cancelled() }
     }
 }

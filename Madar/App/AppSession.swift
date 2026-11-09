@@ -1228,7 +1228,7 @@ final class AppSession {
 
     var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }
     var bookStagingDirectory: URL { commandAdapter.bookStagingDirectory }
-    func executeDiaryCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID()) async throws {
+    func executeDiaryCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID(), updatesPresentation: Bool = true) async throws {
         guard !name.hasPrefix("diary.") || (lockController?.canPresent(.notes) ?? protectedDataAuthorized) else { throw DataError.invalidValue("المذكرات مقفلة") }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { endWrite() }
@@ -1240,7 +1240,7 @@ final class AppSession {
         func run() async throws -> CommandOutcome {
             let result = try await bus.execute(CommandEnvelope(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
             guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "diary command") }
-            try reload(); try publishSnapshot()
+            if updatesPresentation { try reload(); try publishSnapshot() }
             return result
         }
         // F02/V12: a habit change, an intention or a letter reschedules its reminder (a met habit or written intention stops reminding).

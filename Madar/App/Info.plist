@@ -38,7 +38,7 @@
 	<key>MadarCloudKitContainer</key>
 	<string>$(MADAR_CLOUDKIT_CONTAINER)</string>
 	<key>NSCameraUsageDescription</key>
-	<string>امسح باركود الكتاب وصوّر صفحة الفهرس على هذا الجهاز.</string>
+	<string>التقط صورًا تضيفها إلى مذكراتك، وامسح باركود الكتاب أو فهرسه.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>افتح بيانات مدار المحمية بمصادقة الجهاز.</string>
 	<key>NSHealthShareUsageDescription</key>

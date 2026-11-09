@@ -452,7 +452,7 @@ struct DiaryDayView: View {
             // N04: letters are checked when the diary is open and the app comes to the foreground.
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { aiAvailability = .checking; retry += 1 }
-                else { aiComposerOpen = false }
+                else if phase == .background { aiComposerOpen = false }
             }
             .onChange(of: canReadDiary) { _, canRead in
                 if canRead {

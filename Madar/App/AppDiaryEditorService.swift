@@ -30,7 +30,7 @@ extension AppDiaryService {
     func saveDraft(id: UUID, text: String, day: String, margin: GregorianDay?, writingDay: GregorianDay) async throws {
         var payload: [String:MadarCore.JSONValue] = ["id": .string(id.uuidString), "text": .string(text), "day": .string(day), "writingDayKey": .string(writingDay.description)]
         if let margin { payload["targetDayKey"] = .string(margin.description) }
-        try await app.executeDiaryCommand("diary.saveDraft", payload: payload)
+        try await app.executeDiaryCommand("diary.saveDraft", payload: payload, updatesPresentation: false)
     }
     @discardableResult func appendMedia(data: Data, kind: String, contentType: String, caption: String = "", day: String, writingDay: GregorianDay, duration: Int? = nil, assetID: String? = nil, id: UUID = UUID()) async throws -> UUID {
         try authorizeRead()

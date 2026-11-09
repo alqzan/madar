@@ -434,7 +434,7 @@ struct MadarAIAnalysisSheet: View {
             availability = await MadarAIAvailabilityChecker.check()
         }
         .task(id: scopeLoadKey) { await loadSource() }
-        .onChange(of: scenePhase) { _, value in if value != .active { dismiss() } }
+        .onChange(of: scenePhase) { _, value in if value == .background { dismiss() } }
         .onDisappear {
             configuration = nil; activeRequest = nil; request = nil; turns = []
             cachedEnglishSource = nil; englishAnswer = nil; arabicAnswer = nil

@@ -449,4 +449,14 @@ import UIKit
         XCTAssertEqual(presenter.coverWindow?.isHidden, true)
         XCTAssertFalse(window.accessibilityElementsHidden)
     }
+
+    func testNoAppLockDoesNotPseudoLockRoomsDuringTemporarySceneChanges() {
+        let lock = MadarLockController(scope: .none, service: Service())
+        XCTAssertTrue(lock.canPresent(.notes))
+        lock.sceneChanged(.inactive)
+        XCTAssertTrue(lock.canPresent(.notes), "An inactive scene must not lock notes when the app lock is off")
+        lock.sceneChanged(.active)
+        lock.sceneChanged(.background)
+        XCTAssertTrue(lock.canPresent(.notes), "Backgrounding must not lock notes when the app lock is off")
+    }
 }

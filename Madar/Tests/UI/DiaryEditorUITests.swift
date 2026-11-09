@@ -92,6 +92,19 @@ import XCTest
         app.buttons["diary-editor-save"].tap(); app.buttons["diary-today"].tap()
         XCTAssertTrue(app.staticTexts["مسودة من الصفحة"].waitForExistence(timeout: 10))
     }
+    func testWriterKeepsSavedContextAndAttachmentsVisible() throws {
+        continueAfterFailure = false
+        let app = launch("editor"); app.buttons["diary-write"].tap()
+        let context = app.descendants(matching: .any).matching(identifier: "diary-editor-saved-context").firstMatch
+        XCTAssertTrue(context.waitForExistence(timeout: 10), app.debugDescription)
+        let media = app.descendants(matching: .any).matching(identifier: "diary-editor-saved-media").firstMatch
+        XCTAssertTrue(media.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(app.buttons["diary-editor-cancel"].label, "احفظ مسودة")
+        XCTAssertEqual(app.buttons["diary-editor-save"].label, "احفظ الصفحة")
+        capture(app, "OWNER-writing-context-media-L")
+        app.buttons["diary-editor-cancel"].tap()
+        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10), app.debugDescription)
+    }
     func testUnsavedTranscriptRequiresExplicitDiscard() throws {
         continueAfterFailure = false
         let app = launch("editor"); app.buttons["diary-today"].tap()
