@@ -255,12 +255,12 @@ struct DiaryHubView: View {
                     ForEach(1...12, id: \.self) { month in miniMonth(archive, month: month) }
                 }
             }
-            Text("الأغمق = كتابات أكثر. اضغط أي شهر لفتح ورقته.").font(DiaryType.label).foregroundStyle(
+            Text("الأغمق كتابة أكثر. افتح أي شهر لترى ورقته.").font(DiaryType.label).foregroundStyle(
                 theme.color("ink3Text"))
             if travelDays.contains(where: { grid.parts($0).year == selectedYear }) {
                 HStack(spacing: 8) {
                     DiaryAirmailFrame(lineWidth: 1.4, dash: 3).frame(width: 16, height: 16);
-                    Text("الإطار البريدي = أيام السفر").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    Text("الإطار البريدي: أيام السفر").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                 }
                 .accessibilityElement(children: .combine).accessibilityIdentifier("diary-calendar-travel-legend")
             }

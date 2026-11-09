@@ -133,9 +133,9 @@ struct MoneyEnvelopesView: View {
             if visible, let daily = reading.reserve.dailyMinor, daily > 0 {
                 HStack(spacing: 8) {
                     Rectangle().fill(theme.color("reserve")).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) }.frame(width: 8, height: 8)
-                    Text(figure: "مربع = يومية " + amount(daily))
+                    Text(figure: "كل مربع يومية " + amount(daily))
                     Spacer(minLength: 0)
-                    Text("السطر = " + service.dailies(30))
+                    Text("كل سطر " + service.dailies(30))
                 }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }
             if let target = reading.reserveTargetMinor {

@@ -285,7 +285,7 @@ struct MoneyCashbackView: View {
     }
 
     private func footnote(_ r: MoneyCashbackReading) -> some View {
-        Label(r.hasPurchases ? "الجرّة تقدير: مشتريات كل بطاقة في الشهر بعد الردود × نسبتها. لا تغيّر نقدك ولا «صافي رصيدك»، وما ينزل فعلًا يُحسب مرة واحدة. اضغط بطاقة لترى نسبتها ومصدرها."
+        Label(r.hasPurchases ? "الجرّة تقدير لما سيرجع لك من مشتريات الشهر، ولا تدخل في نقدك حتى ينزل فعلًا."
                 : "لا مشتريات مؤكّدة بالبطاقة في هذه السنة بعد. تمتلئ الجرّة مع أول شراء، من نسبة كل بطاقة.", systemImage: "info.circle")
             .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
     }

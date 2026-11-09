@@ -120,7 +120,7 @@ struct MoneySalaryView: View {
             figure("الراتب", amount(salary), service.percent(salary, of: salary), theme.ink)
             figure("الالتزامات", signed(-plan.obligationsMinor), service.percent(plan.obligationsMinor, of: salary), tint("accent"))
             figure("المظاريف", signed(-plan.envelopesMinor), service.percent(plan.envelopesMinor, of: salary), tint("bills"))
-            figure("اليومية × " + service.digits.string(r.opening.input.expectedLengthDays), signed(-plan.dailiesMinor), service.percent(plan.dailiesMinor, of: salary), tint("surplus"))
+            figure("يومياتك " + service.days(r.opening.input.expectedLengthDays), signed(-plan.dailiesMinor), service.percent(plan.dailiesMinor, of: salary), tint("surplus"))
             HStack {
                 Text(plan.leftoverMinor >= 0 ? "الباقي ← " + destination : "الباقي").bold()
                 Spacer(minLength: 4)

@@ -918,7 +918,7 @@ struct MihbaraHomeView: View {
                 let placeholder = VStack(spacing: 12) {
                     Image(systemName: "book.pages").font(.largeTitle)
                     Text("مكان كتابك").font(MadarTypography.cardTitle())
-                    Text(waiting > 0 ? "اختر كتابًا من «أبي أقرأها» (" + MihbaraCopy.books(waiting, service.digits) + ")، واضغطه مطوّلًا ثم «ضعه على الطاولة»" : r.books.isEmpty ? "هنا يوضع الكتاب الذي تقرؤه، وتكمل منه حيث وقفت" : "أضف كتابًا وابدأ من موضعك")
+                    Text(waiting > 0 ? "اختر كتابًا من «أبي أقرأها» (" + MihbaraCopy.books(waiting, service.digits) + ")، واضغطه مطوّلًا ثم «ابدأ قراءته»" : r.books.isEmpty ? "هنا يوضع الكتاب الذي تقرؤه، وتكمل منه حيث وقفت" : "أضف كتابًا وابدأ من موضعك")
                         .font(MadarTypography.caption()).multilineTextAlignment(.center).padding(.horizontal, 16)
                 }.frame(maxWidth: .infinity, minHeight: 210).background(theme.surface, in: .rect(cornerRadius: 5))
                     .overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) }
