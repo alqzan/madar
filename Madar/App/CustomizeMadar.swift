@@ -492,7 +492,7 @@ struct SettingsPageReset: View {
                 Text("أعِد هذه الصفحة إلى الافتراضي").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.madarPlain).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("settings-page-reset")
-            .confirmationDialog("تعود إعدادات هذه الصفحة إلى ما اتفقنا عليه؟", isPresented: $confirming, titleVisibility: .visible) {
+            .confirmationDialog("تعود إعدادات هذه الصفحة إلى المتفق عليه؟", isPresented: $confirming, titleVisibility: .visible) {
                 Button("أعِد الافتراضي", role: .destructive) { session.reset(keys) }
                 Button("إلغاء", role: .cancel) {}
             } message: { Text("بياناتك لا تُمسّ.") }
