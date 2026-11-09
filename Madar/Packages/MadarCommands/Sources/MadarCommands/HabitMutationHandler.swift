@@ -106,7 +106,7 @@ private struct HabitUndo: Codable {
         case .deleteArchived(let identity):
             let row=try habit(identity)
             guard row.archivedAt != nil else{throw DataError.invalidValue("أرشف العادة أولًا")}
-            let instances=try RecordBridge.instances(context)
+            let instances=try habitFamily(context)
             for instance in instances {
                 let before=try instance.record()
                 let isChild=["HabitPolicy","HabitPause","HabitLog","HabitEvent"].contains(before.model) && before.fields["habitID"]?.string == identity.uuidString
@@ -122,16 +122,26 @@ private struct HabitUndo: Codable {
         }
         return try JSONEncoder().encode(inverse)
     }
+    static func habitFamily(_ context: ModelContext) throws -> [any MadarRecordModel] {
+        var rows: [any MadarRecordModel] = []
+        rows += try context.fetch(FetchDescriptor<Habit>()); rows += try context.fetch(FetchDescriptor<HabitPolicy>())
+        rows += try context.fetch(FetchDescriptor<HabitPause>()); rows += try context.fetch(FetchDescriptor<HabitLog>())
+        rows += try context.fetch(FetchDescriptor<HabitEvent>())
+        return rows
+    }
     static func undo(_ data: Data, context: ModelContext, now: Date, writer: String) throws {
         let inverse = try JSONDecoder().decode(HabitUndo.self, from: data)
         if let original = inverse.event {
-            guard let event = try context.fetch(FetchDescriptor<HabitEvent>()).first(where: { $0.id == original.id && $0.deletedAt == nil && $0.mergedInto == nil }), try event.record() == original else { throw DataError.invalidValue("تعذر التراجع عن التسجيل") }
+            let originalID = original.id
+            guard let event = try context.fetch(FetchDescriptor<HabitEvent>(predicate: #Predicate { $0.id == originalID && $0.deletedAt == nil && $0.mergedInto == nil })).first, try event.record() == original else { throw DataError.invalidValue("تعذر التراجع عن التسجيل") }
             let reverse = HabitEvent(); try reverse.apply(original); reverse.id = StableIdentity.uuid(for: "habit-undo:\(original.id)")
             let reverseID = reverse.id
             guard try context.fetchCount(FetchDescriptor<HabitEvent>(predicate: #Predicate { $0.id == reverseID })) == 0 else { return }
             reverse.delta = -event.delta; reverse.createdAt = now; reverse.updatedAt = now; reverse.writerID = writer; context.insert(reverse)
         }
-        let records = try RecordBridge.all(context)
+        guard !inverse.changes.isEmpty else { return }
+        // Every change is a habit-family row, so only those tables are read (the whole store was read before, on each undo).
+        let records = try habitFamily(context).map { try $0.record() }
         for change in inverse.changes {
             if change.before == nil, change.after.model == "Habit" {
                 let included = Set(inverse.changes.map { $0.after.id })

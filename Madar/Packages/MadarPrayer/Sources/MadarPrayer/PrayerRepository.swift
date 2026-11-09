@@ -12,8 +12,25 @@ public final class PrayerRepository {
     public let tripOptions: PrayerCalculationOptions
     public let placeName: String
     public let pendingDays: Int
-    let logs: [PrayerLog]
-    let nightRows: [QiyamNight]
+    /// Prayer and night rows are read on first use: most callers only need the place, the times or the trip, and reading every
+    /// prayer ever logged for that made each habit tap, diary line and reminder plan pay for the whole prayer history.
+    /// Writers call `loadRows()` first so a failed read throws instead of looking like an empty history.
+    private var loadedLogs: [PrayerLog]?
+    private var loadedNights: [QiyamNight]?
+    var logs: [PrayerLog] {
+        if let loadedLogs { return loadedLogs }
+        let rows = ((try? context.fetch(FetchDescriptor<PrayerLog>())) ?? []).filter { $0.mergedInto == nil }
+        loadedLogs = rows; return rows
+    }
+    var nightRows: [QiyamNight] {
+        if let loadedNights { return loadedNights }
+        let rows = ((try? context.fetch(FetchDescriptor<QiyamNight>())) ?? []).filter { $0.mergedInto == nil }
+        loadedNights = rows; return rows
+    }
+    public func loadRows() throws {
+        loadedLogs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.mergedInto == nil }
+        loadedNights = try context.fetch(FetchDescriptor<QiyamNight>()).filter { $0.mergedInto == nil }
+    }
     let trips: [Trip]
     public init(context: ModelContext) throws {
         self.context = context; settings = try SettingsStore(context: context)
@@ -26,8 +43,6 @@ public final class PrayerRepository {
         forTrip.method = PrayerCalculationMethod(rawValue: try settings.value(for: "salah.tripMethod").string ?? "") ?? options.method
         tripOptions = forTrip
         pendingDays = min(14, max(3, Int(try settings.value(for: "salah.pendingDays").number ?? 7)))
-        logs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.mergedInto == nil }
-        nightRows = try context.fetch(FetchDescriptor<QiyamNight>()).filter { $0.mergedInto == nil }
         trips = try context.fetch(FetchDescriptor<Trip>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && !$0.dismissed && $0.start != nil }
     }
     public func activeTrip(at date: Date) -> PrayerTrip? {
@@ -40,17 +55,28 @@ public final class PrayerRepository {
         let key = leg.journeyID ?? leg.id
         return trips.filter { ($0.journeyID ?? $0.id) == key }.sorted { $0.start! < $1.start! }.map { ($0.city, $0.country, $0.start!, $0.end) }
     }
+    /// Prayer times for one day and place, worked out once per repository. The options are fixed for the repository's life, and the
+    /// snapshot asks for the same day many times (each cell, its window end, the next day's Fajr) for every day since tracking began.
+    private struct TimesKey: Hashable { let day: GregorianDay; let place: ActivePlace; let trip: Bool }
+    private var timesMemo: [TimesKey: PrayerDay?] = [:]
+    func times(_ day: GregorianDay, _ place: ActivePlace, trip: Bool) -> PrayerDay? {
+        let key = TimesKey(day: day, place: place, trip: trip)
+        if let known = timesMemo[key] { return known }
+        let value = PrayerTimesEngine.calculate(day: day, place: place, options: trip ? tripOptions : options)
+        timesMemo[key] = .some(value)
+        return value
+    }
     public func place(at date: Date) -> ActivePlace { activeTrip(at: date)?.place ?? home }
     public func calculationOptions(at date: Date) -> PrayerCalculationOptions {
         activeTrip(at: date) == nil ? options : tripOptions
     }
     public func prayerDay(at date: Date) -> GregorianDay {
         let place = place(at: date); let civil = GregorianDay.containing(date, in: place.timeZone)
-        guard let times = PrayerTimesEngine.calculate(day: civil, place: place, options: calculationOptions(at: date)) else { return civil }
+        guard let times = times(civil, place, trip: activeTrip(at: date) != nil) else { return civil }
         return date < times.fajr ? civil.adding(days: -1) : civil
     }
     public func occurrence(_ ref: PrayerReference) -> PrayerOccurrence? {
-        guard let homeTimes = PrayerTimesEngine.calculate(day: ref.day, place: home, options: options) else {
+        guard let homeTimes = times(ref.day, home, trip: false) else {
             return tripOccurrence(ref)
         }
         if let trip = tripOccurrence(ref) { return trip }
@@ -61,7 +87,7 @@ public final class PrayerRepository {
         var earliest: PrayerOccurrence?
         for row in trips {
             guard let place = try? ActivePlace(latitude: row.lat, longitude: row.lon, timeZoneID: row.tzID),
-                  let times = PrayerTimesEngine.calculate(day: ref.day, place: place, options: tripOptions) else { continue }
+                  let times = times(ref.day, place, trip: true) else { continue }
             let actual = times.time(for: ref.prayer)
             guard let active = activeTrip(at: actual), active.id == row.id else { continue }
             if earliest.map({ actual < $0.time }) ?? true {
@@ -73,7 +99,7 @@ public final class PrayerRepository {
     public func missedWindowEnd(_ ref: PrayerReference) -> Date? {
         switch ref.prayer {
         case .fajr:
-            guard let fajr = occurrence(ref), let times = PrayerTimesEngine.calculate(day: ref.day, place: fajr.place, options: fajr.tripID == nil ? options : tripOptions) else { return nil }
+            guard let fajr = occurrence(ref), let times = times(ref.day, fajr.place, trip: fajr.tripID != nil) else { return nil }
             return times.sunrise
         case .dhuhr: return occurrence(.init(day: ref.day, prayer: .asr))?.time
         case .asr: return occurrence(.init(day: ref.day, prayer: .maghrib))?.time
@@ -133,6 +159,7 @@ public final class PrayerRepository {
         return current.adding(days: -1)
     }
     public func snapshot(now: Date) throws -> PrayerSnapshot {
+        if loadedLogs == nil || loadedNights == nil { try loadRows() }
         reading = true; defer { reading = false }
         let current = prayerDay(at: now), track = try tracking(at: now)
         let today = try day(current, now: now, start: track.day, current: current)

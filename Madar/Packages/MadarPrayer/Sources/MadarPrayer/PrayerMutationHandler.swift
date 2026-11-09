@@ -12,7 +12,7 @@ private struct PrayerInverse: Codable {
 /// mutation, inverse and durable CommandReceipt together. No save/suspension here.
 @MainActor public enum PrayerMutationHandler {
     public static func stage(operation: PrayerMutation, in context: ModelContext, now: Date, writer: String, source: CommandSource = .app) throws -> Data? {
-        let repository = try PrayerRepository(context: context)
+        let repository = try PrayerRepository(context: context); try repository.loadRows()
         var before: [String: DataRecord] = [:], after: [String: DataRecord] = [:]
         var captured: Set<String> = []
         func key(_ row: DataRecord) -> String { row.model + ":" + row.id.uuidString }
