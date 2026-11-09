@@ -48,7 +48,7 @@ struct QuranStrengthView: View {
                         }
                     }
                     Text(
-                        "مؤشر وصفي من تقييمك ومواعيد المراجعة؛ ليس احتمالًا للحفظ. البعيد: متأخر مدة كاملة أو متانته تحت خمسين."
+                        "تقدير من تقييمك ومواعيد مراجعتك. «البعيد»: تأخّر عن موعده مدة كاملة، أو متانته أقل من النصف."
                     ).font(quranFont(12)).foregroundStyle(theme.secondaryInk)
                     if board.parts.isEmpty {
                         QuranPaperCard {

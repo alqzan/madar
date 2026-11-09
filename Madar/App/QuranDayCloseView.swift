@@ -43,7 +43,7 @@ struct QuranDayCloseView: View {
                     Text("المتانة العامة: " + percent(summary.strengthBefore) + " ← " + percent(summary.strengthAfter))
                         .font(font(14, bold: true)).accessibilityIdentifier("quran-day-close-strength")
                 }
-                Text("مؤشر وصفي من تقييمك ومواعيد المراجعة. تُحسب «قبل» دون جلسات اليوم، و«بعد» معها، في اليوم نفسه. الوجه غير المكتمل أو بلا جدول لا يدخل المتوسط.").font(font(15))
+                Text("تقدير من تقييمك ومواعيد مراجعتك: «قبل» بدون جلسات اليوم، و«بعد» معها. الوجه غير المكتمل لا يدخل فيه.").font(font(15))
                 Button("تمّ") { explainStrength = false }.font(font(15, bold: true)).frame(maxWidth: .infinity, minHeight: 44)
             }.padding(24).foregroundStyle(theme.ink).background(theme.surface)
                 .presentationDetents([.height(300)]).presentationDragIndicator(.visible)

@@ -104,7 +104,7 @@ struct MadarAIMoneySnapshot: Sendable {
         if !leadingCategories.isEmpty { lines.append("أعلى التصنيفات المسجلة: " + leadingCategories.joined(separator: "، ") + ".") }
         let leadingMerchants = merchants.filter { $0.amountMinor > 0 }.prefix(5).map(\.name)
         if !leadingMerchants.isEmpty { lines.append("أبرز الجهات المسجلة: " + leadingMerchants.joined(separator: "، ") + ".") }
-        else { lines.append("لا توجد حركات مؤكدة مرتبطة بجهة مسجلة في هذا النطاق.") }
+        else { lines.append("لا مصروفات مؤكدة لجهة معروفة في هذه الفترة.") }
         for category in categories.filter({ $0.amountMinor > 0 }).prefix(8) {
             if let merchant = categoryMerchants.first(where: { $0.categoryID == category.id && $0.amountMinor > 0 }) {
                 lines.append("أبرز جهة في تصنيف \(category.name): \(merchant.merchantName).")
@@ -124,7 +124,7 @@ struct MadarAIMoneySnapshot: Sendable {
             }
         }
         if pendingCount > 0 { lines.append("توجد حركات تنتظر قرار المستخدم، ولم تدخل المصروف المؤكد.") }
-        if confirmedCount == 0 { lines.append("لا توجد حركات مؤكدة في النطاق المحدد.") }
+        if confirmedCount == 0 { lines.append("لا مصروفات مؤكدة في هذه الفترة.") }
         return lines.joined(separator: "\n")
     }
 

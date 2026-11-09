@@ -118,7 +118,7 @@ struct MoneyTravelView: View {
                         Text(failure).font(MadarTypography.body()).accessibilityIdentifier("money-travel-read-error")
                         Button("أعد المحاولة", action: load).frame(minHeight: 44).accessibilityIdentifier("money-travel-retry")
                     }.padding(24)
-                } else { Text("لا توجد رحلة جارية. تبدأ الرحلة من حالة السفر المشتركة في الصلاة.").font(MadarTypography.body()).padding(24) }
+                } else { Text("لا رحلة جارية. تبدأ حين تؤكد سفرك في غرفة الصلاة.").font(MadarTypography.body()).padding(24) }
             }.padding(.horizontal, 18).padding(.top, 6).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).environment(\.roomTheme, theme)
             .toolbar(.hidden, for: .navigationBar, .tabBar).task(id: "\(app.prayerRevision)-\(retryAttempt)") { load(); entered = true }
