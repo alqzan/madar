@@ -352,16 +352,16 @@ struct SettingControl: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if definition.key == "bahw.widgetScope" {
-                Text("الآن فقط يعرض العادات التي حان وقتها؛ اليوم كله يشمل نوافذها المتأخرة في اليوم نفسه. العدّاد لليوم كله، ولا تظهر عادات الغد.")
+                Text(session.string("bahw.widgetScope") == "todayOnly" ? "تظهر العادات التي حان وقتها فقط." : "تظهر عادات اليوم كله، ومنها المتأخرة. عادات الغد لا تظهر.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
             }
             if definition.key == "bahw.smartPresence" {
-                Text("هادئ: ما يحتاج فعلًا الآن. متوسط: يضيف ما تبقّى اليوم. حاضر: يضيف خطوتك التالية في الغرف. تظهر داخل البهو، بلا إشعارات إضافية.")
+                Text((["calm": "ما يحتاج فعلًا الآن فقط", "present": "ما يحتاجك الآن، وما تبقّى اليوم، وخطوتك التالية في كل غرفة"][session.string("bahw.smartPresence")] ?? "ما يحتاجك الآن، وما تبقّى اليوم") + "، داخل البهو بلا إشعارات.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if definition.key == "bahw.reminder" {
-                Text("هذا اختيار البداية للعادات الجديدة. الإشعار للعادات التي تسجلها هنا، ويحتاج وقتًا للعادة وتفعيل تذكيرات الجهاز وسماح النظام.")
+                Text("يُطبّق على العادات الجديدة. الإشعار يحتاج وقتًا محددًا للعادة.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }

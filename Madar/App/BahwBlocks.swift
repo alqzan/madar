@@ -603,7 +603,7 @@ struct BahwBlockView: View {
             }
         } else {
             VStack(alignment: .leading, spacing: 10) {
-                HStack { title(lobby.accent); Spacer(); Text("كل حلقة على مقياس سنة").font(small).foregroundStyle(lobby.secondaryInk) }
+                title(lobby.accent)
                 HStack(alignment: .top, spacing: 6) {
                     ForEach(items.prefix(4)) { item in
                         VStack(spacing: 6) {

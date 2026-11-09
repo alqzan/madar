@@ -313,7 +313,7 @@ struct MoneyCardsView: View {
             ForEach(r.dues) { due in
                 Button { selectedDue = due.id } label: { HStack { Text(due.name); Spacer(); dates(due.day); Text(figure: amount(due.amountMinor)) }.font(MadarTypography.caption()).padding(.vertical, 8).contentShape(.rect) }.buttonStyle(.madarPlain)
             }
-            Text("التغطية من النقد الموجود الآن بعد المواعيد السابقة فقط، دون افتراض راتب قادم. لا يُحجز المال ولا يُسجّل سداد من هذه الصفحة.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            Text("محسوبة من نقدك الآن بعد المواعيد السابقة، بلا افتراض راتب قادم.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }.accessibilityElement(children: .contain).accessibilityIdentifier("money-card-calendar")
     }
     private func calendarCell(_ day: GregorianDay, calendar: Calendar, today: GregorianDay, dues: [MoneyCardDue], selectedID: String?) -> some View {
@@ -350,8 +350,8 @@ struct MoneyCardsView: View {
                     ForEach(c.matchedPurchases) { movement($0) }
                     Label(total == payment.amountMinor ? "المشتريات المسجّلة تساوي هذا السداد" : "الفرق بين السداد والمشتريات المسجّلة " + amount(payment.amountMinor - total), systemImage: total == payment.amountMinor ? "checkmark.circle.fill" : "text.magnifyingglass")
                         .font(MadarTypography.body()).foregroundStyle(theme.color("surplusText"))
-                    Text("مقارنة للمصادر المسجّلة في فترة الكشف؛ قد يشمل كشف البنك رصيدًا سابقًا أو رسومًا أو ردودًا لا تمثّلها هذه المشتريات.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                } else { Text("لا توجد فترة كشف بمشتريات مسجّلة تكفي لمقارنة هذا السداد. لا نفترض مطابقة كاملة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
+                    Text("قد يختلف عن كشف البنك إذا فيه رصيد سابق أو رسوم أو مرتجعات.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                } else { Text("لا توجد مشتريات مسجّلة في فترة الكشف لمقارنة هذا السداد بها.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
             } else { Text("لا سداد مؤكّد لهذه البطاقة بعد").font(MadarTypography.cardTitle()); Text("عند وصول رسالة السداد واعتمادها تظهر هنا كتحويل، وتبقى مشترياتك في أيامها.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
             Text(figure: "الكشف الحالي: " + amount(c.billedMinor) + "؛ غير المفوتر: " + amount(c.unbilledMinor)).font(MadarTypography.caption())
             Text("إذا كان السداد أقل من الكشف يبقى الباقي ضمن «عليك». الفائدة تُقدّر من النسبة المدخلة؛ كشف البنك هو المرجع.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)

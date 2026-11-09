@@ -1355,7 +1355,7 @@ private struct MihbaraHomeConfirmations: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .confirmationDialog("اختر كتابًا يرجع إلى أبي أقرأها", isPresented: Binding(get: { slotBook != nil }, set: { if !$0 { slotBook = nil; onDismiss() } }), titleVisibility: .visible, presenting: slotBook) { incoming in
+            .confirmationDialog("رف «أقرأها» ممتلئ: اختر كتابًا يرجع إلى «أبي أقرأها»", isPresented: Binding(get: { slotBook != nil }, set: { if !$0 { slotBook = nil; onDismiss() } }), titleVisibility: .visible, presenting: slotBook) { incoming in
                 ForEach(replacementBooks(incoming)) { old in
                     Button(old.title) { moveToReading(incoming, old.id) }
                 }
@@ -1422,7 +1422,7 @@ private struct MihbaraConversionOffer: ViewModifier {
                 .accessibilityIdentifier("mihbara-offer-convert")
             Button("أبقه PDF", role: .cancel) { book = nil }
         } message: {
-            Text("يقرأ مدار صفحاته على جهازك ويكبر خطه لشاشتك، وتتنقل في التطبيق وهو يعمل. ويبقى الـPDF أصله تفتحه من «الأصل».")
+            Text("يُكبَّر خطه لشاشتك، ويبقى الـPDF الأصلي متاحًا من «الأصل».")
         }
     }
 }

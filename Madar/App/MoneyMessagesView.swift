@@ -321,7 +321,7 @@ struct MoneyMessagesView: View {
             }.labelStyle(.titleAndIcon).tint(theme.color("reserveText")).frame(minHeight: 44).accessibilityIdentifier("money-messages-paste")
             Button { budgetOpen = true } label: { Label("تجاهله من الميزانيات", systemImage: "seal").font(MadarTypography.caption()).frame(minHeight: 44) }
                 .buttonStyle(.madarPlain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-budget-open")
-            Text("لكل عملية تصنيفها. يقترح مدار الفئة بعد تكرار اختياراتك المؤكدة، ويمكنك تغييرها في كل مرة.")
+            Text("يتعلّم مدار من اختياراتك ويقترح الفئة، وتغيّرها متى شئت.")
                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)
             Text("الصق رسائل البنك إن لم تصل عبر الاختصار؛ تُفصل الرسائل بسطر فارغ.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)
         }.padding(.top, 8)

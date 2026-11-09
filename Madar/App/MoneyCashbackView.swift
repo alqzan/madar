@@ -280,7 +280,7 @@ struct MoneyCashbackView: View {
                     if let preferredCardFailure { Text(preferredCardFailure).font(MadarTypography.fine()).foregroundStyle(theme.color("dueText")) }
                 }
             }
-            Text("مقارنة لما اشتريته فعلًا، لا دعوة لشراء أكثر. قد تستثني شروط البنك بعض الفئات أو تضع للاسترداد سقفًا.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+            Text("قد تستثني شروط البنك بعض الفئات أو تضع سقفًا للاسترداد.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
         }
     }
 

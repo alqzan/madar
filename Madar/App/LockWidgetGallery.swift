@@ -42,7 +42,7 @@ struct LockWidgetGallery:View {
                         Link(destination:URL(string:"madar://bahw/habits")!){Label("عاداتك",image:"MadarHabits").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:56).background(theme.surface,in:.rect(cornerRadius:20))}.accessibilityIdentifier("control-preview-habits")
                         Link(destination:URL(string:BuiltRoomWidget.mihbara.route)!){Label("المحبرة",systemImage:"books.vertical").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:56).background(theme.surface,in:.rect(cornerRadius:20))}.accessibilityIdentifier("control-preview-mihbara")
                     }.buttonStyle(.madarPlain)
-                    Text("كل عنصر يفتح غرفته من دون عرض محتواها. تسجيل الصلاة ومؤقّت المراجعة متاحان أيضًا في المعرض.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text("كل عنصر يفتح غرفته دون أن يعرض محتواها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     Link(destination:URL(string:"madar://mal/add")!){Label("مصروف",systemImage:"plus.circle").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:56).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.madarPlain).accessibilityIdentifier("control-preview-money")
                     Text("وضع الاستعداد").font(MadarTypography.section())
                     HStack(spacing:12){preview(.habits,family:.systemSmall).padding(14).background(theme.surface,in:.rect(cornerRadius:24));preview(.mihbara,family:.systemSmall).padding(14).background(RoomTheme(room:"mihbara",dark:colorScheme == .dark).surface,in:.rect(cornerRadius:24))}.frame(height:180)

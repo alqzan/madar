@@ -223,7 +223,7 @@ struct MoneyCategorizeSheet: View {
                 }
                 Text(draft.title).font(MadarTypography.cardTitle()).foregroundStyle(theme.secondaryInk)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("هذا التصنيف لهذه العملية فقط. يقترح مدار فئة مستقبلية بعد تكرار اختيارك يدويًا، دون تثبيت تصنيف للتاجر.")
+                    Text("لهذه العملية فقط. إذا تكرّر اختيارك اقترحه مدار في المرات القادمة.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(14).background(theme.surface, in: .rect(cornerRadius: 16))

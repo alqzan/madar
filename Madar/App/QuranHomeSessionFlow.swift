@@ -64,7 +64,7 @@ struct QuranHomeSessionFlow: View {
             ForEach(state.answers) { answer in Button(answer.text) { perform(.chooseAnswer(answer.id)) }.font(MadarTypography.body()).frame(minHeight: 44) }
             Button(state.primaryTitle) { perform(state.primaryAction) }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("quran-session-advance")
         }.padding(20).foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
-        .confirmationDialog("الجلسة", isPresented: $showExit, titleVisibility: .visible) {
+        .confirmationDialog("تخرج من الجلسة؟", isPresented: $showExit, titleVisibility: .visible) {
             Button("أنهِ وسجّل ما تمّ") { perform(.commitPartial) }
             Button("تجاهل الجلسة", role: .destructive) { perform(.discard) }
             Button("تابع", role: .cancel) {}

@@ -247,7 +247,7 @@ struct PrayerCustomizeView: View {
 
     private var layoutCard: some View {
         card("layout", title: "ترتيب الرئيسية", subtitle: "\(session.digits(layout.visibleCount)) من \(session.digits(PrayerHomeLayout.pinned.count + PrayerHomeLayout.movable.count - 1)) ظاهرة", symbol: "square.grid.2x2", highlighted: true) {
-            Text("الصلاة القادمة والرواق ثابتان: هما جواب «ماذا الآن؟». الباقي يتقدّم ويتأخّر ويُخفى.")
+            Text("الصلاة القادمة والأقواس ثابتة في الأعلى، وترتّب الباقي أو تخفيه.")
                 .font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk).padding(.bottom, 12)
             ForEach(PrayerHomeLayout.pinned, id: \.self) { key in
                 Divider().overlay(theme.ink.opacity(0.1))

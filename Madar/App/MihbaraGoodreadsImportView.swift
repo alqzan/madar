@@ -131,7 +131,7 @@ struct MihbaraGoodreadsImportView: View {
     private var missingDateCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("كتاب مقروء بلا تاريخ قراءة").font(MadarTypography.cardTitle())
-            Text("لا أضيف تاريخًا من عندي؛ اختر الرف الذي يناسب الكتب التي لم يذكر الملف تاريخها.")
+            Text("بعض الكتب بلا تاريخ في الملف؛ اختر الرف الذي تذهب إليه.")
                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             HStack(spacing: 8) { missingDateChoice("قديمًا", value: "old"); missingDateChoice("أنهيتها", value: "finished") }
         }.padding(15).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 16))

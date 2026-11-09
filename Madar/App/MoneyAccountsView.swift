@@ -163,7 +163,7 @@ struct MoneyAccountsView: View {
                 if case .messageDiffers(_, let printed, let difference) = s { Text(figure: "ورد في الرسالة " + amount(printed, currency: r.currency) + "؛ الفرق عن الدفتر " + amount(abs(difference), currency: r.currency)).font(MadarTypography.body()) }
             } else { Text("من دفتر الحركات والكشوف؛ لا نضع رصيدًا بدلًا عن البنك.").font(MadarTypography.body()) }
             if r.amountMinor == nil { Text("الرصيد مجهول؛ الحركات محفوظة، والحساب خارج مجموع الأرصدة حتى المطابقة مع البنك.").font(MadarTypography.body()) }
-            else if !r.counted { Text("هذا الجذر خارج النقد وصافي رصيدك والزكاة. رسائله لا تدخل المصروفات.").font(MadarTypography.body()) }
+            else if !r.counted { Text("هذا الحساب خارج نقدك وصافي رصيدك والزكاة، ورسائله لا تدخل المصروفات.").font(MadarTypography.body()) }
         }.padding(24) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium, .large])
     }
     private func sourceTitle(_ source: AccountBalanceSource) -> String { switch source { case .entered: "رصيد بداية أدخلته"; case .reconciled: "من مطابقة اعتمدتها"; case .message: "رصيد رسالة يطابق الدفتر"; case .messageDiffers: "رصيد رسالة يختلف عن الدفتر" } }

@@ -225,7 +225,7 @@ struct MihbaraPaperIndexEditor: View {
             PaperIndexDocumentScanner(isPresented: $scanningIndexPage, onLines: applyOCRLines, onError: { errorMessage = $0 })
                 .ignoresSafeArea()
         }
-        .confirmationDialog("اختر كتابًا يرجع إلى أبي أقرأها", isPresented: $choosingSlot, titleVisibility: .visible) {
+        .confirmationDialog("رف «أقرأها» ممتلئ: اختر كتابًا يرجع إلى «أبي أقرأها»", isPresented: $choosingSlot, titleVisibility: .visible) {
             ForEach(readingBooks) { old in Button(old.title) { save(replacing: old.id) } }
         }
         .confirmationDialog("تتجاهل تعديلات الفهرس؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
