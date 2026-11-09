@@ -71,6 +71,21 @@ struct DiaryEntryDeletion: Codable {
         let before=try row.record();row.result=result;row.updatedAt=StableIdentity.monotonic(now:now,previous:row.updatedAt);row.writerID=writer
         return try JSONEncoder().encode(DiaryInverse(model:"Niyya",after:row.record(),dayKey:row.dayKey,previousOrigin:nil,before:before))
     }
+    static func setIntentionReview(id: UUID, period: String, text: String, context: ModelContext, now: Date, writer: String) throws -> Data {
+        guard period == "weekly" || period == "monthly",
+              let row = try context.fetch(FetchDescriptor<Niyya>()).first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else {
+            throw DataError.invalidValue("missing intention")
+        }
+        let start = try GregorianDay(row.dayKey)
+        let due = start.adding(days: period == "weekly" ? 7 : 30)
+        guard due <= (try DiaryLineRenderer.today(context: context, now: now)) else { throw DataError.invalidValue("intention review is not due") }
+        guard period != "monthly" || row.weeklyReview != nil else { throw DataError.invalidValue("weekly intention review required") }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= 2_000 else { throw DataError.invalidValue("invalid intention review") }
+        let before = try row.record()
+        if period == "weekly" { row.weeklyReview = text } else { row.monthlyReview = text }
+        row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+        return try JSONEncoder().encode(DiaryInverse(model: "Niyya", after: row.record(), dayKey: row.dayKey, previousOrigin: nil, before: before))
+    }
     /// FB-45: an intention can be removed (tombstone); undo brings it back with its text and result.
     static func deleteIntention(id:UUID,context:ModelContext,now:Date,writer:String) throws -> Data {
         guard let row=try context.fetch(FetchDescriptor<Niyya>()).first(where:{$0.id==id && $0.deletedAt==nil && $0.mergedInto==nil}) else{throw DataError.invalidValue("missing intention")}
@@ -83,6 +98,23 @@ struct DiaryEntryDeletion: Codable {
             try context.fetch(FetchDescriptor<Media>()).contains(where: { $0.id == media && $0.kind == "audio" && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("audio entry required") }
         let before = try row.record(); row.text = text; row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
         return try JSONEncoder().encode(DiaryInverse(model: "Entry", after: row.record(), dayKey: row.dayKey, previousOrigin: nil, before: before))
+    }
+    /// Keep the undo receipt small: a voice insight change must never copy the audio bytes into the command log.
+    static func setAudioInsights(media id: UUID, title: String?, voiceTone: String?, levels: [Double], context: ModelContext, now: Date, writer: String) throws -> Data {
+        guard let row = try context.fetch(FetchDescriptor<Media>()).first(where: { $0.id == id && $0.kind == "audio" && $0.deletedAt == nil && $0.mergedInto == nil }) else {
+            throw DataError.invalidValue("audio media required")
+        }
+        let before = try audioInsightsRecord(id: id, title: row.title, voiceTone: row.voiceTone, audioLevelsJSON: row.audioLevelsJSON)
+        row.title = title; row.voiceTone = voiceTone; row.audioLevelsJSON = try JSONEncoder().encode(levels)
+        row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+        let after = try audioInsightsRecord(id: id, title: row.title, voiceTone: row.voiceTone, audioLevelsJSON: row.audioLevelsJSON)
+        return try JSONEncoder().encode(DiaryInverse(model: "MediaAudioInsights", after: after, dayKey: "", previousOrigin: nil, before: before))
+    }
+    private static func audioInsightsRecord(id: UUID, title: String?, voiceTone: String?, audioLevelsJSON: Data?) throws -> DataRecord {
+        var record = DataRecord(model: "MediaAudioInsights", fields: [:])
+        try record.set(id, for: "id"); try record.set(title, for: "title"); try record.set(voiceTone, for: "voiceTone")
+        try record.set(audioLevelsJSON, for: "audioLevelsJSON")
+        return record
     }
     /// RD1. Before the freeze the line is corrected in place (undo restores the text). After it, a new row replaces
     /// the head and names it; the original row is never changed, and undo tombstones only the new row.
@@ -192,8 +224,15 @@ struct DiaryEntryDeletion: Codable {
             try row.apply(restored)
         } else if inverse.model == "Niyya" {
             guard let row=try context.fetch(FetchDescriptor<Niyya>()).first(where:{$0.id==inverse.after.id && $0.mergedInto==nil}),try row.record()==inverse.after else{throw DataError.invalidValue("undo superseded: intention")}
-            if let before=inverse.before {row.text=try before.decode("text",as:String.self);row.result=try before.decode("result",as:String?.self);row.updatedAt=StableIdentity.monotonic(now:now,previous:row.updatedAt);row.writerID=writer}
+            if let before=inverse.before {row.text=try before.decode("text",as:String.self);row.result=try before.decode("result",as:String?.self);row.weeklyReview=(try? before.decode("weeklyReview",as:String?.self)) ?? nil;row.monthlyReview=(try? before.decode("monthlyReview",as:String?.self)) ?? nil;row.updatedAt=StableIdentity.monotonic(now:now,previous:row.updatedAt);row.writerID=writer}
             else{try tombstone(row)}
+        } else if inverse.model == "MediaAudioInsights" {
+            guard let row = try context.fetch(FetchDescriptor<Media>()).first(where: { $0.id == inverse.after.id && $0.kind == "audio" && $0.mergedInto == nil }),
+                  try audioInsightsRecord(id: row.id, title: row.title, voiceTone: row.voiceTone, audioLevelsJSON: row.audioLevelsJSON) == inverse.after,
+                  let before = inverse.before else { throw DataError.invalidValue("undo superseded: audio insights") }
+            row.title = try before.decode("title", as: String?.self); row.voiceTone = try before.decode("voiceTone", as: String?.self)
+            row.audioLevelsJSON = try before.decode("audioLevelsJSON", as: Data?.self)
+            row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
         } else if inverse.model == "Entry" {
             let rows = try context.fetch(FetchDescriptor<Entry>())
             guard let row = rows.first(where: { $0.id == inverse.after.id && $0.mergedInto == nil }) else { throw DataError.invalidValue("missing diary entry") }

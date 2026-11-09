@@ -7,6 +7,7 @@ struct DiaryDayView: View {
     let day: GregorianDay
     var initialEntryID: UUID? = nil
     var initialEntryRouteID: UUID? = nil
+    var embeddedInNavigationStack = false
     @Environment(\.roomTheme) private var roomTheme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -92,7 +93,12 @@ struct DiaryDayView: View {
         }
     }
     var body: some View {
-        NavigationStack {
+        Group {
+            if embeddedInNavigationStack { dayContent }
+            else { NavigationStack { dayContent } }
+        }.toolbarVisibility(.visible, for: .navigationBar)
+    }
+    @ViewBuilder private var dayContent: some View {
             VStack(spacing: 0) {
                 if let appearance, let ramadanDay = appearance.ramadanDay {
                     DiaryRamadanBanner(
@@ -191,7 +197,11 @@ struct DiaryDayView: View {
                 if shownDay == today, travel == nil, let arc {
                     DiaryDayArcView(arc: arc).padding(.horizontal, 18).padding(.top, 2)
                 }
-                if eveningPrimary, let first = intentions.first {
+                if intentionsOpen {
+                    DiaryIntentionsView(app: app, day: shownDay, evening: service.intentionEvening(shownDay), inline: true, onClose: { intentionsOpen = false })
+                        .environment(\.roomTheme, theme).padding(.horizontal, 12)
+                        .accessibilityIdentifier("diary-niyya-inline")
+                } else if eveningPrimary, let first = intentions.first {
                     eveningIntention(first)
                 } else if shownDay == today || !intentions.isEmpty {
                     Button {
@@ -391,12 +401,14 @@ struct DiaryDayView: View {
                         }.accessibilityIdentifier("diary-day-niyya-undo")
                     }
                 }
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Label("المذكرات", systemImage: "chevron.backward")
-                    }.accessibilityIdentifier("diary-day-close")
+                if !embeddedInNavigationStack {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Label("المذكرات", systemImage: "chevron.backward")
+                        }.accessibilityIdentifier("diary-day-close")
+                    }
                 }
             }
             .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
@@ -440,14 +452,9 @@ struct DiaryDayView: View {
             }
             .sheet(isPresented: $stampsOpen) { DiaryStampsView(app: app).environment(\.roomTheme, theme) }
             .sheet(isPresented: $weekOpen) { DiaryWeekView(app: app, day: shownDay).environment(\.roomTheme, theme) }
-            .sheet(isPresented: $intentionsOpen) {
-                DiaryIntentionsView(app: app, day: shownDay, evening: service.intentionEvening(shownDay)).environment(
-                    \.roomTheme, theme
-                ).madarSheetErrorAlert(app).diaryRootDraftBlocking(app)
-            }
-            .sheet(isPresented: $writing) {
-                DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay).environment(\.roomTheme, theme)
-                    .madarSheetErrorAlert(app)
+            .navigationDestination(isPresented: $writing) {
+                DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay, embeddedInNavigationStack: true)
+                    .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
             }
             // N04: letters are checked when the diary is open and the app comes to the foreground.
             .onChange(of: scenePhase) { _, phase in
@@ -479,7 +486,6 @@ struct DiaryDayView: View {
                 aiAvailability = .checking
                 aiAvailability = await MadarAIAvailabilityChecker.check()
             }
-        }
     }
 
     @MainActor private func loadDiaryPage() async {

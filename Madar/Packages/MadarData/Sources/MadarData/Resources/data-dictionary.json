@@ -1552,6 +1552,18 @@
             "partial",
             "notEasy"
           ]
+        },
+        {
+          "name": "weeklyReview",
+          "type": "String?",
+          "optional": true,
+          "note": "Owner-entered check-in after 7 days; shown inline in today's diary."
+        },
+        {
+          "name": "monthlyReview",
+          "type": "String?",
+          "optional": true,
+          "note": "Owner-entered check-in after 30 days; shown inline in today's diary."
         }
       ]
     },
@@ -2086,6 +2098,25 @@
           "type": "UUID?",
           "optional": true,
           "fk": "ImportBatch"
+        },
+        {
+          "name": "title",
+          "type": "String?",
+          "optional": true,
+          "note": "Local generated title for long audio only; never sent to a service."
+        },
+        {
+          "name": "voiceTone",
+          "type": "String?",
+          "optional": true,
+          "enum": ["calm", "joyful", "sad", "concerned", "grateful", "hopeful", "tired", "mixed", "unclear"],
+          "note": "Tentative tone inferred from the transcript text, not from volume or a clinical assessment."
+        },
+        {
+          "name": "audioLevelsJSON",
+          "type": "Data?",
+          "optional": true,
+          "note": "Codable normalized average microphone levels, one sample per second; display only as volume, never as emotion."
         }
       ]
     },
@@ -5928,6 +5959,12 @@
         "kind": "edit only an existing audio entry transcript; keep original Media and conditional undo",
         "auth": "app-only + diary unlocked"
       },
+      "diary.setAudioInsights": {
+        "intent": null,
+        "payload": "{mediaID: UUID, title: String|null, voiceTone: calm|joyful|sad|concerned|grateful|hopeful|tired|mixed|unclear|null, audioLevels: [Double 0...1]}",
+        "kind": "edit derived metadata on an existing audio Media only; local title/tone and volume samples; receipt excludes original audio bytes",
+        "auth": "app-only + diary unlocked"
+      },
       "diary.setIntention": {
         "intent": null,
         "payload": "{id: UUID, dayKey: YYYY-MM-DD, text: String nonempty}",
@@ -5938,6 +5975,12 @@
         "intent": null,
         "payload": "{id: UUID, result: done|partial|notEasy|null}",
         "kind": "explicit outcome only; preserve Niyya dayKey and text; conditional undo",
+        "auth": "app-only + diary unlocked"
+      },
+      "diary.setIntentionReview": {
+        "intent": null,
+        "payload": "{id: UUID, period: weekly|monthly, text: String nonempty <= 2000}",
+        "kind": "store one owner-entered review after 7 or 30 days on the same Niyya; preserve its daily outcome and dayKey; conditional undo",
         "auth": "app-only + diary unlocked"
       },
       "bahw.saveUpcomingDay": {
@@ -5995,5 +6038,5 @@
       "execution": "Immediately on press, within undo window"
     }
   },
-  "storeSchemaVersion": 15
+  "storeSchemaVersion": 16
 }

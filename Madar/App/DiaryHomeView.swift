@@ -21,7 +21,7 @@ struct DiaryRoomView: View {
         .environment(\.roomTheme, RoomTheme(room: "notes", dark: outerTheme.dark, calmPaper: app.string("core.roomIdentity") == "calmPaper"))
     }
 }
-private struct DiaryEditorTarget: Identifiable {
+private struct DiaryEditorTarget: Identifiable, Hashable {
     var id: String { margin.map { "margin-\($0.description)" } ?? "write-\(day)" }
     let margin: GregorianDay?
     var day = "today"
@@ -71,6 +71,9 @@ struct DiaryHomeView: View {
     @State private var readerEntryRouteID: UUID?
     @State private var failure: String?
     @State private var defaultMemoryDay: GregorianDay?
+    @State private var intentionFollowUp: DiaryIntentionFollowUp?
+    @State private var intentionReviewText = ""
+    @State private var savingIntentionReview = false
 #if DEBUG
     @State private var injectedReadFailure = false
 #endif
@@ -94,6 +97,7 @@ struct DiaryHomeView: View {
             ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 if let snapshot {
+                    if let intentionFollowUp { intentionFollowUpCard(intentionFollowUp) }
                     if app.string("notes.homeShape") == "echoes" {
                         DiaryEchoesView(snapshot: snapshot, service: service, open: { reader = $0 })
                         if !hidden("days") { recentDays(snapshot) }
@@ -195,9 +199,22 @@ struct DiaryHomeView: View {
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
         }
         .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() }; applyPendingDiaryRootIfReady() }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
-        .sheet(item: $editor, onDismiss: editorDidDismiss) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day, prompt: target.prompt).environment(\.roomTheme, theme).madarSheetErrorAlert(app).presentationSizing(.page) }
-        .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil; readerEntryID = nil; readerEntryRouteID = nil } }), onDismiss: { applyPendingDiaryRootIfReady() }) {
-            if let reader { DiaryDayView(app: app, day: reader, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID).environment(\.roomTheme, theme).madarSheetErrorAlert(app).presentationSizing(.page) }
+        .navigationDestination(item: $editor) { target in
+            DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day, prompt: target.prompt, embeddedInNavigationStack: true)
+                .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
+                .hidesRoomAccessory(app, id: "diary-editor-destination")
+        }
+        .navigationDestination(item: $reader) { day in
+            DiaryDayView(app: app, day: day, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID, embeddedInNavigationStack: true)
+                .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
+                .hidesRoomAccessory(app, id: "diary-day-destination")
+        }
+        .onChange(of: editor) { old, new in if old != nil, new == nil { editorDidDismiss() } }
+        .onChange(of: reader) { old, new in
+            if old != nil, new == nil {
+                readerEntryID = nil; readerEntryRouteID = nil
+                applyPendingDiaryRootIfReady()
+            }
         }
         .onChange(of: app.diaryRoute, initial: true) { _, route in
             guard let route else { return }; app.diaryRoute = nil
@@ -486,13 +503,41 @@ struct DiaryHomeView: View {
                                 Text(service.weekday(day.day)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text"))
                             }.frame(minWidth: 35)
                             Text(day.excerpt).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).frame(maxWidth: .infinity, alignment: .leading).multilineTextAlignment(.leading)
-                            if let data = day.photo { DiaryDataThumbnail(data: data, maxPixel: 120) { $0.resizable().scaledToFill().frame(width: 38, height: 38).clipShape(.rect(cornerRadius: 8)) }.id(day.photoID?.uuidString ?? day.id).frame(width: 38, height: 38) }
+                            recentMedia(day)
                         }.padding(16)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-recent-" + day.day.description)
                     if day.id != days.last?.id { Divider().overlay(theme.line) }
                 }
             }.background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 1) }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("diary-recent-days")
+    }
+    @ViewBuilder private func recentMedia(_ day: DiaryDisplayDay) -> some View {
+        let hasPagePhoto = day.photo != nil && !day.media.contains(where: { $0.id == day.photoID })
+        let media = Array(day.media.suffix(3))
+        if hasPagePhoto || !media.isEmpty {
+            HStack(spacing: 4) {
+                if hasPagePhoto, let data = day.photo {
+                    DiaryDataThumbnail(data: data, maxPixel: 120) { $0.resizable().scaledToFill().frame(width: 36, height: 36).clipShape(.rect(cornerRadius: 8)) }
+                        .id(day.photoID?.uuidString ?? day.id).frame(width: 36, height: 36)
+                }
+                ForEach(media) { item in
+                    Group {
+                        if item.kind == "photo" {
+                            DiaryDataThumbnail(data: item.data, maxPixel: 120) { $0.resizable().scaledToFill().frame(width: 36, height: 36).clipShape(.rect(cornerRadius: 8)) }
+                        } else {
+                            Image(systemName: item.kind == "audio" ? "waveform" : item.kind == "video" ? "play.rectangle" : "doc")
+                                .font(.system(size: 15, weight: .medium)).foregroundStyle(theme.accent)
+                                .frame(width: 36, height: 36).background(theme.background, in: .rect(cornerRadius: 8))
+                        }
+                    }.id(item.id)
+                }
+                let total = day.media.count + (hasPagePhoto ? 1 : 0)
+                if total > 3 { Text("+" + service.digits.string(total - 3)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("مرفقات هذا اليوم، " + service.digits.string(day.media.count))
+            .accessibilityIdentifier("diary-recent-media-" + day.day.description)
+        }
     }
     private var secondInk: Color {
         switch app.string("notes.secondInk") { case "green": theme.color("ghad"); case "brown": theme.color("autoInkText"); default: theme.color("pencil") }
@@ -579,11 +624,54 @@ struct DiaryHomeView: View {
             }
             let pages = Dictionary(value.days.map { ($0.day.description, $0) }, uniquingKeysWith: { first, _ in first })
             snapshot = value; defaultMemoryDay = preferredOpeningDay(in: value, pages: pages); failure = nil
+            if let pendingFollowUps = try? await service.dueIntentionFollowUpsOffMain() {
+                guard generation == refreshGeneration, !Task.isCancelled else { return }
+                let next = pendingFollowUps.first
+                if intentionFollowUp?.id != next?.id || intentionFollowUp?.period != next?.period { intentionReviewText = "" }
+                intentionFollowUp = next
+            }
         } catch {
             guard generation == refreshGeneration, !Task.isCancelled else { return }
             snapshot = nil
             defaultMemoryDay = nil
             failure = madarUserMessage(error)
         }
+    }
+    private func intentionFollowUpCard(_ item: DiaryIntentionFollowUp) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(item.period.title).font(DiaryType.heading)
+                Spacer()
+                Text(service.bothDates(item.writtenDay, calendar: app.diaryFirstCalendar)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+            }
+            Text(item.intention).font(DiaryType.writing).frame(maxWidth: .infinity, alignment: .leading)
+            Text(item.period.question).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+            TextField("اكتب مراجعتك هنا", text: $intentionReviewText, axis: .vertical)
+                .lineLimit(2...5).font(DiaryType.writing).padding(12)
+                .background(theme.background, in: .rect(cornerRadius: 12))
+                .accessibilityIdentifier("diary-intention-review-text")
+            Button {
+                guard !savingIntentionReview, !intentionReviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                savingIntentionReview = true
+                Task { @MainActor in
+                    defer { savingIntentionReview = false }
+                    do {
+                        try await service.setIntentionReview(item.id, period: item.period, text: intentionReviewText)
+                        intentionReviewText = ""
+                        intentionFollowUp = try await service.dueIntentionFollowUpsOffMain().first
+                    } catch { failure = madarUserMessage(error) }
+                }
+            } label: {
+                HStack {
+                    if savingIntentionReview { ProgressView().tint(theme.background) }
+                    Text("احفظ المراجعة")
+                }.font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(theme.background)
+                    .background(theme.accent, in: .capsule)
+            }.buttonStyle(.madarPlain).disabled(savingIntentionReview || intentionReviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("diary-intention-review-save")
+        }
+        .padding(16).background(theme.surface, in: .rect(cornerRadius: 20)).overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.line) }
+        .accessibilityElement(children: .contain).accessibilityIdentifier("diary-intention-follow-up")
+        .diaryRootDraftBlocking(app, isBlocking: !intentionReviewText.isEmpty || savingIntentionReview)
     }
 }

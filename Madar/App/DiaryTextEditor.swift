@@ -12,6 +12,7 @@ struct DiaryTextEditor: View {
     var initialDay = "today"
     /// A question chosen from «أسئلة من مذكراتك»: shown quietly above the page, never saved into the text.
     var prompt: String?
+    var embeddedInNavigationStack = false
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -43,7 +44,78 @@ struct DiaryTextEditor: View {
         !text.isEmpty || saving || importing || voice?.recording == true || voice?.savingAudio == true || voice?.converting == true
     }
     var body: some View {
-        NavigationStack {
+        Group {
+            if embeddedInNavigationStack { editorContent }
+            else { NavigationStack { editorContent } }
+        }
+        .task {
+            day = initialDay
+            writingDay = (try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()).map { initialDay == "yesterday" ? $0.adding(days: -1) : $0 }
+            do { if let draft = try AppDiaryService(app: app).draft(margin: margin) { draftID = draft.id; hasDraftRecord = true; text = draft.text; day = draft.day; writingDay = draft.writingDay; draftStatus = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "مسودة مستعادة" } }
+            catch { failure = madarUserMessage(error) }
+            // AU-38: let the restored text's onChange pass first, so «مسودة مستعادة» stays until the user types.
+            await Task.yield()
+            loaded = true
+            refreshSavedDay()
+            if voice == nil {
+                voice = DiaryVoiceController(app: app)
+                await voice?.recoverRecordings()
+            }
+            // A room-tab write link presents during the native sheet transition; an earlier
+            // focus request can be dropped before the text view joins its window.
+            if !app.bool("notes.dictationFirst") {
+                do { try await Task.sleep(for: .milliseconds(450)) } catch { return }
+                if !Task.isCancelled, voice?.recording != true { focused = true }
+            }
+        }
+        .task {
+            while !Task.isCancelled {
+                currentMadarDay = try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()
+                do { try await Task.sleep(for: .seconds(30)) } catch { return }
+            }
+        }
+#if DEBUG
+        .task(id: app.diaryBoundaryUITestClockOverride) {
+            currentMadarDay = try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()
+        }
+#endif
+        .onChange(of: text) { _, _ in scheduleDraft() }
+        .onChange(of: day) { _, _ in scheduleDraft() }
+        .onChange(of: photo) { _, item in Task {
+            guard let item else { return }; importing = true
+            // Cleared so the same photo can be chosen again.
+            defer { importing = false; photo = nil }
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self) else { failure = "تعذّر فتح الصورة. اخترها مرة أخرى."; return }
+                // A library photo is linked: its identifier and a small copy, never a second full image.
+                if let id = item.itemIdentifier, let copy = DiaryPhotoLibrary.smallCopy(of: data) { try await add(copy, kind: "photo", type: "image/jpeg", assetID: id) }
+                else { try await add(data, kind: "photo", type: item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg") }
+            }
+            catch { failure = madarUserMessage(error) }
+        } }
+        .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.data]) { result in Task {
+            do { let url = try result.get(); let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
+                let type = try url.resourceValues(forKeys: [.contentTypeKey]).contentType ?? .data
+                try await add(Data(contentsOf: url), kind: type.conforms(to: .image) ? "photo" : type.conforms(to: .audio) ? "audio" : type.conforms(to: .movie) ? "video" : "document", type: type.preferredMIMEType ?? "application/octet-stream", caption: url.lastPathComponent)
+            } catch { failure = madarUserMessage(error) }
+        } }
+        .fullScreenCover(isPresented: $cameraOpen) {
+            DiaryCameraCapture(captured: cameraCaptured, cancelled: { cameraOpen = false }).ignoresSafeArea()
+        }
+        .onChange(of: voice?.lastMedia?.id) { _, id in if id != nil { attachmentSaved = true; editorUndo = true; refreshSavedDay() } }
+        .onChange(of: writingDay) { _, _ in refreshSavedDay() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { voice?.refreshMicrophoneAuthorization() }
+            else if phase == .background {
+                Task { draftTask?.cancel(); if loaded { do { try await persistDraft() } catch { draftStatus = "لم تُحفظ المسودة"; failure = madarUserMessage(error) } }; await voice?.stop() }
+            }
+        }
+        .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app) } }
+        .madarSheetLock(saving: saving || importing || voice?.savingAudio == true || voice?.converting == true, draft: !text.isEmpty || voice?.recording == true)
+        .onDisappear { draftTask?.cancel(); savedDayTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
+        .diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
+    }
+    @ViewBuilder private var editorContent: some View {
             VStack(spacing: 0) {
 #if DEBUG
                 if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" {
@@ -179,74 +251,8 @@ struct DiaryTextEditor: View {
                         .accessibilityIdentifier("diary-editor-save")
                 }
             }.tint(theme.accent)
-        }
-        .task {
-            day = initialDay
-            writingDay = (try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()).map { initialDay == "yesterday" ? $0.adding(days: -1) : $0 }
-            do { if let draft = try AppDiaryService(app: app).draft(margin: margin) { draftID = draft.id; hasDraftRecord = true; text = draft.text; day = draft.day; writingDay = draft.writingDay; draftStatus = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "مسودة مستعادة" } }
-            catch { failure = madarUserMessage(error) }
-            // AU-38: let the restored text's onChange pass first, so «مسودة مستعادة» stays until the user types.
-            await Task.yield()
-            loaded = true
-            refreshSavedDay()
-            if voice == nil {
-                voice = DiaryVoiceController(app: app)
-                await voice?.recoverRecordings()
-            }
-            // A room-tab write link presents during the native sheet transition; an earlier
-            // focus request can be dropped before the text view joins its window.
-            if !app.bool("notes.dictationFirst") {
-                do { try await Task.sleep(for: .milliseconds(450)) } catch { return }
-                if !Task.isCancelled, voice?.recording != true { focused = true }
-            }
-        }
-        .task {
-            while !Task.isCancelled {
-                currentMadarDay = try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()
-                do { try await Task.sleep(for: .seconds(30)) } catch { return }
-            }
-        }
-#if DEBUG
-        .task(id: app.diaryBoundaryUITestClockOverride) {
-            currentMadarDay = try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()
-        }
-#endif
-        .onChange(of: text) { _, _ in scheduleDraft() }
-        .onChange(of: day) { _, _ in scheduleDraft() }
-        .onChange(of: photo) { _, item in Task {
-            guard let item else { return }; importing = true
-            // Cleared so the same photo can be chosen again.
-            defer { importing = false; photo = nil }
-            do {
-                guard let data = try await item.loadTransferable(type: Data.self) else { failure = "تعذّر فتح الصورة. اخترها مرة أخرى."; return }
-                // A library photo is linked: its identifier and a small copy, never a second full image.
-                if let id = item.itemIdentifier, let copy = DiaryPhotoLibrary.smallCopy(of: data) { try await add(copy, kind: "photo", type: "image/jpeg", assetID: id) }
-                else { try await add(data, kind: "photo", type: item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg") }
-            }
-            catch { failure = madarUserMessage(error) }
-        } }
-        .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.data]) { result in Task {
-            do { let url = try result.get(); let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
-                let type = try url.resourceValues(forKeys: [.contentTypeKey]).contentType ?? .data
-                try await add(Data(contentsOf: url), kind: type.conforms(to: .image) ? "photo" : type.conforms(to: .audio) ? "audio" : type.conforms(to: .movie) ? "video" : "document", type: type.preferredMIMEType ?? "application/octet-stream", caption: url.lastPathComponent)
-            } catch { failure = madarUserMessage(error) }
-        } }
-        .fullScreenCover(isPresented: $cameraOpen) {
-            DiaryCameraCapture(captured: cameraCaptured, cancelled: { cameraOpen = false }).ignoresSafeArea()
-        }
-        .onChange(of: voice?.lastMedia?.id) { _, id in if id != nil { attachmentSaved = true; editorUndo = true; refreshSavedDay() } }
-        .onChange(of: writingDay) { _, _ in refreshSavedDay() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { voice?.refreshMicrophoneAuthorization() }
-            else if phase == .background {
-                Task { draftTask?.cancel(); if loaded { do { try await persistDraft() } catch { draftStatus = "لم تُحفظ المسودة"; failure = madarUserMessage(error) } }; await voice?.stop() }
-            }
-        }
-        .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app) } }
-        .madarSheetLock(saving: saving || importing || voice?.savingAudio == true || voice?.converting == true, draft: !text.isEmpty || voice?.recording == true)
-        .onDisappear { draftTask?.cancel(); savedDayTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
-        .diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
     }
+
     /// The selected range, or an empty range at the cursor (the end when nothing is focused yet).
     private var selectedOffsets: Range<Int> {
         if case .selection(let range) = selection?.indices, range.lowerBound >= text.startIndex, range.upperBound <= text.endIndex {

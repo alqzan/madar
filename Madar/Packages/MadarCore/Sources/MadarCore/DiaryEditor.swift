@@ -5,8 +5,10 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case commitDraft(UUID)
     case appendMedia(file: UUID, kind: String, type: String, caption: String, day: String, writingDay: String, duration: Int?, asset: String? = nil)
     case transcript(entry: UUID, text: String)
+    case audioInsights(media: UUID, title: String?, voiceTone: String?, levels: [Double])
     case intention(id: UUID, day: String, text: String)
     case intentionResult(id: UUID, result: String?)
+    case intentionReview(id: UUID, period: String, text: String)
     case deleteIntention(UUID)
     case edit(entry: UUID, revision: UUID, text: String)
     case deleteEntry(UUID)
@@ -24,7 +26,7 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case deleteUpcomingDay(UUID)
     case saveWidget(id: UUID, name: String, familyID: String, items: [String], style: WidgetMakerStyle)
     case deleteWidget(UUID)
-    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult", "diary.deleteIntention", "diary.editEntry", "diary.deleteEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay", "widget.save", "widget.delete"]
+    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setAudioInsights", "diary.setIntention", "diary.setIntentionResult", "diary.setIntentionReview", "diary.deleteIntention", "diary.editEntry", "diary.deleteEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay", "widget.save", "widget.delete"]
     public static func parse(_ name: String, _ value: [String: JSONValue]) -> Self? {
         func uuid(_ key: String) -> UUID? { value[key]?.string.flatMap(UUID.init(uuidString:)) }
         switch name {
@@ -55,6 +57,11 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
         case "diary.setIntentionResult":
             guard Set(value.keys) == ["id","result"],let id=uuid("id"),value["result"] == .null || value["result"]?.string.map({["done","partial","notEasy"].contains($0)}) == true else{return nil}
             return .intentionResult(id:id,result:value["result"]?.string)
+        case "diary.setIntentionReview":
+            guard Set(value.keys) == ["id", "period", "text"], let id = uuid("id"),
+                  let period = value["period"]?.string, ["weekly", "monthly"].contains(period),
+                  let text = value["text"]?.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= 2_000 else { return nil }
+            return .intentionReview(id: id, period: period, text: text)
         case "diary.editEntry":
             guard Set(value.keys) == ["entryID", "revisionID", "text"], let id = uuid("entryID"), let revision = uuid("revisionID"), revision != id, let text = value["text"]?.string,
                 !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
@@ -122,6 +129,17 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
             return .linkEntry(entry: entry, project: uuid("projectID"))
         case "diary.setTranscript":
             guard Set(value.keys) == ["entryID", "text"], let id = uuid("entryID"), let text = value["text"]?.string else { return nil }; return .transcript(entry: id, text: text)
+        case "diary.setAudioInsights":
+            guard Set(value.keys) == ["mediaID", "title", "voiceTone", "audioLevels"], let id = uuid("mediaID"),
+                  let levelValues = value["audioLevels"]?.array, levelValues.count <= 36_000 else { return nil }
+            let title = value["title"]?.string
+            guard value["title"] == .null || title.map({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.count <= 80 }) == true else { return nil }
+            let tone = value["voiceTone"]?.string
+            let tones = ["calm", "joyful", "sad", "concerned", "grateful", "hopeful", "tired", "mixed", "unclear"]
+            guard value["voiceTone"] == .null || tone.map(tones.contains) == true else { return nil }
+            let levels = levelValues.compactMap(\.number)
+            guard levels.count == levelValues.count, levels.allSatisfy({ (0...1).contains($0) }) else { return nil }
+            return .audioInsights(media: id, title: title, voiceTone: tone, levels: levels)
         default: return nil
         }
     }
@@ -141,6 +159,7 @@ public enum DiarySpeechPolicy {
 private extension JSONValue {
     var string: String? { if case .string(let value) = self { value } else { nil } }
     var number: Double? { if case .number(let value) = self { value } else { nil } }
+    var array: [JSONValue]? { if case .array(let value) = self { value } else { nil } }
 }
 
 /// Owner, 24 Oct 2026: a diary photo linked to the Photos library stores `Media.sourceID = "photos:<local identifier>"`

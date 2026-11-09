@@ -20,23 +20,109 @@ struct DiaryMediaCard: View {
     private var playing: Bool { playback.activeID == media.id && playback.playing }
     @State private var voice: DiaryVoiceController?
     @State private var editingTranscript = false
+    @State private var transcriptDraft = ""
+    @State private var savingTranscript = false
+    @State private var editingTitle = false
+    @State private var titleDraft = ""
+    @State private var savingTitle = false
+    @State private var savedTitle: String?
+    private var visibleTranscript: String {
+        voice.flatMap { $0.transcriptText.isEmpty ? nil : $0.transcriptText } ?? transcript
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if media.kind == "photo", let image = UIImage(data: media.data) {
                 Button { open() } label: { Image(uiImage: image).resizable().scaledToFit().frame(maxWidth: 150).padding(8).background(theme.surface).rotationEffect(.degrees(-2)).shadow(color: theme.ink.opacity(0.1), radius: 5, y: 4) }
                     .buttonStyle(.madarPlain).accessibilityLabel("افتح الصورة").accessibilityIdentifier("diary-media-" + media.id.uuidString)
             } else if media.kind == "audio" {
+                if editingTitle {
+                    HStack(spacing: 8) {
+                        TextField("عنوان التسجيل", text: $titleDraft).font(DiaryType.writing).accessibilityIdentifier("diary-audio-title-edit")
+                        Button("احفظ") { saveTitle() }.disabled(savingTitle || titleDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .accessibilityIdentifier("diary-audio-title-save")
+                    }
+                } else if let title = savedTitle ?? media.title {
+                    HStack {
+                        Text(title).font(DiaryType.heading).frame(maxWidth: .infinity, alignment: .leading)
+                        Button("عدّل العنوان") { titleDraft = title; editingTitle = true }
+                            .font(MadarTypography.fine()).frame(minHeight: 44).accessibilityIdentifier("diary-audio-title-open")
+                    }
+                }
                 HStack(spacing: 12) {
                     Button { togglePlayback() } label: { Image(systemName: playing ? "pause.fill" : "play.fill").frame(width: 44, height: 44).foregroundStyle(theme.onAccent).background(theme.accent, in: .circle) }
                         .buttonStyle(.madarPlain).accessibilityLabel(playing ? "أوقف الصوت مؤقتًا" : "شغّل التسجيل").accessibilityIdentifier("diary-play-" + media.id.uuidString)
                     ProgressView(value: playback.activeID == media.id ? playback.position : 0).tint(theme.accent)
                     Text(media.duration.map(seconds) ?? "تسجيل صوتي").font(MadarTypography.fine())
                 }.padding(10).background(theme.surface, in: .capsule)
+                if let tone = media.voiceTone {
+                    Label("انطباع التفريغ: " + DiaryVoiceTone.label(tone), systemImage: "text.quote")
+                        .font(MadarTypography.fine()).accessibilityIdentifier("diary-audio-tone")
+                }
+                if !media.levelSamples.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("مستوى الصوت عبر التسجيل").font(MadarTypography.fine())
+                        DiaryAudioLevelChart(samples: media.levelSamples)
+                        Text("ارتفاع الصوت لا يحدد المشاعر.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    }.accessibilityIdentifier("diary-audio-levels")
+                }
+                if !visibleTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Label("تفريغ التسجيل", systemImage: "text.quote").font(DiaryType.label)
+                            Spacer()
+                            if editingTranscript {
+                                Button("إلغاء") { editingTranscript = false }.font(DiaryType.label).frame(minHeight: 44)
+                                    .accessibilityIdentifier("diary-audio-transcript-cancel")
+                            } else {
+                                Button("عدّل النص") { transcriptDraft = visibleTranscript; editingTranscript = true }
+                                    .font(DiaryType.label).frame(minHeight: 44).accessibilityIdentifier("diary-audio-transcript-open")
+                            }
+                        }
+                        if editingTranscript {
+                            TextEditor(text: $transcriptDraft).font(DiaryType.writing).scrollContentBackground(.hidden)
+                                .frame(minHeight: 110, maxHeight: 220).padding(8)
+                                .background(theme.background, in: .rect(cornerRadius: 12))
+                                .accessibilityIdentifier("diary-audio-transcript-edit")
+                            Button {
+                                guard !savingTranscript, let voice else { return }
+                                voice.editTranscript(transcriptDraft); savingTranscript = true
+                                Task { @MainActor in
+                                    defer { savingTranscript = false }
+                                    await voice.saveTranscriptEdits()
+                                    if !voice.transcriptIsDirty { editingTranscript = false }
+                                }
+                            } label: {
+                                HStack {
+                                    if savingTranscript { ProgressView().tint(theme.background) }
+                                    Text("احفظ التفريغ")
+                                }.font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(theme.background)
+                                    .background(theme.accent, in: .capsule)
+                            }.buttonStyle(.madarPlain).disabled(savingTranscript)
+                                .accessibilityIdentifier("diary-audio-transcript-save-inline")
+                        } else {
+                            ScrollView {
+                                Text(visibleTranscript).font(DiaryType.writing).frame(maxWidth: .infinity, alignment: .leading)
+                            }.frame(maxHeight: 180).accessibilityIdentifier("diary-audio-transcript-text")
+                        }
+                    }
+                    .padding(12).background(theme.surface, in: .rect(cornerRadius: 14))
+                    .accessibilityElement(children: .contain).accessibilityIdentifier("diary-audio-transcript")
+                } else if let voice, voice.converting {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text("يُفرّغ التسجيل ويحفظ النص هنا…").font(MadarTypography.fine())
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                        .accessibilityIdentifier("diary-audio-transcribing")
+                } else if let voice {
+                    Button { Task { await voice.transcribe(media) } } label: {
+                        Label("حوّل التسجيل إلى نص هنا", systemImage: "text.quote")
+                            .font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 44)
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-transcribe-" + media.id.uuidString)
+                }
                 if let voice {
                     DisclosureGroup("التسجيل والنص") {
-                        DiaryVoiceControls(controller: voice)
-                        if !voice.converting { Button { Task { await voice.transcribe(media) } } label: { Text(transcript.isEmpty ? "حوّله إلى نص" : "أعِد التحويل").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-transcribe-" + media.id.uuidString) }
-                        Button { editingTranscript = true } label: { Text("عدّل النص مع إبقاء الصوت").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-transcript-edit-" + media.id.uuidString)
+                        DiaryVoiceControls(controller: voice, showsTranscriptEditor: false)
+                        if !voice.converting { Button { Task { await voice.transcribe(media) } } label: { Text("أعِد تحويل التسجيل").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-transcribe-again-" + media.id.uuidString) }
                     }.font(MadarTypography.caption())
                 }
             } else if media.kind == "missing" {
@@ -51,9 +137,13 @@ struct DiaryMediaCard: View {
             }
             if let error { Text(error).font(MadarTypography.fine()) }
         }.padding(.vertical, 10).padding(.leading, 58).padding(.trailing, 18)
-            .task { if voice == nil { voice = DiaryVoiceController(app: app) } }
+            .task(id: media.id) {
+                if voice == nil { voice = DiaryVoiceController(app: app) }
+                voice?.loadExistingTranscript(media, text: transcript)
+                if savedTitle == nil { savedTitle = media.title }
+            }
+            .onChange(of: transcript) { _, value in voice?.loadExistingTranscript(media, text: value) }
             .sheet(item: $preview) { item in DiaryQuickLook(url: item.url).onDisappear { try? FileManager.default.removeItem(at: item.url.deletingLastPathComponent()) } }
-            .sheet(isPresented: $editingTranscript) { DiaryTranscriptEditor(app: app, media: media, original: transcript).environment(\.roomTheme, theme).diaryRootDraftBlocking(app) }
             .onDisappear { if playback.activeID == media.id { playback.stop() }; voice?.cancelConversion(); voice?.cancelDownload() }
     }
     /// «ثانية واحدة»، «ثانيتان»، «٥ ثوانٍ»، «٤٠ ثانيةً».
@@ -73,6 +163,23 @@ struct DiaryMediaCard: View {
             try AppDiaryService(app: app).authorizeRead()
             try playback.toggle(id: media.id, data: media.data)
         } catch { self.error = "تعذّر تشغيل الصوت. الملف محفوظ." }
+    }
+    private func saveTitle() {
+        guard !savingTitle else { return }
+        let title = titleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        savingTitle = true
+        Task { @MainActor in
+            defer { savingTitle = false }
+            do {
+                try await app.executeDiaryCommand("diary.setAudioInsights", payload: [
+                    "mediaID": .string(media.id.uuidString), "title": .string(String(title.prefix(80))),
+                    "voiceTone": media.voiceTone.map(MadarCore.JSONValue.string) ?? .null,
+                    "audioLevels": .array(media.levelSamples.map(MadarCore.JSONValue.number))
+                ])
+                savedTitle = String(title.prefix(80)); editingTitle = false
+            } catch { self.error = madarUserMessage(error) }
+        }
     }
     private func open() {
         if let id = media.assetID, let asset = DiaryPhotoLibrary.asset(id) {

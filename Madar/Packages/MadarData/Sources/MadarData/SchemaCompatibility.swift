@@ -25,6 +25,7 @@ enum SchemaCompatibility {
         case 12: MadarSchemaV12.syncedNames
         case 13: MadarSchemaV13.syncedNames
         case 14: MadarSchemaV14.syncedNames
+        case 15: MadarSchemaV15.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -82,6 +83,14 @@ enum SchemaCompatibility {
             if version < 14, row.model == "MoneyTransaction", row.fields["categorySource"] == nil { row.fields["categorySource"] = .null }
             // V15: every older habit policy has no day interval.
             if version < 15, row.model == "HabitPolicy", row.fields["intervalDays"] == nil { row.fields["intervalDays"] = .null }
+            // V16: existing intentions have no later check-ins; existing media has no generated voice metadata.
+            if version < 16 {
+                if row.model == "Niyya" {
+                    row.fields["weeklyReview"] = .null; row.fields["monthlyReview"] = .null
+                } else if row.model == "Media" {
+                    row.fields["title"] = .null; row.fields["voiceTone"] = .null; row.fields["audioLevelsJSON"] = .null
+                }
+            }
             return row
         }
     }

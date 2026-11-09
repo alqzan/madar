@@ -22,6 +22,10 @@ import MadarCore
     private(set) var lastMedia: DiaryDisplayMedia?
     private(set) var elapsedSeconds = 0
     private(set) var meterLevels: [Double] = []
+    private(set) var recordedAudioLevels: [Double] = []
+    private(set) var generatedTitle: String?
+    private(set) var transcriptTone: String?
+    private(set) var insightStatus = ""
     private(set) var transcriptText = ""
     private(set) var transcriptIsDirty = false
     private(set) var runtimeDescription = "سجّل صوتًا"
@@ -29,6 +33,9 @@ import MadarCore
     private var supportedLocale: Locale?
     private var recorder: AVAudioRecorder?
     private var recordingDay: GregorianDay?
+    private var meterWindowSecond = 0
+    private var meterWindowTotal = 0.0
+    private var meterWindowCount = 0
     private var meterTask: Task<Void, Never>?
     private var transcriptMedia: DiaryDisplayMedia?
     private var savedTranscript = ""
@@ -74,6 +81,7 @@ import MadarCore
     func start(writingDay: GregorianDay) async {
         guard !recording, !savingAudio else { return }
         lastMedia = nil; transcriptMedia = nil; transcriptText = ""; savedTranscript = ""; transcriptIsDirty = false
+        generatedTitle = nil; transcriptTone = nil; insightStatus = ""
         let allowed = await AVAudioApplication.requestRecordPermission()
         guard allowed else { refreshMicrophoneAuthorization(); return }
         do {
@@ -82,7 +90,8 @@ import MadarCore
             try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try AVAudioSession.sharedInstance().setActive(true)
             recordingDay = writingDay; microphoneDenied = false; message = "الحبر يسمعك · اضغط للإيقاف"
-            elapsedSeconds = 0; meterLevels = []
+        elapsedSeconds = 0; meterLevels = []; recordedAudioLevels = []
+        meterWindowSecond = 0; meterWindowTotal = 0; meterWindowCount = 0
             try startChunk()
             recording = true
             startMetering()
@@ -136,11 +145,26 @@ import MadarCore
                 let level = min(1, max(0, (decibels + 54) / 54))
                 self.meterLevels.append(level)
                 if self.meterLevels.count > 36 { self.meterLevels.removeFirst(self.meterLevels.count - 36) }
+                let second = Int(recorder.currentTime.rounded(.down))
+                if second > self.meterWindowSecond {
+                    self.appendCompletedMeterWindow()
+                    self.meterWindowSecond = second
+                }
+                self.meterWindowTotal += level; self.meterWindowCount += 1
                 do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
             }
         }
     }
-    private func stopMetering() { meterTask?.cancel(); meterTask = nil }
+    private func stopMetering() {
+        meterTask?.cancel(); meterTask = nil
+        appendCompletedMeterWindow()
+    }
+    private func appendCompletedMeterWindow() {
+        guard meterWindowCount > 0 else { return }
+        recordedAudioLevels.append(min(1, max(0, meterWindowTotal / Double(meterWindowCount))))
+        if recordedAudioLevels.count > 36_000 { recordedAudioLevels.removeFirst(recordedAudioLevels.count - 36_000) }
+        meterWindowTotal = 0; meterWindowCount = 0
+    }
     fileprivate func storeChunk(url: URL, successful: Bool) async {
         guard processed.insert(url).inserted, let day = recordingDay else { return }
         savingAudio = true
@@ -151,7 +175,9 @@ import MadarCore
             let duration = (try? await AVURLAsset(url: url).load(.duration).seconds) ?? 0
             let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent) ?? UUID()
             _ = try await AppDiaryService(app: app).appendMedia(data: data, kind: "audio", contentType: "audio/mp4", day: "today", writingDay: day, duration: Int(duration.rounded()), id: id)
-            lastMedia = .init(id: id, entryID: id.uuidString, kind: "audio", contentType: "audio/mp4", data: data, duration: Int(duration.rounded()))
+            let samples = recordedAudioLevels
+            lastMedia = .init(id: id, entryID: id.uuidString, kind: "audio", contentType: "audio/mp4", data: data, duration: Int(duration.rounded()), title: nil, voiceTone: nil, levelSamples: samples)
+            try? await saveAudioInsights(mediaID: id, title: nil, voiceTone: nil, levels: samples)
             try? FileManager.default.removeItem(at: url.deletingPathExtension().appendingPathExtension("json"))
             message = successful ? "حُفظ التسجيل · يبدأ التفريغ الآن" : "توقف التسجيل؛ حُفظ ما أمكن من الصوت"
             // The staged file is removed only by a successful durable media write.
@@ -159,7 +185,8 @@ import MadarCore
     }
     func transcribe(_ media: DiaryDisplayMedia) async {
         guard !converting, media.kind == "audio" else { return }
-        transcriptMedia = media
+        transcriptMedia = media; recordedAudioLevels = media.levelSamples
+        generatedTitle = media.title; transcriptTone = media.voiceTone
         do { try AppDiaryService(app: app).authorizeRead() } catch { message = madarUserMessage(error); return }
         let token = UUID(); job = token; converting = true; partialText = ""; message = "يُجهّز التحويل…"
         await refreshLanguage(); guard job == token else { return }
@@ -221,6 +248,25 @@ import MadarCore
         } catch { message = "لم يُحفظ التعديل؛ أعد المحاولة. " + madarUserDetail(error) }
     }
     func editTranscript(_ text: String) { transcriptText = text; transcriptIsDirty = text != savedTranscript }
+    func loadExistingTranscript(_ media: DiaryDisplayMedia, text: String) {
+        guard media.kind == "audio", !transcriptIsDirty else { return }
+        if transcriptMedia?.id != media.id || transcriptText != text {
+            transcriptMedia = media; transcriptText = text; savedTranscript = text
+        }
+    }
+    var currentTranscriptMedia: DiaryDisplayMedia? { transcriptMedia }
+    func saveAudioInsights(mediaID: UUID, title: String?, voiceTone: String?, levels: [Double]) async throws {
+        try await app.executeDiaryCommand("diary.setAudioInsights", payload: [
+            "mediaID": .string(mediaID.uuidString),
+            "title": title.map(MadarCore.JSONValue.string) ?? .null,
+            "voiceTone": voiceTone.map(MadarCore.JSONValue.string) ?? .null,
+            "audioLevels": .array(levels.map(MadarCore.JSONValue.number))
+        ])
+        if let title { generatedTitle = title }
+        transcriptTone = voiceTone
+        insightStatus = title != nil ? "اكتمل العنوان التلقائي" : voiceTone != nil ? "اكتمل الانطباع من التفريغ" : ""
+    }
+    func setInsightStatus(_ value: String) { insightStatus = value }
     private func fail(_ error: String, token: UUID) {
         guard job == token else { return }; cancelConversion(); message = "لم يتحوّل؛ الصوت محفوظ · أعد المحاولة. " + error
     }

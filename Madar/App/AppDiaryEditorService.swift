@@ -17,6 +17,9 @@ struct DiaryDisplayMedia: Identifiable, Sendable {
     let data: Data
     let duration: Int?
     var assetID: String? = nil
+    var title: String? = nil
+    var voiceTone: String? = nil
+    var levelSamples: [Double] = []
 }
 extension AppDiaryService {
     func draft(margin: GregorianDay?) throws -> DiaryTextDraft? {

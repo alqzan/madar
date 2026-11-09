@@ -40,6 +40,7 @@ import MadarData
             return try DiaryMutationHandler.stage(text: caption, day: day, targetDay: nil, id: id, context: context, now: now, writer: writer, mediaIDs: kind == "audio" ? [] : [file], audioID: kind == "audio" ? file : nil, storedDay: try GregorianDay(writingDay))
         case .intention(let id,let day,let text): return try DiaryMutationHandler.setIntention(id:id,day:day,text:text,context:context,now:now,writer:writer)
         case .intentionResult(let id,let result): return try DiaryMutationHandler.setIntentionResult(id:id,result:result,context:context,now:now,writer:writer)
+        case .intentionReview(let id, let period, let text): return try DiaryMutationHandler.setIntentionReview(id: id, period: period, text: text, context: context, now: now, writer: writer)
         case .deleteIntention(let id): return try DiaryMutationHandler.deleteIntention(id:id,context:context,now:now,writer:writer)
         case .sealLetter(let letter, let text, let trigger, let value, let target): return try DiaryLetterHandler.seal(id: letter, text: text, trigger: trigger, value: value, target: target, context: context, now: now, writer: writer)
         case .refreshLetters: try DiaryLetterHandler.refresh(context: context, now: now, writer: writer); return nil
@@ -58,6 +59,7 @@ import MadarData
         case .edit(let entry, let revision, let text): return try DiaryMutationHandler.edit(entry: entry, revision: revision, text: text, context: context, now: now, writer: writer)
         case .deleteEntry(let entry): return try DiaryMutationHandler.deleteEntry(entry, context: context, now: now, writer: writer)
         case .transcript(let entry, let text): return try DiaryMutationHandler.setTranscript(entry: entry, text: text, context: context, now: now, writer: writer)
+        case .audioInsights(let media, let title, let voiceTone, let levels): return try DiaryMutationHandler.setAudioInsights(media: media, title: title, voiceTone: voiceTone, levels: levels, context: context, now: now, writer: writer)
         }
     }
 }

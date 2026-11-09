@@ -10,7 +10,7 @@ import MadarDesign
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "restored", "today", "editor", "entryRoute", "return", "travel", "travelClock", "letters", "lettersRoutes"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "restored", "today", "editor", "entryRoute", "return", "travel", "travelClock", "letters", "lettersRoutes", "intentionReview"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -84,6 +84,13 @@ extension AppSession {
         }
         if variant == "return" {
             let day=GregorianDay.containing(prayerUITestClock(.now),in:.riyadh).adding(days:-5),row=Entry();row.dayKey=day.description;row.text="آخر سطر محفوظ قبل الانقطاع";row.tzID="Asia/Riyadh";row.eventAt=day.date(in:.riyadh).addingTimeInterval(12*3600);context.insert(row);try context.save();return
+        }
+        if variant == "intentionReview" {
+            let today = GregorianDay.containing(prayerUITestClock(.now), in: .riyadh)
+            let written = today.adding(days: -7), intention = Niyya()
+            intention.dayKey = written.description; intention.text = "أمشي نصف ساعة كل يوم"
+            intention.createdAt = written.date(in: .riyadh).addingTimeInterval(8 * 3600); intention.updatedAt = intention.createdAt
+            context.insert(intention); try context.save(); return
         }
         if variant != "empty" && variant != "welcome" {
             let today = GregorianDay.containing(prayerUITestClock(.now), in: .riyadh)

@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-// Generated from Specification/data-dictionary.json (schema V15). UUID foreign keys intentionally avoid ownership relationships.
+// Generated from Specification/data-dictionary.json (schema V16). UUID foreign keys intentionally avoid ownership relationships.
 @MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
 @Model public final class Setting {
     public var id: UUID = UUID()
@@ -1055,6 +1055,8 @@ extension DayPage: MadarRecordModel {
     public var order: Int = 0
     public var text: String = ""
     public var result: String? = nil
+    public var weeklyReview: String? = nil
+    public var monthlyReview: String? = nil
     public init() {}
 }
 extension Niyya: MadarRecordModel {
@@ -1072,6 +1074,8 @@ extension Niyya: MadarRecordModel {
             "order": JSONValue.encode(order),
             "text": JSONValue.encode(text),
             "result": JSONValue.encode(result),
+            "weeklyReview": JSONValue.encode(weeklyReview),
+            "monthlyReview": JSONValue.encode(monthlyReview),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -1087,6 +1091,8 @@ extension Niyya: MadarRecordModel {
         order = try record.decode("order", as: Int.self)
         text = try record.decode("text", as: String.self)
         result = try record.decode("result", as: String?.self)
+        weeklyReview = try record.fields["weeklyReview"]?.decode(String?.self)
+        monthlyReview = try record.fields["monthlyReview"]?.decode(String?.self)
     }
 }
 @Model public final class Entry {
@@ -1423,6 +1429,9 @@ extension Project: MadarRecordModel {
     public var sourceID: String? = nil
     public var state: String = "ok"
     public var importBatchID: UUID? = nil
+    public var title: String? = nil
+    public var voiceTone: String? = nil
+    public var audioLevelsJSON: Data? = nil
     public init() {}
 }
 extension Media: MadarRecordModel {
@@ -1445,6 +1454,9 @@ extension Media: MadarRecordModel {
             "sourceID": JSONValue.encode(sourceID),
             "state": JSONValue.encode(state),
             "importBatchID": JSONValue.encode(importBatchID),
+            "title": JSONValue.encode(title),
+            "voiceTone": JSONValue.encode(voiceTone),
+            "audioLevelsJSON": JSONValue.encode(audioLevelsJSON),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -1465,6 +1477,9 @@ extension Media: MadarRecordModel {
         sourceID = try record.decode("sourceID", as: String?.self)
         state = try record.decode("state", as: String.self)
         importBatchID = try record.decode("importBatchID", as: UUID?.self)
+        title = try record.fields["title"]?.decode(String?.self)
+        voiceTone = try record.fields["voiceTone"]?.decode(String?.self)
+        audioLevelsJSON = try record.fields["audioLevelsJSON"]?.decode(Data?.self)
     }
 }
 @Model public final class Account {

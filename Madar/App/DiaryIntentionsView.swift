@@ -6,6 +6,8 @@ struct DiaryIntentionsView:View {
     @Bindable var app:AppSession
     let day:GregorianDay
     let evening:Bool
+    var inline = false
+    var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var rows:[DiaryIntention]=[]
@@ -22,10 +24,22 @@ struct DiaryIntentionsView:View {
         return !text.isEmpty
     }
     var body:some View {
-        NavigationStack {
+        Group {
+            if inline { intentionContent }
+            else { NavigationStack { intentionContent } }
+        }.diaryRootDraftBlocking(app, isBlocking: inline ? hasUnsavedInput : true)
+    }
+    private var intentionContent: some View {
             ScrollView {
                 VStack(alignment:.leading,spacing:18){
-                    Text(evening ? "حصيلة النيّات" : "نيّة اليوم").font(DiaryType.title)
+                    HStack {
+                        Text(evening ? "حصيلة النيّات" : "نيّة اليوم").font(DiaryType.title)
+                        Spacer()
+                        if inline {
+                            Button("تم") { requestClose() }.font(DiaryType.label).frame(minWidth: 44, minHeight: 44)
+                                .accessibilityIdentifier("diary-niyya-close-inline")
+                        }
+                    }
                     MadarDateLabel(service.bothDates(day,calendar:app.diaryFirstCalendar)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     if evening {Text("كيف مضت نيّتك؟ اختر ما يصف يومك.").font(DiaryType.writing)}
                     ForEach(rows){row in
@@ -47,14 +61,18 @@ struct DiaryIntentionsView:View {
                     if saved,app.undoToken != nil {Button {app.undo();saved=false} label: { Text("تراجع عن آخر تعديل").font(MadarTypography.body()).frame(minHeight:44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-niyya-undo")}
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink).scrollDismissesKeyboard(.interactively).navigationBarTitleDisplayMode(.inline)
-                .toolbar{ToolbarItem(placement:.topBarLeading){Button("الصفحة"){if hasUnsavedInput {focused=false;confirmDiscard=true} else {dismiss()}}.madarWaitsForSave().accessibilityIdentifier("diary-niyya-close")}}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
+                .toolbar{if !inline {ToolbarItem(placement:.topBarLeading){Button("الصفحة"){requestClose()}.madarWaitsForSave().accessibilityIdentifier("diary-niyya-close")}}}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
                 .madarSheetLock(saving: busy, draft: hasUnsavedInput)
                 .confirmationDialog("تتجاهل النيّة؟",isPresented:$confirmDiscard,titleVisibility:.visible){
-                    Button("تجاهل المسودة",role:.destructive){text="";editing=nil;dismiss()}.accessibilityIdentifier("diary-niyya-discard")
+                    Button("تجاهل المسودة",role:.destructive){text="";editing=nil;if inline {onClose?()} else {dismiss()}}.accessibilityIdentifier("diary-niyya-discard")
                     Button("أكمل الكتابة"){}.accessibilityIdentifier("diary-niyya-continue")
                 } message:{Text("لم تحفظ التغييرات على النيّة.")}
                 .task(id:app.prayerRevision){load()}.disabled(busy)
-        }.diaryRootDraftBlocking(app)
+    }
+    private func requestClose() {
+        if hasUnsavedInput { focused = false; confirmDiscard = true }
+        else if inline { onClose?() }
+        else { dismiss() }
     }
     private func load(){do{rows=try service.intentions(day);failure=nil}catch{failure=madarUserMessage(error)}}
     private func run(_ action:@escaping @MainActor () async throws -> Void){busy=true;Task{@MainActor in defer{busy=false};do{try await action();saved=true;load()}catch{failure=madarUserMessage(error)}}}

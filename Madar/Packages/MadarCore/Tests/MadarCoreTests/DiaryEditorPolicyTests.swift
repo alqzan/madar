@@ -19,6 +19,22 @@ struct DiaryEditorPolicyTests {
         #expect(DiaryEditorCommand.parse("diary.saveDraft", valid.merging(["writingDayKey": .string("2026-02-30")]) { _, new in new }) == nil)
         #expect(DiaryEditorCommand.parse("diary.appendMedia", ["fileID": .string("../../store"), "kind": .string("audio")]) == nil)
     }
+    @Test func audioInsightsAndIntentionReviewsHaveStrictBoundedPayloads() {
+        let id = UUID()
+        let levels: [JSONValue] = [.number(0), .number(0.43), .number(1)]
+        let audio: [String: JSONValue] = ["mediaID": .string(id.uuidString), "title": .string("لحظة هادئة"),
+            "voiceTone": .string("calm"), "audioLevels": .array(levels)]
+        #expect(DiaryEditorCommand.parse("diary.setAudioInsights", audio) != nil)
+        #expect(DiaryEditorCommand.parse("diary.setAudioInsights", audio.merging(["audioLevels": .array([.number(1.2)])]) { _, next in next }) == nil)
+        #expect(DiaryEditorCommand.parse("diary.setAudioInsights", audio.merging(["voiceTone": .string("loud")]) { _, next in next }) == nil)
+        #expect(DiaryEditorCommand.parse("diary.setAudioInsights", audio.merging(["unexpected": .bool(true)]) { _, next in next }) == nil)
+
+        let review: [String: JSONValue] = ["id": .string(id.uuidString), "period": .string("weekly"), "text": .string("تعلمت أن أبدأ بخطوة أصغر.")]
+        #expect(DiaryEditorCommand.parse("diary.setIntentionReview", review) != nil)
+        #expect(DiaryEditorCommand.parse("diary.setIntentionReview", review.merging(["period": .string("daily")]) { _, next in next }) == nil)
+        #expect(DiaryEditorCommand.parse("diary.setIntentionReview", review.merging(["text": .string("  ")]) { _, next in next }) == nil)
+        #expect(DiaryEditorCommand.parse("diary.setIntentionReview", review.merging(["text": .string(String(repeating: "ا", count: 2001))]) { _, next in next }) == nil)
+    }
     /// Owner, 24 Oct 2026: a photo may be linked to the Photos library by its identifier; audio may not, nor an empty one.
     @Test func appendMediaAcceptsALibraryLinkOnlyForPhotos() {
         let base: [String:JSONValue] = ["fileID": .string(UUID().uuidString), "kind": .string("photo"), "contentType": .string("image/jpeg"), "caption": .string(""), "day": .string("today"), "writingDayKey": .string("2026-10-24")]

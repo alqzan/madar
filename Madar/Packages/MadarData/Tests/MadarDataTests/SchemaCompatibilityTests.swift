@@ -262,7 +262,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 15)
+        #expect(MadarSchema.version == 16)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -285,7 +285,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 15)
+        #expect(MadarSchema.version == 16)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
@@ -736,6 +736,73 @@ import Testing
         #expect(checked.records.first { $0.id == policyID }?.fields["intervalDays"] == .number(3))
         #expect(try stableGenerationHashes(generation) == sourceHash)
         }
+    }
+
+    /// V16 adds optional metadata only. Existing voice bytes, transcripts, and daily intention outcomes survive unchanged.
+    @Test func schemaV15UpgradeKeepsDiaryDataAndLeavesNewInsightsEmpty() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV16-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let intentionID = UUID(), mediaID = UUID(), stamp = Date(timeIntervalSince1970: 1_797_000_000)
+        let audio = Data([0, 1, 2, 3, 250, 251, 252])
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV15.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV15.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV15.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+
+            let intention = MadarFrozenDiaryV15.Niyya()
+            intention.id = intentionID; intention.dayKey = "2026-10-01"; intention.order = 0
+            intention.text = "أُنهي ما بدأت"; intention.result = "partial"
+            intention.createdAt = stamp; intention.updatedAt = stamp; intention.writerID = "synthetic-v15"
+            old.mainContext.insert(intention)
+            let intentionShape = Niyya(); intentionShape.id = intentionID; intentionShape.dayKey = intention.dayKey
+            intentionShape.order = intention.order; intentionShape.text = intention.text; intentionShape.result = intention.result
+            intentionShape.createdAt = stamp; intentionShape.updatedAt = stamp; intentionShape.writerID = intention.writerID
+            var intentionRecord = try intentionShape.record()
+            intentionRecord.fields.removeValue(forKey: "weeklyReview"); intentionRecord.fields.removeValue(forKey: "monthlyReview")
+            before.append(intentionRecord)
+
+            let media = MadarFrozenDiaryV15.Media()
+            media.id = mediaID; media.kind = "audio"; media.contentType = "audio/mp4"; media.data = audio
+            media.sizeBytes = audio.count; media.sha256 = BackupCodec.hash(audio); media.durationS = 122
+            media.createdAt = stamp; media.updatedAt = stamp; media.writerID = "synthetic-v15"
+            old.mainContext.insert(media)
+            let mediaShape = Media(); mediaShape.id = mediaID; mediaShape.kind = media.kind
+            mediaShape.contentType = media.contentType; mediaShape.data = audio; mediaShape.sizeBytes = audio.count
+            mediaShape.sha256 = media.sha256; mediaShape.durationS = media.durationS
+            mediaShape.createdAt = stamp; mediaShape.updatedAt = stamp; mediaShape.writerID = media.writerID
+            var mediaRecord = try mediaShape.record()
+            mediaRecord.fields.removeValue(forKey: "title"); mediaRecord.fields.removeValue(forKey: "voiceTone")
+            mediaRecord.fields.removeValue(forKey: "audioLevelsJSON"); before.append(mediaRecord)
+            before.append(contentsOf: try seedAllRoomMigrationRecords(in: old.mainContext, stamp: stamp))
+            try old.mainContext.save()
+        }
+        try DurableFiles.encode(15, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: stamp), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        let loadedIntention = try #require(upgraded.container.mainContext.fetch(FetchDescriptor<Niyya>()).first { $0.id == intentionID })
+        #expect(loadedIntention.text == "أُنهي ما بدأت" && loadedIntention.result == "partial")
+        #expect(loadedIntention.weeklyReview == nil && loadedIntention.monthlyReview == nil)
+        let loadedMedia = try #require(upgraded.container.mainContext.fetch(FetchDescriptor<Media>()).first { $0.id == mediaID })
+        #expect(loadedMedia.data == audio && loadedMedia.durationS == 122)
+        #expect(loadedMedia.title == nil && loadedMedia.voiceTone == nil && loadedMedia.audioLevelsJSON == nil)
+        let expected = try SchemaCompatibility.currentRecords(before, from: 15)
+        #expect(expected.first { $0.model == "Niyya" }?.fields["weeklyReview"] == .null)
+        #expect(expected.first { $0.model == "Media" }?.fields["title"] == .null)
+        try RecordValidator.validate(expected)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(upgraded.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expected))
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(reopened.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expected))
+        #expect(try stableGenerationHashes(generation) == sourceHash)
     }
 
     @Test func schemaV11UpgradeKeepsHabitTimesWithoutADiaryLinkAndReopen() throws {
