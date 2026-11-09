@@ -50,7 +50,7 @@ struct DiaryHomeView: View {
     @Environment(\.isFrontRoom) private var isFrontRoom
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var roomWidth: CGFloat = 0
-    private var wide: Bool { sizeClass == .regular && roomWidth >= 960 }
+    private var wide: Bool { isPadWide(sizeClass) && roomWidth >= 960 }
     @State private var snapshot: DiaryHomeSnapshot?
     @State private var selected: GregorianDay?
     @State private var customizing = false
@@ -153,7 +153,7 @@ struct DiaryHomeView: View {
                 }
                 else { ProgressView("تُفتح صفحتك…") }
             }.padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 12)
-            .frame(maxWidth: sizeClass != .regular ? .infinity : wide ? 1100 : 720).frame(maxWidth: .infinity)
+            .frame(maxWidth: !isPadWide(sizeClass) ? .infinity : wide ? 1100 : 720).frame(maxWidth: .infinity)
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
         }

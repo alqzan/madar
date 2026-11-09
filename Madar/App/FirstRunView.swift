@@ -43,9 +43,9 @@ struct FirstRunView: View {
                         }
                     }
                     actions
-                }.padding(24).padding(.top, sizeClass == .regular ? 0 : 64).frame(maxWidth: 560).frame(maxWidth: .infinity)
+                }.padding(24).padding(.top, isPadWide(sizeClass) ? 0 : 64).frame(maxWidth: 560).frame(maxWidth: .infinity)
                     // iPad: the card stands in the middle of the screen instead of hanging from the top.
-                    .modifier(PadCentered(on: sizeClass == .regular))
+                    .modifier(PadCentered(on: isPadWide(sizeClass)))
             }.background(theme.background).foregroundStyle(theme.ink).font(MadarTypography.body())
         }
         .interactiveDismissDisabled()

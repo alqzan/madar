@@ -139,7 +139,7 @@ struct QuranMushafView: View {
         let requested = number
         do { let loaded = try await service.page(requested); guard number == requested else { return }; page = loaded; error = nil }
         catch { guard number == requested else { return }; self.error = quranUserMessage(error) }
-        guard sizeClass == .regular, page != nil else { return }
+        guard isPadWide(sizeClass), page != nil else { return }
         let other = requested % 2 == 1 ? requested + 1 : requested - 1
         guard (1...604).contains(other), let loaded = try? await service.page(other), number == requested else { return }
         facing = loaded

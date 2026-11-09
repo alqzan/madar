@@ -101,7 +101,7 @@ struct BahwLobbyView: View {
                                            openHabits: { session.habitsOpen = true })
                     }
                     let visible = layout.visible
-                    let columns = sizeClass == .regular ? 8 : 4
+                    let columns = isPadWide(sizeClass) ? 8 : 4
                     let placements = BahwGrid.pack(visible.map { ($0.rawValue, layout.size($0)) }, columns: columns)
                     BahwGridLayout(placements: placements, columns: columns) {
                         ForEach(visible, id: \.self) { block in tile(block, size: layout.size(block)) }
@@ -123,7 +123,7 @@ struct BahwLobbyView: View {
                                 .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule)
                         }.buttonStyle(.madarPlain).disabled(layout.hiddenBuilt.isEmpty).accessibilityIdentifier("bahw-drawer")
                     }
-                }.padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 24).frame(maxWidth: sizeClass == .regular ? 1100 : 620).frame(maxWidth: .infinity)
+                }.padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 24).frame(maxWidth: isPadWide(sizeClass) ? 1100 : 620).frame(maxWidth: .infinity)
             }
             // Owner 7 Nov 2026: pull down to bring in what arrived outside the app and read every tile again now.
             .refreshable { await session.refreshFromPull() }

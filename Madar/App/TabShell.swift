@@ -22,6 +22,10 @@ import MadarData
     }
 }
 
+/// The iPad layout (sidebar, wide lobby, two-column rooms) is for iPad only: a large iPhone in landscape also reports a regular
+/// width but has too little height and width for it, so it keeps the iPhone layout.
+@MainActor func isPadWide(_ sizeClass: UserInterfaceSizeClass?) -> Bool { sizeClass == .regular && UIDevice.current.userInterfaceIdiom == .pad }
+
 struct FoundationTab: Identifiable, Hashable {
     let id: String
     let title: String
@@ -62,7 +66,7 @@ struct TabShell<Content: View>: View {
     /// leading (right) edge instead of above the bottom bar. iPhone keeps the bar.
     var body: some View {
         Group {
-            if sizeClass == .regular { padBody } else { phoneBody }
+            if isPadWide(sizeClass) { padBody } else { phoneBody }
         }
         .tint(theme.accent)
         .onChange(of: selection, initial: true) { _, tab in

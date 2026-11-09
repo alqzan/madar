@@ -180,7 +180,7 @@ struct PrayerTodayView: View {
                                 .padding(.top, 8)
                                 .accessibilityIdentifier("prayer-home-refreshing")
                         }
-                        if sizeClass == .regular && roomWidth >= 960 {
+                        if isPadWide(sizeClass) && roomWidth >= 960 {
                             // iPad, wide: the arches stand on the right and the day's record sits beside them, instead of one long column.
                             HStack(alignment: .top, spacing: 36) {
                                 VStack(spacing: 0) { heroColumn(snapshot, now: instant, current: homeSnapshotIsCurrent) }
@@ -211,7 +211,7 @@ struct PrayerTodayView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 32)
-                .frame(maxWidth: sizeClass != .regular ? 620 : roomWidth >= 960 ? 1100 : 720)
+                .frame(maxWidth: !isPadWide(sizeClass) ? 620 : roomWidth >= 960 ? 1100 : 720)
                 .frame(maxWidth: .infinity)
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
