@@ -195,7 +195,7 @@ struct QuranSessionLogView: View {
                     }.padding(12).frame(maxWidth: .infinity, alignment: .leading).background(theme.color("dueTint"), in: .rect(cornerRadius: 14))
                 }
                 if let warning = record.warning { Text(warning).font(quranFont(13)).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("quran-history-warning") }
-                Button("احذف الجلسة", role: .destructive) { deleting = record.id }.font(quranFont(13, bold: true)).foregroundStyle(theme.color("dueText")).frame(minHeight: 44).accessibilityIdentifier("quran-history-delete")
+                Button(role: .destructive) { deleting = record.id } label: { Text("احذف الجلسة").font(quranFont(13, bold: true)).foregroundStyle(theme.color("dueText")).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-history-delete")
                 }.id("quran-history-route-details-" + record.id.uuidString)
             }
         }
