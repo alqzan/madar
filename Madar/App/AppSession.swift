@@ -266,6 +266,8 @@ final class AppSession {
         try prepareHabitFixture(group: group)
         try prepareMoneyFixture(group: group)
         try prepareMihbaraFixture(group: group)
+        // Opens a room at launch for layout checks (iPad captures cannot tap the sidebar).
+        if ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil, let tab = ProcessInfo.processInfo.environment["MADAR_UI_START_TAB"] { selectedTab = tab }
         let uiTestEnvironment = ProcessInfo.processInfo.environment
         if uiTestEnvironment["MADAR_UI_STORE_ID"] == group.lastPathComponent,
            group.deletingLastPathComponent().lastPathComponent == "UITestStores",

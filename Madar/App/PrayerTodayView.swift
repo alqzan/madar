@@ -46,6 +46,8 @@ struct PrayerTodayView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.roomVisit) private var roomVisit
     @Environment(\.isFrontRoom) private var isFrontRoom
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var roomWidth: CGFloat = 0
 
     @State private var homeSnapshot: PrayerSnapshot?
     @State private var loadedHomeSnapshotKey: PrayerHomeSnapshotKey?
@@ -113,6 +115,49 @@ struct PrayerTodayView: View {
         }
     }
 
+    @ViewBuilder private func heroColumn(_ snapshot: PrayerSnapshot, now instant: Date, current homeSnapshotIsCurrent: Bool) -> some View {
+            let pills = travelPillText(snapshot) != nil || snapshot.today.cells.contains(where: { $0.isFriday })
+            VStack(spacing: 10) {
+                if let text = travelPillText(snapshot) {
+                    PrayerTravelPill(text: text) { openTravel(snapshot) }
+                        .disabled(!homeSnapshotIsCurrent)
+                }
+                if snapshot.today.cells.contains(where: { $0.isFriday }) {
+                    fridayPill.disabled(!homeSnapshotIsCurrent)
+                }
+            }
+            .padding(.top, pills ? 16 : 0)
+            nextPrayer(snapshot, now: instant)
+                .padding(.top, pills ? 18 : 26)
+            verseDivider
+                .padding(.top, 18)
+            riwaq(snapshot, now: instant)
+                .padding(.top, 18)
+                .disabled(!homeSnapshotIsCurrent)
+            if snapshot.hasTimes {
+                Text(todaySummary(snapshot, now: instant))
+                    .font(PrayerHomeType.body)
+                    .foregroundStyle(theme.secondaryInk)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 14)
+                    .accessibilityIdentifier("prayer-today-summary")
+            }
+    }
+
+    private func sideColumn(_ snapshot: PrayerSnapshot, now instant: Date, current homeSnapshotIsCurrent: Bool) -> some View {
+            VStack(spacing: 16) {
+                ForEach(PrayerHomeLayout(session.values["salah.layout"]).visible, id: \.self) { block in
+                    switch block {
+                    case "pending":
+                        if let pending = notice(snapshot, now: instant) { pending.disabled(!homeSnapshotIsCurrent) }
+                        heartNotice(snapshot).disabled(!homeSnapshotIsCurrent)
+                    case "hali": haliCard(snapshot).disabled(!homeSnapshotIsCurrent)
+                    default: EmptyView()
+                    }
+                }
+            }
+    }
+
     var body: some View {
         TimelineView(PrayerTodayMinuteTimelineSchedule(isActive: isFrontRoom && scenePhase == .active)) { timeline in
             let instant = session.prayerNow(timeline.date)
@@ -135,44 +180,20 @@ struct PrayerTodayView: View {
                                 .padding(.top, 8)
                                 .accessibilityIdentifier("prayer-home-refreshing")
                         }
-                        let pills = travelPillText(snapshot) != nil || snapshot.today.cells.contains(where: { $0.isFriday })
-                        VStack(spacing: 10) {
-                            if let text = travelPillText(snapshot) {
-                                PrayerTravelPill(text: text) { openTravel(snapshot) }
-                                    .disabled(!homeSnapshotIsCurrent)
+                        if sizeClass == .regular && roomWidth >= 960 {
+                            // iPad, wide: the arches stand on the right and the day's record sits beside them, instead of one long column.
+                            HStack(alignment: .top, spacing: 36) {
+                                VStack(spacing: 0) { heroColumn(snapshot, now: instant, current: homeSnapshotIsCurrent) }
+                                    .frame(maxWidth: .infinity)
+                                sideColumn(snapshot, now: instant, current: homeSnapshotIsCurrent)
+                                    .frame(width: 380)
+                                    .padding(.top, 26)
                             }
-                            if snapshot.today.cells.contains(where: { $0.isFriday }) {
-                                fridayPill.disabled(!homeSnapshotIsCurrent)
-                            }
+                        } else {
+                            heroColumn(snapshot, now: instant, current: homeSnapshotIsCurrent)
+                            sideColumn(snapshot, now: instant, current: homeSnapshotIsCurrent)
+                                .padding(.top, 20)
                         }
-                        .padding(.top, pills ? 16 : 0)
-                        nextPrayer(snapshot, now: instant)
-                            .padding(.top, pills ? 18 : 26)
-                        verseDivider
-                            .padding(.top, 18)
-                        riwaq(snapshot, now: instant)
-                            .padding(.top, 18)
-                            .disabled(!homeSnapshotIsCurrent)
-                        if snapshot.hasTimes {
-                            Text(todaySummary(snapshot, now: instant))
-                                .font(PrayerHomeType.body)
-                                .foregroundStyle(theme.secondaryInk)
-                                .multilineTextAlignment(.center)
-                                .padding(.top, 14)
-                                .accessibilityIdentifier("prayer-today-summary")
-                        }
-                        VStack(spacing: 16) {
-                            ForEach(PrayerHomeLayout(session.values["salah.layout"]).visible, id: \.self) { block in
-                                switch block {
-                                case "pending":
-                                    if let pending = notice(snapshot, now: instant) { pending.disabled(!homeSnapshotIsCurrent) }
-                                    heartNotice(snapshot).disabled(!homeSnapshotIsCurrent)
-                                case "hali": haliCard(snapshot).disabled(!homeSnapshotIsCurrent)
-                                default: EmptyView()
-                                }
-                            }
-                        }
-                        .padding(.top, 20)
                     } else {
                         header(day: nil)
                         PrayerPaperCard {
@@ -190,9 +211,10 @@ struct PrayerTodayView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 32)
-                .frame(maxWidth: 620)
+                .frame(maxWidth: sizeClass != .regular ? 620 : roomWidth >= 960 ? 1100 : 720)
                 .frame(maxWidth: .infinity)
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
             .madarTopClipped()
             .background(theme.background)
             .foregroundStyle(theme.ink)
