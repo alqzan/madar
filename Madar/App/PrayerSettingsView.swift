@@ -80,7 +80,7 @@ struct PrayerSettingsView: View {
                     Text("يبدأ السجل من اليوم الذي تختاره؛ ما قبله لا يدخل في سجل الصلاة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     if state.tracking.canEdit {
                         Button("عدّل بداية التتبّع") { trackingDate = state.tracking.date; editingTracking = true }.accessibilityIdentifier("prayer-tracking-edit")
-                        if editingTracking { DatePicker("البداية", selection: $trackingDate, in: state.tracking.earliestDate...state.tracking.latestDate, displayedComponents: .date).environment(\.timeZone, TimeZone(identifier: state.timeZoneID) ?? .gmt).accessibilityIdentifier("prayer-tracking-date"); Button("احفظ التعديل الوحيد") { confirmTracking = true }.accessibilityIdentifier("prayer-tracking-save") }
+                        if editingTracking { DatePicker("البداية", selection: $trackingDate, in: state.tracking.earliestDate...state.tracking.latestDate, displayedComponents: .date).environment(\.timeZone, TimeZone(identifier: state.timeZoneID) ?? .gmt).accessibilityIdentifier("prayer-tracking-date"); Button("احفظ البداية") { confirmTracking = true }.accessibilityIdentifier("prayer-tracking-save") }
                     } else { Text("اكتمل التعديل الوحيد لبداية التتبّع.").font(MadarTypography.caption()) }
                 }
                 Section("إذن الإشعارات") {
@@ -98,7 +98,7 @@ struct PrayerSettingsView: View {
         .toolbar { ToolbarItem(placement: .topBarTrailing) { EditButton().accessibilityIdentifier("prayer-layout-edit") } }
         .disabled(model.busy).task { await model.refresh() }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await model.refresh() } } }
-        .confirmationDialog("احفظ بداية التتبّع؟", isPresented: $confirmTracking, titleVisibility: .visible) { Button("احفظ التعديل الوحيد") { Task { await model.run { try await model.service.changeTrackingStart(to: trackingDate) }; if model.error == nil { editingTracking = false } } } } message: { Text("بعد نجاح الحفظ لن يُقبل تعديل آخر للبداية. الأيام المضافة تبدأ مهلة تعليقها من يوم التعديل.") }
+        .confirmationDialog("احفظ بداية التتبّع؟", isPresented: $confirmTracking, titleVisibility: .visible) { Button("احفظ البداية") { Task { await model.run { try await model.service.changeTrackingStart(to: trackingDate) }; if model.error == nil { editingTracking = false } } } } message: { Text("بعد الحفظ لا تتغيّر البداية مرة أخرى، والأيام المضافة تُحسب معلّقة من اليوم.") }
         .confirmationDialog("أعِد إعدادات الصلاة؟", isPresented: $confirmReset, titleVisibility: .visible) { Button("أعِد المتفق عليه", role: .destructive) { Task { await model.run { try await model.service.resetSettings() } } } } message: { Text("تعود إعدادات الشكل والمواقيت والتذكير. سجلّك وبداية التتبّع محفوظان.") }
         .alert("تعذّر إتمام الطلب", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) { Button("حسنًا") { model.error = nil } } message: { Text(model.error ?? "") }
     }

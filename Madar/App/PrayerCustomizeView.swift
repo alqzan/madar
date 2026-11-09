@@ -312,7 +312,7 @@ struct PrayerCustomizeView: View {
                             .accessibilityIdentifier("prayer-tracking-date")
                         MadarDateLabel(session.dateLabels(GregorianDay.containing(startDate, in: zone)))
                         Button { confirmStart = true } label: {
-                            Text("احفظ التعديل الوحيد").font(PrayerHomeType.strong).foregroundStyle(theme.color("onAccent"))
+                            Text("احفظ البداية").font(PrayerHomeType.strong).foregroundStyle(theme.color("onAccent"))
                                 .padding(.horizontal, 20).frame(minHeight: 48).background(theme.ink, in: .rect(cornerRadius: 24))
                         }.buttonStyle(.madarPlain).disabled(session.prayerWriteInProgress).accessibilityIdentifier("prayer-tracking-save")
                     } else {
@@ -329,7 +329,7 @@ struct PrayerCustomizeView: View {
                     let day = GregorianDay.containing(startDate, in: zone)
                     session.editPrayerTrackingStart(day) { ok in if ok { editingStart = false } }
                 }
-            } message: { Text("بعد الحفظ لا يُقبل تعديل آخر للبداية. الأيام المضافة تبدأ مهلة تعليقها من اليوم.") }
+            } message: { Text("بعد الحفظ لا تتغيّر البداية مرة أخرى، والأيام المضافة تُحسب معلّقة من اليوم.") }
         }
     }
 
