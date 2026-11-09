@@ -16,9 +16,12 @@ struct CustomizeMadar: View {
     @State private var routedSettingKey: String?
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var settingsWidth: CGFloat = 0
+    private var settingsWide: Bool { isPadWide(sizeClass) && settingsWidth >= 960 && query.isEmpty }
     var body: some View {
         ScrollViewReader { proxy in
-        CustomizationTemplate(title: "إعدادات مدار", subtitle: "كل تعديل يُحفظ وحده") {
+        CustomizationTemplate(title: "إعدادات مدار", subtitle: "كل تعديل يُحفظ وحده", maxWidth: settingsWide ? 1060 : 620) {
             EmptyView()
         } content: {
             VStack(spacing: 16) {
@@ -41,7 +44,7 @@ struct CustomizeMadar: View {
                 }
                 if query.isEmpty {
                     SettingsHome(session: session, openTafsir: { quranTafsirLibrary = true }, openMaker: { widgetMaker = true }, openGallery: { widgetGallery = true },
-                                 resetAll: { confirmReset = true }, changes: changesLabel)
+                                 resetAll: { confirmReset = true }, changes: changesLabel, twoColumns: settingsWide)
                 } else {
                 if query.isEmpty || normalized("المحبرة").contains(normalized(query)) {
                     Button { session.selectedTab = "mihbara" } label: {
@@ -106,6 +109,7 @@ struct CustomizeMadar: View {
                 }
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { settingsWidth = $0 }
         .navigationDestination(isPresented: $session.moneyOpen) { MoneyRoomView(app: session) }
         .navigationDestination(isPresented: $quranTafsirLibrary) { QuranTafsirLibraryView(app: session) }
         .sheet(isPresented: $widgetMaker, onDismiss: { session.widgetMakerRoute = nil; session.widgetMakerRouteID = nil }) {

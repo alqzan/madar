@@ -78,8 +78,10 @@ public struct CustomizationTemplate<Preview: View, Content: View>: View {
     private let subtitle: String
     private let preview: Preview
     private let content: Content
-    public init(title: String, subtitle: String = "كل تعديل يُحفظ وحده", @ViewBuilder preview: () -> Preview, @ViewBuilder content: () -> Content) {
-        self.title = title; self.subtitle = subtitle; self.preview = preview(); self.content = content()
+    /// The column width; a page that lays itself out in two columns on iPad passes a wider one.
+    private let maxWidth: CGFloat
+    public init(title: String, subtitle: String = "كل تعديل يُحفظ وحده", maxWidth: CGFloat = 620, @ViewBuilder preview: () -> Preview, @ViewBuilder content: () -> Content) {
+        self.title = title; self.subtitle = subtitle; self.maxWidth = maxWidth; self.preview = preview(); self.content = content()
     }
     public var body: some View {
         ScrollView {
@@ -91,7 +93,7 @@ public struct CustomizationTemplate<Preview: View, Content: View>: View {
                 preview
                 content
             }
-            .padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
+            .padding(16).frame(maxWidth: maxWidth).frame(maxWidth: .infinity)
         }
         .background(theme.background).foregroundStyle(theme.ink)
     }

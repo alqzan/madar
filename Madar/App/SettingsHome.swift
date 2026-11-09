@@ -14,8 +14,21 @@ struct SettingsHome: View {
     let changes: String
     @Environment(\.roomTheme) private var theme
 
+    /// iPad, wide: the rooms on the right, the general settings beside them.
+    var twoColumns = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        if twoColumns {
+            HStack(alignment: .top, spacing: 28) {
+                VStack(alignment: .leading, spacing: 24) { roomGroups }.frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: 24) { generalGroup }.frame(maxWidth: .infinity)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 24) { roomGroups; generalGroup }
+        }
+    }
+
+    @ViewBuilder private var roomGroups: some View {
             group("الأقسام") {
                 link("أقسامك والبهو", "أضف قسمًا أو أخفِه، ورتّب البهو وأحجامه", "square.grid.2x2") {
                     SettingsPage(title: "أقسامك والبهو") {
@@ -36,6 +49,9 @@ struct SettingsHome: View {
                 if session.roomEnabled(.mihbara) { door("المحبرة", "إعدادات المحبرة داخل القسم", "books.vertical") { session.selectedTab = "mihbara" } }
                 if !hasRoomSettings { Text("أضف قسمًا من «أقسامك والبهو» لتظهر إعداداته هنا.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
             }
+    }
+
+    private var generalGroup: some View {
             group("عام") {
                 link("اليوم والتقويم", "بداية اليوم والتقويم الأول", "moon") { sectionsPage("اليوم والتقويم", ["اليوم والتقويم", "مدينتك"]) }
                 link("المظهر", "الوضع والألوان والأرقام", "paintpalette") { sectionsPage("المظهر", ["المظهر"]) }
@@ -51,7 +67,6 @@ struct SettingsHome: View {
                 link("انقل من مدار القديم", "استيراد بياناتك السابقة", "square.and.arrow.down") { LegacyMoveView(app: session) }
                 door("أعِد الإعدادات المتفق عليها", changes, "arrow.counterclockwise", resetAll)
             }
-        }
     }
 
     private var hasRoomSettings: Bool { [BahwBlock.salah, .habits, .year, .upcoming, .quran, .notes, .mal, .mihbara].contains { session.roomEnabled($0) } }

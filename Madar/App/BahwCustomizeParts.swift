@@ -19,6 +19,8 @@ extension BahwBlockSize {
 
 struct BahwCustomizePreview: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var pad: Bool { isPadWide(sizeClass) }
     @Bindable var session: AppSession
     let changes: String
     let reset: () -> Void
@@ -39,7 +41,7 @@ struct BahwCustomizePreview: View {
                     Text(changes).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk).accessibilityIdentifier("customization-changes")
                 }
                 Spacer(minLength: 0)
-                miniLobby.frame(width: 120, height: 236).accessibilityHidden(true)
+                miniLobby.frame(width: pad ? 236 : 120, height: pad ? 180 : 236).accessibilityHidden(true)
             }
             HStack(spacing: 10) {
                 Button { session.selectedTab = "foundation" } label: {
@@ -83,13 +85,14 @@ struct BahwCustomizePreview: View {
         default: return (lobby.color(block.tone).opacity(0.16), lobby.ink)
         }
     }
-    /// A small phone drawn with the same packing as the lobby (`BahwGrid.pack`).
+    /// A small phone (or, on iPad, a small iPad on eight columns) drawn with the same packing as the lobby (`BahwGrid.pack`).
     private var miniLobby: some View {
-        let visible = layout.visible, placements = BahwGrid.pack(visible.map { ($0.rawValue, layout.size($0)) })
+        let columns = pad ? 8 : 4
+        let visible = layout.visible, placements = BahwGrid.pack(visible.map { ($0.rawValue, layout.size($0)) }, columns: columns)
         return VStack(spacing: 6) {
             HStack { Circle().stroke(lobby.secondaryInk, lineWidth: 1).frame(width: 9, height: 9); Circle().stroke(lobby.secondaryInk, lineWidth: 1).frame(width: 9, height: 9); Spacer(); Capsule().fill(lobby.ink).frame(width: 48, height: 6) }
             GeometryReader { geometry in
-                let gap: CGFloat = 4, unit = (geometry.size.width - 3 * gap) / 4
+                let gap: CGFloat = 4, unit = (geometry.size.width - CGFloat(columns - 1) * gap) / CGFloat(columns)
                 ForEach(Array(zip(visible, placements)), id: \.0) { block, place in
                     let w = CGFloat(place.size.columns) * unit + CGFloat(place.size.columns - 1) * gap, h = CGFloat(place.size.rows) * unit + CGFloat(place.size.rows - 1) * gap
                     let tile = tileColours(block)
