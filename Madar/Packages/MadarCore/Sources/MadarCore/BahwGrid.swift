@@ -17,12 +17,13 @@ public struct BahwPlacement: Equatable, Sendable {
 }
 
 public enum BahwGrid {
-    public static func pack(_ blocks: [(id: String, size: BahwBlockSize)]) -> [BahwPlacement] {
+    /// `columns` is 4 on iPhone; iPad uses 8, so two wide cards or four small ones share a row at the same card size.
+    public static func pack(_ blocks: [(id: String, size: BahwBlockSize)], columns: Int = 4) -> [BahwPlacement] {
         var filled = Set<[Int]>(), placements: [BahwPlacement] = []
         for block in blocks {
             var row = 0
             search: while true {
-                for column in 0...(4 - block.size.columns) {
+                for column in 0...max(0, columns - block.size.columns) {
                     let cells = (row..<row + block.size.rows).flatMap { r in (column..<column + block.size.columns).map { [r, $0] } }
                     if cells.allSatisfy({ !filled.contains($0) }) {
                         cells.forEach { filled.insert($0) }

@@ -46,8 +46,9 @@ struct BahwLayoutValue: Equatable {
 
 struct BahwGridLayout: Layout {
     let placements: [BahwPlacement]
+    var columns: Int = 4
     let gap: CGFloat = 10
-    func cell(_ width: CGFloat) -> CGFloat { (width - 3 * gap) / 4 }
+    func cell(_ width: CGFloat) -> CGFloat { (width - CGFloat(columns - 1) * gap) / CGFloat(columns) }
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width ?? 365, rows = CGFloat(BahwGrid.rows(placements))
         return .init(width: width, height: rows * cell(width) + max(0, rows - 1) * gap)
@@ -100,8 +101,9 @@ struct BahwLobbyView: View {
                                            openHabits: { session.habitsOpen = true })
                     }
                     let visible = layout.visible
-                    let placements = BahwGrid.pack(visible.map { ($0.rawValue, layout.size($0)) })
-                    BahwGridLayout(placements: placements) {
+                    let columns = sizeClass == .regular ? 8 : 4
+                    let placements = BahwGrid.pack(visible.map { ($0.rawValue, layout.size($0)) }, columns: columns)
+                    BahwGridLayout(placements: placements, columns: columns) {
                         ForEach(visible, id: \.self) { block in tile(block, size: layout.size(block)) }
                     }
                     // AU-32: hiding every widget leaves a way back, not a blank lobby.
@@ -121,7 +123,7 @@ struct BahwLobbyView: View {
                                 .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule)
                         }.buttonStyle(.madarPlain).disabled(layout.hiddenBuilt.isEmpty).accessibilityIdentifier("bahw-drawer")
                     }
-                }.padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 24).frame(maxWidth: sizeClass == .regular ? 860 : 620).frame(maxWidth: .infinity)
+                }.padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 24).frame(maxWidth: sizeClass == .regular ? 1100 : 620).frame(maxWidth: .infinity)
             }
             // Owner 7 Nov 2026: pull down to bring in what arrived outside the app and read every tile again now.
             .refreshable { await session.refreshFromPull() }
