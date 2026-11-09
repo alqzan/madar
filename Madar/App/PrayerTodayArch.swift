@@ -28,7 +28,9 @@ private extension EnvironmentValues {
 }
 
 struct PrayerTodayArch: View {
-    static let archHeight: CGFloat = 92
+    /// On iPad the arches stand taller and wider: the riwaq is the room's centrepiece and the screen has the room for it.
+    static var archHeight: CGFloat { UIDevice.current.userInterfaceIdiom == .pad ? 138 : 92 }
+    private static var archMaxWidth: CGFloat { UIDevice.current.userInterfaceIdiom == .pad ? 86 : 58 }
     let cell: PrayerCell
     let isNext: Bool
     let title: String
@@ -103,7 +105,7 @@ struct PrayerTodayArch: View {
 
     private var arch: some View {
         GeometryReader { geometry in
-            let width = min(geometry.size.width - 12, 58)
+            let width = min(geometry.size.width - 12, Self.archMaxWidth)
             let height = geometry.size.height
             let rect = CGRect(x: (geometry.size.width - width) / 2, y: 0, width: width, height: height)
             let shape = PrayerHorseshoe().path(in: rect)
