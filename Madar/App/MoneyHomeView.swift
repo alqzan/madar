@@ -113,8 +113,12 @@ struct MoneyHomeView: View {
         guard let key = hawlKey, let hawl = MoneyHawl.read(key, app: app) else { return nil }
         return hawl.daysLeft == 0 ? "حولك اليوم" : "حولك بعد " + service.days(hawl.daysLeft)
     }
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var roomWidth: CGFloat = 0
+    private var wide: Bool { isPadWide(sizeClass) && roomWidth >= 960 }
     var body: some View {
         ScrollView { homeContent }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
         .madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $envelopesOpen) { MoneyEnvelopesView(app: app, revealed: $revealed, initialEnvelopeID: $routedEnvelopeID, initialRouteRequestID: $routedEnvelopeRequestID) }
@@ -220,17 +224,29 @@ struct MoneyHomeView: View {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 300).transition(.opacity)
             }
         }
-        .padding(.horizontal, 16).padding(.top, 0).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
+        .padding(.horizontal, 16).padding(.top, 0).padding(.bottom, 30).frame(maxWidth: wide ? 1100 : 620).frame(maxWidth: .infinity)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: reading != nil || failure != nil)
     }
     @ViewBuilder private func dashboard(_ reading: MoneyHomeReading) -> some View {
         let blocks = RoomHomeLayout(session: app, key: "mal.layout").visible
-        ForEach(blocks, id: \.self) { id in
+        if wide {
+            // iPad landscape: the scroll and today's balance on the right, the desk (envelopes, limits, dues) beside them.
+            let lead = blocks.filter { ["curve", "now"].contains($0) }
+            HStack(alignment: .top, spacing: 28) {
+                VStack(alignment: .leading, spacing: 10) { ForEach(lead, id: \.self) { block($0, reading, blocks) } }.frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: 10) { ForEach(blocks.filter { !lead.contains($0) }, id: \.self) { block($0, reading, blocks) }; doors }.frame(maxWidth: .infinity)
+            }
+        } else {
+            ForEach(blocks, id: \.self) { block($0, reading, blocks) }
+            doors
+        }
+    }
+    @ViewBuilder private func block(_ id: String, _ reading: MoneyHomeReading, _ blocks: [String]) -> some View {
             switch id {
             case "curve":
                 if let cycle = reading.cycle {
                     if dynamicType.isAccessibilitySize { cycleSummary(cycle) }
-                    else { MoneyScrollChart(cycle: cycle, app: app, visible: amountsVisible, obligations: reading.obligations).frame(height: 224) }
+                    else { MoneyScrollChart(cycle: cycle, app: app, visible: amountsVisible, obligations: reading.obligations).frame(height: wide ? 300 : 224) }
                 }
             case "now":
                 if let cycle = reading.cycle { headline(reading, cycle: cycle) }
@@ -247,8 +263,6 @@ struct MoneyHomeView: View {
                 if blocks.firstIndex(of: "obligations") != blocks.firstIndex(of: "limits").map({ $0 + 1 }) { obligations(reading) }
             default: EmptyView()
             }
-        }
-        doors
     }
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {

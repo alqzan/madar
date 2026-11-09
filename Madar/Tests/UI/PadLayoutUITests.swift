@@ -13,6 +13,8 @@ final class PadLayoutUITests: XCTestCase {
             ("foundation", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]),
             ("mihbara", ["MADAR_UI_MIHBARA_FIXTURE": "home", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]),
             ("customize", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]),
+            ("money", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]),
+            ("quran", ["MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]),
         ]
         for (tab, env) in rooms {
             let app = XCUIApplication()

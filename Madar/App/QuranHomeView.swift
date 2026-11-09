@@ -83,6 +83,18 @@ struct QuranHomeView: View {
     }
     private var theme: RoomTheme { RoomTheme(room: "quran", dark: colorScheme == .dark) }
     private var next: QuranUIStep? { state?.steps.first { !$0.completed && $0.available } }
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var roomWidth: CGFloat = 0
+    private var wide: Bool { isPadWide(sizeClass) && roomWidth >= 960 }
+    @ViewBuilder private func block(_ id: String, _ state: QuranRoomState) -> some View {
+        switch id {
+        case "sadr": coverage(state)
+        case "path": planContent(state)
+        case "log14": log(state)
+        case "tools": tools(state)
+        default: EmptyView()
+        }
+    }
     var body: some View {
         ScrollView {
             if let error {
@@ -103,18 +115,21 @@ struct QuranHomeView: View {
             if let state {
                 VStack(alignment: .leading, spacing: 24) {
                     header(state)
-                    ForEach(RoomHomeLayout(session: service.app, key: "quran.layout").visible, id: \.self) { id in
-                        switch id {
-                        case "sadr": coverage(state)
-                        case "path": planContent(state)
-                        case "log14": log(state)
-                        case "tools": tools(state)
-                        default: EmptyView()
+                    let blocks = RoomHomeLayout(session: service.app, key: "quran.layout").visible
+                    if wide {
+                        // iPad landscape: what is in your heart and today's path on the right, the record and the tools beside them.
+                        let lead = blocks.filter { ["sadr", "path"].contains($0) }
+                        HStack(alignment: .top, spacing: 28) {
+                            VStack(alignment: .leading, spacing: 24) { ForEach(lead, id: \.self) { block($0, state) } }.frame(maxWidth: .infinity)
+                            VStack(alignment: .leading, spacing: 24) { ForEach(blocks.filter { !lead.contains($0) }, id: \.self) { block($0, state) } }.frame(width: 400)
                         }
+                    } else {
+                        ForEach(blocks, id: \.self) { block($0, state) }
                     }
-                }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36).frame(maxWidth: 700).frame(maxWidth: .infinity)
+                }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36).frame(maxWidth: wide ? 1100 : 700).frame(maxWidth: .infinity)
             } else if error == nil { ProgressView().frame(maxWidth: .infinity).padding(60) }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
         .madarTopClipped()
         .background(theme.background.ignoresSafeArea())
         .foregroundStyle(theme.ink)
