@@ -22,28 +22,49 @@ struct QuranMushafView: View {
     @GestureState private var magnification: CGFloat = 1
     @State private var pan = CGSize.zero
     @GestureState private var dragging = CGSize.zero
+    /// iPad landscape shows two facing pages; `facing` is the other page of the open spread.
+    @State private var twoUp = false
+    @State private var facing: QuranUIPage?
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var step: Int { twoUp ? 2 : 1 }
+    private func sheet(_ page: QuranUIPage) -> some View {
+        QuranCoachPage(page: page, coach: reading(page), stage: .grading, reveal: { _ in },
+                       readingTap: { if selectedAyah != nil { selectedAyah = nil } else { tools.toggle() } },
+                       medinaStyle: true, selectedAyah: selectedAyah, ayahPress: { selectedAyah = $0; tools = false })
+    }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 theme.color("mushafPaper").ignoresSafeArea()
                 if let page {
-                    QuranCoachPage(page: page, coach: reading(page), stage: .grading, reveal: { _ in },
-                                   readingTap: { if selectedAyah != nil { selectedAyah = nil } else { tools.toggle() } },
-                                   medinaStyle: true, selectedAyah: selectedAyah, ayahPress: { selectedAyah = $0; tools = false })
-                        .frame(width: geometry.size.width, height: min(geometry.size.height, geometry.size.width * 1.64))
+                    Group {
+                        if twoUp, let facing {
+                            // iPad landscape: the open book, odd page on the right and its facing even page on the left.
+                            let right = page.page % 2 == 1 ? page : facing, left = page.page % 2 == 1 ? facing : page
+                            let width = min(geometry.size.width / 2, geometry.size.height / 1.64)
+                            HStack(spacing: 0) {
+                                sheet(right).frame(width: width, height: min(geometry.size.height, width * 1.64))
+                                Rectangle().fill(LinearGradient(colors: [theme.ink.opacity(0), theme.ink.opacity(0.12), theme.ink.opacity(0)], startPoint: .leading, endPoint: .trailing))
+                                    .frame(width: 14).accessibilityHidden(true)
+                                sheet(left).frame(width: width, height: min(geometry.size.height, width * 1.64))
+                            }
+                        } else {
+                            sheet(page).frame(width: geometry.size.width, height: min(geometry.size.height, geometry.size.width * 1.64))
+                        }
+                    }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .scaleEffect(scale).offset(offset(in: geometry.size))
                         .gesture(MagnifyGesture().updating($magnification) { value, state, _ in state = value.magnification }.onEnded { value in zoom = min(3, max(1, zoom * value.magnification)); if zoom == 1 { pan = .zero } })
                         .simultaneousGesture(DragGesture(minimumDistance: 20).updating($dragging) { value, state, _ in if scale > 1 { state = value.translation } }.onEnded { value in
                             if zoom > 1 { pan = bounded(CGSize(width: pan.width + value.translation.width, height: pan.height + value.translation.height), in: geometry.size) }
-                            else if abs(value.translation.width) > 60, abs(value.translation.width) > abs(value.translation.height) { move(value.translation.width > 0 ? 1 : -1) }
+                            else if abs(value.translation.width) > 60, abs(value.translation.width) > abs(value.translation.height) { move(value.translation.width > 0 ? step : -step) }
                         })
                         .onTapGesture(count: 2) { zoom = zoom == 1 ? 2 : 1; pan = .zero }
                         .clipped()
                         .accessibilityIdentifier("quran-mushaf-page")
                         .accessibilityAction(named: "إظهار الأدوات") { tools = true }
-                        .accessibilityScrollAction { edge in if edge == .leading { move(1) } else if edge == .trailing { move(-1) } }
+                        .accessibilityScrollAction { edge in if edge == .leading { move(step) } else if edge == .trailing { move(-step) } }
                 } else if let error {
                     VStack(spacing: 16) { Text(error); Button("حاول مرة أخرى") { self.error = nil; Task { await load() } }; Button("رجوع", action: close) }.padding(24)
                 } else { ProgressView() }
@@ -55,6 +76,7 @@ struct QuranMushafView: View {
                 }
             }
         }
+        .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height && $0.size.width >= 900 } action: { twoUp = $0 }
         .foregroundStyle(theme.ink).background(theme.color("mushafPaper").ignoresSafeArea())
         .statusBarHidden(!tools).interactiveDismissDisabled()
         .onChange(of: tools) { _, shown in if shown { hint = false; UserDefaults.standard.set(true, forKey: "quran.mushaf.toolsHintSeen") } }
@@ -90,8 +112,8 @@ struct QuranMushafView: View {
             }.padding(8).glassEffect(.regular, in: .capsule)
             Spacer()
             HStack(spacing: 4) {
-                icon("chevron.right", label: "الوجه السابق", id: "quran-mushaf-previous") { move(-1) }.disabled(number == 1)
-                icon("chevron.left", label: "الوجه التالي", id: "quran-mushaf-next") { move(1) }.disabled(number == 604)
+                icon("chevron.right", label: "الوجه السابق", id: "quran-mushaf-previous") { move(-step) }.disabled(number == 1)
+                icon("chevron.left", label: "الوجه التالي", id: "quran-mushaf-next") { move(step) }.disabled(number == 604)
                 Spacer(minLength: 0)
                 Button { selectedAyah = page?.semanticAyat.first?.id; tools = false } label: { Label("التفسير", systemImage: "text.book.closed") }
                     .font(MadarTypography.caption()).frame(minHeight: 44).buttonStyle(.madarPlain).disabled(page?.semanticAyat.isEmpty ?? true)
@@ -106,7 +128,7 @@ struct QuranMushafView: View {
             .buttonStyle(.madarPlain).accessibilityLabel(label).accessibilityIdentifier(id)
     }
     private func move(_ delta: Int) { selectedAyah = nil; go(to: number + delta) }
-    private func go(to target: Int) { let next = min(604, max(1, target)); if next != number { number = next; page = nil; error = nil; zoom = 1; pan = .zero } }
+    private func go(to target: Int) { let next = min(604, max(1, target)); if next != number { number = next; page = nil; facing = nil; error = nil; zoom = 1; pan = .zero } }
     /// The tafsir sheet walked to another ayah: light it, and turn the page when it starts on another one.
     private func open(_ ayahID: Int) {
         guard let ayah = try? QuranResources.catalog().ayah(id: ayahID) else { return }
@@ -117,6 +139,10 @@ struct QuranMushafView: View {
         let requested = number
         do { let loaded = try await service.page(requested); guard number == requested else { return }; page = loaded; error = nil }
         catch { guard number == requested else { return }; self.error = quranUserMessage(error) }
+        guard sizeClass == .regular, page != nil else { return }
+        let other = requested % 2 == 1 ? requested + 1 : requested - 1
+        guard (1...604).contains(other), let loaded = try? await service.page(other), number == requested else { return }
+        facing = loaded
     }
 }
 

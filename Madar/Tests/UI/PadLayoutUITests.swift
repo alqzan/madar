@@ -20,5 +20,14 @@ final class PadLayoutUITests: XCTestCase {
             try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-\(tab).png"))
             app.terminate()
         }
+        // The mushaf opens as two facing pages in landscape.
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
+        app.launch()
+        let mushaf = app.buttons["quran-tool-mushaf"]
+        for _ in 0..<4 where !mushaf.isHittable { app.swipeUp() }
+        mushaf.tap()
+        sleep(4)
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-mushaf.png"))
     }
 }
