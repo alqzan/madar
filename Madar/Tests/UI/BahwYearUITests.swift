@@ -53,9 +53,8 @@ import XCTest
             let option = app.buttons["option-bahw.yearWhich-\(mode)"]
             XCTAssertTrue(option.waitForExistence(timeout: 8), app.debugDescription)
             option.tap()
-            let searchButton = app.keyboards.buttons.matching(identifier: "Search").firstMatch
-            if searchButton.exists { searchButton.tap() }
-
+            // Choosing the room tab dismisses the keyboard. Its Search key may still
+            // appear in accessibility after it has moved below the screen.
             let lobby = app.buttons["tab-foundation"]
             XCTAssertTrue(lobby.waitForExistence(timeout: 8), app.debugDescription)
             lobby.tap()
@@ -154,5 +153,5 @@ import XCTest
         XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
         XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
     }
-    private func capture(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
+    private func capture(_ app: XCUIApplication, _ name: String) { guard ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] != nil else { return }; let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
 }

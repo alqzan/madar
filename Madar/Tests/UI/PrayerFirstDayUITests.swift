@@ -51,10 +51,10 @@ import XCTest
             "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-06-21T12:00:00+02:00",
             "MADAR_UI_TRACKING_START": "2026-06-20", "MADAR_UI_STYLE_SETTINGS": "salah.askHeart=true"]
         app.launch()
-        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
-        let start = app.buttons["first-run-continue"]
-        if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
-        app.buttons["tab-prayer"].tap()
+        // The isolated polar fixture includes its city and completed welcome.
+        let prayerTab = app.buttons["tab-prayer"]
+        XCTAssertTrue(prayerTab.waitForExistence(timeout: 15), app.debugDescription)
+        prayerTab.tap()
 
         let noTimes = app.staticTexts["prayer-no-times"]
         XCTAssertTrue(noTimes.waitForExistence(timeout: 10), app.debugDescription)
@@ -121,7 +121,7 @@ import XCTest
             }
             let old = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "من فترة سابقة")).firstMatch
             XCTAssertEqual(old.exists, past, app.debugDescription)
-            let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = past ? "UX-08-real-history-L" : "UX-08-first-night-L"; shot.lifetime = .keepAlways; add(shot)
+            attachScreenshot(app, named: past ? "UX-08-real-history-L" : "UX-08-first-night-L")
             app.terminate()
         }
     }
@@ -144,6 +144,7 @@ import XCTest
         XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
     }
     private func attachScreenshot(_ app: XCUIApplication, named name: String) {
+        guard ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] != nil else { return }
         let screenshot = app.screenshot()
         let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name
@@ -158,9 +159,12 @@ import XCTest
         XCTAssertTrue(element.waitForExistence(timeout: 10), app.debugDescription)
         // A partly visible tall card can report hittable while its tap point is
         // beneath the floating accessory. Bring its centre into the clear area.
-        for _ in 0..<12 {
+        // Retained rooms also expose scroll views; target the card's own container.
+        let scroll = app.scrollViews.containing(.button, identifier: element.identifier).firstMatch
+        XCTAssertTrue(scroll.waitForExistence(timeout: 5), app.debugDescription)
+        for _ in 0..<6 {
             if element.isHittable && element.frame.midY < app.frame.maxY * 0.8 { break }
-            app.swipeUp()
+            scroll.swipeUp(velocity: .slow)
         }
         XCTAssertTrue(element.isHittable, app.debugDescription)
         XCTAssertLessThan(element.frame.midY, app.frame.maxY * 0.8, app.debugDescription)

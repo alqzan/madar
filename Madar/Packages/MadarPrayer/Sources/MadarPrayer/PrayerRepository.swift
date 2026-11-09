@@ -15,24 +15,41 @@ public final class PrayerRepository {
     /// Prayer and night rows are read on first use: most callers only need the place, the times or the trip, and reading every
     /// prayer ever logged for that made each habit tap, diary line and reminder plan pay for the whole prayer history.
     /// Writers call `loadRows()` first so a failed read throws instead of looking like an empty history.
+    private let readLogs: (ModelContext) throws -> [PrayerLog]
+    private let readNights: (ModelContext) throws -> [QiyamNight]
     private var loadedLogs: [PrayerLog]?
     private var loadedNights: [QiyamNight]?
     var logs: [PrayerLog] {
-        if let loadedLogs { return loadedLogs }
-        let rows = ((try? context.fetch(FetchDescriptor<PrayerLog>())) ?? []).filter { $0.mergedInto == nil }
-        loadedLogs = rows; return rows
+        get throws {
+            if let loadedLogs { return loadedLogs }
+            let rows = try readLogs(context).filter { $0.mergedInto == nil }
+            loadedLogs = rows
+            return rows
+        }
     }
     var nightRows: [QiyamNight] {
-        if let loadedNights { return loadedNights }
-        let rows = ((try? context.fetch(FetchDescriptor<QiyamNight>())) ?? []).filter { $0.mergedInto == nil }
-        loadedNights = rows; return rows
+        get throws {
+            if let loadedNights { return loadedNights }
+            let rows = try readNights(context).filter { $0.mergedInto == nil }
+            loadedNights = rows
+            return rows
+        }
     }
     public func loadRows() throws {
-        loadedLogs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.mergedInto == nil }
-        loadedNights = try context.fetch(FetchDescriptor<QiyamNight>()).filter { $0.mergedInto == nil }
+        let logs = try readLogs(context).filter { $0.mergedInto == nil }
+        let nights = try readNights(context).filter { $0.mergedInto == nil }
+        loadedLogs = logs; loadedNights = nights
     }
     let trips: [Trip]
-    public init(context: ModelContext) throws {
+    public convenience init(context: ModelContext) throws {
+        try self.init(context: context,
+                      readLogs: { try $0.fetch(FetchDescriptor<PrayerLog>()) },
+                      readNights: { try $0.fetch(FetchDescriptor<QiyamNight>()) })
+    }
+    /// Internal row readers let isolated tests reproduce store failures without corrupting a store.
+    init(context: ModelContext, readLogs: @escaping (ModelContext) throws -> [PrayerLog],
+         readNights: @escaping (ModelContext) throws -> [QiyamNight]) throws {
+        self.readLogs = readLogs; self.readNights = readNights
         self.context = context; settings = try SettingsStore(context: context)
         let city = try settings.value(for: "core.homeCity").object ?? [:]
         home = try ActivePlace(latitude: city["lat"]?.number ?? 24.7136, longitude: city["lon"]?.number ?? 46.6753, timeZoneID: city["tz"]?.string ?? "Asia/Riyadh")
@@ -121,25 +138,26 @@ public final class PrayerRepository {
     private var reading = false
     private lazy var liveLogIndex: [String: PrayerLog] = {
         var index: [String: PrayerLog] = [:]
-        for row in logs where row.deletedAt == nil {
+        // Built only inside a snapshot, after both throwing row reads succeeded.
+        for row in loadedLogs ?? [] where row.deletedAt == nil {
             let key = row.dayKey + "|" + row.prayer
             if let existing = index[key], !(existing.updatedAt == row.updatedAt ? existing.id.uuidString > row.id.uuidString : existing.updatedAt < row.updatedAt) { continue }
             index[key] = row
         }
         return index
     }()
-    func log(_ ref: PrayerReference, includeDeleted: Bool = false) -> PrayerLog? {
+    func log(_ ref: PrayerReference, includeDeleted: Bool = false) throws -> PrayerLog? {
         if reading && !includeDeleted { return liveLogIndex[ref.day.description + "|" + ref.prayer.rawValue] }
-        return logs.filter { $0.dayKey == ref.day.description && $0.prayer == ref.prayer.rawValue && (includeDeleted || $0.deletedAt == nil) }.max { a, b in a.updatedAt == b.updatedAt ? a.id.uuidString > b.id.uuidString : a.updatedAt < b.updatedAt }
+        return try logs.filter { $0.dayKey == ref.day.description && $0.prayer == ref.prayer.rawValue && (includeDeleted || $0.deletedAt == nil) }.max { a, b in a.updatedAt == b.updatedAt ? a.id.uuidString > b.id.uuidString : a.updatedAt < b.updatedAt }
     }
     public func day(_ day: GregorianDay, now: Date) throws -> PrayerDaySummary {
         try self.day(day, now: now, start: tracking(at: now).day, current: prayerDay(at: now))
     }
     /// `start` and `current` are the same for every day of one snapshot, so the snapshot reads them once.
     private func day(_ day: GregorianDay, now: Date, start: GregorianDay, current: GregorianDay) throws -> PrayerDaySummary {
-        return .init(day: day, cells: Prayer.allCases.map { prayer in
+        return .init(day: day, cells: try Prayer.allCases.map { prayer in
             let ref = PrayerReference(day: day, prayer: prayer), occurrence = occurrence(ref)
-            let row = log(ref).flatMap { ["jamaah", "alone", "qada"].contains($0.status) ? $0 : nil }
+            let row = try log(ref).flatMap { ["jamaah", "alone", "qada"].contains($0.status) ? $0 : nil }
             let due = occurrence.map { $0.time <= now } ?? false
             let expiredPending = due && day.adding(days: pendingDays) <= current
             let status = row.flatMap { PrayerDisplayStatus(rawValue: $0.status) } ?? (due && day >= start ? (expiredPending ? .unconfirmed : .pending) : .future)
@@ -150,8 +168,8 @@ public final class PrayerRepository {
             return PrayerCell(reference: ref, status: status, heart: row?.heart.flatMap(PrayerHeart.init(rawValue:)), time: occurrence == nil ? nil : row?.eventAt ?? occurrence?.time, prayerTime: occurrence?.time, shortened: row?.shortened == true, fridayKind: row?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), pairID: row?.pairID, isFriday: friday, canLog: day >= start && (due || occurrence == nil), canMarkMissed: false, canMakeUp: day >= start && windowEnded)
         })
     }
-    public func nightRequiresRestore(_ night: GregorianDay) -> Bool {
-        nightRows.filter { $0.nightKey == night.description }.max { $0.updatedAt < $1.updatedAt }?.deletedAt != nil
+    public func nightRequiresRestore(_ night: GregorianDay) throws -> Bool {
+        try nightRows.filter { $0.nightKey == night.description }.max { $0.updatedAt < $1.updatedAt }?.deletedAt != nil
     }
     public func defaultNight(at now: Date) -> GregorianDay {
         let current = prayerDay(at: now)
@@ -178,7 +196,7 @@ public final class PrayerRepository {
         let month = all.filter { $0.day >= monthStart }
         // Qada is now a status on a completed prayer, not an outstanding-debt collection.
         let qada: [PrayerQada] = []
-        let nights = nightRows.filter { $0.deletedAt == nil }.compactMap { row -> PrayerNight? in guard let day = try? GregorianDay(row.nightKey) else { return nil }; return .init(night: day, rakaat: row.rakaat, witr: row.witr, quranSessionID: row.quranSessionID) }.sorted { $0.night < $1.night }
+        let nights = try nightRows.filter { $0.deletedAt == nil }.compactMap { row -> PrayerNight? in guard let day = try? GregorianDay(row.nightKey) else { return nil }; return .init(night: day, rakaat: row.rakaat, witr: row.witr, quranSessionID: row.quranSessionID) }.sorted { $0.night < $1.night }
         let cells = all.flatMap(\.cells)
         let next = (0...1).flatMap { offset in Prayer.allCases.compactMap { occurrence(.init(day: current.adding(days: offset), prayer: $0)) } }.filter { $0.time > now }.min { $0.time < $1.time }
         let active = activeTrip(at: now)

@@ -78,7 +78,7 @@ import SwiftData
         let now = ISO8601DateFormatter().date(from: "2026-10-15T22:00:00+03:00")!
         let service = AppBahwService(session: app, evaluationDate: now)
         let model = try XCTUnwrap(service.prayer())
-        XCTAssertEqual(model.nextName, "الفجر")
+        XCTAssertEqual(model.nextName, "الفجر غدًا")
         XCTAssertFalse(model.nextTime?.isEmpty ?? true)
         XCTAssertTrue(model.nextAfter?.contains("بعد") == true)
         // Tomorrow's Fajr must not be highlighted as an unlogged arch in today's five.

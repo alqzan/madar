@@ -10,7 +10,7 @@ import UIKit
         app.launchEnvironment=environment;app.launch();return app
     }
     private func open(_ app:XCUIApplication){let block=app.descendants(matching:.any).matching(identifier:"bahw-block-habits").firstMatch;XCTAssertTrue(block.waitForExistence(timeout:20));let header=app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { block.tap() };XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
-    private func shot(_ app:XCUIApplication,_ name:String){let s=app.screenshot(),a=XCTAttachment(screenshot:s);a.name=name;a.lifetime = .keepAlways;add(a); if let dir=ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to:URL(fileURLWithPath:dir).appendingPathComponent(name+".png")) }}
+    private func shot(_ app:XCUIApplication,_ name:String){guard ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] != nil else {return};let s=app.screenshot(),a=XCTAttachment(screenshot:s);a.name=name;a.lifetime = .keepAlways;add(a); if let dir=ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to:URL(fileURLWithPath:dir).appendingPathComponent(name+".png")) }}
     func testAutomaticThemeUsesResolvedAppearanceInLobbyAndHabitSheets() throws {
         continueAfterFailure = false
         // Fixture leaves core.theme at its schema default, auto. Only the root's resolved scheme is forced.
@@ -226,14 +226,15 @@ import UIKit
         row().tap();XCTAssertTrue(app.buttons["habit-resume"].waitForExistence(timeout:5));shot(app,"M4-V02-frozen-L");app.buttons["habit-resume"].tap();XCTAssertTrue(app.buttons["habit-resume"].waitForNonExistence(timeout:5))
         row().tap();app.buttons["habit-delete"].tap();XCTAssertTrue(app.buttons["habit-first"].waitForExistence(timeout:5));app.buttons["habit-archived"].tap();app.buttons["استعدها"].tap();XCTAssertTrue(row().waitForExistence(timeout:5))
         app.terminate();app.launch();open(app);XCTAssertTrue(row().waitForExistence(timeout:10));shot(app,"M4-V02-accessory-after-L");XCTAssertTrue(row().isHittable)
-        let accessory=app.otherElements["fixed-tab-bar"] // FB-31: the glass tab bar replaced the next-prayer accessory.
+        let accessory=app.tabBars["fixed-tab-bar"] // FB-31: the native glass bar is a UITabBar.
         XCTAssertTrue(accessory.waitForExistence(timeout:10))
         XCTAssertLessThanOrEqual(row().frame.maxY,accessory.frame.minY,"The first habit row should finish above the glass tab bar.")
         row().tap();XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["habit-progress"].label.contains("١ من ١"))
         app.buttons["تمّ"].tap();row().tap();app.buttons["habit-delete"].tap()
         XCTAssertTrue(app.buttons["habit-archived"].waitForExistence(timeout:5));app.buttons["habit-archived"].tap()
         let finalDelete=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","حذف نهائي")).firstMatch
-        XCTAssertTrue(finalDelete.waitForExistence(timeout:5));finalDelete.tap();app.buttons["احذف نهائيًا"].tap()
+        XCTAssertTrue(finalDelete.waitForExistence(timeout:5));finalDelete.tap()
+        let confirmDelete=app.buttons["احذف"];XCTAssertTrue(confirmDelete.waitForExistence(timeout:5));confirmDelete.tap()
         XCTAssertTrue(app.buttons["habit-archived"].waitForNonExistence(timeout:5))
         let undo=app.buttons["تراجع"];XCTAssertTrue(undo.waitForExistence(timeout:5));undo.tap()
         // The archived list sits low in the room; a covered button would take the tap to the glass bar above it.
@@ -259,7 +260,7 @@ import UIKit
         XCTAssertTrue(yearlyBead.exists); yearlyBead.tap()
         XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout: 5)); app.buttons["تمّ"].tap()
         // The orbit sits above the lists, so rows are scrolled clear of the floating accessory before a tap.
-        let accessory=app.otherElements["fixed-tab-bar"] // FB-31: the glass tab bar replaced the next-prayer accessory.
+        let accessory=app.tabBars["fixed-tab-bar"] // FB-31: the native glass bar is a UITabBar.
         func reveal(_ e:XCUIElement) {
             for _ in 0..<8 {
                 let floor=accessory.exists ? accessory.frame.minY : app.frame.maxY-120

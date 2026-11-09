@@ -255,7 +255,7 @@ final class AppSession {
         _ = try PrayerHistoryMaintenance.removeUnperformedPrayerHistory(in: container.mainContext, now: prayerNow())
         #if DEBUG
         try preparePrayerUITestTrackingStart()
-        try preparePrayerPolarNoTimesFixture()
+        try preparePrayerPolarNoTimesFixture(group: group)
         try prepareStyleSettingsFixture()
         try preparePrayerStatisticsFixture()
         try preparePrayerHomeShowcaseFixture()
@@ -653,10 +653,21 @@ final class AppSession {
         try container.mainContext.save()
     }
     /// Isolated UI-test fixture for the contract that polar days have no invented times but remain manually loggable.
-    private func preparePrayerPolarNoTimesFixture() throws {
+    private func preparePrayerPolarNoTimesFixture(group: URL) throws {
         let environment = ProcessInfo.processInfo.environment
         guard UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+              environment["MADAR_UI_STORE_ID"] == group.lastPathComponent,
+              group.deletingLastPathComponent().lastPathComponent == "UITestStores",
               environment["MADAR_UI_PRAYER_FIXTURE"] == "polarNoTimes" else { return }
+        // This fixture already supplies its city. A delayed first-run cover otherwise
+        // intercepts scrolling after the test has read the room behind it.
+        let context = container.mainContext
+        if !(try context.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.onboardingCompleted" }) {
+            let marker = DeviceSetting()
+            marker.key = "sys.onboardingCompleted"
+            marker.valueJSON = Data("true".utf8)
+            context.insert(marker)
+        }
         try store.prepare(.object([
             "name": .string("Tromsø"), "country": .string("NO"),
             "lat": .number(69.6492), "lon": .number(18.9553),

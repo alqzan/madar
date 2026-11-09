@@ -22,7 +22,7 @@ private struct PrayerInverse: Codable {
         }
         func registerNew<T: MadarRecordModel>(_ row: T) throws { captured.insert(key(try row.record())) }
         var logIndex: [PrayerReference: PrayerLog] = [:]
-        for row in repository.logs { if let day = try? GregorianDay(row.dayKey), let prayer = Prayer(rawValue: row.prayer) { let ref = PrayerReference(day: day, prayer: prayer); if logIndex[ref].map({ $0.updatedAt < row.updatedAt }) ?? true { logIndex[ref] = row } } }
+        for row in try repository.logs { if let day = try? GregorianDay(row.dayKey), let prayer = Prayer(rawValue: row.prayer) { let ref = PrayerReference(day: day, prayer: prayer); if logIndex[ref].map({ $0.updatedAt < row.updatedAt }) ?? true { logIndex[ref] = row } } }
         let track = try repository.tracking(at: now)
         let current = repository.prayerDay(at: now)
         func touch<T: MadarRecordModel>(_ row: T, restoringDebt: Bool = false) throws {
@@ -67,7 +67,7 @@ private struct PrayerInverse: Codable {
             let zone = occurrence?.place.timeZone ?? repository.place(at: now).timeZone
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
             let isFridayNoon = ref.prayer == .dhuhr && calendar.component(.weekday, from: ref.day.date(in: zone)) == 6
-            let existingKind = repository.log(ref)?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:))
+            let existingKind = try repository.log(ref)?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:))
             let resolvedFridayKind = fridayKind ?? existingKind
             guard isFridayNoon || fridayKind == nil else { throw PrayerDomainError.invalidRecord }
             guard !isFridayNoon || [.unrecordedHistory, .excused].contains(status) || resolvedFridayKind != nil else { throw PrayerDomainError.invalidRecord }
@@ -81,7 +81,7 @@ private struct PrayerInverse: Codable {
             row.loggedAt = now; row.source = recordSource ?? source.rawValue; try touch(row, restoringDebt: restoring)
         }
         func makeUp(_ ref: PrayerReference, at eventAt: Date? = nil, fridayKind: FridayPrayerKind? = nil, restoringCurrentLog: Bool = false) throws {
-            if let existing = repository.log(ref), existing.status == PrayerStoredStatus.qada.rawValue {
+            if let existing = try repository.log(ref), existing.status == PrayerStoredStatus.qada.rawValue {
                 guard let fridayKind else { return }
                 guard ref.prayer == .dhuhr else { throw PrayerDomainError.invalidRecord }
                 let timeZone = TimeZone(identifier: existing.tzID) ?? repository.place(at: now).timeZone
@@ -124,14 +124,14 @@ private struct PrayerInverse: Codable {
             guard status != .unrecordedHistory && status != .excused && status != .missed else { throw PrayerDomainError.invalidRecord }
             if status == .qada { try makeUp(ref, fridayKind: fridayKind, restoringCurrentLog: true); if let heart { let row = try logRow(ref, restoring: ref.day >= track.day); if row.heart != heart.rawValue { row.heart = heart.rawValue; try touch(row) } } }
             else {
-                if let row = repository.log(ref), row.status == status.rawValue, heart == nil || row.heart == heart?.rawValue, shortened == nil || row.shortened == shortened, fridayKind == nil || row.fridayKind == fridayKind?.rawValue { break }
+                if let row = try repository.log(ref), row.status == status.rawValue, heart == nil || row.heart == heart?.rawValue, shortened == nil || row.shortened == shortened, fridayKind == nil || row.fridayKind == fridayKind?.rawValue { break }
                 try setLog(ref, status: status, heart: heart, shortened: shortened, fridayKind: fridayKind, restoring: true)
             }
         case .makeUp(let ref, let at, let fridayKind): try makeUp(ref, at: at, fridayKind: fridayKind, restoringCurrentLog: true)
         case .addOldMissed, .restoreOldMissed, .addOldMissedRun, .makeUpOldest:
             throw PrayerDomainError.invalidRecord
         case .answerHeart(let ref, let heart):
-            guard let row = repository.log(ref), ["jamaah", "alone", "qada"].contains(row.status) else { throw PrayerDomainError.invalidRecord }
+            guard let row = try repository.log(ref), ["jamaah", "alone", "qada"].contains(row.status) else { throw PrayerDomainError.invalidRecord }
             if row.heart != heart?.rawValue { try capture(row); row.heart = heart?.rawValue; try touch(row) }
         case .markUnrecorded:
             throw PrayerDomainError.invalidRecord
@@ -139,7 +139,7 @@ private struct PrayerInverse: Codable {
             _ = resolutions
             throw PrayerDomainError.invalidRecord
         case .clear(let ref):
-            if let row = repository.log(ref) { try unlinkPair(row); try remove(row) }
+            if let row = try repository.log(ref) { try unlinkPair(row); try remove(row) }
         case .agePending:
             // RP1: legacy commands remain decodable, but time passing never records
             // a religious status or debt on the user's behalf.
@@ -148,14 +148,14 @@ private struct PrayerInverse: Codable {
             guard [.jamaah, .alone].contains(status), try repository.settings.value(for: "salah.travelShortenCombine") == .bool(true), let trip = repository.activeTrip(at: now) else { throw PrayerDomainError.noActiveTrip }
             let first = PrayerReference(day: day, prayer: pair.prayers[0]), second = PrayerReference(day: day, prayer: pair.prayers[1])
             guard let times = PrayerTimesEngine.calculate(day: day, place: trip.place, options: repository.tripOptions), day == current, now >= times.time(for: mode == .taqdim ? first.prayer : second.prayer) else { throw PrayerDomainError.invalidPair }
-            if let a = repository.log(first), let b = repository.log(second), a.pairID != nil, a.pairID == b.pairID, a.status == status.rawValue, b.status == status.rawValue, a.shortened == (shortened && first.prayer != .maghrib), b.shortened == shortened { break }
+            if let a = try repository.log(first), let b = try repository.log(second), a.pairID != nil, a.pairID == b.pairID, a.status == status.rawValue, b.status == status.rawValue, a.shortened == (shortened && first.prayer != .maghrib), b.shortened == shortened { break }
             let pairID = StableIdentity.uuid(for: "PrayerPair:\(day):\(pair.rawValue)")
             for ref in [first, second] {
                 // Only the second of an approved taqdim pair can precede its time.
                 // A traveller's Friday noon in a combined pair is Dhuhr (RP5 asks only when Jumu'ah is possible).
                 var tripCalendar = Calendar(identifier: .gregorian); tripCalendar.timeZone = trip.place.timeZone
                 let fridayNoon = ref.prayer == .dhuhr && tripCalendar.component(.weekday, from: ref.day.date(in: trip.place.timeZone)) == 6
-                try setLog(ref, status: status, shortened: shortened && ref.prayer != .maghrib, fridayKind: fridayNoon && repository.log(ref)?.fridayKind == nil ? .dhuhr : nil, early: true)
+                try setLog(ref, status: status, shortened: shortened && ref.prayer != .maghrib, fridayKind: fridayNoon && (try repository.log(ref))?.fridayKind == nil ? .dhuhr : nil, early: true)
                 let row = try logRow(ref); row.pairID = pairID; row.tripID = trip.id; row.eventAt = times.time(for: ref.prayer); row.tzID = trip.place.timeZoneID; try touch(row)
             }
         case .logQiyam(let night, let rakaat, let witr), .restoreQiyam(let night, let rakaat, let witr):
@@ -164,7 +164,7 @@ private struct PrayerInverse: Codable {
             let latest = repository.defaultNight(at: now)
             guard night <= latest, night >= latest.adding(days: -6) else { throw PrayerDomainError.invalidNight }
             guard (0...99).contains(rakaat) else { throw PrayerDomainError.invalidRakaat }
-            let old = repository.nightRows.filter { $0.nightKey == night.description }.max { $0.updatedAt < $1.updatedAt }
+            let old = try repository.nightRows.filter { $0.nightKey == night.description }.max { $0.updatedAt < $1.updatedAt }
             if let old { guard old.deletedAt == nil || restoring else { throw PrayerDomainError.explicitRestoreRequired }; try capture(old) }
             if old?.deletedAt == nil, old?.rakaat == rakaat, old?.witr == witr { break }
             let row = old ?? QiyamNight(); if old == nil { row.id = StableIdentity.uuid(for: "QiyamNight:\(night)"); row.createdAt = now; row.updatedAt = now; context.insert(row); try registerNew(row) }

@@ -457,3 +457,64 @@ import MadarData
         #expect(TravelRule.suggestedMethod(country: "SA") == .ummAlQura)
     }
 }
+
+
+@Suite(.serialized) @MainActor struct PrayerReadFailureTests {
+    private enum ReadFailure: Error { case unavailable }
+    private let now = ISO8601DateFormatter().date(from: "2026-10-07T12:00:00+03:00")!
+
+    @Test func placeAndTimesDoNotReadHistory() throws {
+        let container = try MadarContainerFactory.makeInMemory()
+        var reads = 0
+        let repository = try PrayerRepository(context: container.mainContext,
+            readLogs: { _ in reads += 1; throw ReadFailure.unavailable },
+            readNights: { _ in reads += 1; throw ReadFailure.unavailable })
+        _ = repository.place(at: now)
+        _ = repository.prayerDay(at: now)
+        #expect(repository.occurrence(.init(day: try GregorianDay("2026-10-07"), prayer: .fajr)) != nil)
+        #expect(reads == 0)
+    }
+
+    @Test func failedDayReadThrowsAndRetryKeepsRecordedPrayer() throws {
+        let container = try MadarContainerFactory.makeInMemory()
+        let row = PrayerLog(); row.dayKey = "2026-10-07"; row.prayer = "fajr"; row.status = "alone"
+        var attempts = 0, nightReads = 0
+        let repository = try PrayerRepository(context: container.mainContext,
+            readLogs: { _ in attempts += 1; if attempts == 1 { throw ReadFailure.unavailable }; return [row] },
+            readNights: { _ in nightReads += 1; return [] })
+        let day = try GregorianDay("2026-10-07")
+        #expect(throws: ReadFailure.self) { try repository.day(day, now: now) }
+        let retry = try repository.day(day, now: now)
+        #expect(retry.cells.first { $0.reference.prayer == .fajr }?.status == .alone)
+        #expect(attempts == 2)
+        #expect(nightReads == 0)
+    }
+
+    @Test func failedNightReadThrowsAndRetryRecognizesTombstone() throws {
+        let container = try MadarContainerFactory.makeInMemory()
+        let row = QiyamNight(); row.nightKey = "2026-10-06"; row.deletedAt = now
+        var attempts = 0, prayerReads = 0
+        let repository = try PrayerRepository(context: container.mainContext,
+            readLogs: { _ in prayerReads += 1; return [] },
+            readNights: { _ in attempts += 1; if attempts == 1 { throw ReadFailure.unavailable }; return [row] })
+        let night = try GregorianDay("2026-10-06")
+        #expect(throws: ReadFailure.self) { try repository.nightRequiresRestore(night) }
+        #expect(try repository.nightRequiresRestore(night))
+        #expect(attempts == 2)
+        #expect(prayerReads == 0)
+    }
+
+    @Test func failedDirectReadDoesNotPoisonSnapshot() throws {
+        let container = try MadarContainerFactory.makeInMemory()
+        let row = PrayerLog(); row.dayKey = "2026-10-07"; row.prayer = "fajr"; row.status = "jamaah"
+        var attempts = 0
+        let repository = try PrayerRepository(context: container.mainContext,
+            readLogs: { _ in attempts += 1; if attempts == 1 { throw ReadFailure.unavailable }; return [row] },
+            readNights: { _ in [] })
+        let day = try GregorianDay("2026-10-07")
+        #expect(throws: ReadFailure.self) { try repository.day(day, now: now) }
+        let snapshot = try repository.snapshot(now: now)
+        #expect(snapshot.today.cells.first { $0.reference.prayer == .fajr }?.status == .jamaah)
+        #expect(attempts == 2)
+    }
+}

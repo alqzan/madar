@@ -39,8 +39,8 @@ for key in ['notes.dictationFirst', 'salah.liveActivity', 'quran.tapForTafsir']:
 # Owner, 4 Nov 2026: the heart question starts off again (docs/DECISIONS.md); 26 Oct had set it on.
 require(settings['salah.askHeart']['default'] is False, 'salah.askHeart owner default must be false (owner, 4 Nov 2026)')
 require(settings['quran.tapForTafsir']['availabilityGate'] == 'M2 licence check', 'RQ8 licence gate missing')
-# Owner, 27 Oct: defined in-app smart suggestions; the calm default is retained.
-require(settings['bahw.smartPresence']['availability'] == 'v1' and settings['bahw.smartPresence']['default'] == 'calm', 'owner smart-presence contract changed')
+# Owner, 6 Nov (FB-39b): smart presence starts at medium.
+require(settings['bahw.smartPresence']['availability'] == 'v1' and settings['bahw.smartPresence']['default'] == 'medium', 'owner smart-presence contract changed')
 require(settings['bahw.widgetScope']['availability'] == 'v1' and settings['bahw.widgetScope']['default'] == 'todayAndAfter', 'owner habit widget scope contract changed')
 reader = settings['mihbara.readerEn']
 require(reader['default']['arabicHints'] == 'none', 'RMI1 hints must default off')
@@ -61,7 +61,7 @@ journeys = ROOT / 'docs/journeys'
 all_steps = '\n'.join(p.read_text() for p in journeys.glob('*.md') if p.name != 'README.md')
 for number in range(1, 19):
     require(re.search(rf'\| J{number:02d} / test_\w+', all_steps), f'J{number:02d} lacks a procedure')
-for required in ['Current milestone', 'Last checked', 'Board', 'Later', 'Handovers']:
+for required in ['Current work', 'Board', 'Later', 'Handovers']:
     require(f'# {required}' in (ROOT / 'docs/PROGRESS.md').read_text(), f'progress heading missing: {required}')
 require((ROOT / 'docs/OWNER-RUNBOOK.md').exists(), 'RA6 runbook missing')
 if args.require_ra4:
