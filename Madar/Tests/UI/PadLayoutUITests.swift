@@ -34,6 +34,13 @@ final class PadLayoutUITests: XCTestCase {
         sleep(4)
         try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-mushaf.png"))
         app.terminate()
+        // A memorisation session.
+        app.launch()
+        let begin = app.buttons["quran-begin"].firstMatch
+        if begin.waitForExistence(timeout: 10) { begin.tap() }
+        sleep(12)
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-session.png"))
+        app.terminate()
         // A PDF book opens as two facing pages, right to left.
         let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 420, height: 600)).pdfData { context in
             for page in 1...4 {
