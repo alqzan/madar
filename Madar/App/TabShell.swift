@@ -56,7 +56,34 @@ struct TabShell<Content: View>: View {
     @State private var barHeight: CGFloat = 0
     @State private var bottomInset: CGFloat = 0
 
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    /// Owner, 9 Nov 2026: «ابيك تبدا ببناء نسخه للايباد» — on a wide screen (iPad, regular width) the rooms sit beside a sidebar on the
+    /// leading (right) edge instead of above the bottom bar. iPhone keeps the bar.
     var body: some View {
+        Group {
+            if sizeClass == .regular { padBody } else { phoneBody }
+        }
+        .tint(theme.accent)
+        .onChange(of: selection, initial: true) { _, tab in
+            // Retained rooms keep drafts, but their keyboard must not cover the destination.
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            remember(tab)
+        }
+    }
+
+    private var padBody: some View {
+        HStack(spacing: 0) {
+            MadarSidebar(tabs: tabs, selection: selection, select: select)
+                .frame(width: 250)
+            Rectangle().fill(theme.ink.opacity(0.08)).frame(width: 0.5).ignoresSafeArea()
+            rooms.frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .onAppear { session.tabBarHeight = 0 }
+        .sensoryFeedback(.selection, trigger: selection)
+    }
+
+    private var phoneBody: some View {
         rooms
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0; session.tabBarHeight = max(0, barHeight - $0) }
@@ -83,12 +110,6 @@ struct TabShell<Content: View>: View {
                 }
             }
             #endif
-            .tint(theme.accent)
-            .onChange(of: selection, initial: true) { _, tab in
-                // Retained rooms keep drafts, but their keyboard must not cover the destination.
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                remember(tab)
-            }
     }
 
     private var rooms: some View {
@@ -574,4 +595,43 @@ struct MadarTopClip: Shape {
 extension View {
     /// Owner, 6 Nov 2026: «مشطوف». The hard cut under the clock is gone: the system's soft scroll edge fades the ink out under the status bar.
     func madarTopClipped() -> some View { scrollEdgeEffectStyle(.soft, for: .top) }
+}
+
+
+/// The iPad room list: every room, «خصّص» last and apart, the chosen room lit in its accent. Leading edge, so the right side in Arabic.
+private struct MadarSidebar: View {
+    let tabs: [FoundationTab]
+    let selection: String
+    let select: (String) -> Void
+    @Environment(\.roomTheme) private var theme
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("مدار").font(.custom("thmanyahserifdisplay-Bold", size: 30, relativeTo: .largeTitle))
+                .foregroundStyle(theme.ink).padding(.horizontal, 14).padding(.top, 18).padding(.bottom, 14)
+            ForEach(tabs.filter { $0.id != "customize" }) { row($0) }
+            Spacer(minLength: 12)
+            if let customize = tabs.first(where: { $0.id == "customize" }) { row(customize) }
+        }
+        .padding(.horizontal, 12).padding(.bottom, 12)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(theme.background.ignoresSafeArea())
+        .accessibilityIdentifier("fixed-tab-bar")
+    }
+    private func row(_ tab: FoundationTab) -> some View {
+        let on = tab.id == selection
+        return Button { select(tab.id) } label: {
+            HStack(spacing: 12) {
+                Image(tab.symbol + (on ? "Selected" : "")).renderingMode(.template).resizable().scaledToFit().frame(width: 24, height: 24)
+                Text(tab.title).font(MadarTypography.section())
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(on ? theme.accent : theme.ink)
+            .padding(.horizontal, 14).frame(minHeight: 48)
+            .background(on ? theme.accent.opacity(0.12) : .clear, in: .rect(cornerRadius: 14))
+            .contentShape(.rect(cornerRadius: 14))
+        }
+        .buttonStyle(.madarPlain)
+        .accessibilityIdentifier("tab-" + tab.id)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
 }
