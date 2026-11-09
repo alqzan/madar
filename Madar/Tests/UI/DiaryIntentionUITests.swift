@@ -5,6 +5,8 @@ import XCTest
         let app=XCUIApplication();let store=UUID().uuidString
         app.launchEnvironment=["MADAR_UI_STORE_ID":store,"MADAR_UI_DIARY_FIXTURE":"editor","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T07:00:00+03:00"]
         app.launch();XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout:25));app.buttons["diary-today"].tap()
+        XCTAssertEqual(app.staticTexts["diary-audio-duration-label"].waitForExistence(timeout:10) ? app.staticTexts["diary-audio-duration-label"].label : "", "مدة التسجيل: ١ ثانية")
+        XCTAssertFalse(app.descendants(matching:.any)["diary-audio-tone"].exists, "The diary shows volume and duration without emotion labels")
         XCTAssertTrue(app.scrollViews["diary-audio-transcript-text"].waitForExistence(timeout:10));app.buttons["diary-audio-transcript-open"].tap()
         XCTAssertTrue(app.textViews["diary-audio-transcript-edit"].waitForExistence(timeout:5));app.buttons["diary-audio-transcript-cancel"].tap();app.buttons["diary-niyya-open"].tap()
         let text=app.textFields["diary-niyya-text"];XCTAssertTrue(text.waitForExistence(timeout:10));capture(app,"OWNER-notes-intention-inline-L");text.tap();text.typeText("أُنهي ما بدأت");app.buttons["diary-niyya-save"].tap()

@@ -406,7 +406,7 @@ private struct DiaryDayReadConfiguration: Sendable {
             if let row = mediaByID[id] {
                 if let data = row.data {
                     let levels = row.audioLevelsJSON.flatMap { try? JSONDecoder().decode([Double].self, from: $0) } ?? []
-                    attachments.append(.init(id: row.id, entryID: entry, kind: row.kind, contentType: row.contentType, data: data, duration: row.durationS, assetID: DiaryPhotoLink.assetID(sourceID: row.sourceID), title: row.title, voiceTone: row.voiceTone, levelSamples: levels))
+                    attachments.append(.init(id: row.id, entryID: entry, kind: row.kind, contentType: row.contentType, data: data, duration: row.durationS, assetID: DiaryPhotoLink.assetID(sourceID: row.sourceID), title: row.title, levelSamples: levels))
                 }
                 // N01: an attachment the export did not contain is shown as missing, never invented.
                 else if row.state == "missing" { attachments.append(.init(id: row.id, entryID: entry, kind: "missing", contentType: row.kind, data: Data(), duration: nil)) }

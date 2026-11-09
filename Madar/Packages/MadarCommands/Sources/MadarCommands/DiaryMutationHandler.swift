@@ -100,12 +100,12 @@ struct DiaryEntryDeletion: Codable {
         return try JSONEncoder().encode(DiaryInverse(model: "Entry", after: row.record(), dayKey: row.dayKey, previousOrigin: nil, before: before))
     }
     /// Keep the undo receipt small: a voice insight change must never copy the audio bytes into the command log.
-    static func setAudioInsights(media id: UUID, title: String?, voiceTone: String?, levels: [Double], context: ModelContext, now: Date, writer: String) throws -> Data {
+    static func setAudioInsights(media id: UUID, title: String?, levels: [Double], context: ModelContext, now: Date, writer: String) throws -> Data {
         guard let row = try context.fetch(FetchDescriptor<Media>()).first(where: { $0.id == id && $0.kind == "audio" && $0.deletedAt == nil && $0.mergedInto == nil }) else {
             throw DataError.invalidValue("audio media required")
         }
         let before = try audioInsightsRecord(id: id, title: row.title, voiceTone: row.voiceTone, audioLevelsJSON: row.audioLevelsJSON)
-        row.title = title; row.voiceTone = voiceTone; row.audioLevelsJSON = try JSONEncoder().encode(levels)
+        row.title = title; row.audioLevelsJSON = try JSONEncoder().encode(levels)
         row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
         let after = try audioInsightsRecord(id: id, title: row.title, voiceTone: row.voiceTone, audioLevelsJSON: row.audioLevelsJSON)
         return try JSONEncoder().encode(DiaryInverse(model: "MediaAudioInsights", after: after, dayKey: "", previousOrigin: nil, before: before))

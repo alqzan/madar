@@ -5,7 +5,7 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case commitDraft(UUID)
     case appendMedia(file: UUID, kind: String, type: String, caption: String, day: String, writingDay: String, duration: Int?, asset: String? = nil)
     case transcript(entry: UUID, text: String)
-    case audioInsights(media: UUID, title: String?, voiceTone: String?, levels: [Double])
+    case audioInsights(media: UUID, title: String?, levels: [Double])
     case intention(id: UUID, day: String, text: String)
     case intentionResult(id: UUID, result: String?)
     case intentionReview(id: UUID, period: String, text: String)
@@ -130,16 +130,17 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
         case "diary.setTranscript":
             guard Set(value.keys) == ["entryID", "text"], let id = uuid("entryID"), let text = value["text"]?.string else { return nil }; return .transcript(entry: id, text: text)
         case "diary.setAudioInsights":
-            guard Set(value.keys) == ["mediaID", "title", "voiceTone", "audioLevels"], let id = uuid("mediaID"),
+            let keys = Set(value.keys), currentKeys: Set<String> = ["mediaID", "title", "audioLevels"]
+            let legacyKeys = currentKeys.union(["voiceTone"])
+            guard keys == currentKeys || keys == legacyKeys, let id = uuid("mediaID"),
                   let levelValues = value["audioLevels"]?.array, levelValues.count <= 36_000 else { return nil }
             let title = value["title"]?.string
             guard value["title"] == .null || title.map({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.count <= 80 }) == true else { return nil }
-            let tone = value["voiceTone"]?.string
             let tones = ["calm", "joyful", "sad", "concerned", "grateful", "hopeful", "tired", "mixed", "unclear"]
-            guard value["voiceTone"] == .null || tone.map(tones.contains) == true else { return nil }
+            if keys.contains("voiceTone"), value["voiceTone"] != .null, value["voiceTone"]?.string.map(tones.contains) != true { return nil }
             let levels = levelValues.compactMap(\.number)
             guard levels.count == levelValues.count, levels.allSatisfy({ (0...1).contains($0) }) else { return nil }
-            return .audioInsights(media: id, title: title, voiceTone: tone, levels: levels)
+            return .audioInsights(media: id, title: title, levels: levels)
         default: return nil
         }
     }

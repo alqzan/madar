@@ -59,7 +59,7 @@ import MadarData
         case .edit(let entry, let revision, let text): return try DiaryMutationHandler.edit(entry: entry, revision: revision, text: text, context: context, now: now, writer: writer)
         case .deleteEntry(let entry): return try DiaryMutationHandler.deleteEntry(entry, context: context, now: now, writer: writer)
         case .transcript(let entry, let text): return try DiaryMutationHandler.setTranscript(entry: entry, text: text, context: context, now: now, writer: writer)
-        case .audioInsights(let media, let title, let voiceTone, let levels): return try DiaryMutationHandler.setAudioInsights(media: media, title: title, voiceTone: voiceTone, levels: levels, context: context, now: now, writer: writer)
+        case .audioInsights(let media, let title, let levels): return try DiaryMutationHandler.setAudioInsights(media: media, title: title, levels: levels, context: context, now: now, writer: writer)
         }
     }
 }

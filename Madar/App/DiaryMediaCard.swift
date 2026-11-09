@@ -52,17 +52,13 @@ struct DiaryMediaCard: View {
                     Button { togglePlayback() } label: { Image(systemName: playing ? "pause.fill" : "play.fill").frame(width: 44, height: 44).foregroundStyle(theme.onAccent).background(theme.accent, in: .circle) }
                         .buttonStyle(.madarPlain).accessibilityLabel(playing ? "أوقف الصوت مؤقتًا" : "شغّل التسجيل").accessibilityIdentifier("diary-play-" + media.id.uuidString)
                     ProgressView(value: playback.activeID == media.id ? playback.position : 0).tint(theme.accent)
-                    Text(media.duration.map(seconds) ?? "تسجيل صوتي").font(MadarTypography.fine())
+                    Text(media.duration.map { "مدة التسجيل: " + seconds($0) } ?? "تسجيل صوتي")
+                        .font(MadarTypography.fine()).accessibilityIdentifier("diary-audio-duration-label")
                 }.padding(10).background(theme.surface, in: .capsule)
-                if let tone = media.voiceTone {
-                    Label("انطباع التفريغ: " + DiaryVoiceTone.label(tone), systemImage: "text.quote")
-                        .font(MadarTypography.fine()).accessibilityIdentifier("diary-audio-tone")
-                }
                 if !media.levelSamples.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("مستوى الصوت عبر التسجيل").font(MadarTypography.fine())
                         DiaryAudioLevelChart(samples: media.levelSamples)
-                        Text("ارتفاع الصوت لا يحدد المشاعر.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     }.accessibilityIdentifier("diary-audio-levels")
                 }
                 if !visibleTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -146,10 +142,8 @@ struct DiaryMediaCard: View {
             .sheet(item: $preview) { item in DiaryQuickLook(url: item.url).onDisappear { try? FileManager.default.removeItem(at: item.url.deletingLastPathComponent()) } }
             .onDisappear { if playback.activeID == media.id { playback.stop() }; voice?.cancelConversion(); voice?.cancelDownload() }
     }
-    /// «ثانية واحدة»، «ثانيتان»، «٥ ثوانٍ»، «٤٠ ثانيةً».
     private func seconds(_ n: Int) -> String {
-        let digits = AppDiaryService(app: app).digits
-        switch n { case 1: return "ثانية واحدة"; case 2: return "ثانيتان"; case 0, 3...10: return digits.string(n) + " ثوانٍ"; default: return digits.string(n) + (n % 100 >= 11 ? " ثانيةً" : " ثانية") }
+        DiaryDurationFormat.elapsed(n, digits: AppDiaryService(app: app).digits)
     }
     private var missingText: String {
         let digits = AppDiaryService(app: app).digits
@@ -174,7 +168,6 @@ struct DiaryMediaCard: View {
             do {
                 try await app.executeDiaryCommand("diary.setAudioInsights", payload: [
                     "mediaID": .string(media.id.uuidString), "title": .string(String(title.prefix(80))),
-                    "voiceTone": media.voiceTone.map(MadarCore.JSONValue.string) ?? .null,
                     "audioLevels": .array(media.levelSamples.map(MadarCore.JSONValue.number))
                 ])
                 savedTitle = String(title.prefix(80)); editingTitle = false

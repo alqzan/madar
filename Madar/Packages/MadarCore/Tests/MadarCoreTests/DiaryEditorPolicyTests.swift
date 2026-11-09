@@ -23,10 +23,12 @@ struct DiaryEditorPolicyTests {
         let id = UUID()
         let levels: [JSONValue] = [.number(0), .number(0.43), .number(1)]
         let audio: [String: JSONValue] = ["mediaID": .string(id.uuidString), "title": .string("لحظة هادئة"),
-            "voiceTone": .string("calm"), "audioLevels": .array(levels)]
+            "audioLevels": .array(levels)]
         #expect(DiaryEditorCommand.parse("diary.setAudioInsights", audio) != nil)
+        let legacyAudio = audio.merging(["voiceTone": .string("calm")]) { _, next in next }
+        #expect(DiaryEditorCommand.parse("diary.setAudioInsights", legacyAudio) != nil)
         #expect(DiaryEditorCommand.parse("diary.setAudioInsights", audio.merging(["audioLevels": .array([.number(1.2)])]) { _, next in next }) == nil)
-        #expect(DiaryEditorCommand.parse("diary.setAudioInsights", audio.merging(["voiceTone": .string("loud")]) { _, next in next }) == nil)
+        #expect(DiaryEditorCommand.parse("diary.setAudioInsights", legacyAudio.merging(["voiceTone": .string("loud")]) { _, next in next }) == nil)
         #expect(DiaryEditorCommand.parse("diary.setAudioInsights", audio.merging(["unexpected": .bool(true)]) { _, next in next }) == nil)
 
         let review: [String: JSONValue] = ["id": .string(id.uuidString), "period": .string("weekly"), "text": .string("تعلمت أن أبدأ بخطوة أصغر.")]
@@ -34,6 +36,18 @@ struct DiaryEditorPolicyTests {
         #expect(DiaryEditorCommand.parse("diary.setIntentionReview", review.merging(["period": .string("daily")]) { _, next in next }) == nil)
         #expect(DiaryEditorCommand.parse("diary.setIntentionReview", review.merging(["text": .string("  ")]) { _, next in next }) == nil)
         #expect(DiaryEditorCommand.parse("diary.setIntentionReview", review.merging(["text": .string(String(repeating: "ا", count: 2001))]) { _, next in next }) == nil)
+    }
+    @Test func elapsedVoiceDurationSwitchesFromSecondsToMinutesAndHours() {
+        #expect(DiaryDurationFormat.elapsed(0) == "٠ ثانية")
+        #expect(DiaryDurationFormat.elapsed(1) == "١ ثانية")
+        #expect(DiaryDurationFormat.elapsed(59) == "٥٩ ثانية")
+        #expect(DiaryDurationFormat.elapsed(60) == "١:٠٠")
+        #expect(DiaryDurationFormat.elapsed(125) == "٢:٠٥")
+        #expect(DiaryDurationFormat.elapsed(3599) == "٥٩:٥٩")
+        #expect(DiaryDurationFormat.elapsed(3600) == "١:٠٠:٠٠")
+        #expect(DiaryDurationFormat.elapsed(3661) == "١:٠١:٠١")
+        #expect(DiaryDurationFormat.elapsed(65, digits: .init(style: .western)) == "1:05")
+        #expect(DiaryDurationFormat.totalSeconds(3661) == "٣٦٦١ ثانية")
     }
     /// Owner, 24 Oct 2026: a photo may be linked to the Photos library by its identifier; audio may not, nor an empty one.
     @Test func appendMediaAcceptsALibraryLinkOnlyForPhotos() {

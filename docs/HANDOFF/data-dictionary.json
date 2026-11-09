@@ -2120,7 +2120,7 @@
       "mixed",
       "unclear"
      ],
-     "note": "Tentative tone inferred from the transcript text, not from volume or a clinical assessment."
+     "note": "Reserved compatibility field only; new builds do not infer, generate, or display voice emotion."
     },
     {
      "name": "audioLevelsJSON",
@@ -5985,8 +5985,8 @@
    },
    "diary.setAudioInsights": {
     "intent": null,
-    "payload": "{mediaID: UUID, title: String|null, voiceTone: calm|joyful|sad|concerned|grateful|hopeful|tired|mixed|unclear|null, audioLevels: [Double 0...1]}",
-    "kind": "edit derived metadata on an existing audio Media only; local title/tone and volume samples; receipt excludes original audio bytes",
+    "payload": "{mediaID: UUID, title: String|null, audioLevels: [Double 0...1]}",
+    "kind": "edit a local title and volume samples on existing audio Media; accept but ignore the legacy voiceTone key; receipt excludes original audio bytes",
     "auth": "app-only + diary unlocked"
    },
    "diary.setIntentionReview": {
