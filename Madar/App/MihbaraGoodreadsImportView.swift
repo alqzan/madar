@@ -168,7 +168,7 @@ struct MihbaraGoodreadsImportView: View {
                 MadarDateLabel(app.dateLabels(GregorianDay.containing(date, in: app.activePlace.timeZone)),
                                primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             } else if row.entry.exclusiveShelf == "read" {
-                Text(row.entry.dateReadText.isEmpty ? "بلا تاريخ قراءة؛ سيبقى التاريخ فارغًا" : "لم أتعرف على تاريخ القراءة؛ لن أضيف تاريخًا")
+                Text(row.entry.dateReadText.isEmpty ? "بلا تاريخ قراءة؛ سيبقى التاريخ فارغًا" : "تاريخ القراءة غير واضح، فيبقى بلا تاريخ")
                     .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }
             if let review = row.entry.review, !review.isEmpty {
