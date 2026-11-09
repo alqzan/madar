@@ -28,7 +28,7 @@ struct QuranFreeView: View {
             VStack(alignment: .leading, spacing: 14) {
                 QuranScreenHeader(title: "مراجعة حرة", close: close)
                 Text("تختار ما تسمّعه خارج الجدول").font(quranFont(13)).foregroundStyle(theme.secondaryInk)
-                Text("انقر من أين إلى أين، ويُحتسب في جدولك ما في صدرك وحده").font(quranFont(13))
+                Text("اختر البداية ثم النهاية؛ يدخل جدولك ما حفظته فقط").font(quranFont(13))
                 HStack(spacing: 4) {
                     ForEach([("last","آخر أوجه"),("surah","سورة"),("juz","الجزء"),("range","اختر نطاقًا")], id: \.0) { key, title in
                         Menu {
