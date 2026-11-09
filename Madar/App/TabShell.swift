@@ -273,117 +273,6 @@ private struct RoomAccessoryHider: ViewModifier {
     }
 }
 
-private struct GlassRoomShortcuts: View {
-    let tabs: [FoundationTab]
-    let persistentShortcutIDs: Set<String>
-    @Binding var selection: String
-    let session: AppSession
-    let ink: Color
-    let secondaryInk: Color
-    let prayerAccent: Color
-    @Environment(\.tabViewBottomAccessoryPlacement) private var placement
-
-    private var isInline: Bool { placement == .inline }
-    private var visibleTabs: [FoundationTab] {
-        if isInline { return tabs.filter { $0.id != selection } }
-        return tabs.filter { persistentShortcutIDs.contains($0.id) && $0.id != selection }
-    }
-
-    var body: some View {
-        Group {
-            if isInline {
-                HStack(spacing: 0) {
-                    ForEach(visibleTabs) { tab in
-                        shortcutButton(tab)
-                    }
-                }
-                .padding(.horizontal, 0)
-                .padding(.vertical, 3)
-            } else {
-                HStack(spacing: 2) {
-                    PrayerAccessoryStatus(session: session, ink: ink,
-                                          secondaryInk: secondaryInk, accent: prayerAccent)
-                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                    ForEach(visibleTabs) { tab in
-                        shortcutButton(tab)
-                    }
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-            }
-        }
-    }
-
-    private func shortcutButton(_ tab: FoundationTab) -> some View {
-        Button { selection = tab.id } label: {
-            roomIcon(tab)
-                .frame(width: 20, height: 20)
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.madarPlain)
-        .foregroundStyle(ink)
-        .accessibilityLabel(tab.title)
-        .accessibilityIdentifier("tab-\(tab.id)")
-        .accessibilityAddTraits(selection == tab.id ? .isSelected : [])
-    }
-
-    @ViewBuilder private func roomIcon(_ tab: FoundationTab) -> some View {
-        if tab.symbol.hasPrefix("Madar") {
-            Image(tab.symbol + (selection == tab.id ? "Selected" : ""))
-                .resizable().scaledToFit()
-        } else {
-            Image(systemName: tab.symbol).font(.system(size: 20, weight: .regular))
-        }
-    }
-}
-
-/// The expanded glass accessory shows the next useful moment; when the native bar
-/// minimizes, the same surface becomes one-tap shortcuts to the other rooms.
-private struct PrayerAccessoryStatus: View {
-    let session: AppSession
-    let ink: Color
-    let secondaryInk: Color
-    let accent: Color
-    /// The whole prayer history is recomputed to find the next prayer, so it is done once per minute and per
-    /// committed prayer write, not on every parent redraw.
-    private final class Cache { var key: [Int] = []; var model: BahwPrayerModel? }
-    @State private var cache = Cache()
-
-    var body: some View {
-        TimelineView(.everyMinute) { timeline in
-            let instant = session.prayerNow(timeline.date)
-            let key = [Int(instant.timeIntervalSince1970 / 60), session.prayerRevision]
-            let prayer: BahwPrayerModel? = {
-                if cache.key != key { cache.model = AppBahwService(session: session, evaluationDate: instant).prayer(); cache.key = key }
-                return cache.model
-            }()
-            HStack(spacing: 8) {
-                MadarGlyph("MadarPrayer", size: 20).foregroundStyle(accent)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("الصلاة القادمة").font(MadarTypography.caption()).foregroundStyle(secondaryInk)
-                    Text(prayer.flatMap { model in model.nextName.map { $0 + " " + (model.nextTime ?? "") } } ?? "المواقيت غير متاحة")
-                        .font(MadarTypography.caption())
-                        .foregroundStyle(ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                    }
-            }
-            .padding(.leading, 12)
-            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(accessibilitySummary(prayer))
-            .accessibilityIdentifier("tab-accessory-next-prayer")
-        }
-    }
-
-    private func accessibilitySummary(_ prayer: BahwPrayerModel?) -> String {
-        guard let prayer, let name = prayer.nextName else { return "مواقيت الصلاة غير متاحة" }
-        return ["الصلاة القادمة", name, prayer.nextTime]
-            .compactMap { $0 }.joined(separator: "، ")
-    }
-}
-
 /// One room's navigation root. Its only inputs are the session (a stable reference) and the tab, so when the app root redraws after a
 /// write the rooms kept alive behind the one on screen are not rebuilt with it; each redraws only for what it reads itself.
 struct MadarRoomRoot: View {
@@ -590,12 +479,6 @@ private struct AnchoredUndo: View {
 }
 
 
-/// Owner, 6 Nov 2026: «الجلاس ابدا مهب موجود». A room's scroll view was clipped to its frame, so nothing ever passed under the
-/// bottom Liquid Glass bar and the glass read as a flat capsule. This clip keeps scrolling ink out of the status bar only; below,
-/// the content runs on under the glass bar (and any floating glass button) for the glass to refract.
-struct MadarTopClip: Shape {
-    func path(in rect: CGRect) -> Path { Path(CGRect(x: rect.minX - 400, y: rect.minY, width: rect.width + 800, height: rect.height + 2000)) }
-}
 extension View {
     /// Owner, 6 Nov 2026: «مشطوف». The hard cut under the clock is gone: the system's soft scroll edge fades the ink out under the status bar.
     func madarTopClipped() -> some View { scrollEdgeEffectStyle(.soft, for: .top) }

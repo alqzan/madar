@@ -340,17 +340,6 @@ struct PrayerStatisticsView: View {
         }
     }
 
-    private func dayView(_ day: PrayerDaySummary) -> some View {
-        List {
-            Section { MadarDateLabel(dateTitle(day.day)) }
-            ForEach(day.cells) { cell in
-                if cell.canLog && (cell.time == nil || cell.status != .future) {
-                    Button { select(cell) } label: { Text(prayerTitle(cell.reference.prayer) + "، " + statusTitle(cell.status)).frame(minHeight: 44) }
-                        .accessibilityIdentifier("prayer-history-log-\(cell.reference.prayer.rawValue)")
-                } else { Text(prayerTitle(cell.reference.prayer) + "، " + statusTitle(cell.status)).frame(minHeight: 44) }
-            }
-        }.navigationTitle("سجلّ اليوم").navigationBarTitleDisplayMode(.inline)
-    }
     private func hijri(_ day: GregorianDay) -> HijriDate {
         HijriCalendar.date(for: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600), timeZone: session.activePlace.timeZone,
             source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(session.number("core.hijriOffset")))

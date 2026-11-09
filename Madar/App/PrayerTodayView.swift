@@ -586,11 +586,6 @@ struct PrayerTodayView: View {
         }
     }
 
-    /// «الأربعاء ٢٦ ربيع الآخر ١٤٤٨، ٧ أكتوبر». RU1: «،» separates the two dates, never «·».
-    private func headerDate(_ day: GregorianDay) -> String {
-        session.dateLabels(day).combined
-    }
-
     /// Friday greeting. The Quran room has no entry point yet, so the pill carries no link and no Al-Kahf pointer.
     /// §7.2 «سطر الكهف (يقود إلى القرآن)»: now that the Quran room is built, the pill opens the mushaf where Al-Kahf begins (page 293).
     private var fridayPill: some View {
@@ -805,30 +800,6 @@ struct PrayerTodayView: View {
         .accessibilityLabel("سلاسلك: " + summary)
         .accessibilityHint("افتح تفاصيل السلاسل")
         .accessibilityIdentifier("prayer-streaks")
-    }
-
-    private func qiyamCard(_ snapshot: PrayerSnapshot) -> some View {
-        let night = snapshot.nights.first { $0.night == snapshot.nightDefault }
-        let summary = night.map { PrayerCopy.rakaat($0.rakaat, digits: digits) + ($0.witr ? "، أوترتُ" : "") } ?? "لم تُسجَّل ليلتك"
-        return Button { selectedSheet = .qiyam } label: {
-            PrayerPaperCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("قيام الليل").font(PrayerHomeType.cardHead)
-                        Spacer(minLength: 8)
-                        Text(summary).font(PrayerHomeType.strong).foregroundStyle(theme.accent)
-                            .accessibilityIdentifier("prayer-qiyam-summary")
-                    }
-                    if !dynamicType.isAccessibilitySize {
-                        PrayerNightFootprint(nights: snapshot.nights, last: snapshot.nightDefault)
-                    }
-                    Text("آخر ثلاثين ليلة")
-                        .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
-                }
-            }
-        }
-        .buttonStyle(.madarPlain)
-        .accessibilityIdentifier("prayer-qiyam")
     }
 
     // MARK: Formatting

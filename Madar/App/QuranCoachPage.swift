@@ -123,47 +123,6 @@ private struct QuranPageNumberOval: View {
     }
 }
 
-/// The printed mushaf's page border: two gold rules with a band of small green and gold lozenges between them.
-private struct QuranMushafFrame: View {
-    let gold: Color, green: Color
-    var body: some View {
-        Canvas { context, size in
-            let outer = CGRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1), band: CGFloat = 9
-            let inner = outer.insetBy(dx: band, dy: band)
-            context.stroke(Path(outer), with: .color(gold), lineWidth: 1.4)
-            context.stroke(Path(inner), with: .color(gold), lineWidth: 1)
-            context.stroke(Path(inner.insetBy(dx: -2.5, dy: -2.5)), with: .color(green.opacity(0.55)), lineWidth: 0.6)
-            func lozenge(_ c: CGPoint, _ r: CGFloat) -> Path {
-                Path { p in
-                    p.move(to: CGPoint(x: c.x, y: c.y - r)); p.addLine(to: CGPoint(x: c.x + r, y: c.y));
-                    p.addLine(to: CGPoint(x: c.x, y: c.y + r)); p.addLine(to: CGPoint(x: c.x - r, y: c.y));
-                    p.closeSubpath()
-                }
-            }
-            let mid = band / 2 + 1, step: CGFloat = 11
-            var index = 0
-            func bead(_ c: CGPoint) {
-                context.fill(lozenge(c, 2.6), with: .color(index % 2 == 0 ? green.opacity(0.8) : gold)); index += 1
-            }
-            var x = outer.minX + mid + step
-            while x < outer.maxX - mid - step / 2 {
-                bead(CGPoint(x: x, y: outer.minY + mid)); bead(CGPoint(x: x, y: outer.maxY - mid)); x += step
-            }
-            var y = outer.minY + mid + step
-            while y < outer.maxY - mid - step / 2 {
-                bead(CGPoint(x: outer.minX + mid, y: y)); bead(CGPoint(x: outer.maxX - mid, y: y)); y += step
-            }
-            for corner in [
-                CGPoint(x: outer.minX + mid, y: outer.minY + mid), CGPoint(x: outer.maxX - mid, y: outer.minY + mid),
-                CGPoint(x: outer.minX + mid, y: outer.maxY - mid), CGPoint(x: outer.maxX - mid, y: outer.maxY - mid),
-            ] {
-                context.fill(lozenge(corner, 4.2), with: .color(gold))
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
 private struct QuranCoachTextCanvas: UIViewRepresentable {
     let page: QuranUIPage
     let coach: QuranUICoach
@@ -397,32 +356,6 @@ private final class QuranCoachTextView: UIView {
             sealInk.setStroke()
             let frame = UIBezierPath(rect: box.insetBy(dx: 0.5, dy: 0.5)); frame.lineWidth = 0.7; frame.stroke()
         }
-    }
-
-    private func drawAyahSeal(_ number: String, center: CGPoint, diameter: CGFloat, context: CGContext) {
-        context.saveGState(); defer { context.restoreGState() }
-        let radius = diameter / 2, rosette = UIBezierPath()
-        for point in 0..<16 {
-            let angle = CGFloat(point) * .pi / 8 - .pi / 2
-            let r = radius * (point.isMultiple(of: 2) ? 1 : 0.78)
-            let p = CGPoint(x: center.x + cos(angle) * r, y: center.y + sin(angle) * r)
-            if point == 0 { rosette.move(to: p) } else { rosette.addLine(to: p) }
-        }
-        rosette.close(); gold.setFill(); sealInk.setStroke(); rosette.lineWidth = 0.65; rosette.fill(); rosette.stroke()
-        let ring = UIBezierPath(
-            ovalIn: CGRect(
-                x: center.x - radius * 0.72, y: center.y - radius * 0.72, width: radius * 1.44, height: radius * 1.44))
-        paper.setFill(); ring.lineWidth = 0.7; ring.fill(); ring.stroke()
-        for angle: CGFloat in [0, .pi / 2, .pi, .pi * 1.5] {
-            let dot = CGPoint(x: center.x + cos(angle) * radius * 0.85, y: center.y + sin(angle) * radius * 0.85)
-            sealInk.setFill();
-            UIBezierPath(ovalIn: CGRect(x: dot.x - 0.65, y: dot.y - 0.65, width: 1.3, height: 1.3)).fill()
-        }
-        let font = UIFont(name: "Amiri-Bold", size: max(11, diameter * 0.51)) ?? .systemFont(ofSize: 11)
-        let line = CTLineCreateWithAttributedString(
-            NSAttributedString(string: number, attributes: [.font: font, .foregroundColor: ink]))
-        let image = CTLineGetImageBounds(line, nil)
-        draw(line, at: CGPoint(x: center.x - image.midX, y: center.y + image.midY), context: context)
     }
 
     private func draw(_ line: CTLine, at point: CGPoint, context: CGContext) {

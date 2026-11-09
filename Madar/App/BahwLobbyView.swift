@@ -350,33 +350,6 @@ private struct BahwReturnPlanCard: View {
     }
 }
 
-private struct BahwOpened: Identifiable { let block: BahwBlock; var id: String { block.rawValue } }
-
-/// A tap opens a sheet with the room's summary and a button into the room (§7.1 «التفاعل»).
-struct BahwBlockSheet: View {
-    @Environment(\.colorScheme) private var colorScheme
-    @Bindable var session: AppSession
-    let block: BahwBlock
-    let open: () -> Void
-    @Environment(\.dismiss) private var dismiss
-    private var theme: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 18) {
-                    BahwBlockView(service: .init(session: session), block: block, size: .large).frame(height: 365)
-                    if block.tab != nil || block == .year || block == .upcoming {
-                        Button { open() } label: { Text(block.tab == nil ? "افتح السنة وما يهمّك" : "افتح " + block.title).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accentFill, in: .capsule) }
-                            .buttonStyle(.madarPlain).accessibilityIdentifier("bahw-open-" + (block.tab ?? "year"))
-                    }
-                }.padding(18)
-            }.background(theme.background).foregroundStyle(theme.ink)
-                .navigationTitle(block.title).navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تمّ") { dismiss() }.accessibilityIdentifier("bahw-sheet-done") } }
-        }.environment(\.roomTheme, theme).tint(theme.accent).presentationDetents([.medium, .large])
-    }
-}
-
 
 private struct BahwSuggestionsView: View {
     @Bindable var session: AppSession

@@ -188,9 +188,6 @@ struct CustomizeMadar: View {
         let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"] + RoomHomeLayout.rooms.map { $0.0 + ".layout" }).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
         return CustomizationCopy.changes(count: count, formattedCount: session.digits(count))
     }
-    private func valueLabel(_ key: String) -> String {
-        session.schema.settings.first(where: { $0.key == key })?.options.first(where: { $0.value == session.values[key] })?.label ?? ""
-    }
     private func previewLine(_ title: String, value: String) -> some View {
         Group {
             if dynamicType.isAccessibilitySize {
@@ -442,22 +439,6 @@ extension SettingOption {
 }
 extension AppSession {
     func digits(_ integer: Int) -> String { MadarNumberFormatter(style: string("core.numerals") == "western" ? .western : .hindi).string(integer) }
-}
-
-/// Later rooms reuse the same search, preview and settings controls without owning global values.
-struct CustomizeRoom<Preview: View>: View {
-    let title: String
-    let owner: String
-    @Bindable var session: AppSession
-    @ViewBuilder let preview: () -> Preview
-    var body: some View {
-        CustomizationTemplate(title: "خصّص \(title)", preview: preview) {
-            ForEach(session.schema.settings.filter { $0.owner == owner && AppSession.supportedKeys.contains($0.key) }, id: \.key) { definition in
-                MadarCard { SettingControl(definition: definition, session: session) }
-            }
-            Text("المظهر واليوم ومدينتك من خصّص مدار").font(MadarTypography.caption())
-        }
-    }
 }
 
 

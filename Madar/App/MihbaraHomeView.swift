@@ -22,7 +22,6 @@ struct MihbaraHomeView: View {
     @State private var tableID: UUID?
     @State private var sheet: MihbaraSheet?
     @State private var showingAddBook = false
-    @State private var sunnahDrawerOpen = false
     @State private var readerRoute: MihbaraReaderRoute?
     @State private var notebookRouteID: UUID?
     @State private var renaming: MihbaraBook?
@@ -70,17 +69,6 @@ struct MihbaraHomeView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.surface, in: .rect(cornerRadius: 18))
-    }
-    @ViewBuilder private func deskAndContinuation(_ reading: MihbaraHomeReading) -> some View {
-        VStack(spacing: 0) {
-            desk(reading)
-            if let book = lastReadBook(reading) {
-                let index = MihbaraBookCovers.leatherIndices(for: reading.books)[book.id] ?? 0
-                continueCard(book, leather: index)
-                    .padding(.horizontal, 8).padding(.bottom, 12)
-            }
-        }
-        .background(theme.color("wood"), in: .rect(topLeadingRadius: 26, bottomLeadingRadius: 12, bottomTrailingRadius: 12, topTrailingRadius: 26))
     }
     var body: some View {
         timelineContent
@@ -466,13 +454,6 @@ struct MihbaraHomeView: View {
             return
         }
         if case .opened = openBook(book) { app.mihbaraBookToOpen = nil }
-    }
-    private func showMotivation() {
-        guard let reading else { return }
-        do {
-            motivationCues = try service.motivationCues(for: reading, book: tableBook)
-            sheet = .motivation
-        } catch { app.errorMessage = madarUserMessage(error) }
     }
     private func performMotivation(_ cue: MihbaraMotivationCue) {
         if let number = cue.hadithNumber { sheet = .hadith(number); return }
@@ -1051,116 +1032,6 @@ struct MihbaraHomeView: View {
             if nearlyDone { finishedHint(b) }
         }
     }
-    private func sunnahDrawer(_ r: MihbaraHomeReading) -> some View {
-        let count = r.collection.hadiths.count
-        let nextHadith = r.todayHadiths.first ?? r.collection.hadiths.first
-        return VStack(spacing: 0) {
-            Button {
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { sunnahDrawerOpen.toggle() }
-            } label: {
-                HStack(spacing: 12) {
-                    Text("درج كتب السنّة، كتاب واحد")
-                        .font(MadarTypography.caption()).padding(.horizontal, 12).padding(.vertical, 9)
-                        .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).background(theme.color("goldUnderstand"), in: .rect(cornerRadius: 5))
-                    Spacer(minLength: 0)
-                    Capsule().fill(theme.color("goldUnderstand")).frame(width: 58, height: 10)
-                        .shadow(color: .black.opacity(0.2), radius: 2, y: 2)
-                    Spacer(minLength: 0)
-                    Text(sunnahDrawerOpen ? "أغلقه" : "اسحبه").font(MadarTypography.fine()).foregroundStyle(theme.color("onDesk")).padding(7).background(theme.color("desk"), in: .capsule)
-                }
-                .padding(12).frame(minHeight: 64)
-                .background(LinearGradient(colors: [theme.color("wood"), theme.color("desk")], startPoint: .top, endPoint: .bottom), in: .rect(cornerRadius: 9))
-                .overlay { RoundedRectangle(cornerRadius: 9).stroke(theme.color("onDesk").opacity(0.12), lineWidth: 1) }
-                .shadow(color: theme.ink.opacity(0.22), radius: 4, y: 4)
-            }.buttonStyle(.madarPlain)
-                .accessibilityIdentifier("mihbara-sunnah-drawer")
-                .accessibilityValue(sunnahDrawerOpen ? "مفتوح" : "مغلق")
-                .accessibilityHint("كتب السنّة وتقدمك فيها")
-            if sunnahDrawerOpen {
-                VStack(spacing: 14) {
-                    HStack(spacing: 12) {
-                        RoundedRectangle(cornerRadius: 4).fill(theme.color("sunnahLeather").gradient)
-                            .frame(width: 31, height: 53)
-                            .overlay(alignment: .leading) { Rectangle().fill(theme.color("goldUnderstand").opacity(0.45)).frame(width: 2).padding(.vertical, 7) }
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(r.collection.title).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline)).foregroundStyle(theme.color("onDesk"))
-                            Text(r.readCount == 0 ? "لم تبدأ الأربعين بعد" : "فهمت " + MihbaraCopy.hadithsObject(r.readCount, service.digits) + " من " + service.digits.string(count))
-                                .font(MadarTypography.fine()).foregroundStyle(theme.color("onDesk"))
-                        }
-                        Spacer(minLength: 0)
-                        Text("على المكتب").font(MadarTypography.fine()).padding(.horizontal, 9).padding(.vertical, 7)
-                            .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).background(theme.color("goldUnderstand"), in: .rect(cornerRadius: 7))
-                        if let nextHadith {
-                            Button { sheet = .hadith(nextHadith.number) } label: { Text(r.todayHadiths.isEmpty ? "اقرأ" : "الورد")
-                                .font(MadarTypography.caption()).frame(minWidth: 48, minHeight: 44)
-                                .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).background(theme.color("goldUnderstand"), in: .capsule).contentShape(Rectangle()) }
-                                .accessibilityIdentifier("mihbara-sunnah-drawer-read")
-                        }
-                    }.padding(8)
-                    Button { showingAddBook = true } label: {
-                        Label("أضف كتابًا من ملف", systemImage: "plus")
-                            .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 48)
-                            .foregroundStyle(theme.color("onDesk"))
-                            .overlay { RoundedRectangle(cornerRadius: 10).stroke(theme.color("onDesk").opacity(0.6), style: .init(lineWidth: 1, dash: [4, 3])) }
-                    }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-sunnah-drawer-add")
-                }.padding(12).background(theme.color("desk"), in: .rect(bottomLeadingRadius: 12, bottomTrailingRadius: 12))
-                    .padding(.horizontal, 8).transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-    }
-    /// OR-32, owner mockup A (26 Oct): the drawer gives way to «أكمل من حيث وقفت». The stand already continues the book
-    /// on it, so this card names the last book you opened that is not on the stand; with none, it stays away.
-    private func lastReadBook(_ r: MihbaraHomeReading) -> MihbaraBook? {
-        r.books.first { $0.id != tableBook?.id && $0.shelf == "reading" && hasSavedPosition($0) }
-    }
-    private func continueCard(_ b: MihbaraBook, leather: Int) -> some View {
-        let digits = service.digits
-        // AU-25: a book opened but not read yet is «لم تبدأه بعد», not «قرأت منه ٠٪».
-        let percent = MihbaraCopy.progressPercent(b.progress)
-        let read = (b.isReadableEPUB || b.isReadablePDF) ? MihbaraCopy.pagesRead(b) : b.page
-        let total = b.pages.flatMap { $0 > 0 ? $0 : nil }
-        let where_: String = {
-            if let read, let total { return "صفحة " + digits.string(read) + " من " + digits.string(total) }
-            if let read { return "صفحة " + digits.string(read) }
-            return "موضعك محفوظ"
-        }()
-        return HStack(alignment: .center, spacing: 16) {
-            MihbaraBookCover(book: b, shape: shapes[b.id], leather: leather, digits: digits)
-                .scaleEffect(0.78).frame(width: 96, height: 128)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 8) {
-                Text("أكمل من حيث وقفت").font(MadarTypography.fine()).foregroundStyle(theme.color("onDesk").opacity(0.85))
-                Text(MihbaraBookCovers.split(b.title).main)
-                    .font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .title3))
-                    .foregroundStyle(theme.color("onDesk")).lineLimit(2)
-                HStack(spacing: 8) {
-                    Text(where_).font(MadarTypography.caption())
-                    if let percent { Text(digits.string(percent) + "٪").font(MadarTypography.caption()).bold() }
-                }.foregroundStyle(theme.color("onDesk"))
-                if let p = b.progress {
-                    Capsule().fill(theme.color("onDesk").opacity(0.18)).frame(height: 5)
-                        .overlay(alignment: .leading) {
-                            GeometryReader { g in Capsule().fill(theme.color("goldUnderstand")).frame(width: max(5, g.size.width * p)) }
-                        }
-                        .accessibilityHidden(true)
-                }
-                Button { openBook(b) } label: {
-                    // A paper book opens its card, where its page is kept; a file opens at its place.
-                    Text(b.isReadableEPUB || b.isReadablePDF ? "أكمل القراءة" : "افتح الكتاب").font(MadarTypography.caption()).bold()
-                        .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink)
-                        .padding(.horizontal, 18).frame(minHeight: 44)
-                        .background(theme.color("goldUnderstand"), in: .capsule)
-                }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-continue-reading")
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(14)
-        .background(theme.color("desk"), in: .rect(cornerRadius: 16))
-        .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("onDesk").opacity(0.12), lineWidth: 1) }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("mihbara-continue-card")
-    }
     @State private var folded = false
     private func deskLabel(_ text: String, title: Bool = false) -> some View {
         Group {
@@ -1264,25 +1135,6 @@ struct MihbaraHomeView: View {
         .buttonStyle(.madarPlain)
         .contextMenu { bookMenu(b) }
         .accessibilityIdentifier("mihbara-library-book-" + b.id.uuidString)
-    }
-    private func libraryRow(_ b: MihbaraBook, matchingBookIDs: Set<UUID>) -> some View {
-                    Button { openBook(b) } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: b.isReadablePDF ? "doc.text" : b.isReadableEPUB ? "book" : "book.closed").font(.title3).foregroundStyle(theme.secondaryInk).frame(width: 28)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(b.title).font(MadarTypography.cardTitle())
-                                Text(b.author).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                                Text(libraryDetail(b)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                            }
-                            Spacer(minLength: 8)
-                            VStack(alignment: .trailing, spacing: 3) {
-                                Text(libraryShelfName(b.shelf)).font(MadarTypography.fine())
-                                if let p = MihbaraCopy.progressPercent(b.progress), b.shelf != "finished" { Text(service.digits.string(p) + "٪").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
-                            }
-                        }.padding(16).background(theme.surface, in: .rect(cornerRadius: 14))
-                    }.buttonStyle(.madarPlain).opacity(matchingBookIDs.contains(b.id) ? 1 : 0.3)
-                        .contextMenu { bookMenu(b) }
-                        .accessibilityIdentifier("mihbara-library-book-" + b.id.uuidString)
     }
 
     private func foldedForSearch(_ text: String) -> String {
@@ -1564,55 +1416,6 @@ private struct MihbaraRahlOpeningView: View {
             ToolbarItem(placement: .principal) { Text("فتح الرَّحل").font(MadarTypography.section()) }
             ToolbarItem(placement: .topBarTrailing) { Button("تمّ") { dismiss() }.accessibilityIdentifier("mihbara-rahlOpens-close") }
         }
-    }
-}
-
-private struct MihbaraOldBooksCabinet: View {
-    let books: [MihbaraBook]
-    let theme: RoomTheme
-    var shapes: [UUID: MihbaraBookShape] = [:]
-    var digits: MadarNumberFormatter = .init()
-    let openBook: (UUID) -> Void
-    private var leathers: [UUID: Int] { MihbaraBookCovers.leatherIndices(for: books) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("خزانة «قديمًا»").font(MadarTypography.cardTitle())
-                Spacer()
-                HStack(spacing: 5) {
-                    Circle().fill(theme.color("onDesk").opacity(0.55)).frame(width: 3, height: 3)
-                    Circle().fill(theme.color("onDesk").opacity(0.35)).frame(width: 3, height: 3)
-                    Circle().fill(theme.color("onDesk").opacity(0.45)).frame(width: 3, height: 3)
-                }.accessibilityHidden(true)
-            }
-            if books.isEmpty {
-                Text("كتب أنهيتها منذ زمن تستقر هنا حين تستورد قراءاتك القديمة.")
-                    .font(MadarTypography.caption())
-                    .foregroundStyle(theme.color("onDesk"))
-                    .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
-            } else {
-                ScrollView(.horizontal) {
-                    HStack(alignment: .bottom, spacing: 10) {
-                        ForEach(books) { book in
-                            Button { openBook(book.id) } label: {
-                                // The cabinet is desk-dark, so a desk-coloured leather would vanish; it takes the next one.
-                                let index = leathers[book.id] ?? 0
-                                MihbaraBookSpine(book: book, shape: shapes[book.id], leather: index == 3 ? 4 : index, digits: digits)
-                            }
-                            .buttonStyle(.madarPlain)
-                            .accessibilityLabel("افتح كتابًا قديمًا: " + book.title)
-                            .accessibilityHint("خيارات العودة إلى القراءة أو إلى رف أبي أقرأها")
-                            .accessibilityIdentifier("mihbara-old-book-" + book.id.uuidString)
-                        }
-                    }.padding(.horizontal, 6).padding(.top, 10)
-                }.scrollIndicators(.hidden)
-                MihbaraShelfPlank().padding(.top, -12)
-            }
-        }
-        .padding(14)
-        .background(theme.color("desk"), in: .rect(cornerRadius: 16))
-        .foregroundStyle(theme.color("onDesk"))
     }
 }
 

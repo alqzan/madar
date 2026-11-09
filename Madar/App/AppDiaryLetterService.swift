@@ -122,8 +122,6 @@ extension AppDiaryService {
     func rescheduleLetter(_ id: UUID, to date: Date) async throws {
         try await command("diary.rescheduleLetter", ["id": .string(id.uuidString), "dayKey": .string(GregorianDay.containing(date, in: app.activePlace.timeZone).description)])
     }
-    /// Sealed letters written on this day: shown on the page as a blurred line, never their text.
-    func sealedLetters(writtenOn day: GregorianDay) throws -> Int { try letters().filter { $0.writtenDay == day && $0.state != .opened }.count }
 
     func projects() throws -> [DiaryProjectCard] {
         try authorizeRead()
@@ -151,18 +149,5 @@ extension AppDiaryService {
     func deleteProject(_ id: UUID) async throws { try await command("diary.deleteProject", ["id": .string(id.uuidString)]) }
     func link(_ entry: String, to project: UUID?) async throws {
         try await command("diary.linkEntry", ["entryID": .string(entry), "projectID": project.map { .string($0.uuidString) } ?? .null])
-    }
-    /// Line id → linked project name, and per-line suggestions, for the day page.
-    func projectNotes(_ day: GregorianDay) throws -> (links: [String: String], suggestions: [String: DiaryProjectCard]) {
-        try authorizeRead()
-        let key = day.description, context = ModelContext(app.container)
-        let projects = try projects(), names = Dictionary(uniqueKeysWithValues: projects.map { ($0.id, $0.name) })
-        let rows = Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil })))
-        var links: [String: String] = [:], suggestions: [String: DiaryProjectCard] = [:]
-        for row in rows {
-            if let id = row.projectID, let name = names[id] { links[row.id.uuidString] = name }
-            else if row.projectID == nil, let match = projects.first(where: { $0.finishedAt == nil && $0.keyword.map { DiaryProjectKeyword.mentions(row.text, keyword: $0) } == true }) { suggestions[row.id.uuidString] = match }
-        }
-        return (links, suggestions)
     }
 }

@@ -127,22 +127,6 @@ extension AppSession {
         return true
     }
 
-    /// CaptureIntent requires device authentication; whole-app protection is still checked here
-    /// before the private note is written through Mihbara's owning command and undo receipt.
-    private func saveMihbaraIdeaFromIntent(text: String, id: UUID) async -> Bool {
-        open(URL(string:"madar://mihbara")!)
-        guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { return false }
-        do {
-            try await executeBookCommand("notebook.savePrivate", payload:["id":.string(id.uuidString),"text":.string(text)], id:id)
-            clearRecoveredMaintenanceError()
-            return true
-        } catch BackupOperationError.busy { return false }
-        catch {
-            errorMessage = "لم تُحفظ الفكرة في دفتر المحبرة. أعد المحاولة."
-            return true
-        }
-    }
-
     /// The prayer day comes from the same snapshot as the prayer home (Fajr to the next Fajr).
     /// Friday Dhuhr said as «الظهر» is recorded as Dhuhr, never silently as Jumu'ah.
     private func logPrayerFromCapture(_ prayer: Prayer, status: String, shortened: Bool?, fridayKind: FridayPrayerKind?) -> Bool {

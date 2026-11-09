@@ -85,7 +85,6 @@ public struct GoodreadsPreview: Equatable, Sendable {
     public var createCount: Int { rows.filter { $0.targetBookID == nil }.count }
     public var updateCount: Int { rows.count - createCount }
     public var suggestionCount: Int { rows.filter { !$0.suggestions.isEmpty && $0.targetBookID == nil }.count }
-    public var readingCount: Int { rows.filter { $0.targetShelf == "reading" }.count }
 }
 
 public enum GoodreadsCSV {

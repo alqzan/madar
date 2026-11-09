@@ -1056,16 +1056,6 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             return (target, amount)
         }
     }
-    private static func allocationTarget(_ row: Allocation) -> AllocationTarget? {
-        switch row.target {
-        case "daily": .daily
-        case "reserve": .reserve
-        case "surplus": .surplus
-        case "envelope": row.targetID.map { .envelope($0.uuidString) }
-        case "goal": row.targetID.map { .goal($0.uuidString) }
-        default: nil
-        }
-    }
     static func writeAllocations(_ rows: [AllocationRow], context: ModelContext, now: Date, writer: String) throws {
         let stored = try context.fetch(FetchDescriptor<Allocation>())
         for value in rows {

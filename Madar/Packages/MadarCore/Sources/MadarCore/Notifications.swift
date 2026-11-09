@@ -225,9 +225,6 @@ public enum NotificationArbiter {
         let start = boundary == .fajr ? day.fajr : day.maghrib
         return (instant < start ? civil.adding(days: -1) : civil).description
     }
-    public static func deferOutsideWindows(_ instant: Date, windows: [SanctityWindow]) -> Date {
-        SanctityGuard(windows: windows).clamp(instant)
-    }
     private static func isQuiet(_ date: Date, timeZone: TimeZone, policy: NotificationPolicy, prayerDays: [PrayerDay]) -> Bool {
         guard let from = policy.quietFromMinutes else { return false }
         return quietWindowContains(date, timeZone: timeZone, fromMinutes: from, until: policy.quietUntil, prayerDays: prayerDays)

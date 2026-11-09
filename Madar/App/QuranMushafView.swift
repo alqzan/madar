@@ -145,27 +145,3 @@ struct QuranMushafView: View {
         facing = loaded
     }
 }
-
-private struct QuranAyahReaderSheet: View {
-    let page: QuranUIPage
-    let close: () -> Void
-    @Environment(\.roomTheme) private var theme
-    @State private var position = 0
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                HStack { Text("آية آية").font(MadarTypography.cardTitle()); Spacer(); Button("تمّ", action: close).frame(minHeight: 44) }
-                if page.semanticAyat.indices.contains(position) {
-                    let ayah = page.semanticAyat[position]
-                    Text(ayah.title).font(MadarTypography.section())
-                    Text(ayah.text).font(.custom("Amiri-Regular", size: 28, relativeTo: .title2)).lineSpacing(10).accessibilityIdentifier("quran-mushaf-semantic-ayah")
-                    HStack {
-                        Button("السابقة") { position -= 1 }.disabled(position == 0)
-                        Spacer()
-                        Button("التالية") { position += 1 }.disabled(position == page.semanticAyat.count - 1)
-                    }.frame(minHeight: 44)
-                }
-            }.padding(24)
-        }.foregroundStyle(theme.ink).background(theme.surface).presentationDetents([.large]).presentationDragIndicator(.visible)
-    }
-}

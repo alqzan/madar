@@ -291,9 +291,6 @@ struct PrayerCustomizeView: View {
     // MARK: Tracking start (P04)
 
     private var numeralLocale: Locale { Locale(identifier: session.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab") }
-    private func dateWords(_ day: GregorianDay) -> String {
-        session.dateLabels(day).combined
-    }
 
     @ViewBuilder private var trackingStartBlock: some View {
         if let tracking = try? session.prayerSnapshot(at: session.prayerNow()).tracking {

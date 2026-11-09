@@ -217,11 +217,6 @@ public final class SettingsStore {
         for (key,value) in values.sorted(by: { $0.key < $1.key }) where inverse[key] != value { try prepare(value,for:key,now:now,validateDependencies:false) }
         return inverse
     }
-    @discardableResult public func resetMany(keys: [String], now: Date = Date()) throws -> SettingsUndoToken {
-        var values: [String:JSONValue] = [:]
-        for key in keys { values[key] = try schema.definition(for:key).defaultValue }
-        return try perform(changes:values,name:"ResetSettings",window:600,now:now)
-    }
     @discardableResult public func set(_ value: JSONValue, for key: String, now: Date = Date()) throws -> SettingsUndoToken { try perform(changes:[key:value],name:"SetSetting",window:600,now:now) }
     @discardableResult public func reset(_ key: String, now: Date = Date()) throws -> SettingsUndoToken { try set(schema.definition(for:key).defaultValue,for:key,now:now) }
     @discardableResult public func applyPreset(settings: [String:JSONValue], layouts: [String:JSONValue] = [:], now: Date = Date()) throws -> SettingsUndoToken {

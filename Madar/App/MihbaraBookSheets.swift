@@ -18,10 +18,6 @@ enum MihbaraCopy {
     static func hadiths(_ count: Int, _ digits: MadarNumberFormatter) -> String {
         arabicCount(count, ["حديث واحد", "حديثان", "أحاديث", "حديثًا"], digits)
     }
-    /// The same noun as an object: «فهمت حديثًا واحدًا / حديثين / ٣ أحاديث / ١٢ حديثًا».
-    static func hadithsObject(_ count: Int, _ digits: MadarNumberFormatter) -> String {
-        arabicCount(count, ["حديثًا واحدًا", "حديثين", "أحاديث", "حديثًا"], digits)
-    }
     static func years(_ count: Int, _ digits: MadarNumberFormatter) -> String {
         arabicCount(count, ["سنة واحدة", "سنتين", "سنوات", "سنة"], digits)
     }
@@ -454,47 +450,6 @@ private struct MihbaraRecentImportRow: View {
     }
 }
 
-struct MihbaraPaperEditor: View {
-    let app: AppSession
-    let readingBooks: [MihbaraBook]
-    let onSaved: () -> Void
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.roomTheme) private var theme
-    @State private var title = ""
-    @State private var author = ""
-    @State private var pages = ""
-    @State private var shelf = "reading"
-    @State private var saving = false
-    @State private var identity = UUID()
-    @State private var choosingSlot = false
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack { Text("كتاب ورقي").font(MadarTypography.title()); Spacer(); Button("إلغاء") { dismiss() } }
-                Text("كتابك على رفّ «أقرؤها الآن»، وموضعك في مدار.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                field("العنوان", text: $title, id: "mihbara-paper-title")
-                field("المؤلف", text: $author, id: "mihbara-paper-author")
-                field("عدد الصفحات، إن عرفته", text: $pages, id: "mihbara-paper-pages").keyboardType(.numberPad)
-                Text("يمكنك ترك الصفحات فارغة حتى تتأكد من طبعتك.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                Picker("ضعه على رف", selection: $shelf) { Text("أقرؤه الآن").tag("reading"); Text("أبي أقرأه").tag("want"); Text("أنهيته").tag("finished") }.pickerStyle(.menu).font(MadarTypography.section())
-                Button { save() } label: { Text(saving ? "يُحفظ…" : "ضعه على الرف") }.buttonStyle(MadarPrimaryButton()).disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("mihbara-paper-save")
-            }.padding(22)
-        }.scrollDismissesKeyboard(.interactively).background(theme.background).foregroundStyle(theme.ink)
-        .confirmationDialog("رف «أقرأها» ممتلئ: اختر كتابًا يرجع إلى «أبي أقرأها»", isPresented: $choosingSlot, titleVisibility: .visible) { ForEach(readingBooks) { old in Button(old.title) { save(replacing: old.id) } } }
-        .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } } }
-    }
-    private func field(_ label: String, text: Binding<String>, id: String) -> some View { VStack(alignment: .leading, spacing: 7) { Text(label).font(MadarTypography.caption()); TextField(label, text: text).font(MadarTypography.body()).padding(15).background(theme.surface, in: .rect(cornerRadius: 12)).overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.line) }.accessibilityIdentifier(id) } }
-    private func save(replacing: UUID? = nil) {
-        if shelf == "reading", readingBooks.count >= 3, replacing == nil { choosingSlot = true; return }
-        var p: [String:MadarCore.JSONValue] = ["id":.string(identity.uuidString),"title":.string(title),"author":.string(author),"shelf":.string(shelf)]
-        if !pages.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            guard let n = mihbaraInteger(pages), n > 0 else { app.errorMessage = "اكتب عدد صفحات صحيحًا"; return }; p["pages"] = .number(Double(n))
-        }
-        if let replacing { p["replacing"] = .string(replacing.uuidString) }
-        saving = true
-        Task { do { try await app.executeBookCommand("book.savePaper", payload: p); onSaved() } catch { app.errorMessage = madarUserMessage(error) }; saving = false }
-    }
-}
 struct MihbaraBookCard: View {
     let app: AppSession
     let book: MihbaraBook

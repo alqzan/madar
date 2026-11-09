@@ -7,7 +7,6 @@ import MadarCommands
 
 extension HabitFrequency {
     var arabic: String { switch self { case .daily: "يومية"; case .interval: "كل عدة أيام"; case .weekly: "أسبوعية"; case .monthly: "شهرية"; case .yearly: "سنوية" } }
-    var periodArabic: String { switch self { case .daily: "أيام"; case .interval: "مُدد"; case .weekly: "أسابيع"; case .monthly: "أشهر"; case .yearly: "سنوات" } }
 }
 extension HabitReading {
     /// What was missed in the habit's own unit (audit 28 Oct: «فاتتك فترة» meant nothing for a daily habit):

@@ -168,37 +168,6 @@ struct RoomIntroSheet: View {
     }
 }
 
-/// The lobby card that adds the next room.
-struct AddRoomCard: View {
-    @Bindable var session: AppSession
-    let blocks: [BahwBlock]
-    let theme: RoomTheme
-    /// The rooms the owner uses every day come first.
-    private var ordered: [BahwBlock] {
-        let order: [BahwBlock] = [.quran, .habits, .notes, .mal, .mihbara, .year, .upcoming]
-        return blocks.sorted { (order.firstIndex(of: $0) ?? 99) < (order.firstIndex(of: $1) ?? 99) }
-    }
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("أضف قسمًا").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
-            ForEach(Array(ordered.prefix(2)), id: \.self) { block in
-                Button { session.enableRoom(block); session.requestOpen(block) } label: {
-                    HStack(spacing: 12) {
-                        MadarGlyph(block.symbol, size: 26).foregroundStyle(theme.accent)
-                        Text(block.title).font(MadarTypography.body().bold())
-                        Spacer(minLength: 8)
-                        Image(systemName: "plus.circle").font(.title3).foregroundStyle(theme.accent)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).contentShape(Rectangle())
-                }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-add-" + block.rawValue)
-                if block != ordered.prefix(2).last { Divider().overlay(theme.line) }
-            }
-        }
-        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line) }
-    }
-}
-
 extension BahwBlock {
     var themeRoom: String {
         switch self { case .salah: "salah"; case .quran: "quran"; case .mal: "mal"; case .notes: "notes"; case .mihbara: "mihbara"; default: "bahw" }

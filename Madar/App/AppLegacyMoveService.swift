@@ -16,7 +16,6 @@ struct LegacyMoveRoom: Identifiable, Hashable, Codable {
 struct LegacyMovePreview: Identifiable {
     let id = UUID()
     let fileName: String, data: Data, rooms: [LegacyMoveRoom]
-    var hasContent: Bool { rooms.contains { !$0.isEmpty } }
 }
 /// The result per room after a move: what was added, what the owner already had, and what could not move.
 struct LegacyMoveOutcome: Identifiable, Hashable, Codable {

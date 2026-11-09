@@ -1,7 +1,5 @@
 /// Offsets and the salary close (§7.5 rules, L02, L13, L14, `mal.autoOffset`, `mal.surplusCap`, `mal.salaryRemainder`).
 public enum OffsetEngine {
-    /// §15 #24: the agreed default is 3 dailies; the owner can configure the per-cycle cap.
-    public static let capPerCycleInDailies = 3
 
     public enum Shortfall: Equatable, Sendable {
         case disabled
