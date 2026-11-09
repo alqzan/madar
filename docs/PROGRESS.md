@@ -4,7 +4,7 @@ The owner requests a full cleanup: reconcile AGENTS/CLAUDE/PROGRESS first, then 
 
 ## Verified baseline and delivery
 
-- M0–M6 software is integrated on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (19)**, source `07a841e2` (iPad layout + simplification sweep); previous 0.1.0 (15) diary-search `e0578d9d`; Xcode 27.2 Release archive and `xcodebuild -exportArchive` internal-only upload succeeded. Upload log confirms Apple processing **started**, not completed. Installation on the owner's iPhone has not been checked. Builds 13–14 remain historical evidence.
+- M0–M6 software is integrated on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (20)**, source `a17c9a8a` (iPad two-column rooms); previous 0.1.0 (15) diary-search `e0578d9d`; Xcode 27.2 Release archive and `xcodebuild -exportArchive` internal-only upload succeeded. Upload log confirms Apple processing **started**, not completed. Installation on the owner's iPhone has not been checked. Builds 13–14 remain historical evidence.
 - Build 15 adds the diary-search usability batch: five affected UI cases passed (4 search + 1 routed query); app/widget versions and archive signature verified. Artifacts: `Madar/Artifacts/Madar-0.1.0-15.xcarchive`, `OWNER-TestFlight-15-archive.log`, `OWNER-TestFlight-15-upload.log`. Source changes are committed; owner visual/device acceptance remains separate.
 - Previous build 14 includes `18472ddd` copy/wrapping changes and this cleanup batch; its Release build/archive succeeded. The 17 focused cases below cover this batch; they are not a claim of every-screen acceptance.
 - Host checked 8 Nov: installed **Xcode 27.2 (27B52)**; approved **iOS 27.0** runtime and sole simulator `390840AD-4FF0-476F-8E1D-E0C521A58E45` are available. No project setting pins Xcode 27.1; the old wait for that patch is superseded. Check actual build/signing errors rather than assuming incompatibility.
@@ -146,6 +146,7 @@ Historical pre-first-TestFlight queue. The first upload has happened; the old fr
 | TF-17 | ما بعد النفضة (٨–٩ نوفمبر) | أُرشف 0.1.0 (17) من تصدير نظيف لـ`4a45fff2` (دون ملفات كوديكس غير الملتزمة): «ARCHIVE SUCCEEDED» ثم «Upload succeeded» و«EXPORT SUCCEEDED». معالجة Apple وقبول المالك على جهازه لم يُتحقق منهما. دفعات تبسيط ٩ نوفمبر (`e0e01aa9` وما بعده) ليست في هذه النسخة. |
 | TF-18 | جولة التبسيط (٩ نوفمبر) | أُرشف 0.1.0 (18) من تصدير نظيف لـ`8514c4db` (دون ملفات كوديكس): «Upload succeeded» و«EXPORT SUCCEEDED». يحوي دفعات النصوص ١–٩. معالجة Apple وقبول المالك لم يُتحقق منهما. |
 | TF-19 | الآيباد + التبسيط ١٠–١١ (٩ نوفمبر) | أُرشف 0.1.0 (19) من تصدير نظيف لـ`07a841e2` (دون ملفات كوديكس): «ARCHIVE SUCCEEDED» و«Upload succeeded» و«EXPORT SUCCEEDED». معالجة Apple وقبول المالك لم يُتحقق منهما. |
+| TF-20 | الآيباد: الغرف عمودان، PDF كتاب مفتوح، الإعدادات (٩ نوفمبر) | أُرشف 0.1.0 (20) من تصدير نظيف لـ`a17c9a8a`: «ARCHIVE SUCCEEDED» و«Upload succeeded» و«EXPORT SUCCEEDED». معالجة Apple وقبول المالك لم يُتحقق منهما. |
 
 ## Owner follow-up — 1 Nov 2026
 
