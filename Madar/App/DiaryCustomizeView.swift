@@ -99,7 +99,7 @@ struct DiaryCustomizeView: View {
                     Text("لا إعداد بهذا الاسم. جرّب كلمة أقصر.").font(MadarTypography.body()).padding(16)
                 }
                 if matches("النقل استيراد داي ون تصدير كتاب السنة") { transferCard }
-                Text("بداية اليوم والمظهر والتقويم العام من «خصّص مدار». إخفاء الذكرى أو تغيير الشكل لا يغيّر كتابتك.")
+                Text("بداية اليوم والتقويم من «خصّص مدار». تغيير الشكل لا يمسّ كتابتك.")
                     .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 12)
             }.padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background).foregroundStyle(theme.ink).toolbarVisibility(.hidden, for: .navigationBar)

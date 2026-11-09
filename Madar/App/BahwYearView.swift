@@ -430,7 +430,7 @@ struct BahwDaySheet: View {
                             .accessibilityIdentifier("bahw-day-count-up")
                     }
                     if let next = previewOccurrence { MadarDateLabel(session.dateLabels(next)).accessibilityIdentifier("bahw-day-date-preview") }
-                    Text("يُحسب الموعد من القاعدة كل مرة، وإن لم يكن في الشهر هذا اليوم فآخر يوم فيه.").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
+                    Text("إذا كان الشهر أقصر، يأتي الموعد في آخر يوم منه.").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(lobby.ink) }
                     Button { save() } label: {
                         Text("احفظ").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(lobby.onAccent).background(lobby.accentFill, in: .capsule)

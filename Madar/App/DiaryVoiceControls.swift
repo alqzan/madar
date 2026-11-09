@@ -16,7 +16,7 @@ struct DiaryVoiceControls: View {
         .alert("يُرسل الصوت إلى Apple للتحويل", isPresented: $controller.needsConsent) {
             Button("موافق") { Task { await controller.consent(true) } }
             Button("لا، سجّل فقط", role: .cancel) { Task { await controller.consent(false) } }
-        } message: { Text("التحويل على الجهاز غير متاح لهذه اللغة الآن. يمكنك إبقاء الصوت والكتابة دون إرساله. موافقتك لهذا الجهاز، ويمكن إلغاؤها من خصّص المذكرات.") }
+        } message: { Text("تحويل الصوت إلى نص غير متاح لهذه اللغة على جهازك. يبقى الصوت محفوظًا وتكتب بيدك، وتلغي موافقتك من خصّص المذكرات.") }
     }
     private var options: some View {
         VStack(alignment: .leading, spacing: 8) {

@@ -74,7 +74,7 @@ struct HabitEditorView:View {
                     }
                     section("التكرار") {
                         Picker("تكرار العادة",selection:Binding(get:{rule.frequency},set:{rule.frequency=$0;rule.intervalDays = $0 == .interval ? (rule.intervalDays ?? 3) : nil})) { Text("يومية").tag(HabitFrequency.daily);Text("كل عدد من الأيام").tag(HabitFrequency.interval);Text("أسبوعية").tag(HabitFrequency.weekly);Text("شهرية").tag(HabitFrequency.monthly);Text("سنوية").tag(HabitFrequency.yearly) }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-frequency")
-                        if reading != nil { Text("تغيير التكرار يبدأ سلسلة جديدة؛ السجل يبقى. بقية التغييرات لا تمسّ الفترات الماضية.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                        if reading != nil { Text("تغيير التكرار يبدأ سلسلة جديدة، وسجلّك يبقى.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                         // FB-39 (owner, 6 Nov): «كل ٣ أيام»، «كل ٤٠ يومًا» — any day inside each block counts.
                         if rule.frequency == .interval {
                             Stepper(value:Binding(get:{rule.intervalDays ?? 3},set:{rule.intervalDays=$0}),in:2...3660) {
@@ -94,7 +94,7 @@ struct HabitEditorView:View {
                             Picker("التقويم",selection:$rule.hijri){Text("هجري").tag(true);Text("ميلادي").tag(false)}.pickerStyle(.segmented)
                             if rule.frequency == .monthly { TextField("أيام الشهر، مثل ١٣، ١٤، ١٥",text:$monthDays).keyboardType(.numbersAndPunctuation).frame(minHeight:44).accessibilityIdentifier("habit-month-days") }
                             else { Stepper("الشهر: "+digits.string(rule.yearMonth),value:$rule.yearMonth,in:1...12).frame(minHeight:44);Stepper("اليوم: "+digits.string(rule.yearDay),value:$rule.yearDay,in:1...(rule.hijri ? 30 : 31)).frame(minHeight:44) }
-                            Text("إذا نقص اليوم عن طول الشهر يقع في آخر يوم، ولا يسقط الاستحقاق.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            Text("إذا كان الشهر أقصر، تُستحق في آخر يوم منه.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                     }
                     section("قدر يسهل أن تدوم عليه") {
@@ -108,11 +108,11 @@ struct HabitEditorView:View {
                                 rule.measure = unit == "minutes" ? .duration : .count;rule.unit=unit;rule.target=unitTargets[unit] ?? (unit == "pages" ? 10 : unit == "chapters" ? 1 : 15);rule.minimum=unitMinimums[unit].map{min($0,rule.target)}
                             })) {Text("بالدقائق").tag("minutes");Text("بالصفحات").tag("pages");Text("بالفصول").tag("chapters")}.pickerStyle(.segmented).accessibilityIdentifier("habit-reading-unit")
                             if let hint=readingHint { Text(hint).font(MadarTypography.caption()).foregroundStyle(theme.accent).accessibilityIdentifier("habit-reading-hint") }
-                            Text("تُحسب من جلسات القراءة في المحبرة: الوقت وأنت تقرأ فعلًا، والصفحات الجديدة فقط. الجلسة الأقصر من دقيقة لا تُحسب.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            Text("تُحسب من قراءتك في المحبرة: الوقت الفعلي والصفحات الجديدة.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         if source == "walking" {
                             Picker("وحدة الصحة",selection:Binding(get:{rule.unit ?? "steps"},set:{unitTargets[rule.unit ?? "steps"]=rule.target;rule.unit=$0;rule.target=unitTargets[$0] ?? ($0 == "steps" ? 6000 : 30)})) {Text("خطوات").tag("steps");Text("دقائق حركة").tag("exerciseMinutes")}.pickerStyle(.menu)
-                            Text("دقائق الحركة تشمل كل تمرين، وليست المشي وحده. السماح بالصحة باختيارك، ولا يكتب مدار فيها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            Text("دقائق الحركة تشمل كل تمرين. مدار يقرأ من الصحة ولا يكتب فيها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         if rule.measure != .once {
                             // FB-39: a step of one up to 100000 meant 2000 taps to move a walking goal from 6000 to 8000 steps; type it, or step by a sensible amount.
@@ -124,7 +124,7 @@ struct HabitEditorView:View {
                                         .background(theme.surface,in:.rect(cornerRadius:10)).accessibilityIdentifier("habit-target-field")
                                 }
                             }
-                            if !rule.weekdays.isEmpty && rule.frequency == .weekly || !monthDays.isEmpty && rule.frequency == .monthly { Text("الأيام المحددة تحدد هدف الفترة؛ ما زاد مكافأة.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                            if !rule.weekdays.isEmpty && rule.frequency == .weekly || !monthDays.isEmpty && rule.frequency == .monthly { Text("عدد الأيام هو هدف الفترة، وما زاد فضل.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             Toggle("أقلّ القليل يحفظ السلسلة",isOn:$minimumOn).frame(minHeight:44).accessibilityIdentifier("habit-minimum-toggle")
                             if minimumOn { Stepper("أقلّ القليل: "+habitUnitCount(min(rule.target,rule.minimum ?? 1),rule.unit,digits),value:Binding(get:{min(rule.target,rule.minimum ?? 1)},set:{rule.minimum=$0}),in:1...max(1,rule.target)).frame(minHeight:44) }
                         }
