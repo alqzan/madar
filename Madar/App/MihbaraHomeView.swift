@@ -13,6 +13,8 @@ struct MihbaraHomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reading: MihbaraHomeReading?
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var roomWidth: CGFloat = 0
     @State private var shapes: [UUID: MihbaraBookShape] = [:]
     @State private var shelfWidth: CGFloat = 360
     @State private var motivationCues: [MihbaraMotivationCue] = []
@@ -196,6 +198,16 @@ struct MihbaraHomeView: View {
         .presentationDragIndicator(.visible)
         .madarSheetErrorAlert(app)
     }
+    /// FB-34 (owner, 5 Nov: «الاحصائيات حقت الكتب شف لها طريقه»): what the stand used to tell, for every book in hand.
+    @ViewBuilder private func inHand(_ reading: MihbaraHomeReading) -> some View {
+        MihbaraReadingNow(app: app, books: reading.books, shapes: shapes, digits: service.digits, open: { openBook($0) })
+        if let readingGoal {
+            MihbaraReadingGoalCard(app: app, goal: readingGoal, digits: service.digits,
+                                   onCreate: { goalEditor = .init(reading: nil) },
+                                   onEdit: { goalEditor = .init(reading: $0) })
+        }
+    }
+    private var wide: Bool { isPadWide(sizeClass) && roomWidth >= 960 }
     private var timelineContent: some View {
         TimelineView(.periodic(from: Date(timeIntervalSince1970: 0), by: 60)) { tick in
             ScrollViewReader { proxy in
@@ -218,19 +230,22 @@ struct MihbaraHomeView: View {
                 if let reading {
                     MadarDateLabel(app.dateLabels(reading.day)).foregroundStyle(theme.secondaryInk)
                     conversionCards
-                    shelfView(reading)
-                    // FB-34 (owner, 5 Nov: «الاحصائيات حقت الكتب شف لها طريقه»): what the stand used to tell, for every book in hand.
-                    MihbaraReadingNow(app: app, books: reading.books, shapes: shapes, digits: service.digits, open: { openBook($0) })
-                    if let readingGoal {
-                        MihbaraReadingGoalCard(app: app, goal: readingGoal, digits: service.digits,
-                                               onCreate: { goalEditor = .init(reading: nil) },
-                                               onEdit: { goalEditor = .init(reading: $0) })
+                    if wide {
+                        // iPad landscape: the bookcase on the right, the books in hand and the goal beside it.
+                        HStack(alignment: .top, spacing: 28) {
+                            shelfView(reading).frame(maxWidth: .infinity)
+                            VStack(alignment: .leading, spacing: 20) { inHand(reading) }.frame(width: 400)
+                        }
+                    } else {
+                        shelfView(reading)
+                        inHand(reading)
                     }
                 }
             }
             .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 28)
-            .frame(maxWidth: 650).frame(maxWidth: .infinity)
+            .frame(maxWidth: wide ? 1100 : 650).frame(maxWidth: .infinity)
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
         .madarTopClipped()
         .onChange(of: date) { if !shelfReadFailed { load() } }
         .onChange(of: scrollTarget) { _, target in handleScrollTargetChange(target, proxy: proxy) }
