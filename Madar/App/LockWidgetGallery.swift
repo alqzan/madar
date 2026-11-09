@@ -19,7 +19,7 @@ struct LockWidgetGallery:View {
             HStack {Button{dismiss()}label:{Label("الودجات",systemImage:"chevron.right")}.frame(minHeight:44);Spacer();Text("القفل والاستعداد").font(.custom("thmanyahserifdisplay-Bold",size:26,relativeTo:.title)).accessibilityIdentifier("lock-widgets-title")}.padding(16)
             ScrollView {
                 VStack(alignment:.leading,spacing:18) {
-                    Text("أضفها من تخصيص شاشة القفل. تتبع ألوان النظام؛ وفي الاستعداد تُستخدم ودجات الشاشة الرئيسية.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text("أضفها من تخصيص شاشة القفل، وتتبع ألوان النظام.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 3), spacing: 18) {
                         ForEach(BuiltRoomWidget.allCases, id: \.self) { room in
                             Link(destination: URL(string: room.route)!) {
