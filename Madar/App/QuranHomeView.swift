@@ -112,7 +112,7 @@ struct QuranHomeView: View {
                         default: EmptyView()
                         }
                     }
-                }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36)
+                }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36).frame(maxWidth: 700).frame(maxWidth: .infinity)
             } else if error == nil { ProgressView().frame(maxWidth: .infinity).padding(60) }
         }
         .madarTopClipped()

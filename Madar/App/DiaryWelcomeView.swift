@@ -80,7 +80,7 @@ struct DiaryWelcomeView: View {
                         Text("لا يلزم أن تكتب يومًا كاملًا. افتح صفحة اليوم واكتب ما تريد الاحتفاظ به، أو ارجع إلى أمس بختم «كُتبت لاحقًا».").font(DiaryType.writing).lineSpacing(8).multilineTextAlignment(.center)
                     }
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.accent) }
-                }.padding(.horizontal, 28).padding(.bottom, 20)
+                }.padding(.horizontal, 28).padding(.bottom, 20).frame(maxWidth: 600).frame(maxWidth: .infinity)
             }
             HStack(spacing: 10) {
                 if step > 0 { Button("السابق") { step -= 1 }.font(MadarTypography.section()).frame(minHeight: 52).padding(.horizontal, 16) }
@@ -91,7 +91,7 @@ struct DiaryWelcomeView: View {
                     if step < 3 { step += 1 } else { Task { await finish() } }
                 }.font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
                     .disabled(saving || app.settingsWriteInProgress).accessibilityIdentifier("diary-welcome-next")
-            }.padding(.horizontal, 24).padding(.bottom, 18)
+            }.padding(.horizontal, 24).padding(.bottom, 18).frame(maxWidth: 600)
         }.foregroundStyle(theme.ink).background(theme.background)
     }
     private func finish() async {

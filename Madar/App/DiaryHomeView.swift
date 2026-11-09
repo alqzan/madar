@@ -48,6 +48,9 @@ struct DiaryHomeView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.roomVisit) private var roomVisit
     @Environment(\.isFrontRoom) private var isFrontRoom
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var roomWidth: CGFloat = 0
+    private var wide: Bool { sizeClass == .regular && roomWidth >= 960 }
     @State private var snapshot: DiaryHomeSnapshot?
     @State private var selected: GregorianDay?
     @State private var customizing = false
@@ -100,6 +103,26 @@ struct DiaryHomeView: View {
                         if !memory.dayOne, !hidden("sinceThatDay") { since(memory) }
                         if !hidden("days") { recentDays(snapshot) }
                     } else {
+                    if wide {
+                        // iPad, wide: the years stand on the right and the recent days run beside them.
+                        HStack(alignment: .top, spacing: 28) {
+                            VStack(alignment: .leading, spacing: 14) {
+                    // A brand-new diary has no years to switch between: the first-page card below is the only thing to read (owner, 4 Nov).
+                    if snapshot.days.contains(where: { $0.photo != nil || $0.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }) {
+                    HStack {
+                        Text(snapshot.selection.match == .echo ? "أقرب ما كتبتَه إلى اليوم" : "هذا اليوم عبر السنين").font(DiaryType.heading).lineLimit(1).minimumScaleFactor(0.8)
+                        Spacer()
+                        HStack(spacing: 2) {
+                            calendarButton(.gregorian, "بالميلادي")
+                            calendarButton(.hijri, "بالهجري")
+                        }.padding(3).background(theme.ink.opacity(0.06), in: .capsule)
+                    }
+                    }
+                                if blocks.contains("memory") { years(snapshot) }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                            if blocks.contains("days"), !hidden("days") { recentDays(snapshot).frame(width: 380) }
+                        }
+                    } else {
                     // A brand-new diary has no years to switch between: the first-page card below is the only thing to read (owner, 4 Nov).
                     if snapshot.days.contains(where: { $0.photo != nil || $0.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }) {
                     HStack {
@@ -120,6 +143,7 @@ struct DiaryHomeView: View {
                         }
                     }
                     }
+                    }
                     DiaryQuestionsCard(app: app) { question in editor = .init(margin: nil, day: "today", prompt: question) }
                 } else if let failure {
                     VStack(alignment: .leading, spacing: 10) {
@@ -129,7 +153,9 @@ struct DiaryHomeView: View {
                 }
                 else { ProgressView("تُفتح صفحتك…") }
             }.padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 12)
+            .frame(maxWidth: sizeClass != .regular ? .infinity : wide ? 1100 : 720).frame(maxWidth: .infinity)
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
         }
         .background(theme.background).foregroundStyle(theme.ink)
          .safeAreaInset(edge: .bottom, spacing: 0) {
