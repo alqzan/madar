@@ -195,9 +195,9 @@ struct DiaryHomeView: View {
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
         }
         .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() }; applyPendingDiaryRootIfReady() }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
-        .sheet(item: $editor, onDismiss: editorDidDismiss) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day, prompt: target.prompt).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
+        .sheet(item: $editor, onDismiss: editorDidDismiss) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day, prompt: target.prompt).environment(\.roomTheme, theme).madarSheetErrorAlert(app).presentationSizing(.page) }
         .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil; readerEntryID = nil; readerEntryRouteID = nil } }), onDismiss: { applyPendingDiaryRootIfReady() }) {
-            if let reader { DiaryDayView(app: app, day: reader, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
+            if let reader { DiaryDayView(app: app, day: reader, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID).environment(\.roomTheme, theme).madarSheetErrorAlert(app).presentationSizing(.page) }
         }
         .onChange(of: app.diaryRoute, initial: true) { _, route in
             guard let route else { return }; app.diaryRoute = nil

@@ -41,6 +41,15 @@ final class PadLayoutUITests: XCTestCase {
                 ("صفحة \(page)" as NSString).draw(at: CGPoint(x: 140, y: 270), withAttributes: [.font: UIFont.boldSystemFont(ofSize: 48)])
             }
         }
+        // The diary's day page.
+        let diary = XCUIApplication()
+        diary.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "today", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00", "MADAR_UI_START_TAB": "notes"]
+        diary.launch()
+        let today = diary.buttons["diary-today"].firstMatch
+        if today.waitForExistence(timeout: 10) { today.tap() }
+        sleep(3)
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-diary-day.png"))
+        diary.terminate()
         let reader = XCUIApplication()
         reader.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "missingFile", "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString(),
                                     "MADAR_UI_MIHBARA_PDF_READY": "1", "MADAR_UI_MIHBARA_ROUTE": "madar://mihbara/continue", "MADAR_UI_START_TAB": "mihbara"]
