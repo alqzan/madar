@@ -196,6 +196,8 @@ struct MihbaraHomeView: View {
         }
         .environment(\.roomTheme, theme)
         .presentationDragIndicator(.visible)
+        // iPad: the library, a book, a hadith and the notebook open as a full page; the small cards stay small.
+        .modifier(PadPageSheet(on: { if case .opening = target { return false }; if case .motivation = target { return false }; return true }()))
         .madarSheetErrorAlert(app)
     }
     /// FB-34 (owner, 5 Nov: «الاحصائيات حقت الكتب شف لها طريقه»): what the stand used to tell, for every book in hand.
@@ -1632,5 +1634,13 @@ struct MihbaraOpenBook: View {
     }
     private func page(header: String, title: String, text: String, footer: String) -> some View {
         VStack(spacing: sunnah ? 8 : 12) { Text(header).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2); Spacer(minLength: 0); Text(title).font(.custom(sunnah ? "Amiri-Regular" : "Amiri-Bold", size: sunnah ? 16 : 23, relativeTo: .title2)).multilineTextAlignment(.center); Text(text).font(.custom("Amiri-Regular", size: sunnah ? 18 : 21, relativeTo: .body)).multilineTextAlignment(.center).lineLimit(sunnah ? 5 : 4); Spacer(minLength: 0); Text(footer).font(.custom("Amiri-Regular", size: 14, relativeTo: .caption)) }.padding(.horizontal, 12).padding(.vertical, sunnah ? 10 : 16).frame(maxWidth: .infinity).frame(minHeight: sunnah ? 180 : 220).background(theme.surface).overlay(alignment: .leading) { LinearGradient(colors: [theme.ink.opacity(0.08), .clear], startPoint: .leading, endPoint: .trailing).frame(width: 15).allowsHitTesting(false) }
+    }
+}
+
+/// iPad: a sheet full of reading or writing opens as a page instead of a small form. iPhone sheets are unchanged.
+struct PadPageSheet: ViewModifier {
+    let on: Bool
+    func body(content: Content) -> some View {
+        if on { content.presentationSizing(.page) } else { content }
     }
 }
