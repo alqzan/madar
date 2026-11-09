@@ -30,5 +30,20 @@ final class PadLayoutUITests: XCTestCase {
         mushaf.tap()
         sleep(4)
         try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-mushaf.png"))
+        app.terminate()
+        // A PDF book opens as two facing pages, right to left.
+        let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 420, height: 600)).pdfData { context in
+            for page in 1...4 {
+                context.beginPage()
+                ("صفحة \(page)" as NSString).draw(at: CGPoint(x: 140, y: 270), withAttributes: [.font: UIFont.boldSystemFont(ofSize: 48)])
+            }
+        }
+        let reader = XCUIApplication()
+        reader.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "missingFile", "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString(),
+                                    "MADAR_UI_MIHBARA_PDF_READY": "1", "MADAR_UI_MIHBARA_ROUTE": "madar://mihbara/continue", "MADAR_UI_START_TAB": "mihbara"]
+        reader.launch()
+        _ = reader.buttons["mihbara-pdf-ink"].waitForExistence(timeout: 20)
+        sleep(2)
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-pdf.png"))
     }
 }

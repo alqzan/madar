@@ -17,6 +17,9 @@ struct MihbaraPDFReaderView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    /// iPad landscape: two facing pages, read right to left like a printed Arabic book.
+    @State private var twoUp = false
     @State private var document: PDFDocument?
     @State private var pageIndex = 0
     @State private var error: String?
@@ -65,8 +68,9 @@ struct MihbaraPDFReaderView: View {
                 header
                 Rectangle().fill(ink.opacity(0.10)).frame(height: 1)
                 if let document {
-                    MihbaraPDFPage(document: document, pageIndex: pageIndex, paper: paper, ink: inkLayer, inking: inking, onPageChange: pageChanged)
+                    MihbaraPDFPage(document: document, pageIndex: pageIndex, paper: paper, ink: inkLayer, inking: inking, twoUp: twoUp, onPageChange: pageChanged)
                         .accessibilityIdentifier("mihbara-pdf-content")
+                        .onGeometryChange(for: Bool.self) { isPadWide(sizeClass) && $0.size.width > $0.size.height && $0.size.width >= 900 } action: { twoUp = $0 }
                         .allowsHitTesting(!closing)
                 } else {
                     VStack(spacing: 18) {
@@ -514,6 +518,7 @@ private struct MihbaraPDFPage: UIViewRepresentable {
     let paper: Color
     var ink: MihbaraInkOverlay? = nil
     var inking = false
+    var twoUp = false
     let onPageChange: (Int, Bool) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onPageChange: onPageChange) }
@@ -545,6 +550,13 @@ private struct MihbaraPDFPage: UIViewRepresentable {
         context.coordinator.onPageChange = onPageChange
         // While drawing, PDFKit's own gestures step aside so a finger draws instead of scrolling.
         if view.isInMarkupMode != inking { view.isInMarkupMode = inking }
+        let mode: PDFDisplayMode = twoUp ? .twoUpContinuous : .singlePageContinuous
+        if view.displayMode != mode {
+            view.displayMode = mode
+            view.displaysAsBook = twoUp
+            view.displaysRTL = twoUp
+            view.autoScales = true
+        }
         guard view.reportsPageChanges, let page = document.page(at: pageIndex), view.currentPage !== page else { return }
         view.go(to: page)
     }
