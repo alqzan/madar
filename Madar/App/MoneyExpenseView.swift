@@ -85,7 +85,7 @@ struct MoneyExpenseView: View {
 #endif
                 if let reading {
                     amountHeading(reading)
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-expense-reveal") }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-expense-reveal") }
                     if let code = reading.tripCurrency, code != reading.currency {
                         Picker("عملة المصروف", selection: $foreign) { Text(service.currencyName(code)).tag(true); Text(service.currencyName(reading.currency)).tag(false) }.pickerStyle(.segmented).accessibilityIdentifier("money-expense-currency")
                         if foreign { Text(figure: reading.tripRate == nil ? "أدخل سعر الرحلة أولًا" : "بعملة البيت " + service.amount(homeMinor)).font(MadarTypography.caption()) }

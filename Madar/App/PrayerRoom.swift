@@ -155,7 +155,7 @@ struct PrayerRoom: View {
                     if let message = state.locationMessage { Text(message).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     if let travel = state.travel { travelCard(travel, dayKey: state.dayKey) }
                     ForEach(blocks(state), id: \.self) { key in block(key, state: state) }
-                    Button("سجلّ الصلاة") { sheet = .history }.frame(minHeight: 44).accessibilityIdentifier("prayer-history")
+                    Button { sheet = .history } label: { Text("سجلّ الصلاة").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("prayer-history")
                 }.padding(16).frame(maxWidth: 650).frame(maxWidth: .infinity)
             } else { ContentUnavailableView("الصلاة", systemImage: "moon.stars", description: Text("تُقرأ مواقيتك وسجلّك من هذا الجهاز.")); Button("حاول مجددًا") { Task { await model.refresh() } } }
         }
@@ -246,12 +246,12 @@ struct PrayerRoom: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text(state.qada.isEmpty ? "لا قضاء مسجّل عليك" : "\(number(state.qada.count, state)) فوائت عليك").font(MadarTypography.cardTitle()).foregroundStyle(state.qada.isEmpty ? theme.ink : theme.color("missedTextOnSurface"))
                 PrayerQadaCitation()
-                Button(state.qada.isEmpty ? "القضاء · أضِف فائتة قديمة" : "اقضِ واحدة") { sheet = .qada }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("prayer-qada")
+                Button { sheet = .qada } label: { Text(state.qada.isEmpty ? "القضاء · أضِف فائتة قديمة" : "اقضِ واحدة").frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("prayer-qada")
             }
         }
     }
     private func travelCard(_ travel: PrayerUITravel, dayKey: String) -> some View {
-        MadarCard { VStack(alignment: .leading, spacing: 12) { Label(travel.title, systemImage: "suitcase").font(MadarTypography.section()); ForEach(travel.availablePairs) { pair in Button("سجّل " + pair.title + " جمعًا") { sheet = .pair(pair) }.frame(minHeight: 44).accessibilityIdentifier("prayer-pair-" + pair.rawValue) }; if travel.canEnd { Button("أنهِ الرحلة") { sheet = .endTrip }.frame(minHeight: 44).accessibilityIdentifier("prayer-end-trip") } } }
+        MadarCard { VStack(alignment: .leading, spacing: 12) { Label(travel.title, systemImage: "suitcase").font(MadarTypography.section()); ForEach(travel.availablePairs) { pair in Button("سجّل " + pair.title + " جمعًا") { sheet = .pair(pair) }.frame(minHeight: 44).accessibilityIdentifier("prayer-pair-" + pair.rawValue) }; if travel.canEnd { Button { sheet = .endTrip } label: { Text("أنهِ الرحلة").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("prayer-end-trip") } } }
     }
     @ViewBuilder private func sheetBody(_ route: PrayerSheet) -> some View {
         if let state = model.state {

@@ -36,8 +36,8 @@ struct PrayerHeartAnswerSheet: View {
             .buttonStyle(.madarPlain).disabled(answer == nil).opacity(answer == nil ? 0.4 : 1).padding(.top, 18)
             .accessibilityIdentifier("prayer-heart-save")
             // With an answer already saved, "skip" must not erase it: it just closes.
-            Button(cell.heart == nil ? "أمرّ" : "أبقِ جوابي") { if cell.heart == nil { save(nil) } else { finished() } }.font(PrayerHomeType.strong).foregroundStyle(theme.secondaryInk)
-                .frame(maxWidth: .infinity, minHeight: 44).padding(.top, 4).accessibilityIdentifier("prayer-heart-skip")
+            Button { if cell.heart == nil { save(nil) } else { finished() } } label: { Text(cell.heart == nil ? "أمرّ" : "أبقِ جوابي").font(PrayerHomeType.strong).foregroundStyle(theme.secondaryInk)
+                .frame(maxWidth: .infinity, minHeight: 44).padding(.top, 4).contentShape(Rectangle()) }.accessibilityIdentifier("prayer-heart-skip")
         }
         .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 14)
         .frame(maxWidth: .infinity, alignment: .leading)

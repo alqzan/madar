@@ -64,7 +64,7 @@ struct MoneyReconcileView: View {
                         identity(row, reading: reading)
                         arches(row)
                         sentence(row)
-                        if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-reconcile-reveal") }
+                        if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-reconcile-reveal") }
                         nudges(row)
                         naming(row, reading: reading)
                         hint(row)

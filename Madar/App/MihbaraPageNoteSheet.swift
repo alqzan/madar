@@ -18,8 +18,8 @@ struct MihbaraPageNoteSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 // FB-39: «إلغاء» threw a written note away in one tap.
-                Button("إلغاء") { if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { dismiss() } else { confirmDiscard = true } }
-                    .font(MadarTypography.body()).frame(minHeight: 44)
+                Button { if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { dismiss() } else { confirmDiscard = true } } label: { Text("إلغاء")
+                    .font(MadarTypography.body()).frame(minHeight: 44).contentShape(Rectangle()) }
                     .accessibilityIdentifier("mihbara-note-cancel")
                     .confirmationDialog("تترك ما كتبته؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
                         Button("اترك الحاشية", role: .destructive) { dismiss() }
@@ -28,19 +28,19 @@ struct MihbaraPageNoteSheet: View {
 #if DEBUG
                 if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] == "1",
                    ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil {
-                    Button("الجذر") { app.open(URL(string: "madar://mihbara")!) }
-                        .font(MadarTypography.fine()).frame(minHeight: 44)
+                    Button { app.open(URL(string: "madar://mihbara")!) } label: { Text("الجذر")
+                        .font(MadarTypography.fine()).frame(minHeight: 44).contentShape(Rectangle()) }
                         .accessibilityIdentifier("mihbara-page-note-root-route")
                 }
 #endif
                 Spacer()
                 Text("ملاحظة على الصفحة").font(MadarTypography.section())
                 Spacer()
-                Button("احفظ") {
+                Button {
                     saving = true
                     Task { if !(await save(text.trimmingCharacters(in: .whitespacesAndNewlines))) { saving = false } }
-                }
-                .font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .body)).frame(minHeight: 44)
+                } label: { Text("احفظ")
+                .font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .body)).frame(minHeight: 44).contentShape(Rectangle()) }
                 .disabled(saving || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.count > 2000)
                 .accessibilityIdentifier("mihbara-note-save")
             }

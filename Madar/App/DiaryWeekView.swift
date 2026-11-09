@@ -19,7 +19,7 @@ struct DiaryWeekView:View {
                 Text("ارجع إلى ما كتبت، ثم اكتب ما تختاره عن أسبوعك.").font(DiaryType.writing)
                 if days.isEmpty {Text("لم تُكتب صفحات هذا الأسبوع بعد.").font(DiaryType.writing)}
                 ForEach(days){row in Button{reader=row.day}label:{VStack(alignment:.leading,spacing:8){MadarDateLabel(service.bothDates(row.day,calendar:app.diaryFirstCalendar)).font(DiaryType.label);Text(row.excerpt).font(DiaryType.writing).lineLimit(4)}.frame(maxWidth:.infinity,alignment:.leading).padding(16).background(theme.surface,in:.rect(cornerRadius:16)).contentShape(.rect)}.buttonStyle(.madarPlain).accessibilityIdentifier("diary-week-day-"+row.id)}
-                Button("اكتب عن أسبوعك"){writing=true}.font(DiaryType.heading).frame(minHeight:54).accessibilityIdentifier("diary-week-write")
+                Button {writing=true} label: { Text("اكتب عن أسبوعك").font(DiaryType.heading).frame(minHeight:54).contentShape(Rectangle()) }.accessibilityIdentifier("diary-week-write")
                 if let failure{Text(failure).font(DiaryType.label)}
             }.padding(18)}.background(theme.background).foregroundStyle(theme.ink).navigationBarTitleDisplayMode(.inline)
                 .toolbar{ToolbarItem(placement:.topBarLeading){Button("الصفحة"){dismiss()}.accessibilityIdentifier("diary-week-close")}}.tint(theme.accent)

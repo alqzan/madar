@@ -105,7 +105,7 @@ struct LegacyMoveView: View {
             }
             Text("كل غرفة تُنقل وحدها. الصلاة المسجّلة هنا في يومها، والعادة بالاسم نفسه، والحساب برقمه، تبقى كما هي وتأخذ تاريخها القديم معها. الرسائل البنكية تمرّ بالمراجعة كأنها وصلت الآن.")
                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
-            Button("اختر ملفًا آخر") { preview = nil; choose() }.frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("legacy-move-other")
+            Button { preview = nil; choose() } label: { Text("اختر ملفًا آخر").frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("legacy-move-other")
         }
     }
 
@@ -141,9 +141,9 @@ struct LegacyMoveView: View {
                 }
             }
             HStack(spacing: 12) {
-                Button("تراجع عن النقل") { confirmUndo = true }.frame(minHeight: 44).disabled(r.added == 0 && service.lastMove() == nil).accessibilityIdentifier("legacy-move-undo")
+                Button { confirmUndo = true } label: { Text("تراجع عن النقل").frame(minHeight: 44).contentShape(Rectangle()) }.disabled(r.added == 0 && service.lastMove() == nil).accessibilityIdentifier("legacy-move-undo")
                 Spacer(minLength: 0)
-                Button("انقل الملف مرة أخرى") { receipt = nil }.frame(minHeight: 44).accessibilityIdentifier("legacy-move-again")
+                Button { receipt = nil } label: { Text("انقل الملف مرة أخرى").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("legacy-move-again")
             }
         }
     }
@@ -153,7 +153,7 @@ struct LegacyMoveView: View {
             Text("آخر نقل").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             Text(when(r.at)).font(MadarTypography.body())
             Text(r.added == 0 ? "لم يضف شيئًا" : "أضاف " + service.phrase(r.outcomes.reduce(into: [:]) { $0.merge($1.parts, uniquingKeysWith: +) })).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-            Button("تراجع عن هذا النقل") { confirmUndo = true }.frame(minHeight: 44).accessibilityIdentifier("legacy-move-undo-last")
+            Button { confirmUndo = true } label: { Text("تراجع عن هذا النقل").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("legacy-move-undo-last")
         }.accessibilityElement(children: .contain).accessibilityIdentifier("legacy-move-last")
     }
 
@@ -168,7 +168,7 @@ struct LegacyMoveView: View {
             if result.plan.keptChanged > 0 {
                 Text("وما عدّلته بعد النقل بقي كما هو (" + digits.string(result.plan.keptChanged) + ").").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
-            Button("ابدأ من جديد") { undone = nil; preview = nil; receipt = nil; last = service.lastMove() }.frame(minHeight: 44).accessibilityIdentifier("legacy-move-restart")
+            Button { undone = nil; preview = nil; receipt = nil; last = service.lastMove() } label: { Text("ابدأ من جديد").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("legacy-move-restart")
         }
     }
 

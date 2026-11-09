@@ -50,9 +50,9 @@ struct MihbaraTrashView: View {
                 Text(item.detail + "، حُذف " + ago(item.deletedAt)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }
             Spacer(minLength: 8)
-            Button("أعِده") { restore(item) }
+            Button { restore(item) } label: { Text("أعِده")
                 .font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44)
-                .background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent)
+                .background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent).contentShape(Rectangle()) }
                 .buttonStyle(.madarPlain).disabled(restoring != nil)
                 .accessibilityIdentifier("mihbara-trash-restore-" + item.id.uuidString)
         }

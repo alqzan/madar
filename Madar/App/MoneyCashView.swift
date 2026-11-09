@@ -38,7 +38,7 @@ struct MoneyCashView: View {
                     Text("مصادر «عليك»").font(MadarTypography.cardTitle())
                     ForEach(reading.debts) { item in sourceButton(item) }
                 }
-                if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44) }
+                if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) } }
             }.padding(.horizontal, 18).padding(.top, 12).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).toolbarVisibility(.hidden, for: .navigationBar)
             .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible) }

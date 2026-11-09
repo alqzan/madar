@@ -79,11 +79,11 @@ struct WidgetMakerView: View {
                         behavior("أزرار تُتمّ من الودجة", detail: "خطوة من عادة مخصصة؛ العادة المربوطة تُفتح دون تسجيل", value: $draft.style.interactive, id: "interactive")
                     }
                 }
-                Button("أعِد المظهر الافتراضي") { beforeReset = (draft.style, draft.familyID); draft.style = .init(); draft.familyID = "medium" }.frame(minHeight: 44)
-                if let previous = beforeReset { Button("تراجع عن إعادة المظهر") { draft.style = previous.0; draft.familyID = previous.1; beforeReset = nil }.frame(minHeight: 44) }
+                Button { beforeReset = (draft.style, draft.familyID); draft.style = .init(); draft.familyID = "medium" } label: { Text("أعِد المظهر الافتراضي").frame(minHeight: 44).contentShape(Rectangle()) }
+                if let previous = beforeReset { Button { draft.style = previous.0; draft.familyID = previous.1; beforeReset = nil } label: { Text("تراجع عن إعادة المظهر").frame(minHeight: 44).contentShape(Rectangle()) } }
                 if !saved.isEmpty { savedWidgets }
                 if session.undoToken != nil {
-                    Button("تراجع عن آخر حفظ أو حذف") { session.undo() }.frame(minHeight: 44).accessibilityIdentifier("widget-maker-undo")
+                    Button { session.undo() } label: { Text("تراجع عن آخر حفظ أو حذف").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("widget-maker-undo")
                 }
                 } header: {
                     VStack(spacing: 10) {
@@ -166,7 +166,7 @@ struct WidgetMakerView: View {
     }
     private var contentChoices: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack { Text("ماذا تعرض؟").font(MadarTypography.section()); Spacer(); if !draft.items.isEmpty { Button("امسح") { draft.items = [] }.font(MadarTypography.caption()).frame(minHeight: 44) } }
+            HStack { Text("ماذا تعرض؟").font(MadarTypography.section()); Spacer(); if !draft.items.isEmpty { Button { draft.items = [] } label: { Text("امسح").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } } }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 2 : 3), spacing: 8) {
                 // FB-34: the Forty Nawawi left the Mihbara, so «حديث اليوم» is no longer offered (saved widgets keep working).
                 ForEach(WidgetMakerStyle.itemIDs.filter { $0 != "hadith" }, id: \.self) { id in
@@ -205,7 +205,7 @@ struct WidgetMakerView: View {
     }
     private var savedWidgets: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack { Text("ودجاتي").font(MadarTypography.section()); Spacer(); Button("جديدة") { select(.init()) }.frame(minHeight: 44) }
+            HStack { Text("ودجاتي").font(MadarTypography.section()); Spacer(); Button { select(.init()) } label: { Text("جديدة").frame(minHeight: 44).contentShape(Rectangle()) } }
             ScrollView(.horizontal) {
                 WidgetMakerGlassGroup {
                 HStack(alignment: .top, spacing: 10) {

@@ -51,7 +51,7 @@ struct DiaryYearbookView:View {
                     }.font(MadarTypography.body()).tint(theme.color("ghad")).padding(16).background(theme.surface,in:.rect(cornerRadius:18)).overlay{RoundedRectangle(cornerRadius:18).stroke(theme.line)}
                     if let failure {Text(failure).font(DiaryType.label).accessibilityIdentifier("diary-book-error")}
                     // AU-95: a failed first read left «جهّز الكتاب» dim for good; read the years again.
-                    if failure != nil, pages.isEmpty {Button("أعِد المحاولة"){failure=nil;attempt+=1}.font(DiaryType.label).frame(minHeight:44).contentShape(Rectangle()).accessibilityIdentifier("diary-book-retry")}
+                    if failure != nil, pages.isEmpty {Button {failure=nil;attempt+=1} label: { Text("أعِد المحاولة").font(DiaryType.label).frame(minHeight:44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-book-retry")}
                     if busy {ProgressView("يجهّز الكتاب…")}
                     Button{prepare()}label:{Text("جهّز الكتاب").font(DiaryType.heading).frame(maxWidth:.infinity,minHeight:56).foregroundStyle(theme.background).background(theme.ink,in:.capsule)}.buttonStyle(.madarPlain).disabled(busy || pages.isEmpty).accessibilityIdentifier("diary-book-prepare")
                     if let artifact {HStack{Button("اقرأ الكتاب"){preview=true}.accessibilityIdentifier("diary-book-preview");Spacer();Button("حفظ أو مشاركة"){Task{do{try await service.shareDiary(artifact)}catch{failure=madarUserMessage(error)}}}}}

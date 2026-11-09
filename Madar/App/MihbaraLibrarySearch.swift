@@ -105,7 +105,7 @@ struct MihbaraTextSearchSection: View {
                         ProgressView()
                         Text("أبحث في " + service.digits.string(progress) + " من " + service.digits.string(readable.count)).font(MadarTypography.caption())
                         Spacer()
-                        Button("أوقف") { running?.cancel(); running = nil; runID = nil }.frame(minHeight: 44).buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-text-search-stop")
+                        Button { running?.cancel(); running = nil; runID = nil } label: { Text("أوقف").frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-text-search-stop")
                     }
                 } else if hits == nil || searchedFor != trimmed {
                     Button { start() } label: {

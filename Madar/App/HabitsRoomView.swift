@@ -94,8 +94,8 @@ struct HabitsRoomView: View {
                         roomHabits
                     }
                     if readings.contains(where: \.archived) {
-                        Button(showArchived ? "أخفِ العادات المحذوفة" : "عادات محذوفة") { showArchived.toggle() }.font(MadarTypography.caption()).frame(minHeight:44).accessibilityIdentifier("habit-archived")
-                        if showArchived { ForEach(readings.filter(\.archived)) { row in HStack(spacing:10) { Text(row.name); Spacer(); Button("حذف نهائي") { deletingArchived=row }.font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(minHeight:44).accessibilityLabel("حذف نهائي "+row.name); Button("استعدها") { perform("habit.archive",["id":.string(row.id.uuidString),"archived":.bool(false)]) }.buttonStyle(.borderedProminent).frame(minHeight:44) }.padding(14).background(theme.surface,in:.rect(cornerRadius:18)) } }
+                        Button { showArchived.toggle() } label: { Text(showArchived ? "أخفِ العادات المحذوفة" : "عادات محذوفة").font(MadarTypography.caption()).frame(minHeight:44).contentShape(Rectangle()) }.accessibilityIdentifier("habit-archived")
+                        if showArchived { ForEach(readings.filter(\.archived)) { row in HStack(spacing:10) { Text(row.name); Spacer(); Button { deletingArchived=row } label: { Text("حذف نهائي").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(minHeight:44).contentShape(Rectangle()) }.accessibilityLabel("حذف نهائي "+row.name); Button("استعدها") { perform("habit.archive",["id":.string(row.id.uuidString),"archived":.bool(false)]) }.buttonStyle(.borderedProminent).frame(minHeight:44) }.padding(14).background(theme.surface,in:.rect(cornerRadius:18)) } }
                     }
                     VStack(spacing:5) { Text("«أحبّ الأعمال إلى الله أدومها وإن قلّ»").font(MadarTypography.body()); Text("متفق عليه، من حديث عائشة رضي الله عنها").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }.frame(maxWidth:.infinity).padding(.vertical,24)
                 }.padding(.horizontal,14).padding(.vertical,8)

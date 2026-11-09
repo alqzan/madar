@@ -43,19 +43,19 @@ struct MoneyZakatEditor: View {
     }
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment:.leading,spacing:16) {
-            HStack { Text("بيانات الزكاة").font(MadarTypography.cardTitle());Spacer();Button("تمّ"){dismiss()}.frame(minHeight:44).accessibilityIdentifier("money-zakat-editor-close").madarWaitsForSave() }
+            HStack { Text("بيانات الزكاة").font(MadarTypography.cardTitle());Spacer();Button {dismiss()} label: { Text("تمّ").frame(minHeight:44).contentShape(Rectangle()) }.accessibilityIdentifier("money-zakat-editor-close").madarWaitsForSave() }
             Text("أساس النصاب").font(MadarTypography.section())
             HStack { Button("ذهب ٢٤ قيراطًا") { selectedBasis = .gold; basisChosen = true }.accessibilityIdentifier("money-zakat-editor-gold");Spacer();Button("فضة") { selectedBasis = .silver; basisChosen = true }.accessibilityIdentifier("money-zakat-editor-silver") }.font(MadarTypography.body())
             if basisChosen { Text(selectedBasis == .gold ? "اخترت الذهب عيار ٢٤" : "اخترت الفضة").font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText")) }
             if selectedBasis == .gold { field("سعر غرام الذهب عيار ٢٤، بعملة البيت", $gold, "gold-price"); field("وزن النصاب بالغرام", $goldWeight, "gold-weight", placeholder: "٨٥") }
             else { field("سعر غرام الفضة، بعملة البيت", $silver, "silver-price"); field("وزن النصاب بالغرام", $silverWeight, "silver-weight", placeholder: "٥٩٥") }
-            Button("أعِد الوزنين الافتراضيين") { goldWeight=service.moneyInput(85000,exponent:3);silverWeight=service.moneyInput(595000,exponent:3) }.font(MadarTypography.caption()).frame(minHeight:44)
+            Button { goldWeight=service.moneyInput(85000,exponent:3);silverWeight=service.moneyInput(595000,exponent:3) } label: { Text("أعِد الوزنين الافتراضيين").font(MadarTypography.caption()).frame(minHeight:44).contentShape(Rectangle()) }
             Text("المظاريف داخل الحسابات أصلًا").font(MadarTypography.section())
             if numbersVisible { field("أموال أخرى تُزكّى، بعملة البيت", $other, "other", placeholder: "٠") }
             else {
                 // The saved other-assets total stays hidden like every amount until the numbers are revealed.
                 Text("أموالك الأخرى المحفوظة مخفية حتى تُظهر الأرقام.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-zakat-editor-reveal")
+                Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-zakat-editor-reveal")
             }
             Text("ذهب أو أسهم أو ديون مرجوّة لك؛ أدخل مجموعها مرة واحدة.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             Picker("الديون",selection:$selectedDebt) { Text("لم أختر").tag(ZakatDebtsPolicy.unset);Text("لا أخصم ديونًا").tag(ZakatDebtsPolicy.none);Text("المستحق الآن").tag(ZakatDebtsPolicy.dueNow);Text("عليك دون القرض").tag(ZakatDebtsPolicy.allOwed);Text("عليك وباقي القرض").tag(ZakatDebtsPolicy.allOwedAndLoan) }.accessibilityIdentifier("money-zakat-editor-debts")

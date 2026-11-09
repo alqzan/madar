@@ -270,10 +270,10 @@ struct QuranTafsirLibraryView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("quran-tafsir-library-message")
                 }
-                Button("أعِد تفسير السعدي") {
+                Button {
                     app.reset([QuranTafsirPreferences.defaultBookKey, QuranTafsirPreferences.lastBooksKey])
-                }
-                .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
+                } label: { Text("أعِد تفسير السعدي")
+                .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
                 .accessibilityIdentifier("quran-tafsir-reset")
             }
             .padding(18).frame(maxWidth: 680).frame(maxWidth: .infinity)
@@ -365,17 +365,17 @@ struct QuranTafsirLibraryView: View {
                     .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 Spacer(minLength: 0)
                 if selectedDefault != book.id {
-                    Button("اجعله تفسيري") {
+                    Button {
                         app.set(.number(Double(book.id)), key: QuranTafsirPreferences.defaultBookKey)
                         QuranTafsirPreferences.saveLastBookIDs([book.id], in: app)
-                    }
-                    .font(MadarTypography.caption()).frame(minHeight: 44)
+                    } label: { Text("اجعله تفسيري")
+                    .font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
                     .accessibilityIdentifier("quran-tafsir-make-default-\(book.id)")
                 }
                 if !book.isBundled {
-                    Button("احذف") { deleteBookID = book.id }
+                    Button { deleteBookID = book.id } label: { Text("احذف")
                         .font(MadarTypography.caption()).frame(minHeight: 44)
-                        .foregroundStyle(theme.color("hifzText"))
+                        .foregroundStyle(theme.color("hifzText")).contentShape(Rectangle()) }
                         .accessibilityIdentifier("quran-tafsir-delete-\(book.id)")
                 }
             }

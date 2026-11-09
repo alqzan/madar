@@ -14,8 +14,8 @@ struct MihbaraTranslationSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Button("تمّ") { dismiss() }
-                    .font(MadarTypography.body()).frame(minWidth: 44, minHeight: 44)
+                Button { dismiss() } label: { Text("تمّ")
+                    .font(MadarTypography.body()).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
                     .accessibilityIdentifier("mihbara-translation-close")
                 Spacer()
                 Text("ترجمة الفقرة").font(MadarTypography.section())

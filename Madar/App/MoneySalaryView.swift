@@ -38,7 +38,7 @@ struct MoneySalaryView: View {
                 if let reading {
                     masthead(reading)
                     opening(reading)
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44) }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } }
                     ledger(reading)
                     if reading.needsChoice || remainderTo != nil { remainderChoice(reading) }
                     confirmButton(reading)

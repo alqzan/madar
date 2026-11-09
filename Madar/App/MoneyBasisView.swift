@@ -51,7 +51,7 @@ struct MoneyBasisView: View {
                     } else if let failure {
                         VStack(alignment: .leading, spacing: 12) { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }.padding(20)
                     } else { ProgressView().frame(maxWidth: .infinity, minHeight: 300) }
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-basis-reveal") }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-basis-reveal") }
                 }.padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
             }
             .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)

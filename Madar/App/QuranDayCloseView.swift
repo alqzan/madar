@@ -44,7 +44,7 @@ struct QuranDayCloseView: View {
                         .font(font(14, bold: true)).accessibilityIdentifier("quran-day-close-strength")
                 }
                 Text("تقدير من تقييمك ومواعيد مراجعتك: «قبل» بدون جلسات اليوم، و«بعد» معها. الوجه غير المكتمل لا يدخل فيه.").font(font(15))
-                Button("تمّ") { explainStrength = false }.font(font(15, bold: true)).frame(maxWidth: .infinity, minHeight: 44)
+                Button { explainStrength = false } label: { Text("تمّ").font(font(15, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
             }.padding(24).foregroundStyle(theme.ink).background(theme.surface)
                 .presentationDetents([.height(300)]).presentationDragIndicator(.visible)
                 .environment(\.layoutDirection, .rightToLeft)
@@ -110,7 +110,7 @@ struct QuranDayCloseView: View {
                 Text(value.reviewedFaces == 0 ? "المراجعة" : "راجعت " + service.faceCount(value.reviewedFaces, accusative: true)).font(font(14, bold: true))
                     .accessibilityIdentifier("quran-day-close-reviewed")
                 Spacer(minLength: 4)
-                Button("قبل ← بعد") { explainStrength = true }.font(font(11)).foregroundStyle(theme.secondaryInk).frame(minHeight: 44)
+                Button { explainStrength = true } label: { Text("قبل ← بعد").font(font(11)).foregroundStyle(theme.secondaryInk).frame(minHeight: 44).contentShape(Rectangle()) }
                     .accessibilityLabel("المتانة قبل وبعد، على أي أساس")
             }
             if value.strengths.isEmpty {

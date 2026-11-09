@@ -230,8 +230,8 @@ struct MihbaraEPUBImportView: View {
                         .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.line.opacity(0.7), lineWidth: 1) }
                         // A long index (Turath books reach thousands of headings) shows a preview; the reader has it all.
                         if value.outline.count > Self.indexPreview {
-                            Button(showingFullIndex ? "اختصر الفهرس" : "اعرض الفهرس كاملًا") { showingFullIndex.toggle() }
-                                .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
+                            Button { showingFullIndex.toggle() } label: { Text(showingFullIndex ? "اختصر الفهرس" : "اعرض الفهرس كاملًا")
+                                .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
                                 .accessibilityIdentifier("mihbara-epub-import-toc-all")
                         }
                     }

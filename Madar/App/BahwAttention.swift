@@ -110,8 +110,8 @@ struct BahwAttentionSheet: View {
                 Text("لا تدخل أرقامك إلا بعد قرارك.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }
             Spacer(minLength: 8)
-            Button("افرزها") { moneyOpen = true }.font(MadarTypography.caption().bold()).foregroundStyle(theme.onAccent)
-                .padding(.horizontal, 18).frame(minHeight: 44).background(theme.accentFill, in: .capsule).contentShape(.capsule)
+            Button { moneyOpen = true } label: { Text("افرزها").font(MadarTypography.caption().bold()).foregroundStyle(theme.onAccent)
+                .padding(.horizontal, 18).frame(minHeight: 44).background(theme.accentFill, in: .capsule).contentShape(.capsule) }
                 .buttonStyle(.madarPlain).accessibilityIdentifier("bahw-attention-money")
         }
         .padding(16).background(theme.surface, in: .rect(cornerRadius: 18)).overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line) }
@@ -130,11 +130,11 @@ struct BahwAttentionSheet: View {
                         Text(figure: reconcileLine(item, money: money)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     }
                     Spacer(minLength: 8)
-                    Button(item.matches ? "ثبّت" : "طابق") {
+                    Button {
                         if item.matches { confirm(item) } else { reconcileOpen = true }
-                    }
+                    } label: { Text(item.matches ? "ثبّت" : "طابق")
                     .font(MadarTypography.caption().bold()).foregroundStyle(theme.onAccent)
-                    .padding(.horizontal, 18).frame(minHeight: 44).background(theme.accentFill, in: .capsule).contentShape(.capsule)
+                    .padding(.horizontal, 18).frame(minHeight: 44).background(theme.accentFill, in: .capsule).contentShape(.capsule) }
                     .buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("bahw-attention-reconcile-\(item.id.uuidString)")
                 }
                 .padding(16).background(theme.surface, in: .rect(cornerRadius: 18)).overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line) }

@@ -70,7 +70,7 @@ struct QuranPlanView: View {
                             line; choiceRow("جدول المراجعة", key: "quran.reviewSchedule", options: [("spaced","متباعدة"),("fixedJuzDaily","جزء يوميًا"),("fixedManzilWeekly","المنازل الأسبوعية")])
                         }
                     }
-                    Button(overview.input == nil ? "ابدأ خطة الحفظ" : "عدّل خطة الحفظ") { showSetup = true }.font(quranFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("quran-plan-edit")
+                    Button { showSetup = true } label: { Text(overview.input == nil ? "ابدأ خطة الحفظ" : "عدّل خطة الحفظ").font(quranFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-plan-edit")
                     QuranPaperCard {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack { Text("موعد الختمة").font(quranFont(17, bold: true)); Spacer(); Text("تقدير لكل درجة").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
@@ -134,13 +134,13 @@ struct QuranPlanView: View {
                             }
                         }
                     }
-                    Button("أعِد المتفق عليه") { app.reset(resetKeys) }.font(quranFont(14)).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("quran-plan-reset")
+                    Button { app.reset(resetKeys) } label: { Text("أعِد المتفق عليه").font(quranFont(14)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-plan-reset")
                     Text(overview.version).font(quranFont(11)).accessibilityIdentifier("quran-plan-version").foregroundStyle(theme.secondaryInk)
                 }
                 if let error { Text(error).font(quranFont(13)) }
                 // AU-95: a failed first read left only the header; one tap reads the plan again.
                 if overview == nil, error != nil {
-                    Button("أعِد المحاولة") { reload(at: service.currentTime()) }.font(quranFont(14, bold: true)).frame(minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("quran-plan-retry")
+                    Button { reload(at: service.currentTime()) } label: { Text("أعِد المحاولة").font(quranFont(14, bold: true)).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-plan-retry")
                 }
             }.padding(16)
         }.madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)

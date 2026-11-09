@@ -123,8 +123,8 @@ struct MihbaraReadingGoalCard: View {
                 Text("وِرد القراءة").font(MadarTypography.section())
                 Spacer()
                 if let habit = goal.habit {
-                    Button("عدّل الهدف") { onEdit(habit) }.font(MadarTypography.caption()).foregroundStyle(theme.accent)
-                        .frame(minHeight: 44).buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-goal-edit")
+                    Button { onEdit(habit) } label: { Text("عدّل الهدف").font(MadarTypography.caption()).foregroundStyle(theme.accent)
+                        .frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-goal-edit")
                 }
             }
             headline

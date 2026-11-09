@@ -42,14 +42,14 @@ struct MoneyAccountsView: View {
                         .background(theme.surface, in: .rect(cornerRadius: 12))
                 }
                 if let r = reading {
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-reveal") }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-accounts-reveal") }
                     VStack(spacing: 0) {
                         tree(r)
                         ledger(r)
                     }
                     if r.rows.contains(where: { $0.side == .cash && $0.amountMinor == nil }) {
                         Text("لم يُعرف رصيدها بعد؛ الحسابات المجهولة لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                        Button("المطابقة مع البنك") { reconcileOpen = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-unknown-reconcile")
+                        Button { reconcileOpen = true } label: { Text("المطابقة مع البنك").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-accounts-unknown-reconcile")
                     }
                     if let basis = r.basis {
                         if !(r.rows.contains { $0.side == .cash && $0.amountMinor == nil } && !r.rows.contains { $0.side == .cash && $0.amountMinor != nil }) {
@@ -104,10 +104,10 @@ struct MoneyAccountsView: View {
         if dynamicType.isAccessibilitySize {
             VStack(alignment: .leading, spacing: 16) { ForEach(r.rows) { row in
                 VStack(alignment: .leading, spacing: 6) {
-                    Button(row.name) { if let edit = row.edit { selected = edit } else { selectedSource = row } }.font(MadarTypography.cardTitle()).frame(minHeight: 44)
+                    Button { if let edit = row.edit { selected = edit } else { selectedSource = row } } label: { Text(row.name).font(MadarTypography.cardTitle()).frame(minHeight: 44).contentShape(Rectangle()) }
                     Text(row.amountMinor == nil ? "لم يُعرف رصيدها بعد" : row.subtitle + (row.counted ? "، يُحتسب" : "، خارج الحساب")).font(MadarTypography.body())
                     Text(figure: row.amountMinor.map { amount($0, currency: row.currency) } ?? "—").font(MadarTypography.body())
-                    Button("مصدر الرصيد") { selectedSource = row }.frame(minHeight: 44)
+                    Button { selectedSource = row } label: { Text("مصدر الرصيد").frame(minHeight: 44).contentShape(Rectangle()) }
                 }
             } }
         } else {

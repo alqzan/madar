@@ -25,10 +25,10 @@ struct PresetsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Label("المتفق عليه", systemImage: "lock").font(MadarTypography.section())
                         Text("نمط مدار الافتراضي").foregroundStyle(theme.secondaryInk)
-                        Button("عاين النمط") {
+                        Button {
                             let settings = Dictionary(uniqueKeysWithValues: session.schema.settings.filter { $0.preset && AppSession.supportedKeys.contains($0.key) }.map { ($0.key, $0.defaultValue) })
                             candidate = .init(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, name: "المتفق عليه", settings: settings, layouts: [:])
-                        }.frame(minHeight: 44).accessibilityIdentifier("preview-default-preset")
+                        } label: { Text("عاين النمط").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("preview-default-preset")
                     }
                 }
                 ForEach(saved.filter { $0.deletedAt == nil && !$0.locked }.sorted { $0.createdAt > $1.createdAt }) { preset in
@@ -36,14 +36,14 @@ struct PresetsView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(preset.name).font(MadarTypography.section())
                             MadarDateLabel(session.dateLabels(GregorianDay.containing(preset.createdAt, in: session.activePlace.timeZone))).foregroundStyle(theme.secondaryInk)
-                            Button("عاين النمط") {
+                            Button {
                                 do {
                                     let payload = try JSONDecoder().decode(JSONValue.self, from: preset.payloadJSON)
                                     guard case .object(let root) = payload, case .object(let values) = root["settings"] else { throw PresetViewError.invalidPayload }
                                     let layouts = root["layouts"]?.object ?? [:]
                                     candidate = .init(id: preset.id, name: preset.name, settings: values, layouts: layouts)
                                 } catch { session.errorMessage = "تعذّرت قراءة النمط المحفوظ. \(madarUserMessage(error))" }
-                            }.frame(minHeight: 44)
+                            } label: { Text("عاين النمط").frame(minHeight: 44).contentShape(Rectangle()) }
                         }
                     }
                 }

@@ -74,15 +74,15 @@ struct MoneyGoalView: View {
                 }
                 if let reading {
                     if !visible {
-                        Button("المس لإظهار الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier(
+                        Button { revealed = true } label: { Text("المس لإظهار الأرقام").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier(
                             "money-goal-reveal")
                     }
                     ScrollView(.horizontal) {
                         HStack {
                             ForEach(["هدية", "دراسة", "سفرة", "أثاث", "سيارة"], id: \.self) { title in
-                                Button(title) { name = title }.font(MadarTypography.caption()).padding(.horizontal, 18)
+                                Button { name = title } label: { Text(title).font(MadarTypography.caption()).padding(.horizontal, 18)
                                     .frame(minHeight: 42).background(name == title ? theme.ink : .clear, in: Capsule())
-                                    .foregroundStyle(name == title ? theme.background : theme.ink).overlay {
+                                    .foregroundStyle(name == title ? theme.background : theme.ink).contentShape(Rectangle()) }.overlay {
                                         Capsule().stroke(theme.color("reserveText").opacity(0.25))
                                     }
                             }
@@ -180,15 +180,15 @@ struct MoneyGoalView: View {
                             Capsule().stroke(theme.color("reserveText").opacity(0.25))
                         }
                     }
-                    Button("عدّل المبلغ والاقتطاع والمصدر") { edit = true }.font(MadarTypography.caption()).frame(
+                    Button { edit = true } label: { Text("عدّل المبلغ والاقتطاع والمصدر").font(MadarTypography.caption()).frame(
                         minHeight: 44
-                    ).disabled(!visible).accessibilityIdentifier("money-goal-adjust")
-                    Button("خطة سنة من الاحتياطي ويومك") { yearPlan() }.font(MadarTypography.caption()).frame(
+                    ).contentShape(Rectangle()) }.disabled(!visible).accessibilityIdentifier("money-goal-adjust")
+                    Button { yearPlan() } label: { Text("خطة سنة من الاحتياطي ويومك").font(MadarTypography.caption()).frame(
                         minHeight: 44
-                    ).disabled(!visible).accessibilityIdentifier("money-goal-year")
-                    Button("دفعت منه شيء قبل؟ " + (paid.isEmpty ? "اختر من مصروفاتك" : shown(already))) {
+                    ).contentShape(Rectangle()) }.disabled(!visible).accessibilityIdentifier("money-goal-year")
+                    Button {
                         paidOpen = true
-                    }.font(MadarTypography.caption()).frame(minHeight: 44).disabled(!visible).accessibilityIdentifier(
+                    } label: { Text("دفعت منه شيء قبل؟ " + (paid.isEmpty ? "اختر من مصروفاتك" : shown(already))).font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.disabled(!visible).accessibilityIdentifier(
                         "money-goal-paid")
                     if let failure { Text(failure).font(MadarTypography.caption()) }
                     if failure == nil, let blocked {
@@ -298,9 +298,9 @@ struct MoneyGoalView: View {
                     Text(
                         "كل مبلغ قابل للتعديل، والاقتطاع لا يتجاوز يومك. يتوقف عند اكتمال الهدف وفي أيام إيقاف اليومية."
                     ).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    Button("تمّ") {
+                    Button {
                         selected = -1; edit = false
-                    }.frame(maxWidth: .infinity, minHeight: 48).background(theme.ink).foregroundStyle(theme.background)
+                    } label: { Text("تمّ").frame(maxWidth: .infinity, minHeight: 48).background(theme.ink).foregroundStyle(theme.background).contentShape(Rectangle()) }
                         .accessibilityIdentifier("money-goal-editor-done")
                 }.textFieldStyle(.roundedBorder).padding(22)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(
@@ -337,10 +337,10 @@ struct MoneyGoalView: View {
                         }.frame(minHeight: 50).contentShape(.rect)
                     }.accessibilityIdentifier("money-goal-paid-" + item.id.uuidString)
                 }
-                Button("تمّ") {
+                Button {
                     upfront = service.moneyInput(min(target, minor(upfront)));
                     daily = service.moneyInput(min(rest, minor(daily))); selected = -1; paidOpen = false
-                }.frame(minHeight: 44).accessibilityIdentifier("money-goal-paid-done")
+                } label: { Text("تمّ").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-goal-paid-done")
             }.padding(22)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
     }
@@ -359,10 +359,10 @@ struct MoneyGoalView: View {
             Text("الموعد تقديري إذا بقي الاقتطاع اليومي كما هو. لا تعاد كتابة مصروفاتك السابقة.").font(
                 MadarTypography.caption()
             ).foregroundStyle(theme.secondaryInk)
-            Button(saving ? "جارٍ الإنشاء…" : "اعتمد الخطة") { save() }.frame(maxWidth: .infinity, minHeight: 50)
-                .background(theme.ink).foregroundStyle(theme.background).disabled(saving || !valid)
+            Button { save() } label: { Text(saving ? "جارٍ الإنشاء…" : "اعتمد الخطة").frame(maxWidth: .infinity, minHeight: 50)
+                .background(theme.ink).foregroundStyle(theme.background).contentShape(Rectangle()) }.disabled(saving || !valid)
                 .accessibilityIdentifier("money-goal-confirm")
-            Button("ارجع للتعديل") { preview = false }.frame(minHeight: 44).disabled(saving).accessibilityIdentifier(
+            Button { preview = false } label: { Text("ارجع للتعديل").frame(minHeight: 44).contentShape(Rectangle()) }.disabled(saving).accessibilityIdentifier(
                 "money-goal-back")
         }.padding(24).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
             .presentationDetents([.medium, .large]).madarSheetLock(saving: saving)

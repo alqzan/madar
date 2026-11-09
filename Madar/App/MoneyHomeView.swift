@@ -253,7 +253,7 @@ struct MoneyHomeView: View {
                 else { firstPage(reading) }
                 if reading.unknownBalanceCount > 0 {
                     Text("بعض الحسابات لم يُعرف رصيدها بعد؛ لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    Button("المطابقة مع البنك") { reconcileOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-unknown-balance-reconcile")
+                    Button { reconcileOpen = true } label: { Text("المطابقة مع البنك").font(MadarTypography.body()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-unknown-balance-reconcile")
                 }
             case "envelopes": envelopeSection(reading)
             case "limits":
@@ -315,7 +315,7 @@ struct MoneyHomeView: View {
                 Text(figure: "تجاوزت استحقاق الدورة بـ" + amount(over)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-over-cycle")
             }
             if !amountsVisible {
-                Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-reveal")
+                Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-reveal")
             }
         }.accessibilityElement(children: .contain)
     }
@@ -334,12 +334,12 @@ struct MoneyHomeView: View {
             // With accounts already here, the one missing step is the salary that opens the cycle: it leads, and
             // adding an account is no longer offered as if the room were empty (owner data trial, 23 Oct).
             if reading.hasAccounts {
-                Button("ابدأ دورتك برسالة الراتب") { messagesOpen = true }.font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink, in: Capsule()).foregroundStyle(theme.background).accessibilityIdentifier("money-first-salary")
-                Button("إعداد استقبال رسائل البنك") { guideOpen = true }.font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).accessibilityIdentifier("money-guide-open")
+                Button { messagesOpen = true } label: { Text("ابدأ دورتك برسالة الراتب").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink, in: Capsule()).foregroundStyle(theme.background).contentShape(Rectangle()) }.accessibilityIdentifier("money-first-salary")
+                Button { guideOpen = true } label: { Text("إعداد استقبال رسائل البنك").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).contentShape(Rectangle()) }.accessibilityIdentifier("money-guide-open")
             } else {
-                Button("إعداد استقبال رسائل البنك") { guideOpen = true }.font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink, in: Capsule()).foregroundStyle(theme.background).accessibilityIdentifier("money-guide-open")
-                Button("أضف حسابك يدويًا") { accountsOpen = true }.font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).accessibilityIdentifier("money-first-account")
-                Button("ابدأ برسالة الراتب") { messagesOpen = true }.font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).accessibilityIdentifier("money-first-salary")
+                Button { guideOpen = true } label: { Text("إعداد استقبال رسائل البنك").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink, in: Capsule()).foregroundStyle(theme.background).contentShape(Rectangle()) }.accessibilityIdentifier("money-guide-open")
+                Button { accountsOpen = true } label: { Text("أضف حسابك يدويًا").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).contentShape(Rectangle()) }.accessibilityIdentifier("money-first-account")
+                Button { messagesOpen = true } label: { Text("ابدأ برسالة الراتب").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).contentShape(Rectangle()) }.accessibilityIdentifier("money-first-salary")
             }
             if reading.hasAccounts {
                 Button { basisOpen = true } label: {
@@ -356,7 +356,7 @@ struct MoneyHomeView: View {
                 .buttonStyle(.madarPlain)
                 .accessibilityLabel(!reading.hasKnownBalance ? "على أي أساس، لم يُعرف رصيد الحسابات بعد" : "على أي أساس، الأرصدة المعروفة " + amount(reading.basis.inAccountMinor))
                 .accessibilityIdentifier("money-basis-open")
-                if !amountsVisible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-reveal") }
+                if !amountsVisible { Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-reveal") }
             }
         }
     }
@@ -586,7 +586,7 @@ struct MoneyHomeView: View {
             Text("لم تكتمل قراءة المال").font(MadarTypography.cardTitle())
             Text(message).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
             Button("أعِد المحاولة", action: load).frame(minHeight: 44)
-            Button("الحسابات") { accountsOpen = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-open")
+            Button { accountsOpen = true } label: { Text("الحسابات").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-accounts-open")
         }.padding(20)
     }
 }

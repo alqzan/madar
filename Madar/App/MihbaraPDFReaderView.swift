@@ -79,7 +79,7 @@ struct MihbaraPDFReaderView: View {
                             Text(error).font(MadarTypography.body()).multilineTextAlignment(.center)
                                 .accessibilityIdentifier("mihbara-pdf-error")
                             // AU-46: a passing failure (locked data, busy file) can be retried without leaving.
-                            Button("أعد المحاولة") { self.error = nil; Task { await openPDF() } }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("mihbara-pdf-retry")
+                            Button { self.error = nil; Task { await openPDF() } } label: { Text("أعد المحاولة").font(MadarTypography.body()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("mihbara-pdf-retry")
                             Button("العودة إلى المحبرة", action: close).buttonStyle(MadarPrimaryButton())
                         } else { ProgressView("يفتح ملف PDF من جهازك…") }
                     }
@@ -135,9 +135,9 @@ struct MihbaraPDFReaderView: View {
         .overlay(alignment: .topLeading) {
             if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] == "1",
                UUID(uuidString: ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] ?? "") != nil {
-                Button("اختبار رابط المحبرة") { app.open(URL(string: "madar://mihbara")!) }
+                Button { app.open(URL(string: "madar://mihbara")!) } label: { Text("اختبار رابط المحبرة")
                     .font(.caption).padding(8).background(paper)
-                    .padding(.top, 60).accessibilityIdentifier("mihbara-pdf-root-route")
+                    .padding(.top, 60).contentShape(Rectangle()) }.accessibilityIdentifier("mihbara-pdf-root-route")
             }
         }
         #endif

@@ -157,9 +157,9 @@ struct RoomIntroSheet: View {
                     if let tab = block.tab, session.selectedTab == tab { return }
                     session.openRoom(block)
                 }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("intro-start")
-                Button("ليس الآن") { session.markIntroSeen(block); session.pendingIntro = nil }
+                Button { session.markIntroSeen(block); session.pendingIntro = nil } label: { Text("ليس الآن")
                     .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                    .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("intro-later")
+                    .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("intro-later")
             }.padding(24).frame(maxWidth: 560).frame(maxWidth: .infinity)
         }
         .background(theme.background).foregroundStyle(theme.ink).font(MadarTypography.body())

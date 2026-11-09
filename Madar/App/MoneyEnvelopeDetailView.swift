@@ -41,7 +41,7 @@ struct MoneyEnvelopeDetailView: View {
                         }
                     }
                     if visible { MoneyEnvelopeRoad(app: app, reading: reading) }
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44) }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) } }
                     if reading.savingMinor > 0 || (visible && reading.savingPlanID != nil) {
                         HStack(spacing: 10) {
                             Label { Text("تدّخر \(Text(figure: amount(reading.savingMinor)).font(MadarTypography.cardTitle())) من كل راتب") } icon: { Image(systemName: "diamond.fill").foregroundStyle(theme.color("reserveText")) }.font(MadarTypography.body()).accessibilityLabel("تدّخر " + amount(reading.savingMinor) + " من كل راتب").accessibilityIdentifier("money-envelope-saving-value")
@@ -103,8 +103,8 @@ struct MoneyEnvelopeDetailView: View {
                 } else { Text(figure: "الدين " + service.amount(debt) + " بلا خطة سداد") }
             }.font(MadarTypography.body()).foregroundStyle(theme.color("debt")).accessibilityIdentifier("money-detail-debt")
             Spacer(minLength: 8)
-            Button(reading.repayment?.nextMinor != nil ? "غيّر الخطة" : "سدّه على " + salariesText(suggestedSalaries(reading))) { repayOpen = true }
-                .font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule).foregroundStyle(theme.color("debt")).accessibilityIdentifier("money-repay-open")
+            Button { repayOpen = true } label: { Text(reading.repayment?.nextMinor != nil ? "غيّر الخطة" : "سدّه على " + salariesText(suggestedSalaries(reading)))
+                .font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44).glassEffect(.regular.interactive(), in: .capsule).foregroundStyle(theme.color("debt")).contentShape(Rectangle()) }.accessibilityIdentifier("money-repay-open")
         }
     }
     /// The salaries that land before the envelope's due date (1…6); with no date, three.

@@ -471,11 +471,11 @@ struct NotificationPermissionCard: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(session.notificationPermissionTitle).font(MadarTypography.body())
                     if session.canRequestNotificationPermission {
-                        Button("اسمح بالإشعارات") { session.requestPrayerNotificationPermission() }
-                            .frame(minHeight: 44).accessibilityIdentifier("prayer-notification-permission-request")
+                        Button { session.requestPrayerNotificationPermission() } label: { Text("اسمح بالإشعارات")
+                            .frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("prayer-notification-permission-request")
                     } else if session.shouldOpenNotificationSettings {
-                        Button("افتح إعدادات النظام") { session.openPrayerNotificationSettings() }
-                            .frame(minHeight: 44).accessibilityIdentifier("prayer-notification-permission-settings")
+                        Button { session.openPrayerNotificationSettings() } label: { Text("افتح إعدادات النظام")
+                            .frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("prayer-notification-permission-settings")
                     }
                 }
             }

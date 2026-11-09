@@ -124,7 +124,7 @@ struct PrayerCustomizeView: View {
                 // AU-26: a search with no match explains itself instead of leaving a blank page.
                 if !query.isEmpty, !showsTrackingStart, !normalized("ترتيب الرئيسية").contains(normalized(query)), groups.allSatisfy({ definitions($0).isEmpty }) {
                     Text("لا إعداد يطابق «\(query)». جرّب «المواقيت» أو «التذكير».").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
-                    Button("امسح البحث") { query = "" }.font(PrayerHomeType.body.bold()).frame(minHeight: 44).accessibilityIdentifier("prayer-customize-clear-search")
+                    Button { query = "" } label: { Text("امسح البحث").font(PrayerHomeType.body.bold()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("prayer-customize-clear-search")
                 }
                 Text("تصمت تنبيهات مدار " + MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi).string(30)
                      + " دقيقة بعد كل أذان، و" + MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi).string(20)
@@ -344,18 +344,18 @@ struct PrayerCustomizeView: View {
                 if group.id == "times" && query.isEmpty && session.bool("salah.travelShortenCombine") && session.string("core.travelMode") != "manual" && !askedLocation && travelLocator.canAskForLocation {
                     Divider().overlay(theme.ink.opacity(0.1))
                     Text("يقارن موقعك بمدينتك عند فتح الصلاة ليعرف أنك سافرت، ولا يحفظه. وبدونه يبقى السفر اليدوي.").font(PrayerHomeType.body)
-                    Button("اسمح بالموقع لكشف السفر") { askedLocation = true; travelLocator.askForLocation() }
-                        .frame(minHeight: 44).accessibilityIdentifier("prayer-travel-location-request")
+                    Button { askedLocation = true; travelLocator.askForLocation() } label: { Text("اسمح بالموقع لكشف السفر")
+                        .frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("prayer-travel-location-request")
                 }
                 if group.id == "remind" && (session.bool("salah.askReminder") || session.bool("salah.beforeReminder")) && !session.notificationsAuthorized {
                     Divider().overlay(theme.ink.opacity(0.1))
                     Text(session.notificationPermissionTitle).font(PrayerHomeType.body)
                     if session.canRequestNotificationPermission {
-                        Button("اسمح بإشعارات الصلاة") { session.requestPrayerNotificationPermission() }
-                            .frame(minHeight: 44).accessibilityIdentifier("prayer-notification-permission-request")
+                        Button { session.requestPrayerNotificationPermission() } label: { Text("اسمح بإشعارات الصلاة")
+                            .frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("prayer-notification-permission-request")
                     } else if session.shouldOpenNotificationSettings {
-                        Button("افتح إعدادات النظام") { session.openPrayerNotificationSettings() }
-                            .frame(minHeight: 44).accessibilityIdentifier("prayer-notification-permission-settings")
+                        Button { session.openPrayerNotificationSettings() } label: { Text("افتح إعدادات النظام")
+                            .frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("prayer-notification-permission-settings")
                     }
                 }
             }

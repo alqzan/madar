@@ -156,7 +156,7 @@ struct HabitPastDaySheet:View {
                             .accessibilityIdentifier("ui-test-open-bahw-root")
                     }
 #endif
-                    Spacer(); Button("إلغاء"){dismiss()}.frame(minHeight:44).madarWaitsForSave()
+                    Spacer(); Button {dismiss()} label: { Text("إلغاء").frame(minHeight:44).contentShape(Rectangle()) }.madarWaitsForSave()
                 }
                 Text(reading.name).font(MadarTypography.section()).foregroundStyle(theme.secondaryInk)
                 if first < today {

@@ -140,9 +140,9 @@ struct MoneyZakatView: View {
                     }.frame(maxWidth: .infinity, minHeight: 48).background(theme.ink).foregroundStyle(theme.background)
                 }.disabled(app.settingsWriteInProgress).accessibilityIdentifier("money-zakat-reminder-save")
             } else if saved != "off" {
-                Button("أوقف التذكير السنوي") {
+                Button {
                     app.set(.string("off"), key: "mal.zakatReminder") { reminderDraft = nil }
-                }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
+                } label: { Text("أوقف التذكير السنوي").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
                     .disabled(app.settingsWriteInProgress).accessibilityIdentifier("money-zakat-reminder-disable")
             }
         }
@@ -196,7 +196,7 @@ struct MoneyZakatView: View {
                     Spacer()
                     VStack(alignment: .leading, spacing: 3) { Text("الموعد القادم"); MadarDateLabel(app.dateLabels(hawl.anniversary), primaryFont: .system(size: 11), secondaryFont: .system(size: 11)) }
                 }.font(.system(size: 11)).foregroundStyle(theme.secondaryInk)
-            } else { Button("اختر تاريخًا تحاسب فيه نفسك كل سنة") { editor = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-zakat-choose-hawl") }
+            } else { Button { editor = true } label: { Text("اختر تاريخًا تحاسب فيه نفسك كل سنة").font(MadarTypography.body()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-zakat-choose-hawl") }
         }
     }
     private var hawlStartMonth: Int { input?.hawlStartHijri.flatMap { key in key.dropFirst(2).split(separator: "-").dropFirst().first.flatMap { Int($0) } } ?? 1 }

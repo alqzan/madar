@@ -59,7 +59,7 @@ struct MoneyCardsView: View {
                         ScrollView(.horizontal) {
                             HStack(spacing: 10) { ForEach(reading.cards) { miniature($0) } }
                         }.scrollIndicators(.hidden).accessibilityIdentifier("money-card-strip")
-                        if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-cards-reveal") }
+                        if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-cards-reveal") }
                         ViewThatFits(in: .horizontal) {
                             tabStrip
                             ScrollView(.horizontal) { tabStrip }.scrollIndicators(.hidden)
@@ -73,7 +73,7 @@ struct MoneyCardsView: View {
                             }
                         }
                     }
-                } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة") { load(routeRequestID: initialRouteRequestID) }.frame(minHeight: 44) }
+                } else if let failure { Text(failure).font(MadarTypography.body()); Button { load(routeRequestID: initialRouteRequestID) } label: { Text("أعِد المحاولة").frame(minHeight: 44).contentShape(Rectangle()) } }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 250) }
             }.padding(.horizontal, 20).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme)

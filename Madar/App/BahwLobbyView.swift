@@ -110,7 +110,7 @@ struct BahwLobbyView: View {
                     if visible.isEmpty && !arranging {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("أخفيت كل الودجات").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                            Button("أظهر الودجات المخفية") { arranging = true; drawerOpen = true }.font(MadarTypography.body().bold()).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle()).accessibilityIdentifier("bahw-show-hidden")
+                            Button { arranging = true; drawerOpen = true } label: { Text("أظهر الودجات المخفية").font(MadarTypography.body().bold()).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle()) }.accessibilityIdentifier("bahw-show-hidden")
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if !arranging {
@@ -135,9 +135,9 @@ struct BahwLobbyView: View {
                 HStack {
                     Text("رتّب البهو").font(MadarTypography.section())
                     Spacer()
-                    Button("تمّ") { withAnimation(.snappy) { arranging = false } }
+                    Button { withAnimation(.snappy) { arranging = false } } label: { Text("تمّ")
                         .font(MadarTypography.section()).frame(minHeight: 44).padding(.horizontal, 20)
-                        .background(theme.accentFill, in: .capsule).contentShape(.capsule).foregroundStyle(theme.onAccent)
+                        .background(theme.accentFill, in: .capsule).contentShape(.capsule).foregroundStyle(theme.onAccent) }
                         .accessibilityIdentifier("bahw-arrange")
                 }.padding(.horizontal, 14).padding(.vertical, 6).background(theme.background)
             }

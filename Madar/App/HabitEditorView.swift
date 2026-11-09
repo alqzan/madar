@@ -54,14 +54,14 @@ struct HabitEditorView:View {
     var body:some View {
         VStack(spacing:0) {
             HStack {
-                Button("إلغاء"){dismiss()}.frame(minHeight:44).madarWaitsForSave().accessibilityIdentifier("habit-cancel")
+                Button {dismiss()} label: { Text("إلغاء").frame(minHeight:44).contentShape(Rectangle()) }.madarWaitsForSave().accessibilityIdentifier("habit-cancel")
 #if DEBUG
                 if ProcessInfo.processInfo.environment["MADAR_UI_BAHW_ROOT_ROUTE_HARNESS"] == "1" {
                     Button("اختبر رابط البهو") { session.open(URL(string: "madar://bahw")!) }
                         .accessibilityIdentifier("ui-test-open-bahw-root")
                 }
 #endif
-                Spacer();Text(reading == nil ? "عادة جديدة" : "تعديل العادة").font(MadarTypography.cardTitle());Spacer();Button("احفظ"){save()}.font(MadarTypography.section()).frame(minHeight:44).disabled(busy || name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).accessibilityIdentifier("habit-save")
+                Spacer();Text(reading == nil ? "عادة جديدة" : "تعديل العادة").font(MadarTypography.cardTitle());Spacer();Button {save()} label: { Text("احفظ").font(MadarTypography.section()).frame(minHeight:44).contentShape(Rectangle()) }.disabled(busy || name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).accessibilityIdentifier("habit-save")
             }.padding(.horizontal,20).padding(.top,10)
             // AU-35: the error sits under «احفظ», not below five sections, and editing clears it.
             if let issue { Text(issue).font(MadarTypography.caption()).foregroundStyle(theme.accent).frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,20).padding(.top,6).accessibilityIdentifier("habit-editor-error") }

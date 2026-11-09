@@ -45,7 +45,7 @@ struct MoneyBigExpenseView: View {
                         HStack(spacing: 0) { ForEach(BigExpense.Mode.allCases, id: \.rawValue) { m in
                             Button { mode = m; cycles = nil; failure = nil } label: { Text(title(m)).font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).background(m == mode ? theme.ink : .clear).foregroundStyle(m == mode ? theme.background : theme.ink) }.accessibilityIdentifier("money-big-mode-" + m.rawValue)
                         } }.overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) }
-                        if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-big-reveal") }
+                        if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-big-reveal") }
                         if let p = plan {
                             distribution(p, amount: r.amountMinor)
                             effect(p, reading: r)
@@ -73,7 +73,7 @@ struct MoneyBigExpenseView: View {
                             Button { save(p, r) } label: { Text(saving ? "جارٍ الاعتماد…" : "اعتمد التوزيع").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || !visible || (p.futureMinor > 0 && envelopeID == nil && name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)).accessibilityIdentifier("money-big-save")
                         } else {
                             Text(reading?.home.cycle == nil ? "تحتاج دورة مالية لحساب أثر التوزيع." : mode == .reserve ? "الاحتياطي لا يكفي لهذا المبلغ. اختر توزيعًا آخر." : "هذا السداد يتجاوز ثلث يومك أو اثنتي عشرة دورة. جرّب المزج أو الاحتياطي.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).padding(.vertical, 30).accessibilityIdentifier("money-big-unavailable")
-                            if cycles != nil { Button("اختر أقصر مدة ممكنة") { cycles = nil }.frame(minHeight: 44) }
+                            if cycles != nil { Button { cycles = nil } label: { Text("اختر أقصر مدة ممكنة").frame(minHeight: 44).contentShape(Rectangle()) } }
                         }
                     } else if let failure { Text(failure); Button("أعِد المحاولة", action: load) }
                     else { ProgressView().frame(height: 200) }

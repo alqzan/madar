@@ -56,8 +56,8 @@ struct DiarySearchView: View {
                     if let failure {
                         VStack(alignment:.leading,spacing:10) {
                             Text(failure).font(DiaryType.writing).accessibilityIdentifier("diary-search-read-error")
-                            Button("أعد المحاولة") { loadAttempt += 1 }
-                                .font(DiaryType.label).frame(minHeight:44).accessibilityIdentifier("diary-search-retry")
+                            Button { loadAttempt += 1 } label: { Text("أعد المحاولة")
+                                .font(DiaryType.label).frame(minHeight:44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-search-retry")
                         }
                     }
                     let found = results

@@ -63,7 +63,7 @@ struct MoneyAnalysisView: View {
                 if !empty { periodPicker }
                 if let reading {
                     summary(reading)
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-analysis-reveal") }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-analysis-reveal") }
                     if visible, canReadMoney,
                        (aiAvailability == .ready || aiAvailability == .needsDownload) {
                         Button {

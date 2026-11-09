@@ -118,7 +118,7 @@ struct MihbaraConversionCard: View {
                     }
                     Text("تنقّل في التطبيق كما تشاء؛ يكمل وحده ويضعه على رفّك.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
-                    Button("إيقاف") { MihbaraConversions.shared.cancel(job.id, app: app) }.font(MadarTypography.caption()).frame(minHeight: 44)
+                    Button { MihbaraConversions.shared.cancel(job.id, app: app) } label: { Text("إيقاف").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
                         .accessibilityIdentifier("mihbara-pdf-flow-cancel")
                 case .assembling:
                     Text("يرتّب صفحات «\(job.title)» في كتاب منساب").font(MadarTypography.section())
@@ -164,11 +164,11 @@ struct MihbaraConversionCard: View {
                             Button("افتحه") { MihbaraConversions.shared.dismiss(job.id); onOpen(bookID) }.buttonStyle(MadarPrimaryButton())
                                 .accessibilityIdentifier("mihbara-pdf-flow-open")
                         }
-                        Button("حسنًا") { MihbaraConversions.shared.dismiss(job.id) }.font(MadarTypography.caption()).frame(minHeight: 44)
+                        Button { MihbaraConversions.shared.dismiss(job.id) } label: { Text("حسنًا").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
                     }
                 case .failed(let message):
                     Text(message).font(MadarTypography.caption()).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("mihbara-pdf-flow-error")
-                    Button("حسنًا") { MihbaraConversions.shared.dismiss(job.id) }.font(MadarTypography.caption()).frame(minHeight: 44)
+                    Button { MihbaraConversions.shared.dismiss(job.id) } label: { Text("حسنًا").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
                 }
             }
         }
@@ -176,8 +176,8 @@ struct MihbaraConversionCard: View {
     }
 
     private var cancelButton: some View {
-        Button("إيقاف") { MihbaraConversions.shared.cancel(job.id, app: app) }
-            .font(MadarTypography.caption()).frame(minHeight: 44)
+        Button { MihbaraConversions.shared.cancel(job.id, app: app) } label: { Text("إيقاف")
+            .font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
             .accessibilityIdentifier("mihbara-pdf-flow-cancel")
     }
 

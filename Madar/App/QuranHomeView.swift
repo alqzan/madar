@@ -53,10 +53,10 @@ struct QuranHomeView: View {
     #endif
     @ViewBuilder private func planContent(_ state: QuranRoomState) -> some View {
                     if let draft = state.draft {
-                        Button(draft.isPastDay ? "راجع ما تمّ في جلستك السابقة" : "تابع جلستك") {
+                        Button {
                             run { active = try await service.resume(draftID: draft.id) }
-                        }.font(bodyFont(14, bold: true)).foregroundStyle(theme.ink).padding(14)
-                            .frame(maxWidth: .infinity).background(theme.color("hifzTint"), in: .rect(cornerRadius: 16))
+                        } label: { Text(draft.isPastDay ? "راجع ما تمّ في جلستك السابقة" : "تابع جلستك").font(bodyFont(14, bold: true)).foregroundStyle(theme.ink).padding(14)
+                            .frame(maxWidth: .infinity).background(theme.color("hifzTint"), in: .rect(cornerRadius: 16)).contentShape(Rectangle()) }
                             .disabled(busy).accessibilityIdentifier("quran-resume")
                     }
                     if let key = state.missedDayKey {
@@ -74,7 +74,7 @@ struct QuranHomeView: View {
                             }
                         } }
                     }
-                    if state.plan == nil { Button("ابدأ خطة الحفظ") { showSetup = true }.font(bodyFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).contentShape(Capsule()).accessibilityIdentifier("quran-start-plan") }
+                    if state.plan == nil { Button { showSetup = true } label: { Text("ابدأ خطة الحفظ").font(bodyFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).contentShape(Capsule()) }.accessibilityIdentifier("quran-start-plan") }
                     if state.plan != nil || !state.steps.isEmpty { path(state) }
     }
     private enum HomeDetail: Identifiable {
@@ -175,15 +175,15 @@ struct QuranHomeView: View {
                     Button("ابدأ التدريب") { detail = nil; run { active = try await service.start(kind: .drill, stepID: step.id, range: nil, rakaat: nil, spotID: nil) } }.disabled(busy)
                         .font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()).contentShape(Capsule())
                         .disabled(busy).accessibilityIdentifier("quran-drill-start")
-                    Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).foregroundStyle(theme.ink)
+                    Button { detail = nil } label: { Text("تمّ").font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).foregroundStyle(theme.ink) }
                 } else if step.available, !step.completed, state?.draft == nil {
                     // Owner 20 Oct: the day's order is a suggestion, not a gate; any open step can start now.
                     Button(step.id == next?.id ? "ابدأ" : "ابدأ بها الآن") { detail = nil; run { active = try await service.start(kind: step.kind, stepID: step.id, range: step.range, rakaat: nil, spotID: nil) } }.disabled(busy)
                         .font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()).contentShape(Capsule())
                         .disabled(busy).accessibilityIdentifier("quran-step-start")
-                    Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).foregroundStyle(theme.ink)
+                    Button { detail = nil } label: { Text("تمّ").font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).foregroundStyle(theme.ink) }
                 } else {
-                Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()).contentShape(Capsule())
+                Button { detail = nil } label: { Text("تمّ").font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()).contentShape(Capsule()) }
                 }
             }.padding(24).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface)
                 .presentationDetents([.height(step.kind == .drill || (step.available && !step.completed && state?.draft == nil) ? 300 : 260)]).presentationDragIndicator(.visible)
@@ -325,9 +325,9 @@ struct QuranHomeView: View {
                 VStack(spacing: 18) { ForEach(reviewSteps) { step in stepRow(step, color: theme.color("reviewText")) } }
                     .background(alignment: .leading) { if !reviewSteps.isEmpty { Rectangle().fill(theme.color("track")).frame(width: 1.5).padding(.vertical, 16).padding(.leading, 10) } }
                 if state.dayCloseAvailable {
-                    Button("ختام اليوم") { showDayClose = true }
+                    Button { showDayClose = true } label: { Text("ختام اليوم")
                         .font(bodyFont(14, bold: true)).foregroundStyle(theme.color("reviewText"))
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
                         .accessibilityIdentifier("quran-day-close-open")
                 }
             }

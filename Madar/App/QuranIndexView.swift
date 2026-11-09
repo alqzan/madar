@@ -103,9 +103,9 @@ struct QuranIndexView: View {
                 if let error {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(error).font(quranFont(13)).accessibilityIdentifier("quran-index-read-error");
-                        Button("أعد المحاولة") {
+                        Button {
                             self.error = nil; attempt += 1
-                        }.font(quranFont(13, bold: true)).frame(minHeight: 44).accessibilityIdentifier(
+                        } label: { Text("أعد المحاولة").font(quranFont(13, bold: true)).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier(
                             "quran-index-retry")
                     }
                 }
@@ -153,9 +153,9 @@ struct QuranIndexView: View {
                     Text(item.title).font(quranSerif(28)).accessibilityIdentifier(
                         "quran-index-selected-item-" + item.id);
                     Text(item.subtitle).font(quranFont(14)); Text(status(item)).font(quranFont(14, bold: true));
-                    Button("افتح في المصحف") {
+                    Button {
                         selected = nil; reader = item.firstPage
-                    }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()); Button("تمّ") { selected = nil }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                    } label: { Text("افتح في المصحف").frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }; Button { selected = nil } label: { Text("تمّ").frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
                 }.padding(24).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface).foregroundStyle(
                     theme.ink
                 ).presentationDetents([.height(310), .large]).environment(\.layoutDirection, .rightToLeft)

@@ -54,8 +54,8 @@ struct MihbaraPDFSearchView: View {
                             .tint(theme.accentFill)
                         Text("أقرأ صفحة الملف \(digits.string(min(pages.count + 1, max(1, total)))) من \(digits.string(total))…")
                             .font(MadarTypography.caption())
-                        Button("أوقف استخراج النص") { jobID = nil; phase = "stopped" }
-                            .font(MadarTypography.caption()).frame(minHeight: 44)
+                        Button { jobID = nil; phase = "stopped" } label: { Text("أوقف استخراج النص")
+                            .font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
                             .accessibilityIdentifier("mihbara-pdf-ocr-cancel")
                     } else if phase == "done" {
                         Text("اكتمل النص المتاح لصفحات الملف.").font(MadarTypography.caption())
@@ -63,8 +63,8 @@ struct MihbaraPDFSearchView: View {
                     } else {
                         Text(failure ?? "توقف الاستخراج؛ يمكنك البحث في الصفحات المقروءة.")
                             .font(MadarTypography.caption())
-                        Button("واصل استخراج النص") { failure = nil; phase = "scanning"; jobID = UUID() }
-                            .frame(minHeight: 44).accessibilityIdentifier("mihbara-pdf-ocr-resume")
+                        Button { failure = nil; phase = "scanning"; jobID = UUID() } label: { Text("واصل استخراج النص")
+                            .frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("mihbara-pdf-ocr-resume")
                     }
                     Text("صفحات الصور تُقرأ على جهازك وقد تخطئ، فراجع الصفحة. يُحذف هذا النص عند إغلاق البحث.")
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)

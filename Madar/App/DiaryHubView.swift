@@ -92,8 +92,8 @@ struct DiaryHubView: View {
                             VStack(spacing: 12) {
                                 Text(failure).font(DiaryType.heading).multilineTextAlignment(.center)
                                     .accessibilityIdentifier("diary-hub-error")
-                                Button("أعد المحاولة") { loadAttempt += 1 }
-                                    .frame(minHeight: 44).accessibilityIdentifier("diary-hub-retry")
+                                Button { loadAttempt += 1 } label: { Text("أعد المحاولة")
+                                    .frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-hub-retry")
                             }.frame(maxWidth: .infinity).padding(.vertical, 28)
                         } else {
                             ProgressView("تُفتح أيامك…")
@@ -246,9 +246,9 @@ struct DiaryHubView: View {
                 monthPage(archive, month: month)
             } else if typeSize.isAccessibilitySize {
                 ForEach(1...12, id: \.self) { month in
-                    Button(grid.monthName(year: selectedYear, month: month)) { self.month = month }.font(
+                    Button { self.month = month } label: { Text(grid.monthName(year: selectedYear, month: month)).font(
                         DiaryType.heading
-                    ).frame(minHeight: 44)
+                    ).frame(minHeight: 44).contentShape(Rectangle()) }
                 }
             } else {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 3), spacing: 16) {
@@ -267,11 +267,11 @@ struct DiaryHubView: View {
             HStack(spacing: 8) {
                 Text("التقويم").font(DiaryType.label)
                 ForEach([FirstCalendar.gregorian, .hijri], id: \.rawValue) { value in
-                    Button(value == .gregorian ? "الميلادي" : "الهجري") {
+                    Button {
                         app.set(.string(value.rawValue), key: "notes.calendarFirst") {
                             year = nil; month = nil
                         }
-                    }.font(DiaryType.label).frame(minHeight: 44).padding(.horizontal, 8).overlay {
+                    } label: { Text(value == .gregorian ? "الميلادي" : "الهجري").font(DiaryType.label).frame(minHeight: 44).padding(.horizontal, 8).contentShape(Rectangle()) }.overlay {
                         Capsule().stroke(grid.first == value ? theme.accent : theme.line)
                     }.contentShape(Capsule()).accessibilityIdentifier("diary-calendar-" + value.rawValue)
                 }
@@ -465,8 +465,8 @@ struct DiaryHubView: View {
             if case .failure(let error) = loaded {
                 Text(madarUserMessage(error)).font(DiaryType.writing).accessibilityIdentifier("diary-hub-memory-error")
                 // A real failure leaves the flag false already: bumping the attempt is what reads again.
-                Button("أعد المحاولة") { memoryReadFailurePending = false; loadAttempt += 1 }
-                    .frame(minHeight: 44).accessibilityIdentifier("diary-hub-memories-retry")
+                Button { memoryReadFailurePending = false; loadAttempt += 1 } label: { Text("أعد المحاولة")
+                    .frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-hub-memories-retry")
             } else {
                 timeline(
                     archive.days.filter { home?.selection.days.contains($0.day) == true },

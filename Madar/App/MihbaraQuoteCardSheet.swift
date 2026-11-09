@@ -118,9 +118,9 @@ struct MihbaraQuoteCardSheet: View {
                 Text("النص").font(MadarTypography.caption()).foregroundStyle(secondaryInk)
                 Spacer()
                 if quote != card.quote {
-                    Button("أعد النص كما في الكتاب") { quote = card.quote }
+                    Button { quote = card.quote } label: { Text("أعد النص كما في الكتاب")
                         .font(MadarTypography.caption()).foregroundStyle(ink)
-                        .frame(minHeight: 44)
+                        .frame(minHeight: 44).contentShape(Rectangle()) }
                         .accessibilityIdentifier("mihbara-quote-card-restore")
                 }
             }

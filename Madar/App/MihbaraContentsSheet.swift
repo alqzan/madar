@@ -41,7 +41,7 @@ struct MihbaraContentsSheet: View {
             HStack {
                 Text("فهرس الكتاب").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title2))
                 Spacer()
-                Button("تمّ") { dismiss() }.font(MadarTypography.caption()).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("mihbara-reader-contents-close")
+                Button { dismiss() } label: { Text("تمّ").font(MadarTypography.caption()).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("mihbara-reader-contents-close")
             }
             if items.isEmpty {
                 Text("لا يتضمن هذا الكتاب فهرسًا").font(MadarTypography.body()).foregroundStyle(palette.ink2)

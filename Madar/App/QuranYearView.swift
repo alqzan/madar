@@ -101,7 +101,7 @@ struct QuranYearView: View {
                         MadarDateLabel(day.date); Text("حفظ " + service.faceCount(day.hifz) + "، مراجعة " + service.faceCount(day.review)).font(quranFont(13))
                     }
                     if item.hifz == 0 && item.review == 0 { Text("لا جلسات مسجّلة").font(quranFont(15)) }
-                    Button("تمّ") { month = nil }.frame(minHeight: 44)
+                    Button { month = nil } label: { Text("تمّ").frame(minHeight: 44).contentShape(Rectangle()) }
                 }.padding(24) }.background(theme.surface).foregroundStyle(theme.ink).presentationDetents([.medium, .large]).environment(\.layoutDirection, .rightToLeft)
             }
     }

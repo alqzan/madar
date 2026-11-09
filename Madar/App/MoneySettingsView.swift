@@ -148,7 +148,7 @@ struct MoneySettingsView: View {
                                 Image(systemName: "seal").font(.title).foregroundStyle(theme.color("reserveText"))
                             }
                             if !visible {
-                                Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier(
+                                Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier(
                                     "money-settings-reveal")
                             }
                             switch page {
@@ -162,9 +162,9 @@ struct MoneySettingsView: View {
                             case .room: roomPage
                             case .reconciliation: reconciliationPage
                             }
-                            Button("أعِد الافتراضي") {
+                            Button {
                                 editing = false; app.reset(keys) { load() }
-                            }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier(
+                            } label: { Text("أعِد الافتراضي").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier(
                                 "money-settings-reset")
                             Text("— " + service.digits.string(page.rawValue + 1) + " —").font(MadarTypography.fine())
                                 .foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity)
@@ -512,7 +512,7 @@ struct MoneySettingsView: View {
                 }
             } else {
                 Text("••• أيام").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity)
-                Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44)
+                Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
                     .accessibilityIdentifier("money-settings-reconcile-reveal")
             }
             note(

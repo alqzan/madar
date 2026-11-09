@@ -40,7 +40,7 @@ struct MoneyMessagesView: View {
                             .foregroundStyle(theme.color("reserveText"))
                     }
                     arches(reading)
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-messages-reveal") }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-messages-reveal") }
                     ForEach(reading.statements) { statementCard($0) }
                     ForEach(reading.drafts) { draftRow($0) }
                     clearButton(reading)
@@ -51,7 +51,7 @@ struct MoneyMessagesView: View {
                             Text("كل رسالة وصلت حُسمت. ما يصل عبر الاختصار يظهر هنا للمراجعة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
                         }.padding(.vertical, 24).accessibilityIdentifier("money-messages-empty")
                     }
-                    Button("دليل إعداد الاختصار وفحص الوصول") { guideOpen = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-guide-open")
+                    Button { guideOpen = true } label: { Text("دليل إعداد الاختصار وفحص الوصول").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-guide-open")
                     footer(reading)
                 } else if let failure {
                     Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44)

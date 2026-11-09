@@ -45,7 +45,7 @@ struct MoneyCategoriesView: View {
                 }.padding(.top, 8)
                 if let reading {
                     header(reading)
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44) }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } }
                     if reading.shelves.isEmpty {
                         Text("لا تصنيفات بعد. تُنشأ حين تصنّف أول حركة في رسائل البنك.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
                     }

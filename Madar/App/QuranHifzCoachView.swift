@@ -102,7 +102,7 @@ struct QuranHifzCoachView: View {
                                     .font(font(14)).frame(minHeight: 44).contentShape(Rectangle())
                             }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-method-" + method.rawValue)
                         }
-                        Button("تمّ") { sheet = nil }.font(font(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("quran-method-done")
+                        Button { sheet = nil } label: { Text("تمّ").font(font(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-method-done")
                     } else {
                         Text(coach.pastDay ? "هذه جلسة من يوم سابق. احفظ ما تمّ بيومه أو تجاهل المسودة." : coach.review ? "المسودة محفوظة تلقائيًا. سجّل الأوجه التي قيّمتها، أو تجاهل الجلسة، أو تابع." : "المسودة محفوظة تلقائيًا. سجّل ما اجتاز التسميع المستور، أو تجاهل الجلسة، أو تابع.")
                             .font(font(14)).foregroundStyle(theme.secondaryInk)

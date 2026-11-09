@@ -83,13 +83,13 @@ struct DiaryWelcomeView: View {
                 }.padding(.horizontal, 28).padding(.bottom, 20).frame(maxWidth: 600).frame(maxWidth: .infinity)
             }
             HStack(spacing: 10) {
-                if step > 0 { Button("السابق") { step -= 1 }.font(MadarTypography.section()).frame(minHeight: 52).padding(.horizontal, 16) }
+                if step > 0 { Button { step -= 1 } label: { Text("السابق").font(MadarTypography.section()).frame(minHeight: 52).padding(.horizontal, 16).contentShape(Rectangle()) } }
                 // Audit 28 Oct: four steps with no way past them; every choice already has its agreed default.
-                else { Button("ابدأ مباشرة") { Task { await finish() } }.font(MadarTypography.section()).frame(minHeight: 52).padding(.horizontal, 16)
+                else { Button { Task { await finish() } } label: { Text("ابدأ مباشرة").font(MadarTypography.section()).frame(minHeight: 52).padding(.horizontal, 16).contentShape(Rectangle()) }
                     .disabled(saving || app.settingsWriteInProgress).accessibilityIdentifier("diary-welcome-skip") }
-                Button(step == 3 ? "افتح دفتري" : "التالي") {
+                Button {
                     if step < 3 { step += 1 } else { Task { await finish() } }
-                }.font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
+                } label: { Text(step == 3 ? "افتح دفتري" : "التالي").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule).contentShape(Rectangle()) }
                     .disabled(saving || app.settingsWriteInProgress).accessibilityIdentifier("diary-welcome-next")
             }.padding(.horizontal, 24).padding(.bottom, 18).frame(maxWidth: 600)
         }.foregroundStyle(theme.ink).background(theme.background)

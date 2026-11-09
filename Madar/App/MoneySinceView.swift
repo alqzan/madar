@@ -42,7 +42,7 @@ struct MoneySinceView: View {
                             .overlay { Rectangle().stroke(theme.color("dueText").opacity(0.6), style: .init(lineWidth: 1, dash: [3, 2])) }
                             .accessibilityIdentifier("money-since-silent")
                     }
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44) }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } }
                     columns(reading)
                     dayDetail(reading)
                     if reading.pending > 0 { decisions(reading) }

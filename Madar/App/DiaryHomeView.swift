@@ -148,7 +148,7 @@ struct DiaryHomeView: View {
                 } else if let failure {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(failure).font(DiaryType.writing)
-                        Button("حاول مرة أخرى") { Task { await refresh(retrying: true) } }.frame(minHeight: 44).accessibilityIdentifier("diary-home-retry")
+                        Button { Task { await refresh(retrying: true) } } label: { Text("حاول مرة أخرى").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-home-retry")
                     }
                 }
                 else { ProgressView("تُفتح صفحتك…") }

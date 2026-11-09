@@ -237,7 +237,7 @@ struct MoneyCategorizeSheet: View {
                     ProgressView("يقرأ التصنيفات…").frame(maxWidth: .infinity, minHeight: 120)
                 } else if let loadFailure {
                     Text(loadFailure).font(MadarTypography.body()).foregroundStyle(theme.color("dueText"))
-                    Button("أعِد المحاولة") { loadCategories() }.frame(minHeight: 44).accessibilityIdentifier("money-categorize-load-retry")
+                    Button { loadCategories() } label: { Text("أعِد المحاولة").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-categorize-load-retry")
                 } else if categories.isEmpty {
                     Text("لا توجد تصنيفات متاحة لهذه الحركة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
                 } else {

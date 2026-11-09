@@ -44,19 +44,19 @@ struct QuranOutsideView: View {
                         Text("تصل التذكيرات بعد انتهاء حرمة الصلاة، وضمن ميزانية هذا الجهاز.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         Toggle("تذكيرات هذا الجهاز", isOn: Binding(get: { app.bool("notif.thisDeviceReminders") }, set: { app.set(.bool($0), key: "notif.thisDeviceReminders") }))
                         if !app.notificationsAuthorized {
-                            Button(app.shouldOpenNotificationSettings ? "افتح إعدادات الإشعارات" : "اسمح بالتذكيرات") {
+                            Button {
                                 if app.shouldOpenNotificationSettings { app.openPrayerNotificationSettings() } else { app.requestPrayerNotificationPermission() }
-                            }.frame(minHeight: 44)
+                            } label: { Text(app.shouldOpenNotificationSettings ? "افتح إعدادات الإشعارات" : "اسمح بالتذكيرات").frame(minHeight: 44).contentShape(Rectangle()) }
                         }
-                        Button("أعِد المتفق عليه") { app.reset(["quran.wirdReminder", "quran.lateReminder"]) }.frame(minHeight: 44).accessibilityIdentifier("quran-reminder-reset")
+                        Button { app.reset(["quran.wirdReminder", "quran.lateReminder"]) } label: { Text("أعِد المتفق عليه").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-reminder-reset")
                     }.font(MadarTypography.body()).disabled(app.settingsWriteInProgress)
                 }
                 Text("أضف «القرآن» من معرض ودجات iOS، واختر قالب «في صدرك» أو «مسار اليوم» أو «الحفظ والمراجعة». يختار النظام حجمها. وزرّ «مؤقّت المراجعة» في مركز التحكم يفتح جلسة المراجعة مباشرة.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 if let error {
                     Text(error).font(MadarTypography.caption()).accessibilityIdentifier("quran-outside-read-error")
-                    Button("أعد المحاولة") { retryAttempt += 1 }
-                        .font(MadarTypography.body()).frame(minHeight: 44)
+                    Button { retryAttempt += 1 } label: { Text("أعد المحاولة")
+                        .font(MadarTypography.body()).frame(minHeight: 44).contentShape(Rectangle()) }
                         .accessibilityIdentifier("quran-outside-retry")
                 }
             }.padding(16)

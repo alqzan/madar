@@ -66,8 +66,8 @@ struct QuranFreeView: View {
                 if let error { Text(error).font(quranFont(13)).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("quran-free-error") }
                 // AU-95: a failed index read left «ابدأ» disabled for good; one tap reads it again.
                 if error != nil, pages.isEmpty {
-                    Button("أعِد المحاولة") { error = nil; indexAttempt += 1 }
-                        .font(quranFont(14, bold: true)).frame(minHeight: 44).contentShape(Rectangle())
+                    Button { error = nil; indexAttempt += 1 } label: { Text("أعِد المحاولة")
+                        .font(quranFont(14, bold: true)).frame(minHeight: 44).contentShape(Rectangle()) }
                         .accessibilityIdentifier("quran-free-retry")
                 }
             }.padding(16)
@@ -78,9 +78,9 @@ struct QuranFreeView: View {
                         Text("من الوجه " + service.numerals.string(range.lowerBound) + " إلى " + service.numerals.string(range.upperBound))
                             .font(quranFont(16, bold: true)).accessibilityIdentifier("quran-free-range-summary")
                         Text(saved == 0 ? "هذا النطاق للقراءة فقط؛ لا يُسجّل تقييمًا أو يزيد حفظك أو سلسلتك" : "يُسجّل من النطاق ما اكتمل في صدرك (" + service.faceCount(saved) + ")؛ الباقي قراءة فقط").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
-                        Button(saved == 0 ? "ابدأ القراءة" : "ابدأ التسميع") {
+                        Button {
                             beginReading(range)
-                        }.font(quranFont(16,bold:true)).foregroundStyle(theme.onAccent).frame(maxWidth:.infinity,minHeight:50).background(theme.accent,in:Capsule()).disabled(busy || pages.isEmpty).accessibilityIdentifier("quran-free-start")
+                        } label: { Text(saved == 0 ? "ابدأ القراءة" : "ابدأ التسميع").font(quranFont(16,bold:true)).foregroundStyle(theme.onAccent).frame(maxWidth:.infinity,minHeight:50).background(theme.accent,in:Capsule()).contentShape(Rectangle()) }.disabled(busy || pages.isEmpty).accessibilityIdentifier("quran-free-start")
                     }
                 }.padding(16)
             }

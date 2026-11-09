@@ -174,7 +174,7 @@ struct DiaryDayOneImportView: View {
                 Text("كل ما في هذا الملف موجود في دفترك من قبل. لا شيء جديد.").font(MadarTypography.body()).accessibilityIdentifier("dayone-nothing-new")
             }
             if importing == nil {
-                Button("اختر ملفًا آخر") { reset(); choose() }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("dayone-choose-again")
+                Button { reset(); choose() } label: { Text("اختر ملفًا آخر").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("dayone-choose-again")
             }
         }
     }
@@ -220,7 +220,7 @@ struct DiaryDayOneImportView: View {
     private var undoneCard: some View {
         card {
             Text("أُلغي الاستيراد. لم يبقَ منه شيء في دفترك، وما كتبته بنفسك لم يُمسّ.").font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("dayone-undone")
-            Button("اختر ملفًا") { undone = false; choose() }.font(MadarTypography.caption()).frame(minHeight: 44)
+            Button { undone = false; choose() } label: { Text("اختر ملفًا").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
         }
     }
 

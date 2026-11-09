@@ -265,7 +265,7 @@ struct DiaryDayView: View {
                                 if let failure {
                                     VStack(alignment: .leading, spacing: 10) {
                                         Text(failure).font(MadarTypography.body()).accessibilityIdentifier("diary-day-read-error")
-                                        Button("حاول مرة أخرى") { retry += 1 }.frame(minHeight: 44)
+                                        Button { retry += 1 } label: { Text("حاول مرة أخرى").frame(minHeight: 44).contentShape(Rectangle()) }
                                             .accessibilityIdentifier("diary-day-read-retry")
                                     }.padding(20)
                                 }

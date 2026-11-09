@@ -26,8 +26,8 @@ struct DiaryProjectsPanel: View {
                 .buttonStyle(.madarPlain).accessibilityIdentifier("diary-project-new")
             if let failure {
                 Text(failure).font(MadarTypography.body()).accessibilityIdentifier("diary-project-read-error")
-                Button("أعد المحاولة") { loadAttempt += 1 }
-                    .frame(minHeight: 44).accessibilityIdentifier("diary-project-retry")
+                Button { loadAttempt += 1 } label: { Text("أعد المحاولة")
+                    .frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-project-retry")
             }
             if let routeMessage { Text(routeMessage).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-project-route-status") }
             let open = projects.filter { $0.finishedAt == nil }, chapters = projects.filter { $0.finishedAt != nil }

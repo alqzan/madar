@@ -102,9 +102,9 @@ struct QuranPlanSetupView: View {
                         if let error { Text(error).font(quranFont(13)).foregroundStyle(theme.color("dueText")) }
                         // AU-46: a failed first read is not a dead end.
                         if input == nil, error != nil {
-                            Button("حاول مرة أخرى") {
+                            Button {
                                 self.error = nil; loadPlan()
-                            }.font(quranFont(15, bold: true)).frame(minHeight: 44).accessibilityIdentifier(
+                            } label: { Text("حاول مرة أخرى").font(quranFont(15, bold: true)).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier(
                                 "quran-setup-retry")
                         }
                     }.padding(16)
@@ -129,7 +129,7 @@ struct QuranPlanSetupView: View {
                                     .foregroundStyle(theme.secondaryInk)
                             }
                         }
-                        Button(step == 4 ? (busy ? "نحفظ الخطة…" : "احفظ الخطة") : "التالي") {
+                        Button {
                             if step < 4 {
                                 step += 1
                             } else {
@@ -141,9 +141,9 @@ struct QuranPlanSetupView: View {
                                     }
                                 }
                             }
-                        }.font(quranFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 52).foregroundStyle(
+                        } label: { Text(step == 4 ? (busy ? "نحفظ الخطة…" : "احفظ الخطة") : "التالي").font(quranFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 52).foregroundStyle(
                             theme.onAccent
-                        ).background(theme.accent, in: Capsule()).accessibilityIdentifier("quran-setup-next")
+                        ).background(theme.accent, in: Capsule()).contentShape(Rectangle()) }.accessibilityIdentifier("quran-setup-next")
                     }.padding(16)
                 }
             }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review"))

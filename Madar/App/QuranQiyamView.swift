@@ -82,7 +82,7 @@ struct QuranQiyamView: View {
             .preferredColorScheme(.dark)
             .safeAreaInset(edge: .bottom) {
                 if board?.unavailable == nil, board != nil {
-                    Button("ابدأ القيام") {
+                    Button {
                         busy = true;
                         Task {
                             defer { busy = false };
@@ -91,11 +91,11 @@ struct QuranQiyamView: View {
                                     kind: .qiyam, stepID: nil, range: nil, rakaat: rakaat, spotID: nil)
                             } catch { self.error = quranUserMessage(error) }
                         }
-                    }.font(quranFont(16, bold: true)).foregroundStyle(QuranNightColors.onGold).frame(
+                    } label: { Text("ابدأ القيام").font(quranFont(16, bold: true)).foregroundStyle(QuranNightColors.onGold).frame(
                         maxWidth: .infinity, minHeight: 54
                     ).background(QuranNightColors.gold, in: Capsule()).padding(16).background(
                         QuranNightColors.background
-                    ).disabled(busy).accessibilityIdentifier("quran-qiyam-start")
+                    ).contentShape(Rectangle()) }.disabled(busy).accessibilityIdentifier("quran-qiyam-start")
                 }
             }
             .task(id: rakaat) { load() }
@@ -153,11 +153,11 @@ struct QuranQiyamSessionView: View {
                             }
                         }
                         if qiyam.completed > 0 {
-                            Button(qiyam.finished ? "سجّل القيام والمراجعة" : "سجّل ما أتممت") {
+                            Button {
                                 action(qiyam.finished && !qiyam.pastDay ? .commit : .commitPartial)
-                            }.font(quranFont(16, bold: true)).foregroundStyle(QuranNightColors.onGold).frame(
+                            } label: { Text(qiyam.finished ? "سجّل القيام والمراجعة" : "سجّل ما أتممت").font(quranFont(16, bold: true)).foregroundStyle(QuranNightColors.onGold).frame(
                                 maxWidth: .infinity, minHeight: 54
-                            ).background(QuranNightColors.gold, in: Capsule()).accessibilityIdentifier(
+                            ).background(QuranNightColors.gold, in: Capsule()).contentShape(Rectangle()) }.accessibilityIdentifier(
                                 "quran-qiyam-save")
                         }
                     }
@@ -184,19 +184,19 @@ struct QuranQiyamSessionView: View {
                     Text("جلستك محفوظة").font(quranSerif(27));
                     Text("لا تُسجّل الركعات والمراجعة قبل تأكيدك.").font(quranFont(14));
                     if qiyam.completed > 0 {
-                        Button("سجّل ما أتممت") {
+                        Button {
                             exit = false; action(.commitPartial)
-                        }.frame(minHeight: 44).accessibilityIdentifier("quran-qiyam-partial")
+                        } label: { Text("سجّل ما أتممت").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-qiyam-partial")
                     };
                     if !qiyam.pastDay {
-                        Button("احتفظ بالمسودة لوقت آخر") {
+                        Button {
                             exit = false; close()
-                        }.frame(minHeight: 44).accessibilityIdentifier("quran-qiyam-keep")
+                        } label: { Text("احتفظ بالمسودة لوقت آخر").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-qiyam-keep")
                     };
-                    Button("تجاهل الجلسة") {
+                    Button {
                         exit = false; action(.discard)
-                    }.frame(minHeight: 44).accessibilityIdentifier("quran-qiyam-discard");
-                    Button("تابع") { exit = false }.frame(minHeight: 44)
+                    } label: { Text("تجاهل الجلسة").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-qiyam-discard");
+                    Button { exit = false } label: { Text("تابع").frame(minHeight: 44).contentShape(Rectangle()) }
                 }.font(quranFont(15)).padding(24).foregroundStyle(QuranNightColors.gold).frame(
                     maxWidth: .infinity, alignment: .leading
                 ).presentationBackground(QuranNightColors.background).presentationDetents([.height(390)]).environment(

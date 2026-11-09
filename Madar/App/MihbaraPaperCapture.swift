@@ -19,11 +19,11 @@ struct PaperBarcodeScannerSheet: View {
             } else {
                 ContentUnavailableView("مسح الباركود غير متاح", systemImage: "barcode.viewfinder", description: Text("اكتب رقم الكتاب الدولي (ISBN) المطبوع تحت الباركود خلف الغلاف."))
             }
-            Button("تمّ") { dismiss() }
+            Button { dismiss() } label: { Text("تمّ")
                 .font(.body.weight(.semibold))
                 .padding(12)
                 .background(.regularMaterial, in: .capsule)
-                .padding()
+                .padding().contentShape(Rectangle()) }
                 .accessibilityIdentifier("mihbara-paper-scanner-close")
         }
         .background(MadarToken.colors["rooms.mihbara.dark.desk"] ?? RoomTheme(room: "mihbara", dark: true).background)

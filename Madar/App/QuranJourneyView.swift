@@ -77,7 +77,7 @@ struct QuranJourneyView: View {
                 } else if let error {
                     Text(error)
                     // AU-95: one failed read used to leave this page dead.
-                    Button("أعِد المحاولة") { self.error = nil; attempt += 1 }.frame(minHeight: 44).contentShape(Rectangle())
+                    Button { self.error = nil; attempt += 1 } label: { Text("أعِد المحاولة").frame(minHeight: 44).contentShape(Rectangle()) }
                         .accessibilityIdentifier("quran-journey-retry")
                 }
             }
@@ -94,8 +94,8 @@ struct QuranJourneyView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("الوجه " + service.numerals.string(page)).font(quranSerif(26))
                 Text(value?.pageDates[page].map { "حُفظ في " + $0 } ?? "لم يكتمل حفظه بعد").font(quranFont(15))
-                Button("افتح في المصحف") { showPage = false; reader = page }.frame(minHeight: 44)
-                Button("تمّ") { showPage = false }.frame(minHeight: 44)
+                Button { showPage = false; reader = page } label: { Text("افتح في المصحف").frame(minHeight: 44).contentShape(Rectangle()) }
+                Button { showPage = false } label: { Text("تمّ").frame(minHeight: 44).contentShape(Rectangle()) }
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)

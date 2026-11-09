@@ -178,7 +178,7 @@ struct QuranStrengthView: View {
                                 cornerRadius: 3), with: .color(waterColor(face.strength)))
                     }
                 }.frame(height: 24).accessibilityHidden(true)
-                Button("تفاصيل الأوجه") { details = true }.font(quranFont(13)).frame(minHeight: 44)
+                Button { details = true } label: { Text("تفاصيل الأوجه").font(quranFont(13)).frame(minHeight: 44).contentShape(Rectangle()) }
                     .accessibilityIdentifier("quran-strength-details")
                 Text("في هذا الجزء: " + service.faceCount(p.faces.filter(\.far).count) + " بعيدة وفق تعريف المنسوب")
                     .font(quranFont(12)).foregroundStyle(theme.secondaryInk)
@@ -204,7 +204,7 @@ struct QuranStrengthView: View {
                                 theme.accent, in: Capsule())
                         }.accessibilityIdentifier("quran-strength-raise")
                     }
-                    Button("راجعه الآن") { review = true }.font(quranFont(13, bold: true)).frame(minHeight: 48)
+                    Button { review = true } label: { Text("راجعه الآن").font(quranFont(13, bold: true)).frame(minHeight: 48).contentShape(Rectangle()) }
                         .accessibilityIdentifier("quran-strength-review")
                 }
             }
@@ -222,11 +222,11 @@ struct QuranStrengthView: View {
                             "المتبقي: " + service.faceCount(board.remaining) + "، حصة اليوم: "
                                 + service.faceCount(board.activeShare)
                         ).font(quranFont(13));
-                        Button("ألغِ خطة الاسترداد") {
+                        Button {
                             run {
                                 try await service.perform(.cancelRecovery); recovery = false
                             }
-                        }.frame(minHeight: 44).accessibilityIdentifier("quran-recovery-cancel")
+                        } label: { Text("ألغِ خطة الاسترداد").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-recovery-cancel")
                     }
                     ForEach(board.options) { option in
                         Button {
@@ -244,13 +244,13 @@ struct QuranStrengthView: View {
                         }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-recovery-days-" + String(option.id))
                     }
                     if board.far > 0 {
-                        Button(board.active == nil ? "ابدأ الاسترداد" : "ابدأ خطة جديدة") {
+                        Button {
                             run {
                                 try await service.perform(.createRecovery(days: days)); recovery = false
                             }
-                        }.font(quranFont(16, bold: true)).foregroundStyle(theme.onAccent).frame(
+                        } label: { Text(board.active == nil ? "ابدأ الاسترداد" : "ابدأ خطة جديدة").font(quranFont(16, bold: true)).foregroundStyle(theme.onAccent).frame(
                             maxWidth: .infinity, minHeight: 50
-                        ).background(theme.accent, in: Capsule()).accessibilityIdentifier("quran-recovery-create")
+                        ).background(theme.accent, in: Capsule()).contentShape(Rectangle()) }.accessibilityIdentifier("quran-recovery-create")
                     }
                 }
                 // AU-95: a failed start or cancel used to write its reason under the sheet, so the button seemed dead.
@@ -258,7 +258,7 @@ struct QuranStrengthView: View {
                     Text(error).font(quranFont(13)).foregroundStyle(theme.color("dueText")).accessibilityIdentifier(
                         "quran-recovery-error")
                 }
-                Button("تمّ") { recovery = false }.frame(minHeight: 44)
+                Button { recovery = false } label: { Text("تمّ").frame(minHeight: 44).contentShape(Rectangle()) }
             }.padding(24)
         }.foregroundStyle(theme.ink).background(theme.surface).presentationDetents([.height(590), .large]).environment(
             \.layoutDirection, .rightToLeft)
@@ -275,7 +275,7 @@ struct QuranStrengthView: View {
                         Text("آخر تسميع: " + face.reviewed + "\nالموعد: " + face.due).font(quranFont(13));
                         if face.far { Text("بعيد").font(quranFont(12)).foregroundStyle(theme.color("dueText")) }
                     }; Divider()
-                }; Button("تمّ") { details = false }.frame(minHeight: 44)
+                }; Button { details = false } label: { Text("تمّ").frame(minHeight: 44).contentShape(Rectangle()) }
             }.padding(24)
         }.foregroundStyle(theme.ink).background(theme.surface).presentationDetents([.medium, .large]).environment(
             \.layoutDirection, .rightToLeft)

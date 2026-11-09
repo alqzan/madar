@@ -65,7 +65,7 @@ struct MihbaraNotebookContent: View {
                 if let failure {
                     Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         .accessibilityIdentifier("mihbara-notebook-read-error")
-                    Button("أعِد المحاولة") { load() }.font(MadarTypography.body()).frame(minHeight: 44)
+                    Button { load() } label: { Text("أعِد المحاولة").font(MadarTypography.body()).frame(minHeight: 44).contentShape(Rectangle()) }
                         .accessibilityIdentifier("mihbara-notebook-retry")
                 } else if notes.isEmpty {
                     VStack(spacing: 8) {

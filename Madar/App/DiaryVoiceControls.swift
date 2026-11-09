@@ -26,8 +26,8 @@ struct DiaryVoiceControls: View {
             if controller.canDownload {
                 if let progress = controller.downloadProgress {
                     ProgressView("تُحمّل لغة الإملاء…", value: progress)
-                    Button("ألغِ التحميل") { controller.cancelDownload() }.frame(minHeight: 44)
-                } else { Button("حمّل لغة الإملاء") { controller.downloadLanguage() }.font(MadarTypography.caption()).frame(minHeight: 44) }
+                    Button { controller.cancelDownload() } label: { Text("ألغِ التحميل").frame(minHeight: 44).contentShape(Rectangle()) }
+                } else { Button { controller.downloadLanguage() } label: { Text("حمّل لغة الإملاء").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } }
             }
         }
     }
@@ -40,9 +40,9 @@ struct DiaryVoiceFeedback: View {
         VStack(alignment: .leading, spacing: 8) {
             if !controller.message.isEmpty { Text(controller.message).font(MadarTypography.caption()).accessibilityIdentifier("diary-voice-status") }
             if !controller.partialText.isEmpty { Text(controller.partialText).font(DiaryType.writing).foregroundStyle(.secondary) }
-            if controller.converting { Button("ألغِ التحويل؛ أبقِ الصوت") { controller.cancelConversion() }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("diary-voice-cancel") }
-            if controller.pendingAudioCount > 0 { Button("أعد حفظ التسجيل في الصفحة") { Task { await controller.recoverRecordings() } }.frame(minHeight: 44).disabled(controller.savingAudio || controller.recording) }
-            if controller.microphoneDenied { Button("افتح إعدادات الميكروفون") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }.font(MadarTypography.caption()).frame(minHeight: 44) }
+            if controller.converting { Button { controller.cancelConversion() } label: { Text("ألغِ التحويل؛ أبقِ الصوت").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-voice-cancel") }
+            if controller.pendingAudioCount > 0 { Button { Task { await controller.recoverRecordings() } } label: { Text("أعد حفظ التسجيل في الصفحة").frame(minHeight: 44).contentShape(Rectangle()) }.disabled(controller.savingAudio || controller.recording) }
+            if controller.microphoneDenied { Button { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } } label: { Text("افتح إعدادات الميكروفون").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } }
         }
     }
 }

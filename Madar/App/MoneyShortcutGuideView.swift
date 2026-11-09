@@ -27,9 +27,9 @@ struct MoneyShortcutGuideView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("اختبر الوصول").font(MadarTypography.cardTitle())
                 Text("ابدأ الفحص، ثم جرّب وصول رسالة شراء أو كشف من المرسل الذي اخترته. افتح مدار بعدها وتحقق من النتيجة. رسائل التحقق والتسويق لا تُحفظ، فلا تصلح للاختبار.").font(MadarTypography.caption())
-                Button(baseline == nil ? "ابدأ فحص الوصول" : "ابدأ فحصًا جديدًا") { start() }.frame(minHeight: 44).accessibilityIdentifier("money-guide-start")
+                Button { start() } label: { Text(baseline == nil ? "ابدأ فحص الوصول" : "ابدأ فحصًا جديدًا").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-guide-start")
                 if baseline != nil {
-                    Button("تحقق من الوصول") { check() }.frame(minHeight: 44).accessibilityIdentifier("money-guide-check")
+                    Button { check() } label: { Text("تحقق من الوصول").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-guide-check")
                     Text(arrived != nil ? "وصلت رسالة عبر الاختصار ✓" : checked ? "لم تصل رسالة جديدة عبر الاختصار بعد" : "بانتظار رسالة جديدة عبر الاختصار").font(MadarTypography.body()).foregroundStyle(arrived != nil ? theme.color("surplusText") : theme.secondaryInk).accessibilityIdentifier("money-guide-status")
                     if let arrived { MadarDateLabel(app.dateLabels(.containing(arrived, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine()); Text(AppMoneyService(app: app).time(arrived)).font(MadarTypography.fine()) }
                     if checked && arrived == nil { Text("راجع المرسل والعبارة، وأن محتوى الرسالة متصل بإجراء مدار، وأن الأتمتة ما زالت مفعّلة. افتح مدار مرة بعد إعادة تشغيل الهاتف، ثم جرّب مجددًا.").font(MadarTypography.caption()) }

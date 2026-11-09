@@ -119,8 +119,8 @@ struct QuranAyahTafsirSheet: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("لا يذكر " + shortTitle(book?.metadata.title ?? "هذا الكتاب") + " هذه الآية وحدها.")
                     .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                Button("اختر تفسيرًا آخر") { showingLibrary = true }.font(strong)
-                    .foregroundStyle(theme.color("hifzText")).frame(minHeight: 40)
+                Button { showingLibrary = true } label: { Text("اختر تفسيرًا آخر").font(strong)
+                    .foregroundStyle(theme.color("hifzText")).frame(minHeight: 40).contentShape(Rectangle()) }
             }
         } else {
             ForEach(passages) { passage in

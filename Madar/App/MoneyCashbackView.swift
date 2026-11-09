@@ -41,7 +41,7 @@ struct MoneyCashbackView: View {
                     if reading.cards.isEmpty { emptyPage }
                     else {
                         hero(reading)
-                        if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-cashback-reveal") }
+                        if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-cashback-reveal") }
                         if reading.hasPurchases {
                             DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.8).frame(height: 3)
                             monthly(reading)

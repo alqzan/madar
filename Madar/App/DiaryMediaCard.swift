@@ -35,8 +35,8 @@ struct DiaryMediaCard: View {
                 if let voice {
                     DisclosureGroup("التسجيل والنص") {
                         DiaryVoiceControls(controller: voice)
-                        if !voice.converting { Button(transcript.isEmpty ? "حوّله إلى نص" : "أعِد التحويل") { Task { await voice.transcribe(media) } }.frame(minHeight: 44).accessibilityIdentifier("diary-transcribe-" + media.id.uuidString) }
-                        Button("عدّل النص مع إبقاء الصوت") { editingTranscript = true }.frame(minHeight: 44).accessibilityIdentifier("diary-transcript-edit-" + media.id.uuidString)
+                        if !voice.converting { Button { Task { await voice.transcribe(media) } } label: { Text(transcript.isEmpty ? "حوّله إلى نص" : "أعِد التحويل").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-transcribe-" + media.id.uuidString) }
+                        Button { editingTranscript = true } label: { Text("عدّل النص مع إبقاء الصوت").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-transcript-edit-" + media.id.uuidString)
                     }.font(MadarTypography.caption())
                 }
             } else if media.kind == "missing" {

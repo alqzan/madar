@@ -127,7 +127,7 @@ struct DiaryTextEditor: View {
                         }
                         Text(voice.recording ? "اضغط لإيقاف التسجيل وحفظ الصوت" : "اضغط وتكلّم").font(MadarTypography.fine()).frame(maxWidth: .infinity)
                         HStack {
-                            if let media = voice.lastMedia, !voice.converting { Button("حوّله إلى نص") { Task { await voice.transcribe(media) } }.frame(minHeight: 44).accessibilityIdentifier("diary-editor-transcribe") }
+                            if let media = voice.lastMedia, !voice.converting { Button { Task { await voice.transcribe(media) } } label: { Text("حوّله إلى نص").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-editor-transcribe") }
                         }.font(MadarTypography.caption())
                     }.padding(.horizontal, 16).padding(.vertical, 8)
                 }

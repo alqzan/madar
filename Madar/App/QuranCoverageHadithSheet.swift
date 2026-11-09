@@ -30,11 +30,11 @@ struct QuranCoverageHadithSheet: View {
                 Rectangle().fill(theme.color("line")).frame(height: 1)
                 Text("في صدرك هو ما أكملت حفظه من القرآن، وتعينك المراجعة على تثبيته.")
                     .font(.custom("thmanyahsans-Regular", size: 14, relativeTo: .body))
-                Button("تمّ") { dismiss() }
+                Button { dismiss() } label: { Text("تمّ")
                     .font(.custom("thmanyahsans-Bold", size: 14, relativeTo: .body))
                     .frame(maxWidth: .infinity, minHeight: 48)
                     .foregroundStyle(theme.onAccent)
-                    .background(theme.color("accent"), in: Capsule())
+                    .background(theme.color("accent"), in: Capsule()).contentShape(Rectangle()) }
                     .accessibilityIdentifier("quran-hadith-close")
             }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
         }

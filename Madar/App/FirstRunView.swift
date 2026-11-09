@@ -38,8 +38,8 @@ struct FirstRunView: View {
                     if let message = locator.message, step == 1 {
                         Text(message).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         if locator.needsSettings {
-                            Button("افتح إعدادات الآيفون") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
-                                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("first-run-open-settings")
+                            Button { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } } label: { Text("افتح إعدادات الآيفون")
+                                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("first-run-open-settings")
                         }
                     }
                     actions
@@ -64,8 +64,8 @@ struct FirstRunView: View {
             Button("اسمح بالصور") {
                 Task { _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite); session.completeOnboarding() }
             }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("first-run-photos")
-            Button("ليس الآن") { session.completeOnboarding() }
-                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("first-run-continue")
+            Button { session.completeOnboarding() } label: { Text("ليس الآن")
+                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("first-run-continue")
         }
     }
 

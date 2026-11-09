@@ -62,7 +62,7 @@ struct QuranWeekView: View {
                         }
                         if day.partialAyahs > 0 { Text(QuranDayCloseCopy.ayahs(day.partialAyahs, digits: service.numerals) + " من وجه لم يكتمل بعد").font(font(14)) }
                         Text("الخارجية لحفظ وجه، والداخلية لمراجعة ثمانية أوجه؛ يوم الراحة لا يدخل في أيام الحفظ.").font(font(13)).foregroundStyle(theme.secondaryInk)
-                        Button("تمّ") { selected = nil }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                        Button { selected = nil } label: { Text("تمّ").frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
                     }.padding(24)
                 }.foregroundStyle(theme.ink).background(theme.surface).presentationDetents([.height(400), .large]).presentationDragIndicator(.visible).environment(\.layoutDirection, .rightToLeft)
             }

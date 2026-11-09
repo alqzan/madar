@@ -38,7 +38,7 @@ struct MoneyEnvelopesView: View {
                     Text("المظروف المطلوب لم يعد موجودًا. المظاريف الحالية ظاهرة كما هي.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-envelope-route-unavailable")
                 }
-                if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-envelopes-reveal") }
+                if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-envelopes-reveal") }
                 if let reading {
                     if let cycle = reading.home.cycle { dailySplit(cycle) }
                     reserve(reading)
@@ -78,7 +78,7 @@ struct MoneyEnvelopesView: View {
                             .overlay { RoundedRectangle(cornerRadius: 6).stroke(theme.color("accent").opacity(0.6), style: .init(lineWidth: 1, dash: [4, 3])) }
                     }.buttonStyle(.madarPlain).padding(.top, 6).accessibilityIdentifier("money-envelopes-new-goal")
                 } else if let failure {
-                    Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة") { load(routeRequestID: initialRouteRequestID) }.frame(minHeight: 44)
+                    Text(failure).font(MadarTypography.body()); Button { load(routeRequestID: initialRouteRequestID) } label: { Text("أعِد المحاولة").frame(minHeight: 44).contentShape(Rectangle()) }
                 } else { ProgressView().frame(maxWidth: .infinity, minHeight: 200) }
             }.padding(.horizontal, 18).padding(.top, 0).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
@@ -222,7 +222,7 @@ struct MoneyReserveTargetView: View {
             if current != nil && !numbersVisible {
                 // A saved goal stays hidden like every other amount until the user reveals the numbers.
                 Text("الهدف محفوظ ومخفي حتى تُظهر الأرقام.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-reserve-target-reveal")
+                Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-reserve-target-reveal")
             } else {
                 TextField("المبلغ المستهدف", text: $input).keyboardType(.decimalPad).font(MadarTypography.cardTitle()).padding(16).overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.color("reserveText"), lineWidth: 1) }.accessibilityIdentifier("money-reserve-target-input")
                 if let errorMessage { Text(errorMessage).font(MadarTypography.caption()) }

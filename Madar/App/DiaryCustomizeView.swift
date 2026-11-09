@@ -87,7 +87,7 @@ struct DiaryCustomizeView: View {
                                     VStack(alignment: .leading, spacing: 8) {
                                         Text("تحويل الصوت عبر Apple").font(MadarTypography.section())
                                         Text(app.bool("notes.serverDictationConsent") ? "مسموح على هذا الجهاز عند غياب التحويل المحلي" : "لا يُرسل الصوت دون سؤال صريح عند التحويل").font(DiaryType.label)
-                                        if app.bool("notes.serverDictationConsent") { Button("ألغِ الموافقة على إرسال الصوت") { app.set(.bool(false), key: "notes.serverDictationConsent") }.frame(minHeight: 44).accessibilityIdentifier("diary-revoke-speech-consent") }
+                                        if app.bool("notes.serverDictationConsent") { Button { app.set(.bool(false), key: "notes.serverDictationConsent") } label: { Text("ألغِ الموافقة على إرسال الصوت").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-revoke-speech-consent") }
                                     }
                                 }
                                 else { SettingControl(definition: definition, session: app) }

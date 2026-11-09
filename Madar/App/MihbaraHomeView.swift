@@ -62,9 +62,9 @@ struct MihbaraHomeView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(shelfReadError ?? "تعذّرت قراءة بيانات المحبرة الآن.")
                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-            Button("أعِد المحاولة") { load(retryingAfterFailure: true) }
+            Button { load(retryingAfterFailure: true) } label: { Text("أعِد المحاولة")
                 .font(MadarTypography.section()).frame(minHeight: 44)
-                .foregroundStyle(theme.accent)
+                .foregroundStyle(theme.accent).contentShape(Rectangle()) }
                 .accessibilityIdentifier("mihbara-home-retry")
         }
         .padding(16)
@@ -1092,9 +1092,9 @@ struct MihbaraHomeView: View {
                         Text("على المكتب").font(MadarTypography.fine()).padding(.horizontal, 9).padding(.vertical, 7)
                             .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).background(theme.color("goldUnderstand"), in: .rect(cornerRadius: 7))
                         if let nextHadith {
-                            Button(r.todayHadiths.isEmpty ? "اقرأ" : "الورد") { sheet = .hadith(nextHadith.number) }
+                            Button { sheet = .hadith(nextHadith.number) } label: { Text(r.todayHadiths.isEmpty ? "اقرأ" : "الورد")
                                 .font(MadarTypography.caption()).frame(minWidth: 48, minHeight: 44)
-                                .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).background(theme.color("goldUnderstand"), in: .capsule)
+                                .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).background(theme.color("goldUnderstand"), in: .capsule).contentShape(Rectangle()) }
                                 .accessibilityIdentifier("mihbara-sunnah-drawer-read")
                         }
                     }.padding(8)
@@ -1200,7 +1200,7 @@ struct MihbaraHomeView: View {
                         .accessibilityIdentifier("ui-test-mihbara-rename-then-route")
                     }
 #endif
-                    Button("تمّ") { sheet = nil }.frame(minWidth: 44, minHeight: 44)
+                    Button { sheet = nil } label: { Text("تمّ").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
                 }
                 ZStack {
                     UnevenRoundedRectangle(topLeadingRadius: 70, bottomLeadingRadius: 3, bottomTrailingRadius: 3, topTrailingRadius: 70).fill(theme.color("navy").gradient)
@@ -1554,8 +1554,8 @@ private struct MihbaraRahlOpeningView: View {
                         .accessibilityIdentifier("mihbara-rahlOpens-" + value)
                     }
                 }
-                Button("أعِد الإعداد الافتراضي") { app.reset([key]) }
-                    .font(MadarTypography.caption()).frame(minHeight: 44)
+                Button { app.reset([key]) } label: { Text("أعِد الإعداد الافتراضي")
+                    .font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
                     .accessibilityIdentifier("mihbara-rahlOpens-reset")
             }.padding(20)
         }

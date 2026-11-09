@@ -36,8 +36,8 @@ struct QuranSessionLogView: View {
                     if routeUnavailableID != nil {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("هذه الجلسة لم تعد موجودة في السجلّ.").font(quranFont(14)).accessibilityIdentifier("quran-history-route-unavailable")
-                            Button("اعرض السجل الكامل") { self.routeUnavailableID = nil; filter = "all" }
-                                .font(quranFont(13, bold: true)).frame(minHeight: 44).accessibilityIdentifier("quran-history-route-show-all")
+                            Button { self.routeUnavailableID = nil; filter = "all" } label: { Text("اعرض السجل الكامل")
+                                .font(quranFont(13, bold: true)).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-history-route-show-all")
                         }.padding(14).background(theme.surface, in: .rect(cornerRadius: 16))
                     }
                     QuranPaperCard {
@@ -58,7 +58,7 @@ struct QuranSessionLogView: View {
                         if filter != "all" {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("لا جلسات من هذا النوع بعد").font(quranFont(15))
-                                Button("اعرض الكل") { filter = "all" }.font(quranFont(14, bold: true)).frame(minHeight: 44).accessibilityIdentifier("quran-log-show-all")
+                                Button { filter = "all" } label: { Text("اعرض الكل").font(quranFont(14, bold: true)).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-log-show-all")
                             }.padding(20)
                         } else { Text("لا جلسات مسجّلة بعد؛ تظهر هنا بعد أول حفظ أو مراجعة").font(quranFont(15)).padding(20) }
                     }
@@ -92,8 +92,8 @@ struct QuranSessionLogView: View {
                 if let error {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(error).font(quranFont(13))
-                        Button("حاول مرة أخرى") { reloadAttempt &+= 1 }
-                            .font(quranFont(13, bold: true)).frame(minHeight: 44)
+                        Button { reloadAttempt &+= 1 } label: { Text("حاول مرة أخرى")
+                            .font(quranFont(13, bold: true)).frame(minHeight: 44).contentShape(Rectangle()) }
                             .accessibilityIdentifier("quran-history-retry")
                     }
                 }

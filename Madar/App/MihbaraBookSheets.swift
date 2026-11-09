@@ -584,7 +584,7 @@ struct MihbaraBookCard: View {
                     if book.shelf != "finished" {
                         Button("أنهيت الكتاب") { move("finished") }.buttonStyle(MadarPrimaryButton()).disabled(saving).accessibilityIdentifier("mihbara-book-mark-finished")
                     }
-                    Button("أعده إلى أبي أقرأها") { move("want") }.frame(minHeight: 44).accessibilityIdentifier("mihbara-book-to-want")
+                    Button { move("want") } label: { Text("أعده إلى أبي أقرأها").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("mihbara-book-to-want")
                 }
             }.padding(22)
         }.background(theme.background).foregroundStyle(theme.ink).scrollDismissesKeyboard(.interactively)
@@ -783,7 +783,7 @@ struct MihbaraHadithView: View {
                 if let source = URL(string: collection.source) { Link("المصدر والنسخة", destination: source).font(MadarTypography.caption()) }
                 if let license = URL(string: collection.licenseURL) { Link("حقوق النص وعزوه إلى ويكي مصدر", destination: license).font(MadarTypography.fine()) }
                 Button("فهمته") { mark(true) }.buttonStyle(MadarPrimaryButton()).disabled(saving).accessibilityIdentifier("mihbara-hadith-understood")
-                Button("أرجع له") { mark(false) }.frame(maxWidth: .infinity, minHeight: 44).disabled(saving).accessibilityIdentifier("mihbara-hadith-return")
+                Button { mark(false) } label: { Text("أرجع له").frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.disabled(saving).accessibilityIdentifier("mihbara-hadith-return")
             }.padding(24)
         }.background(theme.background).foregroundStyle(theme.ink)
     }

@@ -61,7 +61,7 @@ struct QuranHomeSessionFlow: View {
                     }.pickerStyle(.segmented)
                 }
             }
-            ForEach(state.answers) { answer in Button(answer.text) { perform(.chooseAnswer(answer.id)) }.font(MadarTypography.body()).frame(minHeight: 44) }
+            ForEach(state.answers) { answer in Button { perform(.chooseAnswer(answer.id)) } label: { Text(answer.text).font(MadarTypography.body()).frame(minHeight: 44).contentShape(Rectangle()) } }
             Button(state.primaryTitle) { perform(state.primaryAction) }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("quran-session-advance")
         }.padding(20).foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
         .confirmationDialog("تخرج من الجلسة؟", isPresented: $showExit, titleVisibility: .visible) {

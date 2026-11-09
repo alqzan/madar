@@ -236,8 +236,8 @@ struct QuranWirdReferenceView: View {
         card {
             VStack(alignment: .leading, spacing: 10) {
                 Text("تعذّر فتح خريطة آيات الورد.").font(bodyFont(14, bold: true))
-                Button("حاول مرة أخرى") { retryCount += 1 }
-                    .font(bodyFont(13, bold: true)).frame(minHeight: 44)
+                Button { retryCount += 1 } label: { Text("حاول مرة أخرى")
+                    .font(bodyFont(13, bold: true)).frame(minHeight: 44).contentShape(Rectangle()) }
                     .accessibilityIdentifier("quran-reference-retry")
             }
         }

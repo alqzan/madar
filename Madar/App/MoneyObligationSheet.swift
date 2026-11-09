@@ -107,7 +107,7 @@ struct MoneyObligationSheet: View {
                 HStack {
                     Text("التزام جديد").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
                     Spacer()
-                    Button("إلغاء") { dismiss() }.frame(minHeight: 44).accessibilityIdentifier("money-obligation-cancel").madarWaitsForSave()
+                    Button { dismiss() } label: { Text("إلغاء").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-obligation-cancel").madarWaitsForSave()
                 }.contentShape(Rectangle()).onTapGesture { field = nil }
                 Picker("النوع", selection: $kind) {
                     Text("فاتورة").tag("bill"); Text("اشتراك").tag("subscription"); Text("قرض").tag("loan"); Text("تقسيط").tag("installment")
@@ -119,11 +119,11 @@ struct MoneyObligationSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("المبلغ المقترح مخفي حتى تُظهر الأرقام.")
                             .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                        Button("أظهر الأرقام") {
+                        Button {
                             revealed = true
                             if !amountWasEdited { rawAmount = suggestedAmountInput ?? "" }
-                        }
-                        .font(MadarTypography.caption()).frame(minHeight: 44)
+                        } label: { Text("أظهر الأرقام")
+                        .font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
                         .accessibilityIdentifier("money-obligation-reveal-suggested-amount")
                     }
                 } else {

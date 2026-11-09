@@ -381,7 +381,7 @@ struct BackupSettingsView: View {
                     }.accessibilityElement(children: .combine)
                 }
             } else if model.statusReadFailed {
-                Button("أعِد قراءة حالة النسخ") { Task { await model.refresh() } }.frame(maxWidth: .infinity, minHeight: 80).accessibilityIdentifier("backup-status-retry")
+                Button { Task { await model.refresh() } } label: { Text("أعِد قراءة حالة النسخ").frame(maxWidth: .infinity, minHeight: 80).contentShape(Rectangle()) }.accessibilityIdentifier("backup-status-retry")
             } else { ProgressView("يقرأ حالة النسخ…").frame(maxWidth: .infinity, minHeight: 80) }
         }
     }
@@ -463,7 +463,7 @@ struct BackupSettingsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 heading("استعادة نسخة", "arrow.counterclockwise")
                 note("الفحص والمعاينة لا يغيران بياناتك. تبدأ الاستعادة بعد اختيارك وتأكيدك.")
-                Button("اختر ملف النسخة") { filePurpose = .restore; choosingFile = true }.frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("restore-select-file")
+                Button { filePurpose = .restore; choosingFile = true } label: { Text("اختر ملف النسخة").frame(minHeight: 44).contentShape(Rectangle()) }.disabled(model.busy).accessibilityIdentifier("restore-select-file")
                 if let file = model.selectedFile { Text(file.lastPathComponent).font(MadarTypography.caption()) }
                 SecureField("كلمة مرور النسخة", text: $model.restorePassphrase).textContentType(.password).focused($focusedPassword, equals: 3).submitLabel(.done).onSubmit { focusedPassword = nil }
                     .padding(12).background(theme.background, in: .rect(cornerRadius: 12)).accessibilityIdentifier("restore-password")

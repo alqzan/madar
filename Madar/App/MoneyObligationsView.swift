@@ -56,14 +56,14 @@ struct MoneyObligationsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                             .accessibilityIdentifier("money-obligations-read-error")
-                        Button("أعد المحاولة") { retryAttempt += 1 }.frame(minHeight: 44)
+                        Button { retryAttempt += 1 } label: { Text("أعد المحاولة").frame(minHeight: 44).contentShape(Rectangle()) }
                             .accessibilityIdentifier("money-obligations-retry")
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
                         .background(theme.surface, in: .rect(cornerRadius: 12))
                 }
                 if let reading {
                     summary(reading)
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44) }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } }
                     thread(reading)
                     if let due = current(reading) { detail(due, reading) }
                     if reading.ladder.contains(where: { $0.total > 0 }) { ladder(reading) } else { Text("لا التزامات قادمة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-ladder-empty") }
@@ -76,7 +76,7 @@ struct MoneyObligationsView: View {
                 } else if let failure {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(failure).font(MadarTypography.body()).accessibilityIdentifier("money-obligations-read-error")
-                        Button("أعد المحاولة") { retryAttempt += 1 }.frame(minHeight: 44)
+                        Button { retryAttempt += 1 } label: { Text("أعد المحاولة").frame(minHeight: 44).contentShape(Rectangle()) }
                             .accessibilityIdentifier("money-obligations-retry")
                     }
                 }

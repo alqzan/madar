@@ -27,7 +27,7 @@ struct MoneyBudgetView: View {
                 }.padding(.top, 8)
                 if let reading {
                     summary(reading)
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-budget-reveal") }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-budget-reveal") }
                     let byDay = Dictionary(grouping: reading.rows, by: \.day), days = byDay.keys.sorted(by: >)
                     ForEach(days, id: \.description) { day in
                         VStack(alignment: .leading, spacing: 0) {
@@ -171,13 +171,13 @@ private struct MoneyBudgetReceipt: View {
                     .rotationEffect(.degrees(-1.2)).padding(.horizontal, 4)
                 Text(row.excluded ? "تعود الحركة إلى توزيعها الأصلي؛ النقد والدين يبقيان كما هما." : "الختم لهذه الحركة فقط. تخرج من يومك والمظاريف وحدود التصنيفات، وتبقى في حسابك والسجل.")
                     .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44) }
+                if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) } }
                 if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                 Button(action: save) {
                     HStack { if saving { ProgressView() }; Text(row.excluded ? "ارفع الختم وأعدها للميزانية" : "اعتمد الختم · خارج الميزانية") }
                         .font(MadarTypography.body()).bold().frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: Capsule()).foregroundStyle(theme.background)
                 }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-budget-confirm")
-                Button("إلغاء") { dismiss() }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).madarWaitsForSave()
+                Button { dismiss() } label: { Text("إلغاء").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.madarWaitsForSave()
             }.padding(20).padding(.top, 12).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.surface.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme)
             .presentationDetents([.height(600), .large]).presentationDragIndicator(.visible).madarSheetLock(saving: saving).onChange(of: saving, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }.onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }.accessibilityIdentifier("money-budget-receipt")

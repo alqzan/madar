@@ -129,8 +129,8 @@ struct RoomHomeLayoutEditor: View {
                         }
                     }
                 }
-                Button("أعِد الترتيب الافتراضي") { session.reset([layout.key]) }
-                    .font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("room-layout-reset")
+                Button { session.reset([layout.key]) } label: { Text("أعِد الترتيب الافتراضي")
+                    .font(MadarTypography.body()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("room-layout-reset")
             }.padding(16)
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent)

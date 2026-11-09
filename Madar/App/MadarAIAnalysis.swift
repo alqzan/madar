@@ -380,7 +380,7 @@ struct MadarAIAnalysisSheet: View {
                 if phase == .failed, let errorMessage {
                     Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(themeSecondary)
                         .accessibilityIdentifier("madar-ai-error")
-                    Button("حاول مرة أخرى") { ask() }.font(MadarTypography.caption()).frame(minHeight: 44)
+                    Button { ask() } label: { Text("حاول مرة أخرى").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
                         .accessibilityIdentifier("madar-ai-retry")
                 }
                 sourceDisclosure
@@ -585,9 +585,9 @@ struct MadarAIAnalysisSheet: View {
         return ScrollView(.horizontal) {
             HStack(spacing: 8) {
                 ForEach(suggestions, id: \.self) { suggestion in
-                    Button(suggestion) { question = suggestion }
+                    Button { question = suggestion } label: { Text(suggestion)
                         .font(MadarTypography.fine()).padding(.horizontal, 12).frame(minHeight: 38)
-                        .background(themeSurface, in: Capsule()).glassEffect(.regular.interactive(), in: .capsule)
+                        .background(themeSurface, in: Capsule()).glassEffect(.regular.interactive(), in: .capsule).contentShape(Rectangle()) }
                         .buttonStyle(.plain)
                 }
             }.padding(.vertical, 2)

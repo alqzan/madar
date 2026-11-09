@@ -80,7 +80,7 @@ struct MoneyLogView: View {
                             HStack(spacing: 7) { ForEach(reading.filters) { f in Button { filter = f.id } label: { Text(f.title).font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).background(filter == f.id ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(filter == f.id ? theme.background : theme.ink).glassEffect(.regular.interactive(), in: .capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-log-filter-" + f.id) } }
                         }.scrollIndicators(.hidden)
                     }
-                    if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-log-reveal") }
+                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-log-reveal") }
                     if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         if dynamicType.isAccessibilitySize { dayList(reading.days) }
                         else if calendarMode { monthGrid(reading) }
@@ -90,7 +90,7 @@ struct MoneyLogView: View {
                         searchResults(reading)
                     }
                     monthSummary(reading)
-                } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة") { load() }.frame(minHeight: 44) }
+                } else if let failure { Text(failure).font(MadarTypography.body()); Button { load() } label: { Text("أعِد المحاولة").frame(minHeight: 44).contentShape(Rectangle()) } }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 220) }
             }.padding(.horizontal, 20).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
@@ -205,7 +205,7 @@ struct MoneyLogView: View {
                 // Audit 28 Oct: a narrowed empty day offers the way back to the whole day.
                 VStack(alignment: .leading, spacing: 4) {
                     Text(filter == "all" && query.isEmpty ? "لا حركات في هذا اليوم." : "لا حركات تطابق هذا اليوم والفلتر.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-log-empty")
-                    if filter != "all" || !query.isEmpty { Button("اعرض كل حركات اليوم") { filter = "all"; query = "" }.font(MadarTypography.caption()).foregroundStyle(theme.color("accentText")).frame(minHeight: 44).accessibilityIdentifier("money-log-clear-filter") }
+                    if filter != "all" || !query.isEmpty { Button { filter = "all"; query = "" } label: { Text("اعرض كل حركات اليوم").font(MadarTypography.caption()).foregroundStyle(theme.color("accentText")).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-log-clear-filter") }
                 }.padding(.vertical, 12)
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicType.isAccessibilitySize ? 300 : 150), spacing: 8)], spacing: 8) {

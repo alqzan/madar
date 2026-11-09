@@ -28,8 +28,8 @@ struct DiaryLettersPanel: View {
             if let failure {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(failure).font(MadarTypography.body())
-                    Button("أعِد المحاولة") { Task { await load() } }
-                        .font(DiaryType.label).frame(minHeight: 44).accessibilityIdentifier("diary-letters-retry")
+                    Button { Task { await load() } } label: { Text("أعِد المحاولة")
+                        .font(DiaryType.label).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-letters-retry")
                 }
             }
             if let routeMessage { Text(routeMessage).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-letter-route-status") }
@@ -260,7 +260,7 @@ struct DiaryLetterComposer: View {
                     if let failure { Text(failure).font(MadarTypography.body()) }
                     // AU-95: without its choices «اختمها» stayed dim and the written letter had nowhere to go.
                     if choices.isEmpty, failure != nil {
-                        Button("أعِد المحاولة") { loadChoices() }.font(MadarTypography.section()).frame(minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("diary-letter-choices-retry")
+                        Button { loadChoices() } label: { Text("أعِد المحاولة").font(MadarTypography.section()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-letter-choices-retry")
                     }
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink)
