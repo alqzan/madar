@@ -7,12 +7,12 @@ You are building **Madar**, a native iPhone app (SwiftUI, Arabic RTL). The appro
 - `screens/`
 - `design-tokens.json`, `settings-schema.json`, `screens-index.json`, `data-dictionary.json`, `provenance.json`
 
-## Authority and current mandate — 8 November 2026
+## Authority and current mandate — 9 November 2026
 
 1. The owner's latest explicit instruction wins over older owner decisions, this protocol, the board and the handoff. Log a changed decision once in `docs/DECISIONS.md`; do not keep both versions as current instructions.
 2. `AGENTS.md` and `CLAUDE.md` are one protocol. Keep them byte-identical. `docs/PROGRESS.md` is the current work and delivery status; `docs/DECISIONS.md` records why a rule changed. Archived boards, old handovers and memory are historical evidence, not competing queues or instructions.
 3. For product questions not changed by the owner: review fixes (`docs/HANDOFF/Madar - Handoff Review Fixes - V1.md`) override the handoff. Behaviour and scope: text, then JSON, then screenshots. Exact keys/defaults/ranges/hex: JSON; resolve text/JSON conflicts using the text and record them. Canonical screenshots are the visual baseline; never copy sample data or prototype controls.
-4. Current owner request: first reconcile the project instructions and board, then improve the whole app for ease, flexibility, simplicity and responsiveness. Revisit previously approved interfaces when there is a concrete improvement. This authorizes reversible UI/flow corrections and helper-assisted bug/UX inspection; older review bans, strict screenshot-copy requirements and pre-first-TestFlight freezes do not block this work.
+4. Current owner request (8–9 Nov): keep the instructions and board consistent, then go through the whole app for ease, flexibility, simplicity and responsiveness without making it heavier, and give iPad its own layout (sidebar, wide-screen pages) rather than a stretched iPhone. Revisit previously approved interfaces when there is a concrete improvement. This authorizes reversible UI/flow corrections and helper-assisted bug/UX inspection; older review bans, strict screenshot-copy requirements and pre-first-TestFlight freezes do not block this work.
 5. Existing product/data/licensing safeguards still apply. Ask only for an unresolved product-rule/default/data-model/licence change, public publication, or access to/migration/deletion of real owner data. Do not ask again for work already authorized.
 
 **Product safeguards:** RA1 local-only v1 (CloudKit remains deferred until explicit authorization); RA2 only the app opens the store, extensions use inbox/snapshots; RA3 lean M0; RP1 no automatic missed/qada record; RU1 no middle dot next to a digit. Later explicit owner decisions, including prayer records and calendar order, override original handoff wording.
@@ -108,7 +108,7 @@ Do not load the whole handoff into context. Each task card in `docs/PROGRESS.md`
 - Direct owner requests take priority. Otherwise take the first actionable `ready` card in the active queue. Historical tables do not create a second queue. If blocked, record the precise blocker and continue independent useful work.
 - Before editing a screen, state the screen, its canonical reference (or that the state has none), and the intended visible improvement. Prefer existing components and the room's own paper, typography and ornament; avoid unexplained controls and repetitive copy.
 - The approved design is a baseline. Improve a confusing flow even if previously approved, retaining product rules and room identity. Log the reason and before/after evidence. Do not claim a redesign is pixel-matched to an older canonical.
-- Capture changed visual states at default text size. Use `python3 Madar/scripts/compare-screens.py <board> <shot.png> [<scrolled.png>]` when a canonical applies; document intentional differences. Only the owner marks a screen `approved`; agents use `matched — awaiting owner` or `built — awaiting owner` for intentional redesigns.
+- Screenshots (owner 9 Nov): capture only when a change alters the design (layout, a drawing, a new screen state), at default text size; copy, logic and tap-area changes are verified by tests without captures. Use `python3 Madar/scripts/compare-screens.py <board> <shot.png> [<scrolled.png>]` when a canonical applies; document intentional differences. Only the owner marks a screen `approved`; agents use `matched — awaiting owner` or `built — awaiting owner` for intentional redesigns.
 - Keep Dynamic Type paths working, but do not run enlarged-text or accessibility-inspector audits unless newly requested.
 
 ## Helpers and review
@@ -130,8 +130,8 @@ Do not load the whole handoff into context. Each task card in `docs/PROGRESS.md`
 
 ## Usage, commits and handover
 
-- Check live five-hour usage at the start, after substantial work and before a new large batch/archive. Remaining = 100 minus used percent. Helpers share the allowance. If unavailable, say `not exposed`; do not estimate.
-- Near 5% remaining, stop starting new work and reserve capacity for focused verification, commit, handover and the authorized TestFlight upload. Start archiving early enough to preserve that reserve. Never redeem reset credits without explicit confirmation.
+- Check live five-hour and weekly usage at the start, after substantial work and before a new large batch/archive. Remaining = 100 minus used percent. Helpers share the allowance. If unavailable, say `not exposed`; do not estimate.
+- Near 5% remaining in the five-hour window, or 2% in the weekly window, stop starting new work and reserve capacity for focused verification, commit, handover and the authorized TestFlight upload. Start archiving early enough to preserve that reserve. Never redeem reset credits without explicit confirmation.
 - Commit one coherent finished change with its board update: `[<existing-card>] <result> (codex|claude, model: <actual or not exposed>, effort: <actual or not exposed>)`; use `[OWNER]` for this request where no card applies. No record-only/handover-only commits unless documentation itself is the requested deliverable.
 - Work on `main`; no branch/worktree per task. A single `codex/<section>` branch is allowed for multi-session work. Never force-push, rewrite history or delete another agent's work. Retained unused code need not be deleted as part of UX cleanup.
 - Keep one concise handover per session in `docs/PROGRESS.md` (no fixed length cap, owner 22 Oct): **Works now**, **Verified**, **Differences left**, **Not verified**, **Next**, **Model/effort**, **Usage**. Keep the newest three; archive older handovers. The newest current-work section wins over stale next steps in old handovers.
