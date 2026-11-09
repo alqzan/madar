@@ -9,6 +9,11 @@ Owner requests in force: a whole-app pass for ease, simplicity, flexibility and 
 - Package baseline passes (rows 16–17). Current continuation: prayer history read failures propagate and remain retryable (42/42 prayer, 26/26 command/replay tests). Polar manual logging, habit delete/undo/relaunch and both year-calendar settings paths now pass on iOS 27.0; details in row 18. General no-trip FX rates still need an owner rule/data-model decision. The 9 handwritten-colour findings are resolved in row 19: static shipping-source scan passes (464 sources, 4 catalogs, 38 independently measured token pairs); its manual trace requirement remains separate.
 - Build 22 includes the changes after 21: lazy prayer/night reads and per-day prayer-time memoization, scoped habit undo reads, 1922 dead-code lines removed, stale-test cleanup, and the current continuation fixes. Signature verification passed; app/widget versions are both 0.1.0 (22), minimum OS 27.0, device families 1 and 2, and no iCloud/ubiquity entitlements. No owner-device performance measurement is implied.
 
+## Current focused repair — recurring startup alert
+
+- The 9 Nov screenshot matches the local notification-budget read path: after inbox/store maintenance, reminder refresh decodes the device-only `NotificationBudget/budget.json`; unreadable JSON made each refresh fail and left the same bad file to fail again on later opens. The owner's device/store were not inspected, so the file-level cause is inferred from the exact alert route, not confirmed from device data.
+- Fix: a fresh budget publish preserves unreadable bytes under a recovery filename and reconstructs operational state from the new policy plus live notification-ledger seeds. Prayer records and other SwiftData owner data are untouched. `NotificationBudgetTests` passed 10/10, including the damaged-file preservation/rebuild scenario. Build 25 archived successfully on Xcode 27.2; signature and bundle checks passed (0.1.0/25, iOS 27, iPhone+iPad). Export/upload are pending. The archive reports unrelated pre-existing Swift warnings in `AppDiarySearchService` and `MihbaraPDFReaderView`.
+
 ## Active queue — this request
 
 | Order | Work | Status / evidence |

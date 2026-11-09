@@ -58,7 +58,10 @@ public struct NotificationBudgetStore: Sendable {
         var reservations: [NotificationBudgetReservation] = []
     }
     public func publish(_ policy: NotificationBudgetPolicy, importing seeds: [NotificationBudgetReservation] = []) throws {
-        try transaction { state in
+        // The budget is a rebuildable device cache. Publishing a fresh policy is
+        // the recovery boundary: if its JSON was interrupted or became unreadable,
+        // keep the original bytes and rebuild from the current policy and ledger seeds.
+        try transaction(recoveringUnreadableState: true) { state in
             state.policy = policy
             state.reservations.removeAll { $0.scheduledAt < policy.generatedAt.addingTimeInterval(-7 * 86400) }
             for seed in seeds where !state.reservations.contains(where: { $0.id == seed.id }) { state.reservations.append(seed) }
@@ -142,7 +145,7 @@ public struct NotificationBudgetStore: Sendable {
         guard others.filter({ $0.dayKey == reservation.dayKey }).count < min(10, max(1, limit)) else { throw NotificationBudgetError.full }
         state.reservations = others + [reservation]
     }
-    private func transaction<T>(_ body: (inout State) throws -> T) throws -> T {
+    private func transaction<T>(recoveringUnreadableState: Bool = false, _ body: (inout State) throws -> T) throws -> T {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let fd = open(directory.appending(path: "budget.lock").path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
         guard fd >= 0 else { throw NotificationBudgetError.io(errno) }
@@ -151,7 +154,17 @@ public struct NotificationBudgetStore: Sendable {
         defer { flock(fd, LOCK_UN) }
         let url = directory.appending(path: "budget.json")
         var state: State
-        if FileManager.default.fileExists(atPath: url.path) { state = try JSONDecoder().decode(State.self, from: Data(contentsOf: url)) }
+        if FileManager.default.fileExists(atPath: url.path) {
+            let data = try Data(contentsOf: url)
+            do { state = try JSONDecoder().decode(State.self, from: data) }
+            catch {
+                guard recoveringUnreadableState else { throw error }
+                // Keep damaged operational bytes for diagnosis; never silently erase them.
+                let preserved = directory.appending(path: "budget.json.recovery-\(UUID().uuidString)")
+                try FileManager.default.moveItem(at: url, to: preserved)
+                state = State()
+            }
+        }
         else { state = State() }
         guard state.version == 1 else { throw NotificationBudgetError.unavailable }
         let result = try body(&state)

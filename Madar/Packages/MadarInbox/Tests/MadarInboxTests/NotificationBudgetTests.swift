@@ -80,6 +80,31 @@ struct NotificationBudgetTests {
         try Data("broken".utf8).write(to: root.appending(path: "budget.json"))
         #expect(throws: (any Error).self) { try store.reservePrayerActivity(id: "corrupt", now: clock("04:40")) }
     }
+    @Test func publishPreservesUnreadableOperationalStateAndRebuildsFromCurrentSeeds() throws {
+        let (store, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let damaged = Data("{interrupted budget write".utf8)
+        try damaged.write(to: root.appending(path: "budget.json"))
+
+        let day = try GregorianDay("2026-10-09")
+        let prayers = (0..<3).map { offset in
+            let date = day.adding(days: offset)
+            let start = date.date(in: ActivePlace.riyadh.timeZone)
+            return PrayerDay(day: date, place: .riyadh, fajr: start.addingTimeInterval(4*3600+31*60), sunrise: start.addingTimeInterval(5*3600+48*60),
+                dhuhr: start.addingTimeInterval(11*3600+41*60), asr: start.addingTimeInterval(15*3600+2*60),
+                maghrib: start.addingTimeInterval(17*3600+32*60), isha: start.addingTimeInterval(19*3600+2*60))
+        }
+        let policy = NotificationBudgetPolicy(generatedAt: clock("04:45"), validUntil: clock("23:59"), activityEnabled: true,
+            remindersEnabled: true, dailyBudget: 4, quietFromMinutes: nil, dayBoundary: .fajr, prayerDays: prayers)
+        let seed = NotificationBudgetReservation(id: "ledger.seed", dayKey: "2026-10-09", scheduledAt: clock("06:00"))
+        try store.publish(policy, importing: [seed])
+
+        let recoveryFiles = try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasPrefix("budget.json.recovery-") }
+        #expect(recoveryFiles.count == 1)
+        #expect(try Data(contentsOf: root.appending(path: recoveryFiles[0])) == damaged)
+        #expect(try store.reservations() == [seed])
+        try store.reserve(.init(id: "after.recovery", dayKey: "2026-10-09", scheduledAt: clock("06:30")), now: clock("05:02"))
+        #expect(Set(try store.reservations().map(\.id)) == ["ledger.seed", "after.recovery"])
+    }
     @Test func legacyImportAndRepublishRetainExternalReservations() throws {
         let (store, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         _ = try store.reservePrayerActivity(id: "external", now: clock("05:02"))
