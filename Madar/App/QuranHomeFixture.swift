@@ -9,7 +9,7 @@ import MadarQuran
 extension AppSession {
     func prepareQuranHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview", "historyRoute", "reference", "referencePartial", "referenceBoundary", "referenceFatiha", "referenceFatihaOpening", "referenceKursi", "referenceSadi183", "referenceAalImran", "referenceAalImran191195", "referenceAalImran198200", "referenceNisaa36", "referenceBaqara178186", "referenceBaqara189", "referenceBaqara190", "referenceBaqara191", "referenceBaqara192", "referenceBaqara193", "referenceBaqara194", "referenceBaqara195", "referenceBaqara196198", "referenceBaqara199202", "referenceBaqara203206", "referenceBaqara208209", "referenceBaqara211213", "referenceBaqara214215", "referenceBaqara219", "referenceBaqara220"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "malformedDraft", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview", "historyRoute", "reference", "referencePartial", "referenceBoundary", "referenceFatiha", "referenceFatihaOpening", "referenceKursi", "referenceSadi183", "referenceAalImran", "referenceAalImran191195", "referenceAalImran198200", "referenceNisaa36", "referenceBaqara178186", "referenceBaqara189", "referenceBaqara190", "referenceBaqara191", "referenceBaqara192", "referenceBaqara193", "referenceBaqara194", "referenceBaqara195", "referenceBaqara196198", "referenceBaqara199202", "referenceBaqara203206", "referenceBaqara208209", "referenceBaqara211213", "referenceBaqara214215", "referenceBaqara219", "referenceBaqara220"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let context = ModelContext(container)
         selectedTab = "quran"
@@ -109,6 +109,11 @@ extension AppSession {
         } else if variant == "referenceBoundary" {
             let target = catalog.ayahs.first { $0.surahID == 2 && $0.ayahNumber == 286 }!
             plan.startAyah = target.id; plan.unit = "ayah"; plan.amount = 2; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "malformedDraft" {
+            let draft = SessionDraft()
+            draft.kind = "hifz"; draft.dayKey = today.description; draft.startedAt = now
+            draft.provisionalJSON = Data("{malformed".utf8)
+            context.insert(draft)
         } else if variant == "historyRoute" {
             let row = append(kind: "review", first: 1, last: 7, pages: [1], offset: -1, id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!)
             let mistake = MistakeEvent(); mistake.sessionID = row.id; mistake.ayahId = 2; mistake.wordIndex = 1; mistake.kind = "mistake"; mistake.at = row.endedAt; context.insert(mistake)

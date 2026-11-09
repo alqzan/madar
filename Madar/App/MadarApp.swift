@@ -187,6 +187,9 @@ struct MadarLaunchPlaceholder: View {
             } else { managed = try ManagedDataStore(root: root, commandLockURL: lockURL) }
             let opened = try AppSession(container: managed.container, managedStore: managed, groupDirectory: group)
 #if DEBUG
+            try opened.seedMalformedNotificationBudgetForUITestIfRequested()
+#endif
+#if DEBUG
             if isolatedUITestID != nil {
                 // UI stores are isolated from owner data. Lock-flow UI tests opt in
                 // explicitly; all other UI tests launch without an app lock.
@@ -201,6 +204,9 @@ struct MadarLaunchPlaceholder: View {
 #endif
             opened.lockController = MadarLockController(scope: MadarLockScope(rawValue: opened.string("core.faceIDLock")) ?? .app, service: AppPrivacyService(session: opened))
             await opened.attachPrayerNotifications(prayerNotifications)
+#if DEBUG
+            await opened.resumeNotificationBudgetRecoveryUITestIfRequested()
+#endif
             let backup = AppBackupService(session: opened, store: managed, backupDirectory: group.appending(path: "Backups", directoryHint: .isDirectory), keyStore: KeychainBackupKeyStore(service: backupKeyService))
             backup.backgroundTasks = backgroundBackups
             opened.backupService = backup

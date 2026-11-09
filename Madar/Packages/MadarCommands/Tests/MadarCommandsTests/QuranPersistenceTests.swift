@@ -232,6 +232,24 @@ import MadarQuran
         #expect(snapshot.drafts.isEmpty && snapshot.coverage.coveredAyahs == [1, 2, 3])
     }
 
+    @Test func unreadableDraftDoesNotBlockQuranSnapshotOrEraseSavedBytes() async throws {
+        let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        let draft = try makeDraft(container)
+        try await save(draft, bus: bus)
+        let corrupted = Data("{malformed".utf8)
+        let context = ModelContext(container)
+        let row = try #require(context.fetch(FetchDescriptor<SessionDraft>()).first)
+        row.provisionalJSON = corrupted
+        try context.save()
+
+        let snapshot = try repo(container).snapshot(at: now)
+        #expect(snapshot.drafts.isEmpty)
+        #expect(snapshot.unreadableDraftCount == 1)
+        let preserved = try #require(ModelContext(container).fetch(FetchDescriptor<SessionDraft>()).first)
+        #expect(preserved.provisionalJSON == corrupted)
+        #expect(preserved.deletedAt == nil)
+    }
+
     @Test func deleteAndUndoRestoreSessionChildrenAndScheduleButStaleUndoDoesNotOverwriteGrade() async throws {
         let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
         let draft = try makeDraft(container); try await save(draft, bus: bus); let committed = try await commit(draft, bus: bus)

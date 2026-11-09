@@ -1,6 +1,19 @@
 import XCTest
 
 @MainActor final class QuranHomeUITests: XCTestCase {
+    func testUnreadableDraftDoesNotBlockQuranHome() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "malformedDraft"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["quran-unreadable-draft-notice"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].exists, app.debugDescription)
+        XCTAssertFalse(app.buttons["quran-home-retry"].exists, app.debugDescription)
+        attach(app, "M2-V01-unreadable-draft-home-L")
+        app.terminate()
+    }
+
     func testHomeLevelsDetailsAndDraftResumeAtDefaultSize() throws {
         continueAfterFailure = false
         let app = XCUIApplication(), store = UUID().uuidString

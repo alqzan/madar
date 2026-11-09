@@ -114,6 +114,18 @@ struct QuranHomeView: View {
             }
             if let state {
                 VStack(alignment: .leading, spacing: 24) {
+                    if state.unreadableDraftCount > 0 {
+                        card {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("تعذّرت قراءة جلسة قرآنية غير مكتملة")
+                                    .font(bodyFont(14, bold: true))
+                                    .accessibilityIdentifier("quran-unreadable-draft-notice")
+                                Text("حافظنا على بياناتها كما هي. يمكنك متابعة بقية القرآن.")
+                                    .font(bodyFont(13))
+                                    .foregroundStyle(theme.secondaryInk)
+                            }
+                        }
+                    }
                     header(state)
                     let blocks = RoomHomeLayout(session: service.app, key: "quran.layout").visible
                     if wide {

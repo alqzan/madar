@@ -988,6 +988,31 @@ final class AppSession {
     private func endWrite() { pendingWrites -= 1; userWritesInFlight -= 1 }
     var userWriteInProgress: Bool { userWritesInFlight > 0 }
 #if DEBUG
+    /// Seeds a malformed device notification cache only in the named synthetic UI store.
+    /// This exercises launch recovery without touching an owner's app-group data.
+    func seedMalformedNotificationBudgetForUITestIfRequested() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["MADAR_UI_NOTIFICATION_BUDGET_RECOVERY"] == "1",
+              let storeID = environment["MADAR_UI_STORE_ID"],
+              pendingInbox.directory.deletingLastPathComponent().lastPathComponent == storeID,
+              pendingInbox.directory.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        let directory = notificationBudget.directory
+        let file = directory.appending(path: "budget.json")
+        guard !FileManager.default.fileExists(atPath: file.path) else { return }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data("{malformed notification budget".utf8).write(to: file, options: .atomic)
+    }
+
+    /// Forces the exact post-maintenance refresh that used to surface a recurring JSON error.
+    func resumeNotificationBudgetRecoveryUITestIfRequested() async {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["MADAR_UI_NOTIFICATION_BUDGET_RECOVERY"] == "1",
+              let storeID = environment["MADAR_UI_STORE_ID"],
+              pendingInbox.directory.deletingLastPathComponent().lastPathComponent == storeID,
+              pendingInbox.directory.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        await prayerNotifications?.resumeAfterStoreMaintenance()
+    }
+
     /// UI tests only: the one write hold. A synthetic UI store and `key` set to 1–5000 ms keep the write open so a test can
     /// act while it saves (AU-97 folded the per-room copies of this into one helper; the keys stay per room).
     func holdWriteForUITest(_ key: String, when applies: Bool = true) async throws {

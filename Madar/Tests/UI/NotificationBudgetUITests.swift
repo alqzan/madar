@@ -1,6 +1,25 @@
 import XCTest
 
 @MainActor final class NotificationBudgetUITests: XCTestCase {
+    func testUnreadableDeviceBudgetIsRecoveredWithoutRepeatingLaunchAlert() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString,
+            "MADAR_UI_NOTIFICATION_BUDGET_RECOVERY": "1",
+            "MADAR_UI_SIZE": "L",
+            "MADAR_UI_THEME": "light"
+        ]
+
+        for _ in 0..<2 {
+            app.launch()
+            XCTAssertFalse(app.alerts["لم تكتمل العملية"].waitForExistence(timeout: 4), app.debugDescription)
+            finishOnboarding(app)
+            XCTAssertTrue(app.buttons["tab-foundation"].waitForExistence(timeout: 15), app.debugDescription)
+            app.terminate()
+        }
+    }
+
     func testDailyNotificationBudgetDefaultAndGlobalReset() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

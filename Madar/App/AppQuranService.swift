@@ -229,7 +229,7 @@ import MadarPrayer
             recovery: QuranUIRecovery(distantLabel: { n in faceCount(n) + (n == 1 ? " بعيد" : n == 2 ? " بعيدان" : " بعيدة") }(snapshot.pages.filter(\.isFar).count), activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
             errors: errors, toolsOrder: [], availableTools: [], blockOrder: ["sadr", "path", "log14", "tools"], hiddenBlocks: [],
             sessionUnavailableReason: nil, readerUnavailableReason: nil, numeralLocale: app.values["core.numerals"]?.string == "western" ? "en" : "ar",
-            dayCloseAvailable: snapshot.sessions.contains { $0.dayKey == today })
+            dayCloseAvailable: snapshot.sessions.contains { $0.dayKey == today }, unreadableDraftCount: snapshot.unreadableDraftCount)
     }
     func perform(_ value: QuranUICommand) async throws {
         switch value {

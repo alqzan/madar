@@ -47,6 +47,8 @@ public struct QuranDataSnapshot: Sendable {
     public let planStartDay: GregorianDay?
     public let habitualHifzLevel: QuranDayLevel
     public let drafts: [QuranSessionDraft]
+    /// Draft rows whose JSON could not be decoded remain stored and are reported without blocking the room.
+    public let unreadableDraftCount: Int
     public let lastTest: GregorianDay?
     public let testPages: [Int]
 }
@@ -118,6 +120,9 @@ public final class QuranRepository {
     public func draft(_ id: UUID) throws -> QuranSessionDraft? {
         let row = try context.fetch(FetchDescriptor<SessionDraft>()).first { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }
         guard let row else { return nil }
+        return try decodeDraft(row)
+    }
+    private func decodeDraft(_ row: SessionDraft) throws -> QuranSessionDraft {
         let value = try JSONDecoder().decode(QuranDraftPayload.self, from: row.provisionalJSON).draft
         guard value.id == row.id, value.storedDay.dayKey == row.dayKey, value.kind.rawValue == row.kind else {
             throw DataError.invalidValue("Quran draft identity")
@@ -242,13 +247,29 @@ public final class QuranRepository {
             QuranMistakeSpotSeed(key: QuranMistakeKey(ayahID: $0.ayahId, wordIndex: $0.wordIndex), legacyHits: $0.legacyHits,
                 legacyLastDrillAt: $0.legacyLastDrillAt, legacyStreak: $0.legacyStreak)
         }
-        let drafts = try context.fetch(FetchDescriptor<SessionDraft>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.compactMap { try draft($0.id) }
+        let draftRows = try context.fetch(FetchDescriptor<SessionDraft>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        var drafts: [QuranSessionDraft] = []
+        var unreadableDraftCount = 0
+        for row in draftRows {
+            do {
+                drafts.append(try decodeDraft(row))
+            } catch is DecodingError {
+                // Only isolate unreadable JSON. SwiftData fetch/store failures still surface normally.
+                unreadableDraftCount += 1
+            } catch DataError.invalidValue("Quran draft identity") {
+                unreadableDraftCount += 1
+            } catch {
+                // Preserve the row as-is; one damaged session must not make the Quran room unavailable.
+                throw error
+            }
+        }
         return QuranDataSnapshot(day: storedDay, plan: plan, coverage: coverage, sessions: sessions, pages: pages, memories: memories, completedOn: completedOn,
             activities: activities, hifzLevel: hifzLevel, reviewLevel: reviewLevel, restDay: restDay, forceNewHifz: dayState?.forceNewHifz ?? false,
             hifz: hifz, review: review, recentPages: recent, partialRecent: coverage.partialRecentPortions.filter { !completedToday.contains($0.page) }, allotments: allotments, recovery: recovery,
             mistakes: QuranMistakeEngine.summaries(seeds: seeds, events: mistakeEvents, sessions: mistakeSessions),
             drillBoard: QuranMistakeEngine.drillBoard(seeds: seeds, events: mistakeEvents, sessions: mistakeSessions, dayKey: today, intensity: plan?.plan.intensity ?? .balanced),
-            planStartDay: planStartDay, habitualHifzLevel: QuranDayLevel(rawValue: try settings.value(for: "quran.hifzLevel").string ?? "medium") ?? .medium, drafts: drafts, lastTest: lastTest, testPages: tests)
+            planStartDay: planStartDay, habitualHifzLevel: QuranDayLevel(rawValue: try settings.value(for: "quran.hifzLevel").string ?? "medium") ?? .medium,
+            drafts: drafts, unreadableDraftCount: unreadableDraftCount, lastTest: lastTest, testPages: tests)
     }
 }
 
