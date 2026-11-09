@@ -24,6 +24,7 @@ struct FirstRunView: View {
         }
     }
 
+    @Environment(\.horizontalSizeClass) private var sizeClass
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -42,7 +43,9 @@ struct FirstRunView: View {
                         }
                     }
                     actions
-                }.padding(24).padding(.top, 64).frame(maxWidth: 560).frame(maxWidth: .infinity)
+                }.padding(24).padding(.top, sizeClass == .regular ? 0 : 64).frame(maxWidth: 560).frame(maxWidth: .infinity)
+                    // iPad: the card stands in the middle of the screen instead of hanging from the top.
+                    .modifier(PadCentered(on: sizeClass == .regular))
             }.background(theme.background).foregroundStyle(theme.ink).font(MadarTypography.body())
         }
         .interactiveDismissDisabled()
@@ -71,5 +74,14 @@ struct FirstRunView: View {
         session.set(.object(["name": .string(found.name), "country": .string(found.country), "lat": .number(found.lat), "lon": .number(found.lon),
                              "tz": .string(found.tz), "currency": .string(found.currency)]), key: "core.homeCity")
         step = 2
+    }
+}
+
+
+/// iPad: a short page stands in the middle of the screen; iPhone keeps its natural top-down flow.
+struct PadCentered: ViewModifier {
+    let on: Bool
+    func body(content: Content) -> some View {
+        if on { content.frame(minHeight: 0).containerRelativeFrame(.vertical, alignment: .center) { length, _ in length } } else { content }
     }
 }

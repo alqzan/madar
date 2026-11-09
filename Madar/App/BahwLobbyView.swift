@@ -76,6 +76,7 @@ private struct BahwMinuteTimelineSchedule: TimelineSchedule, Equatable, Sendable
 struct BahwLobbyView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isFrontRoom) private var isFrontRoom
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Bindable var session: AppSession
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var arranging = false
@@ -120,7 +121,7 @@ struct BahwLobbyView: View {
                                 .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule)
                         }.buttonStyle(.madarPlain).disabled(layout.hiddenBuilt.isEmpty).accessibilityIdentifier("bahw-drawer")
                     }
-                }.padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
+                }.padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 24).frame(maxWidth: sizeClass == .regular ? 860 : 620).frame(maxWidth: .infinity)
             }
             // Owner 7 Nov 2026: pull down to bring in what arrived outside the app and read every tile again now.
             .refreshable { await session.refreshFromPull() }

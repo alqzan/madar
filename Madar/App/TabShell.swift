@@ -621,7 +621,10 @@ private struct MadarSidebar: View {
         let on = tab.id == selection
         return Button { select(tab.id) } label: {
             HStack(spacing: 12) {
-                Image(tab.symbol + (on ? "Selected" : "")).renderingMode(.template).resizable().scaledToFit().frame(width: 24, height: 24)
+                Group {
+                    if UIImage(named: tab.symbol) != nil { Image(tab.symbol + (on ? "Selected" : "")).renderingMode(.template).resizable().scaledToFit() }
+                    else { Image(systemName: tab.symbol + (on ? ".fill" : "")).resizable().scaledToFit() }
+                }.frame(width: 24, height: 24)
                 Text(tab.title).font(MadarTypography.section())
                 Spacer(minLength: 0)
             }
