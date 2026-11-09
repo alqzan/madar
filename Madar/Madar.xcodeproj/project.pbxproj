@@ -375,6 +375,7 @@
 		BFB147FC87C8EB464FAA94F5 /* DiaryLockPreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD7A72401A474C493641554 /* DiaryLockPreferenceTests.swift */; };
 		C06A698B9FED8BBC401CF2CC /* CityLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD050864F8C550A9BEA27784 /* CityLocator.swift */; };
 		C1B3EC7F682D34C4E382458A /* MihbaraReadingGoalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D4D84AF94A6F66CBAD1384 /* MihbaraReadingGoalTests.swift */; };
+		C2838D05BF9653A2F162C231 /* LaunchAppearanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BB241AD7E579D99264DA8ED /* LaunchAppearanceTests.swift */; };
 		C2F5FA9E4311C1D1A8C04E5B /* MoneyOwnerTrialUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C7A076695904E8109A22623 /* MoneyOwnerTrialUITests.swift */; };
 		C31CBACA57AF34A8B80AB681 /* MihbaraHomeIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 092A021D5BC8018E0BEEF6F1 /* MihbaraHomeIntegrationTests.swift */; };
 		C4FD1FDEE5F6411C63864BC3 /* DiaryWindowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDFCDBB5E517E579721BA034 /* DiaryWindowUITests.swift */; };
@@ -708,6 +709,7 @@
 		594C5DE48240D569567EC201 /* QuickRoomControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickRoomControls.swift; sourceTree = "<group>"; };
 		5A316A2FA4DB98304D90414F /* AppDiaryEditorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiaryEditorService.swift; sourceTree = "<group>"; };
 		5A8523997C8D124B0ED15941 /* Money.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Money.xcstrings; sourceTree = "<group>"; };
+		5BB241AD7E579D99264DA8ED /* LaunchAppearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAppearanceTests.swift; sourceTree = "<group>"; };
 		5C97580CAFA86F547D3E0410 /* MihbaraReaderSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraReaderSettingsSheet.swift; sourceTree = "<group>"; };
 		5D1D0B8393143F3C03CF8C19 /* PrayerCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerCopyTests.swift; sourceTree = "<group>"; };
 		5D3EC96D647534DFB18C29D1 /* PresetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetsView.swift; sourceTree = "<group>"; };
@@ -1573,6 +1575,7 @@
 				D469796404360B49B02BC5E1 /* DiaryYearbookIntegrationTests.swift */,
 				1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */,
 				41D68577D1E6FA5223FD92FE /* HabitRhythmTests.swift */,
+				5BB241AD7E579D99264DA8ED /* LaunchAppearanceTests.swift */,
 				07E5B58AA5B0B1DDDE4BDE66 /* LegacyHabitTrialTests.swift */,
 				472B1CBA95C9D6F4CB205E81 /* LegacyMoveNativeWinsTests.swift */,
 				1225DCC15EC207F81AE50852 /* LegacyPersonalTrialTests.swift */,
@@ -1939,6 +1942,7 @@
 				ACF8D45E7B47DF98E40E506D /* DiaryYearbookIntegrationTests.swift in Sources */,
 				16A45A0199AD6A2B5E9EC744 /* ExportPrivacyTests.swift in Sources */,
 				A0561536CAB91FAF9E90D622 /* HabitRhythmTests.swift in Sources */,
+				C2838D05BF9653A2F162C231 /* LaunchAppearanceTests.swift in Sources */,
 				52430EB75D09E6A03E8C2296 /* LegacyHabitTrialTests.swift in Sources */,
 				D4427180CF7E563DD2809A57 /* LegacyMoveNativeWinsTests.swift in Sources */,
 				A728D23CC6DFF5D4A5049EA8 /* LegacyPersonalTrialTests.swift in Sources */,

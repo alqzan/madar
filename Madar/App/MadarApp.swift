@@ -107,16 +107,26 @@ private struct MadarSceneContent: View {
                         Text("لم يُفتح مخزن البيانات. بياناتك محفوظة، ويمكنك إعادة المحاولة.\n\(startupError)")
                     } actions: { Button("أعِد المحاولة") { Task { await runtime.load() } } }
                 } else {
-                    VStack(spacing: 14) {
-                        MadarGlyph("MadarOrbit", size: 56).foregroundStyle(Color(red: 0.51, green: 0.38, blue: 0.17))
-                        Text("مدار").font(.custom("thmanyahserifdisplay-Bold", size: 34))
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity).background(Color(red: 0.94, green: 0.92, blue: 0.87).ignoresSafeArea())
-                    .foregroundStyle(Color(red: 0.13, green: 0.1, blue: 0.07))
+                    MadarLaunchPlaceholder()
                 }
         }
     }
     @Environment(\.scenePhase) private var scenePhase
+}
+
+/// The store has not opened yet, so follow the system appearance until saved preferences are available.
+struct MadarLaunchPlaceholder: View {
+    @Environment(\.colorScheme) private var colorScheme
+    private var theme: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
+    var body: some View {
+        VStack(spacing: 14) {
+            MadarGlyph("MadarOrbit", size: 56).foregroundStyle(theme.accent)
+            Text("مدار").font(.custom("thmanyahserifdisplay-Bold", size: 34))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(theme.background.ignoresSafeArea())
+        .foregroundStyle(theme.ink)
+    }
 }
 
 /// The scene and a cold background launch share one in-flight store opening.

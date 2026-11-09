@@ -125,9 +125,11 @@ struct MihbaraBookCover: View {
             }
             .overlay(alignment: .bottom) {
                 if book.shelf == "reading", let p = book.progress, MihbaraCopy.progressPercent(p) != nil {
-                    footer(ink: .white).padding(.horizontal, 10).padding(.bottom, 8).padding(.top, 18)
-                        .background(LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom))
-                        .foregroundStyle(.white)
+                    // The photo can be any colour: small progress text needs the room's
+                    // opaque, approved onDesk/desk pair rather than a translucent scrim.
+                    footer(ink: theme.color("onDesk")).padding(.horizontal, 10).padding(.bottom, 8).padding(.top, 18)
+                        .background(theme.color("desk"))
+                        .foregroundStyle(theme.color("onDesk"))
                 }
             }
             .clipShape(.rect(topLeadingRadius: 3, bottomLeadingRadius: 3, bottomTrailingRadius: 8, topTrailingRadius: 8))

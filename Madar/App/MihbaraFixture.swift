@@ -6,6 +6,7 @@ import SwiftData
 import MadarCore
 import MadarData
 import MadarCommands
+import MadarDesign
 
 extension AppSession {
     /// A drawn jacket for UI shots: deep indigo with a gold eight-point star lattice and a cream title label.
@@ -13,8 +14,12 @@ extension AppSession {
         let size = CGSize(width: 600, height: 860)
         let image = UIGraphicsImageRenderer(size: size).image { ctx in
             let g = ctx.cgContext
-            UIColor(red: 0.10, green: 0.16, blue: 0.33, alpha: 1).setFill(); g.fill(CGRect(origin: .zero, size: size))
-            UIColor(red: 0.85, green: 0.70, blue: 0.38, alpha: 0.55).setStroke(); g.setLineWidth(2)
+            let binding = BookBindings.all[2]
+            let navy = UIColor(MihbaraBookCovers.color(binding.base))
+            let gold = UIColor(MihbaraBookCovers.color(binding.ink))
+            let paper = UIColor(RoomTheme(room: "mihbara").surface)
+            navy.setFill(); g.fill(CGRect(origin: .zero, size: size))
+            gold.withAlphaComponent(0.55).setStroke(); g.setLineWidth(2)
             for row in 0..<9 { for col in 0..<6 {
                 let c = CGPoint(x: 50 + CGFloat(col) * 100 + (row % 2 == 0 ? 0 : 50), y: 50 + CGFloat(row) * 100)
                 for turn in 0..<2 {
@@ -23,10 +28,10 @@ extension AppSession {
                 }
             } }
             let label = CGRect(x: 90, y: 300, width: 420, height: 240)
-            UIColor(red: 0.95, green: 0.91, blue: 0.82, alpha: 1).setFill(); UIBezierPath(roundedRect: label, cornerRadius: 18).fill()
-            UIColor(red: 0.85, green: 0.70, blue: 0.38, alpha: 1).setStroke(); let edge = UIBezierPath(roundedRect: label.insetBy(dx: 10, dy: 10), cornerRadius: 12); edge.lineWidth = 3; edge.stroke()
+            paper.setFill(); UIBezierPath(roundedRect: label, cornerRadius: 18).fill()
+            gold.setStroke(); let edge = UIBezierPath(roundedRect: label.insetBy(dx: 10, dy: 10), cornerRadius: 12); edge.lineWidth = 3; edge.stroke()
             let style = NSMutableParagraphStyle(); style.alignment = .center
-            let ink = UIColor(red: 0.10, green: 0.16, blue: 0.33, alpha: 1)
+            let ink = navy
             ("رحلة القراءة" as NSString).draw(in: CGRect(x: 100, y: 345, width: 400, height: 110), withAttributes: [.font: UIFont.systemFont(ofSize: 68, weight: .heavy), .foregroundColor: ink, .paragraphStyle: style])
             ("من مكتبتك" as NSString).draw(in: CGRect(x: 100, y: 460, width: 400, height: 50), withAttributes: [.font: UIFont.systemFont(ofSize: 30, weight: .medium), .foregroundColor: ink, .paragraphStyle: style])
         }
