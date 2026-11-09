@@ -43,7 +43,7 @@ struct MoneyZakatEditor: View {
     }
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment:.leading,spacing:16) {
-            HStack { Text("بيانات الزكاة").font(MadarTypography.cardTitle());Spacer();Button("إغلاق"){dismiss()}.frame(minHeight:44).accessibilityIdentifier("money-zakat-editor-close").madarWaitsForSave() }
+            HStack { Text("بيانات الزكاة").font(MadarTypography.cardTitle());Spacer();Button("تمّ"){dismiss()}.frame(minHeight:44).accessibilityIdentifier("money-zakat-editor-close").madarWaitsForSave() }
             Text("أساس النصاب").font(MadarTypography.section())
             HStack { Button("ذهب ٢٤ قيراطًا") { selectedBasis = .gold; basisChosen = true }.accessibilityIdentifier("money-zakat-editor-gold");Spacer();Button("فضة") { selectedBasis = .silver; basisChosen = true }.accessibilityIdentifier("money-zakat-editor-silver") }.font(MadarTypography.body())
             if basisChosen { Text(selectedBasis == .gold ? "اخترت الذهب عيار ٢٤" : "اخترت الفضة").font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText")) }

@@ -63,7 +63,7 @@ struct MihbaraGoodreadsImportView: View {
                         }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                             .background(theme.surface, in: .rect(cornerRadius: 18))
                     }
-                    Text("أراجع الملف قبل إضافته. الكتب المطابقة لا تُدمج إلا بعد اختيارك.")
+                    Text("تراجع الكتب قبل إضافتها، والمكرّر لا يُدمج إلا باختيارك.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     HStack(spacing: 9) {
                         GoodreadsCountCard(title: "كتب جديدة", value: digits.string(preview.createCount), theme: theme)
@@ -113,7 +113,7 @@ struct MihbaraGoodreadsImportView: View {
     private var cutoffCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("رفّ الكتب المقروءة").font(MadarTypography.cardTitle())
-            Text("ما قُرئ قبل السنة المحددة يذهب إلى «قديمًا»، وما قُرئ في السنة المحددة أو بعدها إلى «أنهيتها».")
+            Text("ما قُرئ قبل هذه السنة يذهب إلى «قديمًا»، وما بعدها إلى «أنهيتها».")
                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             HStack(spacing: 16) {
                 Button { cutoffYear = max(1900, cutoffYear - 1) } label: { Image(systemName: "minus.circle.fill").font(.title2) }

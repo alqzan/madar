@@ -46,7 +46,7 @@ struct MoneyEditNameSheet: View {
                     HStack {
                         Text(isObligation ? "عدّل الالتزام" : "عدّل اسم المظروف").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
                         Spacer()
-                        Button("إغلاق") { dismiss() }.frame(minHeight: 44).accessibilityIdentifier("money-edit-close")
+                        Button("تمّ") { dismiss() }.frame(minHeight: 44).accessibilityIdentifier("money-edit-close")
                     }
                     field("الاسم") { TextField("الاسم", text: $name).focused($focused).submitLabel(.done).onSubmit(save).accessibilityIdentifier("money-edit-name") }
                     if isObligation && recurring {

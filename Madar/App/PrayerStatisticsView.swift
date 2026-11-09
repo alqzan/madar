@@ -398,7 +398,7 @@ private struct PrayerDayEditSheet: View {
             } else {
                 // AU-38: never a blank sheet with only its handle.
                 Text("تعذّر تحميل هذا اليوم.").font(PrayerHomeType.lead)
-                Button("أغلق") { dismissDay() }.font(PrayerHomeType.strong).frame(minHeight: 44).accessibilityIdentifier("prayer-day-close")
+                Button("تمّ") { dismissDay() }.font(PrayerHomeType.strong).frame(minHeight: 44).accessibilityIdentifier("prayer-day-close")
             }
         }
         .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 12)

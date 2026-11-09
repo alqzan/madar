@@ -19,7 +19,7 @@ struct PaperBarcodeScannerSheet: View {
             } else {
                 ContentUnavailableView("مسح الباركود غير متاح", systemImage: "barcode.viewfinder", description: Text("اكتب رقم الكتاب الدولي (ISBN) المطبوع تحت الباركود خلف الغلاف."))
             }
-            Button("إغلاق") { dismiss() }
+            Button("تمّ") { dismiss() }
                 .font(.body.weight(.semibold))
                 .padding(12)
                 .background(.regularMaterial, in: .capsule)

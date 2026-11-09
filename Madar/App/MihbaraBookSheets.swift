@@ -222,7 +222,7 @@ struct MihbaraAddBookView: View {
                                 .glassEffect(.regular.interactive(), in: .capsule)
                         }
                     }
-                    Text("كل كتاب يبقى على جهازك ويُقرأ بلا إنترنت؛ البحث في تراث وحده يحتاج الاتصال. راجع معاينته قبل إضافته إلى رفّك.")
+                    Text("الكتب تُقرأ على جهازك بلا إنترنت؛ البحث في تراث وحده يحتاج الاتصال.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }
             }

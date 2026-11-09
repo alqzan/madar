@@ -23,7 +23,7 @@ struct MoneyTripRateSheet: View {
     private var rate: String? { currency == app.string("core.currency") ? "1" : TravelBudget.canonicalRate(raw) }
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 16) {
-            HStack { Text("عملة الرحلة وسعرها").font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق") { dismiss() }.madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-trip-rate-close") }
+            HStack { Text("عملة الرحلة وسعرها").font(MadarTypography.cardTitle()); Spacer(); Button("تمّ") { dismiss() }.madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-trip-rate-close") }
             Picker("عملة البلد", selection: $currency) { ForEach(CurrencyExponents.specified.exponents.keys.sorted(), id: \.self) { code in Text(service.currencyName(code) + " (" + code + ")").tag(code) } }.accessibilityIdentifier("money-trip-currency")
             if currency != app.string("core.currency") {
                 Text("كل وحدة من " + service.currencyName(currency) + " تساوي، بعملة البيت:").font(MadarTypography.body())
@@ -51,7 +51,7 @@ struct MoneyTripRateSheet: View {
     }
     private func repricePreview(_ p: MoneyTripReprice) -> some View {
         ScrollView { VStack(alignment: .leading, spacing: 14) {
-            HStack { Text("قبل تطبيق السعر").font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق") { previewOpen = false }.disabled(saving).frame(minHeight: 44).accessibilityIdentifier("money-trip-reprice-close") }
+            HStack { Text("قبل تطبيق السعر").font(MadarTypography.cardTitle()); Spacer(); Button("تمّ") { previewOpen = false }.disabled(saving).frame(minHeight: 44).accessibilityIdentifier("money-trip-reprice-close") }
             Text("هذه القيم بعملة البيت. المبلغ الأصلي ويوم الحركة لا يتغيّران.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             ForEach(p.lines) { row in HStack { Text(row.title); Spacer(); Text(figure: service.amount(row.beforeMinor) + " ← " + service.amount(row.afterMinor)) }.font(MadarTypography.body()) }
             if p.excludedCount > 0 { Text("تبقى الحركات ذات سعر البنك وتقارير الدورات المغلقة وخطط السداد المعتمدة على أرقامها المحفوظة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
@@ -95,7 +95,7 @@ struct MoneyTripFundingSheet: View {
     }
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 16) {
-            HStack { Text("مظروف رحلة " + reading.city).font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق") { dismiss() }.madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-trip-fund-close") }
+            HStack { Text("مظروف رحلة " + reading.city).font(MadarTypography.cardTitle()); Spacer(); Button("تمّ") { dismiss() }.madarWaitsForSave().frame(minHeight: 44).accessibilityIdentifier("money-trip-fund-close") }
             Text("انقل من مالك المخصّص إلى الرحلة. المجموع لا يتغيّر.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             Text("المبلغ بعملة البيت، " + service.currencyName(app.string("core.currency"))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             TextField("المبلغ", text: $raw).keyboardType(.decimalPad).focused($focused).font(.title2).padding(12).background(theme.surface).accessibilityIdentifier("money-trip-fund-input")
