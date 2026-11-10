@@ -1303,12 +1303,14 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         return row
     }
     private static func account(_ id: UUID, _ context: ModelContext) throws -> Account {
-        guard let row = try context.fetch(FetchDescriptor<Account>()).first(where: { $0.id == id && live($0) }) else { throw MoneyCommandError.invalidReference }; return row
+        guard let row = try context.fetch(FetchDescriptor<Account>(predicate: #Predicate { $0.id == id })).first(where: { live($0) }) else { throw MoneyCommandError.invalidReference }; return row
     }
-    private static func transactions(_ context: ModelContext) throws -> [MoneyTransaction] { try context.fetch(FetchDescriptor<MoneyTransaction>()).filter { live($0) } }
+    private static func transactions(_ context: ModelContext) throws -> [MoneyTransaction] {
+        try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+    }
     private static func currency(_ raw: String) throws { guard CurrencyExponents.specified.exponent(raw) != nil else { throw MoneyCommandError.invalidCurrency } }
     private static func fourDigits(_ raw: String) -> Bool { raw.count == 4 && raw.allSatisfy { ("0"..."9").contains($0) } }
-    private static func live<T: MadarRecordModel>(_ row: T) -> Bool { (try? row.record().isLive) == true }
+    private static func live<T: MadarRecordModel>(_ row: T) -> Bool { row.isLiveRow }
     private static func text(_ p: [String: MadarCore.JSONValue], _ key: String) -> String { optionalText(p, key) ?? "" }
     private static func accrueDailyPlans(_ cycle: MoneyCycleReading, through: Int, context: ModelContext, now: Date, writer: String) throws {
         let existing = Set(try context.fetch(FetchDescriptor<Allocation>()).map(\.idempotencyKey))

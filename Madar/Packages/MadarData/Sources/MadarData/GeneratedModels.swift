@@ -1,7 +1,11 @@
 import Foundation
 import SwiftData
 // Generated from Specification/data-dictionary.json (schema V16). UUID foreign keys intentionally avoid ownership relationships.
-@MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
+@MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; var deletedAt: Date? { get }; var mergedInto: UUID? { get }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
+public extension MadarRecordModel {
+    /// Same meaning as `DataRecord.isLive`, read from the stored properties: no row is encoded to find out.
+    var isLiveRow: Bool { deletedAt == nil && mergedInto == nil }
+}
 @Model public final class Setting {
     public var id: UUID = UUID()
     public var createdAt: Date = Date()

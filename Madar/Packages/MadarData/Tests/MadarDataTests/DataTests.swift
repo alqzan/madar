@@ -4,6 +4,18 @@ import Testing
 @testable import MadarData
 
 @Suite(.serialized) @MainActor struct DataTests {
+    /// B1-7: liveness read from the stored properties must agree with the encoded record for every combination.
+    @Test func liveRowFlagMatchesTheEncodedRecord() throws {
+        let container = try MadarContainerFactory.makeInMemory(), context = container.mainContext
+        for (deleted, merged) in [(false, false), (true, false), (false, true), (true, true)] {
+            let row = MoneyTransaction()
+            if deleted { row.deletedAt = Date() }
+            if merged { row.mergedInto = UUID() }
+            context.insert(row)
+            #expect(row.isLiveRow == (try row.record().isLive), "deleted \(deleted), merged \(merged)")
+            #expect(row.isLiveRow == (!deleted && !merged))
+        }
+    }
     @Test func readerAcceptsOnlyItsBundledLanguageFonts() throws {
         let store = try SettingsSchema.bundled()
         func reader(_ font: String) -> JSONValue { .object(["theme": .string("auto"), "size": .number(4), "font": .string(font), "mode": .string("pages"), "tashkil": .bool(true), "footnotes": .string("tap")]) }
