@@ -151,3 +151,40 @@ struct PrayerNextSnapshotTests {
         #expect(store.read("prayerNext", as: PrayerNextSnapshot.self, now: base.addingTimeInterval(1))?.payload == value)
     }
 }
+
+/// B2-20: the widget provider's entry list, written down from the rules in `ConfiguredPrayerProvider`'s comments:
+/// one entry per minute, a refresh at the end of the minute horizon, and the empty «افتح مدار» entry only where the data truly expires.
+struct PrayerTimelinePlanTests {
+    private let now = Date(timeIntervalSince1970: 1_791_000_000) // exact minute boundary
+    private func envelope(until: TimeInterval, lastPrayerIn: TimeInterval) -> SnapshotEnvelope<PrayerNextSnapshot> {
+        .init(name: "prayerNext", generatedAt: now, validUntil: now.addingTimeInterval(until), dayKey: "2026-10-09", tzID: "Asia/Riyadh", privacy: SnapshotPrivacy(),
+              payload: PrayerNextSnapshot(items: [.init(prayer: "fajr", name: "الفجر", at: now.addingTimeInterval(lastPrayerIn))], numerals: "hindi"))
+    }
+    @Test func withoutASnapshotOneEmptyEntryNowAndAnotherAfterFifteenMinutes() {
+        let plan = PrayerTimelinePlan.make(envelope: nil, now: now)
+        #expect(plan.dates == [now])
+        #expect(plan.refreshAt == now.addingTimeInterval(900))
+        #expect(plan.emptyEntryAt == now.addingTimeInterval(900))
+    }
+    @Test func aLongLivedSnapshotRefreshesAtTheEndOfTheEightHourHorizonWithoutAnEmptyEntry() {
+        let plan = PrayerTimelinePlan.make(envelope: envelope(until: 30 * 3600, lastPrayerIn: 30 * 3600), now: now)
+        #expect(plan.dates.count == 481)
+        #expect(plan.dates.first == now)
+        #expect(plan.dates.last == now.addingTimeInterval(480 * 60))
+        #expect(plan.refreshAt == now.addingTimeInterval(481 * 60))
+        #expect(plan.emptyEntryAt == nil)
+    }
+    @Test func aSnapshotThatExpiresSoonEndsWithTheEmptyEntryAtItsExpiry() {
+        let plan = PrayerTimelinePlan.make(envelope: envelope(until: 90, lastPrayerIn: 30 * 3600), now: now)
+        #expect(plan.dates == [now, now.addingTimeInterval(60)])
+        #expect(plan.refreshAt == now.addingTimeInterval(90))
+        #expect(plan.emptyEntryAt == now.addingTimeInterval(90))
+    }
+    @Test func theLastPrayerOfTheSnapshotEndsTheMinuteEntries() {
+        let plan = PrayerTimelinePlan.make(envelope: envelope(until: 3600, lastPrayerIn: 10 * 60), now: now)
+        #expect(plan.dates.count == 11)
+        #expect(plan.dates.last == now.addingTimeInterval(10 * 60))
+        #expect(plan.refreshAt == now.addingTimeInterval(11 * 60))
+        #expect(plan.emptyEntryAt == nil)
+    }
+}

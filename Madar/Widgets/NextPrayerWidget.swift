@@ -235,13 +235,12 @@ struct ConfiguredPrayerProvider:AppIntentTimelineProvider {
     func snapshot(for configuration:PrayerWidgetConfiguration,in context:Context) async->NextPrayerEntry{load(configuration)}
     func timeline(for configuration:PrayerWidgetConfiguration,in context:Context) async->Timeline<NextPrayerEntry>{
         let now=Date(),envelope=(try? SnapshotStore.appGroup("group.com.alqzan.madar2"))?.read("prayerNext",as:PrayerNextSnapshot.self,now:now)
-        let expiry=envelope?.validUntil ?? now.addingTimeInterval(900),zone=envelope?.tzID ?? TimeZone.current.identifier
-        let window=envelope?.payload.minuteWindow(from:now,validUntil:expiry)
-        let dates=window?.dates ?? [now],refresh=window?.refreshAt ?? expiry
-        var entries=dates.map{NextPrayerEntry(date:$0,snapshot:envelope?.payload,tzID:zone,template:configuration.template)}
-        // The empty «افتح مدار» entry only where the snapshot really expires, not at each eight-hour refresh.
-        if envelope == nil || refresh >= expiry { entries.append(.init(date:refresh,snapshot:nil,tzID:zone,template:configuration.template)) }
-        return Timeline(entries:entries,policy:.after(refresh))
+        // The entry list is `PrayerTimelinePlan` (tested in MadarSnapshots): minute entries, a refresh at the end of the horizon,
+        // and the empty «افتح مدار» entry only where the snapshot really expires.
+        let plan=PrayerTimelinePlan.make(envelope:envelope,now:now),zone=envelope?.tzID ?? TimeZone.current.identifier
+        var entries=plan.dates.map{NextPrayerEntry(date:$0,snapshot:envelope?.payload,tzID:zone,template:configuration.template)}
+        if let empty=plan.emptyEntryAt { entries.append(.init(date:empty,snapshot:nil,tzID:zone,template:configuration.template)) }
+        return Timeline(entries:entries,policy:.after(plan.refreshAt))
     }
     private func load(_ config:PrayerWidgetConfiguration)->NextPrayerEntry{
         let envelope=(try? SnapshotStore.appGroup("group.com.alqzan.madar2"))?.read("prayerNext",as:PrayerNextSnapshot.self)

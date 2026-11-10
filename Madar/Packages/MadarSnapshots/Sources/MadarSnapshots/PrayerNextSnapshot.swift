@@ -64,3 +64,18 @@ public struct PrayerNextSnapshot: Codable, Sendable, Equatable {
         return (0...horizonMinutes).map { start.addingTimeInterval(Double($0) * 60) }.filter { $0 <= end }
     }
 }
+
+/// The widget provider's entry list as pure data (B2-20): the provider only maps these dates to entries.
+public struct PrayerTimelinePlan: Equatable, Sendable {
+    /// Entries that carry the snapshot, one per minute.
+    public let dates: [Date]
+    /// A trailing empty «افتح مدار» entry, only where the data really expires or is missing.
+    public let emptyEntryAt: Date?
+    public let refreshAt: Date
+    public static func make(envelope: SnapshotEnvelope<PrayerNextSnapshot>?, now: Date) -> PrayerTimelinePlan {
+        let expiry = envelope?.validUntil ?? now.addingTimeInterval(900)
+        let window = envelope?.payload.minuteWindow(from: now, validUntil: expiry)
+        let dates = window?.dates ?? [now], refresh = window?.refreshAt ?? expiry
+        return .init(dates: dates, emptyEntryAt: envelope == nil || refresh >= expiry ? refresh : nil, refreshAt: refresh)
+    }
+}

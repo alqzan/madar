@@ -1,890 +1,951 @@
 {
- "version": 2,
- "date": "2026-10-09",
- "owner": "Agent A",
- "rules": [
-  "Every bundled file, package and legacy reference is listed here with source, version/commit, license and SHA-256.",
-  "Packages are pinned by exact commit in Package.resolved; assets by SHA-256 of each file (checksums filled at intake, verified by CI).",
-  "Changing any pin is a reviewed change: diff of this file + re-run of the tests named in usedBy.",
-  "licenseStatus \"decision-needed\" or \"verify…\" blocks shipping that asset at its gate, not development.",
-  "Nothing here asserts a license that was not stated in the handoff or the review evidence.",
-  "Font files are tracked in `fonts` (B1/V01); exportEmbed and publicHosting are false for every font until a licence explicitly allows them."
- ],
- "entries": [
-  {
-   "id": "my-dream",
-   "kind": "legacy reference (code + data source)",
-   "source": "https://github.com/alqzan/My-dream",
-   "version": null,
-   "commit": "aba0c1b18a3bf3fc070395a40595e939c3b73aa3",
-   "license": "owner's own code — no third-party license applies",
-   "licenseStatus": "n/a",
-   "checksum": null,
-   "checksumNote": "Read-only Quran source audit completed at the pinned SHA on 2026-10-13; no separate tree checksum is recorded.",
-   "gate": "M0",
-   "usedBy": "§11 migration map, §7.4 Quran engine port, §7.5 money bug corpus",
-   "note": "Replaces \"aba0c1b or later\". Moving the pin = provenance diff + re-run of port tests."
-  },
-  {
-   "id": "adhan-swift",
-   "kind": "Swift package",
-   "source": "https://github.com/batoulapps/adhan-swift",
-   "version": "1.5.0 (version the review reports testing)",
-   "commit": "a6fa2deee80c5abb0b9ad04466f8ab12b53144e7",
-   "license": "MIT (as stated in §1 and the review evidence)",
-   "licenseStatus": "known",
-   "checksum": null,
-   "checksumNote": "SwiftPM pins by revision in Package.resolved = this commit; M0 checks that tag 1.5.0 resolves to this commit",
-   "gate": "M1",
-   "usedBy": "PrayerTimesEngine",
-   "note": "Isha = Maghrib + 90 / +120 in Ramadan is Madar code, not the library. Golden times fixture: evidence/prayer-times-results.json (review)."
-  },
-  {
-   "id": "kfgqpc-hafs-v2-font",
-   "kind": "native Unicode font",
-   "source": "https://download.qurancomplex.gov.sa/resources_dev/UthmanicHafs_v2-0.zip",
-   "version": "2.0",
-   "commit": null,
-   "license": "Mushaf permission obtained by the owner for Madar",
-   "licenseStatus": "owner-confirmed",
-   "checksum": "d560bbbc7a90a4f4d416d206a5ac48bd8a1ad00273d64d232f16ca54941bd041",
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M2",
-   "usedBy": "unchanged semantic text, headings and explicit whitespace; printed words use their original page font",
-   "note": "The Unicode font and text remain unchanged. QCF V2 private codes use only the corresponding verified 1439 page font.",
-   "edition": "1439 layout; KFGQPC Hafs Uthmanic 2.0",
-   "downloadDate": "2026-10-14",
-   "humanReview": {
-    "name": null,
-    "date": null
-   },
-   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
-   "licenseDecision": "docs/DECISIONS.md — 2026-10-14"
-  },
-  {
-   "id": "quran-word-map",
-   "kind": "data asset (word map)",
-   "source": "https://github.com/abdoadel123/mutqin-resources",
-   "version": "Madar bound UTF-16 layout v1",
-   "commit": "0cd14756e44d52d012e00fb15b128979c5c0b213",
-   "license": "Mushaf permission obtained by the owner for Madar",
-   "licenseStatus": "owner-confirmed",
-   "checksum": "250c326545852deff4da21d4da1dc11c233e33ebabd64d16d82898cb3d610feb",
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M2",
-   "usedBy": "word hit-testing, hide/reveal, MistakeSpot.wordIndex",
-   "note": "All 6236 page/start-line/end-line records match the Complex dataset. Opening pages have a seven-row grid offset, normalized explicitly. All 77429 visual word groups bind to unchanged official UTF-16 spans. Seven compound spellings checked against Quran.com word responses. No Quran.com juz/hizb metadata imported.",
-   "edition": 1439,
-   "downloadDate": "2026-10-14",
-   "humanReview": {
-    "name": null,
-    "date": null
-   },
-   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
-   "licenseDecision": "docs/DECISIONS.md — 2026-10-14"
-  },
-  {
-   "id": "quran-text",
-   "kind": "data asset",
-   "source": "https://download.qurancomplex.gov.sa/resources_dev/UthmanicHafs_v2-0.zip",
-   "version": "2.0",
-   "commit": null,
-   "license": "Mushaf permission obtained by the owner for Madar",
-   "licenseStatus": "owner-confirmed",
-   "checksum": "d2960b3217962e7e4252abdcece67bea3d6b48271e4cd3af45bbbb2dd5c872ca",
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M2",
-   "usedBy": "search, tafsir sheet",
-   "note": "Official source JSON unchanged. Quran.com juz/hizb metadata is not used.",
-   "edition": 1439,
-   "downloadDate": "2026-10-14",
-   "humanReview": {
-    "name": null,
-    "date": null
-   },
-   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
-   "licenseDecision": "docs/DECISIONS.md — 2026-10-14"
-  },
-  {
-   "id": "tafsir-muyassar",
-   "kind": "text asset",
-   "source": "not yet chosen",
-   "version": null,
-   "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M2",
-   "usedBy": "tap ayah → tafsir",
-   "note": "Source and terms open (§7.4, §14).",
-   "edition": null,
-   "downloadDate": null,
-   "termsCopied": null,
-   "humanReview": {
-    "name": null,
-    "date": null
-   },
-   "gateRule": "per §7.4 «بوابة سلامة الموارد»: edition, version, download date, SHA-256, terms as copied, and a named human review are all filled before the resource is enabled"
-  },
-  {
-   "id": "thmanyah-fonts",
-   "kind": "font assets (Sans, Serif Display, Serif Text)",
-   "source": "https://font.thmanyah.com/licenses",
-   "version": null,
-   "commit": null,
-   "license": "Thmanyah license — per the review (V01): embedding in a packaged/compiled app is allowed; standalone redistribution or extractable font files are not",
-   "licenseStatus": "known (summary); keep a dated copy of the license text with the files",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M0",
-   "usedBy": "all UI text",
-   "note": "design-tokens.json still says \"no web embedding\" — correction owned by Agent B1 (V01)."
-  },
-  {
-   "id": "amiri",
-   "kind": "font",
-   "source": "Amiri project (Khaled Hosny)",
-   "version": null,
-   "commit": null,
-   "license": "OFL-1.1 (stated in design-tokens.json)",
-   "licenseStatus": "verify the OFL.txt shipped with the exact files",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M0",
-   "usedBy": "sharia text, fallback",
-   "note": ""
-  },
-  {
-   "id": "amiri-quran",
-   "kind": "font",
-   "source": "Amiri project (Khaled Hosny)",
-   "version": null,
-   "commit": null,
-   "license": "OFL-1.1 (stated in design-tokens.json)",
-   "licenseStatus": "verify the OFL.txt shipped with the exact files",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M2",
-   "usedBy": "Quran snippets",
-   "note": ""
-  },
-  {
-   "id": "reem-kufi",
-   "kind": "font",
-   "source": "Reem Kufi (Google Fonts)",
-   "version": null,
-   "commit": null,
-   "license": "OFL-1.1 (stated in design-tokens.json)",
-   "licenseStatus": "verify the OFL.txt shipped with the exact files",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M1",
-   "usedBy": "prayer ayah line",
-   "note": ""
-  },
-  {
-   "id": "aref-ruqaa",
-   "kind": "font",
-   "source": "Aref Ruqaa (Google Fonts)",
-   "version": null,
-   "commit": null,
-   "license": "OFL-1.1 (stated in design-tokens.json)",
-   "licenseStatus": "verify the OFL.txt shipped with the exact files",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M6",
-   "usedBy": "Mihbara notebook",
-   "note": ""
-  },
-  {
-   "id": "ibm-plex-sans-arabic",
-   "kind": "font (fallback)",
-   "source": "IBM Plex",
-   "version": null,
-   "commit": null,
-   "license": "OFL expected",
-   "licenseStatus": "verify",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M0",
-   "usedBy": "UI fallback",
-   "note": ""
-  },
-  {
-   "id": "reader-literata",
-   "kind": "font (reader)",
-   "source": "Literata",
-   "version": null,
-   "commit": null,
-   "license": "OFL expected",
-   "licenseStatus": "verify each file before bundling (§14)",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M6",
-   "usedBy": "Mihbara reader",
-   "note": ""
-  },
-  {
-   "id": "reader-source-serif-4",
-   "kind": "font (reader)",
-   "source": "Source Serif 4",
-   "version": null,
-   "commit": null,
-   "license": "OFL expected",
-   "licenseStatus": "verify each file before bundling (§14)",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M6",
-   "usedBy": "Mihbara reader",
-   "note": ""
-  },
-  {
-   "id": "reader-atkinson-hyperlegible",
-   "kind": "font (reader)",
-   "source": "Atkinson Hyperlegible",
-   "version": null,
-   "commit": null,
-   "license": "OFL expected",
-   "licenseStatus": "verify each file before bundling (§14)",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M6",
-   "usedBy": "Mihbara reader",
-   "note": ""
-  },
-  {
-   "id": "reader-ibm-plex-serif",
-   "kind": "font (reader)",
-   "source": "IBM Plex Serif",
-   "version": null,
-   "commit": null,
-   "license": "OFL expected",
-   "licenseStatus": "verify each file before bundling (§14)",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M6",
-   "usedBy": "Mihbara reader",
-   "note": ""
-  },
-  {
-   "id": "reader-scheherazade-new",
-   "kind": "font (reader)",
-   "source": "Scheherazade New",
-   "version": null,
-   "commit": null,
-   "license": "OFL expected",
-   "licenseStatus": "verify each file before bundling (§14)",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M6",
-   "usedBy": "Mihbara reader",
-   "note": ""
-  },
-  {
-   "id": "readium-swift-toolkit",
-  "kind": "Swift package (EPUB reader engine)",
-   "source": "https://github.com/readium/swift-toolkit",
-  "version": "3.11.1",
-  "commit": "9a8c094b72245fd27043c9d298005e5c78b32a01",
-  "license": "BSD-3-Clause",
-  "licenseStatus": "verified",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M6",
-   "usedBy": "EPUB/PDF reader",
-  "note": "Readium 3.11.1 selected after the Arabic EPUB proof of concept; exact release commit and LICENSE are pinned. The license text ships in App/Resources/Licenses/Readium-BSD-3-Clause.txt."
-  },
-  {
-   "id": "swift-snapshot-testing",
-   "kind": "Swift package (tests only)",
-   "source": "https://github.com/pointfreeco/swift-snapshot-testing",
-   "version": null,
-   "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M0",
-   "usedBy": "snapshot tests",
-   "note": "Pin version + commit at M0; record the license from its LICENSE file."
-  },
-  {
-   "id": "forty-nawawi-text",
-   "kind": "text asset",
-   "source": "https://ar.wikisource.org/w/index.php?title=الأربعون_النووية&oldid=500107",
-   "version": "wikisource-ar-500107",
-   "commit": null,
-   "license": "Nawawi matn: public domain; digital transcription attributed to Wikisource contributors, CC BY-SA 4.0; owner-confirmed permission",
-   "licenseStatus": "confirmed",
-   "checksum": "0927a9cd7c6a567cdef6507b5648e90b372151648add62a00a8122bc78065abe",
-   "checksumNote": "SHA-256 Madar/App/MihbaraResources/nawawi40.json; 42 stable numbered matn entries, including the second paragraphs in 19 and 27; commentary excluded",
-   "gate": "M6",
-   "usedBy": "Sunnah drawer",
-   "note": "Owner 17 Oct 2026: «ماخذ الترخيص انا»; do not ask again. Digital edition is pinned by revision, not claimed to match a scanned print edition. Source/edition/license links ship in the reader. Scientific text/source review is still required before distribution."
-  },
-  {
-   "id": "arabic-dictionary",
-   "kind": "data asset",
-   "source": "owner decision",
-   "version": null,
-   "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M6",
-   "usedBy": "Mihbara word meaning",
-   "note": "Source and license open (§15 #13)."
-  },
-  {
-   "id": "english-dictionary",
-   "kind": "data asset",
-   "source": "owner decision",
-   "version": null,
-   "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M6",
-   "usedBy": "Mihbara word meaning",
-   "note": "Source and license open."
-  },
-  {
-   "id": "openiti-corpus",
-   "kind": "text corpus (optional v1 source)",
-   "source": "https://github.com/OpenITI",
-   "version": null,
-   "commit": null,
-   "license": "CC BY-NC-SA 4.0 per its documentation (review R10); the MIT license of its tools does not cover the texts",
-   "licenseStatus": "known — non-commercial; App Store distribution is not automatically allowed",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "gate": "M6",
-   "usedBy": "Mihbara import (optional)",
-   "note": "Do not ship texts until the owner decides."
-  },
-  {
-   "version": null,
-   "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "note": "",
-   "id": "quran-line-map",
-   "kind": "data asset (line map)",
-   "source": "Quran.com line_number or QUL — source not yet chosen",
-   "gate": "M2",
-   "usedBy": "15-line Mushaf layout, portionEnd fractions",
-   "edition": null,
-   "downloadDate": null,
-   "termsCopied": null,
-   "humanReview": {
-    "name": null,
-    "date": null
-   },
-   "gateRule": "per §7.4 «بوابة سلامة الموارد»: edition, version, download date, SHA-256, terms as copied, and a named human review are all filled before the resource is enabled"
-  },
-  {
-   "version": null,
-   "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "note": "",
-   "id": "mutashabihat",
-   "kind": "data asset",
-   "source": "not yet chosen (legacy mutashabihat.ts at the pinned My-dream SHA is the current reference)",
-   "gate": "M2",
-   "usedBy": "similar-verse alert, discriminationDecoy",
-   "edition": null,
-   "downloadDate": null,
-   "termsCopied": null,
-   "humanReview": {
-    "name": null,
-    "date": null
-   },
-   "gateRule": "per §7.4 «بوابة سلامة الموارد»: edition, version, download date, SHA-256, terms as copied, and a named human review are all filled before the resource is enabled"
-  },
-  {
-   "version": null,
-   "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "note": "must be filled before release (C 30)",
-   "id": "city-list",
-   "kind": "data asset",
-   "source": "bundled city list (name, country, lat, lon, IANA tz) — source not yet chosen",
-   "gate": "pre-release",
-   "usedBy": "manual city picker, Trip"
-  },
-  {
-   "version": "2026-09-17",
-   "commit": null,
-   "license": "ISO permits free use of ISO 4217 codes; numeric minor-unit facts only",
-   "licenseStatus": "owner-confirmed",
-   "checksum": "9271b1d59d67475b76f2c96d233061fe986d1eb3d1c753ffd7617549b4867104",
-   "checksumNote": "SHA-256 of MadarMoney/Resources/currency-minor-units.json",
-   "note": "Derived code-to-exponent facts only; no publication prose/names. ISO use terms: https://www.iso.org/iso-4217-currency-codes.html; source XML SHA-256 33139b438657d1cee116ba737807ea71d19d6de4b90f799a09c56f0cc6a1b0ff",
-   "id": "currency-minor-units",
-   "kind": "data asset",
-   "source": "https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml",
-   "gate": "M5",
-   "usedBy": "money minor-unit exponents (SAR 2, JPY 0, KWD/BHD/OMR 3)",
-   "licenseDecision": "Owner 2026-10-17; docs/DECISIONS.md"
-  },
-  {
-   "license": "Mushaf permission obtained by the owner for Madar",
-   "licenseStatus": "owner-confirmed",
-   "licenseDecision": "docs/DECISIONS.md — 2026-10-14",
-   "gate": "M2",
-   "downloadDate": "2026-10-14",
-   "humanReview": {
-    "name": null,
-    "date": null
-   },
-   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
-   "id": "mushaf-1405-page-frame",
-   "kind": "visual-only artwork",
-   "source": "https://e-quran.com/masahef/pdf/almadinah-qadim.pdf",
-   "version": "old Madinah scan; committee seal 1405, PDF page 620",
-   "edition": 1405,
-   "checksum": "448f4e73d3f4e8f116f351d0b37f4af8aea90faf145259d716ac23b49400864c",
-   "usedBy": "Mushaf frame and surah banner only",
-   "note": "Extracted as four separate ornamental strips. No Quran text or page/line/word boundaries are imported from 1405."
-  },
-  {
-   "license": "Mushaf permission obtained by the owner for Madar",
-   "licenseStatus": "owner-confirmed",
-   "licenseDecision": "docs/DECISIONS.md — 2026-10-14",
-   "gate": "M2",
-   "downloadDate": "2026-10-14",
-   "humanReview": {
-    "name": null,
-    "date": null
-   },
-   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
-   "id": "mushaf-1405-surah-opening",
-   "kind": "visual-only artwork",
-   "source": "https://e-quran.com/masahef/pdf/almadinah-qadim.pdf",
-   "version": "old Madinah scan; committee seal 1405, PDF page 620",
-   "edition": 1405,
-   "checksum": "fa832bc01d493f1b9e8a320be298e964a5667f5aa54016bb184774b06d414304",
-   "usedBy": "Mushaf frame and surah banner only",
-   "note": "Extracted as four separate ornamental strips. No Quran text or page/line/word boundaries are imported from 1405."
-  },
-  {
-   "id": "qcf-v2-1439-printed-fonts",
-   "kind": "original printed word fonts and glyph binding",
-   "source": "https://github.com/abdoadel123/mutqin-resources",
-   "commit": "0cd14756e44d52d012e00fb15b128979c5c0b213",
-   "edition": 1439,
-   "license": "Mushaf permission obtained by the owner for Madar",
-   "licenseStatus": "owner-confirmed",
-   "downloadDate": "2026-10-14",
-   "checksum": "264bb7c4d0db6f87efdb0ac6b2263b1a64c706673d436b5bf5b8fb5ed1d9d592",
-   "checksumNote": "Each of 604 original WOFF2 files is pinned separately in QuranResourceManifest.json. All 604 font and 604 source page JSON bytes match the pinned Git blob IDs.",
-   "usedBy": "QuranCoachPage, per-word learning masks, ayah hit testing and the full-page view",
-   "note": "All 77429 visual word groups and 6236 verse-end glyphs match the existing 1439 semantic map. Every presentation glyph exists in its own page font; only ASCII space uses the verified Unicode font.",
-   "humanReview": {
-    "name": null,
-    "date": null
-   },
-   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed."
-  },
-  {
-   "id": "quran-1439-hizb",
-   "kind": "data asset",
-   "source": "https://dm.qurancomplex.gov.sa/Download/1441-AI-hafs.zip",
-   "version": "Hafs39 even hizb marginal starts v1",
-   "license": "Mushaf permission obtained by the owner for Madar",
-   "licenseStatus": "owner-confirmed",
-   "checksum": "b8ff878014afc4ba7f1c91d6d7d324edf71122999e9275c99272c98110967c73",
-   "archiveSHA256": "280c5d71ca16aaeeb3a343be1b92c76fa6df71d0671e202c026fde12402d9eef",
-   "edition": 1439,
-   "downloadDate": "2026-10-13",
-   "usedBy": "R18-Fihris hizb unit; QuranHizbMapTests; QuranResourceCatalogTests",
-   "note": "All 30 even hizb labels and their adjacent ayah starts visually checked in the official Hafs39 AI pages against the unchanged Hafs 2.0 surah/ayah/page/line records. Archive is a later digital distribution of Hafs39. Odd starts remain the existing official jozz field; no Quran.com metadata is imported. Named human release sample remains pending.",
-   "humanReview": {
-    "name": null,
-    "date": null
-   },
-   "gateRule": "Named human sample before external release remains pending."
-  }
- ],
- "fonts": {
-  "gate": "complete before the first TestFlight build (one row per shipped file; families with file = null expand to one row per file at intake)",
-  "rule": "licence \"OFL-1.1\" is the expected licence; it is confirmed only when licenceFile + licenceSha256 of the OFL.txt shipped with that exact file are filled",
+  "version": 2,
+  "date": "2026-10-10",
+  "owner": "Agent A",
+  "rules": [
+    "Every bundled file, package and legacy reference is listed here with source, version/commit, license and SHA-256.",
+    "Packages are pinned by exact commit in Package.resolved; assets by SHA-256 of each file (checksums filled at intake, verified by CI).",
+    "Changing any pin is a reviewed change: diff of this file + re-run of the tests named in usedBy.",
+    "licenseStatus \"decision-needed\" or \"verify…\" blocks shipping that asset at its gate, not development.",
+    "Nothing here asserts a license that was not stated in the handoff or the review evidence.",
+    "Font files are tracked in `fonts` (B1/V01); exportEmbed and publicHosting are false for every font until a licence explicitly allows them."
+  ],
   "entries": [
-   {
-    "family": "Thmanyah Sans",
-    "file": "ThmanyahSans-300.(otf|ttf) — exact file name at intake",
-    "version": null,
-    "sha256": null,
-    "licence": "Thmanyah",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": "https://font.thmanyah.com/licenses",
-    "retrieved": "2026-10-09",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Thmanyah Sans",
-    "file": "ThmanyahSans-400.(otf|ttf) — exact file name at intake",
-    "version": null,
-    "sha256": null,
-    "licence": "Thmanyah",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": "https://font.thmanyah.com/licenses",
-    "retrieved": "2026-10-09",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Thmanyah Sans",
-    "file": "ThmanyahSans-500.(otf|ttf) — exact file name at intake",
-    "version": null,
-    "sha256": null,
-    "licence": "Thmanyah",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": "https://font.thmanyah.com/licenses",
-    "retrieved": "2026-10-09",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Thmanyah Sans",
-    "file": "ThmanyahSans-700.(otf|ttf) — exact file name at intake",
-    "version": null,
-    "sha256": null,
-    "licence": "Thmanyah",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": "https://font.thmanyah.com/licenses",
-    "retrieved": "2026-10-09",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Thmanyah Serif Display",
-    "file": "ThmanyahSerifDisplay-700.(otf|ttf) — exact file name at intake",
-    "version": null,
-    "sha256": null,
-    "licence": "Thmanyah",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": "https://font.thmanyah.com/licenses",
-    "retrieved": "2026-10-09",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Thmanyah Serif Display",
-    "file": "ThmanyahSerifDisplay-900.(otf|ttf) — exact file name at intake",
-    "version": null,
-    "sha256": null,
-    "licence": "Thmanyah",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": "https://font.thmanyah.com/licenses",
-    "retrieved": "2026-10-09",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Thmanyah Serif Text",
-    "file": "ThmanyahSerifText-400.(otf|ttf) — exact file name at intake",
-    "version": null,
-    "sha256": null,
-    "licence": "Thmanyah",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": "https://font.thmanyah.com/licenses",
-    "retrieved": "2026-10-09",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Thmanyah Serif Text",
-    "file": "ThmanyahSerifText-700.(otf|ttf) — exact file name at intake",
-    "version": null,
-    "sha256": null,
-    "licence": "Thmanyah",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": "https://font.thmanyah.com/licenses",
-    "retrieved": "2026-10-09",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Amiri",
-    "file": null,
-    "version": null,
-    "sha256": null,
-    "licence": "OFL-1.1",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": null,
-    "retrieved": null,
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Amiri Quran",
-    "file": null,
-    "version": null,
-    "sha256": null,
-    "licence": "OFL-1.1",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": null,
-    "retrieved": null,
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Reem Kufi",
-    "file": null,
-    "version": null,
-    "sha256": null,
-    "licence": "OFL-1.1",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": null,
-    "retrieved": null,
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Aref Ruqaa",
-    "file": null,
-    "version": null,
-    "sha256": null,
-    "licence": "OFL-1.1",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": null,
-    "retrieved": null,
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "IBM Plex Sans Arabic",
-    "file": null,
-    "version": null,
-    "sha256": null,
-    "licence": "OFL-1.1",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": null,
-    "retrieved": null,
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": true,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Literata",
-    "file": "Madar/App/Resources/Fonts/Literata-Variable.ttf",
-    "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
-    "sha256": "b41138c9373112f32abb589cc22e8674b06ed4048b0c513be922bdd26f274440",
-    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/literata/Literata[opsz,wght].ttf",
-    "licence": "OFL-1.1",
-    "licenceFile": "Madar/App/Resources/Fonts/Literata-OFL.txt",
-    "licenceSha256": "8742963604cd89dc81437811a850018fc03b2bfad686d7422c8235967c87614e",
-    "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/literata/OFL.txt",
-    "retrieved": "2026-10-18",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": false,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Source Serif 4",
-    "file": "Madar/App/Resources/Fonts/SourceSerif4-Variable.ttf",
-    "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
-    "sha256": "97b2d4da6e3cb494b5a1e66ae176914d852ccabef49e0c02c0df25f3e39aca0b",
-    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/sourceserif4/SourceSerif4[opsz,wght].ttf",
-    "licence": "OFL-1.1",
-    "licenceFile": "Madar/App/Resources/Fonts/SourceSerif4-OFL.txt",
-    "licenceSha256": "5f94c3fd3a23131a417ab5a0c8452de57e70c3cfb9f604d88241f7065ebf9fd9",
-    "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/sourceserif4/OFL.txt",
-    "retrieved": "2026-10-18",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": false,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Atkinson Hyperlegible",
-    "file": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-Regular.ttf",
-    "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
-    "sha256": "7fb917c89019896d0b52ee84b7cbb3304c18cb90b19a62f5e32712bd23e97669",
-    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-Regular.ttf",
-    "licence": "OFL-1.1",
-    "licenceFile": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-OFL.txt",
-    "licenceSha256": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
-    "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/OFL.txt",
-    "retrieved": "2026-10-18",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": false,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Atkinson Hyperlegible",
-    "file": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-Bold.ttf",
-    "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
-    "sha256": "5a3b0c8cc8ca545155150b4512a1fa248298df121c50d6557e651e61fbdab92f",
-    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-Bold.ttf",
-    "licence": "OFL-1.1",
-    "licenceFile": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-OFL.txt",
-    "licenceSha256": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
-    "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/OFL.txt",
-    "retrieved": "2026-10-18",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": false,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "IBM Plex Serif",
-    "file": "Madar/App/Resources/Fonts/IBMPlexSerif-Regular.ttf",
-    "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
-    "sha256": "e882efa9c41949a528ac2369079ec5ef050c1c996bbd0bacce3c3326d44cf80d",
-    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/IBMPlexSerif-Regular.ttf",
-    "licence": "OFL-1.1",
-    "licenceFile": "Madar/App/Resources/Fonts/IBMPlexSerif-OFL.txt",
-    "licenceSha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
-    "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/OFL.txt",
-    "retrieved": "2026-10-18",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": false,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "IBM Plex Serif",
-    "file": "Madar/App/Resources/Fonts/IBMPlexSerif-Bold.ttf",
-    "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
-    "sha256": "534c02c295999dd86e770457ece1d43db0de9256dd98bf741426f63ae904209e",
-    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/IBMPlexSerif-Bold.ttf",
-    "licence": "OFL-1.1",
-    "licenceFile": "Madar/App/Resources/Fonts/IBMPlexSerif-OFL.txt",
-    "licenceSha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
-    "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/OFL.txt",
-    "retrieved": "2026-10-18",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": false,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "Scheherazade New",
-    "file": null,
-    "version": null,
-    "sha256": null,
-    "licence": "OFL-1.1",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": null,
-    "retrieved": null,
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": false,
-     "exportEmbed": false,
-     "publicHosting": false
-    }
-   },
-   {
-    "family": "KFGQPC Hafs Uthmanic 2.0",
-    "file": "Madar/Packages/MadarQuran/Sources/MadarQuran/Resources/UthmanicHafs_v2-0/uthmanic_hafs_v20.ttf",
-    "version": "2.0",
-    "sha256": "d560bbbc7a90a4f4d416d206a5ac48bd8a1ad00273d64d232f16ca54941bd041",
-    "licence": "owner-confirmed; closed",
-    "licenceFile": null,
-    "licenceSha256": null,
-    "licenceURL": null,
-    "retrieved": "2026-10-14",
-    "allowedUses": {
-     "appBundle": true,
-     "widgetBundle": false,
-     "exportEmbed": false,
-     "publicHosting": false
+    {
+      "id": "my-dream",
+      "kind": "legacy reference (code + data source)",
+      "source": "https://github.com/alqzan/My-dream",
+      "version": null,
+      "commit": "aba0c1b18a3bf3fc070395a40595e939c3b73aa3",
+      "license": "owner's own code — no third-party license applies",
+      "licenseStatus": "n/a",
+      "checksum": null,
+      "checksumNote": "Read-only Quran source audit completed at the pinned SHA on 2026-10-13; no separate tree checksum is recorded.",
+      "gate": "M0",
+      "usedBy": "§11 migration map, §7.4 Quran engine port, §7.5 money bug corpus",
+      "note": "Replaces \"aba0c1b or later\". Moving the pin = provenance diff + re-run of port tests."
     },
-    "ownerDecision": "docs/DECISIONS.md — 2026-10-14"
-   }
-  ]
- }
+    {
+      "id": "adhan-swift",
+      "kind": "Swift package",
+      "source": "https://github.com/batoulapps/adhan-swift",
+      "version": "1.5.0 (version the review reports testing)",
+      "commit": "a6fa2deee80c5abb0b9ad04466f8ab12b53144e7",
+      "license": "MIT (as stated in §1 and the review evidence)",
+      "licenseStatus": "known",
+      "checksum": null,
+      "checksumNote": "SwiftPM pins by revision in Package.resolved = this commit; M0 checks that tag 1.5.0 resolves to this commit",
+      "gate": "M1",
+      "usedBy": "PrayerTimesEngine",
+      "note": "Isha = Maghrib + 90 / +120 in Ramadan is Madar code, not the library. Golden times fixture: evidence/prayer-times-results.json (review)."
+    },
+    {
+      "id": "kfgqpc-hafs-v2-font",
+      "kind": "native Unicode font",
+      "source": "https://download.qurancomplex.gov.sa/resources_dev/UthmanicHafs_v2-0.zip",
+      "version": "2.0",
+      "commit": null,
+      "license": "Mushaf permission obtained by the owner for Madar",
+      "licenseStatus": "owner-confirmed",
+      "checksum": "d560bbbc7a90a4f4d416d206a5ac48bd8a1ad00273d64d232f16ca54941bd041",
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M2",
+      "usedBy": "unchanged semantic text, headings and explicit whitespace; printed words use their original page font",
+      "note": "The Unicode font and text remain unchanged. QCF V2 private codes use only the corresponding verified 1439 page font.",
+      "edition": "1439 layout; KFGQPC Hafs Uthmanic 2.0",
+      "downloadDate": "2026-10-14",
+      "humanReview": {
+        "name": null,
+        "date": null
+      },
+      "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
+      "licenseDecision": "docs/DECISIONS.md — 2026-10-14"
+    },
+    {
+      "id": "quran-word-map",
+      "kind": "data asset (word map)",
+      "source": "https://github.com/abdoadel123/mutqin-resources",
+      "version": "Madar bound UTF-16 layout v1",
+      "commit": "0cd14756e44d52d012e00fb15b128979c5c0b213",
+      "license": "Mushaf permission obtained by the owner for Madar",
+      "licenseStatus": "owner-confirmed",
+      "checksum": "250c326545852deff4da21d4da1dc11c233e33ebabd64d16d82898cb3d610feb",
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M2",
+      "usedBy": "word hit-testing, hide/reveal, MistakeSpot.wordIndex",
+      "note": "All 6236 page/start-line/end-line records match the Complex dataset. Opening pages have a seven-row grid offset, normalized explicitly. All 77429 visual word groups bind to unchanged official UTF-16 spans. Seven compound spellings checked against Quran.com word responses. No Quran.com juz/hizb metadata imported.",
+      "edition": 1439,
+      "downloadDate": "2026-10-14",
+      "humanReview": {
+        "name": null,
+        "date": null
+      },
+      "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
+      "licenseDecision": "docs/DECISIONS.md — 2026-10-14"
+    },
+    {
+      "id": "quran-text",
+      "kind": "data asset",
+      "source": "https://download.qurancomplex.gov.sa/resources_dev/UthmanicHafs_v2-0.zip",
+      "version": "2.0",
+      "commit": null,
+      "license": "Mushaf permission obtained by the owner for Madar",
+      "licenseStatus": "owner-confirmed",
+      "checksum": "d2960b3217962e7e4252abdcece67bea3d6b48271e4cd3af45bbbb2dd5c872ca",
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M2",
+      "usedBy": "search, tafsir sheet",
+      "note": "Official source JSON unchanged. Quran.com juz/hizb metadata is not used.",
+      "edition": 1439,
+      "downloadDate": "2026-10-14",
+      "humanReview": {
+        "name": null,
+        "date": null
+      },
+      "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
+      "licenseDecision": "docs/DECISIONS.md — 2026-10-14"
+    },
+    {
+      "id": "tafsir-muyassar",
+      "kind": "text asset",
+      "source": "not yet chosen",
+      "version": null,
+      "commit": null,
+      "license": "to verify",
+      "licenseStatus": "decision-needed",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M2",
+      "usedBy": "tap ayah → tafsir",
+      "note": "Source and terms open (§7.4, §14).",
+      "edition": null,
+      "downloadDate": null,
+      "termsCopied": null,
+      "humanReview": {
+        "name": null,
+        "date": null
+      },
+      "gateRule": "per §7.4 «بوابة سلامة الموارد»: edition, version, download date, SHA-256, terms as copied, and a named human review are all filled before the resource is enabled"
+    },
+    {
+      "id": "thmanyah-fonts",
+      "kind": "font assets (Sans, Serif Display, Serif Text)",
+      "source": "https://font.thmanyah.com/licenses",
+      "version": null,
+      "commit": null,
+      "license": "Thmanyah license — per the review (V01): embedding in a packaged/compiled app is allowed; standalone redistribution or extractable font files are not",
+      "licenseStatus": "known (summary); keep a dated copy of the license text with the files",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M0",
+      "usedBy": "all UI text",
+      "note": "design-tokens.json still says \"no web embedding\" — correction owned by Agent B1 (V01)."
+    },
+    {
+      "id": "amiri",
+      "kind": "font",
+      "source": "Amiri project (Khaled Hosny)",
+      "version": null,
+      "commit": null,
+      "license": "OFL-1.1 (stated in design-tokens.json)",
+      "licenseStatus": "verify the OFL.txt shipped with the exact files",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M0",
+      "usedBy": "sharia text, fallback",
+      "note": ""
+    },
+    {
+      "id": "amiri-quran",
+      "kind": "font",
+      "source": "Amiri project (Khaled Hosny)",
+      "version": null,
+      "commit": null,
+      "license": "OFL-1.1 (stated in design-tokens.json)",
+      "licenseStatus": "verify the OFL.txt shipped with the exact files",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M2",
+      "usedBy": "Quran snippets",
+      "note": ""
+    },
+    {
+      "id": "reem-kufi",
+      "kind": "font",
+      "source": "Reem Kufi (Google Fonts)",
+      "version": null,
+      "commit": null,
+      "license": "OFL-1.1 (stated in design-tokens.json)",
+      "licenseStatus": "verify the OFL.txt shipped with the exact files",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M1",
+      "usedBy": "prayer ayah line",
+      "note": ""
+    },
+    {
+      "id": "aref-ruqaa",
+      "kind": "font",
+      "source": "Aref Ruqaa (Google Fonts)",
+      "version": null,
+      "commit": null,
+      "license": "OFL-1.1 (stated in design-tokens.json)",
+      "licenseStatus": "verify the OFL.txt shipped with the exact files",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M6",
+      "usedBy": "Mihbara notebook",
+      "note": ""
+    },
+    {
+      "id": "ibm-plex-sans-arabic",
+      "kind": "font (fallback)",
+      "source": "IBM Plex",
+      "version": null,
+      "commit": null,
+      "license": "OFL expected",
+      "licenseStatus": "verify",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M0",
+      "usedBy": "UI fallback",
+      "note": ""
+    },
+    {
+      "id": "reader-literata",
+      "kind": "font (reader)",
+      "source": "Literata",
+      "version": null,
+      "commit": null,
+      "license": "OFL expected",
+      "licenseStatus": "verify each file before bundling (§14)",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M6",
+      "usedBy": "Mihbara reader",
+      "note": ""
+    },
+    {
+      "id": "reader-source-serif-4",
+      "kind": "font (reader)",
+      "source": "Source Serif 4",
+      "version": null,
+      "commit": null,
+      "license": "OFL expected",
+      "licenseStatus": "verify each file before bundling (§14)",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M6",
+      "usedBy": "Mihbara reader",
+      "note": ""
+    },
+    {
+      "id": "reader-atkinson-hyperlegible",
+      "kind": "font (reader)",
+      "source": "Atkinson Hyperlegible",
+      "version": null,
+      "commit": null,
+      "license": "OFL expected",
+      "licenseStatus": "verify each file before bundling (§14)",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M6",
+      "usedBy": "Mihbara reader",
+      "note": ""
+    },
+    {
+      "id": "reader-ibm-plex-serif",
+      "kind": "font (reader)",
+      "source": "IBM Plex Serif",
+      "version": null,
+      "commit": null,
+      "license": "OFL expected",
+      "licenseStatus": "verify each file before bundling (§14)",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M6",
+      "usedBy": "Mihbara reader",
+      "note": ""
+    },
+    {
+      "id": "reader-scheherazade-new",
+      "kind": "font (reader)",
+      "source": "Scheherazade New",
+      "version": null,
+      "commit": null,
+      "license": "OFL expected",
+      "licenseStatus": "verify each file before bundling (§14)",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M6",
+      "usedBy": "Mihbara reader",
+      "note": ""
+    },
+    {
+      "id": "readium-swift-toolkit",
+      "kind": "Swift package (EPUB reader engine)",
+      "source": "https://github.com/readium/swift-toolkit",
+      "version": "3.11.1",
+      "commit": "9a8c094b72245fd27043c9d298005e5c78b32a01",
+      "license": "BSD-3-Clause",
+      "licenseStatus": "verified",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M6",
+      "usedBy": "EPUB/PDF reader",
+      "note": "Readium 3.11.1 selected after the Arabic EPUB proof of concept; exact release commit and LICENSE are pinned. The license text ships in App/Resources/Licenses/Readium-BSD-3-Clause.txt."
+    },
+    {
+      "id": "swift-snapshot-testing",
+      "kind": "Swift package (tests only)",
+      "source": "https://github.com/pointfreeco/swift-snapshot-testing",
+      "version": null,
+      "commit": null,
+      "license": "to verify",
+      "licenseStatus": "decision-needed",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M0",
+      "usedBy": "snapshot tests",
+      "note": "Pin version + commit at M0; record the license from its LICENSE file."
+    },
+    {
+      "id": "forty-nawawi-text",
+      "kind": "text asset",
+      "source": "https://ar.wikisource.org/w/index.php?title=الأربعون_النووية&oldid=500107",
+      "version": "wikisource-ar-500107",
+      "commit": null,
+      "license": "Nawawi matn: public domain; digital transcription attributed to Wikisource contributors, CC BY-SA 4.0; owner-confirmed permission",
+      "licenseStatus": "confirmed",
+      "checksum": "0927a9cd7c6a567cdef6507b5648e90b372151648add62a00a8122bc78065abe",
+      "checksumNote": "SHA-256 Madar/App/MihbaraResources/nawawi40.json; 42 stable numbered matn entries, including the second paragraphs in 19 and 27; commentary excluded",
+      "gate": "M6",
+      "usedBy": "Sunnah drawer",
+      "note": "Owner 17 Oct 2026: «ماخذ الترخيص انا»; do not ask again. Digital edition is pinned by revision, not claimed to match a scanned print edition. Source/edition/license links ship in the reader. Scientific text/source review is still required before distribution."
+    },
+    {
+      "id": "arabic-dictionary",
+      "kind": "data asset",
+      "source": "owner decision",
+      "version": null,
+      "commit": null,
+      "license": "to verify",
+      "licenseStatus": "decision-needed",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M6",
+      "usedBy": "Mihbara word meaning",
+      "note": "Source and license open (§15 #13)."
+    },
+    {
+      "id": "english-dictionary",
+      "kind": "data asset",
+      "source": "owner decision",
+      "version": null,
+      "commit": null,
+      "license": "to verify",
+      "licenseStatus": "decision-needed",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M6",
+      "usedBy": "Mihbara word meaning",
+      "note": "Source and license open."
+    },
+    {
+      "id": "openiti-corpus",
+      "kind": "text corpus (optional v1 source)",
+      "source": "https://github.com/OpenITI",
+      "version": null,
+      "commit": null,
+      "license": "CC BY-NC-SA 4.0 per its documentation (review R10); the MIT license of its tools does not cover the texts",
+      "licenseStatus": "known — non-commercial; App Store distribution is not automatically allowed",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "gate": "M6",
+      "usedBy": "Mihbara import (optional)",
+      "note": "Do not ship texts until the owner decides."
+    },
+    {
+      "version": null,
+      "commit": null,
+      "license": "to verify",
+      "licenseStatus": "decision-needed",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "note": "",
+      "id": "quran-line-map",
+      "kind": "data asset (line map)",
+      "source": "Quran.com line_number or QUL — source not yet chosen",
+      "gate": "M2",
+      "usedBy": "15-line Mushaf layout, portionEnd fractions",
+      "edition": null,
+      "downloadDate": null,
+      "termsCopied": null,
+      "humanReview": {
+        "name": null,
+        "date": null
+      },
+      "gateRule": "per §7.4 «بوابة سلامة الموارد»: edition, version, download date, SHA-256, terms as copied, and a named human review are all filled before the resource is enabled"
+    },
+    {
+      "version": null,
+      "commit": null,
+      "license": "to verify",
+      "licenseStatus": "decision-needed",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "note": "",
+      "id": "mutashabihat",
+      "kind": "data asset",
+      "source": "not yet chosen (legacy mutashabihat.ts at the pinned My-dream SHA is the current reference)",
+      "gate": "M2",
+      "usedBy": "similar-verse alert, discriminationDecoy",
+      "edition": null,
+      "downloadDate": null,
+      "termsCopied": null,
+      "humanReview": {
+        "name": null,
+        "date": null
+      },
+      "gateRule": "per §7.4 «بوابة سلامة الموارد»: edition, version, download date, SHA-256, terms as copied, and a named human review are all filled before the resource is enabled"
+    },
+    {
+      "version": null,
+      "commit": null,
+      "license": "to verify",
+      "licenseStatus": "decision-needed",
+      "checksum": null,
+      "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+      "note": "must be filled before release (C 30)",
+      "id": "city-list",
+      "kind": "data asset",
+      "source": "bundled city list (name, country, lat, lon, IANA tz) — source not yet chosen",
+      "gate": "pre-release",
+      "usedBy": "manual city picker, Trip"
+    },
+    {
+      "version": "2026-09-17",
+      "commit": null,
+      "license": "ISO permits free use of ISO 4217 codes; numeric minor-unit facts only",
+      "licenseStatus": "owner-confirmed",
+      "checksum": "9271b1d59d67475b76f2c96d233061fe986d1eb3d1c753ffd7617549b4867104",
+      "checksumNote": "SHA-256 of MadarMoney/Resources/currency-minor-units.json",
+      "note": "Derived code-to-exponent facts only; no publication prose/names. ISO use terms: https://www.iso.org/iso-4217-currency-codes.html; source XML SHA-256 33139b438657d1cee116ba737807ea71d19d6de4b90f799a09c56f0cc6a1b0ff",
+      "id": "currency-minor-units",
+      "kind": "data asset",
+      "source": "https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml",
+      "gate": "M5",
+      "usedBy": "money minor-unit exponents (SAR 2, JPY 0, KWD/BHD/OMR 3)",
+      "licenseDecision": "Owner 2026-10-17; docs/DECISIONS.md"
+    },
+    {
+      "license": "Mushaf permission obtained by the owner for Madar",
+      "licenseStatus": "owner-confirmed",
+      "licenseDecision": "docs/DECISIONS.md — 2026-10-14",
+      "gate": "M2",
+      "downloadDate": "2026-10-14",
+      "humanReview": {
+        "name": null,
+        "date": null
+      },
+      "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
+      "id": "mushaf-1405-page-frame",
+      "kind": "visual-only artwork",
+      "source": "https://e-quran.com/masahef/pdf/almadinah-qadim.pdf",
+      "version": "old Madinah scan; committee seal 1405, PDF page 620",
+      "edition": 1405,
+      "checksum": "448f4e73d3f4e8f116f351d0b37f4af8aea90faf145259d716ac23b49400864c",
+      "usedBy": "Mushaf frame and surah banner only",
+      "note": "Extracted as four separate ornamental strips. No Quran text or page/line/word boundaries are imported from 1405."
+    },
+    {
+      "license": "Mushaf permission obtained by the owner for Madar",
+      "licenseStatus": "owner-confirmed",
+      "licenseDecision": "docs/DECISIONS.md — 2026-10-14",
+      "gate": "M2",
+      "downloadDate": "2026-10-14",
+      "humanReview": {
+        "name": null,
+        "date": null
+      },
+      "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
+      "id": "mushaf-1405-surah-opening",
+      "kind": "visual-only artwork",
+      "source": "https://e-quran.com/masahef/pdf/almadinah-qadim.pdf",
+      "version": "old Madinah scan; committee seal 1405, PDF page 620",
+      "edition": 1405,
+      "checksum": "fa832bc01d493f1b9e8a320be298e964a5667f5aa54016bb184774b06d414304",
+      "usedBy": "Mushaf frame and surah banner only",
+      "note": "Extracted as four separate ornamental strips. No Quran text or page/line/word boundaries are imported from 1405."
+    },
+    {
+      "id": "qcf-v2-1439-printed-fonts",
+      "kind": "original printed word fonts and glyph binding",
+      "source": "https://github.com/abdoadel123/mutqin-resources",
+      "commit": "0cd14756e44d52d012e00fb15b128979c5c0b213",
+      "edition": 1439,
+      "license": "Mushaf permission obtained by the owner for Madar",
+      "licenseStatus": "owner-confirmed",
+      "downloadDate": "2026-10-14",
+      "checksum": "264bb7c4d0db6f87efdb0ac6b2263b1a64c706673d436b5bf5b8fb5ed1d9d592",
+      "checksumNote": "Each of 604 original WOFF2 files is pinned separately in QuranResourceManifest.json. All 604 font and 604 source page JSON bytes match the pinned Git blob IDs.",
+      "usedBy": "QuranCoachPage, per-word learning masks, ayah hit testing and the full-page view",
+      "note": "All 77429 visual word groups and 6236 verse-end glyphs match the existing 1439 semantic map. Every presentation glyph exists in its own page font; only ASCII space uses the verified Unicode font.",
+      "humanReview": {
+        "name": null,
+        "date": null
+      },
+      "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed."
+    },
+    {
+      "id": "quran-1439-hizb",
+      "kind": "data asset",
+      "source": "https://dm.qurancomplex.gov.sa/Download/1441-AI-hafs.zip",
+      "version": "Hafs39 even hizb marginal starts v1",
+      "license": "Mushaf permission obtained by the owner for Madar",
+      "licenseStatus": "owner-confirmed",
+      "checksum": "b8ff878014afc4ba7f1c91d6d7d324edf71122999e9275c99272c98110967c73",
+      "archiveSHA256": "280c5d71ca16aaeeb3a343be1b92c76fa6df71d0671e202c026fde12402d9eef",
+      "edition": 1439,
+      "downloadDate": "2026-10-13",
+      "usedBy": "R18-Fihris hizb unit; QuranHizbMapTests; QuranResourceCatalogTests",
+      "note": "All 30 even hizb labels and their adjacent ayah starts visually checked in the official Hafs39 AI pages against the unchanged Hafs 2.0 surah/ayah/page/line records. Archive is a later digital distribution of Hafs39. Odd starts remain the existing official jozz field; no Quran.com metadata is imported. Named human release sample remains pending.",
+      "humanReview": {
+        "name": null,
+        "date": null
+      },
+      "gateRule": "Named human sample before external release remains pending."
+    }
+  ],
+  "fonts": {
+    "gate": "complete before the first TestFlight build (one row per shipped file; families with file = null expand to one row per file at intake)",
+    "rule": "licence \"OFL-1.1\" is the expected licence; it is confirmed only when licenceFile + licenceSha256 of the OFL.txt shipped with that exact file are filled",
+    "entries": [
+      {
+        "family": "Thmanyah Sans",
+        "file": "ThmanyahSans-300.(otf|ttf) — exact file name at intake",
+        "version": null,
+        "sha256": null,
+        "licence": "Thmanyah",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": "https://font.thmanyah.com/licenses",
+        "retrieved": "2026-10-09",
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "Thmanyah Sans",
+        "file": "ThmanyahSans-400.(otf|ttf) — exact file name at intake",
+        "version": null,
+        "sha256": null,
+        "licence": "Thmanyah",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": "https://font.thmanyah.com/licenses",
+        "retrieved": "2026-10-09",
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "Thmanyah Sans",
+        "file": "ThmanyahSans-500.(otf|ttf) — exact file name at intake",
+        "version": null,
+        "sha256": null,
+        "licence": "Thmanyah",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": "https://font.thmanyah.com/licenses",
+        "retrieved": "2026-10-09",
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "Thmanyah Sans",
+        "file": "ThmanyahSans-700.(otf|ttf) — exact file name at intake",
+        "version": null,
+        "sha256": null,
+        "licence": "Thmanyah",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": "https://font.thmanyah.com/licenses",
+        "retrieved": "2026-10-09",
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "Thmanyah Serif Display",
+        "file": "ThmanyahSerifDisplay-700.(otf|ttf) — exact file name at intake",
+        "version": null,
+        "sha256": null,
+        "licence": "Thmanyah",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": "https://font.thmanyah.com/licenses",
+        "retrieved": "2026-10-09",
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "Thmanyah Serif Display",
+        "file": "ThmanyahSerifDisplay-900.(otf|ttf) — exact file name at intake",
+        "version": null,
+        "sha256": null,
+        "licence": "Thmanyah",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": "https://font.thmanyah.com/licenses",
+        "retrieved": "2026-10-09",
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "Thmanyah Serif Text",
+        "file": "ThmanyahSerifText-400.(otf|ttf) — exact file name at intake",
+        "version": null,
+        "sha256": null,
+        "licence": "Thmanyah",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": "https://font.thmanyah.com/licenses",
+        "retrieved": "2026-10-09",
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "Thmanyah Serif Text",
+        "file": "ThmanyahSerifText-700.(otf|ttf) — exact file name at intake",
+        "version": null,
+        "sha256": null,
+        "licence": "Thmanyah",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": "https://font.thmanyah.com/licenses",
+        "retrieved": "2026-10-09",
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "Amiri",
+        "file": null,
+        "version": null,
+        "sha256": null,
+        "licence": "OFL-1.1",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": null,
+        "retrieved": null,
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "Amiri Quran",
+        "file": null,
+        "version": null,
+        "sha256": null,
+        "licence": "OFL-1.1",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": null,
+        "retrieved": null,
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "Reem Kufi",
+        "file": null,
+        "version": null,
+        "sha256": null,
+        "licence": "OFL-1.1",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": null,
+        "retrieved": null,
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "Aref Ruqaa",
+        "file": null,
+        "version": null,
+        "sha256": null,
+        "licence": "OFL-1.1",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": null,
+        "retrieved": null,
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "IBM Plex Sans Arabic",
+        "file": null,
+        "version": null,
+        "sha256": null,
+        "licence": "OFL-1.1",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": null,
+        "retrieved": null,
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": true,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+       "family": "Literata",
+       "file": "Madar/App/Resources/Fonts/Literata-Variable.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "b41138c9373112f32abb589cc22e8674b06ed4048b0c513be922bdd26f274440",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/literata/Literata[opsz,wght].ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/Literata-OFL.txt",
+       "licenceSha256": "8742963604cd89dc81437811a850018fc03b2bfad686d7422c8235967c87614e",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/literata/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
+      },
+      {
+       "family": "Source Serif 4",
+       "file": "Madar/App/Resources/Fonts/SourceSerif4-Variable.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "97b2d4da6e3cb494b5a1e66ae176914d852ccabef49e0c02c0df25f3e39aca0b",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/sourceserif4/SourceSerif4[opsz,wght].ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/SourceSerif4-OFL.txt",
+       "licenceSha256": "5f94c3fd3a23131a417ab5a0c8452de57e70c3cfb9f604d88241f7065ebf9fd9",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/sourceserif4/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
+      },
+      {
+       "family": "Atkinson Hyperlegible",
+       "file": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-Regular.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "7fb917c89019896d0b52ee84b7cbb3304c18cb90b19a62f5e32712bd23e97669",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-Regular.ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-OFL.txt",
+       "licenceSha256": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
+      },
+      {
+       "family": "Atkinson Hyperlegible",
+       "file": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-Bold.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "5a3b0c8cc8ca545155150b4512a1fa248298df121c50d6557e651e61fbdab92f",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-Bold.ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-OFL.txt",
+       "licenceSha256": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
+      },
+      {
+       "family": "IBM Plex Serif",
+       "file": "Madar/App/Resources/Fonts/IBMPlexSerif-Regular.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "e882efa9c41949a528ac2369079ec5ef050c1c996bbd0bacce3c3326d44cf80d",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/IBMPlexSerif-Regular.ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/IBMPlexSerif-OFL.txt",
+       "licenceSha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
+      },
+      {
+       "family": "IBM Plex Serif",
+       "file": "Madar/App/Resources/Fonts/IBMPlexSerif-Bold.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "534c02c295999dd86e770457ece1d43db0de9256dd98bf741426f63ae904209e",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/IBMPlexSerif-Bold.ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/IBMPlexSerif-OFL.txt",
+       "licenceSha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
+      },
+      {
+        "family": "Scheherazade New",
+        "file": null,
+        "version": null,
+        "sha256": null,
+        "licence": "OFL-1.1",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": null,
+        "retrieved": null,
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": false,
+          "exportEmbed": false,
+          "publicHosting": false
+        }
+      },
+      {
+        "family": "KFGQPC Hafs Uthmanic 2.0",
+        "file": "Madar/Packages/MadarQuran/Sources/MadarQuran/Resources/UthmanicHafs_v2-0/uthmanic_hafs_v20.ttf",
+        "version": "2.0",
+        "sha256": "d560bbbc7a90a4f4d416d206a5ac48bd8a1ad00273d64d232f16ca54941bd041",
+        "licence": "owner-confirmed; closed",
+        "licenceFile": null,
+        "licenceSha256": null,
+        "licenceURL": null,
+        "retrieved": "2026-10-14",
+        "allowedUses": {
+          "appBundle": true,
+          "widgetBundle": false,
+          "exportEmbed": false,
+          "publicHosting": false
+        },
+        "ownerDecision": "docs/DECISIONS.md — 2026-10-14"
+      }
+    ]
+  },
+  "implementationIntake": {
+    "myDreamVerifiedCommit": "aba0c1b18a3bf3fc070395a40595e939c3b73aa3",
+    "adhanVerifiedCommit": "a6fa2deee80c5abb0b9ad04466f8ab12b53144e7",
+    "fontManifest": "../docs/font-provenance.json",
+    "localFontFiles": [
+      {
+        "file": "thmanyahsans-Light.otf",
+        "sha256": "c4286938c04ea60eb1953919cddce7b268270a825a04823a0642a044ebc7fd34",
+        "source": "/Users/abdulrahman/Library/Fonts/thmanyahsans-Light.otf",
+        "modified": false
+      },
+      {
+        "file": "thmanyahsans-Regular.otf",
+        "sha256": "f45a420632384b42a37ec9b24298ddc6502faa52d55d973144779262ebc023dc",
+        "source": "/Users/abdulrahman/Library/Fonts/thmanyahsans-Regular.otf",
+        "modified": false
+      },
+      {
+        "file": "thmanyahsans-Medium.otf",
+        "sha256": "f2762ffbe17351193e3d630dd10f0c3a965e6c873998dfdeda2bd0dcad7985c6",
+        "source": "/Users/abdulrahman/Library/Fonts/thmanyahsans-Medium.otf",
+        "modified": false
+      },
+      {
+        "file": "thmanyahsans-Bold.otf",
+        "sha256": "72cc27021cc1a503e5c03b072df8b16d55c78983e5fd73a4cdf92b5a600af2f7",
+        "source": "/Users/abdulrahman/Library/Fonts/thmanyahsans-Bold.otf",
+        "modified": false
+      },
+      {
+        "file": "thmanyahserifdisplay-Bold.otf",
+        "sha256": "ac2f056441891276792ab6d828d8ad9169ef44ecea60d6ccf126b25361f0ee9d",
+        "source": "/Users/abdulrahman/Library/Fonts/thmanyahserifdisplay-Bold.otf",
+        "modified": false
+      },
+      {
+        "file": "thmanyahserifdisplay-Black.otf",
+        "sha256": "696b78342a499a82421ae25c1db86b73730108ea38d8be216669c243dfea1557",
+        "source": "/Users/abdulrahman/Library/Fonts/thmanyahserifdisplay-Black.otf",
+        "modified": false
+      },
+      {
+        "file": "thmanyahseriftext-Regular.otf",
+        "sha256": "db7294cfea2b2a537c028305dc142fb3b743da1c4738f0fac3a7dd31c0c47b5f",
+        "source": "/Users/abdulrahman/Library/Fonts/thmanyahseriftext-Regular.otf",
+        "modified": false
+      },
+      {
+        "file": "thmanyahseriftext-Bold.otf",
+        "sha256": "001cc1586b6920139780b8ea05f3df399a4c11dc5a86d96102ff356c727a0a35",
+        "source": "/Users/abdulrahman/Library/Fonts/thmanyahseriftext-Bold.otf",
+        "modified": false
+      }
+    ],
+    "officialLicenceEvidence": {
+      "file": "thmanyah-license-2026-10-10.html",
+      "sha256": "084945240b72fadd4f0a9f2e53ec50179529c36aecead111648288c7f75fd462",
+      "retrieved": "2026-10-10"
+    },
+    "distributionGate": "Exact shipped licence text and Amiri evidence remain open. Local development only."
+  }
 }

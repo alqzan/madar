@@ -61,6 +61,11 @@
    "key": "mal.expenseInDiary",
    "movedTo": "notes.autoLines.mal (same toggle shown in خصّص المال)",
    "finding": "C04"
+  },
+  {
+   "key": "core.faceIDLock",
+   "movedTo": "removed — the app lock was deleted (owner, 10 Nov 2026); a value stored by an older build is ignored and left untouched",
+   "finding": "owner 10 Nov 2026"
   }
  ],
  "settings": [
@@ -379,27 +384,6 @@
     1000
    ],
    "storage": "Setting (synced)",
-   "preset": false
-  },
-  {
-   "key": "core.faceIDLock",
-   "owner": "core",
-   "section": "الخصوصية",
-   "title": "القفل بالوجه",
-   "type": "choice",
-   "default": "none",
-   "scope": "device",
-   "options": [
-    {
-     "value": "app",
-     "label": "مدار كله"
-    },
-    {
-     "value": "none",
-     "label": "بلا"
-    }
-   ],
-   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
    "preset": false
   },
   {
