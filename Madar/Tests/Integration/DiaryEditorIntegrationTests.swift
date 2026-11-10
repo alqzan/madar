@@ -60,3 +60,21 @@ import MadarData
         XCTAssertEqual(try Data(contentsOf: input), original)
     }
 }
+
+/// B1-12: the take stops and keeps its audio on a system interruption; nothing happens when no take is running.
+@MainActor final class DiaryVoiceInterruptionTests: XCTestCase {
+    func testARecordingTakeStopsAndSavesOnInterruptionOrLostInput() {
+        XCTAssertEqual(DiaryVoiceInterruption.action(recording: true, event: .interruptionBegan), .stopAndSave)
+        XCTAssertEqual(DiaryVoiceInterruption.action(recording: true, event: .inputLost), .stopAndSave)
+        XCTAssertEqual(DiaryVoiceInterruption.action(recording: false, event: .interruptionBegan), .ignore)
+    }
+    func testOnlyTheBeginningOfAnInterruptionCountsNotItsEnd() {
+        let began = Notification(name: AVAudioSession.interruptionNotification, object: nil,
+                                 userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue])
+        let ended = Notification(name: AVAudioSession.interruptionNotification, object: nil,
+                                 userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.ended.rawValue])
+        XCTAssertEqual(DiaryVoiceInterruption.event(from: began), .interruptionBegan)
+        XCTAssertNil(DiaryVoiceInterruption.event(from: ended))
+        XCTAssertNil(DiaryVoiceInterruption.event(from: Notification(name: .init("other"))))
+    }
+}

@@ -36,6 +36,7 @@ import MadarCore
     private var meterWindowTotal = 0.0
     private var meterWindowCount = 0
     private var meterTask: Task<Void, Never>?
+    private var audioEventTask: Task<Void, Never>?
     private var transcriptMedia: DiaryDisplayMedia?
     private var savedTranscript = ""
     private var processed: Set<URL> = []
@@ -94,6 +95,7 @@ import MadarCore
             try startChunk()
             recording = true
             startMetering()
+            observeAudioSession()
         } catch { recording = false; message = madarUserMessage(error) }
     }
     private func startChunk() throws {
@@ -127,11 +129,34 @@ import MadarCore
     }
     func stop() async {
         guard let recorder else { return }; recording = false
-        stopMetering(); elapsedSeconds = Int(recorder.currentTime.rounded(.down))
+        stopMetering(); stopObservingAudioSession(); elapsedSeconds = Int(recorder.currentTime.rounded(.down))
         let url = recorder.url; recorder.stop(); self.recorder = nil
         await storeChunk(url: url, successful: true)
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         if let lastMedia { await transcribe(lastMedia) }
+    }
+    // MARK: Interruptions (B1-11): a call, an alarm or a lost microphone ends the take cleanly with what was recorded.
+    private func observeAudioSession() {
+        audioEventTask?.cancel()
+        audioEventTask = Task { [weak self] in
+            let center = NotificationCenter.default, session = AVAudioSession.sharedInstance()
+            await withTaskGroup(of: Void.self) { group in
+                for name in [AVAudioSession.interruptionNotification, AVAudioSession.routeChangeNotification] {
+                    group.addTask { [weak self] in
+                        for await note in center.notifications(named: name, object: session) {
+                            guard !Task.isCancelled, let event = DiaryVoiceInterruption.event(from: note) else { continue }
+                            await self?.handleAudioEvent(event)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    private func stopObservingAudioSession() { audioEventTask?.cancel(); audioEventTask = nil }
+    func handleAudioEvent(_ event: DiaryVoiceInterruption.Event) async {
+        guard DiaryVoiceInterruption.action(recording: recording, event: event) == .stopAndSave else { return }
+        await stop()
+        message = "توقف التسجيل لأن النظام قاطعه؛ حُفظ ما سُجّل"
     }
     private func startMetering() {
         meterTask?.cancel()
@@ -328,7 +353,7 @@ extension DiaryVoiceController: AVAudioRecorderDelegate {
         let url = recorder.url
         Task { @MainActor [weak self] in
             guard let self else { return }
-            if self.recorder === recorder { self.recorder = nil; self.recording = false; self.stopMetering() }
+            if self.recorder === recorder { self.recorder = nil; self.recording = false; self.stopMetering(); self.stopObservingAudioSession() }
             if !flag { self.message = "توقف التسجيل؛ نحفظ المقطع الذي اكتمل" }
             await self.storeChunk(url: url, successful: flag)
             if !self.recording, let media = self.lastMedia { await self.transcribe(media) }
@@ -370,4 +395,26 @@ extension DiaryVoiceController: AVAudioRecorderDelegate {
     }
     func cancel() { task?.cancel(); task = nil; finish(.failure(CancellationError())) }
     private func finish(_ result: Result<String, Error>) { let waiter = continuation; continuation = nil; task = nil; recognizer = nil; waiter?.resume(with: result) }
+}
+
+/// What an audio-session notification means for a take in progress. Pure, so it is tested without a microphone.
+enum DiaryVoiceInterruption {
+    enum Event: Equatable { case interruptionBegan, inputLost }
+    enum Action: Equatable { case ignore, stopAndSave }
+    static func action(recording: Bool, event: Event) -> Action { recording ? .stopAndSave : .ignore }
+    static func event(from note: Notification) -> Event? {
+        guard let info = note.userInfo else { return nil }
+        if note.name == AVAudioSession.interruptionNotification {
+            guard let raw = info[AVAudioSessionInterruptionTypeKey] as? UInt, AVAudioSession.InterruptionType(rawValue: raw) == .began else { return nil }
+            return .interruptionBegan
+        }
+        if note.name == AVAudioSession.routeChangeNotification {
+            guard let raw = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  AVAudioSession.RouteChangeReason(rawValue: raw) == .oldDeviceUnavailable,
+                  let previous = info[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription,
+                  !previous.inputs.isEmpty, AVAudioSession.sharedInstance().currentRoute.inputs.isEmpty else { return nil }
+            return .inputLost
+        }
+        return nil
+    }
 }
