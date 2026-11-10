@@ -114,7 +114,7 @@ private struct FixedRoomWidgetView:View {
     let entry:FixedRoomEntry
     @Environment(\.widgetFamily)private var family
     @Environment(\.colorScheme)private var scheme
-    var body:some View{RoomWidgetContent(room:entry.room,snapshot:entry.value,template:entry.template,family:family,mihbaraSnapshot:entry.mihbara,mihbaraLocked:entry.mihbaraLocked,numerals:entry.numerals).widgetURL(entry.openURL).containerBackground(for:.widget){if [WidgetFamily.accessoryCircular,.accessoryRectangular,.accessoryInline].contains(family){Color.clear}else if entry.room == .money{MadarToken.colors["widgetIdentity.room.mal.\(scheme == .dark ? "dark" : "light").bg"] ?? .clear}else{RoomTheme(room:entry.room == .mihbara ? "mihbara" : "bahw",dark:scheme == .dark).surface}}}
+    var body:some View{RoomWidgetContent(room:entry.room,snapshot:entry.value,template:entry.template,family:family,mihbaraSnapshot:entry.mihbara,mihbaraLocked:entry.mihbaraLocked,numerals:entry.numerals).privacySensitive().widgetURL(entry.openURL).containerBackground(for:.widget){if [WidgetFamily.accessoryCircular,.accessoryRectangular,.accessoryInline].contains(family){Color.clear}else if entry.room == .money{MadarToken.colors["widgetIdentity.room.mal.\(scheme == .dark ? "dark" : "light").bg"] ?? .clear}else{RoomTheme(room:entry.room == .mihbara ? "mihbara" : "bahw",dark:scheme == .dark).surface}}}
 }
 struct FixedRoomWidget<Config:FixedRoomConfiguration>:Widget {
     var body:some WidgetConfiguration {

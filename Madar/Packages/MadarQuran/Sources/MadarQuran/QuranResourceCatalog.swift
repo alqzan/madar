@@ -186,8 +186,9 @@ public struct QuranResourceCatalog: Sendable {
         self.indexesByPage = pageIndexes
     }
 
-    public static func bundled() throws -> QuranResourceCatalog {
-        try QuranResourceManifest.bundled().verifyFiles()
+    /// `verifyFiles: false` skips the SHA-256 pass over the ~610 bundled files; the app asks for it once per build number (B1-5).
+    public static func bundled(verifyFiles: Bool = true) throws -> QuranResourceCatalog {
+        if verifyFiles { try QuranResourceManifest.bundled().verifyFiles() }
         guard let url = Bundle.module.url(
             forResource: "hafsData_v2-0",
             withExtension: "json",
