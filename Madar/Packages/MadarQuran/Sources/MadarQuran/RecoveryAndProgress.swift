@@ -176,8 +176,10 @@ public enum QuranProgressEngine {
         let extras = Dictionary(grouping: QuranDailyPlanEngine.uniqueAllotments(allotments)
             .filter { $0.kind == .hifzExtra }, by: \.dayKey)
         var cursor = day, completed = 0.0
-        // Bound tiny/invalid-rate forecasts by the GregorianDay supported range.
-        while cursor.year < 9999 {
+        // B2-7: a forecast beyond a century is not a forecast; stop there instead of walking to year 9999 (seconds on the main thread).
+        var walked = 0
+        while cursor.year < 9999, walked < 36_500 {
+            walked += 1
             if !restDay.contains(cursor) {
                 completed += dailyPages + (extras[cursor] ?? []).reduce(0) { $0 + $1.amount * pagesPerPlanUnit }
                 if completed + 1e-9 >= remainingPages { return .estimated(cursor) }

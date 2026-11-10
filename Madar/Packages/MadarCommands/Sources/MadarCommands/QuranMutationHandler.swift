@@ -197,10 +197,13 @@ public struct QuranStagedResult: Sendable {
             try touch(row, deleting: true); needsCache = true
         case "quran.savePlan":
             let plans = try context.fetch(FetchDescriptor<HifzPlan>()).filter { $0.mergedInto == nil }
+            let previous = plans.filter { $0.deletedAt == nil && $0.supersededAt == nil }.max { $0.version < $1.version }
             for old in plans where old.deletedAt == nil && old.supersededAt == nil { old.supersededAt = now; try touch(old) }
             let row = HifzPlan(); row.version = (plans.map(\.version).max() ?? 0) + 1
             row.startAyah = Int(number("startAyah")); row.unit = text("unit"); row.amount = number("amount"); row.rhythm = text("rhythm"); row.missPolicy = text("missPolicy")
-            row.activeFrom = now; row.createdAt = now; context.insert(row); try touch(row)
+            // B2-7: changing the amount or rhythm of the same plan continues it; only a different starting ayah begins a new one.
+            row.activeFrom = previous.flatMap { $0.startAyah == row.startAyah && $0.activeFrom <= now ? $0.activeFrom : nil } ?? now
+            row.createdAt = now; context.insert(row); try touch(row)
             try repository.settings.prepare(.string(text("restDay")), for: "quran.restDay", now: now)
             needsCache = true
         case "quran.setTodayLevel", "quran.forceNewHifz", "quran.freezeTest":

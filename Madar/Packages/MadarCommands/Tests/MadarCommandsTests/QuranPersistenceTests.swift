@@ -140,6 +140,19 @@ import MadarQuran
         #expect(snapshot.hifzLevel == .deep && snapshot.habitualHifzLevel == .medium)
     }
 
+    /// B2-7: editing the amount of the same plan is not starting over; only a different starting ayah begins a new plan.
+    @Test func resavingTheSamePlanKeepsItsStartDayButANewStartAyahRestarts() async throws {
+        let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        let first = date("2026-10-05T12:00:00+03:00"), second = date("2026-10-09T12:00:00+03:00"), third = date("2026-10-12T12:00:00+03:00")
+        #expect(try await bus.execute(envelope("quran.savePlan", planPayload, at: first), now: first).status == .applied)
+        var edited = planPayload; edited["amount"] = .number(2)
+        #expect(try await bus.execute(envelope("quran.savePlan", edited, at: second), now: second).status == .applied)
+        #expect(try repo(container).snapshot(at: second.addingTimeInterval(1)).planStartDay == GregorianDay("2026-10-05"))
+        var elsewhere = planPayload; elsewhere["startAyah"] = .number(500)
+        #expect(try await bus.execute(envelope("quran.savePlan", elsewhere, at: third), now: third).status == .applied)
+        #expect(try repo(container).snapshot(at: third.addingTimeInterval(1)).planStartDay == GregorianDay("2026-10-12"))
+    }
+
     @Test func needsGradeTurnsTheNextDayIntoConsolidationNotToday() async throws {
         let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
         let planAt = now.addingTimeInterval(-3 * 86400)

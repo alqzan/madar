@@ -205,6 +205,13 @@ final class DailyPlanningTests: XCTestCase {
         XCTAssertEqual(QuranProgressEngine.forecast(remainingPages: 1, dailyPages: 0, startingOn: start, restDay: .none), .unavailable)
     }
 
+    /// B2-7: a vanishing daily amount must not freeze the screen walking day by day to the year 9999.
+    func testForecastWithAVanishingRateAnswersQuickly() throws {
+        let start = try day("2026-10-10"), began = Date()
+        XCTAssertEqual(QuranProgressEngine.forecast(remainingPages: 600, dailyPages: 1e-12, startingOn: start, restDay: .friday), .unavailable)
+        XCTAssertLessThan(Date().timeIntervalSince(began), 1.0)
+    }
+
     func testEightRakatsWithThreeSavedPagesRecordsEachOnce() throws {
         let pages = try [page(1, due: "2026-10-30"), page(2, due: "2026-10-16"), page(3, due: "2026-10-20")]
         let result = try QuranQiyamEngine.assignment(rakats: 8, pages: pages + pages)
