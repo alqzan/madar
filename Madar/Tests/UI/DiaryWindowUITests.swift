@@ -103,7 +103,8 @@ import XCTest
         XCTAssertFalse(app.buttons["diary-export-close"].exists, app.debugDescription)
         app.terminate()
     }
-    func testDiaryRootClosesEmptyProjectDraft() {
+    func testDiaryRootClosesEmptyProjectDraft() throws {
+        try XCTSkipIf(true, "Projects have no entry point in the diary hub since the 8 Nov simplification; covered when the room returns.")
         continueAfterFailure = false
         let app = launch("letters", rootRouteHarness: true)
         app.buttons["diary-days"].tap()
@@ -119,7 +120,8 @@ import XCTest
         XCTAssertTrue(home.isHittable, app.debugDescription)
         app.terminate()
     }
-    func testDiaryRootWaitsForUnsavedProjectReflectionThenOpensQueuedProject() {
+    func testDiaryRootWaitsForUnsavedProjectReflectionThenOpensQueuedProject() throws {
+        try XCTSkipIf(true, "Projects have no entry point in the diary hub since the 8 Nov simplification; covered when the room returns.")
         continueAfterFailure = false
         let app = launch("lettersRoutes", rootRouteHarness: true)
         app.buttons["diary-days"].tap()
@@ -207,7 +209,8 @@ import XCTest
         XCTAssertTrue(composer.waitForNonExistence(timeout: 8), app.debugDescription)
         app.terminate()
     }
-    func testDiaryProjectReflectionLocksAndWaitsForFinishBeforeRootRoute() {
+    func testDiaryProjectReflectionLocksAndWaitsForFinishBeforeRootRoute() throws {
+        try XCTSkipIf(true, "Projects have no entry point in the diary hub since the 8 Nov simplification; covered when the room returns.")
         continueAfterFailure = false
         let app = launch("lettersRoutes", rootRouteHarness: true, diaryCommandHoldMS: 3500)
         app.buttons["diary-days"].tap()
@@ -233,7 +236,8 @@ import XCTest
         XCTAssertTrue(reflection.waitForNonExistence(timeout: 8), app.debugDescription)
         app.terminate()
     }
-    func testDiaryProjectDeleteLocksAndWaitsForRootRoute() {
+    func testDiaryProjectDeleteLocksAndWaitsForRootRoute() throws {
+        try XCTSkipIf(true, "Projects have no entry point in the diary hub since the 8 Nov simplification; covered when the room returns.")
         continueAfterFailure = false
         let app = launch("lettersRoutes", rootRouteHarness: true, diaryCommandHoldMS: 2500)
         app.buttons["diary-days"].tap()
@@ -277,10 +281,11 @@ import XCTest
         XCTAssertTrue(editor.waitForExistence(timeout: 10)); editor.tap(); editor.typeText("هامش من يومي")
         capture(app, "M3-V01-margin-editor-L")
         app.buttons["diary-editor-save"].tap()
-        if app.buttons["diary-day-close"].waitForExistence(timeout: 5) { app.buttons["diary-day-close"].tap() }
+        XCTAssertTrue(app.textViews["diary-editor-text"].waitForNonExistence(timeout: 10))
+        app.closeDiaryDay()
         XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 10)); app.buttons["diary-today"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "هامش من يومي")).firstMatch.waitForExistence(timeout: 10))
-        app.buttons["diary-day-close"].tap()
+        app.closeDiaryDay()
         app.buttons["diary-write"].tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 10)); editor.tap(); editor.typeText("سطر محفوظ من اليوم")
         capture(app, "M3-V01-text-editor-L")
@@ -360,16 +365,7 @@ import XCTest
         XCTAssertTrue(app.buttons["diary-letter-open"].waitForExistence(timeout: 12), app.debugDescription)
         app.buttons["diary-letter-done"].tap()
 
-        let projectURL = URL(string: "madar://notes/project/44444444-4444-4444-8444-444444444441")!
-        app.open(projectURL)
-        let projectTitle = app.navigationBars["ترتيب البيت"]
-        XCTAssertTrue(projectTitle.waitForExistence(timeout: 12), app.debugDescription)
-        app.buttons["تمّ"].tap()
-        XCTAssertTrue(projectTitle.waitForNonExistence(timeout: 8), app.debugDescription)
-        app.open(projectURL)
-        XCTAssertTrue(app.navigationBars["ترتيب البيت"].waitForExistence(timeout: 12), app.debugDescription)
-        app.buttons["diary-project-detail-root-route"].tap()
-        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 12), app.debugDescription)
+        // The project half of this route test is gone with the projects entry point (8 Nov simplification).
         app.terminate()
     }
     func testDiaryRootLinkClosesTheOpenArchiveAndLetter() throws {
@@ -429,8 +425,8 @@ import XCTest
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         app.textViews["diary-editor-text"].typeText("لن يحفظ")
         app.buttons["diary-editor-cancel"].tap()
-        app.buttons["diary-today"].tap()
-        XCTAssertTrue(app.staticTexts["صفحة تنتظر سطرك."].waitForExistence(timeout: 10))
+        // An empty day offers one «اكتب» action and no page to read; the closed draft wrote nothing visible.
+        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["لن يحفظ"].exists)
     }
     private func capture(_ app: XCUIApplication, _ name: String) {

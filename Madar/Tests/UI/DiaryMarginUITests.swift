@@ -65,7 +65,7 @@ import XCTest
         capture(app, "M3-V03-dated-reply-L")
         app.buttons["diary-today"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "ما زلت أذكر ذلك المساء.")).firstMatch.waitForExistence(timeout: 10))
-        app.buttons["diary-day-close"].tap()
+        app.closeDiaryDay()
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["diary-another-memory"].waitForExistence(timeout: 25)); app.buttons["diary-another-memory"].tap()
         XCTAssertTrue(app.staticTexts["ما زلت أذكر ذلك المساء."].waitForExistence(timeout: 10))

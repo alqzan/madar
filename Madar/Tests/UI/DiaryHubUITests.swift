@@ -15,7 +15,7 @@ import XCTest
         app.swipeUp(velocity: .slow)
         capture(app, "M3-V07-year-october-L")
         october.tap(); let day = app.buttons["diary-calendar-day-2026-10-15"]; XCTAssertTrue(day.waitForExistence(timeout: 5)); capture(app,"M3-V07-month-L"); day.tap()
-        XCTAssertTrue(app.buttons["diary-day-write"].waitForExistence(timeout: 10)); app.buttons["diary-day-close"].tap()
+        XCTAssertTrue(app.buttons["diary-day-write"].waitForExistence(timeout: 10)); app.closeDiaryDay()
         app.buttons["diary-hub-timeline"].tap(); XCTAssertTrue(app.buttons["diary-hub-day-2026-10-15"].waitForExistence(timeout: 10)); capture(app,"M3-V07-timeline-L")
         app.buttons["diary-hub-photos"].tap(); XCTAssertTrue(app.images.count > 0); capture(app,"M3-V07-photos-L")
         app.buttons["diary-hub-calendar"].tap(); yearScale.tap()

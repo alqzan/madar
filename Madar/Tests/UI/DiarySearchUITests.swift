@@ -37,7 +37,7 @@ import XCTest
         app.buttons["مسح البحث"].tap()
         field.tap();field.typeText("ماذا كتبت العام الماضي؟\n")
         XCTAssertTrue(app.buttons["diary-search-edit-العام الماضي"].waitForExistence(timeout:5));XCTAssertTrue(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'diary-search-result-'")).firstMatch.waitForExistence(timeout:5));capture(app,"M3-V08-results-L")
-        app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'diary-search-result-'")).firstMatch.tap();XCTAssertTrue(app.buttons["diary-day-write"].waitForExistence(timeout:5));app.buttons["diary-day-close"].tap()
+        app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'diary-search-result-'")).firstMatch.tap();XCTAssertTrue(app.buttons["diary-day-write"].waitForExistence(timeout:5));app.closeDiaryDay()
         app.buttons["diary-search-edit-العام الماضي"].tap();let edit=app.alerts.textFields.firstMatch;XCTAssertTrue(edit.waitForExistence(timeout:5));edit.tap();edit.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:30)+"2024")
         // The keyboard moves the alert after typing; a tap using the previous frame misses Apply.
         let apply = app.alerts.buttons["ابحث"]
@@ -89,7 +89,7 @@ import XCTest
         let editor = app.textViews["diary-editor-text"]
         XCTAssertTrue(editor.waitForExistence(timeout: 8)); editor.tap(); editor.typeText("\nذكرى سفر جديدة")
         app.buttons["diary-editor-save"].tap()
-        XCTAssertTrue(app.buttons["diary-day-close"].waitForExistence(timeout: 10)); app.buttons["diary-day-close"].tap()
+        XCTAssertTrue(app.buttons["diary-day-close"].waitForExistence(timeout: 10)); app.closeDiaryDay()
         XCTAssertTrue(result.waitForExistence(timeout: 10))
         XCTAssertEqual(field.value as? String, "#سفر")
         XCTAssertTrue(editTag.exists)

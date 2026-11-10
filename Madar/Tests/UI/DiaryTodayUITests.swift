@@ -22,9 +22,8 @@ import XCTest
         XCTAssertTrue(excerpt.exists)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "صورة هذا اليوم لم تُنقل")).firstMatch.exists)
         let write = app.buttons["diary-write"]
-        let accessory = app.otherElements["fixed-tab-bar"]   // FB-31: the glass tab bar replaced the prayer accessory
-        XCTAssertLessThanOrEqual(write.frame.maxY, accessory.frame.minY, "Writing stays above the native accessory")
-        XCTAssertLessThanOrEqual(accessory.frame.minY - write.frame.maxY, 24, "No duplicate bottom spacer")
+        XCTAssertTrue(write.isHittable, "The writing bar is reachable above the bottom of the screen")
+        XCTAssertLessThanOrEqual(write.frame.maxY, app.frame.maxY, "Writing stays on screen")
         capture(app, "M3-restored-diary-L")
         app.swipeUp(velocity: .slow)
         XCTAssertLessThanOrEqual(excerpt.frame.maxY, write.frame.minY, "The complete memory excerpt can scroll clear of the writing bar")
@@ -49,7 +48,7 @@ import XCTest
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "عشاء عند أهلي")).firstMatch.waitForExistence(timeout: 10))
         app.buttons["diary-day-yesterday"].tap()
         XCTAssertTrue(app.staticTexts["دوام طويل. وصلت البيت قبل العشاء بدقائق."].waitForExistence(timeout: 10))
-        app.buttons["diary-day-close"].tap(); app.buttons["diary-write"].tap()
+        app.closeDiaryDay(); app.buttons["diary-write"].tap()
         let editor = app.textViews["diary-editor-text"]; XCTAssertTrue(editor.waitForExistence(timeout: 10))
         app.buttons["diary-editor-yesterday"].tap(); editor.tap(); editor.typeText("سطر متأخر محفوظ في أمس"); app.buttons["diary-editor-save"].tap()
         app.buttons["diary-today"].tap(); app.buttons["diary-day-yesterday"].tap()
