@@ -84,6 +84,9 @@ extension AppQuranService {
     func session(draftID: UUID, action: QuranUISessionAction) async throws -> QuranUISessionResult {
         var value = try savedDraft(draftID), draft = value.draft
         let catalog = try QuranResources.catalog()
+        scopedSnapshot = nil
+        scopedSnapshot = try snapshot()
+        defer { scopedSnapshot = nil }
         if draft.storedDay.date != (try snapshot().day.date) {
             switch action {
             case .commitPartial, .discard, .saveProgress: break

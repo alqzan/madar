@@ -27,7 +27,16 @@ import MadarPrayer
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
         return try QuranRepository(context: ModelContext(app.container), catalog: QuranResources.catalog())
     }
-    func snapshot() throws -> QuranDataSnapshot { try repository().snapshot(at: clock()) }
+    /// B1-2: one read per user action. `session(draftID:action:)` sets this for the length of the action, so the day check,
+    /// coverage checks and the returned state share one snapshot instead of rebuilding it for every call. A command clears it.
+    var scopedSnapshot: QuranDataSnapshot?
+    /// Number of full snapshot builds; a test asserts that one session action costs one.
+    private(set) var snapshotReads = 0
+    func snapshot() throws -> QuranDataSnapshot {
+        if let scopedSnapshot { return scopedSnapshot }
+        snapshotReads += 1
+        return try repository().snapshot(at: clock())
+    }
     func snapshotsOffMain(at instant: Date, hifzLevels: [QuranDayLevel?], includePreHifzDaySnapshot: Bool = false,
                           priority: TaskPriority = .userInitiated) async throws -> (snapshots: [QuranDataSnapshot], catalog: QuranResourceCatalog, preHifzDay: QuranDataSnapshot?) {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
@@ -62,7 +71,11 @@ import MadarPrayer
         return result
     }
     func command(_ name: String, _ payload: [String: MadarCore.JSONValue] = [:]) async throws {
+        // A draft save changes only the draft rows; the day, coverage and pages a session action reads stay valid.
+        let keepsScope = name == "quran.saveDraft"
+        if !keepsScope { scopedSnapshot = nil }
         _ = try await app.executeQuranCommand(name, payload: payload)
+        if !keepsScope { scopedSnapshot = nil }
     }
     var numerals: MadarNumberFormatter { MadarNumberFormatter(style: app.values["core.numerals"]?.string == "western" ? .western : .hindi) }
     func count(_ value: Int, singular: String, dual: String, plural: String) -> String {

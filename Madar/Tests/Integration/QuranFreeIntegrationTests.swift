@@ -24,6 +24,23 @@ import MadarCommands
         XCTAssertEqual(events.count,1);XCTAssertEqual(events.first?.ayahId,2);XCTAssertEqual(events.first?.wordIndex,1)
     }
 
+    /// B1-2: a tap inside a session builds the Quran snapshot once, however many checks the action makes.
+    func testOneSessionActionBuildsOneSnapshot() async throws {
+        let root=FileManager.default.temporaryDirectory.appending(path:"QuranOneSnapshot-\(UUID())")
+        let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),context=ModelContext(container)
+        _ = try SettingsStore(context:context).stage(["core.dayStart":.string("midnight")])
+        let saved=HifzSession();saved.fromAyah=1;saved.toAyah=7;saved.pages=[1];saved.dayKey="2026-10-14";saved.endedAt=Date().addingTimeInterval(-86400)
+        context.insert(saved);try context.save()
+        let app=try AppSession(container:container,groupDirectory:root),service=AppQuranService(session:app)
+        let started=try await service.start(kind:.free,stepID:nil,range:.init(fromPage:1,toPage:1),rakaat:nil,spotID:nil)
+        let before=service.snapshotReads
+        _ = try await service.session(draftID:started.id,action:.mistake(ayahID:2,wordIndex:1))
+        XCTAssertEqual(service.snapshotReads-before,1)
+        let beforeGrade=service.snapshotReads
+        _ = try await service.session(draftID:started.id,action:.advance)
+        XCTAssertEqual(service.snapshotReads-beforeGrade,1)
+    }
+
     func testMixedRangeGradesOnlySavedFacesAndFinishesAfterLastPage() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"QuranFree-\(UUID())")
         let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),context=ModelContext(container)
