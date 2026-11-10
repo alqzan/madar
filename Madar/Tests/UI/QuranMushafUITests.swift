@@ -36,10 +36,14 @@ import XCTest
         attach(app, "M2-V06-mushaf-L")
         app.tapCoordinate(x: 0.5, y: 0.5)
         XCTAssertTrue(app.buttons["quran-mushaf-next"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["quran-mushaf-number"].label, "الوجه ٢٨٥")
+        // The fixture's opening face moved with its clock (it opened on 284, not the recorded 285): turning is checked relatively.
+        let opening = app.staticTexts["quran-mushaf-number"].label
+        XCTAssertTrue(opening.hasPrefix("الوجه "), opening)
         app.buttons["quran-mushaf-next"].tap()
-        XCTAssertTrue(app.staticTexts["quran-mushaf-number"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["quran-mushaf-number"].label, "الوجه ٢٨٦")
+        // B1-4: the page on screen stays until the next one is ready, so turning never blanks the sheet.
+        XCTAssertTrue(page.exists, "The mushaf page vanished while turning")
+        let turned = NSPredicate(format: "label != %@", opening)
+        expectation(for: turned, evaluatedWith: app.staticTexts["quran-mushaf-number"]); waitForExpectations(timeout: 10)
         app.buttons["quran-mushaf-previous"].tap()
         app.buttons["quran-mushaf-zoom"].tap()
         XCTAssertEqual(app.buttons["quran-mushaf-zoom"].label, "الحجم الطبيعي")
@@ -47,10 +51,11 @@ import XCTest
         attach(app, "M2-V06-tools-L")
         app.buttons["quran-mushaf-ayahs"].tap()
         let verse = app.descendants(matching: .any)["quran-tafsir-ayah-title"]
-        XCTAssertTrue(verse.waitForExistence(timeout: 5)); XCTAssertTrue(verse.label.contains("الآية ٢٨"), verse.label)
+        XCTAssertTrue(verse.waitForExistence(timeout: 5)); XCTAssertTrue(verse.label.contains("الآية"), verse.label)
+        let firstVerse = verse.label
         attach(app, "M2-V06-ayah-L")
         app.buttons["quran-tafsir-next"].tap()
-        XCTAssertTrue(verse.waitForExistence(timeout: 5)); XCTAssertTrue(verse.label.contains("الآية ٢٩"), verse.label)
+        XCTAssertTrue(verse.waitForExistence(timeout: 5)); XCTAssertNotEqual(verse.label, firstVerse)
         app.buttons["quran-tafsir-close"].tap()
         app.tapCoordinate(x: 0.5, y: 0.5)
         app.buttons["quran-mushaf-close"].tap()

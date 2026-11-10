@@ -128,7 +128,7 @@ struct QuranMushafView: View {
             .buttonStyle(.madarPlain).accessibilityLabel(label).accessibilityIdentifier(id)
     }
     private func move(_ delta: Int) { selectedAyah = nil; go(to: number + delta) }
-    private func go(to target: Int) { let next = min(604, max(1, target)); if next != number { number = next; page = nil; facing = nil; error = nil; zoom = 1; pan = .zero } }
+    private func go(to target: Int) { let next = min(604, max(1, target)); if next != number { number = next; facing = nil;  /* the shown page stays until the next one is ready (B1-4) */ error = nil; zoom = 1; pan = .zero } }
     /// The tafsir sheet walked to another ayah: light it, and turn the page when it starts on another one.
     private func open(_ ayahID: Int) {
         guard let ayah = try? QuranResources.catalog().ayah(id: ayahID) else { return }
@@ -138,7 +138,9 @@ struct QuranMushafView: View {
     private func load() async {
         let requested = number
         do { let loaded = try await service.page(requested); guard number == requested else { return }; page = loaded; error = nil }
-        catch { guard number == requested else { return }; self.error = quranUserMessage(error) }
+        catch { guard number == requested else { return }; page = nil; self.error = quranUserMessage(error) }
+        // Warm the two neighbours (font registration and glyph table) so turning the page does not wait.
+        for neighbour in [requested + 1, requested - 1] where (1...604).contains(neighbour) { _ = try? await service.page(neighbour); guard number == requested else { return } }
         guard isPadWide(sizeClass), page != nil else { return }
         let other = requested % 2 == 1 ? requested + 1 : requested - 1
         guard (1...604).contains(other), let loaded = try? await service.page(other), number == requested else { return }
