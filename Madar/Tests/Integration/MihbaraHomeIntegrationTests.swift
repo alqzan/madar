@@ -269,12 +269,23 @@ import CoreSpotlight
         XCTAssertNil(item.attributeSet.textContent)
     }
 
+    /// B2-18: the rarely-changed calendar, prayer-time and search keys share one «متقدم» fold; everyday keys keep their sections.
+    func testRarelyChangedSettingsShareOneAdvancedSection() {
+        for key in ["core.hijriSource", "core.hijriOffset", "salah.highLatitudeRule", "salah.offsets", "core.spotlightIndex"] {
+            XCTAssertEqual(sectionFor(key), "متقدم", key)
+        }
+        XCTAssertEqual(sectionFor("core.dayStart"), "اليوم والتقويم")
+        XCTAssertEqual(sectionFor("core.firstCalendar"), "اليوم والتقويم")
+        XCTAssertEqual(sectionFor("salah.method"), "المواقيت")
+        XCTAssertEqual(sectionFor("salah.asr"), "المواقيت")
+    }
+
     func testSpotlightSelectionTargetsTheBookRoomWithoutLosingTheRequestedBook() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraSpotlight-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
         XCTAssertFalse(app.bool("core.spotlightIndex"))
         XCTAssertTrue(AppSession.supportedKeys.contains("core.spotlightIndex"))
-        XCTAssertEqual(sectionFor("core.spotlightIndex"), "البحث")
+        XCTAssertEqual(sectionFor("core.spotlightIndex"), "متقدم")
         let id = UUID(); app.openSpotlightBook(id)
         XCTAssertEqual(app.selectedTab, "mihbara")
         XCTAssertEqual(app.mihbaraBookToOpen, id)

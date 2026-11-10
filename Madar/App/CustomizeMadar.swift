@@ -182,8 +182,8 @@ struct CustomizeMadar: View {
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "الذكاء", "اليوم والتقويم", "المظهر", "مدينتك", "البحث", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
-    private let symbols = ["الذكاء": "sparkles", "العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "البحث": "magnifyingglass", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
+    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "الذكاء", "اليوم والتقويم", "المظهر", "مدينتك", "البحث", "الإشعارات", "الصلاة", "المواقيت", "متقدم"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
+    private let symbols = ["متقدم": "gearshape.2", "الذكاء": "sparkles", "العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "البحث": "magnifyingglass", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"] + RoomHomeLayout.rooms.map { $0.0 + ".layout" }).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
         return CustomizationCopy.changes(count: count, formattedCount: session.digits(count))
@@ -205,13 +205,14 @@ func sectionFor(_ key: String) -> String {
     if ["bahw.reminder", "bahw.streakBreakAfter", "bahw.travelFreezesHome", "bahw.widgetScope"].contains(key) { return "العادات" }
     if key == "bahw.yearWhich" { return "السنة" }
     if key == "bahw.upcomingCount" { return "الأيام القادمة" }
-    if ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart"].contains(key) { return "اليوم والتقويم" }
-    if ["salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets"].contains(key) { return "المواقيت" }
+    // B2-18: values most people never change sit in one «متقدم» fold (no value or default changes).
+    if ["core.hijriSource", "core.hijriOffset", "salah.highLatitudeRule", "salah.offsets", "core.spotlightIndex"].contains(key) { return "متقدم" }
+    if ["core.dayStart", "core.firstCalendar", "core.weekStart"].contains(key) { return "اليوم والتقويم" }
+    if ["salah.method", "salah.asr"].contains(key) { return "المواقيت" }
     if key == "core.homeCity" { return "مدينتك" }
     if ["salah.showMosqueStreak", "salah.askHeart"].contains(key) { return "الصلاة" }
     // FB-39: these prayer keys used to fall through to «المظهر», so travel method and pending days were never on the prayer page.
     if ["salah.pendingDays", "salah.tripMethod", "salah.travelShortenCombine", "salah.pool", "salah.fridayTallArch"].contains(key) { return "الصلاة" }
-    if key == "core.spotlightIndex" { return "البحث" }
     if ["salah.beforeReminder", "salah.beforeAdhanMin", "notes.eveningLine", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil"].contains(key) { return "الإشعارات" }
     return "المظهر"
 }
