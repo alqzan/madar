@@ -156,11 +156,11 @@ final class QuranResourceCatalogTests: XCTestCase {
     func testManifestPinsAllFilesAndSeparates1405ArtworkFromQuranData() throws {
         let manifest = try QuranResourceManifest.bundled()
         try manifest.verifyFiles()
-        XCTAssertEqual(manifest.files.count, 611) // five original resources + 604 fonts + glyph binding + printed hizb starts
+        XCTAssertEqual(manifest.files.count, 610) // four original resources + 604 fonts + glyph binding + printed hizb starts
         XCTAssertEqual(manifest.files.filter { $0.path.hasPrefix("Quran1439/Fonts/") }.count, 604)
-        XCTAssertEqual(manifest.files.filter { $0.role == "visualOnly" }.map(\.edition), [1405, 1405])
+        XCTAssertEqual(manifest.files.filter { $0.role == "visualOnly" }.map(\.edition), [1405])
         XCTAssertTrue(manifest.files.filter { $0.role == "quranData" }.allSatisfy { $0.edition == 1439 })
-        for name in ["page-frame", "surah-opening"] {
+        for name in ["surah-opening"] {
             let svg = String(decoding: try manifest.ornament(named: name), as: UTF8.self)
             XCTAssertEqual(svg.components(separatedBy: "<image ").count - 1, 4)
             XCTAssertFalse(svg.contains("<text"))

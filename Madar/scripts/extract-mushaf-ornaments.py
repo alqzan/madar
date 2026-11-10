@@ -17,7 +17,6 @@ output = Path(sys.argv[2])
 output.mkdir(parents=True, exist_ok=True)
 page = source[606]  # printed page 604, PDF page 607
 for name, outer, inner in [
-    ('page-frame', (98, 90, 741, 1016), (131, 122, 708, 984)),
     ('surah-opening', (150, 131, 691, 197), (303, 137, 550, 189)),
 ]:
     x0, y0, x1, y1 = outer

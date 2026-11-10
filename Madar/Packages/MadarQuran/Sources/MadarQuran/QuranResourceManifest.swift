@@ -46,7 +46,7 @@ public struct QuranResourceManifest: Decodable, Sendable {
 
     /// Artwork is kept outside the Quran data namespace and contains no ayah text.
     public func ornament(named name: String) throws -> Data {
-        guard ["page-frame", "surah-opening"].contains(name) else {
+        guard name == "surah-opening" else {
             throw QuranResourceCatalogError.missingResource(name)
         }
         return try verifiedData(at: "Mushaf1405/\(name).svg")

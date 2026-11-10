@@ -449,26 +449,6 @@
         "date": null
       },
       "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
-      "id": "mushaf-1405-page-frame",
-      "kind": "visual-only artwork",
-      "source": "https://e-quran.com/masahef/pdf/almadinah-qadim.pdf",
-      "version": "old Madinah scan; committee seal 1405, PDF page 620",
-      "edition": 1405,
-      "checksum": "448f4e73d3f4e8f116f351d0b37f4af8aea90faf145259d716ac23b49400864c",
-      "usedBy": "Mushaf frame and surah banner only",
-      "note": "Extracted as four separate ornamental strips. No Quran text or page/line/word boundaries are imported from 1405."
-    },
-    {
-      "license": "Mushaf permission obtained by the owner for Madar",
-      "licenseStatus": "owner-confirmed",
-      "licenseDecision": "docs/DECISIONS.md — 2026-10-14",
-      "gate": "M2",
-      "downloadDate": "2026-10-14",
-      "humanReview": {
-        "name": null,
-        "date": null
-      },
-      "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
       "id": "mushaf-1405-surah-opening",
       "kind": "visual-only artwork",
       "source": "https://e-quran.com/masahef/pdf/almadinah-qadim.pdf",
