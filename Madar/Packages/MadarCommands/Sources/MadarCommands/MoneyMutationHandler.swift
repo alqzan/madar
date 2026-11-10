@@ -839,7 +839,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             original = try transaction(row.relatedTransactionID, context)
             guard let original, original.reviewState == "ok", ["expense", "fee", "transfer"].contains(original.kind),
                   original.currency == row.currency, original.cardID == row.cardID else { throw MoneyCommandError.invalidReference }
-            let previous = try transactions(context).filter { $0.kind == "refund" && $0.reviewState == "ok" && $0.relatedTransactionID == original.id }
+            let originalID = original.id
+            let previous = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.relatedTransactionID == originalID && $0.deletedAt == nil && $0.mergedInto == nil })).filter { $0.kind == "refund" && $0.reviewState == "ok" }
             let used = try sum(previous.map(\.amountMinor)), usedHome = try sum(previous.map(\.homeAmountMinor))
             guard row.amountMinor <= original.amountMinor - used else { throw MoneyCommandError.invalidAmount }
             let statedHome = row.rateSource == "message" ? row.homeAmountMinor : nil
@@ -878,7 +879,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         } else if effect.budgetChargeMinor < 0, let original {
             let repo = MoneyRepository(context: context)
             let originalRows = try repo.allocationRows(transactionID: original.id).sorted { $0.idempotencyKey < $1.idempotencyKey }
-            let priorIDs = Set(try transactions(context).filter { $0.kind == "refund" && $0.reviewState == "ok" && $0.relatedTransactionID == original.id }.map(\.id))
+            let originalID = original.id
+            let priorIDs = Set(try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.relatedTransactionID == originalID && $0.deletedAt == nil && $0.mergedInto == nil })).filter { $0.kind == "refund" && $0.reviewState == "ok" }.map(\.id))
             let priorRows = try context.fetch(FetchDescriptor<Allocation>()).filter { live($0) && $0.transactionID.map(priorIDs.contains) == true }
             let priorHome = try sum(priorRows.map(\.amountMinor))
             let cumulative = AllocationEngine.refund(refundTransactionID: row.id.uuidString, homeAmountMinor: priorHome + row.homeAmountMinor, original: originalRows)
@@ -1291,7 +1293,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         row.eventAt = at; row.dayKey = stored.dayKey; row.tzID = place.timeZoneID; row.dayPolicy = boundary.rawValue + "@1"
     }
     private static func messages(for row: MoneyTransaction, _ context: ModelContext) throws -> [BankMessage] {
-        let ids = Set(([row] + (try context.fetch(FetchDescriptor<MoneyTransaction>())).filter { $0.mergedInto == row.id }).compactMap(\.messageID))
+        let rowID: UUID? = row.id
+        let ids = Set(([row] + (try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.mergedInto == rowID })))).compactMap(\.messageID))
         return try context.fetch(FetchDescriptor<BankMessage>()).filter { ids.contains($0.id) && live($0) }
     }
     private static func transaction(_ id: UUID?, _ context: ModelContext) throws -> MoneyTransaction {
