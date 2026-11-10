@@ -99,6 +99,17 @@ import MadarQuran
         return try await bus.execute(envelope("quran.commitSession", ["draftID": .string(draft.draft.id.uuidString)], at: time), now: time)
     }
 
+    @Test func savingADraftNeverReadsTheWholeHistoryButAnUndoableCommandStillDoes() async throws {
+        let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        let draft = try makeDraft(container)
+        let before = QuranMutationHandler.historyReads
+        try await save(draft, bus: bus)
+        #expect(QuranMutationHandler.historyReads == before, "A draft save has no inverse, so it needs no full-history read")
+        let planned = QuranMutationHandler.historyReads
+        #expect(try await bus.execute(envelope("quran.savePlan", planPayload), now: now).status == .applied)
+        #expect(QuranMutationHandler.historyReads > planned, "An undoable command still captures its before-state")
+    }
+
     @Test func QuranDayUsesSelectedPrayerOffsetsBeforeFajr() throws {
         let (container, _, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
         let context = ModelContext(container), settings = try SettingsStore(context: context)

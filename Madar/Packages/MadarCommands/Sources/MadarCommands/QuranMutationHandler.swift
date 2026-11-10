@@ -36,7 +36,8 @@ public struct QuranStagedResult: Sendable {
                              catalog: QuranResourceCatalog, now: Date, writer: String) throws -> QuranStagedResult {
         guard QuranCommandPayload.validate(name: name, payload: payload) else { throw DataError.invalidValue("Quran payload") }
         let repository = try QuranRepository(context: context, catalog: catalog)
-        let before = try records(context)
+        // Only an undoable command needs the full history to build its inverse; a draft save or discard has none.
+        let before = nonUndoableCommands.contains(name) ? [] : try records(context)
         func text(_ key: String) -> String { if case .string(let value) = payload[key] { value } else { "" } }
         func number(_ key: String) -> Double { if case .number(let value) = payload[key] { value } else { 0 } }
         func id(_ key: String) throws -> UUID { guard let id = UUID(uuidString: text(key)) else { throw DataError.invalidValue("Quran id") }; return id }
@@ -284,7 +285,11 @@ public struct QuranStagedResult: Sendable {
         try rebuildCache(QuranRepository(context: context, catalog: catalog), at: now, writer: writer)
     }
 
+    private static let nonUndoableCommands: Set<String> = ["quran.saveDraft", "quran.discardDraft", "quran.discardUnreadableDrafts"]
+    /// Counts full-history reads, so a test can prove that a non-undoable command performs none.
+    nonisolated(unsafe) static var historyReads = 0
     private static func records(_ context: ModelContext) throws -> [DataRecord] {
+        historyReads += 1
         var rows = try context.fetch(FetchDescriptor<HifzPlan>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<HifzSession>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<PageGrade>()).map { try $0.record() }
