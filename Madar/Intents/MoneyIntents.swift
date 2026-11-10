@@ -44,20 +44,26 @@ struct LogExpenseIntent: AppIntent {
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
     static let isDiscoverable = true
     @Parameter(title: "المبلغ") var amount: String
-    @Parameter(title: "العملة", default: "SAR") var currency: String
+    @Parameter(title: "العملة (افتراضيًا عملة مدار)") var currency: String?
     @Parameter(title: "التاجر") var merchant: String?
     @Parameter(title: "طريقة الدفع") var method: MoneyExpenseMethod?
     init() {}
-    init(amount: String, currency: String = "SAR", merchant: String? = nil, method: MoneyExpenseMethod? = nil) {
+    init(amount: String, currency: String? = nil, merchant: String? = nil, method: MoneyExpenseMethod? = nil) {
         self.amount = amount; self.currency = currency; self.merchant = merchant; self.method = method
     }
     static var parameterSummary: some ParameterSummary { Summary("سجّل مصروف \(\.$amount) \(\.$currency)") }
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let code = currency.uppercased(), raw = BankMessageParser.clean(amount).replacingOccurrences(of: ",", with: "")
+        let code = (currency?.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 }?.uppercased() ?? Self.homeCurrency(), raw = BankMessageParser.clean(amount).replacingOccurrences(of: ",", with: "")
         guard let exp = CurrencyExponents.specified.exponent(code), let minor = MoneyAmountInput.minor(raw, exponent: exp), minor > 0 else { throw MoneyIntentError.invalidAmount }
         try MoneyInboxCommandWriter.logExpense(inbox: IngestBankMessageIntent.inbox(), amountMinor: minor, currency: code, merchant: merchant, method: method?.rawValue)
         await MainActor.run { NotificationCenter.default.post(name: .madarInboxChanged, object: nil) }
         return .result(dialog: "حُفظ للمراجعة.")
+    }
+}
+extension LogExpenseIntent {
+    /// B2-13: the shortcut defaults to the currency chosen in Madar (`core.currency`), read from the shared defaults, not a hard-coded SAR.
+    static func homeCurrency() -> String {
+        UserDefaults(suiteName: "group.com.alqzan.madar2")?.string(forKey: "core.currency") ?? "SAR"
     }
 }
 private enum MoneyIntentError: LocalizedError {

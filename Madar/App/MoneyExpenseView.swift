@@ -33,6 +33,7 @@ struct MoneyExpenseView: View {
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var minor: Int { MoneyAmountInput.minor(raw, exponent: CurrencyExponents.specified.exponent(inputCurrency) ?? 2) ?? 0 }
+    private var inputExponent: Int { CurrencyExponents.specified.exponent(inputCurrency) ?? 2 }
     private var inputCurrency: String { foreign ? reading?.tripCurrency ?? reading?.currency ?? "SAR" : reading?.currency ?? "SAR" }
     private var homeMinor: Int { guard let r = reading else { return minor }; return (try? FX.homeAmount(amountMinor: minor, currency: inputCurrency, rate: r.tripRate ?? "1", home: r.currency)) ?? 0 }
     private var method: MoneyPaymentChoice? { reading?.methods.first { $0.id == methodID } }
@@ -143,7 +144,7 @@ struct MoneyExpenseView: View {
     }
     private func amountHeading(_ r: MoneyExpenseReading? = nil) -> some View {
         VStack(spacing: 0) {
-            Text(figure: service.amount(minor, currency: inputCurrency)).font(.custom("thmanyahserifdisplay-Black", size: 60, relativeTo: .largeTitle)).contentTransition(.numericText()).accessibilityIdentifier("money-expense-amount")
+            Text(figure: service.amount(minor, currency: inputCurrency) + (raw.hasSuffix(".") ? "٫" : "")).font(.custom("thmanyahserifdisplay-Black", size: 60, relativeTo: .largeTitle)).contentTransition(.numericText()).accessibilityIdentifier("money-expense-amount")
             Text((inputCurrency == "SAR" ? "ريال" : service.currencyName(inputCurrency)) + dailyDescription).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         }.frame(maxWidth: .infinity).frame(minHeight: 94)
     }
@@ -252,17 +253,23 @@ struct MoneyExpenseView: View {
             ForEach(0..<4, id: \.self) { row in
                 HStack(spacing: 6) {
                     ForEach(0..<3, id: \.self) { column in
-                        let key = row < 3 ? String(row * 3 + column + 1) : ["clear", "0", "delete"][column]
+                        let key = row < 3 ? String(row * 3 + column + 1) : [inputExponent > 0 ? "dot" : "clear", "0", "delete"][column]
                         Button { tap(key) } label: {
-                            Group { if key == "delete" { Image(systemName: "delete.backward") } else { Text(key == "clear" ? "مسح" : service.digits.string(Int(key) ?? 0)) } }.font(.custom("thmanyahserifdisplay-Bold", size: key == "clear" ? 19 : 29, relativeTo: .title2)).frame(maxWidth: .infinity, minHeight: 47).background(theme.surface).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
-                        }.accessibilityLabel(key == "clear" ? "مسح المبلغ" : key == "delete" ? "حذف آخر رقم" : key).accessibilityIdentifier("money-expense-key-" + key)
+                            Group { if key == "delete" { Image(systemName: "delete.backward") } else { Text(key == "clear" ? "مسح" : key == "dot" ? "٫" : service.digits.string(Int(key) ?? 0)) } }.font(.custom("thmanyahserifdisplay-Bold", size: key == "clear" ? 19 : 29, relativeTo: .title2)).frame(maxWidth: .infinity, minHeight: 47).background(theme.surface).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
+                        }.simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in if key == "delete" { tap("clear") } })
+                        .accessibilityLabel(key == "clear" ? "مسح المبلغ" : key == "delete" ? "حذف آخر رقم، اضغط مطولًا للمسح" : key == "dot" ? "الفاصلة العشرية" : key).accessibilityIdentifier("money-expense-key-" + key)
                     }
                 }
             }
         }.padding(.top, 3)
     }
     private func tap(_ key: String) {
-        let update = { if key == "clear" { raw = "" } else if key == "delete" { if !raw.isEmpty { raw.removeLast() } } else if raw.count < 9 { raw += key } }
+        let update = {
+            if key == "clear" { raw = "" }
+            else if key == "delete" { if !raw.isEmpty { raw.removeLast() } }
+            else if key == "dot" { if !raw.contains(".") { raw += raw.isEmpty ? "0." : "." } }
+            else if raw.count < 9, raw.split(separator: ".", omittingEmptySubsequences: false).dropFirst().first.map({ $0.count < inputExponent }) ?? true { raw += key }
+        }
         if reduceMotion { update() } else { withAnimation(.easeOut(duration: 0.16), update) }
     }
     private func diary(_ r: MoneyExpenseReading) -> some View {

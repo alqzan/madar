@@ -15,6 +15,17 @@ import XCTest
         }
         XCTAssertTrue(app.buttons["money-expense-key-4"].waitForExistence(timeout: 10)); return app
     }
+    func testDecimalKeyEntersFractionsAndLongPressDeleteClears() {
+        continueAfterFailure = false
+        let app = openExpense()
+        app.buttons["money-expense-key-4"].tap(); app.buttons["money-expense-key-dot"].tap(); app.buttons["money-expense-key-5"].tap()
+        XCTAssertTrue(app.staticTexts["money-expense-amount"].label.contains("٤٫٥"), app.staticTexts["money-expense-amount"].label)
+        app.buttons["money-expense-key-dot"].tap(); app.buttons["money-expense-key-7"].tap(); app.buttons["money-expense-key-8"].tap()
+        XCTAssertTrue(app.staticTexts["money-expense-amount"].label.contains("٤٫٥٧"), app.staticTexts["money-expense-amount"].label)
+        XCTAssertFalse(app.staticTexts["money-expense-amount"].label.contains("٨"), "Only two decimals are accepted for a two-exponent currency, and a second dot is ignored.")
+        app.buttons["money-expense-key-delete"].press(forDuration: 0.8)
+        XCTAssertFalse(app.staticTexts["money-expense-amount"].label.contains("٤"), "Long-pressing delete clears the amount.")
+    }
     func testClosePromptsBeforeDiscardingExpenseDraft() {
         continueAfterFailure = false
         let app = openExpense()
