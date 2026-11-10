@@ -29,7 +29,7 @@ struct QuranHomeSessionFlow: View {
             } else if state.drill != nil {
                 QuranDrillView(service: service, initial: state, close: close)
             } else if let coach = state.coach {
-                QuranHifzCoachView(state: state, coach: coach, busy: busy, action: perform)
+                QuranHifzCoachView(state: state, coach: coach, busy: busy, action: perform, close: close)
             } else { legacyBody }
         }
         .alert("لم تكتمل العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
@@ -42,7 +42,7 @@ struct QuranHomeSessionFlow: View {
     }
     private var legacyBody: some View {
         VStack(spacing: 18) {
-            HStack { Text(state.title).font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق", systemImage: "xmark") { showExit = true }.labelStyle(.iconOnly).frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
+            HStack { Text(state.title).font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق", systemImage: "xmark") { showExit = true }.labelStyle(.iconOnly).frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle).disabled(busy) }
             Text(state.segmentTitle).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             Text(stageTitle).font(MadarTypography.section()).accessibilityIdentifier("quran-session-stage")
             ScrollView {
@@ -65,10 +65,12 @@ struct QuranHomeSessionFlow: View {
             Button(state.primaryTitle) { perform(state.primaryAction) }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("quran-session-advance")
         }.padding(20).foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
         .confirmationDialog("تخرج من الجلسة؟", isPresented: $showExit, titleVisibility: .visible) {
-            Button("أنهِ وسجّل ما تمّ") { perform(.commitPartial) }
-            Button("تجاهل الجلسة", role: .destructive) { perform(.discard) }
-            Button("تابع", role: .cancel) {}
-        } message: { Text("«تجاهل الجلسة» لا يسجّل شيئًا مما أنجزته الآن.") } // AU-46
+            Button("احتفظ بها كمسودة") { close() }
+                .accessibilityIdentifier("quran-session-keep")
+            Button("سجّل ما أنجزته") { perform(.commitPartial) }
+            Button("احذف الجلسة", role: .destructive) { perform(.discard) }
+            Button("تابع الجلسة", role: .cancel) { }
+        } message: { Text("خطواتك محفوظة تلقائيًا كمسودة، لكنها لا تدخل في سجلّك حتى تسجّل ما أنجزته. يمكنك الاحتفاظ بها أو حذفها.") }
     }
     private var stageTitle: String {
         switch state.stage { case .repetition: "التكرار"; case .lineStarts: "أوائل الأسطر"; case .recall: "استرجاع بالتلقين"; case .covered: "تسميع مستور"; case .grading: "تقييمك"; default: "المراجعة" }

@@ -5,7 +5,8 @@ import XCTest
     func testDrillRevealAnswerNextSpotAndTabsAtDefaultSize() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "drill"]
+        let store = UUID().uuidString
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": store, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "drill"]
         app.launch()
         let step = app.buttons["quran-step-drill"]
         XCTAssertTrue(step.waitForExistence(timeout: 20), app.debugDescription)
@@ -35,8 +36,21 @@ import XCTest
         XCTAssertTrue(app.buttons["quran-drill-tab-mine"].isSelected)
         attach(app, "M2-V04-mine-L")
         app.buttons["quran-drill-close"].tap()
+        XCTAssertTrue(app.buttons["quran-drill-keep"].waitForExistence(timeout: 5), app.debugDescription)
+        attach(app, "M2-V04-exit-L")
+        app.buttons["quran-drill-keep"].tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.buttons["quran-resume"].exists, "An unanswered spot leaves no draft")
+        let resume = app.buttons["quran-resume"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 5), "Choosing to keep the draft leaves a resumable session")
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["quran-resume"].waitForExistence(timeout: 20), app.debugDescription)
+        app.buttons["quran-resume"].tap()
+        XCTAssertTrue(app.buttons["quran-drill-close"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["quran-drill-close"].tap()
+        XCTAssertTrue(app.buttons["quran-drill-discard"].waitForExistence(timeout: 5), app.debugDescription)
+        app.buttons["quran-drill-discard"].tap()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["quran-resume"].exists)
         app.terminate()
     }
     private func attach(_ app: XCUIApplication, _ name: String) {

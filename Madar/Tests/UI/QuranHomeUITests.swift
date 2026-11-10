@@ -10,7 +10,15 @@ import XCTest
         XCTAssertTrue(app.staticTexts["quran-unreadable-draft-notice"].waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].exists, app.debugDescription)
         XCTAssertFalse(app.buttons["quran-home-retry"].exists, app.debugDescription)
-        attach(app, "M2-V01-unreadable-draft-home-L")
+        XCTAssertTrue(app.buttons["quran-hide-unreadable-drafts"].exists, app.debugDescription)
+        attach(app, "M2-V01-unreadable-draft-recovery-L")
+        app.buttons["quran-hide-unreadable-drafts"].tap()
+        let confirm = app.alerts.buttons.matching(identifier: "quran-confirm-hide-unreadable-drafts").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription)
+        attach(app, "M2-V01-unreadable-draft-confirm-L")
+        confirm.tap()
+        XCTAssertFalse(app.staticTexts["quran-unreadable-draft-notice"].waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].exists, app.debugDescription)
         app.terminate()
     }
 

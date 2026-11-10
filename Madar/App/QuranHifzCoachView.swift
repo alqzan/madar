@@ -8,6 +8,7 @@ struct QuranHifzCoachView: View {
     let coach: QuranUICoach
     let busy: Bool
     let action: (QuranUISessionAction) -> Void
+    let close: () -> Void
     @Environment(\.roomTheme) private var theme
     @State private var sheet: CoachSheet?
     @State private var fullPage = false
@@ -104,19 +105,20 @@ struct QuranHifzCoachView: View {
                         }
                         Button { sheet = nil } label: { Text("تمّ").font(font(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-method-done")
                     } else {
-                        Text(coach.pastDay ? "هذه جلسة من يوم سابق. احفظ ما تمّ بيومه أو تجاهل المسودة." : coach.review ? "المسودة محفوظة تلقائيًا. سجّل الأوجه التي قيّمتها، أو تجاهل الجلسة، أو تابع." : "المسودة محفوظة تلقائيًا. سجّل ما اجتاز التسميع المستور، أو تجاهل الجلسة، أو تابع.")
+                        Text(coach.pastDay ? "هذه جلسة من يوم سابق. احتفظ بها كمسودة، أو سجّل ما تمّ بيومه، أو احذفها." : "خطواتك محفوظة تلقائيًا كمسودة. احتفظ بها للمتابعة لاحقًا، سجّل ما أنجزته، أو احذفها.")
                             .font(font(14)).foregroundStyle(theme.secondaryInk)
-                        sheetButton("أنهِ وسجّل ما تمّ", id: "quran-session-save-partial") { action(.commitPartial) }
-                        Text("«تجاهل الجلسة» لا يسجّل شيئًا مما أنجزته الآن.")
+                        sheetButton("احتفظ بها كمسودة", id: "quran-session-keep") { close() }
+                        sheetButton("سجّل ما أنجزته", id: "quran-session-save-partial") { action(.commitPartial) }
+                        Text("«حذف الجلسة» لا يسجّل شيئًا مما أنجزته الآن.")
                             .font(font(12)).foregroundStyle(theme.secondaryInk)
                             .accessibilityIdentifier("quran-session-discard-explanation")
-                        sheetButton("تجاهل الجلسة", id: "quran-session-discard") { action(.discard) }
-                        if !coach.pastDay { sheetButton("تابع", id: "quran-session-continue") {} }
+                        sheetButton("احذف الجلسة", id: "quran-session-discard") { action(.discard) }
+                        if !coach.pastDay { sheetButton("تابع الجلسة", id: "quran-session-continue") { } }
                     }
                 }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
             }
             .foregroundStyle(theme.ink).presentationBackground(theme.background)
-            .presentationDetents([.height(route == .methods ? 410 : 360), .large])
+            .presentationDetents([.height(route == .methods ? 410 : 460), .large])
             .presentationDragIndicator(.visible).environment(\.layoutDirection, .rightToLeft)
             .interactiveDismissDisabled(coach.pastDay)
         }
@@ -132,7 +134,7 @@ struct QuranHifzCoachView: View {
             Button { sheet = .exit } label: {
                 Image(systemName: "xmark").font(.system(size: 19, weight: .regular))
                     .frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
-            }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق الجلسة").accessibilityIdentifier("quran-session-close")
+            }.buttonStyle(.madarPlain).disabled(busy).accessibilityLabel("إغلاق الجلسة").accessibilityIdentifier("quran-session-close")
             VStack(spacing: 4) {
                 Text(state.title).font(font(14, bold: true)).lineLimit(1).minimumScaleFactor(0.8)
                 Text(coach.pageProgress + "، " + state.segmentTitle).font(font(11)).foregroundStyle(theme.secondaryInk)

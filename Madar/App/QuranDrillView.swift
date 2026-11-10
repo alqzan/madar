@@ -14,6 +14,7 @@ struct QuranDrillView: View {
     @Environment(\.roomTheme) private var theme
     @State private var busy = false
     @State private var error: String?
+    @State private var showExit = false
     /// Set when the chosen tab has nothing left today; the last card is then replaced by a quiet message.
     @State private var empty: (tab: QuranUIDrillTab, board: QuranUIDrillBoard)?
 
@@ -39,6 +40,27 @@ struct QuranDrillView: View {
         .background(theme.background.ignoresSafeArea())
         .foregroundStyle(theme.ink)
         .alert("لم تكتمل العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
+        .sheet(isPresented: $showExit) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("جلسة التدريب محفوظة كمسودة").font(font(21, bold: true))
+                Text("لم تسجّل هذه الإجابة بعد. احتفظ بها للمتابعة لاحقًا أو احذفها.").font(font(14)).foregroundStyle(theme.secondaryInk)
+                Button { showExit = false; close() } label: {
+                    Text("احتفظ بها كمسودة").font(font(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).contentShape(Rectangle())
+                }.accessibilityIdentifier("quran-drill-keep")
+                Button(role: .destructive) {
+                    showExit = false
+                    run { try await act(.discard); close() }
+                } label: {
+                    Text("احذف الجلسة").font(font(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).contentShape(Rectangle())
+                }.accessibilityIdentifier("quran-drill-discard")
+                Button { showExit = false } label: {
+                    Text("تابع الجلسة").font(font(14)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                }.accessibilityIdentifier("quran-drill-continue")
+            }
+            .padding(24).frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(theme.ink)
+            .presentationBackground(theme.background).presentationDetents([.height(300)]).presentationDragIndicator(.visible)
+            .environment(\.layoutDirection, .rightToLeft)
+        }
         .interactiveDismissDisabled()
     }
 
@@ -214,10 +236,10 @@ struct QuranDrillView: View {
             try await openNext(value)
         }
     }
-    /// An unanswered spot leaves nothing behind; drills are short, so there is no partial save.
+    /// Ask before leaving an unanswered spot: the draft can be resumed or discarded explicitly.
     private func leave() {
         if empty != nil || state.drill == nil { close(); return }
-        run { try await act(.discard); close() }
+        showExit = true
     }
 }
 

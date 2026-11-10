@@ -126,6 +126,26 @@ public struct QuranStagedResult: Sendable {
             let draftID = try id("draftID")
             if let row = try context.fetch(FetchDescriptor<SessionDraft>()).first(where: { $0.id == draftID && $0.mergedInto == nil && $0.deletedAt == nil }) { try touch(row, deleting: true) }
             else { duplicate = true }
+        case "quran.discardUnreadableDrafts":
+            undoable = false
+            let rows = try context.fetch(FetchDescriptor<SessionDraft>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            var discardedAny = false
+            for row in rows {
+                let value: QuranSessionDraft
+                do {
+                    value = try JSONDecoder().decode(QuranDraftPayload.self, from: row.provisionalJSON).draft
+                } catch is DecodingError {
+                    try touch(row, deleting: true)
+                    discardedAny = true
+                    continue
+                }
+                let hasValidIdentity = value.id == row.id && value.storedDay.dayKey == row.dayKey && value.kind.rawValue == row.kind
+                if !hasValidIdentity {
+                    try touch(row, deleting: true)
+                    discardedAny = true
+                }
+            }
+            duplicate = !discardedAny
         case "quran.commitSession":
             let draftID = try id("draftID")
             let existing = try context.fetch(FetchDescriptor<HifzSession>()).filter { $0.mergedInto == nil }

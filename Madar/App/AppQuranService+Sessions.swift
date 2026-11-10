@@ -7,6 +7,9 @@ import MadarPrayer
 import MadarQuran
 
 extension AppQuranService {
+    func discardUnreadableDrafts() async throws {
+        try await command("quran.discardUnreadableDrafts")
+    }
     func savedDraft(_ id: UUID) throws -> QuranDraftPayload {
         let context = try repository().context
         guard let row = try context.fetch(FetchDescriptor<SessionDraft>()).first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("تعذّر العثور على المسودة") }

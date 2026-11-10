@@ -15,6 +15,7 @@ struct QuranHomeView: View {
     @Environment(\.isFrontRoom) private var isFrontRoom
     @State private var state: QuranRoomState?
     @State private var error: String?
+    @State private var showUnreadableDraftConfirmation = false
     @State private var detail: HomeDetail?
     @State private var active: QuranUISessionState?
     @State private var busy = false
@@ -117,12 +118,35 @@ struct QuranHomeView: View {
                     if state.unreadableDraftCount > 0 {
                         card {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("تعذّرت قراءة جلسة قرآنية غير مكتملة")
+                                Text("تعذّرت قراءة جلسة محفوظة")
                                     .font(bodyFont(14, bold: true))
                                     .accessibilityIdentifier("quran-unreadable-draft-notice")
-                                Text("حافظنا على بياناتها كما هي. يمكنك متابعة بقية القرآن.")
+                                Text("لا يمكن متابعة هذه المسودة. يمكنك إخفاءها، وتبقى بياناتها المحفوظة كما هي.")
                                     .font(bodyFont(13))
                                     .foregroundStyle(theme.secondaryInk)
+                                Button {
+                                    showUnreadableDraftConfirmation = true
+                                } label: {
+                                    Text(state.unreadableDraftCount == 1 ? "إخفاء الجلسة" : "إخفاء الجلسات")
+                                        .font(bodyFont(13, bold: true))
+                                        .foregroundStyle(theme.accent)
+                                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                        .contentShape(Rectangle())
+                                }
+                                .accessibilityIdentifier("quran-hide-unreadable-drafts")
+                            }
+                            .alert(state.unreadableDraftCount == 1 ? "إخفاء الجلسة؟" : "إخفاء الجلسات؟",
+                                isPresented: $showUnreadableDraftConfirmation) {
+                                Button(state.unreadableDraftCount == 1 ? "إخفاء الجلسة" : "إخفاء الجلسات", role: .destructive) {
+                                    run(refresh: true) {
+                                        try await service.discardUnreadableDrafts()
+                                        try await refresh()
+                                    }
+                                }
+                                .accessibilityIdentifier("quran-confirm-hide-unreadable-drafts")
+                                Button("إبقاءها الآن", role: .cancel) { }
+                            } message: {
+                                Text("سيزيلها هذا من القرآن ولن تتمكن من متابعة المسودة. تبقى بياناتها المحفوظة كما هي.")
                             }
                         }
                     }

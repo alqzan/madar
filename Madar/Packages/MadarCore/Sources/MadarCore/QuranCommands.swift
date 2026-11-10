@@ -2,7 +2,7 @@ import Foundation
 
 /// App-only commands for the existing Quran schema. Typed engine validation happens under the store lease.
 public enum QuranCommandPayload {
-    public static let names: Set<String> = ["quran.saveDraft", "quran.discardDraft", "quran.commitSession", "quran.savePlan",
+    public static let names: Set<String> = ["quran.saveDraft", "quran.discardDraft", "quran.discardUnreadableDrafts", "quran.commitSession", "quran.savePlan",
         "quran.setTodayLevel", "quran.forceNewHifz", "quran.resolveMissedDay", "quran.createRecovery", "quran.cancelRecovery",
         "quran.raisePages", "quran.editSessionGrade", "quran.deleteSession", "quran.freezeTest"]
     public static func validate(name: String, payload: [String: JSONValue]) -> Bool {
@@ -13,6 +13,7 @@ public enum QuranCommandPayload {
         switch name {
         case "quran.saveDraft": return keys(["draft"]) && (string("draft")?.utf8.count ?? 0) > 0 && (string("draft")?.utf8.count ?? 0) <= 4_000_000
         case "quran.discardDraft": return keys(["draftID"]) && uuid("draftID")
+        case "quran.discardUnreadableDrafts": return payload.isEmpty
         case "quran.commitSession":
             guard uuid("draftID") else { return false }
             if keys(["draftID"]) { return true }

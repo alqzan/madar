@@ -5735,6 +5735,11 @@
         "kind": "tombstone device-only draft; no session facts",
         "auth": "app"
       },
+      "quran.discardUnreadableDrafts": {
+        "payload": "{}",
+        "kind": "tombstone unreadable device-only SessionDraft rows; preserve stored bytes and create no session facts",
+        "auth": "app"
+      },
       "quran.savePlan": {
         "intent": "SaveHifzPlan",
         "payload": "{startAyah, unit, amount, rhythm, restDay, missPolicy}",

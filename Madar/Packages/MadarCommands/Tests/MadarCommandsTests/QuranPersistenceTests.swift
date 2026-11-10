@@ -250,6 +250,33 @@ import MadarQuran
         #expect(preserved.deletedAt == nil)
     }
 
+    @Test func discardUnreadableDraftsPreservesBytesAndHealthyDrafts() async throws {
+        let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        let broken = try makeDraft(container)
+        try await save(broken, bus: bus)
+        let corrupted = Data("{malformed".utf8)
+        let context = ModelContext(container)
+        let brokenRow = try #require(context.fetch(FetchDescriptor<SessionDraft>()).first)
+        brokenRow.provisionalJSON = corrupted
+        try context.save()
+
+        let healthy = try makeDraft(container)
+        try await save(healthy, bus: bus)
+        #expect(try repo(container).snapshot(at: now).unreadableDraftCount == 1)
+
+        let result = try await bus.execute(envelope("quran.discardUnreadableDrafts", [:]), now: now.addingTimeInterval(1))
+        #expect(result.status == .applied)
+        let snapshot = try repo(container).snapshot(at: now.addingTimeInterval(2))
+        #expect(snapshot.unreadableDraftCount == 0)
+        #expect(snapshot.drafts.map(\.id) == [healthy.draft.id])
+
+        let rows = try ModelContext(container).fetch(FetchDescriptor<SessionDraft>())
+        let preserved = try #require(rows.first { $0.id == broken.draft.id })
+        #expect(preserved.provisionalJSON == corrupted)
+        #expect(preserved.deletedAt != nil)
+        #expect(rows.first { $0.id == healthy.draft.id }?.deletedAt == nil)
+    }
+
     @Test func deleteAndUndoRestoreSessionChildrenAndScheduleButStaleUndoDoesNotOverwriteGrade() async throws {
         let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
         let draft = try makeDraft(container); try await save(draft, bus: bus); let committed = try await commit(draft, bus: bus)

@@ -188,14 +188,12 @@ struct QuranQiyamSessionView: View {
                             exit = false; action(.commitPartial)
                         } label: { Text("سجّل ما أتممت").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-qiyam-partial")
                     };
-                    if !qiyam.pastDay {
-                        Button {
-                            exit = false; close()
-                        } label: { Text("احتفظ بالمسودة لوقت آخر").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-qiyam-keep")
-                    };
+                    Button {
+                        exit = false; close()
+                    } label: { Text("احتفظ بالمسودة لوقت آخر").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-qiyam-keep")
                     Button {
                         exit = false; action(.discard)
-                    } label: { Text("تجاهل الجلسة").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-qiyam-discard");
+                    } label: { Text("احذف الجلسة").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-qiyam-discard");
                     Button { exit = false } label: { Text("تابع").frame(minHeight: 44).contentShape(Rectangle()) }
                 }.font(quranFont(15)).padding(24).foregroundStyle(QuranNightColors.gold).frame(
                     maxWidth: .infinity, alignment: .leading

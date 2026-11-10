@@ -1,10 +1,10 @@
-# Current work — 9 November 2026
+# Current work — 10 November 2026
 
 Owner requests in force: a whole-app pass for ease, simplicity, flexibility and speed without making the app heavier (row 12), an iPad layout of its own (row 13), and consistent rules/board (9 Nov tidy). Internal TestFlight uploads need no further approval. Current continuation (owner, 9 Nov): stop new work at 20% remaining in either exposed usage window; the earlier 5%/2% thresholds do not apply to this session.
 
 ## Verified baseline and delivery
 
-- M0–M6 software is on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (26)** from `fa79e3b7`, including the unreadable-Quran-session recovery and startup notification-budget recovery. Xcode 27.2 archive, app/widget signature checks, export and internal upload succeeded; Apple reported processing started at 23:03 Riyadh on 9 Nov. Processing completion and installation on the owner's iPhone are not checked. Build 24 added level-only voice recording and elapsed-time formatting; older builds 14–20 are history (`docs/archive/PROGRESS-2026-11-08-codex-cleanup-batch.md` for 14–15).
+- M0–M6 software is on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (27)**, including Quran unreadable-draft recovery and the owner's exit-choice behavior. Xcode 27.2 archive and internal upload succeeded at 14:08 Riyadh on 10 Nov; App Store Connect reported that the package is processing. The exported IPA's app and widget signatures, versions, iOS target and entitlements were verified. Processing completion and installation on the owner's iPhone are not checked. Build 26 was the prior upload; build 24 added level-only voice recording and elapsed-time formatting. Older builds 14–20 are history (`docs/archive/PROGRESS-2026-11-08-codex-cleanup-batch.md` for 14–15).
 - Simulators: `Madar 15 Pro Max` and `Madar iPad Pro 13`, both iOS 27.0, no others. Storage local-only (RA1); no owner store access, migration or device run is authorized.
 - Package baseline passes (rows 16–17). Current continuation: prayer history read failures propagate and remain retryable (42/42 prayer, 26/26 command/replay tests). Polar manual logging, habit delete/undo/relaunch and both year-calendar settings paths now pass on iOS 27.0; details in row 18. General no-trip FX rates still need an owner rule/data-model decision. The 9 handwritten-colour findings are resolved in row 19: static shipping-source scan passes (464 sources, 4 catalogs, 38 independently measured token pairs); its manual trace requirement remains separate.
 - Build 22 includes the changes after 21: lazy prayer/night reads and per-day prayer-time memoization, scoped habit undo reads, 1922 dead-code lines removed, stale-test cleanup, and the current continuation fixes. Signature verification passed; app/widget versions are both 0.1.0 (22), minimum OS 27.0, device families 1 and 2, and no iCloud/ubiquity entitlements. No owner-device performance measurement is implied.
@@ -17,6 +17,13 @@ Owner requests in force: a whole-app pass for ease, simplicity, flexibility and 
 - Fix: isolate only draft JSON/identity failures, preserve the stored row bytes, and let the Quran room open with a small notice explaining that the unreadable session remains saved. Unexpected SwiftData fetch failures still propagate. The canonical home is `03-R18-Home.jpg`; the notice is an intentional added recovery state.
 - Verified: `swift test --package-path Madar/Packages/MadarCommands --filter QuranPersistenceTests` — 15 tests / 2 suites passed, including corrupt JSON preservation; iOS 27.0 `Madar 15 Pro Max` UI run — 2/2 passed for the unreadable Quran draft and startup notification-budget recovery. Captured state: `Madar/Artifacts/codex-unreadable-quran-shots/M2-V01-unreadable-draft-home-L.png`.
 - Delivery: build 26 archived with app and widget version 0.1.0 (26), iOS 27, device families 1 and 2; both signatures verified, no iCloud entitlement. `xcodebuild -exportArchive` succeeded and upload log confirms “Upload succeeded” / “Uploaded package is processing” at 23:03 Riyadh. Three pre-existing Swift warnings remain in `AppDiarySearchService.swift` and `MihbaraPDFReaderView.swift`.
+
+### Quran session exit choice — owner, 10 Nov
+
+- Owner chose «اسألني عند الخروج». Quran sessions therefore remain autosaved drafts for resumption, do not count toward the Quran record until explicitly recorded, and ask on exit whether to keep, record completed work, delete, or continue.
+- An unreadable saved session now has an explicit «إخفاء الجلسة» recovery action. It tombstones only active drafts that fail decoding or identity checks; stored bytes remain, and valid drafts are untouched. No owner store was opened.
+- Verification: QuranPersistenceTests 16/16 (2 suites); QuranPayloadTests 2/2. On iOS 27.0, the unreadable-card test and drill keep/resume-after-relaunch test each passed in `OWNER-quran-session-exit-20261110.xcresult`; the first bundle overall was 2/3 because the coach UI test had a stale repetition-label expectation. The coach test's current flow now passes 1/1 in `OWNER-quran-session-exit-coach-20261110-r4.xcresult`. JSON parsing and `git diff --check` pass. Captures: `Artifacts/OWNER-quran-recovery-shots/` and `Artifacts/OWNER-quran-session-exit-shots-r4/`.
+- Delivery: 0.1.0 (27) archived and uploaded internally at 14:08 Riyadh. App and widget in the exported IPA are signed with Apple Distribution, version 27, target iOS 27, device families 1 and 2, with no iCloud entitlement; `codesign --verify --deep --strict` passes. Apple reports the package is processing; availability and owner-iPhone acceptance remain unverified.
 
 ## Active queue — this request
 
@@ -584,14 +591,14 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 # Handovers
 
-## Handover — فتح القرآن مع جلسة غير مقروءة — 2026-11-09 — Codex
-- **Works now:** خطأ JSON في جلسة قرآنية غير مكتملة لا يمنع فتح بقية القرآن. تبقى بيانات الجلسة الأصلية كما هي، وتظهر ملاحظة داخل الصفحة. إعادة بناء ميزانية التنبيهات عند تلف ملفها موثقة ومشمولة في اختبار مستقل.
-- **Verified:** `MadarCommands/QuranPersistenceTests` 15/15 (حزمتان)؛ iOS 27.0، `Madar 15 Pro Max`: اختبارات واجهة محددة 2/2؛ build 26 أرشف ووقّع التطبيق والودجة، الإصدار 0.1.0/26، iOS 27، iPhone+iPad؛ لا iCloud entitlement. `xcodebuild -exportArchive` ورفع TestFlight الداخلي نجحا عند 23:03 بالرياض، وApple قالت إن المعالجة بدأت. لقطة الحالة `Madar/Artifacts/codex-unreadable-quran-shots/M2-V01-unreadable-draft-home-L.png`.
-- **Differences left:** أُضيفت ملاحظة استرداد في حالة الخطأ فوق مرجع القرآن `03-R18-Home.jpg`؛ بقية التخطيط لم يتغير. الأرشيف يحمل تحذيرات Swift سابقة في البحث اليومي وقارئ PDF.
-- **Not verified:** لم يُفتح مخزن المالك، لذا سبب الخطأ على جهازه استدلال من مسار القراءة واختبار مماثل ببيانات اصطناعية. اكتمال معالجة Apple وظهور build 26 على TestFlight وتثبيته وقبوله على iPhone المالك غير متحقق.
-- **Next:** تحقق من اكتمال معالجة Apple ثم قبول المالك على iPhone؛ لا رفع عام.
+## Handover — استرداد مسودة القرآن وخيارات الخروج — 2026-11-10 — Codex
+- **Works now:** المسودة القرآنية تحفظ التقدم تلقائيًا كي يمكن استئنافها، ولا تُسجّل في سجل القرآن حتى يختار المستخدم التسجيل. عند الخروج تظهر خيارات الاحتفاظ، تسجيل المنجز، حذف الجلسة، أو المتابعة. في المسودة غير المقروءة، «إخفاء الجلسة» يزيلها من العرض مع إبقاء بياناتها؛ تبقى المسودات السليمة.
+- **Verified:** `MadarCommands/QuranPersistenceTests` 16/16 (حزمتان)، `QuranPayloadTests` 2/2؛ iOS 27.0 `Madar 15 Pro Max`: اختبار بطاقة الاسترداد واختبار التدريب للاحتفاظ والاستئناف بعد إعادة الفتح اجتاز كل منهما 1/1؛ اختبار مدرب الحفظ للاحتفاظ والاستئناف والحذف اجتاز 1/1 في إعادة التشغيل النهائية. أول تشغيل مجمع كان 2/3 بسبب توقع قديم في اختبار المدرب، وصُحح الاختبار وأُعيد بنجاح. `git diff --check` وفحوص JSON ناجحة. لقطتا الاسترداد والخروج في `Artifacts/OWNER-quran-recovery-shots/` و`Artifacts/OWNER-quran-session-exit-shots-r4/`.
+- **Differences left:** بطاقة «تعذّرت قراءة جلسة محفوظة» وخيارات إخفائها حالة استرداد إضافية فوق `03-R18-Home.jpg`. ورقة الخروج أطول عمدًا لتظهر خياراتها كلها. التغيير لا يضيف حقولًا أو يغيّر سجل القرآن.
+- **Not verified:** لم يُفتح مخزن المالك، لذلك الصف التالف المحدد على جهازه غير مؤكد. Apple قالت إن معالجة build 27 بدأت، لكن اكتمالها وظهوره في TestFlight، وقبول المالك على iPhone، غير متحققين.
+- **Next:** بعد اكتمال المعالجة، ثبّت build 27 على iPhone وتحقق من بطاقة الاسترداد وخيارات الخروج والاستئناف؛ لا رفع عام.
 - **Model/effort:** Codex؛ النموذج والجهد غير مكشوفين؛ لا مساعدين.
-- **Usage:** آخر فحص: 10% مستخدم للخمس ساعات، و83% مستخدم للأسبوع؛ لم تُستخدم أرصدة إعادة الضبط.
+- **Usage:** آخر فحص بعد الرفع: 5% مستخدم للخمس ساعات و84% للأسبوع (16% متبقية أسبوعيًا)؛ لم تُستخدم أرصدة إعادة الضبط.
 
 ## Handover — إصلاح التنبيه المتكرر عند بدء التطبيق — 2026-11-09 — Codex
 - **Works now:** إذا تعذّرت قراءة `budget.json` التشغيلي، يحتفظ مدار ببايتاته ويعيد بناء ميزانية الجهاز من السياسة الحالية وسجل الإشعارات؛ لا تبقى الحالة التالفة لتعطيل كل فتح جديد. أُرسل الإصلاح في TestFlight 0.1.0 (25).
