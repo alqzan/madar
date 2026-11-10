@@ -119,7 +119,11 @@ struct MoneyExpenseView: View {
                         if let waiting { Text(waiting).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-expense-waiting") }
                     }
                 } else if let failure { Text(failure); Button("أعِد المحاولة", action: load) }
-                else { ProgressView().frame(height: 250) }
+                else {
+                    // B1-6: the number pad is ready at once; accounts and cards load behind it and the rest of the sheet joins when they arrive.
+                    amountHeading()
+                    keypad
+                }
             }.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 20).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar, .tabBar).hidesRoomAccessory(app, id: "money-expense")
@@ -137,7 +141,7 @@ struct MoneyExpenseView: View {
             .onChange(of: hasUnsavedInput || saving, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
             .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }
     }
-    private func amountHeading(_ r: MoneyExpenseReading) -> some View {
+    private func amountHeading(_ r: MoneyExpenseReading? = nil) -> some View {
         VStack(spacing: 0) {
             Text(figure: service.amount(minor, currency: inputCurrency)).font(.custom("thmanyahserifdisplay-Black", size: 60, relativeTo: .largeTitle)).contentTransition(.numericText()).accessibilityIdentifier("money-expense-amount")
             Text((inputCurrency == "SAR" ? "ريال" : service.currencyName(inputCurrency)) + dailyDescription).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
