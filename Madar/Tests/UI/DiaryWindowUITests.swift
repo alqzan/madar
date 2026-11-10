@@ -407,9 +407,9 @@ import XCTest
         func waitValue(_ contains: String) { _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", contains), object: editor)], timeout: 8) }
         // The text view's accessibility value lags programmatic edits, so the result is checked on the saved page.
         editor.tap(); editor.typeText("مساء هادئ"); waitValue("مساء هادئ")
-        app.buttons["diary-editor-heading"].tap()
+        app.buttons["diary-editor-format"].tap(); app.buttons["diary-editor-heading"].tap()
         editor.typeText("\nكان يومًا طويلًا"); waitValue("طويلًا")
-        app.buttons["diary-editor-bold"].tap()
+        app.buttons["diary-editor-format"].tap(); app.buttons["diary-editor-bold"].tap()
         capture(app, "OR-13-editor-tools-L")
         app.buttons["diary-editor-save"].tap()
         XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 10)); app.buttons["diary-today"].tap()

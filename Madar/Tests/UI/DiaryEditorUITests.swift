@@ -99,7 +99,7 @@ import XCTest
         XCTAssertTrue(context.waitForExistence(timeout: 10), app.debugDescription)
         let media = app.descendants(matching: .any).matching(identifier: "diary-editor-saved-media").firstMatch
         XCTAssertTrue(media.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertEqual(app.buttons["diary-editor-cancel"].label, "احفظ مسودة")
+        XCTAssertEqual(app.buttons["diary-editor-cancel"].label, "إغلاق")
         XCTAssertEqual(app.buttons["diary-editor-save"].label, "احفظ الصفحة")
         capture(app, "OWNER-writing-context-media-L")
         app.buttons["diary-editor-cancel"].tap()

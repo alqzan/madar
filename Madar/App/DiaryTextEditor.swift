@@ -112,7 +112,10 @@ struct DiaryTextEditor: View {
         }
         .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app) } }
         .madarSheetLock(saving: saving || importing || voice?.savingAudio == true || voice?.converting == true, draft: !text.isEmpty || voice?.recording == true)
-        .onDisappear { draftTask?.cancel(); savedDayTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
+        .onDisappear {
+            // B2-2: leaving never loses words; a pending 500 ms draft write is flushed unless the page was just saved.
+            if loaded, !saving, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Task { try? await persistDraft() } }
+            draftTask?.cancel(); savedDayTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
         .diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
     }
     @ViewBuilder private var editorContent: some View {
@@ -201,12 +204,15 @@ struct DiaryTextEditor: View {
                         Button { focused = false; choosingFile = true } label: { Label("مرفق", systemImage: "doc").font(MadarTypography.caption()).frame(minHeight: 44) }.labelStyle(.iconOnly).accessibilityIdentifier("diary-editor-file")
                         if let voice, focused { recordButton(voice, large: false) }
                         Spacer(minLength: 0)
-                        Button { insertAtCursor(AppDiaryService(app: app).time(app.prayerNow()) + " ") } label: { Image(systemName: "clock").frame(width: 44, height: 44) }.accessibilityLabel("أدرج الوقت")
-                        Button { insertAtCursor("• ") } label: { Image(systemName: "list.bullet").frame(width: 44, height: 44) }.accessibilityLabel("سطر في قائمة")
-                        // OR-13: writing tools; the line is stored as Markdown only when one of them is used.
-                        Button { heading() } label: { Image(systemName: "textformat.size").frame(width: 44, height: 44) }.accessibilityLabel("عنوان").accessibilityIdentifier("diary-editor-heading")
-                        Button { wrap("**") } label: { Image(systemName: "bold").frame(width: 44, height: 44) }.accessibilityLabel("خط عريض").accessibilityIdentifier("diary-editor-bold")
-                        Button { wrap("*") } label: { Image(systemName: "italic").frame(width: 44, height: 44) }.accessibilityLabel("خط مائل").accessibilityIdentifier("diary-editor-italic")
+                        // B2-2: one «التنسيق» menu replaces five bar buttons; the identifiers stay for tests.
+                        Menu {
+                            Button { insertAtCursor(AppDiaryService(app: app).time(app.prayerNow()) + " ") } label: { Label("أدرج الوقت", systemImage: "clock") }
+                            Button { insertAtCursor("• ") } label: { Label("سطر في قائمة", systemImage: "list.bullet") }
+                            Button { heading() } label: { Label("عنوان", systemImage: "textformat.size") }.accessibilityIdentifier("diary-editor-heading")
+                            Button { wrap("**") } label: { Label("خط عريض", systemImage: "bold") }.accessibilityIdentifier("diary-editor-bold")
+                            Button { wrap("*") } label: { Label("خط مائل", systemImage: "italic") }.accessibilityIdentifier("diary-editor-italic")
+                        } label: { Image(systemName: "textformat").frame(width: 44, height: 44).contentShape(Rectangle()) }
+                            .accessibilityLabel("التنسيق").accessibilityIdentifier("diary-editor-format")
                         if focused { Button { focused = false } label: { Image(systemName: "keyboard.chevron.compact.down").frame(width: 44, height: 44) }.accessibilityLabel("أخفِ لوحة الكتابة").accessibilityIdentifier("diary-editor-hide-keyboard") }
                     }.padding(.horizontal, 16) }.scrollBounceBehavior(.basedOnSize)
                 }
@@ -243,7 +249,7 @@ struct DiaryTextEditor: View {
             .navigationTitle(margin == nil ? "صفحة اليوم" : "اكتب في هامشها").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {
-                    Button("احفظ مسودة") { Task { await close() } }.disabled(saving || importing || voice?.savingAudio == true || voice?.converting == true).accessibilityIdentifier("diary-editor-cancel")
+                    Button("إغلاق") { Task { await close() } }.disabled(saving || importing || voice?.savingAudio == true || voice?.converting == true).accessibilityIdentifier("diary-editor-cancel")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(saving ? "يُحفظ…" : "احفظ الصفحة") { Task { await save() } }.fontWeight(.bold)
