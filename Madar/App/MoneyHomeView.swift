@@ -95,7 +95,10 @@ struct MoneyHomeView: View {
     // «تعمّق وحسّن», all-data walk 24 Oct 2026: a drawer with something in it says one fact; counts only, never amounts.
     private var accountsFact: String? {
         guard let r = reading, r.hasAccounts else { return nil }
-        return service.counted(r.knownBalanceCount + r.unknownBalanceCount, ("حساب واحد", "حسابان", "حسابات", "حسابًا"))
+        let base = service.counted(r.knownBalanceCount + r.unknownBalanceCount, ("حساب واحد", "حسابان", "حسابات", "حسابًا"))
+        // Decision 3: a foreign account with no rate is not guessed into the total; say so.
+        guard let first = r.unratedAccountNames.first else { return base }
+        return base + "، «" + first + "» خارج المجموع لأن لا سعر صرف له"
     }
     private var reconcileFact: String? {
         guard let n = reading?.pendingCount, n > 0 else { return nil }

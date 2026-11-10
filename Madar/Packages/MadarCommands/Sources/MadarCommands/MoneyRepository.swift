@@ -135,23 +135,32 @@ public struct MoneyRepository {
         }
         return try MoneyMutationHandler.sum([account.balanceMinor] + deltas)
     }
-    public func homeAccountBalances(at now: Date = .now, rates: [String: String] = [:]) throws -> [(account: Account, homeMinor: Int)] {
+    /// `skippingUnrated`: a foreign account with no rate is left out (the Money home says so) instead of failing the whole reading.
+    /// Zakat and reconciliation keep the strict default: dropping an account silently would give a wrong amount.
+    public func homeAccountBalances(at now: Date = .now, rates: [String: String] = [:], skippingUnrated: Bool = false) throws -> [(account: Account, homeMinor: Int)] {
         let home = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
         let rates = try manualRates(at: now).merging(rates) { _, explicit in explicit }
         let transactions = try confirmedTransactions(), cards = try context.fetch(FetchDescriptor<Card>())
-        return try liveAccounts().filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt != nil }.map { account in
+        return try liveAccounts().filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt != nil }.compactMap { account in
+            if skippingUnrated, account.currency != home, rates[account.currency] == nil { return nil }
             let amount = try accountBalance(account, at: now, transactions: transactions, cards: cards)
             if account.currency == home { return (account, amount) }
             guard let rate = rates[account.currency] else { throw MoneyCommandError.missingRate }
             return (account, try FX.homeAmount(amountMinor: amount, currency: account.currency, rate: rate, home: home))
         }
     }
+    /// Tracked accounts of mine in a foreign currency with a checkpoint but no rate, by name.
+    public func unratedAccountNames(at now: Date = .now) throws -> [String] {
+        let home = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
+        let rates = try manualRates(at: now)
+        return try liveAccounts().filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt != nil && $0.currency != home && rates[$0.currency] == nil }.map(\.name)
+    }
     public func basis(at now: Date = .now, rates: [String: String] = [:]) throws -> Basis {
         BasisEngine.basis(try basisInput(at: now, rates: rates))
     }
     public func basisInput(at now: Date = .now, rates: [String: String] = [:]) throws -> BasisInput {
         let rates = try manualRates(at: now).merging(rates) { _, explicit in explicit }
-        let accounts = try homeAccountBalances(at: now, rates: rates).map { AccountState(balanceMinor: $0.homeMinor) }
+        let accounts = try homeAccountBalances(at: now, rates: rates, skippingUnrated: true).map { AccountState(balanceMinor: $0.homeMinor) }
         let transactions = try confirmedTransactions().filter { $0.eventAt <= now }
         let cardStates = try cardDebts(at: now).map { CreditCardState(statementMinor: $0.statementLeftMinor, paidSinceCloseMinor: $0.creditMinor, unbilledMinor: $0.unbilledLeftMinor) }
         let obligations = try context.fetch(FetchDescriptor<Obligation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }

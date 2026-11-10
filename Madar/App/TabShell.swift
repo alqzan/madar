@@ -299,7 +299,7 @@ struct MadarRoomRoot: View {
                 else if tab == "notes" { DiaryRoomView(app: session) }
                 else if tab == "money" { MoneyRoomView(app: session, isTabRoot: true) }
                 else if tab == "mihbara" { MihbaraHomeView(app: session, isTabRoot: true) }
-                // M4-V01: the lobby replaces the M0 foundation home (kept in FoundationHome.swift, unused).
+                // M4-V01: the lobby replaces the M0 foundation home.
                 else { BahwLobbyView(session: session) }
             }
             .safeAreaPadding(.bottom, session.accessoryHiders.isEmpty ? session.tabBarHeight : 0)
