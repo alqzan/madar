@@ -147,7 +147,7 @@ struct MoneyHomeReadRequest: Sendable {
 enum MoneyHomeReadingBuilder {
     static func load(context: ModelContext, now: Date, currency: String, zone: TimeZone) throws -> MoneyHomeReading {
         let repo = MoneyRepository(context: context)
-        let cycle = try repo.cycle(at: now), basis = try repo.basis(at: now)
+        let cycle = try repo.cycle(at: now), basis = try repo.basis(at: now, skippingUnrated: true)
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let cardCount = try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.count
         let hawlKey = try context.fetch(FetchDescriptor<ZakatProfile>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }

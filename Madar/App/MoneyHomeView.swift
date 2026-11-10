@@ -98,7 +98,8 @@ struct MoneyHomeView: View {
         let base = service.counted(r.knownBalanceCount + r.unknownBalanceCount, ("حساب واحد", "حسابان", "حسابات", "حسابًا"))
         // Decision 3: a foreign account with no rate is not guessed into the total; say so.
         guard let first = r.unratedAccountNames.first else { return base }
-        return base + "، «" + first + "» خارج المجموع لأن لا سعر صرف له"
+        let more = r.unratedAccountNames.count - 1
+        return base + "، «" + first + "»" + (more > 0 ? " و" + service.counted(more, ("حساب آخر", "حسابان آخران", "حسابات أخرى", "حسابًا آخر")) : "") + " خارج المجموع لأنه بلا سعر صرف"
     }
     private var reconcileFact: String? {
         guard let n = reading?.pendingCount, n > 0 else { return nil }

@@ -33,14 +33,20 @@ struct MoneyBasisReading {
 extension AppMoneyService {
     func loadBasis() throws -> MoneyBasisReading {
         let now = app.prayerNow(), home = try load(at: now), context = ModelContext(app.container), repo = MoneyRepository(context: context)
-        let input = try repo.basisInput(at: now)
+        let input = try repo.basisInput(at: now, skippingUnrated: true)
         let future = home.cycle.map { ReconciliationEngine.notYetAccrued(elapsedDays: $0.elapsedDays, $0.input) }
         let explanation = BasisBreakdownEngine.explain(home.basis, futureDailyMinor: future, availableNowMinor: home.cycle?.headline.availableNowMinor)
         let zone = app.activePlace.timeZone
-        var accountRows = try repo.homeAccountBalances(at: now).map { item in
+        var accountRows = try repo.homeAccountBalances(at: now, skippingUnrated: true).map { item in
             MoneySourceDetail(id: "account:" + item.account.id.uuidString, title: item.account.name, amountMinor: item.homeMinor,
                 explanation: "آخر رصيد أكّدته، مضافًا إليه الداخل ومطروحًا منه الخارج المسجّل بعده. لا تنقص مشتريات الائتمان الكاش قبل السداد." + (item.account.currency != home.currency ? " حُوّل من " + currencyName(item.account.currency) + " بسعر يدوي " + localizedRate((try? repo.manualRates(at: now)[item.account.currency]) ?? "—") + " لكل وحدة؛ يمكنك تحديثه من الرحلة." : ""),
                 date: item.account.balanceAt.map { .containing($0, in: zone) })
+        }
+        // A foreign account with no exchange rate is named, not guessed into the total.
+        accountRows += try repo.unratedAccountNames(at: now).map { name in
+            MoneySourceDetail(id: "unrated:" + name, title: name, amountMinor: 0,
+                explanation: "هذا الحساب بعملة غير عملة البيت ولا سعر صرف له، فلا يدخل في المجموع حتى لا يُخمَّن رقمه.",
+                valueText: "خارج المجموع")
         }
         // A missing checkpoint is a fact to explain, never a zero balance.
         accountRows += try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.ownership == "mine" && $0.tracked && $0.balanceAt == nil }.map { account in

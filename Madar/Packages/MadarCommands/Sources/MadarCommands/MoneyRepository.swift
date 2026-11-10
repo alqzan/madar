@@ -155,12 +155,13 @@ public struct MoneyRepository {
         let rates = try manualRates(at: now)
         return try liveAccounts().filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt != nil && $0.currency != home && rates[$0.currency] == nil }.map(\.name)
     }
-    public func basis(at now: Date = .now, rates: [String: String] = [:]) throws -> Basis {
-        BasisEngine.basis(try basisInput(at: now, rates: rates))
+    /// Strict by default (reconciliation records and zakat must never persist an understated basis); only the Money home and its basis page pass `skippingUnrated`.
+    public func basis(at now: Date = .now, rates: [String: String] = [:], skippingUnrated: Bool = false) throws -> Basis {
+        BasisEngine.basis(try basisInput(at: now, rates: rates, skippingUnrated: skippingUnrated))
     }
-    public func basisInput(at now: Date = .now, rates: [String: String] = [:]) throws -> BasisInput {
+    public func basisInput(at now: Date = .now, rates: [String: String] = [:], skippingUnrated: Bool = false) throws -> BasisInput {
         let rates = try manualRates(at: now).merging(rates) { _, explicit in explicit }
-        let accounts = try homeAccountBalances(at: now, rates: rates, skippingUnrated: true).map { AccountState(balanceMinor: $0.homeMinor) }
+        let accounts = try homeAccountBalances(at: now, rates: rates, skippingUnrated: skippingUnrated).map { AccountState(balanceMinor: $0.homeMinor) }
         let transactions = try confirmedTransactions().filter { $0.eventAt <= now }
         let cardStates = try cardDebts(at: now).map { CreditCardState(statementMinor: $0.statementLeftMinor, paidSinceCloseMinor: $0.creditMinor, unbilledMinor: $0.unbilledLeftMinor) }
         let obligations = try context.fetch(FetchDescriptor<Obligation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }

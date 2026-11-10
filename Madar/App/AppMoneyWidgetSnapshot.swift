@@ -18,6 +18,8 @@ extension AppSession {
         }
         let service = AppMoneyService(app: self)
         guard let reading = try? service.load(at: now) else { snapshot.emptyTitle = "افتح المال للتحديث"; return snapshot }
+        // A total that leaves a foreign account out is not shown on the Home Screen without saying so; the room explains it.
+        guard reading.unratedAccountNames.isEmpty else { snapshot.emptyTitle = "افتح المال للتحديث"; return snapshot }
         guard reading.hasAccounts || reading.cycle != nil else { return snapshot }
         if let cycle = reading.cycle {
             snapshot.rows += [.init(id: "salary", title: "دخل الدورة", value: service.amount(cycle.incomeMinor), route: "madar://mal"), .init(id: "now", title: "لك الآن", value: service.amount(cycle.headline.availableNowMinor), route: "madar://mal"), .init(id: "daily", title: "يومك", value: service.amount(cycle.headline.todayAllowanceMinor), detail: service.amount(cycle.headline.todaySpentMinor), share: cycle.headline.todayAllowanceMinor > 0 ? Double(cycle.headline.todaySpentMinor) / Double(cycle.headline.todayAllowanceMinor) : (cycle.headline.todaySpentMinor > 0 ? 1.01 : 0), route: "madar://mal")]

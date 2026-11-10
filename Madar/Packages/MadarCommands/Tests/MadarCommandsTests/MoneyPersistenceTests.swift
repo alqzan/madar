@@ -472,9 +472,12 @@ import MadarInbox
         }
         let repo = MoneyRepository(context: ModelContext(f.container))
         // B2-3/decision 3: an unrated foreign account no longer empties the home; it is left out and named, and strict readers still refuse.
-        #expect(try repo.unratedAccountNames(at: f.now).isEmpty == false)
-        #expect(try repo.basis(at: f.now).inAccountMinor < (try repo.basis(at: f.now, rates: ["USD": "3.75"]).inAccountMinor))
+        #expect(try repo.unratedAccountNames(at: f.now) == ["محفظة"])
+        #expect(throws: MoneyCommandError.missingRate) { try repo.basis(at: f.now) }
         #expect(throws: MoneyCommandError.missingRate) { try repo.homeAccountBalances(at: f.now) }
+        #expect(throws: MoneyCommandError.missingRate) { try repo.zakatAccounts(at: f.now) }
+        let withRate = try repo.basis(at: f.now, rates: ["USD": "3.75"]).inAccountMinor, without = try repo.basis(at: f.now, skippingUnrated: true).inAccountMinor
+        #expect(withRate - without == 4_628)  // 12.34 USD at 3.75, the unrated account and nothing else
         #expect(try repo.basis(at: f.now, rates: ["USD": "3.75"]).inAccountMinor == 2_014_628)
         #expect(try repo.zakatAccounts(at: f.now, rates: ["USD": "3.75"]).reduce(0) { $0 + $1.balanceMinor } == 2_014_628)
     }
