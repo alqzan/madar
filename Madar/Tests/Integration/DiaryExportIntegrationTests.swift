@@ -6,6 +6,11 @@ import MadarCore
 import MadarData
 import MadarCommands
 @testable import Madar
+final class LockedFlags: @unchecked Sendable {
+    private let lock = NSLock(); private var items: [Bool] = []
+    func record(_ value: Bool) { lock.lock(); items.append(value); lock.unlock() }
+    var values: [Bool] { lock.lock(); defer { lock.unlock() }; return items }
+}
 @MainActor final class DiaryExportIntegrationTests:XCTestCase {
     func testDayOnePickerCancellationIsDistinctFromFileReadFailure() {
         XCTAssertTrue(DiaryDayOnePickerFailure.isCancellation(CocoaError(.userCancelled)))
@@ -76,6 +81,26 @@ import MadarCommands
         add(XCTAttachment(string: "2263 synthetic stored days: exportPages \(Date().timeIntervalSince(start)) seconds"))
     }
 
+    /// B2-3: building the PDF / zip (photo re-encoding, hashing, archive) must not run on the main thread.
+    func testExportFileIsBuiltOffTheMainThread() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryExportThread-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        let service = AppDiaryService(app: app), context = ModelContext(container)
+        let entry = Entry(); entry.dayKey = "2024-03-11"; entry.text = "سطر للتصدير"; context.insert(entry); try context.save()
+        let seen = LockedFlags()
+        AppDiaryService.exportBuildProbe = { seen.record(Thread.isMainThread) }
+        defer { AppDiaryService.exportBuildProbe = nil }
+        for format in ["pdf", "markdown", "json"] {
+            var options = DiaryExportOptions(); options.format = format; options.year = 2024
+            let artifact = try await service.exportDiary(options)
+            try? FileManager.default.removeItem(at: artifact.url.deletingLastPathComponent())
+        }
+        XCTAssertEqual(seen.values, [false, false, false])
+    }
+
     func testFrozenSourcesMediaSealedExclusionAndOutputFormats() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"DiaryExportTest-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),app=try AppSession(container:container,groupDirectory:root),service=AppDiaryService(app:app)
@@ -92,12 +117,12 @@ import MadarCommands
         let standalone=DayPage();standalone.dayKey="2024-03-12";standalone.photoMediaID=photo.id;context.insert(standalone);try context.save()
         try await app.applySettingsAndWait(["notes.showPhoto":.bool(false)])
         let pages=try service.exportPages(options);XCTAssertEqual(pages.first{$0.day.description=="2024-03-12"}?.media.map(\.id),[photo.id]);XCTAssertTrue(pages.flatMap(\.lines).contains{$0.text=="صلّيت الفجر جماعة"});XCTAssertFalse(pages.flatMap(\.lines).contains{$0.text.contains("وحدي") || $0.text.contains("DO-NOT")})
-        let pdf=try service.exportDiary(options);defer{try? FileManager.default.removeItem(at:pdf.url.deletingLastPathComponent())}
+        let pdf=try await service.exportDiary(options);defer{try? FileManager.default.removeItem(at:pdf.url.deletingLastPathComponent())}
         let document=try XCTUnwrap(PDFDocument(url:pdf.url));XCTAssertGreaterThan(document.pageCount,3);XCTAssertTrue(document.string?.contains("LAST-PARAGRAPH")==true)
-        options.format="markdown";let md=try service.exportDiary(options);defer{try? FileManager.default.removeItem(at:md.url.deletingLastPathComponent())}
+        options.format="markdown";let md=try await service.exportDiary(options);defer{try? FileManager.default.removeItem(at:md.url.deletingLastPathComponent())}
         let files=try DiaryExportArchive.files(Data(contentsOf:md.url));XCTAssertEqual(files["media/"+audio.id.uuidString+".mp4"],audio.data);XCTAssertEqual(files["media/"+photo.id.uuidString+".jpeg"],photo.data)
         let text=String(data:try XCTUnwrap(files["days/2024-03-11.md"]),encoding:.utf8)!;XCTAssertTrue(text.contains("هامش تاريخي"));XCTAssertTrue(text.contains("صلّيت الفجر جماعة"));XCTAssertFalse(text.contains("DO-NOT"))
-        options.format="json";let json=try service.exportDiary(options);defer{try? FileManager.default.removeItem(at:json.url.deletingLastPathComponent())}
+        options.format="json";let json=try await service.exportDiary(options);defer{try? FileManager.default.removeItem(at:json.url.deletingLastPathComponent())}
         let jsonFiles=try DiaryExportArchive.files(Data(contentsOf:json.url)),object=try XCTUnwrap(JSONSerialization.jsonObject(with:try XCTUnwrap(jsonFiles["Journal.json"])) as? [String:Any]),rows=try XCTUnwrap(object["entries"] as? [[String:Any]])
         XCTAssertEqual((object["metadata"] as? [String:String])?["version"],"1.0");let row=try XCTUnwrap(rows.first);XCTAssertEqual((row["uuid"] as? String)?.count,32);XCTAssertTrue((row["text"] as? String)?.contains("dayone-moment://")==true);XCTAssertEqual((row["photos"] as? [[String:Any]])?.count,1)
         XCTAssertFalse(String(data:try XCTUnwrap(jsonFiles["Journal.json"]),encoding:.utf8)!.contains("DO-NOT"))
@@ -107,6 +132,6 @@ import MadarCommands
         XCTAssertFalse(String(data:try XCTUnwrap(jsonFiles["Madar-lines.json"]),encoding:.utf8)!.contains("DO-NOT"))
         XCTAssertEqual(json.omittedNote,"لا يشمل رسالة مختومة واحدة لم تُفتح بعد.")
         options.sources=false;options.margins=false;XCTAssertFalse(try service.exportPages(options).flatMap(\.lines).contains{["margin","salah"].contains($0.kind)})
-        options.year=2020;XCTAssertThrowsError(try service.exportDiary(options))
+        options.year=2020;do { _ = try await service.exportDiary(options); XCTFail("expected an empty-period error") } catch {}
     }
 }

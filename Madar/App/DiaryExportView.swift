@@ -75,6 +75,6 @@ struct DiaryExportView:View {
         }
     }
     private func card<Content:View>(@ViewBuilder _ content:()->Content)->some View{VStack(alignment:.leading,spacing:12,content:content).padding(16).background(theme.surface,in:.rect(cornerRadius:18)).overlay{RoundedRectangle(cornerRadius:18).stroke(theme.line)}}
-    private func prepare(){busy=true;failure=nil;clear();let started=generation;Task{@MainActor in await Task.yield();defer{busy=false};do{let made=try service.exportDiary(options);if started == generation {artifact=made}else{try? FileManager.default.removeItem(at:made.url.deletingLastPathComponent())}}catch{failure=madarUserMessage(error)}}}
+    private func prepare(){busy=true;failure=nil;clear();let started=generation;Task{@MainActor in await Task.yield();defer{busy=false};do{let made=try await service.exportDiary(options);if started == generation {artifact=made}else{try? FileManager.default.removeItem(at:made.url.deletingLastPathComponent())}}catch{failure=madarUserMessage(error)}}}
     private func clear(){generation += 1;if let artifact {try? FileManager.default.removeItem(at:artifact.url.deletingLastPathComponent())};artifact=nil}
 }
