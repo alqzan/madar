@@ -36,6 +36,7 @@ struct DiaryTextEditor: View {
     @State private var savedDayTask: Task<Void, Never>?
     @State private var currentMadarDay: GregorianDay?
     @State private var saving = false
+    @State private var mediaExpanded = false
     @State private var failure: String?
     /// AU-95: a failed «تمّ» stays on screen; the next quiet draft save must not wipe it while the page is uncommitted.
     @State private var commitFailed = false
@@ -51,7 +52,9 @@ struct DiaryTextEditor: View {
         .task {
             day = initialDay
             writingDay = (try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()).map { initialDay == "yesterday" ? $0.adding(days: -1) : $0 }
-            do { if let draft = try AppDiaryService(app: app).draft(margin: margin) { draftID = draft.id; hasDraftRecord = true; text = draft.text; day = draft.day; writingDay = draft.writingDay; draftStatus = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "مسودة مستعادة" } }
+            do { if let draft = try AppDiaryService(app: app).draft(margin: margin) { draftID = draft.id; hasDraftRecord = true; text = draft.text
+                // 10 Nov owner report: a draft left on an old day used to pull the writer back to that day. Only today and the late-writing «أمس» keep their own page; anything older moves to the page chosen now.
+                if let today = writingDay?.adding(days: initialDay == "yesterday" ? 1 : 0), draft.writingDay >= today.adding(days: -1) { day = draft.day; writingDay = draft.writingDay } else { day = initialDay }; draftStatus = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "مسودة مستعادة" } }
             catch { failure = madarUserMessage(error) }
             // AU-38: let the restored text's onChange pass first, so «مسودة مستعادة» stays until the user types.
             await Task.yield()
@@ -183,16 +186,26 @@ struct DiaryTextEditor: View {
                     DiaryDayPhotos(app: app, day: writingDay) { asset in await linkLibraryPhoto(asset) }.padding(.horizontal, 16)
                 }
                 if margin == nil, let savedDay, !savedDay.media.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(alignment: .top, spacing: 10) {
-                            ForEach(Array(savedDay.media.suffix(4))) { media in
-                                DiaryMediaCard(app: app, media: media,
-                                    transcript: savedDay.lines.first(where: { $0.id == media.entryID })?.text ?? "")
-                                    .frame(width: 280, alignment: .leading)
-                            }
-                        }.padding(.horizontal, 12)
+                    // Recordings and photos already on this page stay one quiet line until asked for; the text keeps the screen.
+                    Button { withAnimation(.snappy) { mediaExpanded.toggle() } } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "paperclip")
+                            Text(AppDiaryService(app: app).attachmentSummary(savedDay.media)).font(MadarTypography.caption())
+                            Spacer()
+                            Image(systemName: mediaExpanded ? "chevron.down" : "chevron.up").font(.caption)
+                        }.foregroundStyle(theme.secondaryInk).padding(.horizontal, 18).frame(minHeight: 44).contentShape(Rectangle())
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-editor-saved-media")
+                    if mediaExpanded {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(alignment: .top, spacing: 10) {
+                                ForEach(Array(savedDay.media.suffix(6))) { media in
+                                    DiaryMediaCard(app: app, media: media,
+                                        transcript: savedDay.lines.first(where: { $0.id == media.entryID })?.text ?? "")
+                                        .frame(width: 280, alignment: .leading)
+                                }
+                            }.padding(.horizontal, 12)
+                        }
                     }
-                    .accessibilityIdentifier("diary-editor-saved-media")
                 }
                 if margin == nil {
                     ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 8) {

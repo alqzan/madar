@@ -94,6 +94,17 @@ private struct DiaryDayReadConfiguration: Sendable {
             source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(app.number("core.hijriOffset")))
         return h.month == 9 || h.month == 12 || h.month == 10 && h.day <= 3 ? .hijri : .gregorian
     }
+    /// «٢ تسجيلات، ١ صورة»: what the page already holds, in one line.
+    func attachmentSummary(_ media: [DiaryDisplayMedia]) -> String {
+        let audio = media.filter { $0.kind == "audio" }.count, photos = media.filter { $0.kind == "photo" }.count
+        let other = media.count - audio - photos
+        var parts: [String] = []
+        if audio > 0 { parts.append(audio == 1 ? "تسجيل واحد" : audio == 2 ? "تسجيلان" : digitsFormatter.string(audio) + (audio <= 10 ? " تسجيلات" : " تسجيلًا")) }
+        if photos > 0 { parts.append(photos == 1 ? "صورة واحدة" : photos == 2 ? "صورتان" : digitsFormatter.string(photos) + (photos <= 10 ? " صور" : " صورة")) }
+        if other > 0 { parts.append(other == 1 ? "مرفق واحد" : digitsFormatter.string(other) + " مرفقات") }
+        return parts.joined(separator: "، ") + " في هذه الصفحة"
+    }
+    private var digitsFormatter: MadarNumberFormatter { .init(style: app.string("core.numerals") == "western" ? .western : .hindi) }
     func hasWelcomed() throws -> Bool {
         try authorizeRead()
         let key = "sys.diaryWelcomeSeen"
