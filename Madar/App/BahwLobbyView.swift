@@ -100,6 +100,8 @@ struct BahwLobbyView: View {
                                            openQuran: { session.selectedTab = "quran" },
                                            openHabits: { session.habitsOpen = true })
                     }
+                    // B3-1: what to do now leads the lobby (it used to sit under the grid, past the fold).
+                    if !arranging { BahwSuggestionsView(session: session) }
                     let visible = layout.visible
                     let columns = isPadWide(sizeClass) ? 8 : 4
                     let placements = BahwGrid.pack(visible.map { ($0.rawValue, layout.size($0)) }, columns: columns)
@@ -115,7 +117,6 @@ struct BahwLobbyView: View {
                     }
                     if !arranging {
                         SavedLobbyWidgets(session: session)
-                        BahwSuggestionsView(session: session)
                     }
                     if arranging {
                         Button { drawerOpen = true } label: {
@@ -358,23 +359,27 @@ private struct BahwSuggestionsView: View {
     private var refreshKey: String {
         "\(session.prayerRevision)-\(session.habitReadingsVersion)-\(session.string("bahw.smartPresence"))-\(Int(session.prayerNow().timeIntervalSince1970 / 60))-\(session.protectedDataAuthorized)"
     }
+    /// «الآن» for the one step that leads; the following rows are «بعدها».
+    private var heading: String { suggestions.count > 1 ? "الآن، ثم بعدها" : "الآن" }
     var body: some View {
         VStack(spacing: 0) {
             if !suggestions.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("خطوتك التالية").font(MadarTypography.section())
-                    ForEach(suggestions) { suggestion in
+                    Text(heading).font(MadarTypography.section())
+                    ForEach(Array(suggestions.enumerated()), id: \.element.id) { index, suggestion in
+                        let lead = index == 0
                         Button { open(suggestion.destination) } label: {
                             HStack(spacing: 12) {
-                                MadarGlyph(suggestion.symbol, size: 22).foregroundStyle(theme.accent)
+                                MadarGlyph(suggestion.symbol, size: lead ? 28 : 22).foregroundStyle(lead ? theme.onAccent : theme.accent)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(suggestion.title).font(MadarTypography.body())
-                                    Text(suggestion.detail).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                    Text(suggestion.title).font(lead ? MadarTypography.section() : MadarTypography.body())
+                                    Text(suggestion.detail).font(MadarTypography.fine()).foregroundStyle(lead ? theme.onAccent.opacity(0.85) : theme.secondaryInk)
                                 }
                                 Spacer(minLength: 4)
-                                Image(systemName: "chevron.left").font(.caption).foregroundStyle(theme.secondaryInk)
-                            }.frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).padding(12)
-                                .background(theme.surface, in: .rect(cornerRadius: 18))
+                                Image(systemName: "chevron.left").font(.caption).foregroundStyle(lead ? theme.onAccent.opacity(0.85) : theme.secondaryInk)
+                            }.frame(maxWidth: .infinity, minHeight: lead ? 72 : 52, alignment: .leading).padding(12)
+                                .foregroundStyle(lead ? theme.onAccent : theme.ink)
+                                .background(lead ? theme.accentFill : theme.surface, in: .rect(cornerRadius: lead ? 22 : 18))
                         }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-suggestion-" + suggestion.id)
                     }
                 }.accessibilityElement(children: .contain).accessibilityIdentifier("bahw-suggestions")

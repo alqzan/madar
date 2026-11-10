@@ -46,6 +46,8 @@ struct HabitEditorView:View {
     @State private var windowOn=false
     @State private var homeOnly=false
     @State private var reminder="dot"
+    /// B2-9: name, repeat and amount are the quick part; time, reminder, travel and days off fold under «متقدم» unless already set.
+    @State private var advancedOpen=false
     @State private var busy=false
     @State private var issue:String?
     @State private var initialSnapshot: HabitEditorSnapshot?
@@ -129,7 +131,12 @@ struct HabitEditorView:View {
                             if minimumOn { Stepper("أقلّ القليل: "+habitUnitCount(min(rule.target,rule.minimum ?? 1),rule.unit,digits),value:Binding(get:{min(rule.target,rule.minimum ?? 1)},set:{rule.minimum=$0}),in:1...max(1,rule.target)).frame(minHeight:44) }
                         }
                     }
-                    section("وقت اختياري") {
+                    section("متقدم") {
+                        Button {withAnimation(.snappy){advancedOpen.toggle()}} label: {
+                            HStack {Text(advancedOpen ? "أخفِ الوقت والتذكير والإجازة" : "الوقت، التذكير، السفر، أيام الإجازة");Spacer();Image(systemName:advancedOpen ? "chevron.up" : "chevron.down")}
+                                .font(MadarTypography.caption()).frame(minHeight:44).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityIdentifier("habit-advanced")
+                        if advancedOpen {
                         Toggle("له وقت في اليوم",isOn:$windowOn).frame(minHeight:44)
                         if windowOn {
                             Picker("البداية من",selection:Binding(get:{rule.windowAnchor?.rawValue ?? "clock"},set:{rule.windowAnchor=Prayer(rawValue:$0)})) { Text("الساعة المحلية").tag("clock");ForEach(Prayer.allCases,id:\.self){p in Text(prayerName(p)).tag(p.rawValue)} }.pickerStyle(.menu)
@@ -147,18 +154,20 @@ struct HabitEditorView:View {
                             if source == "custom" || (reading != nil && reminder == "push") { Text("إشعار لطيف").tag("push") }
                             Text("بلا تذكير").tag("none")
                         }.pickerStyle(.menu).accessibilityIdentifier("habit-reminder")
-                            .onChange(of:reminder){ _,new in if new == "push" && source == "custom" { windowOn = true } }
                         if reminder == "push" {
                             Text(source == "custom" ? "يصلك الإشعار في بداية وقت العادة، فوقتها مطلوب." : "الإشعار غير متاح للعادة المرتبطة؛ يمكنك اختيار نقطة البهو.")
                                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         Toggle("للبيت فقط، تتوقف في السفر",isOn:$homeOnly).frame(minHeight:44)
                         Text("أيام إجازة").font(MadarTypography.caption());dayButtons($rule.restWeekdays)
+                        }
                     }
                     MadarDateLabel(session.dateLabels(AppBahwService(session:session).today)).foregroundStyle(theme.secondaryInk)
                 }.padding(20)
             }
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.timeZone,session.activePlace.timeZone)
+        // Lives here, not on the picker: the picker is folded away under «متقدم», and a push reminder still needs its time.
+        .onChange(of:reminder){ _,new in if new == "push" && source == "custom" { windowOn = true } }
         .task(id:source) {
             guard source == "reading" else { return }
             let service=AppMihbaraService(app:session)
@@ -176,6 +185,7 @@ struct HabitEditorView:View {
             let initialHomeOnly = reading?.homeOnly ?? false
             let defaultReminder = session.string("bahw.reminder")
             let initialReminder = reading?.reminder ?? (["dot", "push", "none"].contains(defaultReminder) ? defaultReminder : "dot")
+            advancedOpen = initialWindowOn || initialHomeOnly || initialReminder != "dot" || !initialRule.restWeekdays.isEmpty
             name=initialName;source=initialSource;rule=initialRule;monthDays=initialMonthDays;minimumOn=initialMinimumOn;windowOn=initialWindowOn;homeOnly=initialHomeOnly;reminder=initialReminder
             initialSnapshot = .init(name:initialName,source:initialSource,rule:initialRule,monthDays:initialMonthDays,minimumOn:initialMinimumOn,windowOn:initialWindowOn,homeOnly:initialHomeOnly,reminder:initialReminder)
         }

@@ -76,12 +76,24 @@ struct TabShell<Content: View>: View {
         }
     }
 
+    /// B2-19: the sidebar folds away so a room can use the whole wide screen (reading, the Mushaf, a long diary page).
+    @AppStorage("Madar.pad.sidebarHidden") private var sidebarHidden = false
     private var padBody: some View {
         HStack(spacing: 0) {
-            MadarSidebar(tabs: tabs, selection: selection, select: select)
-                .frame(width: 250)
-            Rectangle().fill(theme.ink.opacity(0.08)).frame(width: 0.5).ignoresSafeArea()
+            if !sidebarHidden {
+                MadarSidebar(tabs: tabs, selection: selection, select: select, fold: { withAnimation(reduceMotion ? nil : .snappy) { sidebarHidden = true } })
+                    .frame(width: 250).transition(.move(edge: .trailing).combined(with: .opacity))
+                Rectangle().fill(theme.ink.opacity(0.08)).frame(width: 0.5).ignoresSafeArea()
+            }
             rooms.frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(alignment: .topTrailing) {
+                    if sidebarHidden {
+                        Button { withAnimation(reduceMotion ? nil : .snappy) { sidebarHidden = false } } label: {
+                            Image(systemName: "sidebar.trailing").font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.ink)
+                                .frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
+                        }.buttonStyle(.madarPlain).padding(12).accessibilityLabel("أظهر القائمة").accessibilityIdentifier("pad-sidebar-show")
+                    }
+                }
         }
         .onAppear { session.tabBarHeight = 0 }
         .sensoryFeedback(.selection, trigger: selection)
@@ -490,11 +502,16 @@ private struct MadarSidebar: View {
     let tabs: [FoundationTab]
     let selection: String
     let select: (String) -> Void
+    let fold: () -> Void
     @Environment(\.roomTheme) private var theme
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("مدار").font(.custom("thmanyahserifdisplay-Bold", size: 30, relativeTo: .largeTitle))
-                .foregroundStyle(theme.ink).padding(.horizontal, 14).padding(.top, 18).padding(.bottom, 14)
+            HStack {
+                Text("مدار").font(.custom("thmanyahserifdisplay-Bold", size: 30, relativeTo: .largeTitle)).foregroundStyle(theme.ink)
+                Spacer()
+                Button(action: fold) { Image(systemName: "sidebar.trailing").foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44).contentShape(Rectangle()) }
+                    .buttonStyle(.madarPlain).accessibilityLabel("أخفِ القائمة").accessibilityIdentifier("pad-sidebar-hide")
+            }.padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 8)
             ForEach(tabs.filter { $0.id != "customize" }) { row($0) }
             Spacer(minLength: 12)
             if let customize = tabs.first(where: { $0.id == "customize" }) { row(customize) }

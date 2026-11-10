@@ -267,9 +267,8 @@ import XCTest
         let hit = app.buttons["city-hit-الرياض"]
         XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
         if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
-        let later = app.buttons["first-run-continue"]
-        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
-        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
+        // B2-12: the city is the last step; choosing it ends the first run.
+        XCTAssertTrue(city.waitForNonExistence(timeout: 10), app.debugDescription)
     }
     private func capture(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
 }
