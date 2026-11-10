@@ -424,9 +424,8 @@ import XCTest
         let hit = app.buttons["city-hit-الرياض"]
         XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
         if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
-        let later = app.buttons["first-run-continue"]
-        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
-        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
+        // Choosing the city finishes first run; there is no photos step any more (B2-12).
+        XCTAssertTrue(app.buttons["first-run-city"].waitForNonExistence(timeout: 8), app.debugDescription)
     }
     private func capture(_ app: XCUIApplication, _ name: String) {
         let s = app.screenshot(), a = XCTAttachment(screenshot: s); a.name = name; a.lifetime = .keepAlways; add(a)

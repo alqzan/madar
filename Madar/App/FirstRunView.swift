@@ -10,7 +10,7 @@ struct FirstRunView: View {
     @State private var step = 0
     @StateObject private var locator = CityLocator()
     @Environment(\.roomTheme) private var theme
-    private let lastStep = 2
+    private let lastStep = 1
 
     private struct Page { let symbol: String; let title: String; let text: String }
     private var page: Page {
@@ -58,14 +58,11 @@ struct FirstRunView: View {
         case 1:
             Button(locator.working ? "أبحث عن موقعك…" : "اسمح بالموقع") { locator.start(save) }
                 .buttonStyle(MadarPrimaryButton()).disabled(locator.working).accessibilityIdentifier("first-run-locate")
-            NavigationLink("اختر مدينتي بنفسي") { CityEditor(session: session).onDisappear { if !session.cityName.isEmpty { step = 2 } } }
+            NavigationLink("اختر مدينتي بنفسي") { CityEditor(session: session).onDisappear { if !session.cityName.isEmpty { session.completeOnboarding() } } }
                 .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("first-run-city")
         default:
-            Button("اسمح بالصور") {
-                Task { _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite); session.completeOnboarding() }
-            }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("first-run-photos")
-            Button { session.completeOnboarding() } label: { Text("ليس الآن")
-                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("first-run-continue")
+            // B2-12: the photo permission is asked at the first photo the writer adds, not here.
+            EmptyView()
         }
     }
 
@@ -73,7 +70,7 @@ struct FirstRunView: View {
     private func save(_ found: CityLocator.Found) {
         session.set(.object(["name": .string(found.name), "country": .string(found.country), "lat": .number(found.lat), "lon": .number(found.lon),
                              "tz": .string(found.tz), "currency": .string(found.currency)]), key: "core.homeCity")
-        step = 2
+        session.completeOnboarding()
     }
 }
 

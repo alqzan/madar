@@ -16,6 +16,14 @@ struct HabitEngineTests {
         let c = try HabitEngine.evaluate(rules: [r], facts: [fact("2026-10-01")], today: day("2026-10-03"), days: days, breakAfter: 1)
         #expect(c.streak == 0)
     }
+    /// B2-8 (10 Nov): an edit saved on 5 Oct (a rename or goal change keeps «كل ٣ أيام») must not restart the block counting.
+    /// Blocks stay 1–3, 4–6, 7–9, 10–12 Oct, worked by hand.
+    @Test func editingAnEveryThreeDaysHabitKeepsItsBlocks() throws {
+        var first = rule("2026-10-01", frequency: .interval); first.intervalDays = 3
+        var edited = rule("2026-10-05", frequency: .interval); edited.intervalDays = 3; edited.target = 1
+        let result = try HabitEngine.evaluate(rules: [first, edited], facts: [], today: day("2026-10-10"), days: days)
+        #expect(result.periods.map(\.key) == ["2026-10-01", "2026-10-04", "2026-10-07", "2026-10-10"])
+    }
     @Test(arguments: [HabitFrequency.weekly, .monthly, .yearly])
     func twoMissedPeriodsBreakEachFrequency(_ frequency: HabitFrequency) throws {
         let r = rule("2022-01-01", frequency: frequency)
