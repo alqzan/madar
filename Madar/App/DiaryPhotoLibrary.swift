@@ -13,14 +13,18 @@ import MadarDesign
 enum DiaryPhotoLibrary {
     /// Long edge of the kept copy, in pixels. JPEG at this size is tens of kilobytes.
     static let copyPixels = 640
-    static func smallCopy(of data: Data) -> Data? {
+    /// B1-13: a camera photo has no original in Photos, so the diary keeps the only copy: 2048 px on the long edge, good JPEG.
+    static let cameraPixels = 2048
+    static func cameraCopy(of data: Data) -> Data? { scaledCopy(of: data, maxPixels: cameraPixels, quality: 0.85) }
+    static func smallCopy(of data: Data) -> Data? { scaledCopy(of: data, maxPixels: copyPixels, quality: 0.72) }
+    static func scaledCopy(of data: Data, maxPixels: Int, quality: Double) -> Data? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
-                                        kCGImageSourceThumbnailMaxPixelSize: copyPixels]
+                                        kCGImageSourceThumbnailMaxPixelSize: maxPixels]
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
         let out = NSMutableData()
         guard let target = CGImageDestinationCreateWithData(out, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(target, image, [kCGImageDestinationLossyCompressionQuality: 0.72] as CFDictionary)
+        CGImageDestinationAddImage(target, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
         return CGImageDestinationFinalize(target) ? out as Data : nil
     }
     static var canRead: Bool { [.authorized, .limited].contains(PHPhotoLibrary.authorizationStatus(for: .readWrite)) }

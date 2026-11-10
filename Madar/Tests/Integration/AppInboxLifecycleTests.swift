@@ -1,6 +1,7 @@
 import XCTest
 import SwiftData
 import UIKit
+import ImageIO
 import MadarCore
 @testable import MadarData
 import MadarInbox
@@ -300,4 +301,43 @@ import MadarSnapshots
         XCTAssertNil(resumed.errorMessage)
     }
 
+}
+
+/// B1-17
+final class TemporaryFilesCleanupTests: XCTestCase {
+    func testOnlyOldItemsWithKnownNamesAreRemoved() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("CleanupFixture-\(UUID())", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        func make(_ name: String, age: TimeInterval) throws -> URL {
+            let url = root.appendingPathComponent(name)
+            try Data("x".utf8).write(to: url)
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: url.path)
+            return url
+        }
+        let oldBook = try make("\(UUID().uuidString).epub", age: 7200), freshBook = try make("\(UUID().uuidString).epub", age: 60)
+        let oldImport = try make("MadarImport-\(UUID()).madarbackup", age: 7200), stranger = try make("someone-else.tmp", age: 7200)
+        XCTAssertEqual(TemporaryFilesCleanup.run(in: root), 2)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldBook.path)); XCTAssertFalse(FileManager.default.fileExists(atPath: oldImport.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: freshBook.path), "A recent file may still be in use")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: stranger.path), "Unknown names are never touched")
+    }
+}
+
+/// B1-13
+final class DiaryCameraCopyTests: XCTestCase {
+    func testCameraCopyKeepsTwoThousandPixelsWhileTheLibraryCopyStaysSmall() throws {
+        let size = CGSize(width: 3000, height: 2000)
+        let image = UIGraphicsImageRenderer(size: size, format: { let f = UIGraphicsImageRendererFormat(); f.scale = 1; return f }()).image { context in
+            UIColor.orange.setFill(); context.fill(CGRect(origin: .zero, size: size))
+        }
+        let original = try XCTUnwrap(image.jpegData(compressionQuality: 0.82))
+        func longEdge(_ data: Data) throws -> Int {
+            let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+            let props = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+            return max(props[kCGImagePropertyPixelWidth] as? Int ?? 0, props[kCGImagePropertyPixelHeight] as? Int ?? 0)
+        }
+        XCTAssertEqual(try longEdge(XCTUnwrap(DiaryPhotoLibrary.cameraCopy(of: original))), 2048)
+        XCTAssertEqual(try longEdge(XCTUnwrap(DiaryPhotoLibrary.smallCopy(of: original))), 640)
+    }
 }

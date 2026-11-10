@@ -350,7 +350,7 @@ struct DiaryTextEditor: View {
     private func cameraCaptured(_ image: UIImage) {
         cameraOpen = false
         guard let original = image.jpegData(compressionQuality: 0.82),
-              let data = DiaryPhotoLibrary.smallCopy(of: original) else {
+              let data = DiaryPhotoLibrary.cameraCopy(of: original) else {
             failure = "تعذّر تجهيز الصورة. التقطها مرة أخرى."; return
         }
         Task {
