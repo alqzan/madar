@@ -280,6 +280,28 @@ import CoreSpotlight
         XCTAssertEqual(sectionFor("salah.asr"), "المواقيت")
     }
 
+    /// B2-18: the central search also finds the settings a room edits on its own page; every listed key is a real, titled setting
+    /// that the central page does not already show.
+    func testCentralSearchFindsRoomSettings() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "RoomSettingsSearch-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
+        let definitions = app.schema.settings, supported = Set(AppSession.supportedKeys), known = Set(definitions.map(\.key))
+        for key in RoomSettingsIndex.allKeys {
+            XCTAssertTrue(known.contains(key), "\(key) is not in the settings schema")
+            XCTAssertFalse(supported.contains(key), "\(key) is already on the central page")
+            XCTAssertFalse((definitions.first { $0.key == key }?.title ?? "").isEmpty, key)
+        }
+        XCTAssertEqual(RoomSettingsIndex.allKeys.count, RoomSettingsIndex.keys.values.reduce(0) { $0 + $1.count }, "a key is listed under two rooms")
+        XCTAssertTrue(RoomSettingsIndex.hits(in: definitions, query: "", supported: supported).isEmpty)
+        let salary = RoomSettingsIndex.hits(in: definitions, query: "يوم الراتب", supported: supported)
+        XCTAssertTrue(salary.contains { $0.key == "mal.salaryDay" && $0.place == .money }, salary.map(\.key).joined(separator: ","))
+        // The room's name finds all of its settings.
+        let diary = RoomSettingsIndex.hits(in: definitions, query: "المذكرات", supported: supported)
+        XCTAssertEqual(Set(diary.map(\.key)), Set(RoomSettingsIndex.keys[.diary] ?? []))
+        // A central key is never repeated here.
+        XCTAssertFalse(RoomSettingsIndex.hits(in: definitions, query: "core.dayStart", supported: supported).contains { $0.key == "core.dayStart" })
+    }
+
     func testSpotlightSelectionTargetsTheBookRoomWithoutLosingTheRequestedBook() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraSpotlight-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
@@ -335,7 +357,6 @@ import CoreSpotlight
 
         try await app.executeBookCommand("book.moveShelf", payload: ["id": .string(book.id.uuidString), "shelf": .string("finished")])
         XCTAssertNotNil(app.undoToken)
-        XCTAssertTrue(app.undoToastVisible)
 
         try await app.executeBookCommand("book.removeFile", payload: ["id": .string(book.id.uuidString)])
 

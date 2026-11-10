@@ -29,6 +29,9 @@ import XCTest
                                  "MADAR_UI_HABIT_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         app.launch()
         tap(app, "tab-customize", timeout: 20)
+        let advanced = app.descendants(matching: .any)["settings-advanced"].firstMatch
+        for _ in 0..<14 where !advanced.isHittable { app.swipeUp(velocity: .fast) }
+        advanced.tap()
         let link = app.buttons["legacy-move-link"]
         for _ in 0..<14 where !link.isHittable { app.swipeUp(velocity: .fast) }
         XCTAssertTrue(link.isHittable); link.tap()
@@ -54,6 +57,9 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_LEGACY_BACKUP": file.path,
                                  "MADAR_UI_HABIT_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         app.launch(); tap(app, "tab-customize", timeout: 20)
+        let advanced = app.descendants(matching: .any)["settings-advanced"].firstMatch
+        for _ in 0..<14 where !advanced.isHittable { app.swipeUp(velocity: .fast) }
+        advanced.tap()
         let link = app.buttons["legacy-move-link"]
         for _ in 0..<14 where !link.isHittable { app.swipeUp(velocity: .fast) }
         XCTAssertTrue(link.isHittable); link.tap(); tap(app, "legacy-move-choose")
@@ -73,6 +79,9 @@ import XCTest
         let start = app.buttons["first-run-continue"]
         if start.waitForExistence(timeout: 5) { for _ in 0..<4 where start.exists && start.isHittable { start.tap(); Thread.sleep(forTimeInterval: 1) } }
         tap(app, "tab-customize", timeout: 20)
+        let advanced = app.descendants(matching: .any)["settings-advanced"].firstMatch
+        for _ in 0..<14 where !advanced.isHittable { app.swipeUp(velocity: .fast) }
+        advanced.tap()
         let link = app.buttons["legacy-move-link"]
         for _ in 0..<14 where !link.isHittable { app.swipeUp(velocity: .fast) }
         XCTAssertTrue(link.isHittable, "No «انقل من مدار القديم» in settings"); link.tap()

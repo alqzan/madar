@@ -10,6 +10,7 @@ struct CustomizeMadar: View {
     @State private var widgetGallery = false
     @State private var widgetMaker = false
     @State private var quranTafsirLibrary = false
+    @State private var diarySettings = false
     @State private var missingSettingsRoute = false
     @State private var highlightedSettingKey: String?
     @State private var routedSettingsQuery: String?
@@ -77,7 +78,7 @@ struct CustomizeMadar: View {
                     Button {widgetGallery=true} label:{Label("ودجات الشاشة الرئيسية",systemImage:"square.grid.2x2").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:50).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widgets-gallery")
                 }
                 if showsRoomLayouts { RoomHomeLayoutSection(session: session, searching: !query.isEmpty) }
-                if filtered.isEmpty && !showsRoomLayouts && !(query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query))) && !(query.isEmpty || normalized("المال").contains(normalized(query)) || normalized("المحبرة").contains(normalized(query)) || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) || normalized("القرآن التفسير مكتبة التفاسير مرجع الورد").contains(normalized(query))) && !normalized("النسخ والاستعادة نسخة احتياطية انقل من مدار القديم استيراد المزامنة iCloud").contains(normalized(query)) {
+                if filtered.isEmpty && roomHits.isEmpty && !showsRoomLayouts && !(query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query))) && !(query.isEmpty || normalized("المال").contains(normalized(query)) || normalized("المحبرة").contains(normalized(query)) || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) || normalized("القرآن التفسير مكتبة التفاسير مرجع الورد").contains(normalized(query))) && !normalized("النسخ والاستعادة نسخة احتياطية انقل من مدار القديم استيراد المزامنة iCloud").contains(normalized(query)) {
                     ContentUnavailableView.search(text: query)
                 } else {
                     ForEach(sections, id: \.self) { section in
@@ -85,6 +86,7 @@ struct CustomizeMadar: View {
                     }
                     if sections.contains("الإشعارات") { NotificationPermissionCard(session: session) }
                 }
+                if !roomHits.isEmpty { roomResults }
                 // The data links are searchable too: «نسخ» or «انقل» used to land on an empty result.
                 if query.isEmpty || normalized("النسخ والاستعادة نسخة احتياطية انقل من مدار القديم المزامنة").contains(normalized(query)) {
                     if let backup = session.backupService, query.isEmpty || normalized("النسخ والاستعادة نسخة احتياطية").contains(normalized(query)) {
@@ -112,6 +114,7 @@ struct CustomizeMadar: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { settingsWidth = $0 }
         .navigationDestination(isPresented: $session.moneyOpen) { MoneyRoomView(app: session) }
         .navigationDestination(isPresented: $quranTafsirLibrary) { QuranTafsirLibraryView(app: session) }
+        .navigationDestination(isPresented: $diarySettings) { DiaryCustomizeView(app: session) }
         .sheet(isPresented: $widgetMaker, onDismiss: { session.widgetMakerRoute = nil; session.widgetMakerRouteID = nil }) {
             WidgetMakerView(session: session)
                 .presentationDetents([.large]).madarSheetErrorAlert(session)
@@ -171,6 +174,35 @@ struct CustomizeMadar: View {
             withAnimation(.easeInOut(duration: 0.25)) {
                 proxy.scrollTo("settings-route-\(key)", anchor: .center)
             }
+        }
+    }
+    /// B2-18: settings that live on a room's own page.
+    private var roomHits: [RoomSettingsIndex.Hit] { RoomSettingsIndex.hits(in: session.schema.settings, query: query, supported: Set(AppSession.supportedKeys)) }
+    private var roomResults: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("داخل الأقسام").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
+            ForEach(roomHits) { hit in
+                Button { openRoomSetting(hit) } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(hit.title).font(MadarTypography.body())
+                            Text("في " + hit.place.roomName).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        }
+                        Spacer(minLength: 8)
+                        Image(systemName: "chevron.left").font(.footnote).foregroundStyle(theme.secondaryInk)
+                    }
+                    .padding(14).frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).contentShape(Rectangle())
+                    .background(theme.surface, in: .rect(cornerRadius: 16))
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("room-setting-" + hit.key)
+            }
+        }.accessibilityElement(children: .contain).accessibilityIdentifier("room-setting-results")
+    }
+    private func openRoomSetting(_ hit: RoomSettingsIndex.Hit) {
+        switch hit.place {
+        case .money: session.moneyOpensSettings = true; session.moneyOpen = true
+        case .diary: diarySettings = true
+        case .quran: session.selectedTab = "quran"
+        case .prayer: session.selectedTab = "prayer"
         }
     }
     private var showsRoomLayouts: Bool { query.isEmpty || normalized("ما يعرضه كل باب ترتيب الغرف").contains(normalized(query)) }
@@ -245,8 +277,11 @@ struct SettingsSection: View {
             DisclosureGroup(isExpanded: Binding(get: { searching || expanded }, set: { expanded = $0 })) {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(definitions, id: \.key) { definition in
-                        Divider().overlay(theme.line)
+                        // B2-18: the quiet hours' start and end hang under their one switch instead of standing as two more rows.
+                        let underSwitch = ["notif.quietFrom", "notif.quietUntil"].contains(definition.key)
+                        if !underSwitch { Divider().overlay(theme.line) }
                         SettingControl(definition: definition, session: session, highlighted: highlightedSettingKey == definition.key)
+                            .padding(.leading, underSwitch ? 14 : 0)
                             .id("settings-route-\(definition.key)")
                     }
                 }.padding(.top, 12)

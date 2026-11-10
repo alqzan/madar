@@ -65,7 +65,12 @@ struct SettingsHome: View {
                     }
                 }
                 RejectedActionsRow(session: session)
-                link("انقل من مدار القديم", "استيراد بياناتك السابقة", "square.and.arrow.down") { LegacyMoveView(app: session) }
+                // B2-18 (owner, 10 Nov 2026): a one-time move from the old Madar sits folded under «متقدم».
+                DisclosureGroup {
+                    NavigationLink { LegacyMoveView(app: session) } label: { rowLabel("انقل من مدار القديم", "استيراد بياناتك السابقة", "square.and.arrow.down") }
+                        .buttonStyle(.madarPlain).accessibilityIdentifier("legacy-move-link")
+                } label: { Text("متقدم").font(MadarTypography.body().bold()).frame(minHeight: 44, alignment: .leading).accessibilityIdentifier("settings-advanced") }
+                    .padding(.horizontal, 16)
                 door("أعِد الإعدادات المتفق عليها", changes, "arrow.counterclockwise", resetAll)
             }
     }

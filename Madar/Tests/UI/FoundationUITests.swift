@@ -1191,6 +1191,9 @@ import XCTest
         scrollBackupForm(to: location, in: app, towardsTop: true)
         XCTAssertTrue(location.label.contains("ستُحفظ"))
         let export = app.buttons["plain-export-now"]
+        // B2-18: the unencrypted export sits folded under «متقدم».
+        let advanced = app.descendants(matching: .any)["backup-advanced"].firstMatch
+        scrollBackupForm(to: advanced, in: app); advanced.tap()
         scrollBackupForm(to: export, in: app); XCTAssertTrue(export.isHittable); export.tap()
         let cancel = app.buttons["backup-cancel"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 10)); XCTAssertTrue(elementIsOnscreenAndHittable(cancel, in: app))
@@ -1631,7 +1634,7 @@ import XCTest
     private func openBackupSettings(_ app: XCUIApplication) {
         finishOnboarding(app)
         app.buttons["tab-customize"].tap()
-        let link = app.buttons["backup-settings-link"]
+        let link = app.buttons["settings-link-النسخ والاستعادة"]
         scrollTo(link, in: app)
         link.tap()
         XCTAssertTrue(app.navigationBars["النسخ والاستعادة"].waitForExistence(timeout: 10), app.debugDescription)
@@ -1659,7 +1662,7 @@ import XCTest
     private func openPlainExportSettings(_ app: XCUIApplication) {
         finishOnboarding(app)
         app.buttons["tab-customize"].tap()
-        let link = app.buttons["backup-settings-link"]
+        let link = app.buttons["settings-link-النسخ والاستعادة"]
         scrollTo(link, in: app)
         link.tap()
         XCTAssertTrue(app.navigationBars["النسخ والاستعادة"].waitForExistence(timeout: 10), app.debugDescription)
@@ -1668,6 +1671,10 @@ import XCTest
         let form = app.scrollViews.firstMatch // The backup screen is a Madar paper scroll view, not a grouped Form.
         XCTAssertTrue(form.waitForExistence(timeout: 10), app.debugDescription)
         let export = app.buttons["plain-export-now"]
+        // B2-18: the unencrypted export sits folded under «متقدم».
+        let advanced = app.descendants(matching: .any)["backup-advanced"].firstMatch
+        for _ in 0..<12 where !(advanced.exists && advanced.isHittable) { form.swipeUp() }
+        if !export.exists { advanced.tap() }
         for _ in 0..<12 {
             if export.exists && export.isHittable { return }
             form.swipeUp()

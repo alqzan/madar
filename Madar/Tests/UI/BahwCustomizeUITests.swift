@@ -230,6 +230,23 @@ import XCTest
         XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout: 15), app.debugDescription)
     }
 
+    /// B2-18: the central search also finds a setting that lives on a room's own page and opens that page.
+    func testSearchFindsRoomSettingsAndOpensTheirPage() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        app.buttons["tab-customize"].tap()
+        let search = app.textFields["settings-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription)
+        search.tap(); search.typeText("يوم الراتب\n")
+        let hit = app.buttons["room-setting-mal.salaryDay"]
+        XCTAssertTrue(hit.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(hit.label.contains("المال"), hit.label)
+        hit.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["money-settings"].waitForExistence(timeout: 15), app.debugDescription)
+    }
+
     func testHabitWidgetScopeLabelsUndoAndRelaunch() {
         continueAfterFailure = false
         let app = XCUIApplication()

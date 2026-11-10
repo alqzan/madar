@@ -480,6 +480,7 @@
 		F590460A7B328F814D4F172F /* MadarIntentHandoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 966B3399E746D6C594A7B7BF /* MadarIntentHandoff.swift */; };
 		F5C32DC8BACBD37D0EE33ADA /* AppDiarySearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C5F681423C9EE494E433E64 /* AppDiarySearchService.swift */; };
 		F5D155DF7B5E00FBC3AB3D0B /* QuranWidgetContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1ACAD98A1AD83A235C1FCB7 /* QuranWidgetContent.swift */; };
+		F641EEA33B3A786BEC6DB124 /* RoomSettingsIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 542CE53E47E514E65B762542 /* RoomSettingsIndex.swift */; };
 		F725BD763DA913074D70EABE /* MihbaraFinishPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22DA2A4B369CB0EA9B77C259 /* MihbaraFinishPrompt.swift */; };
 		F787AD41340294E2F4115039 /* RoomWidgetContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D68371656FE87541BA053103 /* RoomWidgetContent.swift */; };
 		F7BF086C160186E6B96A59EE /* DiaryLettersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52CE82B02CEE5AA23B683060 /* DiaryLettersView.swift */; };
@@ -695,6 +696,7 @@
 		536586BCDBC61C002DDD0579 /* AppQuranService+History.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppQuranService+History.swift"; sourceTree = "<group>"; };
 		53BA21D015C137C227835A2A /* ButtonEdgeTapUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonEdgeTapUITests.swift; sourceTree = "<group>"; };
 		5411BA4C0C0A0AED3AC7A0AD /* MihbaraStandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraStandTests.swift; sourceTree = "<group>"; };
+		542CE53E47E514E65B762542 /* RoomSettingsIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomSettingsIndex.swift; sourceTree = "<group>"; };
 		54CAED3F538D952FE59BBE34 /* QuranPageMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranPageMap.swift; sourceTree = "<group>"; };
 		5530CFCEB8EEF7F56BE18E26 /* QuranFreeIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranFreeIntegrationTests.swift; sourceTree = "<group>"; };
 		553B8E01D18F85CA08BB1E22 /* MihbaraContentsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraContentsSheet.swift; sourceTree = "<group>"; };
@@ -1365,6 +1367,7 @@
 				4800B7917F177C0E65DE00F7 /* RoomHomeLayout.swift */,
 				D2FA1B34E6D896D7B94B78AE /* RoomIntro.swift */,
 				33571E9B4ECAFDDF1D66AE44 /* RoomNotificationContent.swift */,
+				542CE53E47E514E65B762542 /* RoomSettingsIndex.swift */,
 				D68371656FE87541BA053103 /* RoomWidgetContent.swift */,
 				8CF5E7B996A522A8D37486E4 /* RoomWidgetsGallery.swift */,
 				7CF2E3379E32EA600D74CFDE /* SettingsHome.swift */,
@@ -2327,6 +2330,7 @@
 				5E90F85E5CC1D50519363A57 /* RoomHomeLayout.swift in Sources */,
 				56C940F4000A166483C6E14A /* RoomIntro.swift in Sources */,
 				F98A4A5B02A74E80E39B0A92 /* RoomNotificationContent.swift in Sources */,
+				F641EEA33B3A786BEC6DB124 /* RoomSettingsIndex.swift in Sources */,
 				1C41BED09B5A80D5FE48E2D8 /* RoomWidgetContent.swift in Sources */,
 				5A0E68C5D715CF3C44A6267C /* RoomWidgetsGallery.swift in Sources */,
 				51083EA6A1DC7DA15A28825E /* SettingsHome.swift in Sources */,

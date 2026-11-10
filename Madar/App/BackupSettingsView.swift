@@ -233,6 +233,7 @@ struct BackupSettingsView: View {
     @State private var filePurpose = FilePurpose.restore
     @State private var choosingFile = false
     @State private var confirmingRestore = false
+    @State private var advancedOpen = false
     @FocusState private var focusedPassword: Int?
     @Environment(\.roomTheme) private var theme
     init(service: any BackupUIService, numerals: NumeralStyle = .hindi,
@@ -249,7 +250,7 @@ struct BackupSettingsView: View {
                 folderCard
                 encryptedCard
                 restoreCard
-                plainCard
+                advancedCard
             }
             .padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }
@@ -456,15 +457,21 @@ struct BackupSettingsView: View {
         }
     }
 
-    @ViewBuilder private var plainCard: some View {
+    /// B2-18 (owner, 10 Nov 2026): the unencrypted export is rarely wanted, so it sits folded under «متقدم»; it opens by itself once a file is ready.
+    @ViewBuilder private var advancedCard: some View {
         MadarCard {
-            VStack(alignment: .leading, spacing: 12) {
-                heading("تصدير بياناتك", "square.and.arrow.up.on.square")
-                note("ملف ZIP غير مشفّر يحتوي بياناتك كلها مع الصور والتسجيلات الصوتية، ويمكن فتحه خارج مدار. شاركه مع من تثق به. إعدادات هذا الجهاز وقفل التطبيق لا تدخل فيه.")
-                Button("جهّز ملف التصدير", action: model.exportPlain).frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("plain-export-now")
-                if model.plainExportedURL != nil {
-                    Button(action: model.sharePlain) { Label("احفظ التصدير أو شاركه", systemImage: "square.and.arrow.up") }.frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("plain-export-share")
-                }
+            DisclosureGroup(isExpanded: Binding(get: { advancedOpen || model.plainExportedURL != nil }, set: { advancedOpen = $0 })) {
+                VStack(alignment: .leading, spacing: 12) {
+                    heading("تصدير بياناتك", "square.and.arrow.up.on.square")
+                    note("ملف ZIP غير مشفّر يحتوي بياناتك كلها مع الصور والتسجيلات الصوتية، ويمكن فتحه خارج مدار. شاركه مع من تثق به. إعدادات هذا الجهاز لا تدخل فيه.")
+                    Button("جهّز ملف التصدير", action: model.exportPlain).frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("plain-export-now")
+                    if model.plainExportedURL != nil {
+                        Button(action: model.sharePlain) { Label("احفظ التصدير أو شاركه", systemImage: "square.and.arrow.up") }.frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("plain-export-share")
+                    }
+                }.padding(.top, 12)
+            } label: {
+                // The identifier sits on the label: on the group it would replace every child's own identifier.
+                heading("متقدم", "gearshape.2").accessibilityIdentifier("backup-advanced")
             }
         }
     }
