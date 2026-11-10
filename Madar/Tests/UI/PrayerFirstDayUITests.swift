@@ -21,8 +21,8 @@ import XCTest
             XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
             if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
             let later = app.buttons["first-run-continue"]
-            XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
-            XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
+            // B2-12: first run now ends after the city, so the second «متابعة» may not exist.
+            if later.waitForExistence(timeout: 3) { later.tap(); XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription) }
         }
         app.buttons["tab-prayer"].tap()
 
@@ -126,6 +126,32 @@ import XCTest
         }
     }
 
+    /// B2-4: «في جماعة / وحدي» sit on the open prayer's card; never inside the 30-minute window after the adhan.
+    func testOpenPrayerCardLogsInOneTapAndStaysQuietInsideTheSanctityWindow() throws {
+        continueAfterFailure = false
+        // Riyadh, 7 Oct 2026: Maghrib's adhan is 17:34 (Asr is already recorded in this fixture), its window ends 17:54.
+        for (stamp, offered) in [("2026-10-07T17:45:00+03:00", false), ("2026-10-07T18:10:00+03:00", true)] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_PRAYER_FIXTURE": "homeShowcase",
+                "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": stamp, "MADAR_UI_TRACKING_START": "2026-10-01"]
+            app.launch(); finishOnboarding(app)
+            app.buttons["tab-prayer"].tap()
+            XCTAssertTrue(app.staticTexts["prayer-today-summary"].waitForExistence(timeout: 15), app.debugDescription)
+            let strip = app.descendants(matching: .any).matching(identifier: "prayer-quick-log").firstMatch
+            guard offered else {
+                XCTAssertFalse(strip.waitForExistence(timeout: 3), "inside the sanctity window nothing is offered")
+                app.terminate(); continue
+            }
+            XCTAssertTrue(strip.waitForExistence(timeout: 10), app.debugDescription)
+            attachScreenshot(app, named: "B2-4-quick-log-L")
+            app.buttons["prayer-quick-jamaah"].tap()
+            XCTAssertTrue(strip.waitForNonExistence(timeout: 10), app.debugDescription)
+            let asr = app.descendants(matching: .any).matching(identifier: "prayer-arch-maghrib").firstMatch
+            XCTAssertTrue(asr.label.contains("جماعة"), asr.label)
+            app.terminate()
+        }
+    }
+
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
@@ -140,8 +166,8 @@ import XCTest
         XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
         if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
         let later = app.buttons["first-run-continue"]
-        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
-        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
+        // B2-12: first run now ends after the city, so the second «متابعة» may not exist.
+        if later.waitForExistence(timeout: 3) { later.tap(); XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription) }
     }
     private func attachScreenshot(_ app: XCUIApplication, named name: String) {
         guard ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] != nil else { return }

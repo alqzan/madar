@@ -138,6 +138,9 @@ struct PrayerTodayView: View {
             .padding(.top, pills ? 16 : 0)
             nextPrayer(snapshot, now: instant)
                 .padding(.top, pills ? 18 : 26)
+            if let open = quickLogCell(snapshot, now: instant) {
+                quickLogStrip(open).padding(.top, 14).disabled(!homeSnapshotIsCurrent)
+            }
             verseDivider
                 .padding(.top, 18)
             riwaq(snapshot, now: instant)
@@ -637,6 +640,44 @@ struct PrayerTodayView: View {
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("prayer-next")
+    }
+
+    // MARK: Quick log (B2-4)
+
+    /// The prayer whose time is open and still unrecorded, once its sanctity window has ended (RP3; `PrayerQuickLog` decides).
+    /// A trip or Friday noon keep the sheet, which asks the extra question.
+    private func quickLogCell(_ snapshot: PrayerSnapshot, now: Date) -> PrayerCell? {
+        guard snapshot.activeTrip == nil, let open = currentPrayer(snapshot, now: now),
+              let cell = snapshot.history.flatMap(\.cells).first(where: { $0.reference == open }), let adhan = cell.prayerTime else { return nil }
+        let offered = PrayerQuickLog.isOffered(prayer: cell.reference.prayer, adhan: adhan, nextAdhan: snapshot.next?.time,
+                                               isPending: snapshot.pending.contains(cell.reference), canLog: cell.canLog,
+                                               isFridayNoon: cell.isFriday && cell.reference.prayer == .dhuhr, now: now)
+        return offered ? cell : nil
+    }
+
+    private func quickLogStrip(_ cell: PrayerCell) -> some View {
+        VStack(spacing: 10) {
+            Text("صلّيتَ \(title(cell.reference.prayer))؟").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+            HStack(spacing: 10) {
+                quickLogButton("في جماعة", status: .jamaah, cell: cell)
+                quickLogButton("وحدي", status: .alone, cell: cell)
+            }
+        }
+        .accessibilityElement(children: .contain).accessibilityIdentifier("prayer-quick-log")
+    }
+
+    private func quickLogButton(_ title: String, status: PrayerStoredStatus, cell: PrayerCell) -> some View {
+        Button {
+            guard !session.prayerWriteInProgress else { return }
+            session.recordPrayer(cell.reference, status: status)
+        } label: {
+            Text(title).font(PrayerHomeType.strong).foregroundStyle(theme.ink)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(theme.accent.opacity(0.12), in: .rect(cornerRadius: 20))
+                .overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.accent, lineWidth: 1.2) }
+                .contentShape(.rect(cornerRadius: 20))
+        }
+        .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-quick-\(status.rawValue)")
     }
 
     private func nextLine(_ next: PrayerOccurrence, now: Date) -> String {
