@@ -264,13 +264,15 @@ public enum BankMessageParser {
         let number = #"(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)"#
         let knownWords = Set(currencyWords.map(\.0))
         let words = currencyWords + exponents.exponents.keys.sorted().filter { !knownWords.contains($0) }.map { ($0, $0) }
-        let codes = words.map { NSRegularExpression.escapedPattern(for: $0.0) }.joined(separator: "|")
+        // A multi-word name tolerates any run of spaces between its words («ريال  عماني»).
+        let codes = words.map { NSRegularExpression.escapedPattern(for: $0.0).replacingOccurrences(of: " ", with: "\\s+") }.joined(separator: "|")
         let pattern = "(?:\(number)\\s*(\(codes)))|(?:(\(codes))\\s*\(number))"
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return [] }
         let ns = text as NSString
         return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).compactMap { match in
             func group(_ i: Int) -> String? { match.range(at: i).location == NSNotFound ? nil : ns.substring(with: match.range(at: i)) }
-            guard let raw = group(1) ?? group(4), let word = group(2) ?? group(3),
+            guard let raw = group(1) ?? group(4), let rawWord = group(2) ?? group(3),
+                  case let word = rawWord.split(whereSeparator: \.isWhitespace).joined(separator: " "),
                   let code = words.first(where: { $0.0.caseInsensitiveCompare(word) == .orderedSame })?.1,
                   let exp = exponents.exponent(code), let minor = minorUnits(raw, exponent: exp),
                   let range = Range(match.range, in: text) else { return nil }

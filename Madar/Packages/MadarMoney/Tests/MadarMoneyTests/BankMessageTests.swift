@@ -104,6 +104,9 @@ import Testing
             let found = BankMessageParser.amounts(text, exponents).first
             #expect(found?.minor == minor && found?.currency == code, "\(text)")
         }
+        // Extra spaces between the words of a name do not turn it into a plain riyal.
+        let spaced = BankMessageParser.amounts("مبلغ: 12.500 ريال   عماني", exponents).first
+        #expect(spaced?.minor == 12_500 && spaced?.currency == "OMR")
         // A bare «دينار» names no country: no amount is read rather than guessing one.
         #expect(BankMessageParser.amounts("مبلغ: 5.000 دينار", exponents).isEmpty)
     }
