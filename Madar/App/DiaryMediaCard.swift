@@ -96,9 +96,9 @@ struct DiaryMediaCard: View {
                             }.buttonStyle(.madarPlain).disabled(savingTranscript)
                                 .accessibilityIdentifier("diary-audio-transcript-save-inline")
                         } else {
-                            ScrollView {
-                                Text(visibleTranscript).font(DiaryType.writing).frame(maxWidth: .infinity, alignment: .leading)
-                            }.frame(maxHeight: 180).accessibilityIdentifier("diary-audio-transcript-text")
+                            // Owner, 10 Nov: the whole transcript stays on the page, never behind an inner scroll.
+                            Text(visibleTranscript).font(DiaryType.writing).lineSpacing(8).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                                .accessibilityIdentifier("diary-audio-transcript-text")
                         }
                     }
                     .padding(12).background(theme.surface, in: .rect(cornerRadius: 14))

@@ -17,6 +17,7 @@ struct DiaryDayView: View {
     @State private var highlightGeneration = 0
     @State private var failure: String?
     @State private var writing = false
+    @State private var insertAt: Date?
     @State private var retry = 0
     @State private var intentions: [DiaryIntention] = []
     @State private var arc: DiaryDayArc?
@@ -225,11 +226,20 @@ struct DiaryDayView: View {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 0) {
                                 if let page {
-                                    ForEach(page.lines.filter { $0.kind != "intention" }) { line in
-                                        lineRow(line, page: page).id("diary-entry-" + line.id)
+                                    // 10 Nov owner design: the day is one flow — the day's library photos on top, then every line, recording and attachment in the order it happened.
+                                    if shownDay == today, travel == nil { dayPhotoStrip }
+                                    let flow = page.lines.filter { $0.kind != "intention" }
+                                    ForEach(Array(flow.enumerated()), id: \.element.id) { index, line in
                                         let attached = page.media.filter { $0.entryID == line.id }
+                                        let hasAudio = attached.contains { $0.kind == "audio" }
+                                        // A recording's text is its transcript: the card below shows it whole and editable, so the line itself is not repeated.
+                                        if !hasAudio { lineRow(line, page: page).id("diary-entry-" + line.id) }
                                         ForEach(attached.filter { $0.kind != "missing" }) { media in
                                             DiaryMediaCard(app: app, media: media, transcript: line.text)
+                                                .overlay(alignment: .topLeading) {
+                                                    if media.kind == "audio" { Text(service.time(line.at, zone: line.tzID)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 38).padding(.leading, 6).padding(.top, 20) }
+                                                }
+                                                .id(hasAudio ? "diary-entry-" + line.id : media.id.uuidString)
                                         }
                                         // Owner real-data trial, 24 Oct 2026: one line for the entry's missing files, not one per file.
                                         if let first = attached.first(where: { $0.kind == "missing" }) {
@@ -237,6 +247,7 @@ struct DiaryDayView: View {
                                                 app: app, media: first, transcript: line.text,
                                                 missingCount: attached.filter { $0.kind == "missing" }.count)
                                         }
+                                        if shownDay == today, travel == nil, index < flow.count - 1 { insertHere(after: line.at, before: flow[index + 1].at) }
                                     }
                                     ForEach(0..<sealedHere, id: \.self) { _ in
                                         HStack(alignment: .center, spacing: 12) {
@@ -307,6 +318,11 @@ struct DiaryDayView: View {
                                         rules.move(to: .init(x: 0, y: y)); rules.addLine(to: .init(x: size.width, y: y))
                                     }
                                     context.stroke(rules, with: .color(theme.line), lineWidth: 0.7)
+                                    if shownDay == today, travel == nil {
+                                        // The flow's rail: one thin line beside the times, the way the day runs (RTL: the time column is on the right).
+                                        var rail = Path(); rail.move(to: .init(x: size.width - 50, y: 8)); rail.addLine(to: .init(x: size.width - 50, y: size.height - 70))
+                                        context.stroke(rail, with: .color(theme.accent.opacity(0.35)), lineWidth: 1)
+                                    }
                                     var margin = Path(); margin.move(to: .init(x: size.width - 50, y: 0));
                                     margin.addLine(to: .init(x: size.width - 50, y: size.height))
                                     context.stroke(margin, with: .color(theme.color("margin")), lineWidth: 1)
@@ -352,7 +368,7 @@ struct DiaryDayView: View {
                     HStack(spacing: 10) {
                         if let travel, shownDay == today {
                             Button {
-                                writing = true
+                                insertAt = nil; writing = true
                             } label: {
                                 Text("اكتب من " + travel.city).font(MadarTypography.section()).frame(
                                     maxWidth: .infinity, minHeight: 54
@@ -361,7 +377,7 @@ struct DiaryDayView: View {
                             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-write")
                         } else {
                             Button {
-                                writing = true
+                                insertAt = nil; writing = true
                             } label: {
                                 Label(shownDay == today ? "اكتب" : "اكتب في هامشها", systemImage: "pencil").font(
                                     MadarTypography.section()
@@ -453,7 +469,7 @@ struct DiaryDayView: View {
             .sheet(isPresented: $stampsOpen) { DiaryStampsView(app: app).environment(\.roomTheme, theme) }
             .sheet(isPresented: $weekOpen) { DiaryWeekView(app: app, day: shownDay).environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $writing) {
-                DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay, embeddedInNavigationStack: true)
+                DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay, insertAt: insertAt, embeddedInNavigationStack: true)
                     .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
             }
             // N04: letters are checked when the diary is open and the app comes to the foreground.
@@ -673,6 +689,26 @@ struct DiaryDayView: View {
             content.append(suffix)
         }
         return content
+    }
+    /// The day's photos from the library, on top of the flow: a tap adds one to the page, the rest stay a preview.
+    @ViewBuilder private var dayPhotoStrip: some View {
+        DiaryDayPhotos(app: app, day: shownDay) { asset in
+            guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { return false }
+            do { try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", day: "today", writingDay: shownDay, assetID: asset.localIdentifier); retry += 1; return true }
+            catch { failure = madarUserMessage(error); return false }
+        }.padding(.horizontal, 18).padding(.bottom, 10).accessibilityIdentifier("diary-day-photo-strip")
+    }
+    /// A quiet «اكتب هنا» between two items: the new line lands between them in time.
+    private func insertHere(after previous: Date, before next: Date) -> some View {
+        Button {
+            let gap = next.timeIntervalSince(previous)
+            insertAt = gap > 2 ? previous.addingTimeInterval(gap / 2) : previous.addingTimeInterval(1); writing = true
+        } label: {
+            HStack(spacing: 6) { Image(systemName: "plus"); Text("اكتب هنا") }
+                .font(MadarTypography.fine()).foregroundStyle(theme.color("ink3Text")).frame(maxWidth: .infinity, minHeight: 28)
+                .overlay { Capsule().stroke(theme.line, style: StrokeStyle(lineWidth: 0.7, dash: [3, 3])).padding(.horizontal, 60).padding(.vertical, 3) }
+                .contentShape(Rectangle())
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-flow-insert")
     }
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
         let auto = ["salah", "quran", "mihbara", "mal", "habits"].contains(line.kind)

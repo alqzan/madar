@@ -105,6 +105,16 @@ import XCTest
         app.buttons["diary-editor-cancel"].tap()
         XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10), app.debugDescription)
     }
+    func testDayIsOneFlowWithTheWholeTranscriptAndInsertBetweenLines() throws {
+        continueAfterFailure = false
+        let app = launch("editor"); app.buttons["diary-today"].tap()
+        XCTAssertTrue(app.staticTexts["diary-audio-transcript-text"].waitForExistence(timeout: 10), app.debugDescription)
+        capture(app, "FLOW-day-L")
+        let insert = app.buttons["diary-flow-insert"].firstMatch
+        XCTAssertTrue(insert.waitForExistence(timeout: 5), app.debugDescription)
+        insert.tap()
+        XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout: 10))
+    }
     func testUnsavedTranscriptRequiresExplicitDiscard() throws {
         continueAfterFailure = false
         let app = launch("editor"); app.buttons["diary-today"].tap()

@@ -10,6 +10,8 @@ struct DiaryTextEditor: View {
     @Bindable var app: AppSession
     let margin: GregorianDay?
     var initialDay = "today"
+    /// Set when writing from a «اكتب هنا» between two lines of the day page: the new line lands at this moment.
+    var insertAt: Date?
     /// A question chosen from «أسئلة من مذكراتك»: shown quietly above the page, never saved into the text.
     var prompt: String?
     var embeddedInNavigationStack = false
@@ -356,7 +358,9 @@ struct DiaryTextEditor: View {
             await voice?.stop()
             if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 try await persistDraft()
-                try await app.executeDiaryCommand("diary.commitDraft", payload: ["id": .string(draftID.uuidString)], id: draftID)
+                var payload: [String: MadarCore.JSONValue] = ["id": .string(draftID.uuidString)]
+                if let insertAt, margin == nil, day == "today", insertAt < app.prayerNow() { payload["at"] = .number(insertAt.timeIntervalSince1970) }
+                try await app.executeDiaryCommand("diary.commitDraft", payload: payload, id: draftID)
             }
             dismiss()
         } catch { failure = madarUserMessage(error); commitFailed = true; saving = false }
