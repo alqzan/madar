@@ -3,6 +3,27 @@ import XCTest
 /// iPad layout captures: each wide room in landscape, saved under MADAR_PAD_SHOTS (host path) for review.
 /// Skips on iPhone and when no output folder is given, so the regular suite is unaffected.
 final class PadLayoutUITests: XCTestCase {
+    /// B2-19: the sidebar folds away and comes back; the choice is kept on the device.
+    func testSidebarFoldsAndReturns() throws {
+        let out = ProcessInfo.processInfo.environment["MADAR_PAD_SHOTS"] ?? ""
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad || out.isEmpty)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00", "MADAR_UI_START_TAB": "foundation"]
+        app.launch()
+        let hide = app.buttons["أخفِ القائمة"]
+        XCTAssertTrue(hide.waitForExistence(timeout: 20), app.debugDescription)
+        sleep(2)
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-sidebar-open.png"))
+        hide.tap()
+        let show = app.buttons["أظهر القائمة"]
+        XCTAssertTrue(show.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.buttons["الصلاة"].exists)
+        sleep(1)
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-sidebar-folded.png"))
+        show.tap()
+        XCTAssertTrue(app.buttons["الصلاة"].waitForExistence(timeout: 5), app.debugDescription)
+    }
     func testWideRoomsInLandscape() throws {
         let out = ProcessInfo.processInfo.environment["MADAR_PAD_SHOTS"] ?? ""
         try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad || out.isEmpty)
