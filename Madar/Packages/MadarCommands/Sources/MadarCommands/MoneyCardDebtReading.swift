@@ -25,13 +25,16 @@ extension MoneyRepository {
         let owned = Set(accounts.filter { $0.ownership == "mine" && $0.tracked }.map(\.id))
         let tx = try confirmedTransactions().filter { $0.eventAt <= now }
         let statements = try context.fetch(FetchDescriptor<Statement>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.closeDate <= now }
+        let statementsByCard = Dictionary(grouping: statements) { $0.cardID }
+        let txByCard = Dictionary(grouping: tx) { $0.cardID }
+        let txByID = Dictionary(tx.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.kind == "credit" && ($0.accountID == nil || owned.contains($0.accountID!)) }.map { card in
-            let statement = statements.filter { $0.cardID == card.id }.max { $0.closeDate < $1.closeDate }
+            let statement = (statementsByCard[card.id] ?? []).max { $0.closeDate < $1.closeDate }
             let close = statement?.closeDate ?? .distantPast
             var billed = statement?.statementMinor ?? 0, unbilled = 0, payments = 0
-            for row in tx where row.cardID == card.id && row.eventAt > close {
+            for row in txByCard[card.id] ?? [] where row.eventAt > close {
                 let delta = try effect(of: row).debtMinor
-                if row.kind == "refund", let original = tx.first(where: { $0.id == row.relatedTransactionID }) {
+                if row.kind == "refund", let rid = row.relatedTransactionID, let original = txByID[rid] {
                     if original.eventAt > close { unbilled += delta } else { billed += delta }
                 } else if delta < 0 { payments -= delta }
                 else { unbilled += delta }
