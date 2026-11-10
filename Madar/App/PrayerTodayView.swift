@@ -4,7 +4,8 @@ import MadarDesign
 import MadarPrayer
 
 private struct PrayerHomeSnapshotKey: Equatable {
-    let minute: Int
+    /// Seconds of the loaded snapshot's `validUntil` while it is still valid; -1 once time has passed it (or nothing is loaded).
+    let validity: Int
     let revision: Int
     let generation: Int
     let visit: Int
@@ -51,6 +52,7 @@ struct PrayerTodayView: View {
 
     @State private var homeSnapshot: PrayerSnapshot?
     @State private var loadedHomeSnapshotKey: PrayerHomeSnapshotKey?
+    @State private var snapshotValidUntil: Date = .distantPast
     @State private var homeReadFailed = false
     @State private var homeReadRetry = 0
     #if DEBUG
@@ -60,8 +62,14 @@ struct PrayerTodayView: View {
     /// On a trip the home takes the calm-paper palette (cooler sand, same gold ornaments) so travel looks different at a glance.
     private var theme: RoomTheme { RoomTheme(room: "salah", dark: inheritedTheme.dark, calmPaper: inheritedTheme.calmPaper || onTrip) }
 
+    /// The key changes on a real event only: the loaded snapshot running out (a prayer time or window end), data changes, or a visit.
+    /// The countdown is computed from the clock, so a minute passing no longer reloads the record or disables the arches.
+    static func validity(_ until: Date, at instant: Date) -> Int {
+        instant < until ? Int(until.timeIntervalSince1970) : -1
+    }
+
     private func snapshotKey(at instant: Date) -> PrayerHomeSnapshotKey {
-        PrayerHomeSnapshotKey(minute: Int(instant.timeIntervalSince1970 / 60), revision: session.prayerRevision,
+        PrayerHomeSnapshotKey(validity: Self.validity(snapshotValidUntil, at: instant), revision: session.prayerRevision,
                               generation: session.storeGeneration, visit: roomVisit, retry: homeReadRetry,
                               active: isFrontRoom && scenePhase == .active)
     }
@@ -104,7 +112,8 @@ struct PrayerTodayView: View {
             try Task.checkCancellation()
             guard key == snapshotKey(at: session.prayerNow()), isFrontRoom, scenePhase == .active else { return }
             homeSnapshot = snapshot
-            loadedHomeSnapshotKey = key
+            snapshotValidUntil = snapshot.validUntil
+            loadedHomeSnapshotKey = snapshotKey(at: session.prayerNow())
             homeReadFailed = false
             onTrip = snapshot.activeTrip != nil
         } catch is CancellationError {

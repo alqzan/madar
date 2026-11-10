@@ -88,4 +88,7 @@ public struct PrayerSnapshot: Equatable, Sendable {
     public let estimated: Bool
     public let placeName: String
     public let hasTimes: Bool
+    /// The first instant after the snapshot's `now` at which anything the snapshot shows can change by time alone
+    /// (a prayer time, a window end, a trip start or end). Until then the snapshot only needs a new read when the data changes.
+    public let validUntil: Date
 }

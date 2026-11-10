@@ -25,6 +25,23 @@ import MadarData
     @discardableResult private func apply(_ command: PrayerMutation, _ context: ModelContext, at: String = "2026-10-07T12:00:00+03:00") throws -> Data? {
         let inverse = try PrayerMutationHandler.stage(operation: command, in: context, now: time(at), writer: "test-device"); try context.save(); return inverse
     }
+    @Test func snapshotValidityHoldsUntilThePrayerClockChangesSomething() throws {
+        let container = try container(start: "2026-10-07T04:00:00+03:00")
+        let repository = try PrayerRepository(context: container.mainContext)
+        let now = time("2026-10-07T12:05:00+03:00")
+        let state = try repository.snapshot(now: now)
+        #expect(state.validUntil > now && state.validUntil <= now.addingTimeInterval(86_400))
+        // Anywhere before validUntil the day shows the same statuses and the same next prayer, so no reload is needed.
+        for fraction in [0.0, 0.25, 0.5, 0.99] {
+            let later = now.addingTimeInterval(state.validUntil.timeIntervalSince(now) * fraction)
+            let again = try repository.snapshot(now: later)
+            #expect(again.today.cells.map(\.status) == state.today.cells.map(\.status))
+            #expect(again.next == state.next)
+        }
+        // validUntil is the next prayer time or window end, so the snapshot really does change right after it.
+        let after = try repository.snapshot(now: state.validUntil.addingTimeInterval(1))
+        #expect(after.today.cells.map(\.status) != state.today.cells.map(\.status) || after.next != state.next || after.today.cells.map(\.canMakeUp) != state.today.cells.map(\.canMakeUp))
+    }
     @Test func aPerformedLatePrayerCreatesOneQadaLogAndUndoRemovesIt() throws {
         let container = try container(start: "2026-10-06T04:00:00+03:00")
         let context = container.mainContext

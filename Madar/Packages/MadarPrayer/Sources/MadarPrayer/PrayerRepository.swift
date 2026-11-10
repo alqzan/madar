@@ -201,7 +201,25 @@ public final class PrayerRepository {
         let next = (0...1).flatMap { offset in Prayer.allCases.compactMap { occurrence(.init(day: current.adding(days: offset), prayer: $0)) } }.filter { $0.time > now }.min { $0.time < $1.time }
         let active = activeTrip(at: now)
         let unconfirmed = cells.filter { $0.status == .unconfirmed }
-        return .init(today: today, history: Array(all.suffix(32).reversed()), tracking: track, pending: cells.filter { $0.status == .pending }.map(\.reference), unconfirmed: unconfirmed.map(\.reference), unconfirmedFridayNoon: Set(unconfirmed.filter(\.isFriday).map(\.reference)), pendingHeart: cells.filter { [.jamaah, .alone, .qada].contains($0.status) && $0.heart == nil }.map(\.reference), statistics: PrayerAnalytics.statistics(month: month, all: all, qada: qada, currentDay: current), qada: qada, nights: nights, nightDefault: defaultNight(at: now), activeTrip: active, next: next, estimated: abs((active?.place ?? home).latitude) > 48, placeName: active?.city ?? placeName, hasTimes: today.cells.contains { $0.time != nil })
+        return .init(today: today, history: Array(all.suffix(32).reversed()), tracking: track, pending: cells.filter { $0.status == .pending }.map(\.reference), unconfirmed: unconfirmed.map(\.reference), unconfirmedFridayNoon: Set(unconfirmed.filter(\.isFriday).map(\.reference)), pendingHeart: cells.filter { [.jamaah, .alone, .qada].contains($0.status) && $0.heart == nil }.map(\.reference), statistics: PrayerAnalytics.statistics(month: month, all: all, qada: qada, currentDay: current), qada: qada, nights: nights, nightDefault: defaultNight(at: now), activeTrip: active, next: next, estimated: abs((active?.place ?? home).latitude) > 48, placeName: active?.city ?? placeName, hasTimes: today.cells.contains { $0.time != nil }, validUntil: nextTimeChange(after: now, current: current))
+    }
+    /// The earliest prayer time, missed-window end, or trip boundary after `now`; a pure read of the same helpers the snapshot uses.
+    func nextTimeChange(after now: Date, current: GregorianDay) -> Date {
+        var candidates: [Date] = []
+        for offset in -1...2 {
+            let day = current.adding(days: offset)
+            for prayer in Prayer.allCases {
+                let ref = PrayerReference(day: day, prayer: prayer)
+                if let time = occurrence(ref)?.time { candidates.append(time) }
+                if let end = missedWindowEnd(ref) { candidates.append(end) }
+            }
+        }
+        for trip in trips {
+            if let start = trip.start { candidates.append(start) }
+            if let end = trip.end { candidates.append(end) }
+        }
+        // Never longer than a day, so a missed boundary can only cost one stale day at most.
+        return min(candidates.filter { $0 > now }.min() ?? .distantFuture, now.addingTimeInterval(86_400))
     }
 }
 public enum PrayerAnalytics {
