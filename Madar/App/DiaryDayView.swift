@@ -240,6 +240,8 @@ struct DiaryDayView: View {
                                                     if media.kind == "audio" { Text(service.time(line.at, zone: line.tzID)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 38).padding(.leading, 6).padding(.top, 20) }
                                                 }
                                                 .id(hasAudio ? "diary-entry-" + line.id : media.id.uuidString)
+                                                // 10 Nov owner: a photo or recording is as free as a line — hold it to delete, copy or write after it.
+                                                .contextMenu { lineActions(line, page: page) }
                                         }
                                         // Owner real-data trial, 24 Oct 2026: one line for the entry's missing files, not one per file.
                                         if let first = attached.first(where: { $0.kind == "missing" }) {
