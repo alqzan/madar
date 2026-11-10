@@ -101,6 +101,11 @@ import MadarCommands
         let jsonFiles=try DiaryExportArchive.files(Data(contentsOf:json.url)),object=try XCTUnwrap(JSONSerialization.jsonObject(with:try XCTUnwrap(jsonFiles["Journal.json"])) as? [String:Any]),rows=try XCTUnwrap(object["entries"] as? [[String:Any]])
         XCTAssertEqual((object["metadata"] as? [String:String])?["version"],"1.0");let row=try XCTUnwrap(rows.first);XCTAssertEqual((row["uuid"] as? String)?.count,32);XCTAssertTrue((row["text"] as? String)?.contains("dayone-moment://")==true);XCTAssertEqual((row["photos"] as? [[String:Any]])?.count,1)
         XCTAssertFalse(String(data:try XCTUnwrap(jsonFiles["Journal.json"]),encoding:.utf8)!.contains("DO-NOT"))
+        // B2-3: every line keeps its own time and zone, and the one sealed letter is named as left out.
+        let lineFile=try XCTUnwrap(JSONSerialization.jsonObject(with:try XCTUnwrap(jsonFiles["Madar-lines.json"])) as? [String:Any]),lineRows=try XCTUnwrap(lineFile["lines"] as? [[String:Any]])
+        XCTAssertTrue(lineRows.contains{($0["text"] as? String)=="صلّيت الفجر جماعة" && ($0["at"] as? String)?.isEmpty==false && ($0["timeZone"] as? String)?.isEmpty==false})
+        XCTAssertFalse(String(data:try XCTUnwrap(jsonFiles["Madar-lines.json"]),encoding:.utf8)!.contains("DO-NOT"))
+        XCTAssertEqual(json.omittedNote,"لا يشمل رسالة مختومة واحدة لم تُفتح بعد.")
         options.sources=false;options.margins=false;XCTAssertFalse(try service.exportPages(options).flatMap(\.lines).contains{["margin","salah"].contains($0.kind)})
         options.year=2020;XCTAssertThrowsError(try service.exportDiary(options))
     }

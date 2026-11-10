@@ -26,6 +26,8 @@ struct DiaryExportArtifact: Identifiable {
     let id=UUID()
     let url:URL
     let dayCount:Int
+    /// B2-3: what the file leaves out on purpose, said to the writer (nil when nothing is held back).
+    var omittedNote:String?=nil
 }
 extension AppDiaryService {
     func exportPages(_ options:DiaryExportOptions) throws -> [DiaryExportPage] {
@@ -127,7 +129,7 @@ extension AppDiaryService {
             let file:URL,bytes:Data
             if options.format=="pdf" {file=root.appending(path:"المذكرات.pdf");bytes=DiaryPDF.render(pages,digits:digits)}
             else {
-                var files:[String:Data]=[:],entries:[[String:Any]]=[]
+                var files:[String:Data]=[:],entries:[[String:Any]]=[],lineRecords:[[String:Any]]=[]
                 let iso=ISO8601DateFormatter()
                 for page in pages {
                     var markdown="# "+page.title+"\n\n"+page.lines.map{ time($0.at)+" — "+Self.exportLabel($0.kind)+$0.text }.joined(separator:"\n\n")
@@ -144,17 +146,25 @@ extension AppDiaryService {
                         } else {jsonText += "\n\n[مرفق]("+path+")"}
                     }
                     files["days/"+page.day.description+".md"]=Data(markdown.utf8)
+                    // B2-3: Journal.json merges a day into one text at noon; every line keeps its own time and zone here.
+                    for line in page.lines { lineRecords.append(["day":page.day.description,"at":iso.string(from:line.at),"timeZone":line.tzID ?? app.activePlace.timeZone.identifier,"kind":line.kind,"text":line.text]) }
                     let at=page.day.date(in:app.activePlace.timeZone).addingTimeInterval(12*3600)
                     // Stable synthetic day identity, no UUID generated on repeated exports.
                     let hash=SHA256.hash(data:Data(("madar.diary.day."+page.day.description).utf8)).prefix(16).map{String(format:"%02X",$0)}.joined()
                     entries.append(["uuid":hash,"creationDate":iso.string(from:at),"modifiedDate":iso.string(from:at),"timeZone":app.activePlace.timeZone.identifier,"text":jsonText,"photos":photos,"starred":false,"tags":[]])
                 }
                 if options.format=="json" {files["Journal.json"]=try JSONSerialization.data(withJSONObject:["metadata":["version":"1.0"],"entries":entries],options:[.sortedKeys,.prettyPrinted])}
+ files["Madar-lines.json"]=try JSONSerialization.data(withJSONObject:["version":1,"lines":lineRecords],options:[.sortedKeys,.prettyPrinted])
                 file=root.appending(path:options.format=="json" ? "المذكرات-JSON.zip":"المذكرات-Markdown.zip");bytes=try DiaryExportArchive.encode(files)
             }
             try bytes.write(to:file,options:[.atomic,.completeFileProtection]);try authorizeRead()
-            return .init(url:file,dayCount:pages.count)
+            let sealed=try ModelContext(app.container).fetchCount(FetchDescriptor<Letter>(predicate:#Predicate{$0.deletedAt == nil && $0.mergedInto == nil && $0.state != "opened"}))
+            return .init(url:file,dayCount:pages.count,omittedNote:sealed>0 ? "لا يشمل "+Self.sealedLetters(sealed,digits:digits)+" لم تُفتح بعد." : nil)
         } catch {try? FileManager.default.removeItem(at:root);throw error}
+    }
+    /// Arabic count agreement for sealed letters (one, two, 3–10 plural, 11+ singular).
+    static func sealedLetters(_ count:Int,digits:MadarNumberFormatter)->String {
+        switch count {case 1:"رسالة مختومة واحدة";case 2:"رسالتين مختومتين";case 3...10:digits.string(count)+" رسائل مختومة";default:digits.string(count)+" رسالة مختومة"}
     }
     static func exportLabel(_ kind:String)->String {switch kind{case "margin":"هامش: ";case "salah":"الصلاة: ";case "quran":"القرآن: ";case "intention":"نيّة: ";case "letter":"رسالة مفتوحة: ";case "ghad":"لِغد: ";case "late":"كُتبت لاحقًا: ";default:""}}
     func shareDiary(_ artifact:DiaryExportArtifact) async throws {
