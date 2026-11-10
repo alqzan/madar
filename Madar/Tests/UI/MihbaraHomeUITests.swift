@@ -122,6 +122,43 @@ import UIKit
         app.terminate()
     }
 
+    /// Owner, 10 Nov 2026: «احذف نهائيًا» in the trash erases a deleted book after an explicit confirmation naming it.
+    func testDeletedBookCanBeErasedForGoodFromTheTrash() throws {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launch()
+        open(app)
+        app.buttons["mihbara-library"].tap()
+        let waiting = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-library-book-' AND label CONTAINS 'كتاب ينتظر'")).firstMatch
+        XCTAssertTrue(waiting.waitForExistence(timeout: 8), app.debugDescription)
+        waiting.press(forDuration: 1.0)
+        let delete = app.buttons["mihbara-book-delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), app.debugDescription); delete.tap()
+        let confirm = app.buttons["احذف من مكتبتي"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription); confirm.tap()
+        XCTAssertTrue(waiting.waitForNonExistence(timeout: 8), app.debugDescription)
+        if !app.buttons["mihbara-library-trash"].exists { app.buttons["mihbara-library"].tap() }
+        let trash = app.buttons["mihbara-library-trash"]
+        XCTAssertTrue(trash.waitForExistence(timeout: 8), app.debugDescription)
+        for _ in 0..<6 where !trash.isHittable { app.swipeUp(velocity: .slow) }
+        trash.tap()
+        let purge = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-trash-purge-'")).firstMatch
+        XCTAssertTrue(purge.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "MIH-TRASH-purge-button-L")
+        purge.tap()
+        // Tapping outside the confirmation keeps the book in the trash.
+        let erase = app.sheets.buttons["احذف نهائيًا"].firstMatch
+        XCTAssertTrue(erase.waitForExistence(timeout: 5), app.debugDescription)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.92)).tap()
+        XCTAssertTrue(erase.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(purge.waitForExistence(timeout: 5), app.debugDescription)
+        purge.tap()
+        XCTAssertTrue(erase.waitForExistence(timeout: 5), app.debugDescription); erase.tap()
+        Thread.sleep(forTimeInterval: 1.5); shot(app, "MIH-TRASH-after-purge-L")
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-trash-empty"].waitForExistence(timeout: 8), app.debugDescription)
+        app.terminate()
+    }
+
     /// FB-34 (owner, 5 Nov): three plain shelves top to bottom, no desk or notebook; the book card writes in the margin.
     func testThreeShelvesReadingWantFinishedWithoutDesk() throws {
         continueAfterFailure = false

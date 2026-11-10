@@ -15,6 +15,7 @@ struct MihbaraTrashView: View {
     @State private var items: [Item] = []
     @State private var loaded = false
     @State private var restoring: UUID?
+    @State private var purging: Item?
 
     struct Item: Identifiable {
         enum Kind { case book, highlight, note }
@@ -39,6 +40,11 @@ struct MihbaraTrashView: View {
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .navigationTitle("سلة المحذوفات").navigationBarTitleDisplayMode(.inline)
         .task { load() }
+        // Owner, 10 Nov 2026: a trashed book can be erased for good. The sheet names the book and says it cannot be undone.
+        .confirmationDialog(purging.map { "احذف «" + $0.title + "» نهائيًا؟" } ?? "", isPresented: Binding(get: { purging != nil }, set: { if !$0 { purging = nil } }), titleVisibility: .visible) {
+            Button("احذف نهائيًا", role: .destructive) { if let item = purging { purge(item) } }
+            Button("أبقِه في السلة", role: .cancel) { purging = nil }
+        } message: { Text("يُمحى الكتاب وملفه وغلافه وتظليلاته وملاحظاته وكلماته المحفوظة. لا يمكن التراجع.") }
     }
 
     private func row(_ item: Item) -> some View {
@@ -50,6 +56,11 @@ struct MihbaraTrashView: View {
                 Text(item.detail + "، حُذف " + ago(item.deletedAt)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }
             Spacer(minLength: 8)
+            if item.kind == .book {
+                Button { purging = item } label: { Image(systemName: "trash").font(.body).foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44).contentShape(Rectangle()) }
+                    .buttonStyle(.madarPlain).disabled(restoring != nil).accessibilityLabel("احذف نهائيًا")
+                    .accessibilityIdentifier("mihbara-trash-purge-" + item.id.uuidString)
+            }
             Button { restore(item) } label: { Text("أعِده")
                 .font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44)
                 .background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent).contentShape(Rectangle()) }
@@ -75,7 +86,8 @@ struct MihbaraTrashView: View {
             let books = try context.fetch(FetchDescriptor<Book>()).filter { $0.mergedInto == nil }
             let live = Dictionary(books.filter { $0.deletedAt == nil }.map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })
             var result: [Item] = []
-            for book in books where book.deletedAt != nil && live[book.id] == nil {
+            // An erased book keeps an empty tombstone (book.purge); it is not listed.
+            for book in books where book.deletedAt != nil && live[book.id] == nil && !book.title.isEmpty {
                 result.append(.init(id: book.id, kind: .book, title: book.title, detail: book.author.isEmpty ? "كتاب" : book.author, deletedAt: book.deletedAt!, payload: ["id": .string(book.id.uuidString)]))
             }
             for h in try context.fetch(FetchDescriptor<Highlight>()) where h.deletedAt != nil && h.mergedInto == nil {
@@ -106,6 +118,16 @@ struct MihbaraTrashView: View {
             defer { restoring = nil }
             do { try await app.executeBookCommand(name, payload: item.payload, undoMessage: message); load(); onRestored() }
             // A refused restore (already back, or its book is gone) refreshes the list so the row does not wait for a tap that always fails.
+            catch { app.errorMessage = madarUserMessage(error); load() }
+        }
+    }
+
+    private func purge(_ item: Item) {
+        guard restoring == nil else { return }
+        restoring = item.id; purging = nil
+        Task {
+            defer { restoring = nil }
+            do { try await app.executeBookCommand("book.purge", payload: ["id": .string(item.id.uuidString)]); load(); onRestored() }
             catch { app.errorMessage = madarUserMessage(error); load() }
         }
     }

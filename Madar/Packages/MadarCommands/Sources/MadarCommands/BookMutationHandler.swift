@@ -209,10 +209,49 @@ private struct GoodreadsImportSummary: Codable {
             let row = try book(id), before = try row.record()
             row.deletedAt = now; row.deletionBarrierAt = now
             try touch(row, before: before)
+        case .purgeBook(let id):
+            // Owner, 10 Nov 2026: final removal of a trashed book's content. The tombstone rows stay (deletes are tombstones, RA4);
+            // their content is emptied and the stored bytes released. Reading sessions are history, not content, and stay.
+            // Every tombstoned row of this id (a merge can leave more than one) is emptied together.
+            let rows = books.filter { $0.id == id && $0.mergedInto == nil && $0.deletedAt != nil && !$0.title.isEmpty }
+            guard !rows.isEmpty else { throw DataError.invalidValue("الكتاب ليس في سلة المحذوفات") }
+            let fileIDs = Set(rows.compactMap(\.mediaID))
+            let coverKey = "book-cover:\(id.uuidString)", inkPrefix = "pdf-ink:\(id.uuidString):"
+            for media in try context.fetch(FetchDescriptor<Media>()) where media.mergedInto == nil {
+                let isFile = fileIDs.contains(media.id)
+                guard isFile || media.sourceID == coverKey || (media.sourceID?.hasPrefix(inkPrefix) ?? false) else { continue }
+                // A file another book still points at (same bytes imported twice) is that book's file too: leave it.
+                if isFile, books.contains(where: { $0.id != id && $0.mediaID == media.id }) { continue }
+                media.data = nil; media.sizeBytes = 0; media.sha256 = ""; media.state = "missing"
+                if media.deletedAt == nil { media.deletedAt = now }
+                media.deletionBarrierAt = now
+                media.updatedAt = StableIdentity.monotonic(now: now, previous: media.updatedAt); media.writerID = writer
+            }
+            func tombstone(_ wipe: () -> Void, deletedAt: inout Date?, barrier: inout Date?, updatedAt: inout Date, writerID: inout String) {
+                wipe(); if deletedAt == nil { deletedAt = now }; barrier = now
+                updatedAt = StableIdentity.monotonic(now: now, previous: updatedAt); writerID = writer
+            }
+            for h in try context.fetch(FetchDescriptor<Highlight>()) where h.bookID == id && h.mergedInto == nil {
+                tombstone({ h.locatorJSON = Data(); h.note = nil; h.pageLabel = nil }, deletedAt: &h.deletedAt, barrier: &h.deletionBarrierAt, updatedAt: &h.updatedAt, writerID: &h.writerID)
+            }
+            for n in try context.fetch(FetchDescriptor<NotebookNote>()) where n.targetID == id && n.link != "general" && n.mergedInto == nil {
+                tombstone({ n.text = ""; n.locatorJSON = nil }, deletedAt: &n.deletedAt, barrier: &n.deletionBarrierAt, updatedAt: &n.updatedAt, writerID: &n.writerID)
+            }
+            for w in try context.fetch(FetchDescriptor<UserWord>()) where w.bookID == id && w.mergedInto == nil {
+                tombstone({ w.word = ""; w.meaning = nil; w.context = ""; w.bookTitle = ""; w.locatorJSON = nil }, deletedAt: &w.deletedAt, barrier: &w.deletionBarrierAt, updatedAt: &w.updatedAt, writerID: &w.writerID)
+            }
+            for row in rows {
+                row.title = ""; row.author = ""; row.editor = nil; row.edition = nil; row.pages = nil; row.locatorJSON = nil; row.currentPage = nil; row.tocJSON = nil
+                row.mediaID = nil; row.fileHash = nil; row.isbn13 = nil; row.sourceGoodreadsID = nil; row.turathID = nil; row.review = nil; row.rating = nil
+                row.deletionBarrierAt = now
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+            }
         case .restoreBook(let id):
             // «سلة المحذوفات» (owner, 30 Oct): a tombstoned book comes back with its sessions, quotes and notes, which
             // were never cascaded. A book that was being read returns to «أبي أقرأه» when the three reading places are full.
             guard let row = books.filter({ $0.id == id && $0.mergedInto == nil && $0.deletedAt != nil }).max(by: { $0.updatedAt < $1.updatedAt }) else { throw DataError.invalidValue("الكتاب ليس في سلة المحذوفات") }
+            // A purged book keeps only its tombstone (empty title); nothing is left to bring back.
+            guard !row.title.isEmpty else { throw DataError.invalidValue("حُذف الكتاب نهائيًا ولا يمكن إعادته") }
             let before = try row.record(), barrier = row.deletionBarrierAt ?? row.deletedAt ?? .distantPast
             row.restoredAt = max(now, barrier.addingTimeInterval(0.001)); row.deletedAt = nil
             if row.shelf == "reading", books.filter({ $0.shelf == "reading" && $0.deletedAt == nil && $0.mergedInto == nil && $0.id != id }).count >= 3 { row.shelf = "want" }

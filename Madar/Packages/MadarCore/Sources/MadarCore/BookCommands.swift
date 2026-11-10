@@ -10,6 +10,8 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case deleteBook(id: UUID)
     case restoreBook(id: UUID)
     case removeBookFile(id: UUID)
+    /// Owner, 10 Nov 2026: «احذف نهائيًا» from the trash. Wipes a trashed book's file, cover, drawings, highlights, notes and saved words; final, no undo.
+    case purgeBook(id: UUID)
     case restoreBookFile(id: UUID, fileID: UUID, sha256: String)
     case shelf(id: UUID, shelf: String, replacing: UUID?)
     /// Owner, 21 Oct 2026: rename a file book (EPUB or PDF) after import; paper books edit through `updatePaper`.
@@ -33,10 +35,11 @@ public enum BookCommand: Codable, Equatable, Sendable {
     /// empty data takes the cover off and the book wears its binding again.
     case saveCover(bookID: UUID, image: Data)
     public static let highlightColors: Set<String> = ["yellow", "green", "rose"]
-    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.importGoodreads", "book.delete", "book.restore", "book.removeFile", "book.restoreFile", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save", "ink.savePage", "book.saveCover"]
+    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.importGoodreads", "book.delete", "book.restore", "book.removeFile", "book.purge", "book.restoreFile", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save", "ink.savePage", "book.saveCover"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
         if case .removeBookFile = self { return false }
+        if case .purgeBook = self { return false }
         // Saved as the reader draws; PencilKit's own undo covers the strokes while the page is open.
         if case .savePageInk = self { return false }
         // The card offers «أزل الغلاف» and «غيّر الغلاف»; an undo chip for a photo is noise (owner: undo only where it matters).
@@ -175,6 +178,9 @@ public enum BookCommand: Codable, Equatable, Sendable {
         case "book.removeFile":
             guard Set(p.keys) == ["id"] else { return nil }
             return .removeBookFile(id: id)
+        case "book.purge":
+            guard Set(p.keys) == ["id"] else { return nil }
+            return .purgeBook(id: id)
         case "book.restoreFile":
             guard Set(p.keys) == ["id", "fileID", "sha256"],
                   let fileID = text("fileID").flatMap(UUID.init(uuidString:)),
