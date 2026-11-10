@@ -17,7 +17,7 @@ struct DiaryEntryDeletion: Codable {
     let after: DataRecord
 }
 @MainActor enum DiaryMutationHandler {
-    static func stage(text: String, day: String, targetDay: String?, id: UUID, context: ModelContext, now: Date, writer: String, mediaIDs: [UUID] = [], audioID: UUID? = nil, storedDay: GregorianDay? = nil) throws -> Data? {
+    static func stage(text: String, day: String, targetDay: String?, id: UUID, context: ModelContext, now: Date, writer: String, mediaIDs: [UUID] = [], audioID: UUID? = nil, storedDay: GregorianDay? = nil, eventAt: Date? = nil) throws -> Data? {
         let settings = try SettingsStore(context: context), prayer = try PrayerRepository(context: context)
         let place = prayer.place(at: now), civil = GregorianDay.containing(now, in: place.timeZone)
         let options = prayer.calculationOptions(at: now)
@@ -47,7 +47,7 @@ struct DiaryEntryDeletion: Codable {
             page.dayKey = key.description; page.createdAt = now; context.insert(page)
         }
         page.origin = "native"; page.updatedAt = StableIdentity.monotonic(now: now, previous: page.updatedAt); page.writerID = writer
-        let row = Entry(); row.id = id; row.dayKey = key.description; row.eventAt = now
+        let row = Entry(); row.id = id; row.dayKey = key.description; row.eventAt = eventAt ?? now
         row.tzID = place.timeZoneID; row.dayPolicy = boundary.rawValue + "@1"; row.text = text
         row.textFormat = DayOneMarkdown.hasEditorMarks(text) ? "markdown" : "plain"
         row.attachmentMediaIDs = mediaIDs; row.mediaID = audioID

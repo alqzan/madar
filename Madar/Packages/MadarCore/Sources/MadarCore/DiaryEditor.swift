@@ -2,7 +2,8 @@ import Foundation
 
 public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case saveDraft(id: UUID, text: String, day: String, target: String?, writingDay: String)
-    case commitDraft(UUID)
+    /// `at` places the new line at a chosen moment between two lines of the same day (never in the future).
+    case commitDraft(UUID, at: Double? = nil)
     case appendMedia(file: UUID, kind: String, type: String, caption: String, day: String, writingDay: String, duration: Int?, asset: String? = nil)
     case transcript(entry: UUID, text: String)
     case audioInsights(media: UUID, title: String?, levels: [Double])
@@ -37,7 +38,9 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
             guard value["targetDayKey"] == nil || target.flatMap({ try? GregorianDay($0) }) != nil else { return nil }
             return .saveDraft(id: id, text: text, day: day, target: target, writingDay: writingDay)
         case "diary.commitDraft":
-            guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }; return .commitDraft(id)
+            guard Set(value.keys).isSubset(of: ["id", "at"]), let id = uuid("id") else { return nil }
+            if value["at"] != nil { guard let at = value["at"]?.number, at.isFinite, at > 0 else { return nil }; return .commitDraft(id, at: at) }
+            return .commitDraft(id)
         case "diary.appendMedia":
             guard Set(value.keys).isSubset(of: ["fileID", "kind", "contentType", "caption", "day", "durationS", "writingDayKey", "assetID"]), let id = uuid("fileID"), let kind = value["kind"]?.string, ["photo", "audio", "video", "document"].contains(kind),
                 let type = value["contentType"]?.string, !type.isEmpty, let caption = value["caption"]?.string, let day = value["day"]?.string, ["today", "yesterday"].contains(day) else { return nil }

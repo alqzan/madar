@@ -5894,7 +5894,7 @@
       },
       "diary.commitDraft": {
         "intent": null,
-        "payload": "{id: UUID}",
+        "payload": "{id: UUID, at?: Double (unix seconds, not in the future: places the line between two lines of the same day — owner 10 Nov 2026)}",
         "kind": "atomically append the saved draft and tombstone its draft; receipt replay and durable undo",
         "auth": "app-only + diary unlocked"
       },

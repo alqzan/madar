@@ -44,6 +44,22 @@ import MadarData
         _ = try await bus.execute(.init(name: "system.undo", payload: .object(["undoToken": .string(id.uuidString)]), issuedAt: later), now: later.addingTimeInterval(2))
         #expect(try ModelContext(container).fetch(FetchDescriptor<Entry>()).first?.deletedAt != nil)
     }
+    @Test func aLineCommittedWithAnAtTimeLandsAtThatMomentAndTheFutureIsRefused() async throws {
+        let (container, bus, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let now = date("2026-10-15T20:00:00+03:00"), moment = date("2026-10-15T13:30:00+03:00")
+        func commit(_ id: UUID, at: Date) async throws -> CommandOutcome {
+            let payload: [String:MadarCore.JSONValue] = ["id": .string(id.uuidString), "text": .string("سطر بينهما"), "day": .string("today"), "writingDayKey": .string("2026-10-15")]
+            _ = try await bus.execute(.init(name: "diary.saveDraft", payload: .object(payload), issuedAt: now), now: now)
+            return try await bus.execute(.init(commandID: id, name: "diary.commitDraft", payload: .object(["id": .string(id.uuidString), "at": .number(at.timeIntervalSince1970)]), issuedAt: now), now: now)
+        }
+        let placed = UUID()
+        #expect(try await commit(placed, at: moment).status == .applied)
+        let row = try #require(ModelContext(container).fetch(FetchDescriptor<Entry>()).first { $0.id == placed })
+        #expect(row.eventAt == moment)
+        let refused = UUID()
+        do { let result = try await commit(refused, at: now.addingTimeInterval(3600)); #expect(result.status != .applied) } catch {}
+        #expect(try ModelContext(container).fetch(FetchDescriptor<Entry>()).allSatisfy { $0.id != refused })
+    }
     @Test func audioBytesSurviveTranscriptEditsAndTranscriptUndo() async throws {
         let (container, bus, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let now = date("2026-10-15T12:00:00+03:00"), id = UUID()

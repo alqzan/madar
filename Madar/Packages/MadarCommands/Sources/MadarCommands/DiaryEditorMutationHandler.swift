@@ -19,11 +19,15 @@ import MadarData
             row.provisionalJSON = try JSONEncoder().encode(text); row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
             if existing == nil { row.startedAt = now; row.createdAt = now; context.insert(row) }
             return nil
-        case .commitDraft(let draftID):
+        case .commitDraft(let draftID, let at):
             guard let draft = try context.fetch(FetchDescriptor<SessionDraft>()).first(where: { $0.id == draftID && $0.kind.hasPrefix("diary.") && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("missing diary draft") }
             let text = try JSONDecoder().decode(String.self, from: draft.provisionalJSON), target = try JSONDecoder().decode([String: String].self, from: draft.portionJSON)
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw DataError.invalidValue("اكتب سطرًا أولًا") }
-            let inverse = try DiaryMutationHandler.stage(text: text, day: target["day"] ?? "today", targetDay: target["targetDayKey"].flatMap { $0.isEmpty ? nil : $0 }, id: id, context: context, now: now, writer: writer, storedDay: try GregorianDay(target["writingDayKey"] ?? draft.dayKey))
+            let inverse = try DiaryMutationHandler.stage(text: text, day: target["day"] ?? "today", targetDay: target["targetDayKey"].flatMap { $0.isEmpty ? nil : $0 }, id: id, context: context, now: now, writer: writer, storedDay: try GregorianDay(target["writingDayKey"] ?? draft.dayKey), eventAt: try at.map { value in
+                let moment = Date(timeIntervalSince1970: value)
+                guard moment <= now else { throw DataError.invalidValue("future diary time") }
+                return moment
+            })
             draft.deletedAt = now; draft.deletionBarrierAt = now; draft.updatedAt = StableIdentity.monotonic(now: now, previous: draft.updatedAt); draft.writerID = writer
             return inverse
         case .appendMedia(let file, let kind, let type, let caption, let day, let writingDay, let duration, let asset):
