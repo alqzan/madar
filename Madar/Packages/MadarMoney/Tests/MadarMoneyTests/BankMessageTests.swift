@@ -85,6 +85,29 @@ import Testing
         #expect(s.counterparty == "سالم")
     }
 
+    @Test func aPurchaseWhoseDigitsSitInsideTheBalanceKeepsItsAmount() {
+        // «50.00 SAR» is a substring of «150.00 SAR»; the balance is excluded by position, not by text.
+        let lines = BankMessageParser.parse("شراء عبر مدى\nبطاقة: 1111*\nمبلغ: 50.00 SAR\nلدى: مطعم الريف\nالرصيد: 150.00 SAR", timeZone: riyadh)
+        #expect(lines.amountMinor == 5_000)
+        #expect(lines.balanceMinor == 15_000)
+        let oneLine = BankMessageParser.parse("شراء عبر مدى بطاقة: 1111* مبلغ: 50.00 SAR لدى: مطعم الريف الرصيد: 150.00 SAR", timeZone: riyadh)
+        #expect(oneLine.amountMinor == 5_000)
+    }
+
+    @Test func gulfCurrencyNamesAreNotReadAsRiyals() {
+        let exponents = CurrencyExponents.specified
+        let cases: [(String, Int, String)] = [("مبلغ: 12.500 ريال عماني", 12_500, "OMR"), ("مبلغ: 40.00 ريال قطري", 4_000, "QAR"),
+                                              ("مبلغ: 75.00 درهم", 7_500, "AED"), ("مبلغ: 3.250 دينار كويتي", 3_250, "KWD"),
+                                              ("مبلغ: 2.500 دينار بحريني", 2_500, "BHD"), ("مبلغ: 18.50 ريال", 1_850, "SAR"),
+                                              ("مبلغ: 18.50 ريال سعودي", 1_850, "SAR")]
+        for (text, minor, code) in cases {
+            let found = BankMessageParser.amounts(text, exponents).first
+            #expect(found?.minor == minor && found?.currency == code, "\(text)")
+        }
+        // A bare «دينار» names no country: no amount is read rather than guessing one.
+        #expect(BankMessageParser.amounts("مبلغ: 5.000 دينار", exponents).isEmpty)
+    }
+
     @Test func salaryThousandsAndBillerAndProvider() {
         #expect(BankMessageParser.parse(Self.samples[6].text, timeZone: riyadh).amountMinor == 1_500_000)
         #expect(BankMessageParser.parse(Self.samples[14].text, timeZone: riyadh).biller == "شركة الكهرباء")

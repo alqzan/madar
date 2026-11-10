@@ -251,8 +251,12 @@ public enum BankMessageParser {
 
     // MARK: Fields
 
-    static let currencyWords: [(String, String)] = [("ر.س", "SAR"), ("ريال", "SAR"), ("SAR", "SAR"), ("SR", "SAR"), ("USD", "USD"), ("دولار", "USD"),
-                                                     ("JPY", "JPY"), ("KWD", "KWD"), ("د.ك", "KWD"), ("BHD", "BHD"), ("OMR", "OMR"),
+    /// Longer phrases come first: the pattern takes the first alternative that matches, so «ريال عماني» must be tried before «ريال».
+    /// A bare «دينار» is deliberately absent (Kuwaiti, Bahraini, Jordanian, Iraqi…): the message then carries no amount for review instead of a guess.
+    static let currencyWords: [(String, String)] = [("ريال سعودي", "SAR"), ("ريال عماني", "OMR"), ("ريال قطري", "QAR"),
+                                                     ("دينار كويتي", "KWD"), ("دينار بحريني", "BHD"), ("درهم إماراتي", "AED"), ("درهم", "AED"),
+                                                     ("ر.س", "SAR"), ("ريال", "SAR"), ("SAR", "SAR"), ("SR", "SAR"), ("USD", "USD"), ("دولار", "USD"),
+                                                     ("JPY", "JPY"), ("KWD", "KWD"), ("د.ك", "KWD"), ("BHD", "BHD"), ("OMR", "OMR"), ("QAR", "QAR"),
                                                      ("AED", "AED"), ("EUR", "EUR"), ("GBP", "GBP"), ("EGP", "EGP")]
 
     /// "42.00 SAR", "SAR 42", "بـ 18.50 ر.س", "15,000.00 ريال" → minor units by the currency's exponent.
@@ -291,9 +295,14 @@ public enum BankMessageParser {
     }
 
     static func firstAmount(_ text: String, _ exponents: CurrencyExponents) -> (minor: Int, currency: String)? {
-        // The balance is not the movement's amount.
-        let balanceLine = text.split(separator: "\n").first { has(String($0), ["الرصيد", "Balance"]) }.map(String.init)
-        return amounts(text, exponents).first { balanceLine == nil || !balanceLine!.contains(text[$0.range]) }.map { ($0.minor, $0.currency) }
+        // The balance is not the movement's amount. Compare by position: an amount is the balance when it sits in the
+        // balance line at or after the «الرصيد»/«Balance» label. Comparing text would drop «50.00 SAR» inside «150.00 SAR».
+        let balanceStart = ["الرصيد", "Balance"].compactMap { text.range(of: $0, options: .caseInsensitive)?.lowerBound }.min()
+        let balanceEnd = balanceStart.map { start in text[start...].firstIndex(of: "\n") ?? text.endIndex }
+        return amounts(text, exponents).first { amount in
+            guard let start = balanceStart, let end = balanceEnd else { return true }
+            return !(amount.range.lowerBound >= start && amount.range.upperBound <= end)
+        }.map { ($0.minor, $0.currency) }
     }
 
     static func labelledAmount(_ text: String, _ labels: [String], _ exponents: CurrencyExponents) -> (minor: Int, currency: String)? {
