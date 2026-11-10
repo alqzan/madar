@@ -169,8 +169,7 @@ extension AppDiaryService {
     static func exportLabel(_ kind:String)->String {switch kind{case "margin":"هامش: ";case "salah":"الصلاة: ";case "quran":"القرآن: ";case "intention":"نيّة: ";case "letter":"رسالة مفتوحة: ";case "ghad":"لِغد: ";case "late":"كُتبت لاحقًا: ";default:""}}
     func shareDiary(_ artifact:DiaryExportArtifact) async throws {
         try authorizeRead()
-        guard let controller=app.lockController,let presenter=app.privacyPresenter else{throw PrivacyAuthorizationError.stale}
-        let ticket=try await controller.authorize([.notes]);try controller.validate(ticket);try presenter.present(file:artifact.url,authorization:ticket)
+        try MadarSharePresenter.present(file:artifact.url)
     }
 }
 

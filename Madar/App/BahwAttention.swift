@@ -38,7 +38,7 @@ extension AppBahwService {
     static let reconcileOfferAfterDays = 7
 
     func attention(includeReconcile: Bool = false, ignoringThrottle: Bool = false) -> BahwAttention {
-        guard session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized else { return .init() }
+        guard session.protectedDataAuthorized else { return .init() }
         var result = BahwAttention()
         if session.roomEnabled(.mal) { result.moneyCount = pendingBankDecisions() }
         if session.roomEnabled(.salah) { result.prayer = unloggedPrayerAsk() }

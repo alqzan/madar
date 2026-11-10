@@ -16,22 +16,15 @@ import WidgetKit
     private var cancellation = BackupCancellation()
     private var exportCancellation: BackupCancellation?
     private var restoreID: UUID?
-    private var restoreTicket: PrivacyAuthorization?
     private var exportID: UUID?
-    private var exportTicket: PrivacyAuthorization?
     private var folderTask: Task<BackupFolderResult, Error>?
     private var folderMessage: String?
     private struct FolderUndo { let configuration: BackupFolderConfiguration? }
     private var folderUndo: FolderUndo?
-    private var artifactTickets: [URL: PrivacyAuthorization] = [:]
-    private var artifactFeatures: [URL: Set<MadarProtectedFeature>] = [:]
-    private weak var observedController: MadarLockController?
-    private var lockObserver: UUID?
-    private var revocationObservers: [UUID: @MainActor (Bool) -> Void] = [:]
-    private let presentShare: @MainActor (URL, PrivacyAuthorization) throws -> Void
+    private let presentShare: @MainActor (URL) throws -> Void
     init(session: AppSession, store: ManagedDataStore, backupDirectory: URL, keyStore: any BackupKeyStore = KeychainBackupKeyStore(service: "com.alqzan.madar2.backup"),
          scheduledProgress: @escaping @Sendable (BackupProgress) -> Void = { _ in },
-         sharePresentation: (@MainActor (URL, PrivacyAuthorization) throws -> Void)? = nil,
+         sharePresentation: (@MainActor (URL) throws -> Void)? = nil,
          didCreatePlainExport: @escaping @MainActor (URL) async -> Void = { _ in },
          deriveCredential: @escaping @Sendable (String) async throws -> BackupCredential = { passphrase in
              try await Task.detached(priority: .userInitiated) { try BackupCredential.derive(passphrase: passphrase) }.value
@@ -39,10 +32,7 @@ import WidgetKit
         self.session = session
         self.scheduledProgress = scheduledProgress
         self.didCreatePlainExport = didCreatePlainExport
-        presentShare = sharePresentation ?? { [weak session] file, ticket in
-            guard let presenter = session?.privacyPresenter else { throw PrivacyAuthorizationError.stale }
-            try presenter.present(file: file, authorization: ticket)
-        }
+        presentShare = sharePresentation ?? { file in try MadarSharePresenter.present(file: file) }
         let lifecycle = BackupLifecycle(
             quiesce: { [weak session] in
                 guard let session else { throw DataError.invalidValue("session unavailable") }
@@ -91,27 +81,18 @@ import WidgetKit
     }
     private func protectedExport(passphrase: String?, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL {
         guard exportID == nil else { throw BackupOperationError.busy }
-        let controller = try privacyController(), id = UUID(), token = BackupCancellation()
+        let id = UUID(), token = BackupCancellation()
         exportID = id; exportCancellation = token
-        defer { if exportID == id { exportID = nil; exportTicket = nil; exportCancellation = nil } }
-        var granted: PrivacyAuthorization?
-        // Coordinator invokes this after its writer barrier + store lease, before
-        // reading rows or keys. The private-note query reads presence metadata only.
+        defer { if exportID == id { exportID = nil; exportCancellation = nil } }
+        // The coordinator invokes this after its writer barrier + store lease, before reading rows or keys.
         let authorization: @MainActor () async throws -> Void = { [self] in
-            var features: Set<MadarProtectedFeature> = [.export]
-            if try containsPrivateExportRows() { features.insert(.privateNote) }
-            let ticket = try await controller.authorize(features)
-            try validate(ticket, controller: controller, operation: id); granted = ticket; exportTicket = ticket
+            try token.check()
             if let passphrase, try !coordinator.hasConfiguredKey() {
-                try await coordinator.configurePassphrase(passphrase, validation: { [self] in
-                    try validate(ticket, controller: controller, operation: id)
-                })
-                try validate(ticket, controller: controller, operation: id)
+                try await coordinator.configurePassphrase(passphrase, validation: { try token.check() })
             }
         }
         let guardedProgress: @MainActor @Sendable (BackupUIProgress) -> Void = { [weak self] update in
-            guard let self, let ticket = exportTicket,
-                  (try? validate(ticket, controller: controller, operation: id)) != nil else { return }
+            guard let self, exportID == id else { return }
             progress(update)
         }
         var uncommittedPlainExport: URL?
@@ -125,58 +106,16 @@ import WidgetKit
                 await didCreatePlainExport(file)
             }
             if passphrase != nil { try? await retryFolderDelivery(); await refreshBackgroundSchedule() }
-            guard let ticket = granted else { throw PrivacyAuthorizationError.stale }
-            try validate(ticket, controller: controller, operation: id)
-            artifactTickets[file] = ticket; artifactFeatures[file] = ticket.features
+            try token.check()
             return file
         } catch {
             if let uncommittedPlainExport { try? FileManager.default.removeItem(at: uncommittedPlainExport.deletingLastPathComponent()) }
             token.cancel(); throw error
         }
     }
-    private func containsPrivateExportRows() throws -> Bool {
-        let context = ModelContext(coordinator.store.container)
-        // Backups include tombstones/aliases, so any stored private row counts.
-        return try context.fetchCount(FetchDescriptor<NotebookNote>(predicate: #Predicate { $0.isPrivate })) > 0
-    }
-    private func validate(_ ticket: PrivacyAuthorization, controller: MadarLockController, operation: UUID? = nil) throws {
-        guard session?.lockController === controller, operation == nil || exportID == operation else { throw PrivacyAuthorizationError.stale }
-        try controller.validate(ticket)
-    }
-    private func privacyController() throws -> MadarLockController {
-        guard let controller = session?.lockController else { throw PrivacyAuthorizationError.stale }
-        if observedController !== controller {
-            if let lockObserver { observedController?.removeObserver(lockObserver) }
-            observedController = controller
-            lockObserver = controller.observeRevocation { [weak self] cancelRequests in
-                guard let self else { return }
-                let cancelExport = cancelRequests || exportTicket != nil
-                if cancelRequests || restoreTicket != nil {
-                    cancellation.cancel(); restoreID = nil; restoreTicket = nil
-                }
-                artifactTickets.removeAll()
-                if cancelExport { exportCancellation?.cancel(); exportID = nil; exportTicket = nil }
-                for observer in Array(revocationObservers.values) { observer(cancelExport) }
-            }
-        }
-        return controller
-    }
-    func validateExport(file: URL) throws {
-        guard let ticket = artifactTickets[file] else { throw PrivacyAuthorizationError.stale }
-        try validate(ticket, controller: privacyController())
-    }
     func share(file: URL) async throws {
-        guard let features = artifactFeatures[file] else { throw PrivacyAuthorizationError.stale }
-        let controller = try privacyController()
-        let ticket = try await controller.authorize(features)
-        try validate(ticket, controller: controller)
-        try presentShare(file, ticket)
+        try presentShare(file)
     }
-    func observeExportRevocation(_ observer: @escaping @MainActor (Bool) -> Void) -> UUID {
-        _ = try? privacyController()
-        let id = UUID(); revocationObservers[id] = observer; return id
-    }
-    func removeExportObserver(_ id: UUID) { revocationObservers.removeValue(forKey: id) }
     func previewRestore(file: URL, passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestorePreview {
         clearPreviews()
         cancellation = BackupCancellation()
@@ -196,21 +135,17 @@ import WidgetKit
     func restore(previewID: UUID, mode: BackupUIRestoreMode, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestoreResult {
         guard let preview = previews[previewID] else { throw BackupOperationError.stalePreview }
         guard restoreID == nil else { throw BackupOperationError.busy }
-        let controller = try privacyController(), id = UUID(), token = BackupCancellation()
+        let id = UUID(), token = BackupCancellation()
         cancellation = token; restoreID = id
-        defer { if restoreID == id { restoreID = nil; restoreTicket = nil } }
+        defer { if restoreID == id { restoreID = nil } }
         let validation: @MainActor () throws -> Void = { [self] in
-            guard restoreID == id, let ticket = restoreTicket else { throw PrivacyAuthorizationError.stale }
-            try validate(ticket, controller: controller); try token.check()
+            guard restoreID == id else { throw CancellationError() }
+            try token.check()
         }
         // First-key setup and safety capture share the restore writer barrier.
-        // Only presence metadata is inspected before scene authorization.
         let authorization: @MainActor () async throws -> Void = { [self] in
-            var features: Set<MadarProtectedFeature> = [.export]
-            if try containsPrivateExportRows() { features.insert(.privateNote) }
-            let ticket = try await controller.authorize(features)
-            guard restoreID == id else { throw PrivacyAuthorizationError.stale }
-            restoreTicket = ticket; try validation()
+            guard restoreID == id else { throw CancellationError() }
+            try validation()
             if try !coordinator.hasConfiguredKey() {
                 guard let password = previewPasswords[previewID] else { throw BackupOperationError.backupNotConfigured }
                 try await coordinator.configurePassphrase(password, validation: validation)
@@ -228,7 +163,7 @@ import WidgetKit
     }
     func cancel() async {
         folderTask?.cancel()
-        exportCancellation?.cancel(); cancellation.cancel(); restoreID = nil; restoreTicket = nil; clearPreviews()
+        exportCancellation?.cancel(); cancellation.cancel(); restoreID = nil; clearPreviews()
     }
     func discardPreviews() { clearPreviews() }
     private func clearPreviews() {

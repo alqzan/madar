@@ -28,7 +28,7 @@ struct MoneyBudgetReading {
 extension AppMoneyService {
     func loadBudgetExclusions() throws -> MoneyBudgetReading {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         let context = ModelContext(app.container), repo = MoneyRepository(context: context), now = app.prayerNow()
         let cycle = try repo.cycle(at: now)
         let movements = try repo.confirmedTransactions().filter { $0.eventAt <= now }

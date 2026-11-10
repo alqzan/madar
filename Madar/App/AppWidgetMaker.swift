@@ -34,7 +34,7 @@ extension AppSession {
     }
     func publishWidgetCatalog(at now: Date, readHabitReadings: (() throws -> [HabitReading])? = nil) throws {
         let service = AppBahwService(session: self, evaluationDate: now), day = service.today, dates = dateLabels(day)
-        let locked = MadarLockScope(rawValue: string("core.faceIDLock"))?.effective == .app
+        let locked = false // the app lock is removed (owner 10 Nov 2026); the widget payload still carries the field
         let configs = try widgetMakerDrafts().map { draft in
             WidgetCatalogSnapshot.Config(id: draft.id, name: locked ? "ودجة مدار" : draft.name, familyID: draft.familyID,
                                          styleJSON: try JSONEncoder().encode(draft.style), rows: locked ? [] : widgetMakerRows(draft, at: now, readHabitReadings: readHabitReadings))
@@ -186,7 +186,7 @@ struct SavedLobbyWidgets: View {
         }
         }
         .task(id: key) {
-            guard session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized else { configs = []; return }
+            guard session.protectedDataAuthorized else { configs = []; return }
             let drafts = (try? session.widgetMakerDrafts()) ?? []
             configs = drafts.filter { $0.style.surface == "lobby" }.compactMap { draft in
                 let rows = session.widgetMakerRows(draft, at: session.prayerNow(), outside: false)

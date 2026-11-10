@@ -293,7 +293,7 @@ struct BahwSuggestion: Identifiable {
 extension AppBahwService {
     /// Owner 27 Oct: levels add useful in-app steps; they never schedule a notification or write a room's facts.
     func suggestions() -> [BahwSuggestion] {
-        guard session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized else { return [] }
+        guard session.protectedDataAuthorized else { return [] }
         let level = session.string("bahw.smartPresence")
         let includesToday = ["medium", "present"].contains(level)
         var result: [BahwSuggestion] = []

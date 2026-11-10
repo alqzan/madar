@@ -6,20 +6,8 @@ import MadarCore
 
 /// M4-F02: built rooms share the arbiter; app protection hides content (§8 item 10); a tap opens the room it speaks for.
 @MainActor final class RoomNotificationsIntegrationTests: XCTestCase {
-    private final class LockedNotificationLockService: MadarLockService {
-        func redactProtectedData() async throws {}
-        func authorizeAccess(to feature: MadarProtectedFeature) async throws {}
-        func privacyScopeDidChange(to scope: MadarLockScope) async throws {}
-        func persistedPrivacyScope() throws -> MadarLockScope { .app }
-    }
-    private final class LockedNotificationAuthenticator: MadarDeviceAuthenticator {
-        private(set) var calls = 0
-        func verify() async throws -> Bool { calls += 1; return true }
-        func invalidate() {}
-    }
-
     func testCardRemindersAreAmountFreeAndStopAfterPaymentOrOff() throws {
-        let (app, _, now, day) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight"), "mal.cardDue": .string("3days")])
+        let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight"), "mal.cardDue": .string("3days")])
         app.authorizeProtectedData()
         let c = ModelContext(app.container), account = Account(); account.balanceMinor = 10_000; account.balanceAt = now; c.insert(account)
         let card = Card(); card.name = "بطاقة سرية"; card.accountID = account.id; c.insert(card)
@@ -47,13 +35,12 @@ import MadarCore
         let payment = MoneyTransaction(); payment.kind = "cardPayment"; payment.cardID = card.id; payment.fromAccountID = account.id; payment.eventAt = now; payment.dayKey = day.day.description; payment.amountMinor = 50_000; payment.homeAmountMinor = 50_000; c.insert(payment); try c.save()
         XCTAssertFalse(try RoomNotificationContent.stillRelevant(cash.id, session: app, now: now))
         XCTAssertTrue(RoomNotificationContent.cardCandidates(session: app, prayerDays: [day], now: now).isEmpty)
-        _ = try SettingsStore(context: c).stage(["mal.cardDue": .string("off"), "core.faceIDLock": .string("app")]); try c.save(); try app.reload()
+        _ = try SettingsStore(context: c).stage(["mal.cardDue": .string("off")]); try c.save(); try app.reload()
         XCTAssertTrue(RoomNotificationContent.cardCandidates(session: app, prayerDays: [day], now: now).isEmpty)
-        XCTAssertEqual(RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:]).body, "لديك تنبيه في مدار")
     }
 
     func testPrayerAndDiaryNotificationBodiesOpenTheirSpecificDestinations() throws {
-        let (app, _, _, prayerDay) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
+        let (app, _, _, prayerDay) = try fixture(["core.dayStart": .string("midnight")])
         let day = prayerDay.day.description
 
         RoomNotificationContent.open("quran.\(day).late", userInfo: ["dayKey": day], session: app)
@@ -78,7 +65,7 @@ import MadarCore
     }
 
     func testMoneyNotificationsOpenTheDestinationNamedByTheReminder() throws {
-        let (app, _, _, day) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
+        let (app, _, _, day) = try fixture(["core.dayStart": .string("midnight")])
         RoomNotificationContent.open("mal.alert80.\(UUID().uuidString)", userInfo: ["dayKey": day.day.description], session: app)
         XCTAssertEqual(app.moneyRoute?.path, ["categories"])
         app.moneyRoute = nil
@@ -90,7 +77,7 @@ import MadarCore
     }
 
     func testLimitAlertStaysAmountFreeWhenMoneyIsVisibleInsideTheApp() throws {
-        let (app, _, _, day) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight"),
+        let (app, _, _, day) = try fixture(["core.dayStart": .string("midnight"),
                                             "core.hideMoneyUntilTouch": .bool(false)])
         app.authorizeProtectedData()
         let context = ModelContext(app.container), now = Date(), zone = ActivePlace.riyadh.timeZone
@@ -145,8 +132,8 @@ import MadarCore
         XCTAssertFalse(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now))
     }
 
-    func testReconciliationReminderUsesSharedBudgetAndGenericCopy() throws {
-        let (app, _, now, day) = try fixture(["core.faceIDLock": .string("app"), "core.dayStart": .string("midnight"), "mal.reconcileEveryDays": .number(90)])
+    func testReconciliationReminderUsesSharedBudgetAndAmountFreeCopy() throws {
+        let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight"), "mal.reconcileEveryDays": .number(90)])
         app.authorizeProtectedData()
         let context = ModelContext(app.container), account = Account()
         account.name = "synthetic private account"; account.currency = "SAR"; account.balanceMinor = 1_234_567
@@ -162,7 +149,7 @@ import MadarCore
         XCTAssertEqual(plan.scheduled.map(\.id), [candidate.id], "It uses the existing per-device reminder budget and prayer guard")
         let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
         let shown = content.title + content.body
-        XCTAssertEqual(content.body, "حان وقت المراجعة")
+        XCTAssertEqual(content.body, "راجع أرصدة حساباتك والتزاماتك؛ دقيقة واحدة تكفي")
         XCTAssertNil(shown.rangeOfCharacter(from: .decimalDigits))
         XCTAssertFalse(shown.contains("synthetic private account"))
         XCTAssertEqual(content.userInfo["room"] as? String, "mal")
@@ -176,8 +163,8 @@ import MadarCore
         XCTAssertFalse(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now), "A saved reconciliation makes the old request stale")
     }
 
-    func testZakatReminderSchedulesAmountFreeWhileAppLockedAndStopsWhenOff() throws {
-        let (app, _, now, day) = try fixture(["core.faceIDLock": .string("app"), "core.dayStart": .string("midnight"), "mal.zakatReminder": .string("1week")])
+    func testZakatReminderSchedulesAmountFreeWhileProtectedDataIsClosedAndStopsWhenOff() throws {
+        let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight"), "mal.zakatReminder": .string("1week")])
         app.authorizeProtectedData()
         let context = ModelContext(app.container), profile = ZakatProfile()
         profile.hawlStartHijri = "h:1448-05-01"
@@ -193,13 +180,9 @@ import MadarCore
             context.insert(row)
         }
         try context.save(); try app.reload()
-        let authenticator = LockedNotificationAuthenticator()
-        let lock = MadarLockController(scope: .app, service: LockedNotificationLockService(), authenticator: { authenticator })
-        app.lockController = lock
-        XCTAssertFalse(lock.canPresent(.app), "The app-scope biometric gate starts locked")
         app.redactProtectedData()
-        XCTAssertFalse(app.protectedDataAuthorized, "Background scheduling must not depend on unlocking the app")
-        XCTAssertThrowsError(try AppMoneyService(app: app).loadZakat(at: now), "Protected Zakat data remains unavailable while locked")
+        XCTAssertFalse(app.protectedDataAuthorized, "Background scheduling must not depend on protected data being open")
+        XCTAssertThrowsError(try AppMoneyService(app: app).loadZakat(at: now), "Protected Zakat data remains unavailable while closed")
 
         let restored = RoomNotificationContent.zakatCandidates(session: app, now: now)
         XCTAssertEqual(Set(restored.map(\.id)), Set(candidates.map(\.id)), "The locked scheduler restores already-published requests from ledger metadata")
@@ -214,8 +197,8 @@ import MadarCore
         for candidate in restored {
             let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
             let shown = content.title + content.body
-            XCTAssertEqual(content.title, "مدار")
-            XCTAssertEqual(content.body, "لديك تذكير في مدار")
+            XCTAssertEqual(content.title, "الزكاة")
+            XCTAssertTrue(content.body.hasPrefix("يحين موعد الحساب السنوي الذي اخترته "))
             XCTAssertNil(shown.rangeOfCharacter(from: .decimalDigits), "A zakat reminder never reveals a balance or amount")
             XCTAssertFalse(content.body.contains("هول"))
             XCTAssertEqual(content.userInfo["room"] as? String, "mal")
@@ -227,8 +210,6 @@ import MadarCore
         let reminderDay = GregorianDay.containing(first.dueAt, in: day.place.timeZone)
         let reminderMorning = reminderDay.date(in: day.place.timeZone).addingTimeInterval(10 * 3600)
         XCTAssertTrue(try RoomNotificationContent.stillRelevant(first.id, session: app, now: reminderMorning))
-        XCTAssertFalse(lock.canPresent(.app), "Notification planning must not unlock protected room content")
-        XCTAssertEqual(authenticator.calls, 0, "Scheduling does not ask for Face ID")
         _ = try SettingsStore(context: context).stage(["mal.zakatReminder": .string("off")]); try context.save(); try app.reload()
         XCTAssertTrue(RoomNotificationContent.zakatCandidates(session: app, now: now).isEmpty)
         XCTAssertFalse(try RoomNotificationContent.stillRelevant(first.id, session: app, now: reminderMorning))
@@ -257,7 +238,7 @@ import MadarCore
     }
 
     func testHabitReminderUsesTheActiveTripCivilDay() async throws {
-        let (app, _, _, _) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
+        let (app, _, _, _) = try fixture(["core.dayStart": .string("midnight")])
         let now = ISO8601DateFormatter().date(from: "2026-10-15T20:00:00Z")!
         let context = ModelContext(app.container), trip = Trip()
         trip.city = "طوكيو"; trip.lat = 35.6762; trip.lon = 139.6503; trip.tzID = "Asia/Tokyo"
@@ -278,45 +259,29 @@ import MadarCore
         XCTAssertEqual(calendar.component(.day, from: candidate.dueAt), 16)
     }
 
-    func testQuranReminderCopyIsGenericOnlyUnderWholeAppLock() throws {
-        for lock in ["none", "app"] {
-            let (app, _, now, day) = try fixture(["core.faceIDLock": .string(lock)])
-            let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now,
-                                                timeZone: day.place.timeZone, policy: .init(staleNudgeEnabled: false))
-            for (suffix, title, body) in [("wird", QuranReminderCopy.title, NudgeWording.body(.quranWird, dayKey: "2026-10-15")),
-                                          ("late", QuranReminderCopy.lateTitle, NudgeWording.body(.quranReview, dayKey: "2026-10-15"))] {
-                let candidate = NotificationCandidate(id: "quran.2026-10-15.\(suffix)", room: .quran,
-                                                      dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
-                let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
-                if lock == "app" {
-                    XCTAssertEqual(content.title, "مدار")
-                    XCTAssertEqual(content.body, "لديك تذكير في مدار")
-                } else {
-                    XCTAssertEqual(content.title, title)
-                    XCTAssertEqual(content.body, body)
-                }
-            }
+    func testQuranReminderCopyNamesTheWirdAndTheLateReview() throws {
+        let (app, _, now, day) = try fixture([:])
+        let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now,
+                                            timeZone: day.place.timeZone, policy: .init(staleNudgeEnabled: false))
+        for (suffix, title, body) in [("wird", QuranReminderCopy.title, NudgeWording.body(.quranWird, dayKey: "2026-10-15")),
+                                      ("late", QuranReminderCopy.lateTitle, NudgeWording.body(.quranReview, dayKey: "2026-10-15"))] {
+            let candidate = NotificationCandidate(id: "quran.2026-10-15.\(suffix)", room: .quran,
+                                                  dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
+            let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
+            XCTAssertEqual(content.title, title)
+            XCTAssertEqual(content.body, body)
         }
     }
 
-    func testWholeAppLockPurgesEveryRoomNotificationButKeepsPrayerPrompts() {
-        let identifiers = ["quran.2026-10-15.late", "digest.2026-10-15", "qada.2026-10-15",
-                           "habits.2026-10-15.id", "notes.2026-10-15.niyya", "nudge.2026-10-15",
-                           "mal.alert80.id.category", "mal.cardDue.id", "mal.cardCash.id",
-                           "mal.reconcile.id", "mal.zakat.id", "salah.2026-10-15.fajr"]
-        XCTAssertEqual(Set(AppPrivacyService.protectedRoomNotificationIdentifiers(in: identifiers)),
-                       Set(identifiers.dropLast()), "Whole-app lock removes sensitive room notices while prayer prompts stay available.")
-    }
-
-    func testProtectedAppShowsGenericCopyAndTapsOpenTheRoom() throws {
-        let (app, _, _, day) = try fixture(["core.faceIDLock": .string("app")])
+    func testHabitDigestCopyAndTapsOpenTheRoom() throws {
+        let (app, _, _, day) = try fixture([:])
         let habit = UUID()
         let reminder = NotificationCandidate(id: "habits.2026-10-15.\(habit.uuidString)", room: .habits, dueAt: day.asr.addingTimeInterval(1800), dayKey: "2026-10-15")
         let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
         let h = RoomNotificationContent.content(for: reminder, plan: plan, session: app, habitNames: [habit.uuidString: "المشي"])
-        XCTAssertFalse(h.title.contains("المشي"))
+        XCTAssertEqual(h.title, "المشي")
         let digest = RoomNotificationContent.content(for: NotificationCandidate(id: "digest.2026-10-15", room: .habits, dueAt: day.asr, dayKey: "2026-10-15"), plan: plan, session: app, habitNames: [:])
-        XCTAssertEqual(digest.title, "مدار"); XCTAssertTrue(digest.body.hasSuffix("في مدار"), digest.body)
+        XCTAssertEqual(digest.title, "ملخّص تذكيراتك")
         RoomNotificationContent.open(reminder.id, userInfo: h.userInfo, session: app)
         XCTAssertEqual(app.selectedTab, "foundation"); XCTAssertTrue(app.habitsOpen); XCTAssertEqual(app.habitRouteID, habit)
         RoomNotificationContent.open("qada.2026-10-15", userInfo: [:], session: app)
@@ -324,7 +289,7 @@ import MadarCore
     }
 
     func testHabitAndZakatCopySayWhenAndNeverPromiseAMissingStreak() throws {
-        let (app, _, _, day) = try fixture(["core.faceIDLock": .string("none")])
+        let (app, _, _, day) = try fixture([:])
         let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
         let habit = NotificationCandidate(id: "habits.2026-10-15.\(UUID().uuidString)", room: .habits, dueAt: day.asr.addingTimeInterval(1800), dayKey: "2026-10-15")
         // No streak exists: the line is a first-step one for that day and never one that promises to keep a streak.
@@ -345,26 +310,25 @@ import MadarCore
     }
 
     /// M3-V12: the three diary kinds schedule from day keys and triggers; no title, body or userInfo ever carries diary text,
-    /// with or without the whole-app lock (§8 item 10, RU2, owner 15 Oct).
+    /// (§8 item 10, RU2, owner 15 Oct).
     func testDiaryRemindersScheduleWithoutEverCarryingDiaryText() async throws {
-        for lock in ["none", "app"] {
-            let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight"), "core.faceIDLock": .string(lock)])
+        do {
+            let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight")])
             let context = ModelContext(app.container), secret = "زعفرانيّة"
             let entry = Entry(); entry.dayKey = "2025-10-15"; entry.text = "كتبت " + secret; entry.eventAt = now.addingTimeInterval(-365 * 86400); context.insert(entry)
             let letter = Letter(); letter.text = secret; letter.triggerKind = "date"; letter.triggerValue = "2026-10-15"; context.insert(letter)
             try context.save(); try app.reload()
             let candidates = try await RoomNotificationContent.candidates(session: app, prayerDays: [day], now: now).filter { $0.id.hasPrefix("notes.") }
-            XCTAssertEqual(Set(candidates.map(\.id)), ["notes.2026-10-15.niyya", "notes.2026-10-15.letter", "notes.2026-10-15.onThisDay", "notes.2026-10-15.line"], lock)
+            XCTAssertEqual(Set(candidates.map(\.id)), ["notes.2026-10-15.niyya", "notes.2026-10-15.letter", "notes.2026-10-15.onThisDay", "notes.2026-10-15.line"])
             XCTAssertEqual(candidates.first { $0.id.hasSuffix(".niyya") }?.dueAt, day.fajr.addingTimeInterval(1800))
             XCTAssertEqual(candidates.first { $0.id.hasSuffix(".onThisDay") }?.dueAt, day.isha.addingTimeInterval(1800))
             let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
             for candidate in candidates {
                 let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
                 let shown = content.title + content.body + content.userInfo.values.map { "\($0)" }.joined()
-                XCTAssertFalse(shown.contains(secret), "\(lock) \(candidate.id)")
-                if lock == "app" { XCTAssertEqual(content.body, "لديك رسالة في مدار") }
+                XCTAssertFalse(shown.contains(secret), candidate.id)
             }
-            if lock == "none" {
+            do {
                 XCTAssertEqual(candidates.map { RoomNotificationContent.content(for: $0, plan: plan, session: app, habitNames: [:]).body }.sorted(),
                                ["عندك ذكرى من هذا اليوم", NudgeWording.body(.diaryNiyya, dayKey: "2026-10-15"), "وصلتك رسالة من ماضيك", NudgeWording.body(.diaryLine, dayKey: "2026-10-15")].sorted())
             }

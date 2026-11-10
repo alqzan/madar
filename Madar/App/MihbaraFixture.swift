@@ -43,7 +43,7 @@ extension AppSession {
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.mihbaraFixture" }) else { return }
         for key in ["sys.mihbaraFixture","sys.onboardingCompleted"] { let r = DeviceSetting(); r.key = key; r.valueJSON = Data("true".utf8); c.insert(r) }
-        _ = try SettingsStore(context: c).stage(["core.dayStart":.string("midnight"),"core.faceIDLock":.string("none")])
+        _ = try SettingsStore(context: c).stage(["core.dayStart":.string("midnight")])
         let now = prayerNow()
         if variant == "missingFile" {
             let book = Book(); book.id = StableIdentity.uuid(for: "mihbara-missing-file-fixture-book")

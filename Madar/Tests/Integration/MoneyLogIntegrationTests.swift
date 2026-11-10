@@ -45,7 +45,7 @@ import MadarMoney
         let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container)
         func at(_ day: String) -> Date { ISO8601DateFormatter().date(from: day + "T12:00:00+03:00")! }
         let now = at("2026-10-16")
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.firstCalendar": .string("gregorian"), "core.faceIDLock": .string("none")])
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.firstCalendar": .string("gregorian")])
         let account = Account(); account.balanceMinor = 100_000; account.balanceAt = now; c.insert(account)
         let debit = Card(); debit.kind = "debit"; debit.accountID = account.id; c.insert(debit)
         let credit = Card(); credit.accountID = account.id; c.insert(credit)

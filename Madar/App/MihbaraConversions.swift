@@ -134,7 +134,7 @@ private struct PDFConversionLoadedCheckpoint {
         change(&jobs[index])
     }
 
-    private func authorized(_ app: AppSession) -> Bool { app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized }
+    private func authorized(_ app: AppSession) -> Bool { app.protectedDataAuthorized }
 
     private func run(_ book: MihbaraBook, app: AppSession) async {
         do {

@@ -1292,27 +1292,6 @@ import XCTest
         }
     }
 
-    func testWholeAppLockPersistsWithoutRenderingProtectedContent() throws {
-        let app = XCUIApplication()
-        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
-        app.launch(); finishOnboarding(app)
-        app.buttons["tab-customize"].tap()
-        let search = app.textFields["settings-search"]
-        search.tap(); search.typeText("core.faceIDLock\n")
-        let wholeApp = app.buttons["option-core.faceIDLock-app"]
-        XCTAssertTrue(wholeApp.waitForExistence(timeout: 10)); wholeApp.tap()
-        let gate = app.descendants(matching: .any)["protected-lock-screen"]
-        let cover = app.buttons["scene-lock-authenticate"]
-        XCTAssertTrue(gate.waitForExistence(timeout: 10) || cover.exists, app.debugDescription)
-        XCTAssertFalse(app.buttons["tab-customize"].exists)
-        app.terminate()
-        // Keep the saved scope: ordinary UI launches otherwise explicitly stage none.
-        app.launchEnvironment["MADAR_UI_FACE_ID_LOCK"] = "app"
-        app.launch()
-        XCTAssertTrue(gate.waitForExistence(timeout: 10) || cover.exists, app.debugDescription)
-        XCTAssertFalse(app.buttons["tab-customize"].exists)
-        let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "M0-lock-native-persisted"; screenshot.lifetime = .keepAlways; add(screenshot)
-    }
     /// The host script supplies a real simctl URL after this test terminates the app.
     func testColdSettingsLinkOpenedByOS() throws {
         guard ProcessInfo.processInfo.environment["MADAR_TEST_EXTERNAL_LINK"] == "1" else {
@@ -1747,7 +1726,7 @@ import XCTest
         XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
         if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
         let later = app.buttons["first-run-continue"]
-        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
-        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
+        // B2-12: first run now ends after the city, so the second «متابعة» may not exist.
+        if later.waitForExistence(timeout: 3) { later.tap(); XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription) }
     }
 }

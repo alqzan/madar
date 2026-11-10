@@ -118,7 +118,7 @@ extension AppSession {
         } else {
             open(URL(string: "madar://notes/today")!)
         }
-        guard lockController?.canPresent(.notes) ?? protectedDataAuthorized else { return false }
+        guard protectedDataAuthorized else { return false }
         do {
             try await executeDiaryCommand("diary.appendLine", payload: ["text": .string(text), "day": .string(day)], id: id)
             clearRecoveredMaintenanceError()

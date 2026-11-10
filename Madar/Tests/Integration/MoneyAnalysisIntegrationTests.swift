@@ -12,7 +12,7 @@ import MadarMoney
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container)
         func at(_ day: String) -> Date { ISO8601DateFormatter().date(from: day + "T12:00:00+03:00")! }
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.firstCalendar": .string("gregorian"), "core.faceIDLock": .string("none")])
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.firstCalendar": .string("gregorian")])
         let account = Account(); account.balanceMinor = 1_000_000; account.balanceAt = at("2026-10-16"); c.insert(account)
         let untrackedAccount = Account(); untrackedAccount.ownership = "other"; untrackedAccount.tracked = false; c.insert(untrackedAccount)
         let envelope = Envelope(); envelope.name = "هدف"; c.insert(envelope)

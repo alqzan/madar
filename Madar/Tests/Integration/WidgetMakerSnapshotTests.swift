@@ -10,7 +10,6 @@ import MadarSnapshots
         let root = FileManager.default.temporaryDirectory.appending(path: "SharedWidgetHabits-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let app = try AppSession(container: MadarContainerFactory.makeLocal(at: root), groupDirectory: root)
-        try await app.applySettingsAndWait(["core.faceIDLock": .string("none")])
         var first = WidgetMakerDraft(); first.name = "أولى"; first.items = ["habitsToday"]
         var second = WidgetMakerDraft(); second.name = "ثانية"; second.items = ["habitsToday"]
         try await app.saveWidget(first); try await app.saveWidget(second)
@@ -31,7 +30,7 @@ import MadarSnapshots
         let root = FileManager.default.temporaryDirectory.appending(path: "WidgetHabitIdentity-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
-        try await app.applySettingsAndWait(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
+        try await app.applySettingsAndWait(["core.dayStart": .string("midnight")])
         let context = ModelContext(container), today = AppBahwService(session: app).today
         let habit = Habit(); habit.name = "الماء"; habit.startDate = today.date(in: app.activePlace.timeZone); context.insert(habit)
         let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = today.description; policy.measure = "count"; policy.target = 8; policy.unit = "كوب"; context.insert(policy)
@@ -47,7 +46,6 @@ import MadarSnapshots
         let root = FileManager.default.temporaryDirectory.appending(path: "WidgetMakerSnapshot-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
-        try await app.applySettingsAndWait(["core.faceIDLock": .string("none")])
         let now = app.prayerNow(), today = AppBahwService(session: app).today, context = ModelContext(container)
         let entry = Entry(); entry.dayKey = today.description; entry.text = "VISIBLE-ONLY-WITH-OPT-IN"; entry.eventAt = now; context.insert(entry)
         let letter = Letter(); letter.text = "SECRET-SEALED-LETTER"; context.insert(letter)
@@ -67,11 +65,6 @@ import MadarSnapshots
         try await app.applySettingsAndWait(["notes.widgetContent": .bool(true)])
         let optedIn = try XCTUnwrap(app.snapshotStore.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: app.prayerNow()))
         XCTAssertEqual(optedIn.payload.configs.first?.rows.first { $0.id == "diaryLine" }?.value, "VISIBLE-ONLY-WITH-OPT-IN")
-        try await app.applySettingsAndWait(["core.faceIDLock": .string("app")])
-        let locked = try XCTUnwrap(app.snapshotStore.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: app.prayerNow()))
-        XCTAssertTrue(locked.payload.locked); XCTAssertTrue(locked.payload.configs.allSatisfy { $0.rows.isEmpty && $0.name == "ودجة مدار" })
-        let lockedJSON = String(decoding: try JSONEncoder().encode(locked), as: UTF8.self)
-        XCTAssertFalse(lockedJSON.contains("VISIBLE-ONLY")); XCTAssertFalse(lockedJSON.contains("SECRET-SEALED"))
     }
     func testFamilyCapacitiesComeFromTheOutsideSurfacesTable() {
         XCTAssertEqual(WidgetMakerStyle.capacity(for: "small"), 2)
@@ -86,7 +79,7 @@ import MadarSnapshots
         let root = FileManager.default.temporaryDirectory.appending(path: "HabitWidgetScope-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let app = try AppSession(container: MadarContainerFactory.makeLocal(at: root), groupDirectory: root)
-        try await app.applySettingsAndWait(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
+        try await app.applySettingsAndWait(["core.dayStart": .string("midnight")])
         let today = AppBahwService(session: app).today, at = today.date(in: app.activePlace.timeZone).addingTimeInterval(20 * 3600)
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = app.activePlace.timeZone
         var anytime: UUID?

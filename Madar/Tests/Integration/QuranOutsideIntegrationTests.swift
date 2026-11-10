@@ -61,51 +61,12 @@ import MadarSnapshots
         XCTAssertEqual(app.quranRoute?.path, ["juz", "30"]); XCTAssertNil(app.errorMessage); XCTAssertEqual(app.selectedTab, "quran")
         XCTAssertEqual(try ModelContext(app.container).fetchCount(FetchDescriptor<HifzSession>()), 1)
     }
-    func testQuranWidgetSnapshotIsRemovedUnderWholeAppLockAndReturnsAfterUnlock() async throws {
+    func testQuranWidgetSnapshotIsPublishedWithItsRoute() async throws {
         let (app, _, root, _) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
-        let store = app.snapshotStore
-        let privacy = AppPrivacyService(session: app)
-
-        try await privacy.privacyScopeDidChange(to: .none)
-        let visible = try XCTUnwrap(store.read("quran", as: QuranWidgetSnapshot.self))
+        try app.publishSnapshot()
+        let visible = try XCTUnwrap(app.snapshotStore.read("quran", as: QuranWidgetSnapshot.self))
         XCTAssertEqual(visible.payload.route, "madar://quran/session/hifz")
         XCTAssertFalse(visible.payload.nextDetail.isEmpty)
-        try privacy.redactQuranWidgetSnapshotIfLocked()
-        XCTAssertNotNil(store.read("quran", as: QuranWidgetSnapshot.self), "Notes-only and no-lock redaction must not clear Quran progress.")
-
-        try await privacy.privacyScopeDidChange(to: .app)
-        XCTAssertNil(store.read("quran", as: QuranWidgetSnapshot.self), "A locked app must not leave Quran progress in the App Group snapshot.")
-
-        try store.write(visible) // Simulate an older published file surviving until the lock redaction runs.
-        XCTAssertNotNil(store.read("quran", as: QuranWidgetSnapshot.self))
-        try privacy.redactQuranWidgetSnapshotIfLocked()
-        XCTAssertNil(store.read("quran", as: QuranWidgetSnapshot.self), "Lock redaction must also remove an already-published Quran snapshot.")
-
-        try await privacy.privacyScopeDidChange(to: .none)
-        let restored = try XCTUnwrap(store.read("quran", as: QuranWidgetSnapshot.self))
-        XCTAssertEqual(restored.payload.route, "madar://quran/session/hifz")
-        XCTAssertFalse(restored.payload.nextDetail.isEmpty)
-    }
-    func testWholeAppLockRedactionClearsSensitiveSnapshotsAndKeepsSafeOnes() throws {
-        let (app, _, root, now) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
-        let store = app.snapshotStore
-        let sensitive = Set(BuiltRoomWidget.allCases.map(\.rawValue) + [
-            "quran", HabitShortcutSnapshot.name, WidgetCatalogSnapshot.name,
-            WidgetCatalogSnapshot.valuesName, "notes", "notesToday", "privateNote", "notesMemory"
-        ])
-        let safe: Set<String> = ["foundation", "prayerNext"]
-        for name in sensitive.union(safe) {
-            try store.write(SnapshotEnvelope(name: name, generatedAt: now, validUntil: now.addingTimeInterval(60),
-                                             dayKey: "2026-10-15", tzID: "Asia/Riyadh", privacy: SnapshotPrivacy(),
-                                             payload: ["value": "private"]))
-        }
-
-        app.beginPrivacyScopeTransition()
-        try app.publishSnapshot() // A concurrent publication during the async scope change must not restore room data.
-
-        for name in sensitive { XCTAssertNil(store.read(name, as: [String: String].self, now: now), name) }
-        for name in safe { XCTAssertNotNil(store.read(name, as: [String: String].self, now: now), name) }
-        try app.finishPrivacyScopeTransition()
     }
     func testWidgetReviewProgressCountsDistinctFacesAndDecodesOlderJSON() throws {
         let (app, service, root, now) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }

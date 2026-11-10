@@ -147,23 +147,23 @@ import MadarInbox
         #expect(try inbox.processingFiles().isEmpty)
     }
 
-    @Test func test_M0R03_spoofedAppSourceCannotDisableLockFromInbox() async throws {
+    @Test func test_M0R03_spoofedAppSourceCannotChangeAppOnlySettingFromInbox() async throws {
         let (container, adapter, inbox) = try fixture(), generation = UUID()
         let bus = CommandBus(adapter: adapter)
-        let protected = CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(["core.faceIDLock": .string("app")])]))
+        let protected = CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(["core.numerals": .string("western")])]))
         _ = try await bus.execute(protected)
-        let spoofed = CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(["core.faceIDLock": .string("none")])]), source: .app)
+        let spoofed = CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(["core.numerals": .string("arabicIndic")])]), source: .app)
         _ = try inbox.enqueue(.init(expectedGenerationID: generation, command: spoofed))
         var locked = true
         let drainer = InboxDrainer(inbox: inbox, bus: bus, generation: { .init(generationID: generation, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: {}, authorization: { command in
             command.name == "prayer.log" ? nil : .init(status: locked ? .needsUnlock : .needsApp)
         })
         try await drainer.drain()
-        #expect(try SettingsStore(context: ModelContext(container)).value(for: "core.faceIDLock") == .string("app"))
+        #expect(try SettingsStore(context: ModelContext(container)).value(for: "core.numerals") == .string("western"))
         #expect(try inbox.processingFiles().count == 1)
         locked = false
         try await drainer.drain()
-        #expect(try SettingsStore(context: ModelContext(container)).value(for: "core.faceIDLock") == .string("app"))
+        #expect(try SettingsStore(context: ModelContext(container)).value(for: "core.numerals") == .string("western"))
         #expect(!((try adapter.hasReceipt(commandID: spoofed.commandID))))
         _ = try inbox.enqueue(prayer(generation: generation))
         locked = true

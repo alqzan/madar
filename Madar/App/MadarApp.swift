@@ -31,29 +31,21 @@ private struct MadarSceneContent: View {
             .task { if session == nil && startupError == nil && ProcessInfo.processInfo.environment["MADAR_UI_GALLERY"] != "1" { await runtime.load() } }
             .onChange(of: scenePhase) { _, phase in
                 guard let session else { return }
-                session.privacyPresenter?.transition(phase)
                 guard phase == .active else { return }
                 Task {
-                    // The root view drains the inbox on every return; only while it is hidden behind the lock does this layer do it.
-                    if session.lockController?.canPresent(.app) != true {
-                        do { try await session.drainInbox() }
-                        catch BackupOperationError.busy { }
-                        catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
-                    }
+                    // The root view drains the inbox on every return.
                     await session.reconcileSpotlightIndex()
                     await session.refreshEligibleDiaryLettersForNotificationLifecycle()
                     await MadarIntentHandoff.shared.flush()
                     session.requestPrayerNotificationRefresh()
                 }
             }
-            // A diary line from Siri waits behind the diary lock and lands once it opens.
-            .onChange(of: session?.lockController?.unlocked) { _, _ in
+            // The first time the session exists: a diary line from Siri that arrived before launch lands now.
+            .onChange(of: session.map { ObjectIdentifier($0) }) { _, _ in
                 Task {
                     guard let session else { await MadarIntentHandoff.shared.flush(); return }
-                    if session.lockController?.canPresent(.app) == true {
-                        session.recordBahwReturnVisit()
-                    }
-                    if session.lockController?.canPresent(.notes) ?? session.protectedDataAuthorized {
+                    session.recordBahwReturnVisit()
+                    if session.protectedDataAuthorized {
                         await session.refreshEligibleDiaryLettersForNotificationLifecycle()
                         session.requestPrayerNotificationRefresh()
                     }
@@ -95,10 +87,8 @@ private struct MadarSceneContent: View {
     }
     private var roomContent: some View {
         Group {
-                if let session, let lock = session.lockController {
-                    MadarLockGate(controller: lock, feature: .app) {
-                        MadarRootView(session: session).modelContainer(session.container).environment(session)
-                    }.background(ScenePrivacyBridge(session: session).frame(width: 0, height: 0))
+                if let session {
+                    MadarRootView(session: session).modelContainer(session.container).environment(session)
                 }
                 else if let startupError {
                     ContentUnavailableView {
@@ -187,23 +177,10 @@ struct MadarLaunchPlaceholder: View {
                 }
             } else { managed = try ManagedDataStore(root: root, commandLockURL: lockURL) }
             let opened = try AppSession(container: managed.container, managedStore: managed, groupDirectory: group)
+            opened.authorizeProtectedData() // no app lock: the open store is the only gate (owner, 10 Nov 2026)
 #if DEBUG
             try opened.seedMalformedNotificationBudgetForUITestIfRequested()
 #endif
-#if DEBUG
-            if isolatedUITestID != nil {
-                // UI stores are isolated from owner data. Lock-flow UI tests opt in
-                // explicitly; all other UI tests launch without an app lock.
-                let requestedScope = ProcessInfo.processInfo.environment["MADAR_UI_FACE_ID_LOCK"]
-                let scope = requestedScope == "app" ? "app" : "none"
-                try await opened.applySettingsAndWait(["core.faceIDLock": .string(scope)])
-            }
-#endif
-#if !DEBUG
-            // Owner, 3 Nov 2026: the app lock is removed from Madar. A device that had it on is returned to "none" on open.
-            if opened.string("core.faceIDLock") != "none" { try await opened.applySettingsAndWait(["core.faceIDLock": .string("none")]) }
-#endif
-            opened.lockController = MadarLockController(scope: MadarLockScope(rawValue: opened.string("core.faceIDLock")) ?? .app, service: AppPrivacyService(session: opened))
             await opened.attachPrayerNotifications(prayerNotifications)
 #if DEBUG
             await opened.resumeNotificationBudgetRecoveryUITestIfRequested()

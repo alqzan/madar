@@ -79,7 +79,7 @@ extension AppSession {
         case .maghrib:end=PrayerTimesEngine.calculate(day:next,place:place,options:options)?.maghrib
         }
         let expiry=min(now.addingTimeInterval(3600),end ?? now.addingTimeInterval(900))
-        let locked=string("core.faceIDLock")=="app"
+        let locked=false // the app lock is removed (owner 10 Nov 2026); the payload still carries the field
         for (room,payload) in roomWidgetPayloads(locked:locked,at:now,readHabitReadings:readHabitReadings) {
             let envelope=SnapshotEnvelope(name:room.rawValue,generatedAt:now,validUntil:expiry,dayKey:service.today.description,tzID:place.timeZoneID,privacy:SnapshotPrivacy(moneyHidden:room == .money ? locked || bool("core.hideMoneyOutside") : true,notesLocked:locked),payload:payload)
             try snapshotStore.write(envelope)

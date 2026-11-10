@@ -120,11 +120,11 @@ struct MihbaraPDFSearchView: View {
 
     @MainActor private func scan(_ id: UUID) async {
         do {
-            let authorized = app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized
+            let authorized = app.protectedDataAuthorized
             guard authorized else { return }
             let bytes = try await AppMihbaraService(app: app).pdfDataOffMain(for: book)
             try Task.checkCancellation()
-            guard jobID == id, app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { return }
+            guard jobID == id, app.protectedDataAuthorized else { return }
             let reader = PDFBookTextReader(data: bytes, language: book.language)
             total = try await reader.pageCount()
             for index in pages.count..<total {
@@ -135,7 +135,7 @@ struct MihbaraPDFSearchView: View {
                 // One unreadable page is passed over (searched as empty) instead of stopping the whole scan.
                 catch { page = PDFBookPageText(index: index, text: "", source: .optical) }
                 try Task.checkCancellation()
-                guard jobID == id, app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { return }
+                guard jobID == id, app.protectedDataAuthorized else { return }
                 pages.append(page)
             }
             try Task.checkCancellation()

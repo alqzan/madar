@@ -1,5 +1,4 @@
 import SwiftUI
-import LocalAuthentication
 import MadarDesign
 
 struct MihbaraQuoteCardSheet: View {
@@ -217,17 +216,10 @@ struct MihbaraQuoteCardSheet: View {
         Task { @MainActor in
             defer { sharing = false }
             do {
-                guard let controller = app.lockController, let presenter = app.privacyPresenter else {
-                    throw PrivacyAuthorizationError.stale
-                }
-                let authorization = try await controller.authorize([.app])
-                try controller.validate(authorization)
                 var items: [Any] = [image]
                 if extras.contains(.source), let sourceURL = card.sourceURL { items.append(sourceURL) }
-                try presenter.present(items: items, authorization: authorization)
+                try MadarSharePresenter.present(items: items)
             } catch {
-                // Cancelling Face ID is the reader's choice, not a failure.
-                if let la = error as? LAError, [.userCancel, .systemCancel, .appCancel].contains(la.code) { return }
                 shareError = "تعذّرت المشاركة. أعد المحاولة من البطاقة."
             }
         }

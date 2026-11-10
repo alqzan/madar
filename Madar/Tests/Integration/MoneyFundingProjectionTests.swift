@@ -13,7 +13,7 @@ import MadarCommands
         let root = FileManager.default.temporaryDirectory.appending(path: "FundingForecast-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container)
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"),
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"),
             "mal.dailyAllowance": .object(["mode": .string("fixed"), "amountMinor": .number(40_000), "percentBp": .null]), "mal.salaryDay": .number(27),
             "mal.cycleCalendar": .string("gregorian")])
         let cycle = Cycle(); cycle.start = try GregorianDay("2026-10-01").date(in: zone)
@@ -27,7 +27,7 @@ import MadarCommands
         let root = FileManager.default.temporaryDirectory.appending(path: "FundingForecast-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container)
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"),
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"),
             "mal.dailyAllowance": .object(["mode": .string("fixed"), "amountMinor": .number(40_000), "percentBp": .null]), "mal.salaryDay": .number(27),
             "mal.cycleCalendar": .string("gregorian")])
         let cycle = Cycle(); cycle.start = try GregorianDay("2026-10-01").date(in: zone)

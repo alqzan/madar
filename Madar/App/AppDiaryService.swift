@@ -85,7 +85,7 @@ private struct DiaryDayReadConfiguration: Sendable {
     init(app: AppSession, clock: @escaping @MainActor () -> Date = { prayerUITestClock(.now) }) { self.app = app; self.clock = clock }
     func authorizeRead() throws {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
-        guard app.lockController?.canPresent(.notes) ?? app.protectedDataAuthorized else { throw DataError.invalidValue("المذكرات مقفلة") }
+        guard app.protectedDataAuthorized else { throw DataError.invalidValue("المذكرات مقفلة") }
     }
     var digits: MadarNumberFormatter { .init(style: app.string("core.numerals") == "western" ? .western : .hindi) }
     var preferredMatch: FirstCalendar {

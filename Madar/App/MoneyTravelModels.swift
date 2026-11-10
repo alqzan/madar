@@ -44,7 +44,7 @@ struct MoneyTravelReading {
 }
 extension AppMoneyService {
     func loadTravel() throws -> MoneyTravelReading? {
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         let context = ModelContext(app.container), repo = MoneyRepository(context: context), now = app.prayerNow()
         guard let trip = try repo.trip(at: now), let began = trip.start else { return nil }
         let today = try DiaryLineRenderer.today(context: context, now: now)

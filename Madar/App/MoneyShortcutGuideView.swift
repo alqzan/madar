@@ -51,7 +51,7 @@ struct MoneyShortcutGuideView: View {
     }
     private func messages() throws -> [BankMessage] {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         return try ModelContext(app.container).fetch(FetchDescriptor<BankMessage>()).filter { $0.channel == "shortcut" }
     }
     private func start() { do { baseline = Set(try messages().map(\.id)); arrived = nil; checked = false; failure = nil } catch { failure = "تعذّر بدء الفحص. أعد فتح الصفحة وحاول مرة أخرى." } }

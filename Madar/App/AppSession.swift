@@ -68,8 +68,8 @@ final class AppSession {
     private var notificationStoreAccessSuspended = false
     var backupService: (any BackupUIService)?
     var syncService: (any SyncUIService)?
-    var lockController: MadarLockController?
-    weak var privacyPresenter: ScenePrivacyPresenter?
+    /// Every protected read goes through this one check. With the app lock removed (owner, 10 Nov 2026) `MadarApp` opens it as soon as the store is open;
+    /// it stays closed on a bare session (tests close and reopen it with `redactProtectedData()` / `authorizeProtectedData()`).
     private(set) var protectedDataAuthorized = false
     private(set) var notificationAuthorization = "unknown"
     private(set) var bahwReturnPlanDay: Int?
@@ -79,7 +79,6 @@ final class AppSession {
     var diaryBoundaryUITestClockOverride: Date?
 #endif
     @ObservationIgnored weak var prayerNotifications: PrayerNotificationCoordinator?
-    @ObservationIgnored private var privacyScopeTransitionPending = false
     @ObservationIgnored private var widgetHabitRefreshPending = false
     let schema: SettingsSchema
     var store: SettingsStore
@@ -185,12 +184,12 @@ final class AppSession {
     }, shouldPause: { [weak self] in
         self?.maintenanceInProgress != false || !UIApplication.shared.isProtectedDataAvailable
     }, authorization: { [weak self] command in
-        guard let self, self.lockController != nil else { return .init(status: .needsApp) }
+        guard let self else { return .init(status: .needsApp) }
         guard UIApplication.shared.isProtectedDataAvailable else { return .init(status: .needsUnlock) }
         // §16 authorize: prayer.log and habit.complete are blindWrite even with whole-app Face ID protection.
         // App-only settings never enter via transport, even if it claims source: app.
         if CommandBus.transportBlindWriteNames.contains(command.name) { return nil }
-        return self.lockController?.canPresent(.app) == true ? nil : .init(status: .needsUnlock)
+        return nil
     })
     private var expiryTask: Task<Void, Never>?
     private var toastTask: Task<Void, Never>?
@@ -305,7 +304,7 @@ final class AppSession {
 #endif
     /// Records an authorized app visit. The state lives in a local DeviceSetting and is never sent to CloudKit.
     func recordBahwReturnVisit() {
-        guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { return }
+        guard protectedDataAuthorized else { return }
 
         let now = prayerNow()
         let today = AppBahwService(session: self, evaluationDate: now).today
@@ -876,13 +875,6 @@ final class AppSession {
         moneyExpenseSeed = queuedMoneyExpenseSeeds.removeFirst()
     }
     func set(_ value: JSONValue, key: String, completion: (() -> Void)? = nil) {
-        if key == "core.faceIDLock", case .string(let raw) = value, let scope = MadarLockScope(rawValue: raw), let lockController {
-            Task {
-                do { try await lockController.changeScope(scope); completion?() }
-                catch { errorMessage = "لم يتغيّر القفل. \(madarUserMessage(error))" }
-            }
-            return
-        }
         execute(name: "settings.set", values: [key: value], message: "حُفظ التعديل", completion: completion)
     }
     private func setWithResult(_ value: JSONValue, key: String, completion: @escaping (Bool) -> Void) {
@@ -892,8 +884,7 @@ final class AppSession {
         execute(name: "settings.set", values: values, message: "حُفظ التعديل", completion: completion)
     }
     func reset(_ keys: [String], completion: (() -> Void)? = nil) {
-        // Privacy authorization is changed through its own redaction lifecycle, never a shape reset.
-        let defaults = Dictionary(uniqueKeysWithValues: schema.settings.filter { keys.contains($0.key) && $0.key != "core.faceIDLock" }.map { ($0.key, $0.defaultValue) })
+        let defaults = Dictionary(uniqueKeysWithValues: schema.settings.filter { keys.contains($0.key) }.map { ($0.key, $0.defaultValue) })
         execute(name: "settings.set", values: defaults, message: "عادت الإعدادات المتفق عليها", completion: completion)
     }
     func applyPreset(_ settings: [String: JSONValue], completion: (() -> Void)? = nil) {
@@ -1169,7 +1160,7 @@ final class AppSession {
     }
     /// Quiesces every other writer for a whole old-Madar move or its undo, then reloads, republishes and refreshes widgets once.
     func performLegacyMove<T>(_ body: (Date) async throws -> T) async throws -> T {
-        guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard protectedDataAuthorized else { throw DataError.authenticationFailed }
         // Every other writer (UI, inbox, backup) waits, so the before/after snapshots hold only the move's own rows.
         try await quiesceWriters()
         defer { resumeWriters() }
@@ -1182,7 +1173,7 @@ final class AppSession {
     }
 
     func executeMoneyCommand(_ name: String, payload: [String: MadarCore.JSONValue] = [:], id: UUID = UUID()) async throws {
-        guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard protectedDataAuthorized else { throw DataError.authenticationFailed }
 #if DEBUG
         if name == "money.markVisit", failFirstMoneyVisitMark {
             failFirstMoneyVisitMark = false
@@ -1208,7 +1199,7 @@ final class AppSession {
     }
 
     func executeBookCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID(), undoMessage: String = "حُفظ في المحبرة") async throws {
-        guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard protectedDataAuthorized else { throw DataError.authenticationFailed }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { endWrite() }
         #if DEBUG
@@ -1258,7 +1249,7 @@ final class AppSession {
     var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }
     var bookStagingDirectory: URL { commandAdapter.bookStagingDirectory }
     func executeDiaryCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID(), updatesPresentation: Bool = true) async throws {
-        guard !name.hasPrefix("diary.") || (lockController?.canPresent(.notes) ?? protectedDataAuthorized) else { throw DataError.invalidValue("المذكرات مقفلة") }
+        guard !name.hasPrefix("diary.") || (protectedDataAuthorized) else { throw DataError.invalidValue("المذكرات مقفلة") }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { endWrite() }
 #if DEBUG
@@ -1310,7 +1301,7 @@ final class AppSession {
     /// M3-V09: a Day One import (or its undo) is one app-process write (RA2), gated like a diary command so
     /// backup/restore can quiesce it and a locked diary refuses it.
     func performDiaryImport<T>(_ body: (Date) async throws -> T) async throws -> T {
-        guard lockController?.canPresent(.notes) ?? protectedDataAuthorized else { throw DataError.invalidValue("المذكرات مقفلة") }
+        guard protectedDataAuthorized else { throw DataError.invalidValue("المذكرات مقفلة") }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { endWrite() }
         let result = try await body(prayerNow())
@@ -1338,7 +1329,7 @@ final class AppSession {
     /// when the app opens or returns to the foreground, but only after the diary
     /// access gate is open; the notification coordinator then sees the new state.
     func refreshEligibleDiaryLettersForNotificationLifecycle() async {
-        guard lockController?.canPresent(.notes) ?? protectedDataAuthorized,
+        guard protectedDataAuthorized,
               notificationStoreAccessAvailable else { return }
         do { try await AppDiaryService(app: self).refreshLetters() }
         catch BackupOperationError.busy { }
@@ -1415,30 +1406,16 @@ final class AppSession {
         default: "تُقرأ حالة إذن الإشعارات من النظام."
         }
     }
+    /// The plain protected-data seam: closes every protected read (tests use it) until `authorizeProtectedData()`.
     func redactProtectedData() {
         protectedDataAuthorized = false
         undoToken = nil; setUndoToast(false); expiryTask?.cancel()
     }
+    func authorizeProtectedData() { protectedDataAuthorized = true }
     func redactQuranWidgetSnapshot() throws {
         try snapshotStore.remove("quran")
         WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran")
     }
-    /// Remove every room snapshot that can reveal protected progress before whole-app
-    /// scope is persisted. A later publication replaces these with locked-safe copies.
-    func beginPrivacyScopeTransition() { privacyScopeTransitionPending = true }
-    func finishPrivacyScopeTransition() throws {
-        privacyScopeTransitionPending = false
-        try publishSnapshot()
-    }
-    func redactSensitiveWidgetSnapshots() throws {
-        let names = Set(BuiltRoomWidget.allCases.map(\.rawValue) + [
-            "quran", HabitShortcutSnapshot.name, WidgetCatalogSnapshot.name,
-            WidgetCatalogSnapshot.valuesName, "notes", "notesToday", "privateNote", "notesMemory"
-        ])
-        for name in names { try snapshotStore.remove(name) }
-        WidgetCenter.shared.reloadAllTimelines()
-    }
-    func authorizeProtectedData() { protectedDataAuthorized = true }
     func bindContainer(_ replacement: ModelContainer) {
         container = replacement
         let context = ModelContext(replacement)
@@ -1493,7 +1470,7 @@ final class AppSession {
         // app may be suspended at any moment, so the files are written now. `.inactive` is NOT background: it is the state of a cold
         // launch and of every return to the app, exactly when the first screen must appear (owner 7 Nov: «أول ما أفتح التطبيق يعلق»);
         // leaving the app still writes at once through `flushPendingSnapshot`.
-        if privacyScopeTransitionPending || Self.publishesSnapshotsImmediately || UIApplication.shared.applicationState == .background {
+        if Self.publishesSnapshotsImmediately || UIApplication.shared.applicationState == .background {
             snapshotTask?.cancel(); snapshotTask = nil; try publishSnapshotNow(); return
         }
         snapshotTask?.cancel()
@@ -1514,10 +1491,6 @@ final class AppSession {
         WidgetCenter.shared.reloadAllTimelines()
     }
     func publishSnapshotNow(readHabitReadings: (() throws -> [HabitReading])? = nil) throws {
-        if privacyScopeTransitionPending {
-            try redactSensitiveWidgetSnapshots()
-            return
-        }
         let instant = prayerNow()
         var habitResult: Result<[HabitReading], Error>?
         func sharedHabitReadings() throws -> [HabitReading] {
@@ -1544,13 +1517,9 @@ final class AppSession {
         try snapshotStore.write(snapshot)
         try publishRoomWidgetSnapshots(at:instant,readHabitReadings:sharedHabitReadings)
         publishPrayerNextSnapshot(at: instant, tzID: place.timeZoneID, dayKey: key.dayKey)
-        if string("core.faceIDLock") == "app" {
-            try redactQuranWidgetSnapshot()
-        } else {
-            let quran = AppQuranService(session: self, clock: { instant })
-            do { try snapshotStore.write(quran.widgetSnapshot()); WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran") }
-            catch { try? redactQuranWidgetSnapshot() }
-        }
+        let quran = AppQuranService(session: self, clock: { instant })
+        do { try snapshotStore.write(quran.widgetSnapshot()); WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran") }
+        catch { try? redactQuranWidgetSnapshot() }
         try publishWidgetCatalog(at: instant, readHabitReadings: sharedHabitReadings)
     }
     /// The next-prayer widget reads this file only; it holds times, never counts or streaks (RP9, RU2).

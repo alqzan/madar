@@ -694,7 +694,7 @@ final class PrayerNotificationCoordinator {
         guard UIApplication.shared.applicationState == .active else { return }
 
         let eligibleLetterAt: Date?
-        if session.lockController?.canPresent(.notes) ?? session.protectedDataAuthorized {
+        if session.protectedDataAuthorized {
             let context = ModelContext(session.container)
             let eligibleDescriptor = FetchDescriptor<Letter>(predicate: #Predicate<Letter> { $0.state == "eligible" })
             let eligibleRows: [Letter] = try context.fetch(eligibleDescriptor)

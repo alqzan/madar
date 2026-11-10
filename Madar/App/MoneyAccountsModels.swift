@@ -45,7 +45,7 @@ struct MoneyAccountsReading {
 }
 extension AppMoneyService {
     func loadAccounts() throws -> MoneyAccountsReading {
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         let context = ModelContext(app.container), repo = MoneyRepository(context: context), now = app.prayerNow()
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.sorted { ($0.ownership == "mine" ? 0 : 1, $0.name) < ($1.ownership == "mine" ? 0 : 1, $1.name) }
         let messages = try context.fetch(FetchDescriptor<BankMessage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }

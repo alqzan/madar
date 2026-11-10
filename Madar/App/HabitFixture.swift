@@ -10,7 +10,7 @@ extension AppSession {
         let context=ModelContext(container)
         guard try context.fetchCount(FetchDescriptor<Habit>()) == 0 else{return}
         let settings=try SettingsStore(context:context)
-        var initialSettings: [String: JSONValue] = ["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none")]
+        var initialSettings: [String: JSONValue] = ["core.dayStart": .string("midnight")]
         if let firstCalendar = ProcessInfo.processInfo.environment["MADAR_UI_FIRST_CALENDAR"], ["hijri", "gregorian"].contains(firstCalendar) {
             initialSettings["core.firstCalendar"] = .string(firstCalendar)
         }

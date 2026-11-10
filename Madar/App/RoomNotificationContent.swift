@@ -45,7 +45,7 @@ import MadarPrayer
     static func zakatCandidates(session: AppSession, now: Date) -> [NotificationCandidate] {
         let lead = session.string("mal.zakatReminder")
         guard let leadDays = zakatLeadDays(lead) else { return [] }
-        guard session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized else {
+        guard session.protectedDataAuthorized else {
             return zakatCandidatesFromLedger(session: session, lead: lead, now: now)
         }
         guard let key = zakatHawlKey(session: session),
@@ -207,59 +207,56 @@ import MadarPrayer
 
     static func content(for candidate: NotificationCandidate, plan: NotificationPlan, session: AppSession, habitNames: [String: String]) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent(), id = candidate.id, digits = MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)
-        let protected = session.string("core.faceIDLock") == "app"
         content.sound = .default
         content.threadIdentifier = id.split(separator: ".").first.map(String.init).map { $0 + "." + candidate.dayKey } ?? candidate.dayKey
         if id.hasPrefix("quran.") {
             let late = id.hasSuffix(".late")
-            content.title = protected ? "مدار" : late ? QuranReminderCopy.lateTitle : QuranReminderCopy.title
-            content.body = protected ? "لديك تذكير في مدار" : late ? NudgeWording.body(.quranReview, dayKey: candidate.dayKey) : NudgeWording.body(.quranWird, dayKey: candidate.dayKey)
+            content.title = late ? QuranReminderCopy.lateTitle : QuranReminderCopy.title
+            content.body = late ? NudgeWording.body(.quranReview, dayKey: candidate.dayKey) : NudgeWording.body(.quranWird, dayKey: candidate.dayKey)
             content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
         } else if id.hasPrefix("digest.") {
-            // Under whole-app protection the digest names no room kinds on the lock screen.
-            content.title = protected ? "مدار" : "ملخّص تذكيراتك"
-            let members = plan.digestMembers[id] ?? [], kinds = protected ? [] : RoomReminders.digestKinds(memberIDs: members)
-            content.body = "لديك " + reminderCount(members.count, digits) + (protected ? " في مدار" : kinds.isEmpty ? "" : ": " + kinds.joined(separator: "، "))
+            content.title = "ملخّص تذكيراتك"
+            let members = plan.digestMembers[id] ?? [], kinds = RoomReminders.digestKinds(memberIDs: members)
+            content.body = "لديك " + reminderCount(members.count, digits) + (kinds.isEmpty ? "" : ": " + kinds.joined(separator: "، "))
             content.userInfo = ["dayKey": candidate.dayKey, "room": "bahw"]
         } else if id.hasPrefix("habits.") {
             let habitID = String(id.split(separator: ".").last ?? "")
-            content.title = protected ? "مدار" : habitNames[habitID] ?? "عادتك"
+            content.title = habitNames[habitID] ?? "عادتك"
             // Never promise to keep a streak that does not exist: a first step starts one.
-            let streak = protected ? 0 : ((try? HabitRepository(context: ModelContext(session.container)).readings(at: Date()))?.first { $0.id.uuidString == habitID }?.summary.streak ?? 0)
-            content.body = protected ? "حان وقت عادة" : NudgeWording.body(streak > 0 ? .habitKeepStreak : .habitFirstStep, dayKey: candidate.dayKey)
+            let streak = (try? HabitRepository(context: ModelContext(session.container)).readings(at: Date()))?.first { $0.id.uuidString == habitID }?.summary.streak ?? 0
+            content.body = NudgeWording.body(streak > 0 ? .habitKeepStreak : .habitFirstStep, dayKey: candidate.dayKey)
             content.userInfo = ["dayKey": candidate.dayKey, "room": "habits", "habit": habitID]
         } else if id.hasPrefix("notes.") {
-            // §8 item 10 matrix copy; under the whole-app lock the owner's generic line (15 Oct). Never diary text.
-            content.title = protected ? "مدار" : "المذكرات"
-            content.body = protected ? "لديك رسالة في مدار"
-                : id.hasSuffix(".niyya") ? NudgeWording.body(.diaryNiyya, dayKey: candidate.dayKey)
+            // §8 item 10 matrix copy. Never diary text.
+            content.title = "المذكرات"
+            content.body = id.hasSuffix(".niyya") ? NudgeWording.body(.diaryNiyya, dayKey: candidate.dayKey)
                 : id.hasSuffix(".line") ? NudgeWording.body(.diaryLine, dayKey: candidate.dayKey)
                 : id.hasSuffix(".letter") ? "وصلتك رسالة من ماضيك" : "عندك ذكرى من هذا اليوم"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "notes"]
         } else if id.hasPrefix("mal.card") {
-            // Always amount-free, including core.hideMoneyOutside's default and whole-app protection.
-            content.title = protected ? "مدار" : "سداد البطاقة"
-            content.body = protected ? "لديك تنبيه في مدار" : id.hasPrefix("mal.cardCash.") ? "راجع سداد بطاقتك اليوم؛ النقد الحالي لا يغطي الالتزامات المعروفة" : "موعد سداد بطاقتك " + (session.string("mal.cardDue") == "1day" ? "غدًا" : "بعد ثلاثة أيام") + "؛ راجع الكشف والنقد المتاح"
+            // Always amount-free, including core.hideMoneyOutside's default.
+            content.title = "سداد البطاقة"
+            content.body = id.hasPrefix("mal.cardCash.") ? "راجع سداد بطاقتك اليوم؛ النقد الحالي لا يغطي الالتزامات المعروفة" : "موعد سداد بطاقتك " + (session.string("mal.cardDue") == "1day" ? "غدًا" : "بعد ثلاثة أيام") + "؛ راجع الكشف والنقد المتاح"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.billDue.") {
-            content.title = protected ? "مدار" : "موعد فاتورة"
-            content.body = protected ? "لديك تنبيه في مدار" : id.hasSuffix(".0") ? "عندك فاتورة أو اشتراك يستحق اليوم" : "عندك فاتورة أو اشتراك يستحق قريبًا"
+            content.title = "موعد فاتورة"
+            content.body = id.hasSuffix(".0") ? "عندك فاتورة أو اشتراك يستحق اليوم" : "عندك فاتورة أو اشتراك يستحق قريبًا"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.alert80.") {
             // RU2: notifications stay amount-free even when amounts are visible inside the app.
             // Owner, 26 Oct: name the category and the 80% line, never an amount.
             let categoryID = String(id.split(separator: ".").last ?? "")
-            let category = protected ? nil : (try? AppMoneyService(app: session).loadCategories())?.shelves.first { $0.id.uuidString == categoryID }?.name
-            content.title = protected ? "مدار" : "حدود الصرف"
-            content.body = protected ? "لديك تنبيه في مدار" : category.map { "بلغت " + digits.string(80) + "٪ من حد «\($0)» لهذه الدورة" } ?? "بلغ أحد تصنيفاتك " + digits.string(80) + "٪ من حدّه لهذه الدورة"
+            let category = (try? AppMoneyService(app: session).loadCategories())?.shelves.first { $0.id.uuidString == categoryID }?.name
+            content.title = "حدود الصرف"
+            content.body = category.map { "بلغت " + digits.string(80) + "٪ من حد «\($0)» لهذه الدورة" } ?? "بلغ أحد تصنيفاتك " + digits.string(80) + "٪ من حدّه لهذه الدورة"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.reconcile.") {
-            content.title = protected ? "مدار" : "مطابقة الرصيد"
-            content.body = protected ? "حان وقت المراجعة" : "راجع أرصدة حساباتك والتزاماتك؛ دقيقة واحدة تكفي"
+            content.title = "مطابقة الرصيد"
+            content.body = "راجع أرصدة حساباتك والتزاماتك؛ دقيقة واحدة تكفي"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.zakat.") {
-            content.title = protected ? "مدار" : "الزكاة"
-            content.body = protected ? "لديك تذكير في مدار" : "يحين موعد الحساب السنوي الذي اخترته " + zakatWhen(id)
+            content.title = "الزكاة"
+            content.body = "يحين موعد الحساب السنوي الذي اخترته " + zakatWhen(id)
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else {
             content.title = "مدار"
@@ -342,7 +339,7 @@ import MadarPrayer
             guard parts.count == 4, let leadDays = zakatLeadDays(parts[2]),
                   session.string("mal.zakatReminder") == parts[2],
                   let anniversary = try? GregorianDay(parts[3]) else { return false }
-            guard session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized else {
+            guard session.protectedDataAuthorized else {
                 let today = GregorianDay.containing(now, in: session.activePlace.timeZone)
                 let rows = try ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>())
                 return rows.contains { row in
@@ -454,6 +451,6 @@ enum QuranReminderCopy {
         let settings = session.values.filter { $0.key.hasPrefix("mal.") || $0.key.hasPrefix("core.") }
             .sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ";")
         return Key(container: ObjectIdentifier(session.container), day: GregorianDay.containing(now, in: session.activePlace.timeZone).description,
-                   unlocked: session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized, settings: settings, tables: tables)
+                   unlocked: session.protectedDataAuthorized, settings: settings, tables: tables)
     }
 }

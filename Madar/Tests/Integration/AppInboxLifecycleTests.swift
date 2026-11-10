@@ -15,7 +15,6 @@ import MadarSnapshots
         let root: URL
         let managed: ManagedDataStore
         let session: AppSession
-        let lock: MadarLockController
     }
 
     private func fixture() throws -> Fixture {
@@ -28,12 +27,8 @@ import MadarSnapshots
         _ = try SettingsStore(context: settings).stage(["salah.trackingStart": .object(["dayKey": .string("2026-10-01"), "edits": .number(0)])])
         try settings.save()
         let session = try AppSession(container: managed.container, managedStore: managed, groupDirectory: root)
-        let privacy = AppPrivacyService(session: session)
-        let lock = MadarLockController(scope: .app, service: privacy)
-        session.lockController = lock
         XCTAssertTrue(UIApplication.shared.isProtectedDataAvailable, "App-host drain requires an unlocked device")
-        XCTAssertFalse(lock.canPresent(.app))
-        return Fixture(root: root, managed: managed, session: session, lock: lock)
+        return Fixture(root: root, managed: managed, session: session)
     }
 
     private func prayerCommand(source: CommandSource, prayer: Prayer = .fajr, status: String = "jamaah", issuedAt: Date = Date()) -> CommandEnvelope {
@@ -120,7 +115,6 @@ import MadarSnapshots
         let snapshot = try XCTUnwrap(fixture.session.snapshotStore.read("foundation", as: FoundationSnapshot.self))
         XCTAssertEqual(snapshot.payload.firstCalendar, fixture.session.string("core.firstCalendar"))
         XCTAssertEqual(snapshot.privacy, SnapshotPrivacy())
-        XCTAssertFalse(fixture.lock.canPresent(.app), "Blind prayer writes must not unlock protected content")
         XCTAssertFalse(fixture.session.protectedDataAuthorized)
     }
 
@@ -264,8 +258,7 @@ import MadarSnapshots
         _ = try SettingsStore(context: settings).stage(["salah.trackingStart": .object(["dayKey": .string("2026-10-01"), "edits": .number(0)])])
         try settings.save()
         let session = try AppSession(container: managed.container, managedStore: managed, groupDirectory: root)
-        let lock = MadarLockController(scope: .app, service: AppPrivacyService(session: session)); session.lockController = lock
-        let fixture = Fixture(root: root, managed: managed, session: session, lock: lock)
+        let fixture = Fixture(root: root, managed: managed, session: session)
         XCTAssertTrue(UIApplication.shared.isProtectedDataAvailable)
         let backup = AppBackupService(session: session, store: managed, backupDirectory: root.appending(path: "Backups"), keyStore: MemoryBackupKeyStore())
         let recoveryWarnings = try await backup.coordinator.recoverPendingLifecycle()
@@ -294,7 +287,6 @@ import MadarSnapshots
         let reopened = try ManagedDataStore(root: dataRoot, commandLockURL: root.appending(path: "CommandBus.lock"))
         XCTAssertEqual(reopened.binding.generationID, managed.binding.generationID)
         let resumed = try AppSession(container: reopened.container, managedStore: reopened, groupDirectory: root)
-        let resumedLock = MadarLockController(scope: .app, service: AppPrivacyService(session: resumed)); resumed.lockController = resumedLock
         try await resumed.drainInbox()
         XCTAssertEqual(try RecordFingerprint.hash(RecordBridge.all(ModelContext(resumed.container), syncedOnly: false)), fingerprint)
         XCTAssertEqual(try deliveries("unresolved", fixture: fixture).count, 2)

@@ -11,7 +11,6 @@ import MadarPrayer
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidget-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let app=try AppSession(container:MadarContainerFactory.makeLocal(at:root),groupDirectory:root),id=UUID()
         // The schema default locks the whole app, which keeps personal rows out of widgets; this test reads them unlocked.
-        try await app.applySettingsAndWait(["core.faceIDLock":.string("none")])
         var rule=HabitRule(effectiveFrom:AppBahwService(session:app).today);rule.measure = .count;rule.target=2;rule.unit="كوب"
         let encoded=try JSONDecoder().decode(MadarCore.JSONValue.self,from:JSONEncoder().encode(rule))
         try await app.executeDiaryCommand("habit.save",payload:["id":.string(id.uuidString),"name":.string("الماء"),"rule":encoded])
@@ -121,7 +120,7 @@ import MadarPrayer
     func testUpcomingHabitWidgetUsesFixedRecurringDatesAndLastCompletion() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetHabitComing-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root),app=try AppSession(container:container,groupDirectory:root),context=ModelContext(container)
-        try await app.applySettingsAndWait(["core.faceIDLock":.string("none"),"core.dayStart":.string("midnight")])
+        try await app.applySettingsAndWait(["core.dayStart":.string("midnight")])
         let today=try GregorianDay("2026-10-31"),zone=TimeZone(identifier:"Asia/Riyadh")!,now=ISO8601DateFormatter().date(from:"2026-10-31T12:00:00+03:00")!
         var nextOrder=0
         func addHabit(_ name:String,_ frequency:String,weekdays:[String]?=nil,monthDays:[Int]?=nil,yearMonth:Int?=nil,yearDay:Int?=nil,lastDay:String,lastPeriod:String) throws {
@@ -144,7 +143,7 @@ import MadarPrayer
     func testUpcomingHabitWidgetOmitsRecurrencesWithoutANamedDate() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetHabitComingEmpty-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root),app=try AppSession(container:container,groupDirectory:root),context=ModelContext(container)
-        try await app.applySettingsAndWait(["core.faceIDLock":.string("none"),"core.dayStart":.string("midnight")])
+        try await app.applySettingsAndWait(["core.dayStart":.string("midnight")])
         let today=try GregorianDay("2026-10-31"),zone=TimeZone(identifier:"Asia/Riyadh")!
         for (index,frequency) in ["daily","weekly","monthly"].enumerated() {
             let habit=Habit();habit.id=UUID();habit.name="عادة \(index)";habit.startDate=today.adding(days:-30).date(in:zone);context.insert(habit)
@@ -158,7 +157,6 @@ import MadarPrayer
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetMihbara-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root),app=try AppSession(container:container,groupDirectory:root),context=ModelContext(container),now=app.prayerNow()
         app.authorizeProtectedData()
-        try await app.applySettingsAndWait(["core.faceIDLock":.string("none")])
         let book=Book();book.id=UUID();book.title="على رف القراءة";book.author="مؤلف";book.kind="paper";book.shelf="reading";book.currentPage=14;book.pages=240;book.updatedAt=now;context.insert(book)
         let privateNote=NotebookNote();privateNote.text="SECRET-PRIVATE-NOTE";privateNote.isPrivate=true;privateNote.link="general";privateNote.updatedAt=now.addingTimeInterval(2);context.insert(privateNote)
         let diaryNote=NotebookNote();diaryNote.text="SECRET-DIARY-LINE";diaryNote.isPrivate=false;diaryNote.link="fromDiary";diaryNote.targetID=UUID();diaryNote.updatedAt=now.addingTimeInterval(3);context.insert(diaryNote)

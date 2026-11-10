@@ -29,7 +29,7 @@ struct MoneyAnalysisView: View {
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
-    private var canReadMoney: Bool { app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized }
+    private var canReadMoney: Bool { app.protectedDataAuthorized }
     private func amount(_ n: Int) -> String { visible ? service.amount(n) : "•••" }
     /// Averages and «نحو» projections read in whole currency units; the halalas would claim a precision they lack.
     private func approx(_ n: Int) -> String {

@@ -12,7 +12,7 @@ import MadarSnapshots
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
         func at(_ raw: String) -> Date { ISO8601DateFormatter().date(from: raw)! }
-        _ = try SettingsStore(context: context).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none")])
+        _ = try SettingsStore(context: context).stage(["core.dayStart": .string("midnight")])
         let first = Trip(); first.city = "إسطنبول"; first.tzID = "Europe/Istanbul"
         first.start = at("2026-10-14T00:00:00+03:00"); first.end = at("2026-10-17T10:00:00+03:00")
         let next = Trip(); next.journeyID = first.id; next.city = "باريس"; next.tzID = "Europe/Paris"
@@ -35,7 +35,7 @@ import MadarSnapshots
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
         app.authorizeProtectedData()
-        try await app.applySettingsAndWait(["core.dayStart": .string("midnight"), "notes.widgetContent": .bool(true), "core.faceIDLock": .string("none")])
+        try await app.applySettingsAndWait(["core.dayStart": .string("midnight"), "notes.widgetContent": .bool(true)])
         XCTAssertTrue(app.moneyWidgetPayload(hidden: true, at: app.prayerNow()).rows.isEmpty, "First day has no invented zero balances")
         let now = app.prayerNow(), today = AppBahwService(session: app).today, c = ModelContext(container)
         let account = Account(); account.balanceMinor = 500037; account.balanceAt = now.addingTimeInterval(-86400); c.insert(account)

@@ -70,7 +70,7 @@ struct DiaryDayView: View {
         }
     }
     private var service: AppDiaryService { AppDiaryService(app: app) }
-    private var canReadDiary: Bool { app.lockController?.canPresent(.notes) ?? app.protectedDataAuthorized }
+    private var canReadDiary: Bool { app.protectedDataAuthorized }
     private var pageReloadID: String {
         [shownDay.description, String(app.prayerRevision), String(retry), canReadDiary ? "open" : "closed"].joined(separator: ":")
     }

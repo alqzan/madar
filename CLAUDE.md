@@ -139,7 +139,7 @@ Do not load the whole handoff into context. Each task card in `docs/PROGRESS.md`
 ## Deferred work and repository map
 
 - CloudKit/sync, M0-T06 paperwork, M0-T09 privacy matrix, M0-T12 contrast inspector and app-switcher privacy remain deferred unless explicitly reopened. Encrypted backup is already unfrozen. Fix a confirmed privacy/data-loss defect in any touched route.
-- App lock is optional and off by default (`core.faceIDLock=none`); one unlock opens all rooms. Passcode fallback is used when Face ID is unavailable. No per-room/notebook idle gate.
+- There is no app lock (owner, 10 Nov 2026): the mechanism and the `core.faceIDLock` key are deleted; rooms open directly, protected reads go through `AppSession.protectedDataAuthorized`, and OS file protection still applies. Do not rebuild a lock without an explicit owner request.
 - `Madar/AGENTS.md` and `Madar/CLAUDE.md` point to this protocol and stay byte-identical.
 - `docs/HANDOFF/` holds the approved original spec. Keep changed spec contracts consistent with `Madar/Specification/` when relevant. `docs/reports/M<n>.md` is milestone-gate evidence only; `docs/archive/` is history.
 - `Madar/App/`, `Packages/`, `Tests/`, `scripts/` hold implementation and verification. `Madar/Artifacts/`, `output/`, `tmp/` are ignored local evidence. Do not add new status/report documents when the current board and handover suffice.

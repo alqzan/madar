@@ -21,7 +21,7 @@ extension AppSession {
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
         let settings = try SettingsStore(context: c)
         let homeCurrencyOverride = environment["MADAR_UI_MONEY_CURRENCY"] == "USD" && ["cashback", "showcase"].contains(variant) ? "USD" : nil
-        var seed: [String: MadarData.JSONValue] = ["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["zakatHidden", "travelHidden", "travelMultiLegHidden", "hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden", "subscriptionsHidden"].contains(variant))]
+        var seed: [String: MadarData.JSONValue] = ["core.dayStart": .string("midnight"), "core.hideMoneyUntilTouch": .bool(["zakatHidden", "travelHidden", "travelMultiLegHidden", "hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden", "subscriptionsHidden"].contains(variant))]
         if let homeCurrencyOverride {
             var home = try settings.value(for: "core.homeCity").object ?? [:]
             home["currency"] = .string(homeCurrencyOverride)

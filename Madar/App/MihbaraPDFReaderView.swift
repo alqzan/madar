@@ -48,7 +48,7 @@ struct MihbaraPDFReaderView: View {
     private var saveCoordinator: MihbaraReadingSaveCoordinator { .forSession(app) }
     private var service: AppMihbaraService { .init(app: app) }
     private var digits: MadarNumberFormatter { service.digits }
-    private var canRead: Bool { app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized }
+    private var canRead: Bool { app.protectedDataAuthorized }
     private var readerTheme: RoomTheme { .init(room: "mihbara", dark: colorScheme == .dark) }
     private var paper: Color { readerTheme.background }
     private var ink: Color { readerTheme.ink }

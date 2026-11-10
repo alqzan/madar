@@ -69,10 +69,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     func retryFolderDelivery() async throws
     func exportPlain(progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL
     func export(passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL
-    func validateExport(file: URL) throws
     func share(file: URL) async throws
-    func observeExportRevocation(_ observer: @escaping @MainActor (Bool) -> Void) -> UUID
-    func removeExportObserver(_ id: UUID)
     func previewRestore(file: URL, passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestorePreview
     func restore(previewID: UUID, mode: BackupUIRestoreMode, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestoreResult
     /// Stops cooperatively, removes staging and partial outputs, retains prior successful backups.
@@ -99,26 +96,11 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     var restoreMode: BackupUIRestoreMode = .merge
     private var operation: Task<Void, Never>?
     private var operationID: UUID?
-    private var protectedOperation = false
-    private var revocationObserver: UUID?
     private var retainedPlainExportURL: URL?
-    init(service: any BackupUIService) { self.service = service; observePrivacy() }
-    private func observePrivacy() {
-        guard revocationObserver == nil else { return }
-        revocationObserver = service.observeExportRevocation { [weak self] cancel in
-            guard let self else { return }
-            exportedURL = nil
-            if cancel { discardPlain() } else { plainExportedURL = nil }
-            exportPassphrase = ""; exportConfirmation = ""; restorePassphrase = ""; resultMessage = nil
-            if cancel && protectedOperation {
-                operation?.cancel(); operationID = nil; busy = false; progress = nil; operation = nil; protectedOperation = false
-            }
-        }
-    }
+    init(service: any BackupUIService) { self.service = service }
     var canExport: Bool { !busy && exportPassphrase.count >= 10 && exportPassphrase == exportConfirmation }
     var canInspect: Bool { !busy && selectedFile != nil && !restorePassphrase.isEmpty }
     func refresh() async {
-        observePrivacy()
         do { status = try await service.status(); statusReadFailed = false }
         catch { statusReadFailed = true; errorMessage = "تعذّر قراءة حالة النسخ. \(madarUserMessage(error))" }
     }
@@ -149,11 +131,11 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     func export() {
         guard canExport else { return }
         let passphrase = exportPassphrase
-        run(initial: "يجهّز النسخة المشفّرة…", protected: true) { [self] report, id in
+        run(initial: "يجهّز النسخة المشفّرة…") { [self] report, id in
             let file = try await service.export(passphrase: passphrase, progress: report)
-            try checkRequest(id); try service.validateExport(file: file)
+            try checkRequest(id)
             let current = try? await service.status()
-            try checkRequest(id); try service.validateExport(file: file)
+            try checkRequest(id)
             exportedURL = file; exportPassphrase = ""; exportConfirmation = ""
             if let current { status = current }; resultMessage = "حُفظت النسخة المشفّرة."
         }
@@ -161,9 +143,9 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     func exportPlain() {
         guard !busy else { return }
         discardPlain()
-        run(initial: "يجهّز ملف التصدير…", protected: true) { [self] report, id in
+        run(initial: "يجهّز ملف التصدير…") { [self] report, id in
             let file = try await service.exportPlain(progress: report)
-            try checkRequest(id); try service.validateExport(file: file)
+            try checkRequest(id)
             plainExportedURL = file; retainedPlainExportURL = file
             resultMessage = "التصدير جاهز للحفظ أو المشاركة. الملف غير مشفّر."
         }
@@ -176,13 +158,13 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     func sharePlain() { if let file = plainExportedURL { share(file) } }
     func shareEncrypted() { if let file = exportedURL { share(file) } }
     private func share(_ file: URL) {
-        run(initial: "يفتح المشاركة…", protected: true) { [self] _, id in
+        run(initial: "يفتح المشاركة…") { [self] _, id in
             try await service.share(file: file); try checkRequest(id)
         }
     }
     private func checkRequest(_ id: UUID) throws {
         try Task.checkCancellation()
-        guard operationID == id else { throw PrivacyAuthorizationError.stale }
+        guard operationID == id else { throw CancellationError() }
     }
     func inspect() {
         guard canInspect, let file = selectedFile else { return }
@@ -207,25 +189,23 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     }
     func dismissPreview() { preview = nil; service.discardPreviews() }
     func close() {
-        let wasProtected = protectedOperation
         operation?.cancel(); exportPassphrase = ""; exportConfirmation = ""; restorePassphrase = ""; preview = nil
-        exportedURL = nil; discardPlain(); operationID = nil; busy = false; progress = nil; protectedOperation = false
-        if let revocationObserver { service.removeExportObserver(revocationObserver) }; revocationObserver = nil
-        if !wasProtected { Task { [service] in await service.cancel() } }
+        exportedURL = nil; discardPlain(); operationID = nil; busy = false; progress = nil
+        Task { [service] in await service.cancel() }
     }
     func dismissResult() { resultMessage = nil; restoreResult = nil }
     func cancel() {
         guard busy else { return }
         operation?.cancel()
-        if !protectedOperation { Task { [service] in await service.cancel() } }
+        Task { [service] in await service.cancel() }
     }
-    private func run(initial: String, protected: Bool = false, action: @escaping @MainActor (@escaping @MainActor @Sendable (BackupUIProgress) -> Void, UUID) async throws -> Void) {
+    private func run(initial: String, action: @escaping @MainActor (@escaping @MainActor @Sendable (BackupUIProgress) -> Void, UUID) async throws -> Void) {
         guard !busy else { return }
-        let id = UUID(); operationID = id; busy = true; protectedOperation = protected; resultMessage = nil; restoreResult = nil
+        let id = UUID(); operationID = id; busy = true; resultMessage = nil; restoreResult = nil
         progress = BackupUIProgress(message: initial)
         operation = Task { [weak self] in
             guard let self else { return }
-            defer { if operationID == id { busy = false; progress = nil; operation = nil; protectedOperation = false } }
+            defer { if operationID == id { busy = false; progress = nil; operation = nil } }
             do {
                 #if DEBUG
                 // Controlled UI-state fixture, in an isolated test store only.

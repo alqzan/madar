@@ -37,7 +37,7 @@ struct DiaryHubView: View {
     @State private var aiAvailability: MadarAIAvailability = .checking
     private var service: AppDiaryService { .init(app: app) }
     private var grid: DiaryCalendarGrid { service.diaryCalendar }
-    private var canReadDiary: Bool { app.lockController?.canPresent(.notes) ?? app.protectedDataAuthorized }
+    private var canReadDiary: Bool { app.protectedDataAuthorized }
     private var selectedYear: Int {
         year ?? archive.map { grid.parts($0.today).year ?? $0.today.year } ?? grid.parts(
             GregorianDay.containing(.now, in: app.activePlace.timeZone)

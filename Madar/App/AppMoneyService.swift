@@ -95,7 +95,7 @@ struct MoneyHomeReading: Sendable {
     /// The store/authentication boundary every money read crosses (the ledger used to build the whole home reading just to pass it).
     func requireReadableStore() throws {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         _ = app.prayerRevision
     }
     func load(at instant: Date? = nil) throws -> MoneyHomeReading {

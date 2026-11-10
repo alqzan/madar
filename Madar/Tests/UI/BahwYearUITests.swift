@@ -150,8 +150,8 @@ import XCTest
         XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
         if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
         let later = app.buttons["first-run-continue"]
-        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription); later.tap()
-        XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription)
+        // B2-12: first run now ends after the city, so the second «متابعة» may not exist.
+        if later.waitForExistence(timeout: 3) { later.tap(); XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription) }
     }
     private func capture(_ app: XCUIApplication, _ name: String) { guard ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] != nil else { return }; let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
 }

@@ -110,7 +110,7 @@ import Testing
         let base = try scratch(); defer { try? FileManager.default.removeItem(at: base) }
         let store = try ManagedDataStore(root: base.appendingPathComponent("Managed"), commandLockURL: base.appendingPathComponent("CommandBus.lock"))
         let context = store.container.mainContext; try fixture(context)
-        for key in ["core.faceIDLock", "sys.writerID"] {
+        for key in ["sys.legacyTrial", "sys.writerID"] {
             let row = DeviceSetting(); row.key = key; row.valueJSON = Data("\"private-device-value\"".utf8); context.insert(row)
         }
         context.insert(CommandReceipt()); context.insert(NotificationLedger()); try context.save()

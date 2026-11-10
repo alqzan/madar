@@ -1,5 +1,4 @@
 import SwiftUI
-import LocalAuthentication
 import Observation
 import UIKit
 import WebKit
@@ -50,7 +49,7 @@ import MadarQuran
 
     var canWrite: Bool {
         guard let app else { return false }
-        return app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized
+        return app.protectedDataAuthorized
     }
     var hasPending: Bool { !sessions.isEmpty || !pendingLocators.isEmpty }
     var canRetryPendingWritesNow: Bool {

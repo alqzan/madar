@@ -83,7 +83,7 @@ struct LegacyMoveUndo {
         "habits": ["Habit", "HabitEvent"], "personal": ["Letter", "UpcomingDay"], "money": ["MoneyTransaction", "Account", "Card"]]
 
     func open(_ url: URL) throws -> LegacyMovePreview {
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let data = try Data(contentsOf: url)

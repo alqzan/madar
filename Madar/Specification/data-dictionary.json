@@ -5665,7 +5665,7 @@
     ],
     "auth": {
       "blindWrite": "writes without revealing room content; allowed in background; result text is generic (\"سُجّلت\")",
-      "read": "reveals content; if the room is locked (core.faceIDLock) → needsApp: open the app behind the lock gate",
+      "read": "reveals content; needs the app to be open on this device (needsApp / needsUnlock otherwise)",
       "deviceUnlock": "diary and money commands use IntentAuthenticationPolicy.requiresAuthentication / UNNotificationActionOptions.authenticationRequired"
     },
     "lockedStore": "if an intent cannot open the store (device locked / data protection), it appends the Command envelope to AppGroup/PendingInbox.jsonl and returns; the app drains it through the CommandBus on next foreground (same commandID → idempotent). Before first unlock after reboot even this may fail — recovery is bulk paste. Verified on device in M5.",

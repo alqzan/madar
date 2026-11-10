@@ -34,7 +34,7 @@ struct BahwBlockView: View {
         switch block { case .salah: RoomTheme(room: "salah", dark: dark); case .quran: RoomTheme(room: "quran", dark: dark); case .notes: RoomTheme(room: "notes", dark: dark); case .mihbara: RoomTheme(room: "mihbara", dark: dark); default: lobby }
     }
     private var widgetFamily: WidgetFamily { switch size { case .icon: .accessoryCircular; case .small: .systemSmall; case .wide: .systemMedium; case .large: .systemLarge } }
-    private var mayReadMihbara: Bool { service.session.lockController?.canPresent(.app) ?? service.session.protectedDataAuthorized }
+    private var mayReadMihbara: Bool { service.session.protectedDataAuthorized }
     var body: some View {
         content
             .padding(size == .icon ? 8 : 14)

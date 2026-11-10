@@ -73,7 +73,7 @@ extension AppMoneyService {
 
     func loadMessages(at instant: Date? = nil) throws -> MoneyMessagesReading {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         _ = app.prayerRevision
         let context = ModelContext(app.container), repo = MoneyRepository(context: context), now = instant ?? app.prayerNow()
         let zone = app.activePlace.timeZone, today = try DiaryLineRenderer.today(context: context, now: now)

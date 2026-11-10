@@ -144,8 +144,6 @@ public final class SettingsStore {
     private func decoded(_ data: Data?, for d: SettingDefinition) -> JSONValue {
         let key = d.key
         guard let data else { return d.defaultValue }
-        // Compatibility read only; preserve the stored bytes and all owner records.
-        if key == "core.faceIDLock", (try? JSONDecoder().decode(JSONValue.self, from: data)) == .string("notesOnly") { return .string("none") }
         guard let value = try? JSONDecoder().decode(JSONValue.self,from:data), value == d.defaultValue || (try? schema.validate(value,for:key)) != nil else {
             // The schema promises unknown block ids are dropped on read: a removed or renamed room must not reset the whole lobby layout.
             if key == "bahw.layout", let stored = try? JSONDecoder().decode(JSONValue.self, from: data),

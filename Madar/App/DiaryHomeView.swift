@@ -13,11 +13,7 @@ struct DiaryRoomView: View {
     @Bindable var app: AppSession
     @Environment(\.roomTheme) private var outerTheme
     var body: some View {
-        Group {
-            if let lock = app.lockController {
-                MadarLockGate(controller: lock, feature: .notes) { DiaryLaunchView(app: app) }
-            } else { ProgressView("تُفتح صفحتك…").frame(maxWidth: .infinity, maxHeight: .infinity) }
-        }
+        DiaryLaunchView(app: app)
         .environment(\.roomTheme, RoomTheme(room: "notes", dark: outerTheme.dark, calmPaper: app.string("core.roomIdentity") == "calmPaper"))
     }
 }

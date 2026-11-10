@@ -182,8 +182,8 @@ struct CustomizeMadar: View {
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "الذكاء", "اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "البحث", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
-    private let symbols = ["الذكاء": "sparkles", "العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "الخصوصية": "lock", "البحث": "magnifyingglass", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
+    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "الذكاء", "اليوم والتقويم", "المظهر", "مدينتك", "البحث", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
+    private let symbols = ["الذكاء": "sparkles", "العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "البحث": "magnifyingglass", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"] + RoomHomeLayout.rooms.map { $0.0 + ".layout" }).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
         return CustomizationCopy.changes(count: count, formattedCount: session.digits(count))
@@ -209,7 +209,6 @@ func sectionFor(_ key: String) -> String {
     if ["salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets"].contains(key) { return "المواقيت" }
     if key == "core.homeCity" { return "مدينتك" }
     if ["salah.showMosqueStreak", "salah.askHeart"].contains(key) { return "الصلاة" }
-    if key == "core.faceIDLock" { return "الخصوصية" }
     // FB-39: these prayer keys used to fall through to «المظهر», so travel method and pending days were never on the prayer page.
     if ["salah.pendingDays", "salah.tripMethod", "salah.travelShortenCombine", "salah.pool", "salah.fridayTallArch"].contains(key) { return "الصلاة" }
     if key == "core.spotlightIndex" { return "البحث" }
@@ -337,8 +336,7 @@ struct SettingControl: View {
             default: EmptyView()
             }
             // AU-43: the switches that change what reaches the user say what they do.
-            if let caption = ["core.faceIDLock": "مدار كله (اختياري): يطلب Face ID عند فتح مدار، ورمز iPhone إذا تعذّر، ويخفي تفاصيل الودجات والإشعارات. بلا (الافتراضي): يُفتح مباشرة.",
-                              "notif.thisDeviceReminders": "إيقافه يوقف كل تذكيرات مدار على هذا الجهاز، وتبقى مواعيدك وسجلّك كما هي.",
+            if let caption = ["notif.thisDeviceReminders": "إيقافه يوقف كل تذكيرات مدار على هذا الجهاز، وتبقى مواعيدك وسجلّك كما هي.",
                               "notif.quietAfterIsha": "لا تصلك تذكيرات الغرف من بدء الصمت حتى نهايته التي تختارها: الفجر أو الشروق أو منتصف الليل."][definition.key] {
                 Text(caption).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
             }

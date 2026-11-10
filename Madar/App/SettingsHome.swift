@@ -56,7 +56,7 @@ struct SettingsHome: View {
                 link("اليوم والتقويم", "بداية اليوم والتقويم الأول", "moon") { sectionsPage("اليوم والتقويم", ["اليوم والتقويم", "مدينتك"]) }
                 link("المظهر", "الوضع والألوان والأرقام", "paintpalette") { sectionsPage("المظهر", ["المظهر"]) }
                 link("الإشعارات", "تذكيرات الغرف وأوقات الصمت", "bell.badge") { sectionsPage("الإشعارات", ["الإشعارات"]) }
-                link("الخصوصية والبحث", "فهرسة Spotlight وإخفاء الأرقام", "lock") { sectionsPage("الخصوصية والبحث", ["الخصوصية", "البحث"]) }
+                link("الخصوصية والبحث", "فهرسة Spotlight وإخفاء الأرقام", "lock") { sectionsPage("الخصوصية والبحث", ["البحث"]) }
                 if let backup = session.backupService {
                     link("النسخ والاستعادة", "احفظ بياناتك أو استعدها", "externaldrive") {
                         BackupSettingsView(service: backup, numerals: session.string("core.numerals") == "western" ? .western : .hindi,

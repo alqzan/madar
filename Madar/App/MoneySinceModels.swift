@@ -60,7 +60,7 @@ extension AppMoneyService {
     }
 
     func loadSince(home: MoneyHomeReading, at instant: Date? = nil) throws -> MoneySinceReading {
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         let context = ModelContext(app.container), now = instant ?? app.prayerNow(), zone = app.activePlace.timeZone
         let today = try DiaryLineRenderer.today(context: context, now: now)
         // Every instant becomes a day by core.dayStart, as the home and the stored dayKeys do.

@@ -89,7 +89,6 @@ targets:
             CFBundleURLSchemes: [madar]
         ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: التقط صورًا تضيفها إلى مذكراتك، وامسح باركود الكتاب أو فهرسه.
-        NSFaceIDUsageDescription: افتح بيانات مدار المحمية بمصادقة الجهاز.
         NSLocationWhenInUseUsageDescription: يقرأ مدار موقعك مرة واحدة ليعرف مدينتك ويحسب مواقيت الصلاة بدقة، ويسألك إن كنت مسافرًا. يحفظ المدينة وإحداثياتها على جهازك فقط؛ ولمعرفة اسمها يرسل النظام الموقع إلى Apple مرة واحدة.
         NSHealthShareUsageDescription: يقرأ مدار الخطوات أو دقائق الحركة التي تختارها لحساب عادة المشي؛ لا يكتب في تطبيق الصحة.
         NSHealthUpdateUsageDescription: لا يكتب مدار أي بيانات في تطبيق الصحة؛ يقرأ فقط الخطوات أو دقائق الحركة التي تسمح بها.

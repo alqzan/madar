@@ -94,13 +94,13 @@ let hashtag = "#" + tag
         self.assertTrue(any('categories incomplete' in issue for issue in issues))
 
     def test_literal_bad_colour_font_setting_and_dynamic_not_silently_green(self):
-        definitions = {'core.faceIDLock': {'type':'choice', 'default':'notesOnly'}}
+        definitions = {'core.sample': {'type':'choice', 'default':'one'}}
         source = '''// ١ · ٢ ignored comment
 Text("١ · ٢").font(.system(size: 10))
 Text("value").foregroundStyle(.red)
-session.bool("core.faceIDLock")
+session.bool("core.sample")
 session.string("core.missing")
-session.set(.bool(true), key: "core.faceIDLock")
+session.set(.bool(true), key: "core.sample")
 Text("\\(count) · pages")
 session.string(definition.key)
 Text("\\(digits(count)) سجلًّا")

@@ -45,12 +45,6 @@
       "flow": "Prepare plain export -> share; retained password backup/inspect/restore/cancel, native importer/share; auth/privacy tracked separately T09"
     },
     {
-      "path": "Madar/App/MadarLock.swift",
-      "anchor": "struct MadarLockGate",
-      "availability": "v1 current privacy",
-      "flow": "One app-level biometric-only gate. All rooms stay open after unlock; no notebook/per-room gate or passcode fallback."
-    },
-    {
       "path": "Madar/Intents/OpenMadarIntent.swift",
       "anchor": "static let openAppWhenRun = true",
       "availability": "v1 current navigation only",
@@ -99,7 +93,7 @@
       "flow": "Ephemeral on-device PDF OCR/search; source-page jump and cancellation; no original-file rewrite."
     },
     {
-      "path": "Madar/App/AppPrivacyService.swift",
+      "path": "Madar/App/AppSpotlightIndexing.swift",
       "anchor": "enum AppSpotlightIndexing",
       "availability": "v1 M7 optional",
       "flow": "Off-by-default title-only Spotlight indexing, no diary/body indexing."

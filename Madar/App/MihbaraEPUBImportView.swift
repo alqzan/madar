@@ -9,12 +9,12 @@ import MadarDesign
 
 @MainActor extension AppMihbaraService {
     func stageEPUB(_ source: URL, id: UUID) async throws -> EPUBBookInspection {
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         let root = app.bookStagingDirectory
         let inspection = try await EPUBBookFiles.stageForPreview(source: source, root: root, id: id)
         do {
             try Task.checkCancellation()
-            guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+            guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
             _ = try AppMihbaraService(app: app).bookRestorableFromFile(sha256: inspection.sha256, sizeBytes: inspection.sizeBytes, formats: ["epub"])
             return inspection
         } catch { EPUBBookFiles.discard(id: id, root: root); throw error }

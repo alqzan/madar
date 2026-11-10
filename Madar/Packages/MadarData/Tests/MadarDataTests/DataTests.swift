@@ -177,9 +177,23 @@ import Testing
         context.insert(primary); context.insert(imported); context.insert(again); try context.save(); try RowMerger(context:context).run()
         #expect(try context.fetch(FetchDescriptor<Entry>()).filter { $0.mergedInto == nil && $0.deletedAt == nil }.count == 2); #expect(try RowMerger(context:context).run() == 0)
     }
+    @Test func removedAppLockKeyIsIgnoredAndItsStoredRowIsKept() throws {
+        let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext)
+        #expect(!store.schema.settings.contains { $0.key == "core.faceIDLock" })
+        // A store written by an older build still holds the removed key: opening and reading must not fail or drop the row.
+        for stored in ["\"app\"", "\"notesOnly\""] {
+            let row = DeviceSetting(); row.key = "core.faceIDLock"; row.valueJSON = Data(stored.utf8); c.mainContext.insert(row)
+        }
+        try c.mainContext.save()
+        let values = try store.allValues()
+        #expect(values["core.faceIDLock"] == nil)
+        #expect(values["core.firstCalendar"] == .string("gregorian"))
+        #expect(try c.mainContext.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key == "core.faceIDLock" }.count == 2)
+        #expect(throws: DataError.invalidValue("unknown setting core.faceIDLock")) { try store.set(.string("app"), for: "core.faceIDLock") }
+    }
     @Test func settingsDefaultsPersistenceAndInvalidRejection() throws {
         let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext)
-        #expect(store.schema.settings.count == 150); // settings-schema.json: 151 on 4 Nov, then salah.qadaReminder removed (owner 6 Nov, FB-41)
+        #expect(store.schema.settings.count == 149); // settings-schema.json: 151 on 4 Nov, salah.qadaReminder removed (owner 6 Nov, FB-41), core.faceIDLock removed (owner 10 Nov)
          #expect(try store.value(for:"core.firstCalendar") == .string("gregorian")) // owner, 22 Oct 2026
         #expect(throws:DataError.invalidValue("core.hijriOffset")) { try store.set(.number(9),for:"core.hijriOffset") }
         let undo = try store.set(.number(1),for:"core.hijriOffset"); #expect(try store.value(for:"core.hijriOffset") == .number(1)); try store.undo(undo); #expect(try store.value(for:"core.hijriOffset") == .number(0))

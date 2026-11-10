@@ -38,7 +38,7 @@ import MadarCommands
 }
 extension AppMoneyService {
     func loadZakat(at now: Date? = nil) throws -> MoneyZakatReading {
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         return try MoneyRepository(context: ModelContext(app.container)).zakat(at: now ?? app.prayerNow())
     }
     func moneyInput(_ n: Int, exponent: Int? = nil) -> String {

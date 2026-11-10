@@ -332,8 +332,8 @@ struct MadarAIAnalysisSheet: View {
     private var themeSecondary: Color { theme.secondaryInk }
     private var themeSurface: Color { theme.surface }
     private var themeAccent: Color { theme.accent }
-    private var canReadDiary: Bool { app.lockController?.canPresent(.notes) ?? app.protectedDataAuthorized }
-    private var canReadMoney: Bool { app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized }
+    private var canReadDiary: Bool { app.protectedDataAuthorized }
+    private var canReadMoney: Bool { app.protectedDataAuthorized }
     private var allowedScopes: [MadarAIAnalysisScope] {
         kind == .diary ? [.day, .memo, .month, .custom, .all] : [.week, .month, .cycle, .custom, .all]
     }

@@ -39,8 +39,6 @@
 	<string>$(MADAR_CLOUDKIT_CONTAINER)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>التقط صورًا تضيفها إلى مذكراتك، وامسح باركود الكتاب أو فهرسه.</string>
-	<key>NSFaceIDUsageDescription</key>
-	<string>افتح بيانات مدار المحمية بمصادقة الجهاز.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>يقرأ مدار الخطوات أو دقائق الحركة التي تختارها لحساب عادة المشي؛ لا يكتب في تطبيق الصحة.</string>
 	<key>NSHealthUpdateUsageDescription</key>

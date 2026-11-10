@@ -114,7 +114,7 @@ struct MihbaraMotivationCue: Identifiable {
 
     private func loadHome(at instant: Date?) throws -> MihbaraHomeReading {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         let c = ModelContext(app.container), now = instant ?? app.prayerNow(), day = try DiaryLineRenderer.today(context: c, now: now)
         let storedBooks = try c.fetch(FetchDescriptor<Book>(predicate: #Predicate {
             $0.deletedAt == nil && $0.mergedInto == nil
@@ -234,7 +234,7 @@ struct MihbaraMotivationCue: Identifiable {
     /// RMI3: a book line comes only from the user's own page-linked note. When none exists,
     /// the home offers a short reading step and real progress instead of inventing a quotation.
     func motivationCues(for reading: MihbaraHomeReading, book: MihbaraBook?) throws -> [MihbaraMotivationCue] {
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         var cues: [MihbaraMotivationCue] = []
         if let book {
             let context = ModelContext(app.container)
@@ -279,7 +279,7 @@ struct MihbaraMotivationCue: Identifiable {
 
     /// M6-V08: the book's live paragraph highlights, oldest first so a later one draws on top.
     func highlights(for bookID: UUID) throws -> [MihbaraHighlight] {
-        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         return try ModelContext(app.container).fetch(FetchDescriptor<Highlight>())
             .filter { $0.bookID == bookID && $0.deletedAt == nil && $0.mergedInto == nil && MihbaraHighlight.colors.contains($0.color) }
             .sorted { $0.createdAt == $1.createdAt ? $0.id.uuidString < $1.id.uuidString : $0.createdAt < $1.createdAt }

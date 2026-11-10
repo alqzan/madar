@@ -17,7 +17,7 @@ extension AppSession {
         guard !(try context.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.diaryFixture" }) else { return }
         let settings = try SettingsStore(context: context)
         let dayStart = env["MADAR_UI_DIARY_DAY_BOUNDARY_HARNESS"] == "1" ? "fajr" : "midnight"
-        _ = try settings.stage(["core.faceIDLock": .string("none"), "core.dayStart": .string(dayStart)])
+        _ = try settings.stage(["core.dayStart": .string(dayStart)])
         for key in ["sys.onboardingCompleted", "sys.diaryFixture"] { let row = DeviceSetting(); row.key = key; row.valueJSON = Data("true".utf8); context.insert(row) }
         if variant != "welcome" && variant != "restored" { let marker = DeviceSetting(); marker.key = "sys.diaryWelcomeSeen"; marker.valueJSON = Data("true".utf8); context.insert(marker) }
         if variant == "restored" {
@@ -182,7 +182,6 @@ extension AppSession {
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.legacyTrial" }) else { return }
         for key in ["sys.legacyTrial", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
-        _ = try SettingsStore(context: c).stage(["core.faceIDLock": .string("none")])
         try c.save()
     }
     func runLegacyDiaryTrialIfRequested() async {
