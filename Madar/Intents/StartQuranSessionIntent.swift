@@ -2,9 +2,9 @@ import AppIntents
 import Foundation
 
 enum QuranIntentStep: String, AppEnum {
-    case bridge, hifz, review, drill
+    case hifz, review, drill
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "الخطوة")
-    static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [.bridge: "الجسر", .hifz: "الورد", .review: "المراجعة", .drill: "مواضع الخطأ"]
+    static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [.hifz: "الورد", .review: "المراجعة", .drill: "مواضع الخطأ"]
 }
 struct StartQuranSessionIntent: AppIntent {
     static let title: LocalizedStringResource = "ابدأ جلسة القرآن"
