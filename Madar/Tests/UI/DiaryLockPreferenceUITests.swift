@@ -32,8 +32,6 @@ import notify
         if start.waitForExistence(timeout: 3) { start.tap(); if start.exists && start.isHittable { start.tap() } }
         let notes = app.buttons["tab-notes"]
         XCTAssertTrue(notes.waitForExistence(timeout: 20), app.debugDescription); notes.tap()
-        XCTAssertTrue(app.buttons["diary-welcome-next"].waitForExistence(timeout: 10))
-        for _ in 0..<4 { app.buttons["diary-welcome-next"].tap() }
         XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["المذكرات مقفلة"].exists)
         capture(app, "UX-01-diary-L")

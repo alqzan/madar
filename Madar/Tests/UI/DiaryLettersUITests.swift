@@ -4,20 +4,6 @@ import XCTest
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
-    func testWelcomeRetriesAfterItsFirstReadFails() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "welcome", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_DIARY_WELCOME_READ_FAILURE_ONCE": "1"]
-        app.launch()
-        let retry = app.buttons["diary-welcome-retry"]
-        XCTAssertTrue(retry.waitForExistence(timeout: 12), app.debugDescription)
-        let error = app.staticTexts["diary-welcome-error"]
-        XCTAssertEqual(error.label, "تعذّر فتح صفحة اليوميات.")
-        shot(app, "AU-70-welcome-read-error-L")
-        retry.tap()
-        XCTAssertTrue(app.buttons["diary-welcome-next"].waitForExistence(timeout: 10), app.debugDescription)
-        shot(app, "AU-70-welcome-retried-L")
-    }
     func testDiaryArchiveRetriesAfterItsFirstReadFails() {
         continueAfterFailure = false
         let app = XCUIApplication()

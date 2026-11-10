@@ -4,20 +4,11 @@ import XCTest
     private func launch(_ fixture: String) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]; app.launch(); return app
     }
-    func testWelcomeCompletesOnceAndKeyboardOpensDirectly() throws {
+    func testFirstOpenShowsTodayDirectlyAndKeyboardOpensWithoutWelcome() throws {
         continueAfterFailure = false
         let app = launch("welcome")
-        XCTAssertTrue(app.buttons["diary-welcome-next"].waitForExistence(timeout: 25)); capture(app, "M3-V05-welcome-L")
-        for (index, title) in ["دفتر يكتب معك", "ما تعيشه، بأسلوب المذكرات", "للذكرى أكثر من تقويم", "سطر واحد يكفي للبداية"].enumerated() {
-            let heading = app.staticTexts["diary-welcome-title"]
-            expectation(for: NSPredicate(format: "label == %@", title), evaluatedWith: heading)
-            let next = app.buttons["diary-welcome-next"]
-            expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: next)
-            waitForExpectations(timeout: 10)
-            capture(app, "M3-V05-welcome-step-\(index + 1)-L")
-            next.tap()
-        }
-        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25), app.debugDescription)
+        XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
         app.buttons["diary-write"].tap(); XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))

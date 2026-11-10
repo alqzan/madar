@@ -64,7 +64,7 @@ struct DiaryTextEditor: View {
             // A room-tab write link presents during the native sheet transition; an earlier
             // focus request can be dropped before the text view joins its window.
             if !app.bool("notes.dictationFirst") {
-                do { try await Task.sleep(for: .milliseconds(450)) } catch { return }
+                do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
                 if !Task.isCancelled, voice?.recording != true { focused = true }
             }
         }
