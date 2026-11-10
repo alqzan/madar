@@ -421,6 +421,18 @@
    "preset": false
   },
   {
+   "key": "core.essentials",
+   "owner": "core",
+   "section": "المظهر",
+   "title": "وضع الأساسيات",
+   "type": "bool",
+   "default": false,
+   "scope": "device",
+   "note": "يطوي أقسام «متقدم» كلها في الإعدادات (النقل من مدار القديم، التصدير غير المشفّر، مصدر الهجري وقاعدة خطوط العرض وإزاحات المواقيت وفهرس البحث)؛ لا يغيّر أي قيمة ولا بيانات",
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": false
+  },
+  {
    "key": "core.iCloudSync",
    "owner": "core",
    "section": "البيانات",

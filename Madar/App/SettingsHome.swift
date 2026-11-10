@@ -56,21 +56,22 @@ struct SettingsHome: View {
                 link("اليوم والتقويم", "بداية اليوم والتقويم الأول", "moon") { sectionsPage("اليوم والتقويم", ["اليوم والتقويم", "مدينتك"]) }
                 link("المظهر", "الوضع والألوان والأرقام", "paintpalette") { sectionsPage("المظهر", ["المظهر"]) }
                 link("الإشعارات", "تذكيرات الغرف وأوقات الصمت", "bell.badge") { sectionsPage("الإشعارات", ["الإشعارات"]) }
+                link("صحة مدار", "النسخة الاحتياطية والطلبات المعلّقة والإشعارات", "heart.text.square") { MadarHealthView(session: session) }
                 link("الخصوصية والبحث", "فهرسة Spotlight وإخفاء الأرقام", "lock") { sectionsPage("الخصوصية والبحث", ["البحث"]) }
                 if let backup = session.backupService {
                     link("النسخ والاستعادة", "احفظ بياناتك أو استعدها", "externaldrive") {
                         BackupSettingsView(service: backup, numerals: session.string("core.numerals") == "western" ? .western : .hindi,
                                            dates: { session.dateLabels(GregorianDay.containing($0, in: session.activePlace.timeZone)) },
-                                           time: { session.backupTime($0) })
+                                           time: { session.backupTime($0) }, hidesAdvanced: session.bool("core.essentials"))
                     }
                 }
                 RejectedActionsRow(session: session)
                 // B2-18 (owner, 10 Nov 2026): a one-time move from the old Madar sits folded under «متقدم».
-                DisclosureGroup {
+                if !session.bool("core.essentials") { DisclosureGroup {
                     NavigationLink { LegacyMoveView(app: session) } label: { rowLabel("انقل من مدار القديم", "استيراد بياناتك السابقة", "square.and.arrow.down") }
                         .buttonStyle(.madarPlain).accessibilityIdentifier("legacy-move-link")
                 } label: { Text("متقدم").font(MadarTypography.body().bold()).frame(minHeight: 44, alignment: .leading).accessibilityIdentifier("settings-advanced") }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 16) }
                 door("أعِد الإعدادات المتفق عليها", changes, "arrow.counterclockwise", resetAll)
             }
     }

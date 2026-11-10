@@ -247,6 +247,47 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any)["money-settings"].waitForExistence(timeout: 15), app.debugDescription)
     }
 
+    /// Batch 3: «وضع الأساسيات» folds the «متقدم» group away on the settings home; searching still finds what it hides.
+    func testEssentialsModeFoldsTheAdvancedGroupAway() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        app.buttons["tab-customize"].tap()
+        let search = app.textFields["settings-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription)
+        let advanced = app.descendants(matching: .any)["settings-advanced"].firstMatch
+        for _ in 0..<14 where !advanced.exists { app.swipeUp(velocity: .fast) }
+        XCTAssertTrue(advanced.exists, "«متقدم» is on the settings home by default")
+        for _ in 0..<14 { app.swipeDown(velocity: .fast) }
+        search.tap(); search.typeText("الأساسيات")
+        let toggle = app.switches["setting-core.essentials"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(toggle.value as? String, "0")
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "1")
+        search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 12))
+        for _ in 0..<14 { app.swipeUp(velocity: .fast) }
+        XCTAssertFalse(app.descendants(matching: .any)["settings-advanced"].firstMatch.exists, "Essentials mode hides the «متقدم» group")
+    }
+
+    /// Batch 3: «صحة مدار» opens from the settings home and gives a verdict plus the backup row (a fresh store has no backup yet).
+    func testMadarHealthPageShowsAVerdictAndTheBackupRow() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        app.buttons["tab-customize"].tap()
+        let link = app.buttons["settings-link-صحة مدار"]
+        for _ in 0..<14 where !link.exists || !link.isHittable { app.swipeUp(velocity: .fast) }
+        XCTAssertTrue(link.isHittable, app.debugDescription)
+        link.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["health-verdict"].firstMatch.waitForExistence(timeout: 15), app.debugDescription)
+        let backup = app.descendants(matching: .any)["health-backup"].firstMatch
+        XCTAssertTrue(backup.exists, app.debugDescription)
+        XCTAssertTrue(backup.label.contains("لا توجد نسخة بعد"), backup.label)
+    }
+
     func testHabitWidgetScopeLabelsUndoAndRelaunch() {
         continueAfterFailure = false
         let app = XCUIApplication()

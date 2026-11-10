@@ -93,7 +93,7 @@ struct CustomizeMadar: View {
                         NavigationLink("النسخ والاستعادة") {
                             BackupSettingsView(service: backup, numerals: session.string("core.numerals") == "western" ? .western : .hindi,
                                 dates: { session.dateLabels(GregorianDay.containing($0, in: session.activePlace.timeZone)) },
-                                time: { session.backupTime($0) })
+                                time: { session.backupTime($0) }, hidesAdvanced: session.bool("core.essentials"))
                         }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("backup-settings-link")
                     }
                     // Only a build signed for iCloud shows sync (no entry point to an unconfigured feature).
@@ -214,7 +214,7 @@ struct CustomizeMadar: View {
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "الذكاء", "اليوم والتقويم", "المظهر", "مدينتك", "البحث", "الإشعارات", "الصلاة", "المواقيت", "متقدم"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
+    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "الذكاء", "اليوم والتقويم", "المظهر", "مدينتك", "البحث", "الإشعارات", "الصلاة", "المواقيت", "متقدم"].filter { section in !(section == "متقدم" && query.isEmpty && session.bool("core.essentials")) && filtered.contains { sectionFor($0.key) == section } } }
     private let symbols = ["متقدم": "gearshape.2", "الذكاء": "sparkles", "العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "البحث": "magnifyingglass", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"] + RoomHomeLayout.rooms.map { $0.0 + ".layout" }).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count

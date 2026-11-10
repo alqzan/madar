@@ -193,7 +193,7 @@ import Testing
     }
     @Test func settingsDefaultsPersistenceAndInvalidRejection() throws {
         let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext)
-        #expect(store.schema.settings.count == 149); // settings-schema.json: 151 on 4 Nov, salah.qadaReminder removed (owner 6 Nov, FB-41), core.faceIDLock removed (owner 10 Nov)
+        #expect(store.schema.settings.count == 150); // settings-schema.json: core.essentials added (owner 10 Nov, Batch 3); 151 on 4 Nov, salah.qadaReminder removed (owner 6 Nov, FB-41), core.faceIDLock removed (owner 10 Nov)
          #expect(try store.value(for:"core.firstCalendar") == .string("gregorian")) // owner, 22 Oct 2026
         #expect(throws:DataError.invalidValue("core.hijriOffset")) { try store.set(.number(9),for:"core.hijriOffset") }
         let undo = try store.set(.number(1),for:"core.hijriOffset"); #expect(try store.value(for:"core.hijriOffset") == .number(1)); try store.undo(undo); #expect(try store.value(for:"core.hijriOffset") == .number(0))

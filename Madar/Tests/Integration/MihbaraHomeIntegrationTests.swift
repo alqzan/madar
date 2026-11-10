@@ -270,6 +270,17 @@ import CoreSpotlight
     }
 
     /// B2-18: the rarely-changed calendar, prayer-time and search keys share one «متقدم» fold; everyday keys keep their sections.
+    /// Batch 3: «وضع الأساسيات» is an additive device setting, off by default, and it does not move any other key into «متقدم».
+    func testEssentialsModeIsAnAdditiveDeviceSettingOffByDefault() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "EssentialsMode-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
+        let definition = try XCTUnwrap(app.schema.settings.first { $0.key == "core.essentials" })
+        XCTAssertEqual(definition.defaultValue, .bool(false))
+        XCTAssertEqual(definition.scope, "device")
+        XCTAssertTrue(AppSession.supportedKeys.contains("core.essentials"))
+        XCTAssertEqual(sectionFor("core.essentials"), "المظهر")
+    }
+
     func testRarelyChangedSettingsShareOneAdvancedSection() {
         for key in ["core.hijriSource", "core.hijriOffset", "salah.highLatitudeRule", "salah.offsets", "core.spotlightIndex"] {
             XCTAssertEqual(sectionFor(key), "متقدم", key)

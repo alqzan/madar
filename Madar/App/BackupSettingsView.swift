@@ -234,12 +234,15 @@ struct BackupSettingsView: View {
     @State private var choosingFile = false
     @State private var confirmingRestore = false
     @State private var advancedOpen = false
+    /// Essentials mode (core.essentials) folds the unencrypted export away; it stays open once a file is ready.
+    private let hidesAdvanced: Bool
     @FocusState private var focusedPassword: Int?
     @Environment(\.roomTheme) private var theme
     init(service: any BackupUIService, numerals: NumeralStyle = .hindi,
          dates: @escaping (Date) -> MadarDateLabels,
-         time: @escaping (Date) -> String = { $0.formatted(date: .omitted, time: .shortened) }) {
-        self.numerals = numerals; self.dates = dates; self.time = time
+         time: @escaping (Date) -> String = { $0.formatted(date: .omitted, time: .shortened) },
+         hidesAdvanced: Bool = false) {
+        self.numerals = numerals; self.dates = dates; self.time = time; self.hidesAdvanced = hidesAdvanced
         _model = State(initialValue: BackupSettingsModel(service: service))
     }
     var body: some View {
@@ -250,7 +253,7 @@ struct BackupSettingsView: View {
                 folderCard
                 encryptedCard
                 restoreCard
-                advancedCard
+                if !hidesAdvanced || model.plainExportedURL != nil { advancedCard }
             }
             .padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }
