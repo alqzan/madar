@@ -42,6 +42,16 @@ import MadarData
         let after = try repository.snapshot(now: state.validUntil.addingTimeInterval(1))
         #expect(after.today.cells.map(\.status) != state.today.cells.map(\.status) || after.next != state.next || after.today.cells.map(\.canMakeUp) != state.today.cells.map(\.canMakeUp))
     }
+    @Test func daysOlderThanThirtyTwoStayReachableThroughEarlier() throws {
+        // Tracking began on 8 Aug, 61 days up to 7 Oct 2026; history holds the newest 32 and earlier the rest, in one unbroken run.
+        let container = try container(start: "2026-08-08T04:00:00+03:00")
+        let state = try PrayerRepository(context: container.mainContext).snapshot(now: time("2026-10-07T12:05:00+03:00"))
+        #expect(state.history.count == 32)
+        #expect(state.history.first?.day.description == "2026-10-07")
+        #expect(state.earlier.count == 29)
+        #expect(state.earlier.first?.day.description == "2026-09-05")
+        #expect(state.earlier.last?.day.description == "2026-08-08")
+    }
     @Test func aPerformedLatePrayerCreatesOneQadaLogAndUndoRemovesIt() throws {
         let container = try container(start: "2026-10-06T04:00:00+03:00")
         let context = container.mainContext

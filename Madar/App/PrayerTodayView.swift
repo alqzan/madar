@@ -1126,7 +1126,7 @@ private struct PrayerTodayLogSheet: View {
         let tint = theme.accent
         let (title, detail): (String, String) = switch option {
         case .jamaah: ("في جماعة", "مع الناس")
-        case .alone: ("وحدي", "في وقتها")
+        case .alone: ("وحدي", cell.canMakeUp ? "بلا جماعة" : "في وقتها")
         case .qada: ("قضاءً", "صلّيتها بعد وقتها")
         case .missed, .unrecordedHistory, .excused: ("", "")
         }

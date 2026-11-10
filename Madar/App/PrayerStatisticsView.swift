@@ -198,7 +198,7 @@ struct PrayerStatisticsView: View {
                 }
             }
             if typeSize.isAccessibilitySize {
-                ForEach(snapshot.history.filter { hijri($0.day).month == month.month && hijri($0.day).year == month.year }, id: \.day) { day in
+                ForEach((snapshot.history + snapshot.earlier).filter { hijri($0.day).month == month.month && hijri($0.day).year == month.year }, id: \.day) { day in
                     Button { editing = PrayerDayRoute(day: day.day) } label: {
                         MadarDateLabel(dateTitle(day.day))
                             .fixedSize(horizontal: false, vertical: true)
@@ -224,7 +224,7 @@ struct PrayerStatisticsView: View {
             ForEach(0..<leading, id: \.self) { _ in Color.clear.frame(height: 64).accessibilityHidden(true) }
             ForEach(monthDays, id: \.self) { day in
                 let isToday = day == snapshot.today.day
-                if let summary = snapshot.history.first(where: { $0.day == day }) {
+                if let summary = (snapshot.history + snapshot.earlier).first(where: { $0.day == day }) {
                     Button { editing = PrayerDayRoute(day: day) } label: { dayCell(day, cells: summary.cells, today: isToday) }
                         .buttonStyle(.madarPlain)
                         .accessibilityLabel(dateTitle(day)).accessibilityIdentifier("prayer-history-day-\(day)")
@@ -370,7 +370,7 @@ private struct PrayerDayEditSheet: View {
     @State private var contentHeight: CGFloat = 560
 
     private var summary: PrayerDaySummary? {
-        (try? session.prayerSnapshot(at: session.prayerNow()))?.history.first { $0.day == day }
+        (try? session.prayerSnapshot(at: session.prayerNow())).flatMap { ($0.history + $0.earlier).first { $0.day == day } }
     }
 
     var body: some View {

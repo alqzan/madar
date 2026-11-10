@@ -74,6 +74,8 @@ public struct PrayerTracking: Equatable, Sendable {
 public struct PrayerSnapshot: Equatable, Sendable {
     public let today: PrayerDaySummary
     public let history: [PrayerDaySummary]
+    /// B2-5: days older than `history` (newest first), already computed for the statistics; the log screens page back into them.
+    public let earlier: [PrayerDaySummary]
     public let tracking: PrayerTracking
     public let pending: [PrayerReference]
     public let unconfirmed: [PrayerReference]
