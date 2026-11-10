@@ -219,6 +219,14 @@ import XCTest
         XCTAssertFalse(app.buttons["bahw-suggestion-notes"].exists)
         reveal(quran); capture(app, "OR-03-smart-medium-L"); quran.tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))
+        // Batch 3: the lobby step opens the ready session itself; it covers the tab bar until closed.
+        let closeSession = app.buttons["quran-session-close"]
+        if closeSession.waitForExistence(timeout: 5) {
+            closeSession.tap()
+            let keep = app.buttons["quran-session-keep"]
+            XCTAssertTrue(keep.waitForExistence(timeout: 8), app.debugDescription); keep.tap()
+            XCTAssertTrue(closeSession.waitForNonExistence(timeout: 10), app.debugDescription)
+        }
         // FB-32: a setting change shows no undo line; the reset at the foot of the page brings the default back.
         openSetting(); app.buttons["option-bahw.smartPresence-present"].tap(); selected("present")
         capture(app, "OR-03-smart-settings-L")
