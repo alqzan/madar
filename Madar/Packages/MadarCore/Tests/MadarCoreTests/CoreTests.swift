@@ -96,6 +96,17 @@ func sanctityGuardCascades() throws {
     #expect(guarder.clamp(following.start) == following.end)
     #expect(guarder.clamp(following.end) == following.end)
 }
+@Test("B2-11 a snooze obeys quiet hours; the prayer ask itself does not")
+func snoozeObeysQuietHours() throws {
+    let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
+    let late = day.isha.addingTimeInterval(2 * 3600)   // inside «صمت بعد العشاء» (from 20:00 to midnight)
+    let policy = NotificationPolicy(quietFromMinutes: 20 * 60, quietUntil: .midnight, staleNudgeEnabled: false)
+    let ask = NotificationCandidate(id: "salah.\(day.day).isha", room: .salah, kind: .prayerAsk, dueAt: late, dayKey: day.day.description)
+    let snooze = NotificationCandidate(id: "salah.\(day.day).isha.snooze", room: .salah, kind: .prayerAsk, dueAt: late, dayKey: day.day.description)
+    let plan = NotificationArbiter.plan(candidates: [ask, snooze], prayerDays: [day], now: day.isha, timeZone: day.place.timeZone, policy: policy)
+    #expect(plan.scheduled.map(\.id) == [ask.id])
+    #expect(plan.droppedIDs.contains(snooze.id))
+}
 @Test("RP3 planning clamps prayer asks, snoozes, room requests, digest and nudge")
 func sanctityRequestPaths() throws {
     let friday = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))

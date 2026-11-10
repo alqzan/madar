@@ -150,7 +150,9 @@ public enum NotificationArbiter {
                 guard due == candidate.dueAt, !isQuiet(due, timeZone: timeZone, policy: policy, prayerDays: prayerDays) else { dropped.append(candidate.id); continue }
                 scheduled.append(shifted); continue
             }
-            if candidate.kind == .prayerAsk { scheduled.append(shifted); continue }
+            // The prayer ask itself is not muted by quiet hours (it is moved off sanctity only); a snooze of it is the writer's own
+            // «ذكّرني بعد ساعة», which obeys quiet hours like every other reminder (B2-11, 10 Nov).
+            if candidate.kind == .prayerAsk, !candidate.id.hasSuffix(".snooze") { scheduled.append(shifted); continue }
             guard !isQuiet(due, timeZone: timeZone, policy: policy, prayerDays: prayerDays) else { dropped.append(candidate.id); continue }
             let key = madarKey(at: due, prayerDays: prayerDays, timeZone: timeZone, boundary: policy.dayBoundary)
             if let cycle = candidate.categoryCycleKey, cycles.contains(cycle) { dropped.append(candidate.id); continue }
