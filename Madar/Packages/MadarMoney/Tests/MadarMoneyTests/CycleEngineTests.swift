@@ -8,6 +8,18 @@ import Testing
     static let c0 = CycleInput(expectedLengthDays: 30, policies: [.init(mode: .fixed(allowanceMinor: 41_300))],
                                plans: [.init(id: "tamara", amountMinor: 1_300, period: .perDay)])
 
+    /// B1-19: values an import can carry must not crash the engine.
+    @Test func zeroLengthNegativeIncomeAndHugeAmountsNeverTrap() {
+        // Zero expected days behave as one day; a negative income earns nothing: 30% of 10 000 over one day.
+        let oneDay = CycleEngine.freeze(.percent(basisPoints: 3_000, incomeMinor: 10_000), expectedLengthDays: 0)
+        #expect(oneDay.dailyRateMinor == 3_000 && oneDay.lastDayRemainderMinor == 0)
+        let none = CycleEngine.freeze(.percent(basisPoints: 3_000, incomeMinor: -5_000), expectedLengthDays: 30)
+        #expect(none.dailyRateMinor == 0 && none.lastDayRemainderMinor == 0)
+        // 20 000% of a huge amount overflows Int: it saturates; the sign follows the arithmetic.
+        #expect(MoneyMath.applying(basisPoints: 2_000_000, to: Int.max / 2) == Int.max)
+        #expect(MoneyMath.applying(basisPoints: 2_000_000, to: -(Int.max / 2)) == Int.min)
+    }
+
     @Test func c0DailyIsTheAllowanceLessThePlansShare() {
         #expect(CycleEngine.day(1, Self.c0).dailyMinor == 40_000)
         #expect(CycleEngine.day(1, Self.c0).dripsMinor == ["tamara": 1_300])

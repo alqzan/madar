@@ -8,7 +8,10 @@ public enum MoneyMath {
         // Split before multiplying so a valid percentage of a representable amount does not overflow.
         // The remainder is smaller than 10,000, and the whole part cannot exceed the amount for 0...100%.
         guard (0...basisPointsPerWhole).contains(bp) else {
-            return divideRounded(amount * bp, by: basisPointsPerWhole)
+            // Outside 0…100% the product can exceed Int: saturate instead of trapping on an imported or mistyped value.
+            let product = amount.multipliedReportingOverflow(by: bp)
+            if product.overflow { return (amount < 0) == (bp < 0) ? Int.max : Int.min }
+            return divideRounded(product.partialValue, by: basisPointsPerWhole)
         }
         let whole = amount / basisPointsPerWhole
         let remainder = amount % basisPointsPerWhole

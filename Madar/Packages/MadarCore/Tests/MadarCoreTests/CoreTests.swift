@@ -559,3 +559,14 @@ func prayerBeforeQuiet() throws {
 func defaultRoomPriority() {
     #expect(NotificationPolicy().priority == [.quran, .habits, .notes, .salah, .mal, .mihbara])
 }
+
+
+/// B1-19
+@Suite struct GregorianDayBoundsTests {
+    @Test func anAbsurdDayOffsetStaysOnAValidDayInsteadOfTrapping() throws {
+        let day = try GregorianDay("2026-10-14")
+        #expect(day.adding(days: 1) == (try GregorianDay("2026-10-15")))
+        #expect(day.adding(days: -14) == (try GregorianDay("2026-09-30")))
+        _ = day.adding(days: Int.max); _ = day.adding(days: Int.min)
+    }
+}

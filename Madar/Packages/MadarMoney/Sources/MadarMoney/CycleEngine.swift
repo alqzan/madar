@@ -76,7 +76,8 @@ public enum CycleEngine {
         case .fixed(let allowance):
             return FrozenRate(dailyRateMinor: allowance, lastDayRemainderMinor: 0)
         case .percent(let bp, let income):
-            let (each, remainder) = MoneyMath.split(MoneyMath.applying(basisPoints: bp, to: income), into: expectedLengthDays)
+            // A cycle row from an import can carry a zero length or a negative income: treat them as one day and no income, never trap.
+            let (each, remainder) = MoneyMath.split(max(0, MoneyMath.applying(basisPoints: bp, to: max(0, income))), into: max(1, expectedLengthDays))
             return FrozenRate(dailyRateMinor: each, lastDayRemainderMinor: remainder)
         }
     }

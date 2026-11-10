@@ -32,7 +32,18 @@ public struct GregorianDay: Codable, Hashable, Comparable, Sendable, CustomStrin
         let p = cal.dateComponents([.year, .month, .day], from: date)
         return try! Self(year: p.year!, month: p.month!, day: p.day!)
     }
-    public func adding(days: Int) -> Self { var cal = Calendar(identifier: .gregorian); cal.timeZone = .gmt; return Self.containing(cal.date(byAdding: .day, value: days, to: date(in: .gmt))!, in: .gmt) }
+    public func adding(days: Int) -> Self {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = .gmt
+        // A corrupt or absurd offset (from an imported row) clamps to about ±5,000 years rather than trapping on a nil date.
+        let bounded = min(max(days, -1_800_000), 1_800_000)
+        guard let moved = cal.date(byAdding: .day, value: bounded, to: date(in: .gmt)), let result = try? Self.containingSafely(moved) else { return self }
+        return result
+    }
+    private static func containingSafely(_ date: Date) throws -> Self {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = .gmt
+        let p = cal.dateComponents([.year, .month, .day], from: date)
+        return try Self(year: p.year ?? 0, month: p.month ?? 0, day: p.day ?? 0)
+    }
     public static func < (lhs: Self, rhs: Self) -> Bool { lhs.description < rhs.description }
 }
 
