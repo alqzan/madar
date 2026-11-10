@@ -48,13 +48,20 @@ public enum BackupCodec {
         try encodeArchive(contentFiles(records: records, now: now))
     }
     /// Shared logical representation; never contains the device store or SQLite files.
-    static func contentFiles(records: [DataRecord], now: Date = Date()) throws -> [String: Data] {
+    /// With `mediaSink`, each media file is handed over as soon as it is decoded and verified and is not kept: the caller seals or writes it,
+    /// so only one decoded file is alive at a time instead of every photo, recording and book at once (B1-15). The manifest still lists
+    /// every media file, so the archive's index is byte-for-byte what the all-in-memory call produces without the media entries.
+    static func contentFiles(records: [DataRecord], now: Date = Date(), mediaSink: ((String, Data) throws -> Void)? = nil) throws -> [String: Data] {
         guard records.allSatisfy({ MadarSchema.syncedNames.contains($0.model) }) else { throw DataError.invalidBackup }
         var files: [String:Data] = [:]; var persisted = records
-        for i in persisted.indices where persisted[i].model == "Media" {
+        var sunk: [BackupManifest.File] = []
+        for i in persisted.indices.filter({ persisted[$0].model == "Media" }).sorted(by: { persisted[$0].id.uuidString < persisted[$1].id.uuidString }) {
             if let bytes = try? persisted[i].decode("data",as:Data.self) {
-                guard hash(bytes) == persisted[i].fields["sha256"]?.string, bytes.count == Int(persisted[i].fields["sizeBytes"]?.number ?? -1) else { throw DataError.invalidBackup }
-                files["media/\(persisted[i].id.uuidString)"] = bytes; persisted[i].fields["data"] = .null
+                let digest = hash(bytes)
+                guard digest == persisted[i].fields["sha256"]?.string, bytes.count == Int(persisted[i].fields["sizeBytes"]?.number ?? -1) else { throw DataError.invalidBackup }
+                let path = "media/\(persisted[i].id.uuidString)"
+                if let mediaSink { sunk.append(.init(path:path,bytes:bytes.count,sha256:digest)); try mediaSink(path,bytes) } else { files[path] = bytes }
+                persisted[i].fields["data"] = .null
             } else if persisted[i].isLive && persisted[i].fields["state"] == .string("ok") { throw DataError.invalidBackup }
         }
         for model in MadarSchema.syncedNames {
@@ -62,7 +69,7 @@ public enum BackupCodec {
             for row in persisted.filter({ $0.model == model }).sorted(by: { $0.id.uuidString < $1.id.uuidString }) { bytes.append(try JSONValue.object(row.fields).canonicalData()); bytes.append(0x0a) }
             files["data/\(model).jsonl"] = bytes
         }
-        let manifest = BackupManifest(formatVersion:1,storeSchemaVersion:MadarSchema.version,createdAt:now,counts:Dictionary(uniqueKeysWithValues:MadarSchema.syncedNames.map { model in (model,records.filter { $0.model == model }.count) }),files:files.sorted { $0.key < $1.key }.map { .init(path:$0.key,bytes:$0.value.count,sha256:hash($0.value)) })
+        let manifest = BackupManifest(formatVersion:1,storeSchemaVersion:MadarSchema.version,createdAt:now,counts:Dictionary(uniqueKeysWithValues:MadarSchema.syncedNames.map { model in (model,records.filter { $0.model == model }.count) }),files:(files.map { BackupManifest.File(path:$0.key,bytes:$0.value.count,sha256:hash($0.value)) }+sunk).sorted { $0.path < $1.path })
         files["manifest.json"] = try JSONEncoder().encode(manifest)
         return files
     }
@@ -110,9 +117,12 @@ public enum BackupCodec {
         let openedCredential = BackupCredential(salt: header.kdf.salt, keyData: key.withUnsafeBytes { Data($0) }, nextNonceCounter: 0)
         return (try decodeArchive(archive), header, openedCredential)
     }
-    static func validateFiles(_ files: [String: Data], manifest: BackupManifest, sourceModels: [String], cancellation: BackupCancellation = BackupCancellation(), progress: @Sendable (BackupProgress) -> Void = { _ in }) throws -> ValidatedBackup {
-        guard manifest.formatVersion == 1, Set(manifest.counts.keys) == Set(sourceModels), Set(manifest.files.map(\.path)).count == manifest.files.count, Set(files.keys) == Set(manifest.files.map(\.path)+["manifest.json"]) else { throw DataError.invalidBackup }
-        for file in manifest.files { guard let data = files[file.path], data.count == file.bytes, hash(data) == file.sha256 else { throw DataError.invalidBackup } }
+    static func validateFiles(_ files: [String: Data], manifest: BackupManifest, sourceModels: [String], hydrateMedia: Bool = true, cancellation: BackupCancellation = BackupCancellation(), progress: @Sendable (BackupProgress) -> Void = { _ in }) throws -> ValidatedBackup {
+        guard manifest.formatVersion == 1, Set(manifest.counts.keys) == Set(sourceModels), Set(manifest.files.map(\.path)).count == manifest.files.count else { throw DataError.invalidBackup }
+        // Without hydration (the write-time check of a package whose media were already verified one by one) media bytes are absent by design.
+        let carried = hydrateMedia ? manifest.files : manifest.files.filter { !$0.path.hasPrefix("media/") }
+        guard Set(files.keys) == Set(carried.map(\.path)+["manifest.json"]) else { throw DataError.invalidBackup }
+        for file in carried { guard let data = files[file.path], data.count == file.bytes, hash(data) == file.sha256 else { throw DataError.invalidBackup } }
         var records: [DataRecord] = []
         for model in sourceModels {
             guard let data = files["data/\(model).jsonl"] else { throw DataError.invalidBackup }
@@ -120,12 +130,13 @@ public enum BackupCodec {
             guard manifest.counts[model] == lines.count else { throw DataError.invalidBackup }
             for line in lines { let fields = try JSONDecoder().decode([String:JSONValue].self,from:Data(line)); var row = DataRecord(model:model,fields:fields)
                 guard UUID(uuidString:fields["id"]?.string ?? "") != nil else { throw DataError.invalidBackup }
-                if model == "Media", let media = files["media/\(row.id.uuidString)"] { guard hash(media) == row.fields["sha256"]?.string, media.count == Int(row.fields["sizeBytes"]?.number ?? -1) else { throw DataError.invalidBackup }; try row.set(media,for:"data") }
+                if model == "Media", !hydrateMedia { /* verified object by object by the caller */ }
+                else if model == "Media", let media = files["media/\(row.id.uuidString)"] { guard hash(media) == row.fields["sha256"]?.string, media.count == Int(row.fields["sizeBytes"]?.number ?? -1) else { throw DataError.invalidBackup }; try row.set(media,for:"data") }
                 else if model == "Media", row.isLive && row.fields["state"] == .string("ok") { throw DataError.invalidBackup }
                 records.append(row)
             }
         }
-        let allowedPaths = Set(sourceModels.map { "data/\($0).jsonl" } + records.filter { $0.model == "Media" && $0.fields["data"] != .null }.map { "media/\($0.id.uuidString)" })
+        let allowedPaths = Set(sourceModels.map { "data/\($0).jsonl" } + (hydrateMedia ? records.filter { $0.model == "Media" && $0.fields["data"] != .null }.map { "media/\($0.id.uuidString)" } : manifest.files.map(\.path).filter { $0.hasPrefix("media/") }))
         guard Set(manifest.files.map(\.path)) == allowedPaths else { throw DataError.invalidBackup }
         records = try SchemaCompatibility.currentRecords(records,from:manifest.storeSchemaVersion)
         // Decode every stored property through generated typed models in an isolated validation container.

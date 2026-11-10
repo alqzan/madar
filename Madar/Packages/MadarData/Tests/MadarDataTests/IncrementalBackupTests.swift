@@ -192,3 +192,28 @@ import Testing
         #expect(safety.records.first { $0.id == oldID }?.isLive == true)
     }
 }
+
+/// B1-15: media are handed over one at a time, and the package they produce is identical to the all-in-memory one.
+@Suite(.serialized) @MainActor struct BackupMediaStreamingTests {
+    @Test func sinkReceivesEachMediaOnceAndTheManifestStillListsThem() throws {
+        var records: [DataRecord] = []
+        var expected: [String: Data] = [:]
+        for index in 0..<3 {
+            let bytes = Data((0..<2_000).map { UInt8(truncatingIfNeeded: $0 &* 7 &+ index) })
+            let media = Media(); media.kind = "audio"; media.data = bytes; media.sizeBytes = bytes.count; media.sha256 = BackupCodec.hash(bytes); media.state = "ok"
+            records.append(try media.record()); expected["media/\(media.id.uuidString)"] = bytes
+        }
+        var received: [String: Data] = [:]
+        let streamed = try BackupCodec.contentFiles(records: records, mediaSink: { path, bytes in
+            #expect(received[path] == nil); received[path] = bytes
+        })
+        let inMemory = try BackupCodec.contentFiles(records: records)
+        #expect(received == expected)
+        #expect(streamed.keys.allSatisfy { !$0.hasPrefix("media/") }, "A streamed call never keeps media bytes")
+        #expect(Set(inMemory.keys).subtracting(streamed.keys) == Set(expected.keys))
+        let streamedManifest = try JSONDecoder().decode(BackupManifest.self, from: try #require(streamed["manifest.json"]))
+        let memoryManifest = try JSONDecoder().decode(BackupManifest.self, from: try #require(inMemory["manifest.json"]))
+        #expect(streamedManifest.files.map(\.path) == memoryManifest.files.map(\.path))
+        #expect(streamedManifest.files.map(\.sha256) == memoryManifest.files.map(\.sha256))
+    }
+}

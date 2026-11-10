@@ -59,9 +59,8 @@ public enum BackupArtifact {
                                                 cancellation: BackupCancellation,
                                                 progress: @Sendable (BackupProgress) -> Void) throws -> Int {
         try cancellation.check()
-        var files = try BackupCodec.contentFiles(records: records, now: now)
-        let media = files.filter { $0.key.hasPrefix("media/") }.sorted { $0.key < $1.key }
-        let hashes = Set(media.map { BackupCodec.hash($0.value) })
+        // The distinct media hashes are known from the rows (contentFiles verifies each against its bytes), so no file is decoded yet.
+        let hashes = Set(records.filter { $0.model == "Media" && $0.fields["data"] != .null }.compactMap { $0.fields["sha256"]?.string })
         guard prefixes.count == hashes.count + 1 else { throw DataError.invalidBackup }
         // A damaged, differently keyed or older cache is never authoritative.
         var cached: [String: URL] = [:]
@@ -80,7 +79,8 @@ public enum BackupArtifact {
         defer { if !completed { try? manager.removeItem(at: destination) } }
         var objects: [String: String] = [:], links: [MediaLink] = []
         var reused = 0, prefixIndex = 1
-        for (path, bytes) in media {
+        // Each media file is sealed and written the moment it is decoded, then released (B1-15).
+        var files = try withoutActuallyEscaping(progress) { progress in try BackupCodec.contentFiles(records: records, now: now, mediaSink: { path, bytes in
             try cancellation.check()
             let sha = BackupCodec.hash(bytes)
             let name: String
@@ -104,18 +104,18 @@ public enum BackupArtifact {
                           cancellation: cancellation, progress: progress)
                 objects[sha] = name
             }
-            links.append(.init(path: path, object: name)); files.removeValue(forKey: path)
-        }
+            links.append(.init(path: path, object: name))
+        }) }
         files["package.json"] = try JSONEncoder().encode(PackageIndex(formatVersion: 2, media: links))
         let index = try BackupCodec.seal(archive: BackupCodec.encodeArchive(files), credential: credential,
                                         noncePrefix: prefixes[0], now: now, formatVersion: 2, cancellation: cancellation)
         try write(index, to: destination.appendingPathComponent(indexName), cancellation: cancellation, progress: progress)
-        _ = try readPackage(destination, credential: credential, cancellation: cancellation)
+        _ = try readPackage(destination, credential: credential, hydrateMedia: false, cancellation: cancellation)
         completed = true
         return reused
     }
     private static func readPackage(_ directory: URL, passphrase: String? = nil, credential: BackupCredential? = nil,
-                                    cancellation: BackupCancellation = BackupCancellation(),
+                                    hydrateMedia: Bool = true, cancellation: BackupCancellation = BackupCancellation(),
                                     progress: @Sendable (BackupProgress) -> Void = { _ in }) throws -> (backup: ValidatedBackup, links: [MediaLink]) {
         let all = try artifactFiles(directory)
         let opened = try BackupCodec.openArchive(readBounded(directory.appendingPathComponent(indexName)), passphrase: passphrase,
@@ -130,10 +130,20 @@ public enum BackupArtifact {
               Set(index.media.map(\.path)) == Set(mediaFiles.map(\.path)) else { throw DataError.invalidBackup }
         let expectedPaths = Set([indexName] + index.media.map { mediaDirectory + "/" + $0.object })
         guard Set(all.map(\.0)) == expectedPaths else { throw DataError.invalidBackup }
-        var objects: [String: Data] = [:], hydratedBytes = 0
+        var objects: [String: Data] = [:], hydratedBytes = 0, checkedObjects = Set<String>()
         for link in index.media {
             try cancellation.check()
             guard validObjectName(link.object), let descriptor = mediaFiles.first(where: { $0.path == link.path }) else { throw DataError.invalidBackup }
+            if !hydrateMedia {
+                // Verify the object and drop it at once: only one media file is ever in memory.
+                // A shared object is verified once.
+                guard checkedObjects.insert(link.object).inserted else { continue }
+                let encrypted = try readBounded(directory.appendingPathComponent(mediaDirectory).appendingPathComponent(link.object))
+                guard BackupCodec.hash(encrypted) == String(link.object.dropLast(".madarmedia".count)) else { throw DataError.invalidBackup }
+                let blob = try BackupCodec.openArchive(encrypted, credential: opened.credential, cancellation: cancellation)
+                guard Set(blob.files.keys) == ["blob"], let bytes = blob.files["blob"], bytes.count == descriptor.bytes, BackupCodec.hash(bytes) == descriptor.sha256 else { throw DataError.invalidBackup }
+                continue
+            }
             let data: Data
             if let existing = objects[link.object] { data = existing }
             else {
@@ -148,7 +158,7 @@ public enum BackupArtifact {
             hydratedBytes += data.count; files[link.path] = data
         }
         let models = try SchemaCompatibility.modelNames(version: manifest.storeSchemaVersion)
-        return (try BackupCodec.validateFiles(files, manifest: manifest, sourceModels: models, cancellation: cancellation, progress: progress), index.media)
+        return (try BackupCodec.validateFiles(files, manifest: manifest, sourceModels: models, hydrateMedia: hydrateMedia, cancellation: cancellation, progress: progress), index.media)
     }
     private static func validObjectName(_ name: String) -> Bool {
         guard name.hasSuffix(".madarmedia") else { return false }

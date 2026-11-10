@@ -202,7 +202,9 @@ import Darwin
     }
     private func currentRecords() throws -> [DataRecord] { let context = ModelContext(store.container); context.autosaveEnabled = false; return try RecordBridge.all(context) }
     private func exportUnderLease(kind: BackupKind, passphrase: String?, progress: @escaping @Sendable (BackupProgress) -> Void, cancellation: BackupCancellation, now: Date) async throws -> BackupReceipt {
-        try cancellation.check(); let rows = try currentRecords(); try RecordValidator.validate(rows)
+        try cancellation.check(); let rows = try currentRecords()
+        // Typed validation does not need the media bytes (their hash and size are checked when the archive is written): validate a copy without them.
+        try RecordValidator.validate(rows.map { row in var copy = row; if copy.model == "Media", copy.fields["data"] != nil { copy.fields["data"] = .null }; return copy })
         let fitted = BackupBookFiles.fitting(rows,budget:bookBudget); let archived = fitted.records
         let incremental = kind == .automatic && archived.contains { $0.model == "Media" && $0.fields["data"] != .null }
         let credential: BackupCredential; let prefixes: [Data]
