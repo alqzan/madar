@@ -247,7 +247,6 @@ struct DiaryDayView: View {
                                                 app: app, media: first, transcript: line.text,
                                                 missingCount: attached.filter { $0.kind == "missing" }.count)
                                         }
-                                        if shownDay == today, travel == nil, index < flow.count - 1 { insertHere(after: line.at, before: flow[index + 1].at) }
                                     }
                                     ForEach(0..<sealedHere, id: \.self) { _ in
                                         HStack(alignment: .center, spacing: 12) {
@@ -698,17 +697,15 @@ struct DiaryDayView: View {
             catch { failure = madarUserMessage(error); return false }
         }.padding(.horizontal, 18).padding(.bottom, 10).accessibilityIdentifier("diary-day-photo-strip")
     }
-    /// A quiet «اكتب هنا» between two items: the new line lands between them in time.
-    private func insertHere(after previous: Date, before next: Date) -> some View {
-        Button {
-            let gap = next.timeIntervalSince(previous)
-            insertAt = gap > 2 ? previous.addingTimeInterval(gap / 2) : previous.addingTimeInterval(1); writing = true
-        } label: {
-            HStack(spacing: 6) { Image(systemName: "plus"); Text("اكتب هنا") }
-                .font(MadarTypography.fine()).foregroundStyle(theme.color("ink3Text")).frame(maxWidth: .infinity, minHeight: 28)
-                .overlay { Capsule().stroke(theme.line, style: StrokeStyle(lineWidth: 0.7, dash: [3, 3])).padding(.horizontal, 60).padding(.vertical, 3) }
-                .contentShape(Rectangle())
-        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-flow-insert")
+    /// 10 Nov owner: no permanent «اكتب هنا» between every item. Any line is the place to write: its menu (or a tap on a room's own line) writes right after it, in time.
+    private func writeAfter(_ line: DiaryDisplayLine, page: DiaryDisplayDay) {
+        guard shownDay == today, travel == nil else { return }
+        let flow = page.lines.filter { $0.kind != "intention" }
+        if let index = flow.firstIndex(where: { $0.id == line.id }), index < flow.count - 1 {
+            let gap = flow[index + 1].at.timeIntervalSince(line.at)
+            insertAt = gap > 2 ? line.at.addingTimeInterval(gap / 2) : line.at.addingTimeInterval(1)
+        } else { insertAt = nil }
+        writing = true
     }
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
         let auto = ["salah", "quran", "mihbara", "mal", "habits"].contains(line.kind)
@@ -722,7 +719,7 @@ struct DiaryDayView: View {
                 Text(styledLine(line, auto: auto))
                     .font(.custom("thmanyahseriftext-Regular", size: auto ? 17 : 19, relativeTo: .body)).lineSpacing(11)
                     .italic(auto || line.kind == "margin")
-                    .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier(
+                    .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier(
                         "diary-day-line")
                 if let first = page.originals[line.id] {
                     Button {
@@ -744,6 +741,9 @@ struct DiaryDayView: View {
                 line.kind == "margin"
                     ? secondInk
                     : line.kind == "late" ? theme.color("late") : auto ? theme.color("autoInkText") : theme.ink)
+        }.contentShape(Rectangle()).onTapGesture {
+            // Tap a line you wrote to change it right there; tap a room's own line (prayer, Quran…) to write after it.
+            if page.editable.contains(line.id) { editing = .init(id: line.id, text: line.text) } else { writeAfter(line, page: page) }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("diary-entry-" + line.id).overlay {
             if highlightedEntryID?.uuidString == line.id {
                 RoundedRectangle(cornerRadius: 12).stroke(theme.accent, lineWidth: 2)
@@ -763,6 +763,10 @@ struct DiaryDayView: View {
             ).frame(minHeight: 34)
     }
     @ViewBuilder private func lineActions(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
+        if shownDay == today, travel == nil {
+            Button("اكتب بعده", systemImage: "text.append") { writeAfter(line, page: page) }.accessibilityIdentifier("diary-line-write-after")
+        }
+        if !line.text.isEmpty { Button("انسخ", systemImage: "doc.on.doc") { UIPasteboard.general.string = line.text } }
         if page.editable.contains(line.id) {
             Button("عدّل السطر", systemImage: "pencil") { editing = .init(id: line.id, text: line.text) }
         }

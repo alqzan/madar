@@ -110,10 +110,15 @@ import XCTest
         let app = launch("editor"); app.buttons["diary-today"].tap()
         XCTAssertTrue(app.staticTexts["diary-audio-transcript-text"].waitForExistence(timeout: 10), app.debugDescription)
         capture(app, "FLOW-day-L")
-        let insert = app.buttons["diary-flow-insert"].firstMatch
-        XCTAssertTrue(insert.waitForExistence(timeout: 5), app.debugDescription)
-        insert.tap()
-        XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout: 10))
+        // 10 Nov owner: no «اكتب هنا» capsule between every item; a line's own menu writes right after it.
+        XCTAssertFalse(app.buttons["diary-flow-insert"].exists)
+        let menu = app.buttons["diary-line-menu"].firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), app.debugDescription)
+        menu.tap()
+        let after = app.buttons["diary-line-write-after"].firstMatch
+        XCTAssertTrue(after.waitForExistence(timeout: 5), app.debugDescription)
+        after.tap()
+        XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout: 10), app.debugDescription)
     }
     func testUnsavedTranscriptRequiresExplicitDiscard() throws {
         try XCTSkipIf(true, "The transcript is edited inline on the page now; the explicit-discard sheet no longer exists.")
