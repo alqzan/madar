@@ -28,32 +28,6 @@ struct NextPrayerEntry: TimelineEntry {
     var template:PrayerWidgetTemplate = .next
 }
 
-struct NextPrayerProvider: TimelineProvider {
-    private func load(now: Date) -> (PrayerNextSnapshot, String)? {
-        guard let store = try? SnapshotStore.appGroup("group.com.alqzan.madar2"),
-              let envelope = store.read("prayerNext", as: PrayerNextSnapshot.self, now: now) else { return nil }
-        return (envelope.payload, envelope.tzID)
-    }
-    func placeholder(in context: Context) -> NextPrayerEntry {
-        let now = Date()
-        return .init(date: now, snapshot: PrayerNextSnapshot(items: [.init(prayer: "maghrib", name: "المغرب", at: now.addingTimeInterval(74 * 60))], numerals: "hindi"), tzID: TimeZone.current.identifier)
-    }
-    func getSnapshot(in context: Context, completion: @escaping (NextPrayerEntry) -> Void) {
-        let now = Date()
-        if let (snapshot, tz) = load(now: now) { completion(.init(date: now, snapshot: snapshot, tzID: tz)) }
-        else { completion(context.isPreview ? placeholder(in: context) : .init(date: now, snapshot: nil, tzID: TimeZone.current.identifier)) }
-    }
-    func getTimeline(in context: Context, completion: @escaping (Timeline<NextPrayerEntry>) -> Void) {
-        let now = Date()
-        guard let (snapshot, tz) = load(now: now) else {
-            completion(Timeline(entries: [.init(date: now, snapshot: nil, tzID: TimeZone.current.identifier)], policy: .after(now.addingTimeInterval(900))))
-            return
-        }
-        let entries = snapshot.timelineDates(from: now).map { NextPrayerEntry(date: $0, snapshot: snapshot, tzID: tz) }
-        completion(Timeline(entries: entries, policy: .atEnd))
-    }
-}
-
 private enum Salah {
     static func color(light: UInt32, dark: UInt32) -> Color {
         Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? UIColor(hex: dark) : UIColor(hex: light) })
