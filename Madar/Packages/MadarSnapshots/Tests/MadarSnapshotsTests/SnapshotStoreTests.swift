@@ -113,6 +113,26 @@ struct PrayerNextSnapshotTests {
         #expect(retained.map(\.prayer) == ["fajr", "dhuhr", "fajr"])
         #expect(retained.first?.at == (try instant("2026-10-13T05:00:00+03:00")))
     }
+    @Test func publishedWeekGivesTheRightNextPrayerFiveDaysLater() throws {
+        let zone = try #require(TimeZone(identifier: "Asia/Riyadh"))
+        let formatter = ISO8601DateFormatter()
+        func instant(_ value: String) throws -> Date { try #require(formatter.date(from: value)) }
+        var candidates: [PrayerNextSnapshot.Item] = []
+        // Twelve days of Fajr and Dhuhr at fixed clock times: the published window keeps ten of them.
+        for day in 13...24 {
+            candidates.append(.init(prayer: "fajr", name: "الفجر", at: try instant("2026-10-\(day)T05:00:00+03:00")))
+            candidates.append(.init(prayer: "dhuhr", name: "الظهر", at: try instant("2026-10-\(day)T12:00:00+03:00")))
+        }
+        let published = PrayerNextSnapshot.itemsForDays(candidates, at: try instant("2026-10-13T12:15:00+03:00"), timeZone: zone, days: PrayerNextSnapshot.publishedDays)
+        let expectedLast = try instant("2026-10-22T12:00:00+03:00")
+        #expect(published.last?.at == expectedLast)
+        let snapshot = PrayerNextSnapshot(items: published, numerals: "hindi")
+        // Five days after publication, at 06:00, the next prayer is that day's Dhuhr — not an empty widget.
+        let later = snapshot.state(at: try instant("2026-10-18T06:00:00+03:00"))
+        let expectedNext = try instant("2026-10-18T12:00:00+03:00")
+        #expect(later?.item.prayer == "dhuhr" && later?.item.at == expectedNext)
+        #expect(later?.minutes == 360)
+    }
     @Test func countdownUsesTwoFieldsAndTheChosenNumerals() {
         #expect(snapshot().countdown(minutes: 5) == "٠:٠٥")
         #expect(snapshot().countdown(minutes: 600) == "١٠:٠٠")

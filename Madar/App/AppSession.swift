@@ -1553,15 +1553,20 @@ final class AppSession {
     private func publishPrayerNextSnapshot(at instant: Date, tzID: String, dayKey: String) {
         let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
         var items: [PrayerNextSnapshot.Item] = []
-        for offset in [0, 1] {
-            guard let day = try? prayerSnapshot(at: instant.addingTimeInterval(Double(offset) * 86_400)).today else { continue }
-            for cell in day.cells {
-                guard let at = cell.prayerTime, !items.contains(where: { $0.at == at }) else { continue }
-                items.append(.init(prayer: cell.reference.prayer.rawValue, name: names[cell.reference.prayer] ?? "", at: at))
+        // Times only: the repository's occurrence rule (home or trip place) for each day, no history snapshot per day.
+        let repository = try? PrayerRepository(context: ModelContext(container))
+        if let repository {
+            let first = repository.prayerDay(at: instant)
+            for offset in 0..<(PrayerNextSnapshot.publishedDays + 1) {
+                let day = first.adding(days: offset)
+                for prayer in Prayer.allCases {
+                    guard let at = repository.occurrence(.init(day: day, prayer: prayer))?.time, !items.contains(where: { $0.at == at }) else { continue }
+                    items.append(.init(prayer: prayer.rawValue, name: names[prayer] ?? "", at: at))
+                }
             }
         }
-        let snapshotItems = PrayerNextSnapshot.itemsForTodayAndTomorrow(
-            items, at: instant, timeZone: TimeZone(identifier: tzID) ?? .current
+        let snapshotItems = PrayerNextSnapshot.itemsForDays(
+            items, at: instant, timeZone: TimeZone(identifier: tzID) ?? .current, days: PrayerNextSnapshot.publishedDays
         )
         guard let last = snapshotItems.map(\.at).max(), last > instant else { try? snapshotStore.remove("prayerNext"); return }
         let envelope = SnapshotEnvelope(name: "prayerNext", generatedAt: instant, validUntil: last, dayKey: dayKey, tzID: tzID, privacy: SnapshotPrivacy(),
