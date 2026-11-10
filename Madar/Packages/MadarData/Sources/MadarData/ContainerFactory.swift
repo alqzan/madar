@@ -66,11 +66,47 @@ public enum MadarContainerFactory {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let stamp = directory.appendingPathComponent("SchemaVersion.json")
         try preflightVersion(at: directory)
+        try backupBeforeMigration(at: directory)
         let container = try ModelContainer(for: MadarSchema.schema, migrationPlan: MadarMigrationPlan.self, configurations: [
             ModelConfiguration("synced", schema: Schema(MadarSchema.syncedTypes), url: directory.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
             ModelConfiguration("deviceOnly", schema: Schema(MadarSchema.deviceTypes), url: directory.appendingPathComponent("Device.store"), cloudKitDatabase: .none)
         ])
         try JSONEncoder().encode(MadarSchema.version).write(to: stamp, options: .atomic)
         return container
+    }
+
+    /// B1-14: before SwiftData migrates an older store in place, copy its three files aside. If the migration fails or loses
+    /// something, the pre-migration copy is still there. Only the two newest copies are kept.
+    public static let preMigrationFolderPrefix = "pre-migration-"
+    static func backupBeforeMigration(at directory: URL, now: Date = Date(), keeping: Int = 2) throws {
+        let fileManager = FileManager.default
+        let store = directory.appendingPathComponent("Madar.store")
+        guard fileManager.fileExists(atPath: store.path) else { return }
+        let version = try storeVersion(at: directory)
+        guard version < MadarSchema.version else { return }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = TimeZone(identifier: "UTC"); formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let folder = directory.appendingPathComponent("\(preMigrationFolderPrefix)\(version)-\(formatter.string(from: now))", isDirectory: true)
+        // A copy for this schema and second already exists: never overwrite it.
+        guard !fileManager.fileExists(atPath: folder.path) else { return }
+        let staging = directory.appendingPathComponent(".\(UUID().uuidString).tmp", isDirectory: true)
+        try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
+        do {
+            for suffix in ["", "-wal", "-shm"] {
+                let source = directory.appendingPathComponent("Madar.store" + suffix)
+                if fileManager.fileExists(atPath: source.path) { try fileManager.copyItem(at: source, to: staging.appendingPathComponent("Madar.store" + suffix)) }
+            }
+            try fileManager.moveItem(at: staging, to: folder)
+        } catch { try? fileManager.removeItem(at: staging); throw error }
+        let copies = try preMigrationBackups(in: directory)
+        for old in copies.dropFirst(keeping) { try? fileManager.removeItem(at: old) }
+    }
+    /// Newest first.
+    public static func preMigrationBackups(in directory: URL) throws -> [URL] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        // The name ends with a sortable UTC stamp, so the stamp orders copies even across schema versions.
+        return names.filter { $0.hasPrefix(preMigrationFolderPrefix) }
+            .sorted { $0.split(separator: "-").suffix(2).joined() > $1.split(separator: "-").suffix(2).joined() }
+            .map { directory.appendingPathComponent($0, isDirectory: true) }
     }
 }
