@@ -21,9 +21,11 @@ public struct MoneyCycleReading: Sendable {
 
 extension MoneyRepository {
     public func pendingDecisionCount() throws -> Int {
-        let messages = try context.fetch(FetchDescriptor<BankMessage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && ["needsLook", "possibleDuplicate"].contains($0.status) }
-        let manual = try pendingTransactions().filter { $0.messageID == nil }
-        return messages.count + manual.count
+        // B2-15: two counting queries with the conditions in the store, not two whole-table reads filtered in memory.
+        let messages = try context.fetchCount(FetchDescriptor<BankMessage>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && ($0.status == "needsLook" || $0.status == "possibleDuplicate") }))
+        let manualRows = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate<MoneyTransaction> { $0.reviewState != "ok" }))
+        let manual = manualRows.filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.messageID == nil }.count
+        return messages + manual
     }
 
     /// Cycle membership uses the salary instant. Stored transaction days and the first policy's

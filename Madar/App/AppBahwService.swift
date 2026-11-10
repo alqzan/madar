@@ -323,7 +323,7 @@ extension AppBahwService {
             if session.roomEnabled(.notes), let diary = diary(), diary.count == 0 {
                 result.append(.init(id: "notes", title: "سطر من يومك", detail: "ما الذي تحب أن يبقى من هذا اليوم؟", symbol: "MadarDiary", destination: .diary))
             }
-            if session.roomEnabled(.mal), let money = try? AppMoneyService(app: session).load(at: now), money.pendingCount > 0 {
+            if session.roomEnabled(.mal), pendingBankDecisions() > 0 {
                 result.append(.init(id: "money", title: "راجع رسائلك البنكية", detail: "رسائل تنتظر قرارك قبل أن تصبح حركات", symbol: "banknote", destination: .money))
             }
             if session.roomEnabled(.mihbara), let book = session.mihbaraWidgetSnapshot(locked: false, at: now).currentBook {
