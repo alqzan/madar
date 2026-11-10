@@ -197,6 +197,18 @@ final class DailyPlanningTests: XCTestCase {
         XCTAssertEqual(QuranProgressEngine.pace(activities: activities, completedOn: completed, through: try day("2026-11-01")).windowStart.description, "2026-10-05")
     }
 
+    /// Batch 3: «تجاوزه» costs the khatma the rest-day-aware gap between finishing now and finishing one day's portion later.
+    /// 2026-11-12 is a Thursday and Friday is the rest day.
+    func testSkippingADayDelaysTheKhatmaByTheCalendarGap() throws {
+        // 2 faces left at 2/day from Thursday end Thursday; with one more day's portion the end moves past Friday to Saturday: 2 days.
+        XCTAssertEqual(QuranProgressEngine.skipDelayDays(remainingPages: 2, dailyPages: 2, startingOn: try day("2026-11-12"), restDay: .friday), 2)
+        // From Saturday, 4 faces end Sunday and 6 end Monday: 1 day.
+        XCTAssertEqual(QuranProgressEngine.skipDelayDays(remainingPages: 4, dailyPages: 2, startingOn: try day("2026-11-14"), restDay: .friday), 1)
+        // Nothing left, or no pace: no claim.
+        XCTAssertNil(QuranProgressEngine.skipDelayDays(remainingPages: 0, dailyPages: 2, startingOn: try day("2026-11-14"), restDay: .friday))
+        XCTAssertNil(QuranProgressEngine.skipDelayDays(remainingPages: 4, dailyPages: 0, startingOn: try day("2026-11-14"), restDay: .friday))
+    }
+
     func testForecastWalksCalendarRestAndAllotmentsAndCompleteState() throws {
         let start = try day("2026-10-10")
         XCTAssertEqual(QuranProgressEngine.forecast(remainingPages: 320, dailyPages: 1, startingOn: start, restDay: .friday), .estimated(try day("2027-10-17")))

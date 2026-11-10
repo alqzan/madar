@@ -8,4 +8,10 @@ public enum PrayerQuickLog {
         if let nextAdhan, now >= nextAdhan { return false }
         return !SanctityWindow(prayer: prayer, adhan: adhan).contains(now)
     }
+    /// Seconds until the open prayer's time ends, only where the next adhan is that end (Dhuhr, Asr, Maghrib).
+    /// Fajr ends at sunrise and Isha at midnight, so no remaining time is claimed for them.
+    public static func timeLeft(prayer: Prayer, nextAdhan: Date?, now: Date) -> TimeInterval? {
+        guard prayer == .dhuhr || prayer == .asr || prayer == .maghrib, let nextAdhan, nextAdhan > now else { return nil }
+        return nextAdhan.timeIntervalSince(now)
+    }
 }

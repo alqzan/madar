@@ -18,6 +18,8 @@ import XCTest
         XCTAssertTrue(amount.isHittable)
         XCTAssertTrue(amount.label.contains("وجه ونصف"), amount.label)
         XCTAssertFalse(amount.label.contains("المقدار") || amount.label.contains("وحدة"))
+        // Batch 3: «تجاوزه» says what skipping costs in days.
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'تتأخر الختمة'")).firstMatch.waitForExistence(timeout: 8), app.debugDescription)
         capture(app, "OR-21-fractional-wird-L")
     }
     func testForecastTrackComparesLevelsWithoutChangingTheHabitualSetting() throws {

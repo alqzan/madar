@@ -139,7 +139,7 @@ struct PrayerTodayView: View {
             nextPrayer(snapshot, now: instant)
                 .padding(.top, pills ? 18 : 26)
             if let open = quickLogCell(snapshot, now: instant) {
-                quickLogStrip(open).padding(.top, 14).disabled(!homeSnapshotIsCurrent)
+                quickLogStrip(open, snapshot: snapshot, now: instant).padding(.top, 14).disabled(!homeSnapshotIsCurrent)
             }
             verseDivider
                 .padding(.top, 18)
@@ -655,9 +655,14 @@ struct PrayerTodayView: View {
         return offered ? cell : nil
     }
 
-    private func quickLogStrip(_ cell: PrayerCell) -> some View {
+    private func quickLogStrip(_ cell: PrayerCell, snapshot: PrayerSnapshot, now: Date) -> some View {
         VStack(spacing: 10) {
             Text("صلّيتَ \(title(cell.reference.prayer))؟").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+            // Batch 3: how long is left, so the ask can be answered before the time runs out (never shown inside the sanctity window).
+            if let left = PrayerQuickLog.timeLeft(prayer: cell.reference.prayer, nextAdhan: snapshot.next?.time, now: now) {
+                Text("ينتهي وقتها " + PrayerCopy.after(seconds: left, digits: digits)).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                    .accessibilityIdentifier("prayer-quick-left")
+            }
             HStack(spacing: 10) {
                 quickLogButton("في جماعة", status: .jamaah, cell: cell)
                 quickLogButton("وحدي", status: .alone, cell: cell)

@@ -282,7 +282,7 @@ struct BahwUpcomingItem: Identifiable, Equatable {
 
 
 struct BahwSuggestion: Identifiable {
-    enum Destination { case prayer, habit(UUID), quran, diary, money, mihbara(book: UUID?) }
+    enum Destination { case prayer, habit(UUID), quran(route: String?), diary, money, mihbara(book: UUID?) }
     let id: String
     let title: String
     let detail: String
@@ -325,7 +325,7 @@ extension AppBahwService {
            quran.done < quran.total {
             // Same shape as the habit row above («الماء / بقي ٨ أكواب»): the step's name, then the passage.
             let title = quran.nextTitle.hasPrefix("التالي: ") ? String(quran.nextTitle.dropFirst("التالي: ".count)) : quran.nextTitle
-            result.append(.init(id: "quran", title: title, detail: quran.nextDetail, symbol: "MadarQuran", destination: .quran))
+            result.append(.init(id: "quran", title: title, detail: quran.nextDetail, symbol: "MadarQuran", destination: .quran(route: quran.route)))
         }
         if level == "present" {
             if session.roomEnabled(.notes), let diary = diary(), diary.count == 0 {

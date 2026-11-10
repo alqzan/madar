@@ -189,6 +189,17 @@ public enum QuranProgressEngine {
         return .unavailable
     }
 
+    /// Days the khatma moves if one hifz day's portion is skipped (the plan's «تجاوزه» choice), counted on the calendar
+    /// so a rest day in between counts too. Spreading or doubling the portion moves nothing, so only skipping needs this.
+    public static func skipDelayDays(remainingPages: Double, dailyPages: Double, startingOn day: GregorianDay,
+                                     restDay: QuranRestDay, pagesPerPlanUnit: Double = 1) -> Int? {
+        guard remainingPages > 0,
+              case .estimated(let now) = forecast(remainingPages: remainingPages, dailyPages: dailyPages, startingOn: day, restDay: restDay, pagesPerPlanUnit: pagesPerPlanUnit),
+              case .estimated(let later) = forecast(remainingPages: remainingPages + dailyPages, dailyPages: dailyPages, startingOn: day, restDay: restDay, pagesPerPlanUnit: pagesPerPlanUnit)
+        else { return nil }
+        return Int((later.date(in: .gmt).timeIntervalSince(now.date(in: .gmt)) / 86_400).rounded())
+    }
+
     public static func meanStrength(_ pages: [QuranPlanningPage]) -> Double? {
         guard !pages.isEmpty else { return nil }
         return Double(pages.reduce(0) { $0 + $1.strength }) / Double(pages.count)

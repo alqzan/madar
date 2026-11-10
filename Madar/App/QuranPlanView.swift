@@ -120,7 +120,7 @@ struct QuranPlanView: View {
                                             Image(systemName: input.missPolicy == key ? "largecircle.fill.circle" : "circle").foregroundStyle(input.missPolicy == key ? theme.color("hifzText") : theme.secondaryInk)
                                             VStack(alignment: .leading, spacing: 3) {
                                                 Text(title).font(quranFont(14, bold: input.missPolicy == key))
-                                                Text(key == "ask" ? "تختار عند كل ورد فائت" : key == "spread" ? "ثلث الورد في ثلاثة أيام حفظ" : key == "double" ? "ورد إضافي في يوم حفظ واحد" : "تُكمل بالمعتاد")
+                                                Text(key == "ask" ? "تختار عند كل ورد فائت" : key == "spread" ? "ثلث الورد في ثلاثة أيام حفظ" : key == "double" ? "ورد إضافي في يوم حفظ واحد" : skipLine(overview))
                                                     .font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                                             }
                                             Spacer()
@@ -174,6 +174,12 @@ struct QuranPlanView: View {
             madarDayRevision = key[1]
             madarDayGeneration = key[2]
         }
+    }
+    /// Batch 3: what skipping costs, in days, from the khatma date the engine already forecasts.
+    private func skipLine(_ overview: QuranUIPlanOverview) -> String {
+        let level = previewLevel ?? QuranUILevel(rawValue: app.string("quran.hifzLevel")) ?? .medium
+        guard let days = overview.forecasts[level.rawValue]?.skipDelayDays, days > 0 else { return "تُكمل بالمعتاد" }
+        return "تُكمل بالمعتاد، وتتأخر الختمة " + (days == 1 ? "يومًا" : days == 2 ? "يومين" : service.numerals.string(days) + (days <= 10 ? " أيام" : " يومًا"))
     }
     private func missedDayChart(_ overview: QuranUIPlanOverview, policy: String) -> some View {
         let choice = policy == "ask" ? "spread" : policy

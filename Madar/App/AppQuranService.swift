@@ -300,6 +300,8 @@ import MadarPrayer
                 if (target.first...target.last).allSatisfy({ snapshot.coverage.coveredAyahs.contains($0) }) { startingOn = startingOn.adding(days: 1) }
             }
         }
+        let dailyPages = input.amount * unitFaces * (level ?? snapshot.habitualHifzLevel).hifzFactor
+        let skipDelay = QuranProgressEngine.skipDelayDays(remainingPages: Double(remainingPages), dailyPages: dailyPages, startingOn: startingOn, restDay: rest, pagesPerPlanUnit: unitFaces)
         let result = QuranProgressEngine.forecast(remainingPages: Double(remainingPages), dailyPages: input.amount * unitFaces * (level ?? snapshot.habitualHifzLevel).hifzFactor,
             startingOn: startingOn, restDay: rest, allotments: snapshot.allotments, pagesPerPlanUnit: unitFaces)
         let title: String
@@ -313,7 +315,7 @@ import MadarPrayer
             estimatedDays = startingOn.quranDistance(to: day) + 1
         }
         return QuranUIForecast(title: title, assumptions: "تقدير بافتراض إتمام أيام الحفظ بلا فوت أو تثبيت، حُسب في " + displayDate(snapshot.day.date),
-            warning: input.amount * unitFaces > 2 ? "المقدار يتجاوز وجهين في يوم الحفظ" : nil, portions: [], estimatedDays: estimatedDays, secondaryDate: secondaryDate)
+            warning: input.amount * unitFaces > 2 ? "المقدار يتجاوز وجهين في يوم الحفظ" : nil, portions: [], estimatedDays: estimatedDays, secondaryDate: secondaryDate, skipDelayDays: skipDelay)
     }
     func page(_ number: Int) async throws -> QuranUIPage {
         let catalog = try QuranResources.catalog()

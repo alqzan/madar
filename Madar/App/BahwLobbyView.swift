@@ -391,7 +391,9 @@ private struct BahwSuggestionsView: View {
         case .prayer:
             session.selectedTab = "prayer"
         case .habit(let id): session.habitRouteID = id; session.habitsOpen = true
-        case .quran: session.selectedTab = "quran"
+        case .quran(let route):
+            // Batch 3: the step opens the session itself (madar://quran/session/hifz|review|drill) when the Quran room has one ready.
+            if let route, route.contains("/session/"), let url = URL(string: route) { session.open(url) } else { session.selectedTab = "quran" }
         case .diary:
             if let url = URL(string: "madar://notes/write") { session.open(url) }
         case .money:
