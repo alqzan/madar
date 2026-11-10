@@ -346,6 +346,7 @@
 		B099652587C1885A807C6EDC /* BahwAttentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DEA3BA58F06FAAC274081E2 /* BahwAttentionTests.swift */; };
 		B11E82DD4DCE28EC375542B2 /* DiaryExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693A9339530A3EDDA16FBF05 /* DiaryExportView.swift */; };
 		B1E0883905AB8A0BC6C0DF24 /* MadarGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA770813B3F76287BD061E21 /* MadarGlyph.swift */; };
+		B29627296F5A00D1C01B4A82 /* RejectedActionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 407A65B38BD060FC59E32B77 /* RejectedActionsView.swift */; };
 		B3AF3C9022728286FD29F935 /* LegacyMoveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4577E38D00C17B617BE270F3 /* LegacyMoveView.swift */; };
 		B3FDF0EF04DBAF95B86037C6 /* MadarSheetLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5187072B7E3770AA085E0207 /* MadarSheetLock.swift */; };
 		B4121C8BAA2C6E5365DA38B1 /* DiaryDayOneImportUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFD1CB727B5430D55A173B15 /* DiaryDayOneImportUITests.swift */; };
@@ -650,6 +651,7 @@
 		3D4DA6A41BFC8B46816890E9 /* CitySearchUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitySearchUITests.swift; sourceTree = "<group>"; };
 		3F2989DAFF327646B3C614EA /* DiaryTodayUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryTodayUITests.swift; sourceTree = "<group>"; };
 		3FF6E4771F76AE9E6020594D /* MihbaraHomeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraHomeUITests.swift; sourceTree = "<group>"; };
+		407A65B38BD060FC59E32B77 /* RejectedActionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RejectedActionsView.swift; sourceTree = "<group>"; };
 		417D810C18B9D81E74D00117 /* nawawi40.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = nawawi40.json; sourceTree = "<group>"; };
 		41D68577D1E6FA5223FD92FE /* HabitRhythmTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitRhythmTests.swift; sourceTree = "<group>"; };
 		420D1F4F6AE179838E2A03D7 /* MoneyLogModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyLogModels.swift; sourceTree = "<group>"; };
@@ -1363,6 +1365,7 @@
 				E1ACAD98A1AD83A235C1FCB7 /* QuranWidgetContent.swift */,
 				D782FD90DCA400C2CA265B25 /* QuranWirdReferenceView.swift */,
 				B5265ABF3C9DFCE44A071263 /* QuranYearView.swift */,
+				407A65B38BD060FC59E32B77 /* RejectedActionsView.swift */,
 				4800B7917F177C0E65DE00F7 /* RoomHomeLayout.swift */,
 				D2FA1B34E6D896D7B94B78AE /* RoomIntro.swift */,
 				33571E9B4ECAFDDF1D66AE44 /* RoomNotificationContent.swift */,
@@ -2328,6 +2331,7 @@
 				F5D155DF7B5E00FBC3AB3D0B /* QuranWidgetContent.swift in Sources */,
 				E0348C7CF0B10FF5C76D8C09 /* QuranWirdReferenceView.swift in Sources */,
 				DD86CCD87BD8C1FB2214433D /* QuranYearView.swift in Sources */,
+				B29627296F5A00D1C01B4A82 /* RejectedActionsView.swift in Sources */,
 				5E90F85E5CC1D50519363A57 /* RoomHomeLayout.swift in Sources */,
 				56C940F4000A166483C6E14A /* RoomIntro.swift in Sources */,
 				F98A4A5B02A74E80E39B0A92 /* RoomNotificationContent.swift in Sources */,

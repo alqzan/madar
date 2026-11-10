@@ -81,6 +81,28 @@ struct TransportTests {
         try inbox.acknowledge(processing)
         #expect(try inbox.unacknowledgedHabitIDs() == [unresolvedID])
     }
+    @Test func rejectedDeliveriesAreListedAndCanBeRetriedOrDismissed() throws {
+        let inbox = fixture(), first = record(), second = record()
+        #expect(try inbox.rejectedDeliveries().isEmpty)
+        _ = try inbox.enqueue(first); _ = try inbox.enqueue(second)
+        for file in try inbox.claimBatch() { try inbox.quarantine(file, reason: "invalidCommand") }
+        let listed = try inbox.rejectedDeliveries()
+        #expect(listed.count == 2)
+        #expect(listed.allSatisfy { $0.commandName == "prayer.log" && $0.reason == "invalidCommand" && $0.canRetry && $0.issuedAt != nil })
+        try inbox.retryRejected(fileName: listed[0].fileName)
+        #expect(try inbox.rejectedDeliveries().count == 1)
+        let again = try inbox.claimBatch()
+        #expect(again.count == 1, "A retried delivery is claimed by the next drain")
+        try inbox.acknowledge(again[0])
+        try inbox.dismissRejected(fileName: try #require(try inbox.rejectedDeliveries().first).fileName)
+        #expect(try inbox.rejectedDeliveries().isEmpty)
+        #expect(try inbox.claimBatch().isEmpty)
+        // An unreadable record is listed but cannot be retried.
+        let junk = inbox.directory.appending(path: "quarantine/\(UUID().uuidString).jsonl")
+        try Data("not json".utf8).write(to: junk)
+        let unreadable = try #require(try inbox.rejectedDeliveries().first)
+        #expect(unreadable.commandName == nil && !unreadable.canRetry)
+    }
     @Test func test_M0R03_cliAndFoundationTempAliasesClaimTheSameDirectory() throws {
         let inbox = fixture(), accepted = record()
         _ = try inbox.enqueue(accepted)

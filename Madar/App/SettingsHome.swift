@@ -64,6 +64,7 @@ struct SettingsHome: View {
                                            time: { session.backupTime($0) })
                     }
                 }
+                RejectedActionsRow(session: session)
                 link("انقل من مدار القديم", "استيراد بياناتك السابقة", "square.and.arrow.down") { LegacyMoveView(app: session) }
                 door("أعِد الإعدادات المتفق عليها", changes, "arrow.counterclockwise", resetAll)
             }

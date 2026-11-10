@@ -126,6 +126,43 @@ public struct PendingInbox: Sendable {
     }
     public func quarantine(_ file: URL, reason: String) throws { try retain(file, folder: "quarantine", reason: reason) }
     public func retainForResolution(_ file: URL, reason: String) throws { try retain(file, folder: "unresolved", reason: reason) }
+    /// A widget or Siri action the app refused for good (`quarantine`), shown so it never disappears silently.
+    public struct RejectedDelivery: Equatable, Sendable, Identifiable {
+        public var id: String { fileName }
+        public let fileName: String
+        /// Nil when the record itself is unreadable; such a delivery can only be dismissed.
+        public let commandName: String?
+        public let issuedAt: Date?
+        public let reason: String?
+        public var canRetry: Bool { commandName != nil && reason != "unknownVersion" }
+    }
+    public func rejectedDeliveries() throws -> [RejectedDelivery] {
+        try files(in: "quarantine").map { file in
+            let record = (try? Data(contentsOf: file)).flatMap { $0.count <= 1_048_576 ? try? JSONDecoder().decode(InboxRecord.self, from: $0) : nil }
+            let diagnostic = diagnosticURL(for: file)
+            let reason = (try? Data(contentsOf: diagnostic)).flatMap { try? JSONDecoder().decode(InboxDiagnostic.self, from: $0) }?.reason
+            return RejectedDelivery(fileName: file.lastPathComponent, commandName: record?.command.name, issuedAt: record?.command.issuedAt, reason: reason)
+        }
+    }
+    /// Puts a refused delivery back in the queue; the next drain tries it again with the same command ID, so dedupe still holds.
+    public func retryRejected(fileName: String) throws {
+        let file = try rejectedFile(named: fileName)
+        let destination = directory.appending(path: "pending/\(file.lastPathComponent)")
+        guard renamex_np(file.path, destination.path, UInt32(RENAME_EXCL)) == 0 else { throw InboxError.io(errno) }
+        try? FileManager.default.removeItem(at: diagnosticURL(for: file))
+        try syncDirectory(file.deletingLastPathComponent()); try syncDirectory(destination.deletingLastPathComponent())
+    }
+    public func dismissRejected(fileName: String) throws {
+        let file = try rejectedFile(named: fileName)
+        try FileManager.default.removeItem(at: file)
+        try? FileManager.default.removeItem(at: diagnosticURL(for: file))
+        try syncDirectory(file.deletingLastPathComponent())
+    }
+    private func diagnosticURL(for file: URL) -> URL { file.deletingPathExtension().appendingPathExtension("diagnostic.json") }
+    private func rejectedFile(named name: String) throws -> URL {
+        guard let file = try files(in: "quarantine").first(where: { $0.lastPathComponent == name }) else { throw InboxError.invalidLocation }
+        return file
+    }
     /// Conservative GC: unreadable files throw so callers cannot accidentally collect dedupe IDs.
     public func unacknowledgedCommandIDs() throws -> Set<UUID> {
         Set(try unacknowledgedRecords().map { $0.command.commandID })
