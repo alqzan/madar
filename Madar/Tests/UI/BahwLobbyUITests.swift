@@ -98,6 +98,29 @@ import XCTest
         mihbara.tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
     }
+    /// B3-1: before an adhan the lobby leads with that prayer; inside the sanctity window it shows no step at all.
+    func testLobbyLeadsWithNextPrayerBeforeAdhanAndIsQuietInsideTheWindow() throws {
+        continueAfterFailure = false
+        // Riyadh, 9 Oct 2026: Maghrib's adhan is about 17:32; its window ends 20 minutes later.
+        for (stamp, quiet) in [("2026-10-09T17:10:00+03:00", false), ("2026-10-09T17:40:00+03:00", true)] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": stamp, "MADAR_UI_TRACKING_START": "2026-10-01"]
+            app.launch(); finishOnboarding(app)
+            app.buttons["tab-foundation"].tap()
+            let later = app.buttons["bahw-attention-primary"]
+            if later.waitForExistence(timeout: 3) { later.tap(); _ = later.waitForNonExistence(timeout: 5) }
+            let lead = app.buttons["bahw-suggestion-nextPrayer"]
+            if quiet {
+                XCTAssertTrue(app.buttons["tab-foundation"].isSelected)
+                XCTAssertFalse(lead.waitForExistence(timeout: 4), "no step inside the sanctity window")
+                XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "bahw-suggestions").firstMatch.exists, app.debugDescription)
+            } else {
+                XCTAssertTrue(lead.waitForExistence(timeout: 10), app.debugDescription)
+                XCTAssertTrue(lead.label.contains("المغرب"), lead.label)
+            }
+            app.terminate()
+        }
+    }
     func testMoneySuggestionOpensBankMessages() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

@@ -297,6 +297,14 @@ extension AppBahwService {
         let level = session.string("bahw.smartPresence")
         let includesToday = ["medium", "present"].contains(level)
         var result: [BahwSuggestion] = []
+        // B3-1: the moment of the day decides which step leads. Inside a sanctity window the lobby offers nothing (RP3).
+        let moment = lobbyMoment()
+        if moment == .quiet { return [] }
+        if case .beforeAdhan(let prayer, let minutes) = moment {
+            let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
+            result.append(.init(id: "nextPrayer", title: "صلاة " + (names[prayer] ?? "") + " بعد " + (minutes <= 1 ? "دقيقة" : minutes == 2 ? "دقيقتين" : digits.string(minutes) + ((3...10).contains(minutes) ? " دقائق" : " دقيقة")),
+                                detail: "استعدّ لها", symbol: "MadarPrayer", destination: .prayer))
+        }
         if let snapshot = try? session.prayerSnapshot(at: now) {
             // Name the prayers themselves: «كيف صلّيت العشاء؟», not an anonymous «صلاة تنتظر».
             let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
@@ -330,7 +338,16 @@ extension AppBahwService {
                 result.append(.init(id: "mihbara", title: "أكمل «" + book.title + "»", detail: book.currentPage.map { "موضعك محفوظ عند الصفحة " + digits.string($0) } ?? "ابدأ القراءة من رحل المحبرة", symbol: "books.vertical", destination: .mihbara(book: book.id)))
             }
         }
-        return result
+        let order = LobbyMomentPlan.order(result.map(\.id), moment: moment)
+        return order.compactMap { id in result.first { $0.id == id } }
+    }
+    /// Yesterday, today and tomorrow of the active place (a night spans two civil days); with no calculable times the moment is `.general`.
+    private func lobbyMoment() -> LobbyMoment {
+        guard let repository = try? PrayerRepository(context: ModelContext(session.container)) else { return .general }
+        let place = repository.place(at: now), options = repository.calculationOptions(at: now)
+        let first = repository.prayerDay(at: now)
+        let days = (-1...1).compactMap { PrayerTimesEngine.calculate(day: first.adding(days: $0), place: place, options: options) }
+        return LobbyMomentPlan.moment(at: now, days: days)
     }
     /// The amount itself («بقي ٥ أكواب»), never a generic «خطوة صغيرة».
     private func habitRemainingPhrase(_ habit: HabitReading) -> String {
