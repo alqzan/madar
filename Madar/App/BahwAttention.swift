@@ -18,12 +18,18 @@ struct BahwAttention: Equatable, Identifiable {
         let at: Date
         var matches: Bool { expectedMinor == observedMinor }
     }
+    /// B2-14 (owner vision, 4 Nov): the latest prayer of today that is still unlogged and past its adhan, asked once with two buttons.
+    struct PrayerAsk: Equatable {
+        let reference: PrayerReference
+        let title: String
+    }
     var moneyCount = 0
     var reconcile: [ReconcileItem] = []
-    var isEmpty: Bool { moneyCount == 0 && reconcile.isEmpty }
+    var prayer: PrayerAsk?
+    var isEmpty: Bool { moneyCount == 0 && reconcile.isEmpty && prayer == nil }
     /// The same day with the same waiting items is shown once; a new day or a changed set shows it again.
     var signature: String {
-        "m\(moneyCount)|r" + reconcile.map { "\($0.id.uuidString):\($0.observedMinor)" }.sorted().joined(separator: ",")
+        "m\(moneyCount)|p\(prayer.map { $0.reference.day.description + $0.reference.prayer.rawValue } ?? "")|r" + reconcile.map { "\($0.id.uuidString):\($0.observedMinor)" }.sorted().joined(separator: ",")
     }
 }
 
@@ -35,6 +41,7 @@ extension AppBahwService {
         guard session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized else { return .init() }
         var result = BahwAttention()
         if session.roomEnabled(.mal) { result.moneyCount = pendingBankDecisions() }
+        if session.roomEnabled(.salah) { result.prayer = unloggedPrayerAsk() }
         // The whole-ledger reading is heavy for a pop-up, so the lobby asks at most once every few hours.
         if includeReconcile, session.roomEnabled(.mal), (ignoringThrottle || BahwAttentionMemory.reconcileDue(now: now)) { result.reconcile = reconcileOffers() }
         return result
@@ -49,6 +56,21 @@ extension AppBahwService {
             if let last = row.lastAt, last > cutoff { return nil }
             return .init(id: row.id, name: row.name, expectedMinor: row.expectedMinor, observedMinor: suggestion.observedMinor, at: suggestion.at)
         }.sorted { $0.name < $1.name }
+    }
+    /// Today's most recent past prayer that nobody has logged, never inside its sanctity window (adhan to +30 min, Maghrib +20) and never a Friday noon (its kind needs the prayer room).
+    func unloggedPrayerAsk() -> BahwAttention.PrayerAsk? {
+        guard let snapshot = try? session.prayerSnapshot(at: now) else { return nil }
+        let cells = snapshot.today.cells
+        let inSanctity = cells.contains { cell in
+            guard let time = cell.prayerTime else { return false }
+            let window: TimeInterval = (cell.reference.prayer == .maghrib ? 20 : 30) * 60
+            return now >= time && now < time.addingTimeInterval(window)
+        }
+        guard !inSanctity else { return nil }
+        let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
+        guard let cell = cells.last(where: { $0.status == .pending && $0.canLog && ($0.prayerTime.map { $0 <= now } ?? false) && !($0.isFriday && $0.reference.prayer == .dhuhr) }),
+              let name = names[cell.reference.prayer] else { return nil }
+        return .init(reference: cell.reference, title: name)
     }
     /// The count alone, from the repository: the whole money reading is far heavier than a pop-up deserves.
     func pendingBankDecisions() -> Int {
@@ -76,6 +98,7 @@ struct BahwAttentionSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("شيء ينتظرك").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
+                if let ask = attention.prayer { prayerSection(ask) }
                 if attention.moneyCount > 0 { moneySection }
                 if !attention.reconcile.isEmpty { reconcileSection }
                 Button { later() } label: {
@@ -100,6 +123,27 @@ struct BahwAttentionSheet: View {
         .sheet(isPresented: $moneyOpen, onDismiss: { attention.moneyCount = service.pendingBankDecisions(); if attention.isEmpty { dismiss() } }) {
             NavigationStack { MoneyMessagesView(app: session, revealed: $revealed) }
         }
+    }
+
+    private func prayerSection(_ ask: BahwAttention.PrayerAsk) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("صلّيتَ \(ask.title)؟").font(MadarTypography.section())
+            HStack(spacing: 10) {
+                ForEach([(PrayerStoredStatus.jamaah, "في جماعة"), (.alone, "وحدي")], id: \.1) { status, title in
+                    Button {
+                        guard !saving else { return }; saving = true
+                        session.recordPrayer(ask.reference, status: status) { ok in
+                            saving = false
+                            if ok { attention.prayer = nil; if attention.isEmpty { dismiss() } }
+                        }
+                    } label: {
+                        Text(title).font(MadarTypography.caption().bold()).foregroundStyle(theme.onAccent)
+                            .frame(maxWidth: .infinity, minHeight: 44).background(theme.accentFill, in: .capsule).contentShape(.capsule)
+                    }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("bahw-attention-prayer-\(status.rawValue)")
+                }
+            }
+        }
+        .padding(16).background(theme.surface, in: .rect(cornerRadius: 18)).overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line) }
     }
 
     private var moneySection: some View {
