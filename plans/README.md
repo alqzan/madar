@@ -60,7 +60,7 @@ under test.
 | 004  | A cleared diary draft stays cleared; a recording that ends on its own releases the audio session | P2 | S | yes | — | DONE |
 | 012  | A habit cannot be logged on a past day that was inside a pause | P2 | S | no (build only) | — | DONE |
 | 009  | PDF conversion reads the book off the main thread | P2 | S | no (build only) | — | DONE |
-| 005  | The board (`docs/PROGRESS.md`) no longer contradicts the protocol or the owner's answers | P2 | S | no | — | TODO |
+| 005  | The board (`docs/PROGRESS.md`) no longer contradicts the protocol or the owner's answers | P2 | S | no | — | DONE |
 | 006  | One fast `make check`, a current process test in `make test`, inbox tests on a fixed clock | P2 | S | no | — | TODO |
 | 010  | The seven tap-crawl tests report a skip instead of a pass | P3 | S | yes (one short run) | — | TODO |
 | 007  | Mihbara looks up one saved word and one reading session without loading the whole table | P3 | S | no (build only) | — | TODO |
