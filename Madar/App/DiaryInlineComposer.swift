@@ -70,7 +70,7 @@ struct DiaryInlineComposer: View {
                 }
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 8).background(theme.background)
+        .padding(.horizontal, 14).padding(.vertical, 8).frame(maxWidth: 640).frame(maxWidth: .infinity).background(theme.background)
         .task(id: editorOpen) { if !editorOpen { await loadDraft() } }
         .onChange(of: text) { _, _ in if edit == nil { scheduleDraft() } }
         .onChange(of: edit) { _, value in if let value { editText = value.text; focused = true } }
