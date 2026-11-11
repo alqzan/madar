@@ -18,20 +18,42 @@ import MadarDesign
         }
         #endif
         let cache = cacheURL
+        // D1 (owner, 11 Nov 2026): the cached catalogue is read and decoded off the main thread, and its download is capped.
         let age = (try? cache.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate).map { Date().timeIntervalSince($0) }
-        if let age, age < 7 * 86_400, let data = try? Data(contentsOf: cache), let books = try? TurathCatalogue.decode(data) { return books }
+        if let age, age < 7 * 86_400, let books = await cachedCatalogue(cache) { return books }
         do {
             var request = URLRequest(url: TurathCatalogue.catalogueURL)
             request.setValue("Madar/0.1.0 (iOS)", forHTTPHeaderField: "User-Agent")
             request.setValue("https://app.turath.io/", forHTTPHeaderField: "Referer")
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (bytes, response) = try await URLSession.shared.bytes(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw TurathError.unreadable }
+            guard response.expectedContentLength <= Int64(catalogueMaximumBytes) else { throw TurathError.tooLarge }
+            let data = try await boundedData(bytes, maximumBytes: catalogueMaximumBytes, expectedCount: response.expectedContentLength)
             let books = try await Task.detached { try TurathCatalogue.decode(data) }.value
             try? data.write(to: cache, options: .atomic)
             return books
         } catch {
-            if let data = try? Data(contentsOf: cache), let books = try? TurathCatalogue.decode(data) { return books }
+            if let books = await cachedCatalogue(cache) { return books }
             throw error
+        }
+    }
+
+    nonisolated static let catalogueMaximumBytes = 64 * 1024 * 1024
+
+    private static func cachedCatalogue(_ cache: URL) async -> [TurathCatalogueBook]? {
+        await Task.detached(priority: .userInitiated) { () -> [TurathCatalogueBook]? in
+            guard let data = try? Data(contentsOf: cache, options: .mappedIfSafe) else { return nil }
+            return try? TurathCatalogue.decode(data)
+        }.value
+    }
+
+    /// D1: downloads abandoned by a closed sheet or a failed import are swept once they are a day old; a fresh one is never touched.
+    nonisolated static func sweepDownloads(in folder: URL, now: Date = Date(), olderThan age: TimeInterval = 86_400) {
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey]
+        guard let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: Array(keys)) else { return }
+        for file in files {
+            guard let modified = try? file.resourceValues(forKeys: keys).contentModificationDate, now.timeIntervalSince(modified) > age else { continue }
+            try? FileManager.default.removeItem(at: file)
         }
     }
 
@@ -45,9 +67,13 @@ import MadarDesign
         #else
         data = try await fetch(book)
         #endif
-        let epub = try await Task.detached(priority: .userInitiated) {
+        // The same downloaded bytes go into the same builder, so the EPUB is byte-identical; closing the sheet now cancels the build.
+        let build = Task.detached(priority: .userInitiated) {
             try TurathEPUB.build(TurathBookDocument.decode(data, catalogue: book))
-        }.value
+        }
+        let epub = try await withTaskCancellationHandler { try await build.value } onCancel: { build.cancel() }
+        try Task.checkCancellation()
+        sweepDownloads(in: folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let name = book.title.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-").prefix(80)
         let file = folder.appendingPathComponent("\(name).epub")
@@ -68,13 +94,17 @@ import MadarDesign
     }
 
     nonisolated static func boundedData<Bytes: AsyncSequence & Sendable>(_ bytes: Bytes, maximumBytes: Int, expectedCount: Int64 = -1) async throws -> Data where Bytes.Element == UInt8 {
+        // D1: bytes are gathered in 64 KB chunks instead of one `Data.append` per byte; the cap and the bytes kept are unchanged.
         var data = Data()
         if expectedCount > 0 { data.reserveCapacity(min(maximumBytes, Int(expectedCount))) }
+        let chunk = 64 * 1024
+        var buffer: [UInt8] = []; buffer.reserveCapacity(chunk)
         for try await byte in bytes {
-            guard data.count < maximumBytes else { throw TurathError.tooLarge }
-            if data.count & 0x3fff == 0 { try Task.checkCancellation() }
-            data.append(byte)
+            guard data.count + buffer.count < maximumBytes else { throw TurathError.tooLarge }
+            buffer.append(byte)
+            if buffer.count == chunk { try Task.checkCancellation(); data.append(contentsOf: buffer); buffer.removeAll(keepingCapacity: true) }
         }
+        data.append(contentsOf: buffer)
         return data
     }
 }

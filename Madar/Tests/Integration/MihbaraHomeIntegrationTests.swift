@@ -116,6 +116,33 @@ import CoreSpotlight
             XCTAssertEqual(error, .tooLarge)
         }
     }
+    /// D1: chunked gathering keeps every byte in order across chunk boundaries (the EPUB builder gets the same input), keeps the exact cap,
+    /// and the download folder sweep removes only files older than a day.
+    func testTurathChunkedDownloadKeepsEveryByteAndOldDownloadsAreSwept() async throws {
+        let original = (0..<200_003).map { UInt8(truncatingIfNeeded: $0 &* 31 &+ 7) }
+        let stream = AsyncThrowingStream<UInt8, Error>(bufferingPolicy: .unbounded) { continuation in
+            for byte in original { continuation.yield(byte) }
+            continuation.finish()
+        }
+        let collected = try await MihbaraTurathSource.boundedData(stream, maximumBytes: original.count)
+        XCTAssertEqual(collected, Data(original))
+        let over = AsyncThrowingStream<UInt8, Error>(bufferingPolicy: .unbounded) { continuation in
+            for byte in original { continuation.yield(byte) }
+            continuation.finish()
+        }
+        do { _ = try await MihbaraTurathSource.boundedData(over, maximumBytes: original.count - 1); XCTFail("One byte over the cap must stop") }
+        catch let error as TurathError { XCTAssertEqual(error, .tooLarge) }
+
+        let folder = FileManager.default.temporaryDirectory.appending(path: "TurathSweep-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let old = folder.appending(path: "old.epub"), fresh = folder.appending(path: "fresh.epub")
+        try Data([1]).write(to: old); try Data([2]).write(to: fresh)
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-2 * 86_400)], ofItemAtPath: old.path)
+        MihbaraTurathSource.sweepDownloads(in: folder)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: old.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fresh.path))
+    }
     func testPageFootnotesKeepContinuationLinesAndLongSourceText() throws {
         let note = try XCTUnwrap(MihbaraFootnote(html: "<aside><p>١ الحاشية الأولى.</p><p>سطر مكمل للحاشية.</p><a role=\"doc-backlink\" href=\"#page-ref\">عودة</a></aside>", referrer: "حواشي الصفحة"))
         XCTAssertEqual(note.number, "حواشي الصفحة")
