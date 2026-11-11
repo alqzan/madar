@@ -66,9 +66,9 @@
     }
   ],
   "modelCount": {
-    "synced": 56,
+    "synced": 59,
     "deviceOnly": 6,
-    "total": 62
+    "total": 65
   },
   "reconcileOrder": [
     "Setting",
@@ -126,7 +126,10 @@
     "HabitPause",
     "HabitLog",
     "HabitEvent",
-    "WidgetConfig"
+    "WidgetConfig",
+    "AccountTail",
+    "BankReading",
+    "UpcomingDue"
   ],
   "models": [
     {
@@ -5502,6 +5505,222 @@
           "optional": true
         }
       ]
+    },
+    {
+      "name": "AccountTail",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "one more card or account tail a bank prints for an account or card the owner tracks (Apple Pay device tail, replacement card); natural key (accountID or cardID, tail); undo restores",
+      "amendedBy": "owner 11 Nov 2026, bank-message tails, readings and upcoming dues (schema V17)",
+      "relationships": [
+        {
+          "field": "accountID",
+          "to": "Account",
+          "kind": "one"
+        },
+        {
+          "field": "cardID",
+          "to": "Card",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "accountID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Account"
+        },
+        {
+          "name": "cardID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Card",
+          "note": "set when the tail belongs to a card (a credit card's Apple Pay tail)"
+        },
+        {
+          "name": "tail",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "four digits, as the bank prints them"
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "card",
+          "enum": [
+            "card",
+            "applePay",
+            "account"
+          ]
+        },
+        {
+          "name": "label",
+          "type": "String?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "BankReading",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "last balance and last available limit a bank message printed for an account or card, with the message time; one row per subject (UUIDv5 of the subject); only a later message replaces a value",
+      "amendedBy": "owner 11 Nov 2026, bank-message tails, readings and upcoming dues (schema V17)",
+      "relationships": [
+        {
+          "field": "accountID",
+          "to": "Account",
+          "kind": "one"
+        },
+        {
+          "field": "cardID",
+          "to": "Card",
+          "kind": "one"
+        },
+        {
+          "field": "balanceMessageID",
+          "to": "BankMessage",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "accountID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Account"
+        },
+        {
+          "name": "cardID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Card"
+        },
+        {
+          "name": "balanceMinor",
+          "type": "Int?",
+          "optional": true,
+          "unit": "minor units of the account currency (exponent from currency-minor-units.json) (signed)"
+        },
+        {
+          "name": "balanceAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "balanceMessageID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "BankMessage"
+        },
+        {
+          "name": "availableLimitMinor",
+          "type": "Int?",
+          "optional": true,
+          "unit": "minor units of the card currency (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "availableLimitAt",
+          "type": "Date?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "UpcomingDue",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "a payment a bank message announced but not yet made (bill issued, Tamara/Tabby reminder); never an expense or a reservation; closed by a later payment to the same payee for the same amount",
+      "amendedBy": "owner 11 Nov 2026, bank-message tails, readings and upcoming dues (schema V17)",
+      "relationships": [
+        {
+          "field": "sourceMessageID",
+          "to": "BankMessage",
+          "kind": "one"
+        },
+        {
+          "field": "closedByTransactionID",
+          "to": "MoneyTransaction",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "payee",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "the biller or BNPL provider as the message names it"
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "bill",
+          "enum": [
+            "bill",
+            "bnpl"
+          ]
+        },
+        {
+          "name": "amountMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "currency",
+          "type": "String",
+          "optional": false,
+          "default": "SAR"
+        },
+        {
+          "name": "dueAt",
+          "type": "Date?",
+          "optional": true,
+          "note": "the due date the message printed; none when it printed none"
+        },
+        {
+          "name": "sourceMessageID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "BankMessage"
+        },
+        {
+          "name": "closedByTransactionID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "MoneyTransaction",
+          "note": "the payment that closed it; a due whose payment is no longer live is open again"
+        },
+        {
+          "name": "closedAt",
+          "type": "Date?",
+          "optional": true
+        }
+      ]
     }
   ],
   "snapshotEnvelope": {
@@ -6019,5 +6238,5 @@
       "execution": "Immediately on press, within undo window"
     }
   },
-  "storeSchemaVersion": 16
+  "storeSchemaVersion": 17
 }

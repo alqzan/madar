@@ -262,7 +262,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 16)
+        #expect(MadarSchema.version == 17)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -285,7 +285,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 16)
+        #expect(MadarSchema.version == 17)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
@@ -803,6 +803,48 @@ import Testing
         #expect(reopened.binding.generationID == upgraded.binding.generationID)
         #expect(try RecordFingerprint.hash(RecordBridge.all(reopened.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expected))
         #expect(try stableGenerationHashes(generation) == sourceHash)
+    }
+
+    /// V17 only adds `AccountTail`, `BankReading` and `UpcomingDue`: every stored V16 row survives byte for byte and the new tables start empty.
+    @Test func schemaV16UpgradeKeepsMoneyRowsAndStartsWithNoBankReadingsTailsOrDues() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV17-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let stamp = Date(timeIntervalSince1970: 1_797_000_000), accountID = UUID(), messageID = UUID()
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV16.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV16.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV16.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+            let account = Account(); account.id = accountID; account.name = "synthetic account"; account.last4 = "1234"; account.balanceMinor = 50_000
+            account.createdAt = stamp; account.updatedAt = stamp; account.writerID = "synthetic-v16"
+            old.mainContext.insert(account); before.append(try account.record())
+            let message = BankMessage(); message.id = messageID; message.text = "synthetic"; message.receivedAt = stamp
+            message.createdAt = stamp; message.updatedAt = stamp; message.writerID = "synthetic-v16"
+            old.mainContext.insert(message); before.append(try message.record())
+            try old.mainContext.save()
+        }
+        try DurableFiles.encode(16, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: stamp), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        let context = upgraded.container.mainContext
+        #expect(try context.fetch(FetchDescriptor<Account>()).first { $0.id == accountID }?.balanceMinor == 50_000)
+        #expect(try context.fetch(FetchDescriptor<BankMessage>()).contains { $0.id == messageID })
+        #expect(try context.fetchCount(FetchDescriptor<AccountTail>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<BankReading>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<UpcomingDue>()) == 0)
+        let expected = try SchemaCompatibility.currentRecords(before, from: 16)
+        #expect(expected == before)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(context, syncedOnly: false)) == RecordFingerprint.hash(expected))
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
     }
 
     @Test func schemaV11UpgradeKeepsHabitTimesWithoutADiaryLinkAndReopen() throws {

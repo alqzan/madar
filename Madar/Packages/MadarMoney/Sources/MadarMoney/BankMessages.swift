@@ -140,6 +140,11 @@ public enum BankMessageParser {
         }
     }
 
+    /// A bill-issued notice («تم إصدار فاتورتك … المبلغ المطلوب …»): classed as marketing, but it announces an upcoming due, so intake keeps it.
+    public static func isDueNotice(_ text: String) -> Bool {
+        matches(clean(text), #"صدور\s+فاتورة|فاتورة\s+جديدة|تم\s+إصدار\s+فاتورتك|invoice\s+(?:generated|due)|new\s+bill"#)
+    }
+
     public static func classify(_ text: String) -> BankMessageKind {
         let t = clean(text)
         // Order matters: the dangerous and the specific first.

@@ -23,14 +23,14 @@ import Testing
         #expect(value["createdAt"] == .string("2033-05-18T03:33:20Z"))
         #expect(Set(value["counts"]!.object!.keys) == Set(MadarSchema.syncedNames))
         #expect(value["counts"]!.object!.values.allSatisfy { $0 == .number(0) })
-        #expect(files.count == 57); #expect(files["data/MoneyTransaction.jsonl"] == Data())
+        #expect(files.count == 60); #expect(files["data/MoneyTransaction.jsonl"] == Data())
         #expect(files["data/Transaction.jsonl"] == nil)
         #expect(try PortableExportCodec.validate(bytes).records.isEmpty)
     }
     @Test func everySyncedModelPhotoAudioAliasAndTombstoneRoundTripsIntoEmptyStore() throws {
         let expected = try seeded(); let bytes = try PortableExportCodec.export(records: expected)
         let files = try PortableZIP.decode(bytes); let validated = try PortableExportCodec.validate(bytes)
-        #expect(validated.manifest.counts.count == 56)
+        #expect(validated.manifest.counts.count == 59)
         #expect(validated.manifest.counts["Media"] == 2)
         #expect(try RecordFingerprint.hash(validated.records) == RecordFingerprint.hash(expected))
         let target = try MadarContainerFactory.makeInMemory()

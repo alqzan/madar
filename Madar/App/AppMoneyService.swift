@@ -51,6 +51,8 @@ struct MoneyHomeReading: Sendable {
     var obligations: [MoneyHomeObligation]
     /// Foreign accounts left out of the basis because no exchange rate is known.
     var unratedAccountNames: [String] = []
+    /// Owner, 11 Nov 2026: upcoming dues and balance differences read from bank messages.
+    var bankInsights = MoneyBankInsights()
 }
 
 @MainActor struct AppMoneyService {
@@ -269,6 +271,6 @@ enum MoneyHomeReadingBuilder {
             knownBalanceCount: accounts.filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt != nil }.count,
             pendingCount: try repo.pendingDecisionCount(), reserveMinor: reserve, surplusMinor: surplus, reserveRunway: reserveReading.runway, reserveDailies: reserveReading.wholeDailies, obligationsPerCycleMinor: cycleObligations,
             surplusHistory: history, envelopes: goals, limits: limits.sorted { $0.title < $1.title }, obligations: due,
-            unratedAccountNames: try repo.unratedAccountNames(at: now))
+            unratedAccountNames: try repo.unratedAccountNames(at: now), bankInsights: (try? MoneyBankInsightsReader.insights(context: context, now: now, zone: zone)) ?? MoneyBankInsights())
     }
 }

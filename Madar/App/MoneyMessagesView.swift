@@ -14,6 +14,7 @@ struct MoneyMessagesView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicType
     @State private var reading: MoneyMessagesReading?
+    @State private var tailQuestions: [MoneyTailQuestion] = []
     @State private var failure: String?
     @State private var note: String?
     @State private var deleteFailureID: UUID?
@@ -41,11 +42,16 @@ struct MoneyMessagesView: View {
                     }
                     arches(reading)
                     if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-messages-reveal") }
+                    ForEach(tailQuestions) { question in
+                        MoneyTailQuestionCard(question: question, digits: service.digits, answer: { candidate, kind in
+                            run("money.attachTail", MoneyBankInsightsCopy.attachPayload(question, candidate: candidate, kind: kind))
+                        }, skip: { MoneyTailSkips.skip(question.id); tailQuestions.removeAll { $0.id == question.id } })
+                    }
                     ForEach(reading.statements) { statementCard($0) }
                     ForEach(reading.drafts) { draftRow($0) }
                     clearButton(reading)
                     if !reading.looks.isEmpty { looks(reading.looks) }
-                    if reading.drafts.isEmpty && reading.statements.isEmpty && reading.looks.isEmpty {
+                    if reading.drafts.isEmpty && reading.statements.isEmpty && reading.looks.isEmpty && tailQuestions.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("لا شيء ينتظر").font(MadarTypography.cardTitle())
                             Text("كل رسالة وصلت حُسمت. ما يصل عبر الاختصار يظهر هنا للمراجعة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
@@ -354,6 +360,7 @@ struct MoneyMessagesView: View {
         }
     }
     private func load() {
+        Task { if let found = try? await service.loadTailQuestionsOffMain() { tailQuestions = found } }
         do { reading = try service.loadMessages(); failure = nil }
         catch { reading = nil; failure = "تعذّرت قراءة الرسائل. يمكنك إعادة المحاولة." }
     }

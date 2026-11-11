@@ -267,7 +267,7 @@ import WidgetKit
             ("القرآن", ["HifzPlan", "HifzSession", "PageGrade", "MistakeSpot", "MistakeEvent", "QuranDayState", "QuranAllotment", "RecoveryPlan"]),
             ("المذكرات", ["DayPage", "Niyya", "Entry", "HiddenAutoLine", "MarginNote", "Letter", "Project"]),
             ("الصور والصوت والملفات", ["Media"]),
-            ("المال", ["Account", "Card", "Statement", "CashbackEntry", "MoneyTransaction", "Allocation", "Reconciliation", "BankMessage", "Cycle", "CyclePolicy", "Envelope", "EnvelopePlan", "Obligation", "InstallmentItem", "Category", "CategoryLimit", "MerchantRule", "ZakatProfile"]),
+            ("المال", ["Account", "Card", "Statement", "CashbackEntry", "MoneyTransaction", "Allocation", "Reconciliation", "BankMessage", "AccountTail", "BankReading", "UpcomingDue", "Cycle", "CyclePolicy", "Envelope", "EnvelopePlan", "Obligation", "InstallmentItem", "Category", "CategoryLimit", "MerchantRule", "ZakatProfile"]),
             ("المحبرة", ["Book", "ReadingSession", "Highlight", "NotebookNote", "HadithProgress", "UserWord"]),
             ("العادات", ["Habit", "HabitPolicy", "HabitPause", "HabitLog", "HabitEvent"]),
             ("السفر والأيام القادمة", ["Trip", "UpcomingDay"]),

@@ -3760,3 +3760,175 @@ extension ProcessingJob: MadarRecordModel {
         error = try record.decode("error", as: String?.self)
     }
 }
+/// V17 (owner, 11 Nov 2026): one more card or account tail a bank prints for an account or card the owner already tracks —
+/// the Apple Pay device tail, a replacement physical card. The account's own `last4` stays on `Account`/`Card`.
+@Model public final class AccountTail {
+    public var id: UUID = UUID()
+    public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
+    public var deletedAt: Date? = nil
+    public var writerID: String = ""
+    public var mergedInto: UUID? = nil
+    public var deletionBarrierAt: Date? = nil
+    public var restoredAt: Date? = nil
+    public var accountID: UUID? = nil
+    public var cardID: UUID? = nil
+    public var tail: String = ""
+    public var kind: String = "card"
+    public var label: String? = nil
+    public init() {}
+}
+extension AccountTail: MadarRecordModel {
+    public func record() throws -> DataRecord {
+        try DataRecord(model: "AccountTail", fields: [
+            "id": JSONValue.encode(id),
+            "createdAt": JSONValue.encode(createdAt),
+            "updatedAt": JSONValue.encode(updatedAt),
+            "deletedAt": JSONValue.encode(deletedAt),
+            "writerID": JSONValue.encode(writerID),
+            "mergedInto": JSONValue.encode(mergedInto),
+            "deletionBarrierAt": JSONValue.encode(deletionBarrierAt),
+            "restoredAt": JSONValue.encode(restoredAt),
+            "accountID": JSONValue.encode(accountID),
+            "cardID": JSONValue.encode(cardID),
+            "tail": JSONValue.encode(tail),
+            "kind": JSONValue.encode(kind),
+            "label": JSONValue.encode(label),
+        ])
+    }
+    public func apply(_ record: DataRecord) throws {
+        id = try record.decode("id", as: UUID.self)
+        createdAt = try record.decode("createdAt", as: Date.self)
+        updatedAt = try record.decode("updatedAt", as: Date.self)
+        deletedAt = try record.decode("deletedAt", as: Date?.self)
+        writerID = try record.decode("writerID", as: String.self)
+        mergedInto = try record.decode("mergedInto", as: UUID?.self)
+        deletionBarrierAt = try record.decode("deletionBarrierAt", as: Date?.self)
+        restoredAt = try record.decode("restoredAt", as: Date?.self)
+        accountID = try record.decode("accountID", as: UUID?.self)
+        cardID = try record.decode("cardID", as: UUID?.self)
+        tail = try record.decode("tail", as: String.self)
+        kind = try record.decode("kind", as: String.self)
+        label = try record.decode("label", as: String?.self)
+    }
+}
+/// V17: the last balance and the last available limit a bank message printed for an account or card, each with the message
+/// time it was printed at. One row per account or card (id from the subject); only a later message replaces a value.
+@Model public final class BankReading {
+    public var id: UUID = UUID()
+    public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
+    public var deletedAt: Date? = nil
+    public var writerID: String = ""
+    public var mergedInto: UUID? = nil
+    public var deletionBarrierAt: Date? = nil
+    public var restoredAt: Date? = nil
+    public var accountID: UUID? = nil
+    public var cardID: UUID? = nil
+    public var balanceMinor: Int? = nil
+    public var balanceAt: Date? = nil
+    public var balanceMessageID: UUID? = nil
+    public var availableLimitMinor: Int? = nil
+    public var availableLimitAt: Date? = nil
+    public init() {}
+}
+extension BankReading: MadarRecordModel {
+    public func record() throws -> DataRecord {
+        try DataRecord(model: "BankReading", fields: [
+            "id": JSONValue.encode(id),
+            "createdAt": JSONValue.encode(createdAt),
+            "updatedAt": JSONValue.encode(updatedAt),
+            "deletedAt": JSONValue.encode(deletedAt),
+            "writerID": JSONValue.encode(writerID),
+            "mergedInto": JSONValue.encode(mergedInto),
+            "deletionBarrierAt": JSONValue.encode(deletionBarrierAt),
+            "restoredAt": JSONValue.encode(restoredAt),
+            "accountID": JSONValue.encode(accountID),
+            "cardID": JSONValue.encode(cardID),
+            "balanceMinor": JSONValue.encode(balanceMinor),
+            "balanceAt": JSONValue.encode(balanceAt),
+            "balanceMessageID": JSONValue.encode(balanceMessageID),
+            "availableLimitMinor": JSONValue.encode(availableLimitMinor),
+            "availableLimitAt": JSONValue.encode(availableLimitAt),
+        ])
+    }
+    public func apply(_ record: DataRecord) throws {
+        id = try record.decode("id", as: UUID.self)
+        createdAt = try record.decode("createdAt", as: Date.self)
+        updatedAt = try record.decode("updatedAt", as: Date.self)
+        deletedAt = try record.decode("deletedAt", as: Date?.self)
+        writerID = try record.decode("writerID", as: String.self)
+        mergedInto = try record.decode("mergedInto", as: UUID?.self)
+        deletionBarrierAt = try record.decode("deletionBarrierAt", as: Date?.self)
+        restoredAt = try record.decode("restoredAt", as: Date?.self)
+        accountID = try record.decode("accountID", as: UUID?.self)
+        cardID = try record.decode("cardID", as: UUID?.self)
+        balanceMinor = try record.decode("balanceMinor", as: Int?.self)
+        balanceAt = try record.decode("balanceAt", as: Date?.self)
+        balanceMessageID = try record.decode("balanceMessageID", as: UUID?.self)
+        availableLimitMinor = try record.decode("availableLimitMinor", as: Int?.self)
+        availableLimitAt = try record.decode("availableLimitAt", as: Date?.self)
+    }
+}
+/// V17: a payment a bank message announced but the owner has not made yet (a bill issued, a Tamara or Tabby reminder).
+/// Never an expense and never a reservation: it is only listed until a later payment to the same payee for the same amount
+/// closes it. One row per (payee, amount, due day) — a repeated reminder updates it.
+@Model public final class UpcomingDue {
+    public var id: UUID = UUID()
+    public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
+    public var deletedAt: Date? = nil
+    public var writerID: String = ""
+    public var mergedInto: UUID? = nil
+    public var deletionBarrierAt: Date? = nil
+    public var restoredAt: Date? = nil
+    public var payee: String = ""
+    public var kind: String = "bill"
+    public var amountMinor: Int = 0
+    public var currency: String = "SAR"
+    public var dueAt: Date? = nil
+    public var sourceMessageID: UUID? = nil
+    public var closedByTransactionID: UUID? = nil
+    public var closedAt: Date? = nil
+    public init() {}
+}
+extension UpcomingDue: MadarRecordModel {
+    public func record() throws -> DataRecord {
+        try DataRecord(model: "UpcomingDue", fields: [
+            "id": JSONValue.encode(id),
+            "createdAt": JSONValue.encode(createdAt),
+            "updatedAt": JSONValue.encode(updatedAt),
+            "deletedAt": JSONValue.encode(deletedAt),
+            "writerID": JSONValue.encode(writerID),
+            "mergedInto": JSONValue.encode(mergedInto),
+            "deletionBarrierAt": JSONValue.encode(deletionBarrierAt),
+            "restoredAt": JSONValue.encode(restoredAt),
+            "payee": JSONValue.encode(payee),
+            "kind": JSONValue.encode(kind),
+            "amountMinor": JSONValue.encode(amountMinor),
+            "currency": JSONValue.encode(currency),
+            "dueAt": JSONValue.encode(dueAt),
+            "sourceMessageID": JSONValue.encode(sourceMessageID),
+            "closedByTransactionID": JSONValue.encode(closedByTransactionID),
+            "closedAt": JSONValue.encode(closedAt),
+        ])
+    }
+    public func apply(_ record: DataRecord) throws {
+        id = try record.decode("id", as: UUID.self)
+        createdAt = try record.decode("createdAt", as: Date.self)
+        updatedAt = try record.decode("updatedAt", as: Date.self)
+        deletedAt = try record.decode("deletedAt", as: Date?.self)
+        writerID = try record.decode("writerID", as: String.self)
+        mergedInto = try record.decode("mergedInto", as: UUID?.self)
+        deletionBarrierAt = try record.decode("deletionBarrierAt", as: Date?.self)
+        restoredAt = try record.decode("restoredAt", as: Date?.self)
+        payee = try record.decode("payee", as: String.self)
+        kind = try record.decode("kind", as: String.self)
+        amountMinor = try record.decode("amountMinor", as: Int.self)
+        currency = try record.decode("currency", as: String.self)
+        dueAt = try record.decode("dueAt", as: Date?.self)
+        sourceMessageID = try record.decode("sourceMessageID", as: UUID?.self)
+        closedByTransactionID = try record.decode("closedByTransactionID", as: UUID?.self)
+        closedAt = try record.decode("closedAt", as: Date?.self)
+    }
+}

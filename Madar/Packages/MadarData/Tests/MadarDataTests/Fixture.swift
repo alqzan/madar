@@ -59,6 +59,9 @@ import CryptoKit
     let rowHabitPause = HabitPause(); rowHabitPause.id = StableIdentity.uuid(for:"fixture:HabitPause"); context.insert(rowHabitPause)
     let rowHabitLog = HabitLog(); rowHabitLog.id = StableIdentity.uuid(for:"fixture:HabitLog"); context.insert(rowHabitLog)
     let rowWidgetConfig = WidgetConfig(); rowWidgetConfig.id = StableIdentity.uuid(for:"fixture:WidgetConfig"); context.insert(rowWidgetConfig)
+    let rowAccountTail = AccountTail(); rowAccountTail.id = StableIdentity.uuid(for:"fixture:AccountTail"); context.insert(rowAccountTail)
+    let rowBankReading = BankReading(); rowBankReading.id = StableIdentity.uuid(for:"fixture:BankReading"); context.insert(rowBankReading)
+    let rowUpcomingDue = UpcomingDue(); rowUpcomingDue.id = StableIdentity.uuid(for:"fixture:UpcomingDue"); context.insert(rowUpcomingDue)
     rowLayoutState.room = "bahw"
     rowMedia.data = Data([1,2,3,4]); rowMedia.sizeBytes = 4; rowMedia.sha256 = SHA256.hash(data:rowMedia.data!).map { String(format:"%02x",$0) }.joined()
     let audio = Media(); audio.kind = "audio"; audio.data = Data([5,6,7]); audio.sizeBytes = 3; audio.sha256 = SHA256.hash(data:audio.data!).map { String(format:"%02x",$0) }.joined(); context.insert(audio)

@@ -15,7 +15,7 @@ extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
         let environment = ProcessInfo.processInfo.environment
-        guard let variant = environment["MADAR_UI_MONEY_FIXTURE"], ["funding", "goal", "zakat", "zakatHidden", "travel", "travelDupTRY", "travelDupSAR", "travelMissing", "travelHidden", "travelMultiLeg", "travelMultiLegHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = environment["MADAR_UI_MONEY_FIXTURE"], ["funding", "goal", "zakat", "zakatHidden", "travel", "travelDupTRY", "travelDupSAR", "travelMissing", "travelHidden", "travelMultiLeg", "travelMultiLegHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "bankInsights", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -302,6 +302,15 @@ extension AppSession {
             let old = BankMessage(); old.sender = "بنك الاختبار"; old.channel = "shortcut"; old.kind = "purchase"; old.status = "ok"; old.receivedAt = today.adding(days: -4).date(in: zone).addingTimeInterval(13 * 3600); c.insert(old)
             let statement = BankMessage(); statement.sender = "بنك الاختبار"; statement.channel = "shortcut"; statement.kind = "statement"; statement.status = "needsLook"; statement.receivedAt = today.adding(days: -3).date(in: zone).addingTimeInterval(9 * 3600)
             statement.parsedJSON = try JSONSerialization.data(withJSONObject: ["v": 1, "kind": "statement", "last4": "8844", "statementDueMinor": 425_000, "minimumDueMinor": 21_300, "dueDate": today.adding(days: 9).date(in: zone).timeIntervalSinceReferenceDate]); c.insert(statement)
+            try c.save()
+        }
+        if variant == "bankInsights" {
+            // Owner, 11 Nov 2026: a bank message printed a balance 320 below the book, and a bill is due in two days.
+            account.balanceAt = now.addingTimeInterval(-2 * 86_400)
+            let printed = BankReading(); printed.accountID = account.id; printed.balanceAt = now.addingTimeInterval(-3600)
+            printed.balanceMinor = account.balanceMinor - 32_000; c.insert(printed)
+            let bill = UpcomingDue(); bill.payee = "فاتورة الاختبار"; bill.kind = "bill"; bill.amountMinor = 21_500; bill.currency = "SAR"
+            bill.dueAt = today.adding(days: 2).date(in: zone).addingTimeInterval(12 * 3600); c.insert(bill)
             try c.save()
         }
         if variant == "subscriptions" || variant == "subscriptionsHidden" {

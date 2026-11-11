@@ -65,9 +65,9 @@ import Testing
     }
 
     @Test func schemaAndDefaultContainer() throws {
-        #expect(MadarSchema.syncedTypes.count == 56); #expect(MadarSchema.deviceTypes.count == 6)
+        #expect(MadarSchema.syncedTypes.count == 59); #expect(MadarSchema.deviceTypes.count == 6)
         let container = try MadarContainerFactory.makeInMemory(); try fixture(container.mainContext)
-        #expect(try Set(RecordBridge.all(container.mainContext).map(\.model)).count == 55) // the fixture predates HabitEvent (V4)
+        #expect(try Set(RecordBridge.all(container.mainContext).map(\.model)).count == 58) // the fixture predates HabitEvent (V4)
     }
     @Test func diskPersistenceAndNewerVersionGuard() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("MadarDataTest-\(UUID())")
@@ -239,7 +239,7 @@ import Testing
         let records = try RecordBridge.all(source.mainContext)
         let data = try BackupCodec.export(records:records,passphrase:"correct long password")
         let backup = try BackupCodec.validate(data,passphrase:"correct long password")
-        #expect(Set(backup.records) == Set(records)); #expect(backup.manifest.counts.count == 56)
+        #expect(Set(backup.records) == Set(records)); #expect(backup.manifest.counts.count == 59)
         let target = try MadarContainerFactory.makeInMemory(); #expect(try BackupRestore.merge(backup,into:target.mainContext) == records.count)
         #expect(try BackupRestore.merge(backup,into:target.mainContext) == 0)
     }

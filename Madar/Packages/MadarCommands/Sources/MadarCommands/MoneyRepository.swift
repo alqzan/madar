@@ -118,7 +118,7 @@ public struct MoneyRepository {
         try accountBalance(account, at: now, transactions: try confirmedTransactions(), cards: try context.fetch(FetchDescriptor<Card>()))
     }
     /// Same balance from rows already read, so a list of accounts scans the tables once instead of once per account.
-    private func accountBalance(_ account: Account, at now: Date, transactions: [MoneyTransaction], cards: [Card]) throws -> Int {
+    func accountBalance(_ account: Account, at now: Date, transactions: [MoneyTransaction], cards: [Card]) throws -> Int {
         var deltas: [Int] = []
         for row in transactions where row.eventAt > (account.balanceAt ?? .distantPast) && row.eventAt <= now {
             guard row.fromAccountID == account.id || row.toAccountID == account.id else { continue }

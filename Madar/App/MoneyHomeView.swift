@@ -21,6 +21,7 @@ struct MoneyHomeView: View {
     @State private var readingLoadTask: Task<Void, Never>?
     @State private var readingLoadID = UUID()
     @State private var cardCount = 0
+    @State private var bankInsights = MoneyBankInsights()
     @State private var hawlKey: String?
     @State private var failure: String?
     @State private var isAccruingPlans = false
@@ -238,10 +239,11 @@ struct MoneyHomeView: View {
             let lead = blocks.filter { ["curve", "now"].contains($0) }
             HStack(alignment: .top, spacing: 28) {
                 VStack(alignment: .leading, spacing: 10) { ForEach(lead, id: \.self) { block($0, reading, blocks) } }.frame(maxWidth: .infinity)
-                VStack(alignment: .leading, spacing: 10) { ForEach(blocks.filter { !lead.contains($0) }, id: \.self) { block($0, reading, blocks) }; doors }.frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: 10) { ForEach(blocks.filter { !lead.contains($0) }, id: \.self) { block($0, reading, blocks) }; bankInsightsSection; doors }.frame(maxWidth: .infinity)
             }
         } else {
             ForEach(blocks, id: \.self) { block($0, reading, blocks) }
+            bankInsightsSection
             doors
         }
     }
@@ -267,6 +269,22 @@ struct MoneyHomeView: View {
                 if blocks.firstIndex(of: "obligations") != blocks.firstIndex(of: "limits").map({ $0 + 1 }) { obligations(reading) }
             default: EmptyView()
             }
+    }
+    /// Owner, 11 Nov 2026: upcoming dues and a quiet balance difference. No notification; empty means nothing is drawn.
+    private var bankInsightsSection: some View {
+        MoneyBankInsightsSection(app: app, insights: bankInsights, visible: amountsVisible, settle: { item, name in
+            Task {
+                do { try await app.executeMoneyCommand("money.reconcile", payload: ["rows": .array([MoneyBankInsightsCopy.reconcileRow(item, name: name)])]) }
+                catch { app.errorMessage = "لم تُحفظ التسوية: " + madarUserMessage(error) }
+                load()
+            }
+        }, dismissDue: { due in
+            Task {
+                do { try await app.executeMoneyCommand("money.dismissDue", payload: ["id": .string(due.id.uuidString)]) }
+                catch { app.errorMessage = "لم يُحذف المستحق: " + madarUserMessage(error) }
+                load()
+            }
+        })
     }
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -512,6 +530,7 @@ struct MoneyHomeView: View {
             reading = value
             cardCount = value.cardCount
             hawlKey = value.hawlKey
+            bankInsights = value.bankInsights
             failure = nil
             if let route = app.moneyRoute { openMoneyRoute(route) }
         }

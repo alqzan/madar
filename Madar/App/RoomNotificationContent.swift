@@ -444,7 +444,7 @@ enum QuranReminderCopy {
         }
         try mark(Account.self, \.updatedAt); try mark(Card.self, \.updatedAt); try mark(Statement.self, \.updatedAt)
         try mark(CashbackEntry.self, \.updatedAt); try mark(MoneyTransaction.self, \.updatedAt); try mark(Allocation.self, \.updatedAt)
-        try mark(Reconciliation.self, \.updatedAt); try mark(BankMessage.self, \.updatedAt); try mark(Cycle.self, \.updatedAt)
+        try mark(Reconciliation.self, \.updatedAt); try mark(BankMessage.self, \.updatedAt); try mark(AccountTail.self, \.updatedAt); try mark(BankReading.self, \.updatedAt); try mark(UpcomingDue.self, \.updatedAt); try mark(Cycle.self, \.updatedAt)
         try mark(CyclePolicy.self, \.updatedAt); try mark(Envelope.self, \.updatedAt); try mark(EnvelopePlan.self, \.updatedAt)
         try mark(Obligation.self, \.updatedAt); try mark(InstallmentItem.self, \.updatedAt); try mark(MadarData.Category.self, \.updatedAt)
         try mark(CategoryLimit.self, \.updatedAt); try mark(MerchantRule.self, \.updatedAt); try mark(Trip.self, \.updatedAt)

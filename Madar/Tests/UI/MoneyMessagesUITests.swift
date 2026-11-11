@@ -89,6 +89,7 @@ import UIKit
         let note = app.staticTexts["money-draft-delete-error"]
         XCTAssertTrue(note.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertEqual(note.label, "تعذّر حذف الحركة.")
+        for _ in 0..<6 where !note.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(note.isHittable, app.debugDescription)
         XCTAssertTrue(draft.exists, "A failed delete must leave the draft available")
         shot(app, "AU-73-draft-delete-failure-L")
@@ -101,12 +102,9 @@ import UIKit
         let sample = "شراء مدى\n*3333\n18.00 SAR\nلدى: Coffee\n2026-10-16 12:00"
         UIPasteboard.general.string = Array(repeating: sample, count: 501).joined(separator: "\n\n")
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
                                 "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
         app.launch()
-        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
-        let start = app.buttons["first-run-continue"]
-        if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
         let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
         let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
@@ -251,7 +249,10 @@ import UIKit
         let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", String(corpus.count)), object: title)
         XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 30), .completed, "Selected messages did not all reach the review tray")
         XCTAssertTrue(app.descendants(matching: .any)["money-messages-review"].label.contains("٣"))
-        XCTAssertTrue(app.buttons.matching(identifier: "money-draft-confirm").firstMatch.exists)
+        // Tail questions now sit above the drafts and the list is lazy: scroll until the first draft is built.
+        let firstDraft = app.buttons.matching(identifier: "money-draft-confirm").firstMatch
+        for _ in 0..<10 where !firstDraft.exists { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(firstDraft.exists, app.debugDescription)
         shot(app, "M5-E03-local-corpus-L")
     }
 

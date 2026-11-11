@@ -26,12 +26,29 @@ public struct MoneyParsedFields: Codable, Sendable {
     public var dueDate: Date?
     public var balanceMinor: Int?
     public var statedHomeMinor: Int?
+    // Owner, 11 Nov 2026: what the bank also printed. All optional, so rows stored before still decode.
+    public var accountLast4: String?
+    public var counterparty: String?
+    public var counterpartyAccountLast4: String?
+    public var declineReason: String?
+    public var feeMinor: Int?
+    public var vatMinor: Int?
+    public var foreignFeeMinor: Int?
+    public var exchangeRate: String?
+    public var remainingLimitMinor: Int?
+    public var availableLimitMinor: Int?
+    public var eventDateOnly: Date?
     init(_ p: ParsedBankMessage) {
         kind = p.kind.rawValue; amountMinor = p.amountMinor; currency = p.currency; last4 = p.last4
         cardKind = p.cardKind?.rawValue; merchant = p.merchant; biller = p.biller; provider = p.provider
         eventAt = p.eventAt; statedHomeMinor = p.statedHomeMinor; statementDueMinor = p.statementDueMinor; minimumDueMinor = p.minimumDueMinor
         dueDate = p.dueDate; balanceMinor = p.balanceMinor
+        accountLast4 = p.accountLast4; counterparty = p.counterparty; counterpartyAccountLast4 = p.counterpartyAccountLast4
+        declineReason = p.declineReason?.rawValue; feeMinor = p.feeMinor; vatMinor = p.vatMinor; foreignFeeMinor = p.foreignFeeMinor
+        exchangeRate = p.exchangeRate; remainingLimitMinor = p.remainingLimitMinor; availableLimitMinor = p.availableLimitMinor
+        eventDateOnly = p.eventDateOnly
     }
+    var messageKind: BankMessageKind { BankMessageKind(rawValue: kind) ?? .unknown }
 }
 
 /// The six categories of the approved design (`mal/12-Z-R18-cat-1`), seeded once into an empty store.
@@ -41,6 +58,19 @@ public enum MoneyDefaultCategories {
     public static func id(_ slug: String) -> UUID { StableIdentity.uuid(for: "Category:" + slug) }
     /// Older than any real write, so a seed never beats an edit or a deletion in last-writer-wins.
     public static let seedStamp = Date(timeIntervalSince1970: 0)
+}
+
+/// Rows the per-message bank steps (identify, readings, dues) read, fetched once per command. Rows the command inserts are registered so
+/// later messages of the same command see them.
+@MainActor final class BankLookups {
+    var accounts: [Account], cards: [Card], extra: [AccountTail], readings: [UUID: BankReading], dueIDs: Set<UUID>
+    init(_ context: ModelContext) throws {
+        accounts = try context.fetch(FetchDescriptor<Account>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+        cards = try context.fetch(FetchDescriptor<Card>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+        extra = try MoneyAccountRules.liveTails(in: context)
+        readings = Dictionary(try context.fetch(FetchDescriptor<BankReading>()).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        dueIDs = Set(try context.fetch(FetchDescriptor<UpcomingDue>()).map(\.id))
+    }
 }
 
 struct MoneyStagedResult { var inverse: Data?; var duplicate: Bool }
@@ -59,6 +89,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         return false
     }
     private static func discard(_ text: String) -> Bool {
+        // A bill-issued notice is kept: it becomes an upcoming due (owner, 11 Nov 2026).
+        if BankMessageParser.isDueNotice(text) { return false }
         let decision = BankIntake.decision(BankMessageParser.classify(text))
         return decision == .discard || decision == .discardWithoutText
     }
@@ -209,6 +241,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             // Item 34 / M5-V19: only an account nothing ever referred to; a tombstone the app's undo restores.
             guard let accountID = uuid(p, "id"), let row = try context.fetch(FetchDescriptor<Account>()).first(where: { $0.id == accountID && live($0) }) else { throw MoneyCommandError.missingRow }
             guard try MoneyAccountRules.removable(accountID, in: context) else { throw MoneyCommandError.invalidReference }
+            try touch(row, now, writer, deleting: true)
+        case "money.attachTail": try attachTail(p, context, now, writer)
+        case "money.dismissDue":
+            guard let dueID = uuid(p, "id"), let row = try context.fetch(FetchDescriptor<UpcomingDue>()).first(where: { $0.id == dueID && live($0) }) else { throw MoneyCommandError.missingRow }
             try touch(row, now, writer, deleting: true)
         case "money.saveCard": try saveCard(p, context, now, writer)
         case "money.setCardCashback":
@@ -586,6 +622,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
         let liveCategoryIDs = Set(try context.fetch(FetchDescriptor<MadarData.Category>()).filter { live($0) }.map(\.id))
         let learningIndex = MerchantCategoryLearning.makeIndex(samples: learningSamples, liveCategoryIDs: liveCategoryIDs)
+        let lookups = try BankLookups(context)
         for (index, pair) in zip(items, placements).enumerated() {
             let (input, placement) = pair, (p, received, parsed, fingerprint) = input
             let occurrence: Int, possibleDuplicate: Bool
@@ -602,6 +639,11 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             message.parsedJSON = try JSONEncoder().encode(MoneyParsedFields(parsed)); message.createdAt = now
             message.status = parsed.kind == .declined ? "ignored" : possibleDuplicate ? "possibleDuplicate" : "needsLook"
             context.insert(message); try touch(message, now, writer)
+            let fields = MoneyParsedFields(parsed), printedAt = parsed.eventAt ?? received
+            if parsed.kind != .marketing { try recordReadings(fields, sender: message.sender, messageID: message.id, at: printedAt, lookups: lookups, context: context, now: now, writer: writer) }
+            if parsed.kind == .marketing, try recordDue(fields, sender: message.sender, messageID: message.id, at: printedAt, lookups: lookups, context: context, now: now, writer: writer) {
+                message.status = "ok"; try touch(message, now, writer); continue
+            }
             guard parsed.kind != .declined && parsed.kind != .unknown && parsed.kind != .statement,
                   let amount = parsed.amountMinor, amount > 0, amount <= 9_007_199_254_740_991, let code = parsed.currency else { continue }
             let row = MoneyTransaction(); row.id = StableIdentity.uuid(for: "BankMovement:\(message.id)")
@@ -611,7 +653,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             row.kind = transactionKind(parsed.kind); row.merchant = parsed.merchant; row.counterparty = parsed.counterparty
             row.reviewState = possibleDuplicate ? "possibleDuplicate" : "needsLook"; row.createdAt = now
             try stampDay(row, at: parsed.eventAt ?? received, context: context, now: now)
-            try identify(row, parsed: parsed, sender: message.sender, context: context)
+            try identify(row, parsed: MoneyParsedFields(parsed), sender: message.sender, context: context, lookups: lookups)
             if row.currency != row.homeCurrency, let stated = parsed.statedHomeMinor, stated > 0 {
                 row.homeAmountMinor = stated; row.rateAtTime = try FX.impliedRate(amountMinor: row.amountMinor, currency: row.currency, homeMinor: stated, home: row.homeCurrency); row.rateSource = "message"
             } else if row.currency != row.homeCurrency, let trip = try MoneyRepository(context: context).trip(at: row.eventAt), trip.currency == row.currency, let rate = trip.fxRateToHome {
@@ -638,6 +680,87 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             try flagNearDuplicate(row, message: message, context: context, now: now, writer: writer)
         }
         try pairTransfers(context: context, now: now, writer: writer)
+        try closeDues(context: context, now: now, writer: writer)
+    }
+
+    // MARK: Bank readings, upcoming dues (owner, 11 Nov 2026)
+
+    /// The last printed balance of a tracked account and the last available limit of a card, each only replaced by a later message.
+    private static func recordReadings(_ fields: MoneyParsedFields, sender: String, messageID: UUID, at: Date, lookups: BankLookups, context: ModelContext, now: Date, writer: String) throws {
+        guard fields.balanceMinor != nil || fields.availableLimitMinor != nil else { return }
+        let subject = resolve(parsed: fields, sender: sender, accounts: lookups.accounts, cards: lookups.cards, extra: lookups.extra)
+        func row(account: UUID?, card: UUID?) -> BankReading {
+            let id = StableIdentity.uuid(for: "BankReading:" + (card.map { "card:" + $0.uuidString } ?? "account:" + (account?.uuidString ?? "")))
+            if let old = lookups.readings[id] { return old }
+            let new = BankReading(); new.id = id; new.accountID = account; new.cardID = card; new.createdAt = now; context.insert(new)
+            lookups.readings[id] = new; return new
+        }
+        if let balance = fields.balanceMinor {
+            let account: Account? = subject.card.flatMap { $0.kind == "credit" ? nil : $0.accountID }.flatMap { id in lookups.accounts.first { $0.id == id } } ?? subject.account
+            if let account, account.ownership == "mine", account.tracked {
+                let reading = row(account: account.id, card: nil)
+                if BalanceMatching.replaces(storedAt: reading.balanceAt, with: at) {
+                    reading.balanceMinor = balance; reading.balanceAt = at; reading.balanceMessageID = messageID; try touch(reading, now, writer)
+                }
+            }
+        }
+        if let limit = fields.availableLimitMinor, let card = subject.card {
+            let reading = row(account: nil, card: card.id)
+            if BalanceMatching.replaces(storedAt: reading.availableLimitAt, with: at) {
+                reading.availableLimitMinor = limit; reading.availableLimitAt = at; try touch(reading, now, writer)
+            }
+        }
+    }
+
+    /// A bill-issued notice or a Tamara/Tabby reminder is an upcoming due, never a draft expense. One row per (payee, amount, due day):
+    /// a repeated reminder changes nothing; a due the owner dismissed stays dismissed. Returns whether the message was such a notice.
+    private static func recordDue(_ fields: MoneyParsedFields, sender: String, messageID: UUID, at: Date, lookups: BankLookups, context: ModelContext, now: Date, writer: String) throws -> Bool {
+        guard let amount = fields.statementDueMinor, amount > 0, amount <= 9_007_199_254_740_991, let currency = fields.currency else { return false }
+        let payee = [fields.provider, fields.biller, sender].compactMap { $0 }.first { !$0.isEmpty } ?? ""
+        guard !payee.isEmpty else { return false }
+        let zone = try PrayerRepository(context: context).place(at: at).timeZone
+        let dayKey = fields.dueDate.map { GregorianDay.containing($0, in: zone).description }
+        let id = StableIdentity.uuid(for: UpcomingDues.naturalKey(payee: payee, amountMinor: amount, currency: currency, dueDayKey: dayKey))
+        if lookups.dueIDs.contains(id) { return true }
+        let due = UpcomingDue(); due.id = id; due.payee = payee; due.kind = fields.provider != nil ? "bnpl" : "bill"
+        due.amountMinor = amount; due.currency = currency; due.dueAt = fields.dueDate; due.sourceMessageID = messageID; due.createdAt = now
+        context.insert(due); lookups.dueIDs.insert(id); try touch(due, now, writer)
+        // The announcement may arrive after the payment (a bulk paste): the closing pass runs after every row of the command exists.
+        return true
+    }
+
+    /// Closes an open due when a later payment to the same payee for the same amount exists. A closed due whose payment is no longer live
+    /// is open again (read side), so it can be closed by the next matching payment.
+    private static func closeDues(context: ModelContext, now: Date, writer: String) throws {
+        let dues = try context.fetch(FetchDescriptor<UpcomingDue>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+        guard !dues.isEmpty else { return }
+        let payments = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && ($0.kind == "billPayment" || $0.kind == "repayment") }))
+        let liveIDs = Set(payments.map(\.id))
+        // A closing link to a payment of another kind (it was deleted or changed) no longer counts.
+        let linked = Set(dues.compactMap(\.closedByTransactionID)).subtracting(liveIDs)
+        let stillLive = linked.isEmpty ? [] : Set(try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil })).map(\.id).filter(linked.contains))
+        let open = dues.filter { $0.closedByTransactionID.map { !liveIDs.contains($0) && !stillLive.contains($0) } ?? true }
+        guard !open.isEmpty, !payments.isEmpty else { return }
+        let messageIDs = Array(Set(payments.compactMap(\.messageID) + open.compactMap(\.sourceMessageID)))
+        let messages = Dictionary(try context.fetch(FetchDescriptor<BankMessage>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && messageIDs.contains($0.id) })).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var states: [UpcomingDues.Payment] = []
+        for row in payments {
+            guard let message = row.messageID.flatMap({ messages[$0] }) else { continue }
+            let parsed = message.parsedJSON.flatMap { try? JSONDecoder().decode(MoneyParsedFields.self, from: $0) }
+            let names = [parsed?.biller, parsed?.provider, row.merchant, row.counterparty, message.sender].compactMap { $0 }
+            states.append(.init(id: row.id.uuidString, payees: names, amountMinor: row.amountMinor, currency: row.currency, at: row.eventAt))
+        }
+        let dueStates = open.map { due in
+            UpcomingDues.Due(id: due.id.uuidString, payee: due.payee, amountMinor: due.amountMinor, currency: due.currency, dueAt: due.dueAt,
+                             announcedAt: due.sourceMessageID.flatMap { messages[$0] }.map { $0.parsedJSON.flatMap { try? JSONDecoder().decode(MoneyParsedFields.self, from: $0).eventAt } ?? $0.receivedAt } ?? due.createdAt)
+        }
+        for closure in UpcomingDues.closures(open: dueStates, payments: states) {
+            guard let due = open.first(where: { $0.id.uuidString == closure.due }), let payment = UUID(uuidString: closure.payment) else { continue }
+            due.closedByTransactionID = payment; due.closedAt = now; try touch(due, now, writer)
+        }
     }
 
     /// One rule per merchant: the pattern is the normalized merchant name (DECISIONS, M5-V07).
@@ -686,41 +809,133 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         message.status = "ok"; try touch(message, now, writer)
     }
 
-    private static func identify(_ row: MoneyTransaction, parsed: ParsedBankMessage, sender: String, context: ModelContext) throws {
-        let accounts = try context.fetch(FetchDescriptor<Account>()).filter { live($0) }
-        let cards = try context.fetch(FetchDescriptor<Card>()).filter { live($0) }
-        let known = cards.filter { $0.last4 == parsed.last4 && (BankMessageIdentity.matches($0.bank, sender) || $0.aliases.contains { BankMessageIdentity.matches($0, sender) }) }
-        if known.count == 1, let card = known.first {
+    /// «بطاقة جديدة — لأي حساب تتبع؟»: stores the tail on the chosen account or card, then re-reads the unreviewed drafts that carry it, in the same
+    /// command so one undo reverts both. A tail already used by another tracked subject of the same bank is refused (it would stop matching).
+    private static func attachTail(_ p: [String: MadarCore.JSONValue], _ context: ModelContext, _ now: Date, _ writer: String) throws {
+        let tail = text(p, "tail"), accountID = uuid(p, "accountID"), cardID = uuid(p, "cardID")
+        guard fourDigits(tail), (accountID == nil) != (cardID == nil) else { throw MoneyCommandError.invalidReference }
+        let lookups = try BankLookups(context)
+        let accounts = lookups.accounts, cards = lookups.cards, extra = lookups.extra
+        let bank: String, ownLast4: String?, subjectKey: String
+        if let accountID {
+            guard let account = accounts.first(where: { $0.id == accountID }), account.ownership == "mine" else { throw MoneyCommandError.invalidReference }
+            bank = account.bank; ownLast4 = account.last4; subjectKey = "account:" + accountID.uuidString
+        } else if let cardID {
+            guard let card = cards.first(where: { $0.id == cardID }) else { throw MoneyCommandError.invalidReference }
+            bank = card.bank; ownLast4 = card.last4; subjectKey = "card:" + cardID.uuidString
+        } else { throw MoneyCommandError.invalidReference }
+        guard ownLast4 != tail else { throw MoneyCommandError.invalidReference }
+        let clash = accounts.contains { $0.id != accountID && BankMessageIdentity.matches($0.bank, bank) && ($0.last4 == tail || MoneyAccountRules.tails(ofAccount: $0.id, among: extra).contains(tail)) }
+            || cards.contains { $0.id != cardID && BankMessageIdentity.matches($0.bank, bank) && ($0.last4 == tail || MoneyAccountRules.tails(ofCard: $0.id, among: extra).contains(tail)) }
+        guard !clash else { throw MoneyCommandError.invalidReference }
+        let id = StableIdentity.uuid(for: "AccountTail:" + subjectKey + ":" + tail)
+        let kind = text(p, "kind")
+        if let old = try context.fetch(FetchDescriptor<AccountTail>()).first(where: { $0.id == id }) {
+            if live(old) { return }
+            var record = try old.record()
+            let stamp = StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? now)
+            try record.set(Optional<Date>.none, for: "deletedAt"); try record.set(stamp, for: "restoredAt"); try record.set(stamp, for: "updatedAt"); try record.set(writer, for: "writerID")
+            try old.apply(record); old.kind = kind; old.label = optionalText(p, "label")
+            lookups.extra.append(old)
+        } else {
+            let row = AccountTail(); row.id = id; row.accountID = accountID; row.cardID = cardID; row.tail = tail; row.kind = kind
+            row.label = optionalText(p, "label"); row.createdAt = now; context.insert(row); try touch(row, now, writer)
+            lookups.extra.append(row)
+        }
+        let notOK = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.deletedAt == nil && $0.reviewState != "ok" }))
+        let pendingRows = notOK.filter { $0.mergedInto == nil && $0.cardID == nil }
+        let pendingMessageIDs: [UUID] = pendingRows.compactMap(\.messageID)
+        var messages: [UUID: BankMessage] = [:]
+        let byID = FetchDescriptor<BankMessage>(predicate: #Predicate { pendingMessageIDs.contains($0.id) })
+        for message in try context.fetch(byID) where live(message) { messages[message.id] = message }
+        let inQueue = FetchDescriptor<BankMessage>(predicate: #Predicate { $0.status == "needsLook" || $0.status == "possibleDuplicate" })
+        for message in try context.fetch(inQueue) where live(message) { messages[message.id] = message }
+        for row in pendingRows where row.reviewState != "ok" && (row.fromAccountID == nil || row.toAccountID == nil) {
+            guard let message = row.messageID.flatMap({ messages[$0] }), let bytes = message.parsedJSON,
+                  let fields = try? JSONDecoder().decode(MoneyParsedFields.self, from: bytes),
+                  [fields.last4, fields.accountLast4, fields.counterpartyAccountLast4].contains(tail) else { continue }
+            try identify(row, parsed: fields, sender: message.sender, context: context, lookups: lookups); try touch(row, now, writer)
+        }
+        for message in messages.values where ["needsLook", "possibleDuplicate"].contains(message.status) {
+            guard let bytes = message.parsedJSON, let fields = try? JSONDecoder().decode(MoneyParsedFields.self, from: bytes),
+                  [fields.last4, fields.accountLast4].contains(tail), fields.messageKind != .marketing else { continue }
+            try recordReadings(fields, sender: message.sender, messageID: message.id, at: fields.eventAt ?? message.receivedAt, lookups: lookups, context: context, now: now, writer: writer)
+        }
+        try pairTransfers(context: context, now: now, writer: writer)
+    }
+
+    /// The one tracked card, else the one tracked account, a message's tails name. The single definition intake, balance
+    /// readings and the unknown-tail question share.
+    nonisolated static func resolve(parsed: MoneyParsedFields, sender: String, accounts: [Account], cards: [Card], extra: [AccountTail]) -> (card: Card?, account: Account?) {
+        let known = cards.filter { card in
+            guard let last4 = parsed.last4, card.last4 == last4 || MoneyAccountRules.tails(ofCard: card.id, among: extra).contains(last4) else { return false }
+            return BankMessageIdentity.matches(card.bank, sender) || card.aliases.contains { BankMessageIdentity.matches($0, sender) }
+        }
+        if known.count == 1, let card = known.first { return (card, nil) }
+        func accountMatches(_ tail: String?) -> [Account] {
+            accounts.filter { MoneyAccountRules.matches($0, sender: sender, last4: tail, extraTails: MoneyAccountRules.tails(ofAccount: $0.id, among: extra)) }
+        }
+        let matching = [parsed.accountLast4, parsed.last4].lazy.map(accountMatches).first { $0.count == 1 } ?? []
+        return (nil, matching.count == 1 ? matching.first : nil)
+    }
+
+    /// Ties a draft to the tracked card/account the message names. Tails are looked up on `last4` and `accountLast4` (the debited or
+    /// credited account printed apart from the card), on each account's and card's additional tails, and the other side on
+    /// `counterpartyAccountLast4`. A tail that matches more than one tracked subject links nothing. The other side is linked only when
+    /// the tail is safe: a printed bank or name that does not match the account never links (a stranger's tail may equal ours), and a
+    /// tail with no printed name links only if one owned account has it, and then leaves the draft under review.
+    static func identify(_ row: MoneyTransaction, parsed: MoneyParsedFields, sender: String, context: ModelContext, lookups: BankLookups? = nil) throws {
+        let kind = parsed.messageKind
+        let found = try lookups ?? BankLookups(context)
+        let accounts = found.accounts, cards = found.cards, extra = found.extra
+        let subject = resolve(parsed: parsed, sender: sender, accounts: accounts, cards: cards, extra: extra)
+        if let card = subject.card {
             row.cardID = card.id; row.method = "card"
             if card.kind != "credit" {
-                if parsed.kind == .refund || parsed.kind == .reversal { row.toAccountID = card.accountID }
+                if kind == .refund || kind == .reversal { row.toAccountID = card.accountID }
                 else { row.fromAccountID = card.accountID }
             }
-        } else {
-            let matching = accounts.filter { MoneyAccountRules.matches($0, sender: sender, last4: parsed.last4) }
-            if matching.count == 1, let account = matching.first {
-                if [.salary, .income, .transferIn, .refund, .reversal].contains(parsed.kind) { row.toAccountID = account.id }
-                else { row.fromAccountID = account.id }
-                row.method = "transfer"
-                if account.ownership == "notMine" { row.reviewState = "needsLook" }
+        } else if let account = subject.account {
+            if [.salary, .income, .transferIn, .refund, .reversal].contains(kind) { row.toAccountID = account.id }
+            else { row.fromAccountID = account.id }
+            row.method = "transfer"
+            if account.ownership == "notMine" { row.reviewState = "needsLook" }
+        }
+        if kind == .transferOut || kind == .transferIn { row.method = "transfer" }
+        if kind == .transferOut || kind == .transferIn {
+            func owned(_ account: Account) -> Bool { account.ownership == "mine" && account.tracked }
+            let endpoint = parsed.counterparty
+            func namedEndpoint(_ account: Account) -> Bool {
+                guard let endpoint else { return false }
+                return BankMessageIdentity.matches(account.bank, endpoint) || BankMessageIdentity.matches(account.name, endpoint)
+            }
+            var other: Account?
+            if let tail = parsed.counterpartyAccountLast4 {
+                let byTail = accounts.filter { owned($0) && $0.id != (row.fromAccountID ?? row.toAccountID)
+                    && ($0.last4 == tail || MoneyAccountRules.tails(ofAccount: $0.id, among: extra).contains(tail)) }
+                // A stranger's account may print a tail equal to one of ours. With a printed bank or name the candidate must match it (several
+                // candidates: the name picks one); with no printed name a single owned account is linked but the draft stays under review.
+                if byTail.count > 1 { let named = byTail.filter(namedEndpoint); if named.count == 1 { other = named.first } }
+                else if let only = byTail.first {
+                    if endpoint == nil { other = only; if row.reviewState == "ok" { row.reviewState = "needsLook" } }
+                    else if namedEndpoint(only) { other = only }
+                }
+            }
+            if other == nil, let endpoint {
+                let wallets = accounts.filter { owned($0) && ["wallet", "savings"].contains($0.kind)
+                    && (BankMessageIdentity.matches($0.bank, endpoint) || BankMessageIdentity.matches($0.name, endpoint)) }
+                if wallets.count == 1 { other = wallets.first }
+            }
+            if let other {
+                if kind == .transferOut, other.id != row.fromAccountID { row.toAccountID = other.id }
+                if kind == .transferIn, other.id != row.toAccountID { row.fromAccountID = other.id }
             }
         }
-        if parsed.kind == .transferOut || parsed.kind == .transferIn { row.method = "transfer" }
-        if let endpoint = parsed.counterparty {
-            let walletAccounts = accounts.filter {
-                $0.ownership == "mine" && $0.tracked && ["wallet", "savings"].contains($0.kind)
-                    && (BankMessageIdentity.matches($0.bank, endpoint) || BankMessageIdentity.matches($0.name, endpoint))
-            }
-            if walletAccounts.count == 1, let wallet = walletAccounts.first {
-                if parsed.kind == .transferOut, wallet.id != row.fromAccountID { row.toAccountID = wallet.id }
-                if parsed.kind == .transferIn, wallet.id != row.toAccountID { row.fromAccountID = wallet.id }
-            }
-        }
-        if parsed.kind == .billPayment, let biller = parsed.biller {
+        if kind == .billPayment, let biller = parsed.biller {
             let matches = try context.fetch(FetchDescriptor<Obligation>()).filter { live($0) && $0.kind == "bill" && $0.provider == biller }
             if matches.count == 1 { row.obligationID = matches.first?.id }
         }
-        if parsed.kind == .bnplInstalment, let provider = parsed.provider {
+        if kind == .bnplInstalment, let provider = parsed.provider {
             let matches = try context.fetch(FetchDescriptor<Obligation>()).filter { live($0) && $0.kind == "installment" && $0.provider == provider }
             if matches.count == 1 { row.obligationID = matches.first?.id }
         }
@@ -746,22 +961,40 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             row.reviewState = "possibleDuplicate"; message.status = "possibleDuplicate"; try touch(row, now, writer); try touch(message, now, writer)
         }
     }
+    /// An outgoing transfer/top-up of one tracked account and the deposit message of another are one own-accounts transfer: the deposit
+    /// row is folded into the outgoing one (`OwnTransferPairing` owns the rule). A confirmed outgoing row takes part only when the
+    /// message already named the receiving account, so a confirmed row is never rewritten.
     private static func pairTransfers(context: ModelContext, now: Date, writer: String) throws {
-        let rows = try transactions(context).filter { $0.kind == "transfer" && $0.reviewState != "ok" && ($0.fromAccountID == nil || $0.toAccountID == nil) }
-        let accounts = try context.fetch(FetchDescriptor<Account>()).filter { live($0) }
-        // Compare the original currency too; two amounts called 100 in different currencies cannot pair.
-        for currency in Set(rows.map(\.currency)) {
-            let same = rows.filter { $0.currency == currency }
-            let legs = same.compactMap { row -> BankLeg? in
-                guard let id = row.fromAccountID ?? row.toAccountID,
-                      let account = accounts.first(where: { $0.id == id }), account.ownership == "mine", account.tracked else { return nil }
-                return .init(id: row.id.uuidString, accountID: id.uuidString, direction: row.fromAccountID != nil ? .out : .in, amountMinor: row.amountMinor, at: row.eventAt)
+        let all = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && ($0.kind == "transfer" || $0.kind == "income") }))
+        guard all.contains(where: { $0.reviewState != "ok" }) else { return }
+        let accounts = try context.fetch(FetchDescriptor<Account>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+        let messageIDs = all.compactMap(\.messageID)
+        let messages = Dictionary(try context.fetch(FetchDescriptor<BankMessage>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && messageIDs.contains($0.id) })).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        func owned(_ id: UUID?) -> Bool { id == nil || accounts.contains { $0.id == id && $0.ownership == "mine" && $0.tracked } }
+        func direction(_ row: MoneyTransaction) -> OwnTransferLeg.Direction? {
+            switch row.messageID.flatMap({ messages[$0] }).flatMap({ BankMessageKind(rawValue: $0.kind) }) {
+            case .transferOut?: return .out
+            case .transferIn?, .income?: return .in
+            case .some: return nil
+            case nil: return row.fromAccountID != nil && row.toAccountID == nil ? .out : row.toAccountID != nil && row.fromAccountID == nil ? .in : nil
             }
-            for pair in TransferPairing.pairs(legs) {
-                guard let outgoing = same.first(where: { $0.id.uuidString == pair.out }), let incoming = same.first(where: { $0.id.uuidString == pair.in }) else { continue }
-                outgoing.toAccountID = incoming.toAccountID; incoming.mergedInto = outgoing.id
-                try touch(outgoing, now, writer); try touch(incoming, now, writer)
-            }
+        }
+        var legs: [OwnTransferLeg] = []
+        for row in all where owned(row.fromAccountID) && owned(row.toAccountID) {
+            guard let side = direction(row) else { continue }
+            if row.reviewState == "ok" && !(side == .out && row.toAccountID != nil) { continue }
+            if side == .out && row.fromAccountID == nil || side == .in && row.toAccountID == nil { continue }
+            if side == .in && row.kind == "income" && row.fromAccountID != nil { continue }
+            legs.append(.init(id: row.id.uuidString, direction: side, amountMinor: row.amountMinor, currency: row.currency, at: row.eventAt,
+                              fromAccountID: row.fromAccountID?.uuidString, toAccountID: row.toAccountID?.uuidString))
+        }
+        for pair in OwnTransferPairing.pairs(legs) {
+            guard let outgoing = all.first(where: { $0.id.uuidString == pair.out }), let incoming = all.first(where: { $0.id.uuidString == pair.in }) else { continue }
+            outgoing.kind = "transfer"; outgoing.method = "transfer"
+            outgoing.toAccountID = incoming.toAccountID; incoming.mergedInto = outgoing.id
+            try touch(outgoing, now, writer); try touch(incoming, now, writer)
         }
     }
 
@@ -1235,6 +1468,9 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             case is Cycle: 17
             case is CyclePolicy: 18
             case is Reconciliation: 19
+            case is AccountTail: 20
+            case is BankReading: 21
+            case is UpcomingDue: 22
             default: nil
             }
         }
@@ -1277,6 +1513,9 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         rows += try context.fetch(FetchDescriptor<Cycle>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<CyclePolicy>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Reconciliation>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<AccountTail>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<BankReading>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<UpcomingDue>()).map { try $0.record() }
         return rows
     }
     private static func rebuildEnvelopes(_ context: ModelContext, _ now: Date, _ writer: String) throws {
