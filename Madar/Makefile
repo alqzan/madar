@@ -35,7 +35,7 @@ test:
 	swift test --package-path Packages/MadarQuran
 	swift test --package-path Packages/MadarInbox
 	swift test --package-path Packages/MadarSync
-	python3 scripts/cross-process-test.py
+	python3 scripts/inbox-process-test.py
 test-ios: generate
 	xcodebuild -project Madar.xcodeproj -scheme Madar -destination 'platform=iOS Simulator,id=$(SIMULATOR)' -derivedDataPath DerivedData -resultBundlePath Artifacts/M0-tests-$$(date +%s).xcresult CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES test
 test-links: generate
