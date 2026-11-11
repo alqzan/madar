@@ -1333,9 +1333,8 @@ struct MihbaraReaderView: View {
     @MainActor private func savedWordExists(_ word: String, language: String) -> Bool {
         let key = UserWordIdentity.key(language: language, word: word)
         let context = ModelContext(app.container)
-        return (try? context.fetch(FetchDescriptor<UserWord>()))?.contains {
-            $0.deletedAt == nil && $0.mergedInto == nil && UserWordIdentity.key(language: $0.language, word: $0.word) == key
-        } ?? false
+        let descriptor = FetchDescriptor<UserWord>(predicate: #Predicate { $0.language == language && $0.deletedAt == nil && $0.mergedInto == nil })
+        return (try? context.fetch(descriptor))?.contains { UserWordIdentity.key(language: $0.language, word: $0.word) == key } ?? false
     }
 
     @MainActor private func refreshTranslationAvailability(for cardID: UUID) async {

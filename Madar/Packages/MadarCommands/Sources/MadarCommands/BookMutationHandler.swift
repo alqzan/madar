@@ -339,10 +339,10 @@ private struct GoodreadsImportSummary: Codable {
             _ = try fileBook(bookID)
             guard end >= start, activeSeconds >= 60, fromPage <= toPage, pagesCounted >= 0,
                   (0...1).contains(startProgression), (0...1).contains(endProgression) else { throw DataError.invalidValue("بيانات جلسة القراءة غير صالحة") }
-            let sessions = try context.fetch(FetchDescriptor<ReadingSession>())
+            var sessionByID = FetchDescriptor<ReadingSession>(predicate: #Predicate { $0.id == id }); sessionByID.fetchLimit = 1
             let row: ReadingSession
             let isNew: Bool
-            if let existing = sessions.first(where: { $0.id == id }) {
+            if let existing = try context.fetch(sessionByID).first {
                 guard existing.deletedAt == nil, existing.mergedInto == nil, existing.bookID == bookID else { throw DataError.invalidValue("جلسة القراءة موجودة لكتاب آخر أو محذوفة") }
                 row = existing
                 isNew = false
