@@ -84,11 +84,13 @@ import MadarCore
         generatedTitle = nil; insightStatus = ""
         let allowed = await AVAudioApplication.requestRecordPermission()
         guard allowed else { refreshMicrophoneAuthorization(); return }
+        var sessionActive = false
         do {
             try AppDiaryService(app: app).authorizeRead()
             app.diaryPlayback.stop()
             try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try AVAudioSession.sharedInstance().setActive(true)
+            sessionActive = true
             recordingDay = writingDay; microphoneDenied = false; message = "الحبر يسمعك · اضغط للإيقاف"
         elapsedSeconds = 0; meterLevels = []; recordedAudioLevels = []
         meterWindowSecond = 0; meterWindowTotal = 0; meterWindowCount = 0
@@ -96,7 +98,7 @@ import MadarCore
             recording = true
             startMetering()
             observeAudioSession()
-        } catch { recording = false; message = madarUserMessage(error) }
+        } catch { recording = false; if sessionActive { endAudioSession() }; message = madarUserMessage(error) }
     }
     private func startChunk() throws {
         let root = app.diaryStagingDirectory
@@ -127,12 +129,14 @@ import MadarCore
         guard let files = try? FileManager.default.contentsOfDirectory(at: app.diaryStagingDirectory, includingPropertiesForKeys: nil) else { return }
         pendingAudioCount = files.filter { $0.pathExtension == "json" && FileManager.default.fileExists(atPath: $0.deletingPathExtension().appendingPathExtension("m4a").path) }.count
     }
+    /// Every way a take ends hands the audio session back, so other apps' audio can resume.
+    private func endAudioSession() { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
     func stop() async {
         guard let recorder else { return }; recording = false
         stopMetering(); stopObservingAudioSession(); elapsedSeconds = Int(recorder.currentTime.rounded(.down))
         let url = recorder.url; recorder.stop(); self.recorder = nil
         await storeChunk(url: url, successful: true)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        endAudioSession()
         if let lastMedia { await transcribe(lastMedia) }
     }
     // MARK: Interruptions (B1-11): a call, an alarm or a lost microphone ends the take cleanly with what was recorded.
@@ -354,9 +358,11 @@ extension DiaryVoiceController: AVAudioRecorderDelegate {
         let url = recorder.url
         Task { @MainActor [weak self] in
             guard let self else { return }
-            if self.recorder === recorder { self.recorder = nil; self.recording = false; self.stopMetering(); self.stopObservingAudioSession() }
+            let endedHere = self.recorder === recorder
+            if endedHere { self.recorder = nil; self.recording = false; self.stopMetering(); self.stopObservingAudioSession() }
             if !flag { self.message = "توقف التسجيل؛ نحفظ المقطع الذي اكتمل" }
             await self.storeChunk(url: url, successful: flag)
+            if endedHere, !self.recording { self.endAudioSession() }
             if !self.recording, let media = self.lastMedia { await self.transcribe(media) }
         }
     }
@@ -367,6 +373,7 @@ extension DiaryVoiceController: AVAudioRecorderDelegate {
             self.recording = false; self.recorder = nil; self.stopMetering()
             self.message = "توقف التسجيل بسبب خطأ؛ نحفظ ما أمكن من الصوت"
             await self.storeChunk(url: url, successful: false)
+            if !self.recording { self.endAudioSession() }
         }
     }
 }

@@ -119,7 +119,7 @@ struct DiaryTextEditor: View {
         .madarSheetLock(saving: saving || importing || voice?.savingAudio == true || voice?.converting == true, draft: !text.isEmpty || voice?.recording == true)
         .onDisappear {
             // B2-2: leaving never loses words; a pending 500 ms draft write is flushed unless the page was just saved.
-            if loaded, !saving, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { DiaryDraftFlush.run { try? await persistDraft() } }
+            if loaded, !saving, hasDraftRecord || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { DiaryDraftFlush.run { try? await persistDraft() } }
             draftTask?.cancel(); savedDayTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
         .diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
     }

@@ -7,6 +7,16 @@ import MadarData
 @testable import Madar
 
 @MainActor final class DiaryEditorIntegrationTests: XCTestCase {
+    func testSavingAnEmptiedDraftLeavesNothingToRestore() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryEmptied-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data")), app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData(); let service = AppDiaryService(app: app), day = try service.currentDay(), id = UUID()
+        try await service.saveDraft(id: id, text: "سطر سيُمسح", day: "today", margin: nil, writingDay: day)
+        XCTAssertEqual(try service.draft(margin: nil)?.text, "سطر سيُمسح")
+        try await service.saveDraft(id: id, text: "", day: "today", margin: nil, writingDay: day)
+        XCTAssertEqual(try service.draft(margin: nil)?.text ?? "", "")
+    }
     func testDraftPhotoAndAudioPersistWithTheirEntryAndOriginalBytes() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "DiaryMedia-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
