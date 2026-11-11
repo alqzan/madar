@@ -282,6 +282,7 @@ final class AppSession {
 
     /// Bumped on every store reload (after each write and each return to the app): derived read caches key on it.
     @ObservationIgnored private(set) var storeGeneration = 0
+    @ObservationIgnored let bahwReads = BahwReadCache()
     func reload() throws {
         storeGeneration &+= 1
         if let managedStore { try managedStore.refreshIfNeeded(); container = managedStore.container }

@@ -32,6 +32,25 @@ import SwiftData
         XCTAssertFalse(layout.payload.object?["blocks"]?.array?.compactMap(\.string).contains("qada") ?? false)
     }
 
+    func testUpcomingIsReadOncePerStoreGeneration() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "UpcomingCache-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let context = ModelContext(container), settings = try SettingsStore(context: context)
+        _ = try settings.stage(["core.dayStart": .string("midnight"), "core.firstCalendar": .string("gregorian"), "core.weekStart": .string("saturday")])
+        try context.save()
+        let app = try AppSession(container: container, groupDirectory: root)
+        let service = AppBahwService(session: app, evaluationDate: ISO8601DateFormatter().date(from: "2026-10-15T20:00:00+03:00")!)
+        let first = service.upcoming(limit: 50)
+        let behindBack = ModelContext(app.container)
+        let row = UpcomingDay(); row.title = "يوم الاختبار"; row.calendar = "gregorian"; row.month = 3; row.day = 9; row.repeats = "yearly"
+        behindBack.insert(row); try behindBack.save()
+        XCTAssertEqual(service.upcoming(limit: 50).map(\.id), first.map(\.id), "Same store generation: the cached list is returned")
+        try app.reload()
+        XCTAssertTrue(service.upcoming(limit: 50).contains { $0.title == "يوم الاختبار" }, "A new generation re-reads")
+        XCTAssertEqual(service.upcoming(limit: 1).count, 1)
+    }
+
     func testHabitOrbitClockUsesTheSelectedDayBoundaryAndCalendar() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "HabitOrbitClock-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

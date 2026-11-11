@@ -63,6 +63,13 @@ struct BahwUpcomingItem: Identifiable, Equatable {
     var count: Int { elapsedDays ?? daysLeft }
 }
 
+/// Lobby reads that the view body asks for on every render; kept on the session so stores never share them.
+@MainActor final class BahwReadCache {
+    var key = ""
+    var upcoming: [String: [BahwUpcomingItem]] = [:]
+    var year: BahwYearModel?
+}
+
 @MainActor struct AppBahwService {
     let session: AppSession
     var evaluationDate: Date? = nil
@@ -192,14 +199,31 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         guard let summary = try? service.lobbySummary(today) else { return nil }
         return .init(count: summary.count, lastText: summary.lastText, last: summary.last, lastTZID: summary.lastTZID, photo: summary.photo)
     }
+    private var reads: BahwReadCache {
+        let cache = session.bahwReads, key = cacheKey
+        if cache.key != key { cache.key = key; cache.upcoming = [:]; cache.year = nil }
+        return cache
+    }
     func year() -> BahwYearModel {
+        let cache = reads
+        if let cached = cache.year { return cached }
+        let value = readYear(); cache.year = value; return value
+    }
+    /// User days (stored rules) and the seasons as read models; a user day with the same title and date hides the automatic one.
+    /// `outside`: the widget snapshot; the salary day stays in the app when money is hidden outside it (`core.hideMoneyOutside`).
+    func upcoming(limit: Int, outside: Bool = false) -> [BahwUpcomingItem] {
+        let cache = reads, slot = "\(limit):\(outside)"
+        if let cached = cache.upcoming[slot] { return cached }
+        let value = readUpcoming(limit: limit, outside: outside); cache.upcoming[slot] = value; return value
+    }
+    private func readYear() -> BahwYearModel {
         let days = calendarDays, day = today
         return .init(hijri: MadarYear.hijriYear(day, days), gregorian: MadarYear.gregorianYear(day), hijriYear: days.hijri(day).year, gregorianYear: day.year,
                      hijriMonthIndex: days.hijri(day).month - 1, gregorianMonthIndex: day.month - 1, ramadanIn: MadarYear.ramadanIn(day, days), landmarks: MadarYear.landmarks(day, days))
     }
     /// User days (stored rules) and the seasons as read models; a user day with the same title and date hides the automatic one.
     /// `outside`: the widget snapshot; the salary day stays in the app when money is hidden outside it (`core.hideMoneyOutside`).
-    func upcoming(limit: Int, outside: Bool = false) -> [BahwUpcomingItem] {
+    private func readUpcoming(limit: Int, outside: Bool) -> [BahwUpcomingItem] {
         let days = calendarDays, day = today
         var items: [BahwUpcomingItem] = []
         if let rows = try? ModelContext(session.container).fetch(FetchDescriptor<UpcomingDay>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })) {
