@@ -3,7 +3,7 @@ SIMULATOR := 390840AD-4FF0-476F-8E1D-E0C521A58E45
 ifneq ($(SIMULATOR),390840AD-4FF0-476F-8E1D-E0C521A58E45)
 $(error Only the approved Madar 15 Pro Max iOS 27.0 simulator may be used)
 endif
-.PHONY: fonts generate build preview test test-ios test-links cloud-device
+.PHONY: fonts generate build preview check test test-ios test-links cloud-device
 fonts:
 	python3 scripts/prepare-workspace.py
 generate: fonts
@@ -15,6 +15,16 @@ preview: generate
 	xcrun simctl bootstatus $(SIMULATOR) -b
 	xcrun simctl install $(SIMULATOR) DerivedData/Build/Products/Debug-iphonesimulator/Madar.app
 	xcrun simctl launch $(SIMULATOR) com.alqzan.madar2
+# Fast, simulator-free sanity check.
+check:
+	python3 scripts/check-number-separators.py
+	python3 scripts/check-review-contracts.py
+	python3 scripts/check-shipping-sources.py
+	python3 -m unittest discover -s scripts/tests
+	swift test --package-path Packages/MadarCore
+	swift test --package-path Packages/MadarPrayer
+	swift test --package-path Packages/MadarQuran
+
 test:
 	swift test --package-path Packages/MadarCore
 	swift test --package-path Packages/MadarData

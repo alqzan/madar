@@ -7,19 +7,23 @@ import MadarInbox
 @testable import MadarCommands
 
 @Suite(.serialized) @MainActor struct InboxDrainTests {
+    /// Thursday 15 Oct 2026, 14:00 Riyadh: after Fajr, so the prayer day is the civil day. Fixed so the fixture never
+    /// depends on the hour or weekday the suite runs.
+    private static let fixedNow = ISO8601DateFormatter().date(from: "2026-10-15T14:00:00+03:00")!
+    private static let fixedDay = try! GregorianDay("2026-10-15")
     private func fixture() throws -> (ModelContainer, DurableCommandAdapter, PendingInbox) {
         let directory = FileManager.default.temporaryDirectory.appending(path: "MadarDrainFixture-\(UUID())")
         let container = try MadarContainerFactory.makeLocal(at: directory)
-        let now = Date(), context = ModelContext(container), settings = try SettingsStore(context: context)
-        let day = prayerDay(now)
+        let now = Self.fixedNow, context = ModelContext(container), settings = try SettingsStore(context: context)
+        let day = Self.fixedDay
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "Asia/Riyadh")!
         let daysSinceFriday = (calendar.component(.weekday, from: day.date(in: calendar.timeZone)) + 1) % 7
         _ = try settings.stage(["salah.trackingStart": .object(["dayKey": .string(day.adding(days: -(daysSinceFriday == 0 ? 7 : daysSinceFriday)).description), "edits": .number(0)])], now: now)
         try context.save()
         return (container, DurableCommandAdapter(container: container, lockDirectory: directory, transactionClock: { $0 }), PendingInbox(directory: directory.appending(path: "PendingInbox")))
     }
-    private func prayer(id: UUID = UUID(), generation: UUID, now: Date = Date()) -> InboxRecord {
-        .init(expectedGenerationID: generation, command: .init(commandID: id, name: "prayer.log", payload: .object(["dayKey": .string(prayerDay(now).description), "prayer": .string("fajr"), "status": .string("jamaah")]), source: .notification, issuedAt: now))
+    private func prayer(id: UUID = UUID(), generation: UUID, now: Date = Self.fixedNow) -> InboxRecord {
+        .init(expectedGenerationID: generation, command: .init(commandID: id, name: "prayer.log", payload: .object(["dayKey": .string((now == Self.fixedNow ? Self.fixedDay : prayerDay(now)).description), "prayer": .string("fajr"), "status": .string("jamaah")]), source: .notification, issuedAt: now))
     }
     private func prayerDay(_ now: Date) -> GregorianDay {
         let place = try! ActivePlace(latitude: 24.7136, longitude: 46.6753, timeZoneID: "Asia/Riyadh")
@@ -60,7 +64,7 @@ import MadarInbox
         #expect(try FileManager.default.contentsOfDirectory(atPath: inbox.directory.appending(path: "quarantine").path).filter { $0.hasSuffix(".jsonl") }.count == 1)
     }
     @Test func test_M0R06_pendingPinsExpiredReceiptAndAcknowledgedRetryIsUnresolvedAfterGC() async throws {
-        let (container, adapter, inbox) = try fixture(), generation = UUID(), now = Date()
+        let (container, adapter, inbox) = try fixture(), generation = UUID(), now = Self.fixedNow
         let record = prayer(generation: generation, now: now)
         _ = try inbox.enqueue(record)
         var fail = true
@@ -332,7 +336,7 @@ import MadarInbox
         let managed = try ManagedDataStore(root: root)
         let inbox = PendingInbox(directory: root.appending(path: "PendingInbox"))
         let adapter = DurableCommandAdapter(containerProvider: { try managed.containerForTransaction() }, lockDirectory: root, transactionClock: { $0 }, generationProvider: { managed.binding.generationID })
-        let oldGeneration = managed.binding.generationID, deviceStore = managed.binding.deviceStoreURL, now = Date()
+        let oldGeneration = managed.binding.generationID, deviceStore = managed.binding.deviceStoreURL, now = Self.fixedNow
         let first = prayer(generation: oldGeneration, now: now)
         var refreshes = 0
         let drainer = InboxDrainer(inbox: inbox, bus: CommandBus(adapter: adapter), generation: { .init(generationID: managed.binding.generationID, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: { refreshes += 1 })
