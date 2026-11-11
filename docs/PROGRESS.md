@@ -205,7 +205,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - **Works now:** صفحة اليوم: لا «اكتب هنا» متكررة؛ مربع كتابة واحد في الأسفل (`DiaryInlineComposer`): اكتب وأرسل، صورة مباشرة، المس سطرك ليُعدَّل في المربع نفسه، «اكتب بعده» يضع شريحة «بعد: …»، ميكروفون يفتح الورقة الكاملة على المسودة نفسها؛ بطاقات الصور والتسجيلات فيها قائمة حذف/نسخ/اكتب بعده. اختبار `testSmartPresence…` أُصلح (السبب: جلسة القرآن المفتوحة من البهو تغطي شريط التبويب).
 - **Verified (أوامر فعلية):** اختبارات واجهة المذكرة: `DiaryEditorUITests` 8 (3 تخطٍّ بيئي) وWindow/Travel/Revision/Hub/Search مجتمعة 33 تشغيلًا بلا فشل؛ `BahwCustomizeUITests` 7 من 8 نجحت قبل إصلاح الثامن، والثامن وحده نجح بعده؛ حزم: MadarCore 203، MadarCommands 282، MadarMoney 211، MadarPrayer 44، MadarQuran 88 كلها نجحت.
 - **Differences left:** MadarData: `schemaV2ManagedGenerationRecoversAfterEveryInterruption` و`schemaV14Upgrade…` يفشلان أحيانًا (٣ من ٦ تشغيلات، وفشل مرة على commit 7c38d05c قبل أعمال اليوم أيضًا): هشاشة قديمة في المقارنة بالتجزئة، ليست من تغييرات اليوم؛ لم أحدد سببها. «عدّل السطر» من القائمة ما زال بنافذته (يشرح علامة «عُدّل»).
-- **Not verified:** الآيباد لمربع الكتابة (حُدّد عرضه بـ٦٤٠)؛ الأداء؛ قبول جهاز المالك؛ معالجة أبل لبناءَي ٣١ و٣٢.
+- **Not verified:** الآيباد لمربع الكتابة (حُدّد عرضه بـ٦٤٠)؛ الأداء؛ قبول جهاز المالك؛ معالجة أبل لبناءَي ٣١ و٣٢ (٣٢: Archive نجح وCFBundleVersion=32، وسجل الرفع `Madar/Artifacts/OWNER-TestFlight-32/upload.log` فيه «Upload succeeded»؛ رُفع مرة واحدة من f98454d6).
 - **Next:** رأي المالك في المربع؛ بحث الاقتباسات ينتظر قراره.
 - **Model/effort:** claude-sonnet-5-5 / effort: not exposed. **Usage:** not exposed.
 
