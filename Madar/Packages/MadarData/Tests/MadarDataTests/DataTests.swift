@@ -126,6 +126,22 @@ import Testing
         #expect(try note.record() == before); #expect(media.deletedAt == nil)
         #expect(try RowMerger(context:context).run() == 0)
     }
+    @Test func entryDeletedInsideUndoWindowKeepsItsMediaBytes() throws {
+        let c = try MadarContainerFactory.makeInMemory(); let context = c.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let media = Media(); media.data = Data([1,2,3]); let entry = Entry(); entry.mediaID = media.id; entry.deletedAt = now.addingTimeInterval(-60)
+        for row in [media as any PersistentModel,entry] { context.insert(row) }; try context.save()
+        try RowMerger(context:context).run(now: now)
+        #expect(media.deletedAt == nil); #expect(media.data == Data([1,2,3]))
+    }
+    @Test func entryDeletedAfterUndoWindowReleasesItsMedia() throws {
+        let c = try MadarContainerFactory.makeInMemory(); let context = c.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let media = Media(); media.data = Data([1,2,3]); let entry = Entry(); entry.mediaID = media.id; entry.deletedAt = now.addingTimeInterval(-601)
+        for row in [media as any PersistentModel,entry] { context.insert(row) }; try context.save()
+        try RowMerger(context:context).run(now: now)
+        #expect(media.deletedAt != nil); #expect(media.data == nil)
+    }
     @Test func test_M0S1_RD2_bookDeletionRetainsHistoryTitleAndFile() throws {
         let c = try MadarContainerFactory.makeInMemory(); let context = c.mainContext
         let media = Media(); media.data = Data([1,2,3])

@@ -9,11 +9,14 @@ private struct DictionarySpec: Decodable { let models: [ModelDefinition]; let re
 @MainActor public final class RowMerger {
     private let context: ModelContext
     public init(context: ModelContext) { self.context = context }
-    @discardableResult public func run() throws -> Int {
+    /// A deleted diary entry can be undone for this long (`DurableCommandAdapter` sets the same 600 s on the
+    /// receipt); its media stays untouched until then, and the receipt sweep clears it afterwards.
+    public static let entryMediaUndoGrace: TimeInterval = 600
+    @discardableResult public func run(now: Date = Date()) throws -> Int {
         do {
             let instances = try RecordBridge.instances(context)
             let original = try instances.map { try $0.record() }
-            let result = try Self.reconciled(original)
+            let result = try Self.reconciled(original, now: now)
             let changed = result.indices.filter { result[$0] != original[$0] }
             for index in changed { try instances[index].apply(result[index]) }
             if !changed.isEmpty { try context.save() }
@@ -73,7 +76,7 @@ private struct DictionarySpec: Decodable { let models: [ModelDefinition]; let re
         try mergeExceptions(winner:&winner,duplicates:duplicates)
         return winner
     }
-    public static func reconciled(_ input: [DataRecord]) throws -> [DataRecord] {
+    public static func reconciled(_ input: [DataRecord], now: Date = Date()) throws -> [DataRecord] {
         guard let url = Bundle.module.url(forResource: "data-dictionary", withExtension: "json") else { throw DataError.invalidValue("dictionary missing") }
         let spec = try JSONDecoder().decode(DictionarySpec.self, from: Data(contentsOf: url))
         var rows = input
@@ -168,7 +171,7 @@ private struct DictionarySpec: Decodable { let models: [ModelDefinition]; let re
                     else if let values = rows[i].fields[field.name]?.array { rows[i].fields[field.name] = .array(values.map { value in guard let text = value.string, let id = UUID(uuidString:text) else { return value }; return .string(resolve(id:id,model:target,rows:rows,index:passIndex).uuidString) }) }
                 }
             }
-            try cascade(&rows)
+            try cascade(&rows, now: now)
             try repair(&rows)
             if rows == before { break }
         }
@@ -214,12 +217,12 @@ private struct DictionarySpec: Decodable { let models: [ModelDefinition]; let re
         default: break
         }
     }
-    private static func cascade(_ rows: inout [DataRecord]) throws {
+    private static func cascade(_ rows: inout [DataRecord], now: Date) throws {
         for parent in rows where parent.deletedAt != nil && parent.fields["mergedInto"] == .null {
             // RD2: margins and reading history have independent lifetimes. Keep the origin UUID
             // as provenance and the Book tombstone's title; never revive old child tombstones.
             let children: [(String,String)] = switch parent.model { case "HifzSession": [("PageGrade","sessionID"),("MistakeEvent","sessionID")]; default: [] }
-            if parent.model == "Entry" {
+            if parent.model == "Entry", parent.deletedAt! <= now.addingTimeInterval(-Self.entryMediaUndoGrace) {
                 let mediaIDs = Set(([parent.fields["mediaID"] ?? .null] + (parent.fields["attachmentMediaIDs"]?.array ?? [])).compactMap(\.string))
                 for i in rows.indices where rows[i].model == "Media" && mediaIDs.contains(rows[i].id.uuidString) {
                     let id = JSONValue.string(rows[i].id.uuidString)
