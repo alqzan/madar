@@ -91,6 +91,11 @@ struct HabitEditorView:View {
                             MadarDateLabel(session.dateLabels(rule.effectiveFrom),primaryFont:MadarTypography.caption(),secondaryFont:MadarTypography.fine())
                             if rule.effectiveFrom < AppBahwService(session:session).today { Text("تستطيع أن تسجّل الأيام الماضية من صفحة العادة بعد حفظها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                         }
+                        // D6: a habit that has not started keeps its start; say so with both calendars instead of a hidden rule.
+                        else if let reading, reading.firstEffectiveFrom > AppBahwService(session:session).today {
+                            HStack(spacing:6) { Text("تبدأ في").font(MadarTypography.caption()); MadarDateLabel(session.dateLabels(reading.firstEffectiveFrom),primaryFont:MadarTypography.caption(),secondaryFont:MadarTypography.fine()) }
+                                .foregroundStyle(theme.secondaryInk).accessibilityElement(children:.combine).accessibilityIdentifier("habit-pending-start")
+                        }
                         if rule.frequency == .weekly { Text("أيام محددة، أو اتركها لِأي يوم").font(MadarTypography.caption());dayButtons($rule.weekdays) }
                         if rule.frequency == .monthly || rule.frequency == .yearly {
                             Picker("التقويم",selection:$rule.hijri){Text("هجري").tag(true);Text("ميلادي").tag(false)}.pickerStyle(.segmented)
@@ -176,9 +181,10 @@ struct HabitEditorView:View {
         .onAppear {
             let initialName = reading?.name ?? HabitEditorView.linkedDefaults[self.initialSource]?.name ?? ""
             let initialSource = reading?.source ?? self.initialSource
-            var initialRule = reading?.summary.current?.rule ?? HabitRule(effectiveFrom:AppBahwService(session:session).today)
+            // D6: a habit that has not started shows its saved rule and keeps its own start date.
+            var initialRule = reading?.summary.current?.rule ?? reading?.latestRule ?? HabitRule(effectiveFrom:AppBahwService(session:session).today)
             if reading == nil, let linked = HabitEditorView.linkedDefaults[initialSource] { initialRule.measure = linked.measure;initialRule.unit=linked.unit;initialRule.target=linked.target }
-            initialRule.effectiveFrom=AppBahwService(session:session).today
+            initialRule.effectiveFrom=editStart
             let initialMonthDays = initialRule.monthDays.map{digits.string($0)}.joined(separator:"، ")
             let initialMinimumOn = initialRule.minimum != nil
             let initialWindowOn = initialRule.windowStart != nil
@@ -230,12 +236,18 @@ struct HabitEditorView:View {
         let today=AppBahwService(session:session).today,zone=session.activePlace.timeZone
         return today.adding(days:-3660).date(in:zone)...today.adding(days:366).date(in:zone).addingTimeInterval(86399)
     }
+    /// Where a save takes effect: today, or for an existing habit that has not started yet, its own start date (D6).
+    private var editStart:GregorianDay {
+        let today=AppBahwService(session:session).today
+        if let reading, reading.firstEffectiveFrom > today { return reading.firstEffectiveFrom }
+        return today
+    }
     private var targetLimit:Int { source == "jamaah" ? 5 : 100000 }
     private var targetStep:Int { switch rule.unit { case "steps": 500; case "minutes","exerciseMinutes": 5; default: 1 } }
     private func save(){
         busy=true;issue=nil
         do{
-            var saved=rule;if reading != nil { saved.effectiveFrom=AppBahwService(session:session).today }
+            var saved=rule;if reading != nil { saved.effectiveFrom=editStart }
             if saved.frequency != .interval { saved.intervalDays=nil }
             let english=monthDays.map { $0.wholeNumberValue.map(String.init) ?? String($0) }.joined()
             let parts=english.split(whereSeparator:{!$0.isNumber});let parsed=parts.compactMap{Int($0)}

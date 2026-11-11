@@ -21,11 +21,20 @@ private struct HabitUndo: Codable {
         case .save(let identity, let name, let source, let rule, let homeOnly, let reminder):
             let existing = try context.fetch(FetchDescriptor<Habit>(predicate: #Predicate { $0.id == identity })).first
             // FB-39 (owner, 6 Nov): a new habit may start on a free first date, back up to ten years (then its past days can be
-            // logged) or ahead up to a year; an edit of an existing habit still starts today and never rewrites closed periods.
+            // logged) or ahead up to a year; an edit of an existing habit starts today, or on its own start date if that is still ahead.
             if existing == nil {
                 guard rule.effectiveFrom >= today.adding(days: -3660), rule.effectiveFrom <= today.adding(days: 366) else { throw DataError.invalidValue("تاريخ البداية بعيد جدًا") }
             } else {
-                guard rule.effectiveFrom == today else { throw DataError.invalidValue("التعديل يبدأ من اليوم") }
+                // D6 (owner, 11 Nov 2026): a habit that has not started keeps its start date; the edit rewrites that rule, so no day
+                // before the start becomes due. A started habit's edit is dated today and never rewrites closed periods.
+                let habitID = identity
+                let firstStart = try context.fetch(FetchDescriptor<HabitPolicy>(predicate: #Predicate { $0.habitID == habitID && $0.deletedAt == nil && $0.mergedInto == nil }))
+                    .compactMap { try? GregorianDay($0.effectiveFrom) }.min()
+                if let firstStart, firstStart > today {
+                    guard rule.effectiveFrom == firstStart else { throw DataError.invalidValue("العادة تبدأ في تاريخها؛ التعديل يبقيه") }
+                } else {
+                    guard rule.effectiveFrom == today else { throw DataError.invalidValue("التعديل يبدأ من اليوم") }
+                }
             }
             let start = rule.effectiveFrom
             guard existing?.deletedAt == nil, existing?.mergedInto == nil else { throw DataError.invalidValue("استعادة صريحة مطلوبة") }

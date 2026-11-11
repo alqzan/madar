@@ -151,6 +151,39 @@ import MadarData
         let events = try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).filter { $0.delta != 0 }
         #expect(events.map(\.dayKey) == ["2026-10-13"])
     }
+    /// D6 (owner, 11 Nov 2026): editing a habit that has not started keeps its start date and rewrites that rule; no day before the
+    /// start becomes due, and the reading exposes the saved rule so the editor can show it.
+    @Test func editingAHabitThatHasNotStartedKeepsItsStartAndRewritesThatRule() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitFutureEdit-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let bus = CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 }))
+        func run(_ name: String, _ p: [String: MadarCore.JSONValue], at date: Date) async throws -> CommandOutcome {
+            try await bus.execute(.init(name: name, payload: .object(p), issuedAt: date), now: date)
+        }
+        let id = UUID(), start = try GregorianDay("2026-10-20")
+        var rule = HabitRule(effectiveFrom: start); rule.measure = .count; rule.target = 2
+        #expect(try await run("habit.save", payload(id, rule), at: now).status == .applied)
+        // The edit names the habit's own start, not today.
+        rule.target = 5
+        #expect(try await run("habit.save", payload(id, rule), at: now).status == .applied)
+        let policies = try ModelContext(container).fetch(FetchDescriptor<HabitPolicy>()).filter { $0.habitID == id && $0.deletedAt == nil }
+        #expect(policies.count == 1 && policies.first?.effectiveFrom == "2026-10-20" && policies.first?.target == 5)
+        let reading = try #require(try HabitRepository(context: ModelContext(container)).reading(id: id, at: now))
+        #expect(reading.firstEffectiveFrom == start && reading.latestRule?.target == 5 && reading.latestRule?.effectiveFrom == start)
+        #expect(reading.summary.periods.isEmpty)   // nothing is due before the start
+        // An edit dated today would move the start earlier: refused.
+        var early = rule; early.effectiveFrom = try GregorianDay("2026-10-15")
+        await #expect(throws: (any Error).self) { try await run("habit.save", payload(id, early), at: now) }
+        // On the start day the saved rule is the one in force.
+        let onStart = ISO8601DateFormatter().date(from: "2026-10-20T20:00:00+03:00")!
+        #expect(try HabitRepository(context: ModelContext(container)).reading(id: id, at: onStart)?.summary.current?.rule.target == 5)
+        // Once started, an edit is dated today again.
+        let later = ISO8601DateFormatter().date(from: "2026-10-22T20:00:00+03:00")!
+        var after = rule; after.effectiveFrom = start; after.target = 7
+        await #expect(throws: (any Error).self) { try await run("habit.save", payload(id, after), at: later) }
+        after.effectiveFrom = try GregorianDay("2026-10-22")
+        #expect(try await run("habit.save", payload(id, after), at: later).status == .applied)
+    }
     @Test func pauseResumeAndPolicyEditsAreDatedAndUndoable() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitPause-\(UUID())"); defer { try? FileManager.default.removeItem(at:root) }
         let container = try MadarContainerFactory.makeLocal(at:root), bus = CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))
