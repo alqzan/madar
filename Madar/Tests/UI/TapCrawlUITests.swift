@@ -7,13 +7,13 @@ import XCTest
     private struct Finding { let room: String; let kind: String; let key: String }
     private var findings: [Finding] = []
 
-    func testCrawlPrayer() { crawl("prayer", ["MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01"]) }
-    func testCrawlQuran() { crawl("quran", ["MADAR_UI_QURAN_FIXTURE": "home"]) }
-    func testCrawlMoney() { crawl("money", ["MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00"]) }
-    func testCrawlDiary() { crawl("notes", ["MADAR_UI_DIARY_FIXTURE": "home"]) }
-    func testCrawlMihbara() { crawl("mihbara", ["MADAR_UI_MIHBARA_FIXTURE": "home"]) }
-    func testCrawlLobby() { crawl("foundation", ["MADAR_UI_HABIT_FIXTURE": "showcase"]) }
-    func testCrawlCustomize() { crawl("customize", [:]) }
+    func testCrawlPrayer() throws { try crawl("prayer", ["MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01"]) }
+    func testCrawlQuran() throws { try crawl("quran", ["MADAR_UI_QURAN_FIXTURE": "home"]) }
+    func testCrawlMoney() throws { try crawl("money", ["MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00"]) }
+    func testCrawlDiary() throws { try crawl("notes", ["MADAR_UI_DIARY_FIXTURE": "home"]) }
+    func testCrawlMihbara() throws { try crawl("mihbara", ["MADAR_UI_MIHBARA_FIXTURE": "home"]) }
+    func testCrawlLobby() throws { try crawl("foundation", ["MADAR_UI_HABIT_FIXTURE": "showcase"]) }
+    func testCrawlCustomize() throws { try crawl("customize", [:]) }
 
     /// A tap on the empty end of a wide button, away from its text, must still press it.
     func testEdgeTapPressesWideButtons() {
@@ -38,9 +38,9 @@ import XCTest
         app.terminate()
     }
 
-    private func crawl(_ tab: String, _ extra: [String: String]) {
+    private func crawl(_ tab: String, _ extra: [String: String]) throws {
         // About forty minutes for all rooms: run on purpose with TEST_RUNNER_MADAR_UI_CRAWL=1, never in a full suite.
-        guard ProcessInfo.processInfo.environment["MADAR_UI_CRAWL"] == "1" else { return }
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["MADAR_UI_CRAWL"] == "1", "The tap crawl takes about forty minutes; run it on purpose with TEST_RUNNER_MADAR_UI_CRAWL=1")
         continueAfterFailure = true
         var env = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         env.merge(extra) { $1 }
