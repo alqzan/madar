@@ -4,7 +4,7 @@ Owner requests in force: a whole-app pass for ease, simplicity, flexibility and 
 
 ## Verified baseline and delivery
 
-- M0–M6 software is on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (35)** (evidence: `Madar/Artifacts/OWNER-TestFlight-35/upload.log` and the newest handover). Build 27 (10 Nov) included Quran unreadable-draft recovery and the owner's exit-choice behavior. Xcode 27.2 archive and internal upload succeeded at 14:08 Riyadh on 10 Nov; App Store Connect reported that the package is processing. The exported IPA's app and widget signatures, versions, iOS target and entitlements were verified. Processing completion and installation on the owner's iPhone are not checked. Build 26 was the prior upload; build 24 added level-only voice recording and elapsed-time formatting. Older builds 14–20 are history (`docs/archive/PROGRESS-2026-11-08-codex-cleanup-batch.md` for 14–15).
+- M0–M6 software is on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (36)** (evidence: `Madar/Artifacts/OWNER-TestFlight-36/upload.log` and the newest handover; build 35 before it). Build 27 (10 Nov) included Quran unreadable-draft recovery and the owner's exit-choice behavior. Xcode 27.2 archive and internal upload succeeded at 14:08 Riyadh on 10 Nov; App Store Connect reported that the package is processing. The exported IPA's app and widget signatures, versions, iOS target and entitlements were verified. Processing completion and installation on the owner's iPhone are not checked. Build 26 was the prior upload; build 24 added level-only voice recording and elapsed-time formatting. Older builds 14–20 are history (`docs/archive/PROGRESS-2026-11-08-codex-cleanup-batch.md` for 14–15).
 - Simulators: `Madar 15 Pro Max` and `Madar iPad Pro 13`, both iOS 27.0, no others. Storage local-only (RA1); no owner store access, migration or device run is authorized.
 - Package baseline passes (rows 16–17). Current continuation: prayer history read failures propagate and remain retryable (42/42 prayer, 26/26 command/replay tests). Polar manual logging, habit delete/undo/relaunch and both year-calendar settings paths now pass on iOS 27.0; details in row 18. General no-trip FX rates still need an owner rule/data-model decision. The 9 handwritten-colour findings are resolved in row 19: static shipping-source scan passes (464 sources, 4 catalogs, 38 independently measured token pairs); its manual trace requirement remains separate.
 - Build 22 includes the changes after 21: lazy prayer/night reads and per-day prayer-time memoization, scoped habit undo reads, 1922 dead-code lines removed, stale-test cleanup, and the current continuation fixes. Signature verification passed; app/widget versions are both 0.1.0 (22), minimum OS 27.0, device families 1 and 2, and no iCloud/ubiquity entitlements. No owner-device performance measurement is implied.
@@ -82,7 +82,7 @@ Recorded once here and in `docs/DECISIONS.md`; details of each plan are in `plan
 - **D4** Two instalment plans at one merchant and provider are split by printed instalment count and instalment amount.
 - **D5** A relative due day on a message with unknown arrival time is stored undated; a date is computed only when the arrival time is known.
 - **D6** Editing a habit that has not started keeps its start date; the edit rewrites that rule.
-- **D7** A trip gets an optional dismissal-date field; a habit paused by a dismissed trip resumes from that day (owner-accepted data-model change, not yet built).
+- **D7** A trip gets an optional dismissal-date field; a habit paused by a dismissed trip resumes from that day (built in schema V18, 11 Nov; no UI dismisses trips yet).
 - **D8** Next work accepted: named Mushaf bookmarks (new field), a one-time re-read of stored bank messages, a time for media added with «اكتب بعده», loading the bank-message screen in the background.
 - Also: an unreadable Quran row is skipped and counted («N unreadable rows»), as drafts already are.
 
@@ -217,6 +217,17 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 # Handovers
 
+## Handover — قرارات المالك D2–D8: المال، العادات، القرآن، تراث، إضافات D8 — 2026-11-11 — Claude
+
+- **Works now:** محرك المال: التاجر مع كلمة خدمة تاجر مستقل (D2، فُحص على رسائل المالك محليًا بالأعداد فقط: ٨٣٠ اسمًا و٧٦٦ مفتاحًا قبل وبعد)، البيك مفتاح واحد، خطتا أقساط تُفصلان بالعدد والمبلغ (D4)، الاستحقاق النسبي بلا وقت وصول معروف يُخزَّن بلا تاريخ (D5)، المتكرر بيوم مدار المخزن، وتعريف واحد للمسترد. العادات: تعديل عادة لم تبدأ يبقي بدايتها (D6). المخطط V18 فيه `Trip.dismissedAt`، وتنتهي إيقافة الرحلة عند يوم الإغلاق (D7)، ونموذج `MushafBookmark`. القرآن: لا «فاتك ورد» بعد اكتمال الخطة، والصف غير المقروء يُتخطى ويُعدّ بتنبيه هادئ. تراث (D1): التحميل على قطع، والبناء يُلغى مع الورقة، والفهرس خارج الخيط الرئيسي بسقف ٦٤ م.ب، وتُكنس التحميلات القديمة، وبايتات الكتاب كما هي. D8: علامات مصحف بأسماء من قائمة في أدوات المصحف، وإعادة قراءة الرسائل المخزنة مرة واحدة (القارئ ٣، تملأ الحقول المطبوعة الناقصة فقط)، وصورة «اكتب بعده» توضع بين سطريها.
+- **Verified:** MadarMoney ‏305 + 8 XCTest نجحت؛ MadarCommands (Money/Bank/PhaseThree/Refund/Diary/Quran) ‏156 نجحت؛ PhaseThreePersistence ‏14؛ QuranPersistence ‏21؛ DiaryEditorPersistence ‏7؛ MadarData ‏125 (منها ترقية V17→V18)؛ HabitPersistence ‏19؛ QuranServiceIntegrationTests ‏15 وتكامل تراث ٢ على Madar 15 Pro Max؛ TurathBookTests ‏5. بناء المحاكي نجح بعد كل بند. ثلاث مراجعات مركّزة (المال، V18، إعادة القراءة): كل High أُصلح، ولا Critical.
+- **Differences left:** تحميل شاشة الرسائل البنكية في الخلفية **متوقف**: التحقق التجريبي للاعتماد (`MoneyMutationHandler`) و`record()` مربوطان بالخيط الرئيسي، ورفعهما أعطى ١٣٨ خطأ. يحتاج فحص صلاحية اعتماد غير مربوط بالخيط أولًا (الصف في `plans/README.md`). لا واجهة تغلق الرحلة بعد، فـ`dismissedAt` لا يُكتب اليوم. إعادة القراءة تجعل الرسائل القديمة تظهر بأسئلة ذيل حساب وأعداد أقساط جديدة، وهذا مقصود (المراجعة، Medium).
+- **Not verified:** لا لقطات لزر العلامات الجديد ولا تجربة واجهة له؛ إعادة القراءة لم تُجرَّب على متجر المالك؛ لا iPad؛ معالجة Apple للبناء ٣٦ وقبوله على جوال المالك.
+- **Next:** فحص اعتماد غير مربوط بالخيط ثم شاشة الرسائل في الخلفية؛ أمر إغلاق رحلة يكتب `dismissedAt` إن طلبه المالك؛ لقطة لقائمة العلامات.
+- **Delivery:** بناء 0.1.0 (36) أُرشف ورُفع إلى TestFlight الداخلي («Upload succeeded» في `Madar/Artifacts/OWNER-TestFlight-36/upload.log`، 2026-11-11 23:18).
+- **Model/effort:** claude-opus-5-5، المراجعات بمساعد general-purpose؛ effort not exposed.
+- **Usage:** الخمس ساعات ٥٣٪ مستعمل والأسبوعي ٥١٪ عند الرفع.
+
 ## Handover — خطط الإصلاح ٠٠١–٠١٢ من التدقيق — 2026-11-11 — Claude
 
 - **Works now:** (١) دمج الصفوف يُبقي وسائط مذكرة حُذفت قبل أقل من ١٠ دقائق فيعيدها التراجع؛ (٢) تنظيف الإقلاع يزيل مجلدات `MadarBackup-` و`MadarLegacyRead-` المتروكة؛ (٣) البهو يقرأ «القادم» وكتلة السنة مرة لكل جيل مخزن؛ (٤) المسودة الممسوحة تُحفظ فارغة عند المغادرة، وجلسة الصوت تُسلَّم عند كل نهاية تسجيل؛ (٥) اللوحة متسقة مع البروتوكول وقرارات المالك D1–D8 مسجلة في `docs/DECISIONS.md`؛ (٦) `make check` سريع بلا محاكٍ وتجارب الوارد على ساعة ثابتة؛ (٧) بحث كلمة محفوظة وجلسة قراءة بالشرط لا بجلب الجدول؛ (٨) شاشة الرسائل البنكية تتجاهل النقر الثاني أثناء الأمر؛ (٩) تحويل PDF يقرأ الكتاب خارج الخيط الرئيسي؛ (١٠) اختبارات الزحف السبعة تُبلَّغ متخطاة؛ (١١) تسمية الصفحة في EPUB تراث تُهرَّب؛ (١٢) لا تسجيل عادة في يوم سابق داخل إيقاف.
@@ -237,12 +248,3 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - **Delivery:** بناء ٣٤ أُرشف ورُفع إلى TestFlight الداخلي (2026-11-11)؛ معالجة Apple وقبول جهاز المالك لم يُتحقق منهما.
 - **Model/effort:** claude-sonnet-5-5 subagents، claude-haiku-5-5 للتوثيق والإيداع والدفع، مراجعة claude-fable-5-2؛ effort not exposed.
 - **Usage:** حد الخمس ساعات بلغ نهايته أثناء العمل (تجدد ٨ مساءً بتوقيت الرياض)؛ الأسبوعي ٥٨٪ عند آخر قراءة.
-
-## Handover — بقايا الجلسة الجانبية: أرشفة، قراءات المذكرات خارج الخيط الرئيسي، تنظيف — 2026-11-11 — Claude
-- **Works now:** `PROGRESS.md` يحمل ثلاثة تسليمات فقط (الأقدم في `docs/archive/PROGRESS-2026-11-11-handovers.md`)؛ `check-review-contracts.py` يقرأ القاموس من `Madar/Specification` وينجح (٨٥ فحصًا). مركز المذكرات يقرأ الأرشيف (`archiveOffMain`) ورف الذكريات (`homeOffMain`) خارج الخيط الرئيسي. `serif` المكرر صار `quranSerif`/`prayerSerif`؛ حُذف سكربتا المعرض غير المرجَعين.
-- **Verified:** تكامل المذكرات ١١ اختبارًا بلا فشل (`Madar/Artifacts/results/OWNER-diary-offmain-20261111-int.xcresult`)؛ واجهة `DiaryHubUITests`+`DiaryEchoesUITests` ٤ شُغّلت، ١ متخطى (تجربة بيانات المالك)، ٠ فشل (`...-ui2.xcresult`)؛ بناء المحاكي نجح؛ `check-shipping-sources.py` نجح. لم يُشغَّل `make generate` (لم تتغير عضوية الملفات).
-- **Differences left:** صورة تُضاف والشريحة «بعد» مضبوطة تذهب لآخر الصفحة، لأن `diary.appendMedia` في MadarCore/MadarCommands (ملك جلسة المال) لا يأخذ وقتًا ويحتاج تغيير أمر؛ التطبيق يقول ذلك للمستخدم. أُبقيت أربع `card` خاصة لأنها مختلفة بصريًا (ليست تكرارًا)؛ وسكربتات بلا مراجع لكنها أدوات مالك/بيانات (`export-bank-messages`، `legacy-*`، `build-quran-layout`، `build-printed-glyphs`، `draw-icon`، `check-number-separators`) أُبقيت. ب١-١٤ أُغلق (الافتراض خاطئ للمسار الحي). ب٢-١٩ منفَّذ سابقًا (DECISIONS). ب١-١٥ يحتاج إعادة تصميم مسار الدمج ومراجعة مركّزة (سجلات مخزنة). ب١-١٦ قِيس سابقًا ولا تغيير. ب٣-٣ دمج شاشات القرآن/المال/المذكرات إعادة تصميم كبيرة بلا لقطات.
-- **Not verified:** لا رفع TestFlight؛ لم تُجرَّب الذكريات على بيانات المالك؛ لا لقطة (التصميم لم يتغير).
-- **Next:** قرار المالك في ب٣-٣ وب١-١٥؛ إن أُريد وقت للصورة المدرجة فأضفه إلى أمر `diary.appendMedia` بعد انتهاء جلسة المال.
-- **Model/effort:** claude-sonnet-5-5 / medium، بلا مساعدين.
-- **Usage:** not exposed.
