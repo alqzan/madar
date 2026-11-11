@@ -199,7 +199,7 @@ private struct PDFConversionLoadedCheckpoint {
     /// Reads every page (embedded text first, on-device OCR otherwise) and writes the EPUB to a private folder.
     private func convert(_ book: MihbaraBook, app: AppSession) async throws -> (URL, PDFBookEPUB.Summary) {
         guard authorized(app) else { throw DataError.authenticationFailed }
-        let bytes = try AppMihbaraService(app: app).pdfData(for: book)
+        let bytes = try await AppMihbaraService(app: app).pdfDataOffMain(for: book)
         let reader = PDFBookTextReader(data: bytes, language: book.language)
         let total = try await reader.pageCount()
         update(book.id) { $0.total = total }
