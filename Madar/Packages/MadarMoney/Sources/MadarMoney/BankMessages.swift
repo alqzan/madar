@@ -28,6 +28,28 @@ public struct ParsedBankMessage: Equatable, Sendable {
     public var dueDate: Date?
     public var balanceMinor: Int?
     public var statedHomeMinor: Int?
+    /// The owner's own account tail when the message prints it apart from the card: the debited account of a purchase or
+    /// outgoing transfer, the receiving account of an incoming transfer. Never inferred; nil when not printed.
+    public var accountLast4: String?
+    /// Why a card operation was refused, from the declined layouts.
+    public enum DeclineReason: String, Sendable { case insufficientBalance, limitExceeded, wrongPIN, cardBlocked, other }
+    public var declineReason: DeclineReason?
+    /// Fee, VAT and the foreign-currency fee as printed (never added into `amountMinor`). A «رسوم وضريبة» line is one combined
+    /// figure and is kept in `feeMinor` with `vatMinor` left nil.
+    public var feeMinor: Int?
+    public var vatMinor: Int?
+    public var foreignFeeMinor: Int?
+    /// The printed exchange rate as the bank wrote it («4.2150»); text so no precision is invented.
+    public var exchangeRate: String?
+    /// «الصرف المتبقي» / «حد الصرف المتبقي»: what the card may still spend. Not the account balance.
+    public var remainingLimitMinor: Int?
+    /// «الحد المتاح» / «Avl limit». Not the account balance.
+    public var availableLimitMinor: Int?
+    /// A message with a printed date but no clock time (the day at 12:00 local); `eventAt` stays nil.
+    public var eventDateOnly: Date?
+    /// The other side's account tail when the message prints one apart from a name: the destination of an outgoing transfer
+    /// («الى حساب:*7788», «إلى: ***2461»), the source of an incoming one («من:*1357»). `accountLast4` stays the owner's side.
+    public var counterpartyAccountLast4: String?
 }
 
 /// A small, explicit alias table for bank and wallet identities. The sender remains the authority:
@@ -89,15 +111,19 @@ public enum BankMessageParser {
     /// Digits and separators unified (Arabic-Indic → ASCII, «٫» → ".", «٬» → ","), tatweel removed; lines kept.
     public static func clean(_ text: String) -> String {
         var out = ""
+        var lastWasCarriageReturn = false
         for scalar in text.unicodeScalars {
             switch scalar.value {
             case 0x0660...0x0669: out.unicodeScalars.append(Unicode.Scalar(scalar.value - 0x0660 + 0x30)!)
             case 0x06F0...0x06F9: out.unicodeScalars.append(Unicode.Scalar(scalar.value - 0x06F0 + 0x30)!)
             case 0x066B: out.append(".")
             case 0x066C: out.append(",")
-            case 0x0640, 0x200E, 0x200F, 0x2066...0x2069, 0x202A...0x202E: continue
+            case 0x064B...0x0652, 0x0670, 0x0640, 0x200E, 0x200F, 0x2066...0x2069, 0x202A...0x202E: continue
+            case 0x0D: out.append("\n")   // «\r\n» is one Character in Swift and would not split on «\n»
+            case 0x0A where out.last == "\n" && lastWasCarriageReturn: continue
             default: out.unicodeScalars.append(scalar)
             }
+            lastWasCarriageReturn = scalar.value == 0x0D
         }
         return out
     }
@@ -122,25 +148,30 @@ public enum BankMessageParser {
         if matches(t, #"just\s+a\s+hold|hold\s+on\s+your\s+card|حجز\s+مؤقت|حجز\s+على\s+بطاقتك|pre[\s-]?authoriz"#)
             || matches(t, #"صدور\s+فاتورة|فاتورة\s+جديدة|لم\s+يتم\s+سدادها|تم\s+إصدار\s+فاتورتك|invoice\s+(?:generated|due)|new\s+bill"#)
             || matches(t, #"سداد\s+مبكر|منصة\s+الدين|معرف\s+(?:الفرصة|الاستثمار)|investment\s+opportunity|early\s+repayment"#)
+            || matches(t, #"طلب\s+استرداد|بتوصلك\s+رسالة\s+استرداد|تمت\s+الموافقة\s+على\s+طلب"#)
             || matches(t, #"لحمايتك،?\s+حاولنا\s+التواصل|للتحقق\s+من\s+عملية|يرجى\s+مراجعة\s+التفاصيل\s+في\s+التطبيق"#)
             || matches(t, #"تمت\s+اضافة\s+المستفيد|تمت\s+إضافة\s+المستفيد|تم\s+تنشيط\s+المستفيد|تم\s+تسجيل\s+الدخول|تم\s+تسجيلك\s+بنجاح|تسجيل\s+جهاز\s+جديد|نقاط\s+قطاف|نقاط\s+عضوية|رصيد\s+قطاف"#) { return .marketing }
         // Owner, 19 Oct: a charity platform's thank-you receipt is not a movement; the bank's own debit records the gift.
         if has(t, ["وصل تبرعك", "Ehsan.sa"]) { return .marketing }
-        if has(t, ["مرفوضة", "رفض العملية", "لم تتم العملية", "declined", "رصيد غير كافي", "رصيد غير كاف", "Insufficient"]) { return .declined }
-        if has(t, ["عكس عملية", "إلغاء عملية", "عكس العملية", "reversal", "reversed"]) { return .reversal }
+        if has(t, ["مرفوضة", "رفض العملية", "لم تتم العملية", "declined", "Rejected transaction", "رصيد غير كافي", "رصيد غير كاف", "Insufficient"]) { return .declined }
+        if has(t, ["عكس عملية", "إلغاء عملية", "عكس العملية", "reversal", "reversed"]) || matches(t, #"عكس\s+(?:ال)?عملية"#) { return .reversal }
         // Owner special cases: «تأكيد دفعة مقسمة» only confirms a plan (recording it double-counts); a bank purchase
         // «لدى:Tamara» is an ordinary purchase.
         if has(t, ["دفعة مقسمة"]) { return .marketing }
         // Tamara's own texts: «دفعة قادمة بقيمة …» / «دفعتك بقيمة …» (a due notice) and «تأكيد الدفع … بقيمة:» carry no brand word, only a link.
-        if matches(t, #"(?:دفعة\s+قادمة|دفعتك)\s+بقيمة|(?m)^\s*تأكيد\s+الدفع[ \t]*[\r\n][\s\S]*?بقيمة\s*:"#) { return .bnplInstalment }
+        if matches(t, #"(?:دفعة\s+قادمة|دفعتك)\s+بقيمة|(?m)^\s*تأكيد\s+الدفع[ \t]*\n[\s\S]*?بقيمة\s*:"#) { return .bnplInstalment }
         if has(t, ["تمارا", "tamara", "تابي", "tabby"]) && !has(t, ["شراء"]) { return .bnplInstalment }
         if has(t, ["كشف حساب البطاقة", "كشف البطاقة", "statement", "الحد الأدنى للسداد", "المبلغ المستحق"]) && !has(t, ["شراء"]) { return .statement }
-        if has(t, ["سداد بطاقة", "سداد البطاقة", "ائتمانية:سداد", "ائتمانية: سداد", "فيزا:سداد", "ماستركارد:سداد", "تسديد بطاقة", "تسديد البطاقة", "card payment"]) { return .cardPayment }
+        if has(t, ["سداد بطاقة", "سداد البطاقة", "ائتمانية:سداد", "ائتمانية: سداد", "ائتمانية:تسديد", "ائتمانية: تسديد", "فيزا:سداد", "ماستركارد:سداد", "تسديد بطاقة", "تسديد البطاقة", "card payment"]) { return .cardPayment }
         // RM6 corpus (19 Oct): a finance instalment is an obligation paid, like a bill.
         if has(t, ["قسط تمويل"]) { return .billPayment }
         if has(t, ["سداد فاتورة", "سداد", "SADAD", "المفوتر"]) { return .billPayment }
+        // Al Rajhi: «مدفوعات وزارة الداخلية-المخالفات المرورية … رقم الفاتورة: N» is a government bill paid.
+        if matches(t, #"^\s*مدفوعات\s+"#) { return .billPayment }
         if has(t, ["استرداد نقدي", "استرجاع نقدي", "cashback", "cash back", "cash-back", "مكافأة نقدية"]) { return .cashback }
-        if has(t, ["استرداد", "refund", "مرتجع"]) || matches(t, #"رد\s+فائض\s+اكتتاب"#) { return .refund }
+        if has(t, ["استرداد", "refund", "مرتجع"]) || matches(t, #"استرجاع\s+عملية|عملية\s+استرجاع|تم\s+اعادة\s+مبلغ"#)
+            // Al Rajhi: «تم اضافة مبلغ بقيمة SAR N الى بطاقة *1234 من <merchant>»: a credit from a merchant onto the card.
+            || matches(t, #"اضافة\s+مبلغ\s+بقيمة[^\n]*الى\s+بطاقة"#) || matches(t, #"رد\s+فائض\s+اكتتاب"#) { return .refund }
         if has(t, ["راتب", "salary", "payroll"]) { return .salary }
         // SNB: «ايداع رواتب» (no hamza, plural) is a salary-like income deposit.
         if matches(t, #"^\s*[اإ]يداع\s+رواتب"#) { return .income }
@@ -151,8 +182,12 @@ public enum BankMessageParser {
         // Sukuk: an investment into a project leaves the account; a withdrawal from the investment account too.
         if matches(t, #"^\s*عملية\s+استثمارية"#) { return .transferOut }
         if matches(t, #"^\s*سحب\s+من\s+حساب\s+استثماري"#) { return .withdrawal }
+        // Al Rajhi: «ايداع:صراف آلي», «ايداع:شيك ورقي» credit the account.
+        if matches(t, #"^\s*[اإ]يداع\s*:"#) { return .income }
         if has(t, ["سحب صراف", "سحب نقدي", "ATM", "cash withdrawal"]) { return .withdrawal }
-        if has(t, ["حوالة صادرة", "تحويل صادر", "تحويل إلى", "outgoing transfer"])
+        // Al Rajhi: «بطاقة ائتمانية:تحويل … الى حساب:*1234»: money moved from the credit card to an account.
+        if matches(t, #"ائتمانية\s*:\s*تحويل"#) { return .transferOut }
+        if has(t, ["حوالة صادرة", "تحويل صادر", "تحويل إلى", "تحويل الى", "outgoing transfer"])
             || matches(t, #"\boutgoing\b[\s\S]{0,80}\btransfer\b"#) { return .transferOut }
         if has(t, ["حوالة واردة", "تحويل وارد", "incoming transfer"]) { return .transferIn }
         // Some banks put the amount between «تحويل» and its explicit destination.
@@ -169,7 +204,7 @@ public enum BankMessageParser {
         if has(t, ["حوالة داخلية", "حوالة محلية"]) && labelled(t, ["من", "From"]) != nil { return .transferIn }
         // «استلام قطة» returns a share of a shared bill: a refund, not income (owner special case).
         if has(t, ["استلام قطة"]) { return .refund }
-        if has(t, ["تغذية محفظة", "إضافة أموال", "اضافة اموال", "إضافة باستخدام", "اضافة باستخدام", "إيداع عبر حوالة", "شحن المحفظة", "تعبئة المحفظة"])
+        if has(t, ["تغذية محفظة", "إضافة أموال", "إضافة اموال", "اضافة اموال", "إضافة باستخدام", "اضافة باستخدام", "إيداع عبر حوالة", "شحن المحفظة", "تعبئة المحفظة"])
             || matches(t, #"\b(?:money\s+added|add(?:ed)?\s+funds|funds\s+added|top[\s-]*up|cash[\s-]*in)\b"#) {
             // Explicit purchase/debit wording is parsed below and only becomes neutral when it matches a tracked wallet.
             if !has(t, ["شراء", "مشتريات", "purchase", "خصم"]) { return .transferIn }
@@ -178,7 +213,9 @@ public enum BankMessageParser {
         if has(t, ["حوالة داخلية", "حوالة محلية"]) && matches(t, #"(?m)^\s*(?:الى|إلى)\s*:\s*\*?\d"#) && matches(t, #"(?m)^\s*من\s*:\s*[^\d\s*]"#) { return .transferIn }
         if has(t, ["خصم عبر حوالة", "بين حساباتي", "بين حساباتك", "للحساب *", "للبطاقة *"]) || (has(t, ["خصم"]) && has(t, ["من حسابك", "من حساب"]) && has(t, ["تحويل"])) { return .transferOut }
         if has(t, ["اضافة", "إضافة"]) && has(t, ["الى حسابك", "إلى حسابك"]) { return .income }
-        if has(t, ["شراء", "مشتريات", "purchase", "Apple Pay", "مدى", "POS"]) { return .purchase }
+        // Alinma Investment: a share sale pays the portfolio; a share purchase is an ordinary purchase below.
+        if matches(t, #"^\s*تنفيذ\s+بيع"#) { return .income }
+        if has(t, ["شراء", "مشتريات", "purchase", "purchases", "Apple Pay", "مدى", "POS"]) { return .purchase }
         // STC Bank: «دفع قطة» pays a friend's share of a shared bill (the mirror of «استلام قطة»).
         if matches(t, #"^\s*دفع\s+قطة"#) { return .transferOut }
         // Mobily Pay: «You have received amount».
@@ -190,6 +227,8 @@ public enum BankMessageParser {
             if has(t, ["فواتير", "مدفوعات سوا"]) { return .billPayment }
             return .withdrawal
         }
+        // Alinma: «حوالة N ريال لحساب **1234 من <name> <date>» lands in the owner's account.
+        if matches(t, #"^\s*حوالة\s+[\d.,]+\s*(?:ريال|SAR)\s+لحساب\s*\*+\d+\s+من\s+\S"#) { return .transferIn }
         // Al Rajhi Capital: «تحويل N ريال من الحساب …» arrives from the named account.
         if transferInPartyAfterAmount(t) != nil { return .transferIn }
         // STC Bank: «عملية انترنت  ب: N SAR  من:<merchant>».
@@ -259,10 +298,24 @@ public enum BankMessageParser {
         if let stated = labelledAmount(t, ["بما يعادل", "ما يعادل", "equivalent", "المبلغ بالريال"], exponents), stated.currency == homeCurrency, result.currency != homeCurrency {
             result.statedHomeMinor = stated.minor
         }
-        result.balanceMinor = labelledAmount(t, ["الرصيد المتوفر", "الرصيد", "رصيد", "Balance"], exponents)?.minor
+        result.balanceMinor = labelledAmount(t, ["الرصيد المتوفر", "الرصيد المتاح", "الرصيد", "رصيد", "Balance", "Avl Bal"], exponents)?.minor
+        // A balance line may print a bare number («رصيد: 1250.00», «Wallet balance: 80.5»): the account's own currency is meant,
+        // so it is read only when the message's currency has the home currency's exponent, and never on statements.
+        if result.balanceMinor == nil, kind != .statement, kind != .declined, let homeExp = exponents.exponent(homeCurrency),
+           result.currency == nil || exponents.exponent(result.currency!) == homeExp,
+           let raw = first(#"(?mi)^[^\n]*?(?:الرصيد المتوفر|الرصيد المتاح|رصيد المحفظ[هة]|رصيد|(?<!الحد )المتاح|Avl\.?\s*Bal(?:ance)?|Available\s+Balance|Wallet\s+balance|Balance)\s*[:：]?\s*(-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?)\s*$"#, in: t) {
+            result.balanceMinor = minorUnits(raw.replacingOccurrences(of: "-", with: ""), exponent: homeExp).map { raw.hasPrefix("-") ? -$0 : $0 }
+        }
         result.last4 = first(#"\*\s?(\d{4})\b|\b(\d{4})\s?\*"#, in: t)
             // Al Rajhi: «بطاقة:1234;مدى», «عبر:1234;مدى».
             ?? first(#"(?:بطاقة|ببطاقة|عبر)\s*:?\s*(\d{4})(?!\d)"#, in: t)
+            ?? first(#"المنتهية\s*ب\s*:?\s*(\d{4})(?!\d)"#, in: t)
+        result.accountLast4 = ownAccountTail(t, kind)
+        if kind == .transferOut {
+            result.counterpartyAccountLast4 = first(#"(?mi)^\s*(?:الى حساب|إلى حساب|الى|إلى|To|للحساب|لحساب)\s*:?\s*\**\s*(\d{3,4})\s*\**\s*$"#, in: t)
+        } else if kind == .transferIn {
+            result.counterpartyAccountLast4 = first(#"(?mi)^\s*(?:من|من حساب|From)\s*:?\s*\**\s*(\d{3,4})\s*\**\s*$"#, in: t)
+        }
         // Sukuk prints its account number as «رقم: 1234».
         if result.last4 == nil { result.last4 = first(#"(?m)^\s*رقم\s*:\s*(\d{4})\s*$"#, in: t) }
         // Sukuk (a Saudi platform) prints «المبلغ: 1,500.00» with no currency word: the home currency is meant.
@@ -271,16 +324,25 @@ public enum BankMessageParser {
            let exp = exponents.exponent(homeCurrency), let minor = minorUnits(raw, exponent: exp) {
             result.amountMinor = minor; result.currency = homeCurrency
         }
-        result.eventAt = eventDate(t, timeZone, near: receivedAt ?? Date())
-        result.merchant = labelled(t, ["لدى", "من متجر", "at"])
+        result.eventAt = eventDate(t, timeZone, near: receivedAt ?? Date(), referenceIsDelivery: receivedAt != nil)
+        result.merchant = labelled(t, ["لدى", "من متجر", "at", "التاجر"])
         result.biller = labelled(t, ["المفوتر", "Biller"])
-        result.counterparty = kind == .transferIn ? labelled(t, ["من", "From"]) : kind == .transferOut ? (labelled(t, ["إلى", "To"]) ?? transferOutPartyAfterAmount(t)) : nil
+        result.counterparty = kind == .transferIn ? (partyLabelled(t, ["من", "From", "اسم المرسل", "المرسل"]) ?? partyLine(t, ["من", "From"]))
+            : kind == .transferOut ? (partyLabelled(t, ["إلى", "الى", "To", "المستفيد", "اسم المستفيد", "اسم المستلم", "المستلم"]) ?? transferOutPartyAfterAmount(t) ?? partyLine(t, ["إلى", "الى", "To"])) : nil
         if kind == .refund, result.merchant == nil { result.merchant = labelled(t, ["من"]) }
+        // Al Rajhi: «… الى بطاقة *1234 من <merchant> في 25-10-19 10:30 والحد المتبقي …».
+        if kind == .refund, result.merchant == nil {
+            result.merchant = first(#"الى\s+بطاقة\s*\*?\d{4}\s+من\s+(.+?)\s+في\s+\d"#, in: t)
+        }
         if kind == .refund, result.merchant == nil, matches(t, #"رد\s+فائض\s+اكتتاب"#) { result.merchant = "اكتتاب" }
         // Al Rajhi: «على : <merchant>» names the merchant of a declined card operation.
         if kind == .declined, result.merchant == nil { result.merchant = labelled(t, ["على"]) }
+        // Al Rajhi «تم رفض العملية: …»: the merchant sits under «الحساب:» (a name, not an account number).
+        if kind == .declined, result.merchant == nil { result.merchant = partyLabelled(t, ["الحساب"]) }
         // BSF, SNB, Alinma, barq: the merchant opens its own line after «من», «لـ», «لدى» or «At», with or without a colon.
         if [.purchase, .refund, .declined, .reversal].contains(kind), result.merchant == nil { result.merchant = lineMerchant(t) }
+        // stc pay English layout: «At: <merchant> <city> SA» followed by «Date:».
+        if kind == .purchase, let m = result.merchant, matches(t, #"(?m)^\s*Date\s*:"#), matches(t, #"(?m)^\s*At\s*:"#) { result.merchant = stripCountryAndCity(m) }
         // stc pay: «في: <merchant> <city> SA» (the line label «في:» also prints dates elsewhere, so only a non-digit value counts).
         if kind == .purchase, result.merchant == nil, has(t, ["بتاريخ"]),
            let value = first(#"(?m)^\s*في\s*:\s*([^\d\s][^\n]*?)\s*$"#, in: t) { result.merchant = stripCountryAndCity(value) }
@@ -299,6 +361,14 @@ public enum BankMessageParser {
         if kind == .transferOut, result.counterparty == nil,
            let name = first(#"للحساب\s*\*?\d{3,4}\s+\d{1,4}[-/]\d{1,2}[-/]\d{1,4}\s+\d{1,2}:\d{2}(?::\d{2})?\s+(\S[^\n]*)$"#, in: t) { result.counterparty = name.trimmingCharacters(in: .whitespaces) }
         if kind == .transferIn, result.counterparty == nil { result.counterparty = transferInPartyAfterAmount(t) }
+        // Alinma: «حوالة N ريال لحساب **1234 من <name> 2026-01-05 10:30».
+        if kind == .transferIn, result.counterparty == nil {
+            result.counterparty = first(#"(?m)^\s*حوالة\s+[\d.,]+\s*(?:ريال|SAR)\s+لحساب\s*\*+\d+\s+من\s+(.+?)\s+\d{4}-\d{1,2}-\d{1,2}"#, in: t)
+        }
+        // SNB English: «Outgoing IPS local transfer from *1234 To <name> Amount 100 SAR By <bank> …».
+        if kind == .transferOut, result.counterparty == nil {
+            result.counterparty = first(#"\bTo\s+(.+?)\s+Amount\b"#, in: t)
+        }
         // An IPO subscription debit has no recipient line: the subscription itself is the party.
         if kind == .transferOut, result.counterparty == nil, has(t, ["الاكتتاب", "اكتتاب"]) { result.counterparty = "اكتتاب" }
         // Sukuk: the project an investment goes into («في: <project>», the one «في:» line that is not a date).
@@ -313,12 +383,59 @@ public enum BankMessageParser {
         if result.currency != homeCurrency, result.statedHomeMinor == nil,
            let match = t.range(of: #"\(\s*\d[\d.,]*\s*(?:ريال|SAR|SR|ر\.س)\s*\)"#, options: .regularExpression),
            let home = amounts(String(t[match]), exponents).first, home.currency == homeCurrency { result.statedHomeMinor = home.minor }
+        if kind != .fee {
+            let home = exponents.exponent(homeCurrency)
+            result.feeMinor = labelledMoney(t, #"(?:رسوم وضريبة|رسوم العملية|الرسوم|رسوم(?!\s*تحويل)|(?<![\p{L}\p{N}])Fees?(?=\s*:)|عمولة)"#, home)
+            result.vatMinor = labelledMoney(t, #"(?:ضريبة القيمة المضافة|(?<!و)ضريبة|VAT)"#, home)
+        }
+        result.foreignFeeMinor = labelledMoney(t, #"(?:رسوم تحويل العملة|FX Markup|Currency conversion fee)"#, exponents.exponent(homeCurrency))
+        result.exchangeRate = first(#"(?:سعر الصرف|Exchange Rate)\s*[≈~:]*\s*(\d+(?:\.\d+)?)"#, in: t)
+        result.remainingLimitMinor = labelledMoney(t, #"(?:حد الصرف المتبقي|الصرف المتبقي|الحد المتبقي)"#, exponents.exponent(homeCurrency))
+        result.availableLimitMinor = labelledMoney(t, #"(?:الحد المتاح|Avl\.?\s*limit|Available limit)"#, exponents.exponent(homeCurrency))
+        if kind == .declined {
+            result.declineReason = matches(t, #"غير\s+كاف\p{M}*|لعدم\s+وجود\s+رصيد|Insufficient"#) ? .insufficientBalance
+                : matches(t, #"limit\s+exceeded|تجاوز[^\n]*الحد|تجاوز\s+الحد"#) ? .limitExceeded
+                : matches(t, #"\bPIN\b|الرقم\s+السري"#) ? .wrongPIN
+                : matches(t, #"موقوف|محظور|منتهية\s+الصلاحية|\bblocked\b|\binactive\b|غير\s+مفعل"#) ? .cardBlocked : .other
+        }
+        // Alinma Investment trades: «تنفيذ بيع/شراء <security> لمحفظتك … بسعر P SAR لعدد N سهم بقيمة إجمالية T عمولة F ضريبة V».
+        // The amount is the total, not the per-share price that comes first.
+        if matches(t, #"^\s*تنفيذ\s+(?:بيع|شراء)"#), let total = first(#"بقيمة\s+إجمالية\s+(\d[\d,]*(?:\.\d+)?)"#, in: t),
+           let cur = result.currency, let exp = exponents.exponent(cur), let minor = minorUnits(total, exponent: exp) {
+            result.amountMinor = minor
+            result.merchant = first(#"^\s*تنفيذ\s+(?:بيع|شراء)\s+(.+?)\s+لمحفظتك"#, in: t)
+        }
+        // Tamara/Tabby print the due day relatively: «مستحقة اليوم», «خلال يومين», «tomorrow».
+        if kind == .bnplInstalment, result.dueDate == nil, let base = receivedAt {
+            let days = matches(t, #"مستحقة\s+اليوم|due\s+today"#) ? 0 : matches(t, #"خلال\s+يومين"#) ? 2 : matches(t, #"\btomorrow\b|غدا"#) ? 1 : nil
+            if let days { result.dueDate = base.addingTimeInterval(Double(days) * 86_400) }
+        }
+        // Date with no clock time: kept apart so a missing time never becomes a guessed one.
+        if result.eventAt == nil { result.eventDateOnly = dateOnly(t, timeZone, near: receivedAt ?? Date()) }
+        if kind == .bnplInstalment, result.merchant == nil {
+            result.merchant = first(#"لطلبك\s+من\s+(.+?)\s+مستحقة"#, in: t) ?? partyLabelled(t, ["من", "المتجر"])
+                // Tabby English: «Your SAR 120.00 purchase at <merchant> is confirmed» / «Your <merchant> payment of SAR 45 will be charged …».
+                ?? first(#"(?i)purchase\s+at\s+(.+?)\s+is\s+confirmed"#, in: t) ?? first(#"(?i)^\s*Your\s+(.+?)\s+payment\s+of\b"#, in: t)
+        }
+        // Saudi Electricity «شكرا على سداد فاتورة الحساب N بمبلغ 100.00»: no currency word is printed; the utility is Saudi, so the
+        // home currency is meant (sender-scoped, like Sukuk).
+        if kind == .billPayment, result.amountMinor == nil, (sender?.lowercased().contains("alkahraba") ?? false),
+           let raw = first(#"بمبلغ\s+(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)"#, in: t),
+           let exp = exponents.exponent(homeCurrency), let minor = minorUnits(raw, exponent: exp) {
+            result.amountMinor = minor; result.currency = homeCurrency
+        }
         if kind == .bnplInstalment {
             result.provider = has(t, ["تمارا", "tamara", "tmra.pe"]) || (sender?.lowercased().contains("tamara") ?? false) ? "Tamara" : "Tabby"
         }
         if kind == .purchase || kind == .refund || kind == .cashback {
             result.cardKind = has(t, ["ائتمان", "إئتمان", "credit"]) ? .credit : has(t, ["مسبقة الدفع", "prepaid"]) ? .prepaid
                 : has(t, ["مدى", "mada", "Apple Pay"]) ? .debit : nil
+        }
+        // A movement kind with no amount and no statement due is not a movement: an offer, a tariff or terms update, or a
+        // cancelled-for-non-payment notice is a notice; anything else is left for review. Never recorded as an amount-less expense.
+        if BankIntake.decision(result.kind) == .record, result.amountMinor == nil, result.statementDueMinor == nil {
+            let notice = matches(t, #"تحديث|يسري\s+العرض|الشروط\s+والأحكام|لعدم\s+السداد|استمتع|ترشيحك|للاستثمار|بعائد|طرح|مبروك|Congratulations|https?://"#)
+            return ParsedBankMessage(kind: notice ? .marketing : .unknown)
         }
         return result
     }
@@ -365,7 +482,7 @@ public enum BankMessageParser {
         let words = currencyWords + exponents.exponents.keys.sorted().filter { !knownWords.contains($0) }.map { ($0, $0) }
         // A multi-word name tolerates any run of spaces between its words («ريال  عماني»).
         let codes = words.map { NSRegularExpression.escapedPattern(for: $0.0).replacingOccurrences(of: " ", with: "\\s+") }.joined(separator: "|")
-        let pattern = "(?:\(number)\\s*(\(codes)))|(?:(\(codes))\\s*\(number))"
+        let pattern = "(?:\(number)\\s*(\(codes))(?![A-Za-z]))|(?:(?<![A-Za-z])(\(codes))\\s*\(number))"
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return [] }
         let ns = text as NSString
         return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).compactMap { match in
@@ -423,9 +540,78 @@ public enum BankMessageParser {
             for label in ["لدى", "من", "At", "at", "Merchant"] where line.hasPrefix(label) {
                 var value = line.dropFirst(label.count).trimmingCharacters(in: .whitespaces)
                 if value.hasPrefix(":") { value = value.dropFirst().trimmingCharacters(in: .whitespaces) }
+                // Alinma prints a merchant code glued to the name: «من: 1234EXAMPLE SHOP».
+                if let head = value.first, head.isNumber, let code = value.range(of: #"^\d+(?=[A-Za-z\u0621-\u064A])"#, options: .regularExpression) { value = String(value[code.upperBound...]) }
                 guard let head = value.first, !head.isNumber, head != "*", !value.hasPrefix("حساب"), !value.hasPrefix("رصيد") else { continue }
                 if label.count == 2, line.dropFirst(label.count).first?.isLetter == true { continue } // «منصة», «atm»: a word, not a label
                 return value
+            }
+        }
+        return nil
+    }
+
+    /// «label … 12.50 SAR» or «label: 12.50»: the first number after the label on its line, minor units by the home exponent.
+    static func labelledMoney(_ text: String, _ labelPattern: String, _ exponent: Int?) -> Int? {
+        guard let exponent, let raw = first(#"(?mi)^[^\n]*?"# + labelPattern + #"\s*[:：]?\s*(?:(?:SAR|SR|ر\.س)\s*)?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)"#, in: text) else { return nil }
+        return minorUnits(raw, exponent: exponent)
+    }
+
+    /// «في: 20/03/2021», «2026-01-05», «25-12-1»: a date with no time, at 12:00 local.
+    static func dateOnly(_ text: String, _ timeZone: TimeZone, near reference: Date) -> Date? {
+        func noon(_ y: Int, _ m: Int, _ d: Int) -> Date? { var c = DateComponents(); c.year = y; c.month = m; c.day = d; c.hour = 12; return date(c, timeZone) }
+        if let m = first(#"(?<![\d/\\-])(\d{4}-\d{1,2}-\d{1,2})(?![\d-])"#, in: text) {
+            let v = m.split(separator: "-").compactMap { Int($0) }
+            if v.count == 3 { return noon(v[0], v[1], v[2]) }
+        }
+        guard let regex = try? NSRegularExpression(pattern: #"(?<![\d/\\-])(\d{1,2})[/\\-](\d{1,2})[/\\-](\d{2,4})(?![\d])"#),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
+        let v = (1...3).compactMap { Range(match.range(at: $0), in: text).flatMap { Int(text[$0]) } }
+        guard v.count == 3, let yearRange = Range(match.range(at: 3), in: text) else { return nil }
+        let fullYear = text[yearRange].count == 4
+        let candidates = [noon(v[2] < 100 ? 2000 + v[2] : v[2], v[1], v[0]), fullYear ? nil : noon(2000 + v[0], v[1], v[2])].compactMap { $0 }
+        return nearest(candidates, reference)
+    }
+
+    /// The owner's own account tail: «من:*1234» / «من حساب: **0000» / «حساب 1234*» / «A/C:**1234» on a debit,
+    /// «الى:5678» / «إلى **0019» / «حساب *…» on an incoming transfer. The other party's account is never taken.
+    static func ownAccountTail(_ text: String, _ kind: BankMessageKind) -> String? {
+        let tail = #"\s*:?\s*\**\s*(\d{3,4})\s*\**\s*$"#
+        if kind == .transferIn || kind == .income || kind == .salary {
+            return first(#"(?mi)^\s*(?:الى|إلى|To|إلى حساب|الى حساب|حساب|الحساب)"# + tail, in: text)
+        }
+        guard [.purchase, .withdrawal, .transferOut, .cardPayment, .billPayment, .fee, .declined, .reversal, .bnplInstalment, .refund, .cashback].contains(kind) else { return nil }
+        return first(#"(?mi)^\s*(?:من|من حساب|من الحساب|From|A/C|حساب|رقم حساب|الحساب)"# + tail, in: text)
+            // Al Rajhi: «خصم SAR 23.00 من حسابك *1234 في 20-08-25 09:42 - <label>».
+            ?? first(#"من\s+حسابك\s*\*+(\d{3,4})(?!\d)"#, in: text)
+    }
+
+    /// A person, company or wallet name behind a label: «الى:<name>». A value that starts with a digit or «*» is an account, and one
+    /// that starts with an account/bank word is not a name.
+    static func isNameValue(_ value: String) -> Bool {
+        guard let head = value.first, !head.isNumber, head != "*" else { return false }
+        return !matches(value, #"^(?:حساب|الحساب|بنك|البنك|مصرف|IBAN|آيبان|الأيبان|الايبان|لآيبان|بطاقة|البطاقة|رقم)(?![\u0621-\u064A])"#)
+    }
+
+    /// «label: name» on its own line, skipping lines whose value is an account.
+    static func partyLabelled(_ text: String, _ labels: [String]) -> String? {
+        for line in text.split(separator: "\n").map(String.init) {
+            for label in labels {
+                guard let range = line.range(of: label + ":") ?? line.range(of: label + " :") else { continue }
+                // «من:» must open the line or follow a space: «لحساب من:» style tails are not labels of their own.
+                let value = line[range.upperBound...].trimmingCharacters(in: .whitespaces)
+                if isNameValue(value) { return value }
+            }
+        }
+        return nil
+    }
+
+    /// «إلى <name>» or «من <name>» opening its own line with no colon (stc Bank, barq).
+    static func partyLine(_ text: String, _ labels: [String]) -> String? {
+        for line in text.split(separator: "\n").map({ $0.trimmingCharacters(in: .whitespaces) }) {
+            for label in labels {
+                guard line.hasPrefix(label), let next = line.dropFirst(label.count).first, next.isWhitespace else { continue }
+                let value = line.dropFirst(label.count).trimmingCharacters(in: .whitespaces)
+                if isNameValue(value) { return value }
             }
         }
         return nil
@@ -451,23 +637,100 @@ public enum BankMessageParser {
         return nil
     }
 
-    /// RM6: eventAt from the text — "2026-10-15 13:05", "15/10/26 13:05" or "15-10-2026 13:05".
-    static func eventDate(_ text: String, _ timeZone: TimeZone, near reference: Date = Date()) -> Date? {
-        let patterns = [#"(\d{4})-(\d{1,2})-(\d{1,2})[ T]+(\d{1,2}):(\d{2})"#, #"(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\s+(\d{1,2}):(\d{2})"#]
-        for (index, pattern) in patterns.enumerated() {
-            guard let regex = try? NSRegularExpression(pattern: pattern),
-                  let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { continue }
-            let values = (1...5).compactMap { Range(match.range(at: $0), in: text).flatMap { Int(text[$0]) } }
-            guard values.count == 5 else { continue }
-            var parts = DateComponents()
-            parts.hour = values[3]; parts.minute = values[4]
-            if index == 0 { parts.year = values[0]; parts.month = values[1]; parts.day = values[2]; return date(parts, timeZone) }
-            // RM6 corpus: Al Rajhi, Alinma and stc pay print «yy-mm-dd», others «dd-mm-yy». With two-digit ends both
-            // readings can be valid; the one nearest the receive time wins.
-            var dayFirst = parts; dayFirst.day = values[0]; dayFirst.month = values[1]; dayFirst.year = values[2] < 100 ? 2000 + values[2] : values[2]
-            var yearFirst = parts; yearFirst.year = 2000 + values[0]; yearFirst.month = values[1]; yearFirst.day = values[2]
-            let readings = [date(dayFirst, timeZone), values[2] < 100 ? date(yearFirst, timeZone) : nil].compactMap { $0 }
-            return readings.min { abs($0.timeIntervalSince(reference)) < abs($1.timeIntervalSince(reference)) }
+    private static func nearest(_ dates: [Date], _ reference: Date) -> Date? {
+        dates.min { abs($0.timeIntervalSince(reference)) < abs($1.timeIntervalSince(reference)) }
+    }
+
+    private static let arabicMonths: [String: Int] = ["يناير": 1, "فبراير": 2, "مارس": 3, "ابريل": 4, "أبريل": 4, "إبريل": 4, "مايو": 5, "يونيو": 6, "يوليو": 7,
+                                                       "اغسطس": 8, "أغسطس": 8, "سبتمبر": 9, "اكتوبر": 10, "أكتوبر": 10, "نوفمبر": 11, "ديسمبر": 12]
+
+    /// RM6: eventAt from the text — "2026-10-15 13:05", "15/10/26 13:05", "26-1-6 5:36", "10\\1\\26 18:25", "13:05 2026-01-18",
+    /// "on 05/09/26 at 06:23", "09/05 09:54" (year from the receive time) or «14 يونيو 2021 10:52:0 ص».
+    static func eventDate(_ text: String, _ timeZone: TimeZone, near reference: Date = Date(), referenceIsDelivery: Bool = false) -> Date? {
+        /// Month-first readings («2/5/2026 7:25 PM») are never preferred by default: a day-first date stays day first. The swap is
+        /// taken only when the reference is the real delivery time and the month-first reading lands within two days of it while
+        /// the day-first one does not. Without a delivery time (pasted or imported history) nothing is swapped.
+        func preferMonthFirst(_ best: Date, _ alt: Date) -> Bool {
+            referenceIsDelivery && abs(alt.timeIntervalSince(reference)) <= 2 * 86_400 && abs(best.timeIntervalSince(reference)) > 2 * 86_400
+        }
+        func ints(_ match: NSTextCheckingResult, _ range: ClosedRange<Int>) -> [Int] { range.compactMap { Range(match.range(at: $0), in: text).flatMap { Int(text[$0]) } } }
+        func find(_ pattern: String) -> NSTextCheckingResult? {
+            (try? NSRegularExpression(pattern: pattern))?.firstMatch(in: text, range: NSRange(text.startIndex..., in: text))
+        }
+        let sep = #"[/\\-]"#
+        // 1. «yyyy-mm-dd hh:mm»
+        if let m = find(#"(\d{4})-(\d{1,2})-(\d{1,2})[ T]+(\d{1,2}):(\d{2})"#) {
+            let v = ints(m, 1...5)
+            if v.count == 5 { var parts = DateComponents(); parts.year = v[0]; parts.month = v[1]; parts.day = v[2]; parts.hour = v[3]; parts.minute = v[4]; return date(parts, timeZone) }
+        }
+        // 1b. «التاريخ:⏎2026-01-27⏎الوقت:⏎13:38» (traffic violations: value on the line after its label)
+        if let m = find(#"(\d{4})-(\d{1,2})-(\d{1,2})\s*\n\s*الوقت\s*:\s*\n?\s*(\d{1,2}):(\d{2})"#) {
+            let v = ints(m, 1...5)
+            if v.count == 5 { var parts = DateComponents(); parts.year = v[0]; parts.month = v[1]; parts.day = v[2]; parts.hour = v[3]; parts.minute = v[4]; return date(parts, timeZone) }
+        }
+        // 2. «hh:mm yyyy-mm-dd» (stc pay, D360, Alinma)
+        if let m = find(#"(\d{1,2}):(\d{2})(?::\d{1,2})?\s+(\d{4})-(\d{1,2})-(\d{1,2})"#) {
+            let v = ints(m, 1...5)
+            if v.count == 5 { var parts = DateComponents(); parts.hour = v[0]; parts.minute = v[1]; parts.year = v[2]; parts.month = v[3]; parts.day = v[4]; return date(parts, timeZone) }
+        }
+        // 3. «a-b-c hh:mm» and «hh:mm a-b-c» with «-», «/» or «\\»: Al Rajhi, Alinma and stc pay print «yy-mm-dd», others «dd-mm-yy».
+        // Both readings are tried; the one that is a real date nearest the receive time wins.
+        var triple: (a: Int, b: Int, c: Int, cDigits: Int, hour: Int, minute: Int)?
+        if let m = find(#"(\d{1,2})\#(sep)(\d{1,2})\#(sep)(\d{1,4})\s+(?:at\s+|الساعة\s+)?(\d{1,2}):(\d{2})(?::\d{1,2})?(?:[^\d\n]{0,2}?([AaPp][Mm])(?![A-Za-z]))?"#) {
+            let v = ints(m, 1...5)
+            if v.count == 5, let r = Range(m.range(at: 3), in: text) {
+                var hour = v[3]
+                if let marker = Range(m.range(at: 6), in: text).map({ text[$0].lowercased() }) { hour = marker == "pm" ? v[3] % 12 + 12 : v[3] % 12 }
+                triple = (v[0], v[1], v[2], text[r].count, hour, v[4])
+            }
+        } else if let m = find(#"(\d{1,2}):(\d{2})(?::\d{1,2})?\s+(\d{1,2})\#(sep)(\d{1,2})\#(sep)(\d{1,4})"#) {
+            let v = ints(m, 1...5)
+            if v.count == 5, let r = Range(m.range(at: 5), in: text) { triple = (v[2], v[3], v[4], text[r].count, v[0], v[1]) }
+        }
+        if let t = triple {
+            var base = DateComponents(); base.hour = t.hour; base.minute = t.minute
+            var dayFirst = base; dayFirst.day = t.a; dayFirst.month = t.b; dayFirst.year = t.c < 100 ? 2000 + t.c : t.c
+            var yearFirst = base; yearFirst.year = 2000 + t.a; yearFirst.month = t.b; yearFirst.day = t.c
+            // «26-1-6»: a one-digit last part cannot be a year; a four-digit one cannot be a day.
+            let readings = [t.cDigits >= 2 ? date(dayFirst, timeZone) : nil, t.cDigits <= 2 && t.a < 100 ? date(yearFirst, timeZone) : nil].compactMap { $0 }
+            var monthFirst = base; monthFirst.month = t.a; monthFirst.day = t.b; monthFirst.year = t.c < 100 ? 2000 + t.c : t.c
+            let alt = t.cDigits >= 2 ? date(monthFirst, timeZone) : nil
+            // «02/07/2026»: some senders print month first. Day-first stays the default (see preferMonthFirst); month first is
+            // used alone only when day-first is impossible (a month above 12).
+            if let best = nearest(readings, reference) {
+                if let alt, preferMonthFirst(best, alt) { return alt }
+                return best
+            }
+            if let alt { return alt }
+        }
+        // 4. «dd/mm hh:mm» or «hh:mm dd/mm» with no year: the year that puts it nearest the receive time.
+        if let m = find(#"(?<![\d/\\-])(\d{1,2})/(\d{1,2})\s+(\d{1,2}):(\d{2})(?![\d/-])"#) {
+            let v = ints(m, 1...4)
+            if v.count == 4 {
+                var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+                let year = calendar.component(.year, from: reference)
+                func readings(day: Int, month: Int) -> [Date] {
+                    (year - 1...year + 1).compactMap { y -> Date? in var parts = DateComponents(); parts.year = y; parts.month = month; parts.day = day; parts.hour = v[2]; parts.minute = v[3]; return date(parts, timeZone) }
+                }
+                // «09/05 09:54» can be month first; see preferMonthFirst.
+                let best = nearest(readings(day: v[0], month: v[1]), reference), alt = nearest(readings(day: v[1], month: v[0]), reference)
+                if let best {
+                    if let alt, preferMonthFirst(best, alt) { return alt }
+                    return best
+                }
+                if let alt { return alt }
+            }
+        }
+        // 5. «14 يونيو 2021 10:52:0 ص»
+        if let m = find(#"(\d{1,2})\s+([\u0621-\u064A]+)\s+(\d{4})\s+(\d{1,2}):(\d{1,2})(?::\d{1,2})?\s*([صم])?"#),
+           let monthRange = Range(m.range(at: 2), in: text), let month = arabicMonths[String(text[monthRange])] {
+            let v = [1, 3, 4, 5].compactMap { Range(m.range(at: $0), in: text).flatMap { Int(text[$0]) } }
+            if v.count == 4 {
+                var parts = DateComponents(); parts.day = v[0]; parts.month = month; parts.year = v[1]; parts.minute = v[3]
+                let marker = Range(m.range(at: 6), in: text).map { String(text[$0]) }
+                parts.hour = marker == "م" ? (v[2] % 12) + 12 : marker == "ص" ? v[2] % 12 : v[2]
+                return date(parts, timeZone)
+            }
         }
         return nil
     }

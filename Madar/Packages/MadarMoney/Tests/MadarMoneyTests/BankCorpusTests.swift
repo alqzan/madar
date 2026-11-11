@@ -34,6 +34,99 @@ final class BankCorpusTests: XCTestCase {
         return String(lines.joined(separator: " ⏎ ").prefix(180))
     }
 
+    // MARK: Accuracy heuristics (independent of the parser's own regexes)
+
+    /// Figures printed beside a currency word, in hundredths (independent of the parser).
+    private static func printedFigures(_ t: String) -> Set<Int> {
+        var out = Set<Int>()
+        let forms = [#"(\d[\d,]*(?:\.\d+)?)\s*(?:SAR|SR|USD|EUR|AED|GBP|ريال|ر\.س|دولار|درهم)(?![A-Za-z])"#, #"(?<![A-Za-z])(?:SAR|SR|USD|EUR|AED|GBP)\s*(\d[\d,]*(?:\.\d+)?)"#]
+        for form in forms {
+            guard let regex = try? NSRegularExpression(pattern: form) else { continue }
+            for m in regex.matches(in: t, range: NSRange(t.startIndex..., in: t)) {
+                guard let r = Range(m.range(at: 1), in: t), let d = Double(t[r].replacingOccurrences(of: ",", with: "")) else { continue }
+                out.insert(Int((d * 100).rounded()))
+            }
+        }
+        return out
+    }
+
+    private static func has(_ text: String, _ pattern: String) -> Bool { text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil }
+
+    /// What the message prints versus what the parser captured. Returns counters to add for one message.
+    private static func accuracyMisses(_ raw: String, _ p: ParsedBankMessage, sender: String = "?") -> [String: Int] {
+        let t = BankMessageParser.clean(raw)
+        let money = #"(بمبلغ\s*\d)|(\d[\d,]*(\.\d+)?\s*(SAR|SR|USD|AED|EUR|ريال|ر\.س|دولار|درهم))|((SAR|SR|USD|AED|EUR)\s*\d)"#
+        let moneyPrinted = has(t, money)
+        var out: [String: Int] = [:]
+        let decision = BankIntake.decision(p.kind)
+        if decision == .discard || decision == .discardWithoutText {
+            out["financialTotal"] = 1; out["fullyRead"] = 1; out["fullyReadWithSource"] = 1; out["notice"] = 1
+            if p.kind == .marketing && moneyPrinted && has(t, #"(شراء|حوالة|تحويل|سحب|إيداع|ايداع|Purchase|Transfer|Debit|Credit)"#) { out["noticeWithMovementWord"] = 1 }
+            return out
+        }
+        if p.kind == .unknown {
+            if moneyPrinted { out["financialTotal"] = 1; out["miss.unknown"] = 1; out["strict.total"] = 1; out["strict.miss.unknown"] = 1 } else { out["nonFinancialUnknown"] = 1 }
+            return out
+        }
+        out["financialTotal"] = 1
+        var miss: [String] = []
+        let amountCaptured = p.amountMinor != nil || p.statementDueMinor != nil
+        if moneyPrinted && !amountCaptured { miss.append("miss.amount") }
+        // Correctness, not only presence: the parsed amount must equal a figure printed next to a currency word.
+        if let parsedMinor = p.amountMinor, p.kind != .statement, !has(t, "بقيمة إجمالية") {
+            let printed = Self.printedFigures(t)
+            if !printed.isEmpty && !printed.contains(parsedMinor) && !(p.statedHomeMinor.map(printed.contains) ?? false) { miss.append("miss.amountMismatch") }
+        }
+        if moneyPrinted && amountCaptured && p.currency == nil { miss.append("miss.currency") }
+        if has(t, #"\d{1,2}:\d{2}"#) && p.eventAt == nil { miss.append("miss.time") }
+        let valued = #"(?m)^\s*%@\s*:?\s*[^\d\s*:]"#
+        if [.purchase, .refund, .declined].contains(p.kind), p.merchant == nil,
+           (has(t, String(format: valued, "(لدى|من|At|Merchant|على|التاجر)")) || has(t, #"(?m)^\s*(في|ل)\s*:\s*(?!SA\b|السعودية)[^\d\s*:]"#)) { miss.append("miss.merchant") }
+        if [.transferIn, .transferOut].contains(p.kind), p.counterparty == nil,
+           has(t, #"(?m)^\s*(من|إلى|الى|To|From|المستفيد|اسم المستفيد|إلى المستفيد|اسم المرسل|اسم المستلم|المستلم)(\s*:\s*|\s+)(?!حساب|بنك|البنك|مصرف|IBAN|آيبان|الأيبان|الايبان|لآيبان|بطاقة|رقم)[^\d\s*:]"#) || has(t, #"(?m)^\s*ل\s*:\s*[^\d\s*:]"#) || has(t, #"(?i)(?:تحويل|حوالة|transfer)[^\n]*\s(?:إلى|الى|To)\s+[^\d\s]"#) { miss.append("miss.party") }
+        if [.purchase, .withdrawal, .refund, .declined, .reversal].contains(p.kind), p.last4 == nil,
+           has(t, #"(\*\s?\d{4}\b|\b\d{4}\s?\*|(بطاقة|ببطاقة|عبر|card)\s*:?\s*\d{4}(?!\d))"#) { miss.append("miss.last4") }
+        if miss.isEmpty { out["fullyRead"] = 1 } else { for m in miss { out[m, default: 0] += 1 } }
+        // STRICT: notices (marketing/OTP) are outside the count; a recordable message with no amount is an error; the amount must be
+        // a figure printed on an operation line (not balance, limit, fee, VAT or rate lines); a printed name needs a counterparty.
+        var strictMiss = miss.filter { $0 != "miss.amountMismatch" }
+        if p.amountMinor == nil && p.statementDueMinor == nil && !strictMiss.contains("miss.amount") { strictMiss.append("miss.noAmount") }
+        if let parsedMinor = p.amountMinor, p.kind != .statement, !has(t, "بقيمة إجمالية") {
+            let operationLines = t.split(separator: "\n").map(String.init).filter { !has($0, #"(الرصيد|رصيد|المتاح|المتبقي|رسوم|عمولة|ضريبة|Fee|VAT|Balance|Limit|سعر الصرف|Exchange|Markup|إجمالي|الإجمالي|المستحق)"#) }
+            let figures = Self.printedFigures(operationLines.joined(separator: "\n"))
+            if !figures.isEmpty && !figures.contains(parsedMinor) && !(p.statedHomeMinor.map(figures.contains) ?? false) { strictMiss.append("miss.amountNotOperation") }
+        }
+        out["strict.total"] = 1
+        if strictMiss.isEmpty { out["strict.read"] = 1 } else { for m in strictMiss { out["strict." + m, default: 0] += 1 } }
+        // Source/destination account and printed balance are counted apart so the transaction-level number stays comparable.
+        var extra: [String] = []
+        var extra2: [String] = []
+        let noneStatement = p.kind != .statement && p.kind != .declined
+        let balancePrinted = noneStatement && has(t, #"(?mi)^[^\n]*(الرصيد|رصيد|المتاح|Avl\.?\s*Bal|Available\s+Balance|Balance)\s*[:：]?\s*-?\d[\d,]*(\.\d+)?"#)
+            && !has(t, #"(?mi)^[^\n]*(القائم|الحد المتاح|غير كاف|Insufficient|المستحق)[^\n]*$"#)
+        if balancePrinted { out["expect.balance"] = 1 }
+        if balancePrinted, p.balanceMinor == nil { extra.append("miss.balance") }
+        let debit: [BankMessageKind] = [.purchase, .withdrawal, .transferOut, .cardPayment, .billPayment, .fee, .declined, .reversal]
+        let sourcePrinted = debit.contains(p.kind) && (has(t, #"(?mi)^\s*(من|من حساب|من الحساب|From|A/C|حساب|رقم حساب|الحساب)\s*:?\s*\**\s*\d{3,4}\s*\**\s*$"#) || has(t, #"من\s+حسابك\s*\*+\d{3,4}"#))
+        if sourcePrinted { out["expect.sourceAccount"] = 1 }
+        if sourcePrinted, p.accountLast4 == nil { extra.append("miss.sourceAccount") }
+        let destPrinted = p.kind == .transferIn && has(t, #"(?mi)^\s*(الى|إلى|To|إلى حساب|الى حساب|حساب|الحساب)\s*:?\s*\**\s*\d{3,4}\s*\**\s*$"#)
+        if destPrinted { out["expect.destAccount"] = 1 }
+        if destPrinted, p.accountLast4 == nil { extra.append("miss.destAccount") }
+        // Fees, FX and limits (owner scope 11 Nov): counted apart as well.
+        let feePrinted = p.kind != .fee && has(t, #"(?mi)^[^\n]*(رسوم العملية|الرسوم|رسوم|Fees?|عمولة)\s*[:：]?\s*(SAR|SR|ر\.س)?\s*\d"#) && !has(t, #"(?mi)^[^\n]*رسوم\s*تحويل\s*العملة"#)
+        if feePrinted { out["expect.fee"] = 1; if p.feeMinor == nil { extra2.append("miss.fee") } }
+        let limitPrinted = has(t, #"(?mi)(الصرف المتبقي|الحد المتبقي)\s*[:：]?\s*(SAR\s*)?\d"#)
+        if limitPrinted { out["expect.remainingLimit"] = 1; if p.remainingLimitMinor == nil { extra2.append("miss.remainingLimit") } }
+        let fxPrinted = has(t, #"(سعر الصرف|Exchange Rate)\s*[≈~:]*\s*\d"#)
+        if fxPrinted { out["expect.fxRate"] = 1; if p.exchangeRate == nil { extra2.append("miss.fxRate") } }
+        if p.kind == .declined { out["expect.declineReason"] = 1; if p.declineReason == .other { extra2.append("other.declineReason") } }
+        for m in extra2 { out[m, default: 0] += 1 }
+        if miss.isEmpty && extra.isEmpty { out["fullyReadWithSource"] = 1 }
+        for m in extra { out[m, default: 0] += 1 }
+        return out
+    }
+
     func testLayoutMasksGreetingAndNamedCounterparties() {
         let shape = Self.layout("عزيزي اسم عميل تجريبي،\nاسم المرسل: اسم مرسل تجريبي\nBeneficiary: Example Person\nشراء\nلدى: Example Shop")
         XCTAssertFalse(shape.contains("اسم عميل تجريبي"))
@@ -60,6 +153,7 @@ final class BankCorpusTests: XCTestCase {
         }
         let zone = TimeZone(identifier: "Asia/Riyadh")!
         var report: [String: [String: Int]] = [:]
+        var accuracy: [String: [String: Int]] = [:]
         // The guide groups masked layouts per sender; keep every observed class because hidden party names can affect parsing.
         var guide: [String: [String: Layout]] = [:]
         for file in files {
@@ -85,6 +179,7 @@ final class BankCorpusTests: XCTestCase {
                     if [.transferIn, .transferOut].contains(parsed.kind) && parsed.counterparty == nil { entry.missing.insert("الطرف") }
                 }
                 guide[sender, default: [:]][key] = entry
+                for (name, value) in Self.accuracyMisses(line.text, parsed, sender: sender) { accuracy[sender, default: [:]][name, default: 0] += value }
                 counts["kind." + parsed.kind.rawValue, default: 0] += 1
                 let recordable = BankIntake.decision(parsed.kind) == .record
                 if recordable { counts["recordable", default: 0] += 1 }
@@ -99,8 +194,22 @@ final class BankCorpusTests: XCTestCase {
         }
         let out = Self.madar.appendingPathComponent("Artifacts/bank-corpus-report.json")
         try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(report).write(to: out)
+        // Accuracy: financial senders only (any recordable message); percent is over messages that carry money or are recordable.
+        var accSection: [String: Any] = [:]
+        var overall: [String: Int] = [:]
+        for (sender, counts) in report where (counts["recordable"] ?? 0) > 0 {
+            var a = accuracy[sender] ?? [:]
+            a["percent×100"] = (a["financialTotal"] ?? 0) == 0 ? 0 : (a["fullyRead"] ?? 0) * 10_000 / a["financialTotal"]!
+            a["strict.percent×100"] = (a["strict.total"] ?? 0) == 0 ? 0 : (a["strict.read"] ?? 0) * 10_000 / a["strict.total"]!
+            accSection[sender] = a
+            for (k, v) in accuracy[sender] ?? [:] { overall[k, default: 0] += v }
+        }
+        overall["strict.percent×100"] = (overall["strict.total"] ?? 0) == 0 ? 0 : (overall["strict.read"] ?? 0) * 10_000 / overall["strict.total"]!
+        overall["percent×100"] = (overall["financialTotal"] ?? 0) == 0 ? 0 : (overall["fullyRead"] ?? 0) * 10_000 / overall["financialTotal"]!
+        accSection["_overall"] = overall
+        var full: [String: Any] = report
+        full["_accuracy"] = accSection
+        try JSONSerialization.data(withJSONObject: full, options: [.prettyPrinted, .sortedKeys]).write(to: out)
         var md = "# دليل تحليل رسائل البنوك (محلي)\n\nيُولَّد من `BankCorpusTests` عند كل تشغيل. الأرقام مقنّعة بـ#، وما بعد «من/لدى/لـ/إلى/At» مخفي بـ‹…›.\n"
         for (sender, layouts) in guide.sorted(by: { $0.value.values.map(\.count).reduce(0, +) > $1.value.values.map(\.count).reduce(0, +) }) {
             let total = layouts.values.map(\.count).reduce(0, +)

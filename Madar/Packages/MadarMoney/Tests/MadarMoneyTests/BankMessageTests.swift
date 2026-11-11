@@ -585,3 +585,218 @@ import Testing
         #expect(received.counterparty?.hasPrefix("EXAMPLE PERSON") == true)
     }
 }
+
+/// Layout classes added by the 99% accuracy pass (RM6). Every name, number and amount is invented; expected values come from
+/// what each message means, not from the parser's output.
+@Suite struct AccuracyPassLayoutTests {
+    let riyadh = TimeZone(identifier: "Asia/Riyadh")!
+    func at(_ y: Int, _ m: Int, _ d: Int, _ h: Int, _ min: Int) -> Date {
+        var c = Calendar(identifier: .gregorian); c.timeZone = riyadh
+        return c.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min))!
+    }
+    private func parse(_ text: String, sender: String? = nil, received: Date? = nil) -> ParsedBankMessage {
+        BankMessageParser.parse(text, timeZone: riyadh, receivedAt: received ?? at(2026, 10, 15, 13, 0), sender: sender,
+                                trackedWallets: ["STC Pay", "Drahim"])
+    }
+
+    // MARK: Dates
+
+    @Test func windowsLineEndingsSplitIntoLines() {
+        let p = parse("Online Purchase:\r\nCard: ***1234; VISA\r\nAmount: SAR 12.00\r\nAt: Example Shop RIYADH SA\r\nDate: 2026-10-15 12:30:00")
+        #expect(p.kind == .purchase)
+        #expect(p.merchant == "Example Shop")
+        #expect(p.eventAt == at(2026, 10, 15, 12, 30))
+    }
+
+    @Test func oneDigitDayAndBackslashDatesRead() {
+        #expect(parse("شراء انترنت\nبطاقة:0123;مدى\nمبلغ:SAR 5\nلدى:EXAMPLE\nفي:26-10-5 05:27").eventAt == at(2026, 10, 5, 5, 27))
+        #expect(parse("شراء انترنت\nبطاقة:0123;مدى\nمبلغ:SAR 5\nلدى:EXAMPLE\n\u{061C}15\\10\\26 6:07").eventAt == at(2026, 10, 15, 6, 7))
+    }
+
+    @Test func timeBeforeDateAndMonthFirstDatesRead() {
+        let timeFirst = parse("حوالة واردة محلية\nمبلغ 1,000 SAR\nمن اسم تجريبي\nحساب *1234\nفي 09:29 2026-10-14")
+        #expect(timeFirst.eventAt == at(2026, 10, 14, 9, 29))
+        // «2/5/2026 7:25 PM» is February 5 (month first); the day-first reading is eight months from the receive time.
+        let usStyle = parse("إضافة أموال لحسابك\nبـ:500 ر.س\nفي:2/5/2026 7:25\u{00A0}PM", received: at(2026, 2, 5, 19, 26))
+        #expect(usStyle.eventAt == at(2026, 2, 5, 19, 25))
+        // «09/05 09:54» with no year: month first when the day-first reading is months away.
+        let noYear = parse("تسديد آلي\nبطاقة **1234\nمبلغ 100.00 ريال\nفي 09/05 09:54", received: at(2026, 9, 5, 10, 0))
+        #expect(noYear.eventAt == at(2026, 9, 5, 9, 54))
+        // A day-first reading near the receive time stays day first.
+        #expect(parse("Money received\nOn: 02/10/2026 08:00:01", received: at(2026, 10, 2, 8, 1)).eventAt == at(2026, 10, 2, 8, 0))
+    }
+
+    @Test func arabicMonthTradeAndSplitLineViolationDatesRead() {
+        let trade = parse("تنفيذ بيع شركة مثال لمحفظتك 111111-1 في\nSAR الثلاثاء 15 يونيو 2021 2:5:0 م بسعر 10.5 SAR لعدد 2 سهم بقيمة إجمالية 21.00 عمولة 0.05 ضريبة 0.01", received: at(2021, 6, 15, 14, 6))
+        #expect(trade.eventAt == at(2021, 6, 15, 14, 5))
+        let violation = parse("تم قيد مخالفة:\nتجاوز السرعة\nالتاريخ:\n2026-10-13\nالوقت:\n13:38\nالقيمة:\n113 ريال", sender: "MOI")
+        #expect(violation.eventAt == at(2026, 10, 13, 13, 38))
+        #expect(violation.amountMinor == 11_300)
+    }
+
+    @Test func dateWithoutTimeIsKeptApartFromEventAt() {
+        let p = parse("حوالة مالية صادرة مقبولة\nمن: *1234\nالى: اسم تجريبي\nالمبلغ: 40 SAR\nفي: 14/10/2026")
+        #expect(p.eventAt == nil)
+        #expect(p.eventDateOnly == at(2026, 10, 14, 12, 0))
+    }
+
+    // MARK: Classes
+
+    @Test func cashDepositsAndCardPaymentsAndCardTransfers() {
+        let atm = parse("ايداع:صراف آلي\nالى:*1234\nمبلغ:SAR 175.00\nفي:26-10-14 10:00")
+        #expect(atm.kind == .income); #expect(atm.amountMinor == 17_500); #expect(atm.accountLast4 == "1234")
+        let pay = parse("بطاقة ائتمانية:تسديد\nبطاقة:*4321 ;فيزا\nمبلغ:SAR 135.00\nمن:*1234\nفي:26-10-14 10:00")
+        #expect(pay.kind == .cardPayment); #expect(pay.last4 == "4321"); #expect(pay.accountLast4 == "1234")
+        let cash = parse("بطاقة ائتمانية:تحويل\nمن بطاقة:*4321;فيزا\nالى حساب:*1234\nمبلغ:SAR 90.00\nفي:26-10-14 10:00")
+        #expect(cash.kind == .transferOut); #expect(cash.amountMinor == 9_000); #expect(cash.last4 == "4321")
+    }
+
+    @Test func reversalKeepsTheOriginalMerchantAmountAndCard() {
+        let p = parse("عكس  عملية\nبطاقة:*4321 ;فيزا\nمبلغ:SAR 7.50\nلدى:EXAMPLE SHOP\nرصيد:SAR 80.00\nفي:26-10-14 10:00")
+        #expect(p.kind == .reversal)
+        #expect(p.amountMinor == 750); #expect(p.merchant == "EXAMPLE SHOP"); #expect(p.last4 == "4321"); #expect(p.balanceMinor == 8_000)
+    }
+
+    @Test func refundsFromRefundLayouts() {
+        let credit = parse("تم اضافة مبلغ بقيمة SAR 20.00 الى بطاقة *4321 من EXAMPLE SHOP في 26-10-14 10:00 والحد المتبقي SAR 900.00 ريال")
+        #expect(credit.kind == .refund); #expect(credit.amountMinor == 2_000); #expect(credit.merchant == "EXAMPLE SHOP"); #expect(credit.remainingLimitMinor == 90_000)
+        let back = parse("استرجاع عملية\nبطاقة: 4321; فيزا\nمبلغ: 15.00 SAR\nالتاجر: example.shop\nفي: 14-10-2026 10:00")
+        #expect(back.kind == .refund); #expect(back.merchant == "example.shop"); #expect(back.amountMinor == 1_500)
+        let wallet = parse("عملية استرجاع\nبطاقة فيزا **4321\nمبلغ: 3.00 EUR (12.50 SAR)\nلدى :EXAMPLE EU\n2026-10-14 10:00")
+        #expect(wallet.kind == .refund); #expect(wallet.currency == "EUR"); #expect(wallet.statedHomeMinor == 1_250)
+    }
+
+    @Test func requestAcknowledgementsAreNotMovements() {
+        #expect(parse("عزيزي العميل\nلقد تم استلام طلب استرداد التكاليف الطبية الخاص بك").kind == .marketing)
+        #expect(parse("تمت الموافقة على طلب بطاقة الائتمانية بحد ائتماني SAR 5,000.").kind == .marketing)
+    }
+
+    @Test func governmentBillAndWalletTransfers() {
+        let fine = parse("مدفوعات وزارة الداخلية-المخالفات المرورية\nمن:1234\nمبلغ:SR 150\nرقم الفاتورة:1000000001\n26/10/14 10:00")
+        #expect(fine.kind == .billPayment); #expect(fine.amountMinor == 15_000); #expect(fine.accountLast4 == "1234")
+        let toWallet = parse("تحويل الى حساب دراهم\nمن:1234\nمبلغ:SAR 500\nالى:محفظة تجريبية\n26/10/14 10:00")
+        #expect(toWallet.kind == .transferOut); #expect(toWallet.counterparty == "محفظة تجريبية"); #expect(toWallet.accountLast4 == "1234")
+    }
+
+    @Test func alinmaLineTransferAndSnbEnglishTransfer() {
+        let incoming = parse("حوالة 120 ريال لحساب **1234 من اسم تجريبي 2026-10-14 10:30", sender: "alinmabank")
+        #expect(incoming.kind == .transferIn); #expect(incoming.amountMinor == 12_000); #expect(incoming.counterparty == "اسم تجريبي")
+        let english = parse("Outgoing IPS local transfer from *1234 To EXAMPLE CO Amount 2000 SAR By EXAMPLE BANK IBAN *5678 On 14/10/26 15:21", sender: "snb")
+        #expect(english.kind == .transferOut); #expect(english.counterparty == "EXAMPLE CO"); #expect(english.amountMinor == 200_000)
+    }
+
+    @Test func counterpartyLayouts() {
+        let out = parse("حوالة صادرة:داخلية\nمن:*1234\nمبلغ:SAR 27.00\nالى:جمعية تجريبية\nالى حساب:*7788\nفي:26-10-14 23:20")
+        #expect(out.counterparty == "جمعية تجريبية"); #expect(out.accountLast4 == "1234")
+        let stcBank = parse("حوالة صادرة (سريع)\n160.00 ر.س\nإلى اسم تجريبي\nإلى مصرف تجريبي\nحساب *7410\nرسوم 1.00 ر.س\n03/10/26 09:07")
+        #expect(stcBank.counterparty == "اسم تجريبي"); #expect(stcBank.feeMinor == 100)
+        let incoming = parse("حوالة واردة محلية\n50.00 ر.س\nمن اسم تجريبي\nمن بنك مصرف تجريبي\nحساب *7410\n01/10/26 02:00")
+        #expect(incoming.counterparty == "اسم تجريبي"); #expect(incoming.accountLast4 == "7410")
+        let beneficiary = parse("تأكيد إيداع حوالة صادرة محلية (سريع)\nإلى المستفيد: اسم تجريبي\nإلى حساب: **5566\nالمبلغ: 131.40 SAR\nالرسوم: 0.45 SAR\nمن حساب: **0000\nفي: 2026-10-14 08:25")
+        #expect(beneficiary.counterparty == "اسم تجريبي"); #expect(beneficiary.accountLast4 == "0000"); #expect(beneficiary.feeMinor == 45)
+    }
+
+    @Test func declinedAndInternationalCardLayouts() {
+        let limit = parse("Rejected transaction: Daily limit exceeded\nCard: **1234\nAmount: 100.00 SAR\nAt: EXAMPLE PAY\nOn: 2026-10-14 10:00", sender: "barq_app")
+        #expect(limit.kind == .declined); #expect(limit.declineReason == .limitExceeded); #expect(limit.merchant == "EXAMPLE PAY")
+        let funds = parse("تم رفض العملية: الرصيد غير كافٍ.\nالعملية: شراء انترنت\nالبطاقة: 1234\nالمبلغ: SAR 50\nالحساب: EXAMPLE.SITE\nالتاريخ: 14/10/26 10:00")
+        #expect(funds.declineReason == .insufficientBalance); #expect(funds.merchant == "EXAMPLE.SITE"); #expect(funds.last4 == "1234")
+        let other = parse("حوالة مالية صادرة مرفوضة\nالسبب: [DS99] لا يمكن تنفيذ العملية\nالمبلغ: SAR 10")
+        #expect(other.kind == .declined); #expect(other.declineReason == .other)
+        let blocked = parse("Declined transaction: card is blocked\nAmount: SAR 10")
+        #expect(blocked.declineReason == .cardBlocked)
+    }
+
+    @Test func foreignPurchaseKeepsRateAndFeesApart() {
+        let p = parse("POS International Purchases:\nVisa card: **1234 (Apple Pay)\nAmount: 10.00 EUR (45.00 SAR)\nExchange Rate ≈ 4.5000\nFX Markup: 1.20 SAR\nWallet balance: 800.50\nAt: EXAMPLE SHOP\nCountry: FRA\nOn: 2026-10-14 10:00", sender: "barq_app")
+        #expect(p.kind == .purchase); #expect(p.amountMinor == 1_000); #expect(p.currency == "EUR"); #expect(p.statedHomeMinor == 4_500)
+        #expect(p.exchangeRate == "4.5000"); #expect(p.foreignFeeMinor == 120); #expect(p.balanceMinor == 80_050); #expect(p.feeMinor == nil)
+    }
+
+    @Test func feeVatBalanceAndLimitsAreSeparateFields() {
+        let bsf = parse("شراء عبر نقاط البيع بـ SAR 100.00\nرسوم العملية:2.50\nمن EXAMPLE SHOP\nبطاقة ائتمانية 4321* من EXAMPLE BANK\nالمبلغ الإجمالي المستحق SAR 102.50\nالرصيد المتوفر: SAR 900.00\nفي26-10-14 10:00", sender: "BSF")
+        #expect(bsf.amountMinor == 10_000); #expect(bsf.feeMinor == 250); #expect(bsf.balanceMinor == 90_000)
+        let snb = parse("شراء-POS\nبـ21.30 SAR\nمن EXAMPLE SHOP\nإئتمانية **4321 (Apple Pay)\nفي 14/10/26 19:02\nالصرف المتبقي 2712.60 SAR")
+        #expect(snb.remainingLimitMinor == 271_260); #expect(snb.balanceMinor == nil)
+        let combined = parse("سحب صراف\nبطاقة:*4321 ;فيزا\nمبلغ:SAR 200\nرسوم وضريبة: 5.75 SAR\nفي:26-10-14 10:00")
+        #expect(combined.feeMinor == 575); #expect(combined.vatMinor == nil)
+        let limit = parse("شراء\nمبلغ 10.00 SAR\nبطاقة *4321\nالحد المتاح 1,200.00 SAR\nفي 14-10-2026 10:00")
+        #expect(limit.availableLimitMinor == 120_000); #expect(limit.balanceMinor == nil)
+    }
+
+    @Test func bareBalanceIsReadOnlyWhereLabelled() {
+        let wallet = parse("Online Purchases:\nMada card: **1234\nAmount: 25.00 SAR\nBalance: 100.25\nAt: EXAMPLE SHOP\nA/C: **6789\nOn: 2026-10-14 10:00", sender: "barq_app")
+        #expect(wallet.balanceMinor == 10_025); #expect(wallet.accountLast4 == "6789"); #expect(wallet.last4 == "1234")
+        #expect(parse("بطاقة ائتمانية:سداد\nبطاقة:*4321;فيزا\nمبلغ:SAR 10.00").balanceMinor == nil)
+    }
+
+    @Test func shareTradesUseTheTotalNotThePerShareAndKeepFeeAndVat() {
+        let sale = parse("تنفيذ بيع شركة مثال لمحفظتك 111111-1 في\nSAR الخميس 17 يونيو 2021 2:15:0 م بسعر 27.70 SAR لعدد 12 سهم بقيمة إجمالية 332.40 عمولة 0.52 ضريبة 0.06", received: at(2021, 6, 17, 14, 16))
+        #expect(sale.kind == .income); #expect(sale.amountMinor == 33_240); #expect(sale.merchant == "شركة مثال")
+        #expect(sale.feeMinor == 52); #expect(sale.vatMinor == 6)
+        let buy = parse("تنفيذ شراء شركة مثال لمحفظتك 111111-1 في\nSAR الخميس 17 يونيو 2021 2:15:0 م بسعر 27.70 SAR لعدد 2 سهم بقيمة إجمالية 55.40 عمولة 0.10 ضريبة 0.01", received: at(2021, 6, 17, 14, 16))
+        #expect(buy.kind == .purchase); #expect(buy.amountMinor == 5_540)
+    }
+
+    @Test func tamaraDueDaysArePrintedRelatively() {
+        let p = parse("دفعة قادمة بقيمة 123.45 SAR لطلبك من متجر وهمي مستحقة خلال يومين. سددها الحين: https://tmra.pe/abc", sender: "Tamara")
+        #expect(p.dueDate == at(2026, 10, 17, 13, 0))
+    }
+
+    @Test func latinCurrencyCodesNeedWordBoundaries() {
+        // «mada» is the Saudi debit network, not the Moroccan dirham «MAD»; the amount is the SAR figure.
+        let p = parse("POS Purchase\nBy: ***7531 mada Prepaid\nAmount: SAR 17.00\nAt: EXAMPLE SHOP\nDate: 2026/10/14 13:43", sender: "samba")
+        #expect(p.amountMinor == 1_700); #expect(p.currency == "SAR"); #expect(p.last4 == "7531"); #expect(p.merchant == "EXAMPLE SHOP")
+    }
+
+    @Test func electricityPaymentThanksUseTheHomeCurrencyForItsSender() {
+        let p = parse("عزيزي المشترك نشكرك على سداد فاتورة الحساب 1000000001 بمبلغ 187.65", sender: "alkahraba")
+        #expect(p.kind == .billPayment); #expect(p.amountMinor == 18_765); #expect(p.currency == "SAR")
+        #expect(parse("عزيزي المشترك نشكرك على سداد فاتورة الحساب 1000000001 بمبلغ 187.65", sender: "other").amountMinor == nil)
+    }
+
+    @Test func tamaraNoticesNameTheirStore() {
+        #expect(parse("دفعة قادمة بقيمة 50.00 SAR لطلبك من متجر وهمي مستحقة اليوم. سددها الحين", sender: "Tamara").merchant == "متجر وهمي")
+        #expect(parse("تأكيد الدفع\nمن: example.store/\nبقيمة: 142.70 SAR\nفي: 16/10/2026", sender: "Tamara").merchant == "example.store/")
+    }
+
+    @Test func otherSideAccountTailIsKeptApartFromTheOwnersAccount() {
+        let own = parse("تحويل بين حساباتي\nبـ:100.00 ر.س\nمن: ***3579\nإلى: ***2461\nفي:10/10/26 13:09")
+        #expect(own.accountLast4 == "3579"); #expect(own.counterpartyAccountLast4 == "2461")
+        let incoming = parse("حوالة محلية واردة\nمبلغ:SAR 300\nالى:2468\nمن:اسم تجريبي\nمن:1357\nفي:26-10-14 10:59")
+        #expect(incoming.accountLast4 == "2468"); #expect(incoming.counterpartyAccountLast4 == "1357"); #expect(incoming.counterparty == "اسم تجريبي")
+    }
+
+    @Test func feeLabelNeedsAWordBoundaryAndAColon() {
+        #expect(parse("Online Purchase:\nCard: ***1234; VISA\nAmount: SAR 12.00\nAt: Joe Coffee 24\nDate: 2026-10-15 12:30:00").feeMinor == nil)
+        #expect(parse("Online Purchase:\nCard: ***1234; VISA\nAmount: SAR 12.00\nAt: Fee Shop 24\nDate: 2026-10-15 12:30:00").feeMinor == nil)
+        #expect(parse("Online Purchase:\nCard: ***1234; VISA\nAmount: SAR 12.00\nFee: SAR 1.50\nAt: Example Shop\nDate: 2026-10-15 12:30:00").feeMinor == 150)
+    }
+
+    @Test func dayFirstDateIsNotSwappedWithoutADeliveryTimeOrNearReceipt() {
+        let november = parse("شراء\nمبلغ 10.00 SAR\nبطاقة *1234\nفي: 10-09-2026 10:00", received: at(2026, 11, 5, 9, 0))
+        #expect(november.eventAt == at(2026, 9, 10, 10, 0))
+        let pasted = BankMessageParser.parse("Money received\nOn: 02/07/2026 19:26:32", timeZone: riyadh, receivedAt: nil)
+        #expect(pasted.eventAt == at(2026, 7, 2, 19, 26))
+        // A month above 12 can only be day first.
+        #expect(parse("شراء\nمبلغ 10.00 SAR\nبطاقة *1234\nفي: 25/10/2026 10:00").eventAt == at(2026, 10, 25, 10, 0))
+    }
+
+    @Test func amountLessMovementKindsAreNotRecordable() {
+        let promo = parse("حصرياً استمتع بـ 15% استرداد نقدي لدى متجر وهمي مع بطاقات المصرف. يسري العرض حتى 30 ديسمبر")
+        #expect(promo.kind == .marketing); #expect(BankIntake.decision(promo.kind) == .discard)
+        #expect(parse("عزيزي العميل، سيتم تحديث رسوم التعرفة البنكية للمنتجات ابتداءً من 1/1/2027. للتفاصيل زر موقعنا.").kind == .marketing)
+        #expect(parse("تم إلغاء (اختبار تجريبي) لعدم السداد").kind == .marketing)
+        let odd = parse("تم إيداع الأرباح لحسابك الادخاري")
+        #expect(odd.kind == .unknown); #expect(BankIntake.decision(odd.kind) == .needsLook)
+    }
+
+    @Test func recipientNameLabelAndTabbyEnglishMerchant() {
+        let out = parse("حوالة صادرة\nمبلغ: SAR 80.00\nاسم المستلم: اسم تجريبي\nفي: 2026-10-14 10:00")
+        #expect(out.kind == .transferOut); #expect(out.counterparty == "اسم تجريبي")
+        let tabby = parse("Your SAR 120.00 purchase at EXAMPLE STORE is confirmed. Track your upcoming payments with the Tabby app: https://tabby.sa/x", sender: "Tabby")
+        #expect(tabby.kind == .bnplInstalment); #expect(tabby.amountMinor == 12_000); #expect(tabby.merchant == "EXAMPLE STORE")
+        let due = parse("Your EXAMPLE STORE payment of SAR 45 will be charged to your card tomorrow. If you need more time, extend at https://s.tabby.sa/x", sender: "Tabby")
+        #expect(due.merchant == "EXAMPLE STORE")
+    }
+}
