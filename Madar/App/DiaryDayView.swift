@@ -18,6 +18,9 @@ struct DiaryDayView: View {
     @State private var failure: String?
     @State private var writing = false
     @State private var insertAt: Date?
+    @State private var anchorLabel: String?
+    @State private var inlineEdit: DiaryLineEdit?
+    @State private var focusTick = 0
     @State private var retry = 0
     @State private var intentions: [DiaryIntention] = []
     @State private var arc: DiaryDayArc?
@@ -359,14 +362,17 @@ struct DiaryDayView: View {
                     }
                 }
             }
-            .background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme, theme)
+            .background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme, theme).scrollDismissesKeyboard(.interactively)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 8) {
                     if app.undoToastVisible {
                         UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
                             .accessibilityIdentifier("diary-day-undo")
                     }
-                    HStack(spacing: 10) {
+                    if shownDay == today, travel == nil {
+                        DiaryInlineComposer(app: app, insertAt: $insertAt, anchor: $anchorLabel, edit: $inlineEdit, focusTick: $focusTick,
+                                            editorOpen: writing, openEditor: { insertAt = nil; anchorLabel = nil; writing = true }, saved: { retry += 1 })
+                    } else { HStack(spacing: 10) {
                         if let travel, shownDay == today {
                             Button {
                                 insertAt = nil; writing = true
@@ -395,7 +401,7 @@ struct DiaryDayView: View {
                                     .glassEffect(.regular.interactive(), in: .capsule)
                             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-stamps-open")
                         }
-                    }.padding(.horizontal, 18).padding(.vertical, 8).background(theme.background)
+                    }.padding(.horizontal, 18).padding(.vertical, 8).background(theme.background) }
                 }.background(theme.background)
             }
             .toolbar {
@@ -706,8 +712,14 @@ struct DiaryDayView: View {
         if let index = flow.firstIndex(where: { $0.id == line.id }), index < flow.count - 1 {
             let gap = flow[index + 1].at.timeIntervalSince(line.at)
             insertAt = gap > 2 ? line.at.addingTimeInterval(gap / 2) : line.at.addingTimeInterval(1)
-        } else { insertAt = nil }
-        writing = true
+            anchorLabel = String(line.text.prefix(24))
+        } else { insertAt = nil; anchorLabel = nil }
+        inlineEdit = nil; focusTick += 1
+    }
+    /// A tap on a line you wrote changes it in the field at the foot of today's page; older days use the sheet (it explains the «عُدّل» mark).
+    private func editLine(_ line: DiaryDisplayLine) {
+        if shownDay == today, travel == nil { insertAt = nil; anchorLabel = nil; inlineEdit = .init(id: line.id, text: line.text) }
+        else { editing = .init(id: line.id, text: line.text) }
     }
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
         let auto = ["salah", "quran", "mihbara", "mal", "habits"].contains(line.kind)
@@ -745,7 +757,7 @@ struct DiaryDayView: View {
                     : line.kind == "late" ? theme.color("late") : auto ? theme.color("autoInkText") : theme.ink)
         }.contentShape(Rectangle()).onTapGesture {
             // Tap a line you wrote to change it right there; tap a room's own line (prayer, Quran…) to write after it.
-            if page.editable.contains(line.id) { editing = .init(id: line.id, text: line.text) } else { writeAfter(line, page: page) }
+            if page.editable.contains(line.id) { editLine(line) } else { writeAfter(line, page: page) }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("diary-entry-" + line.id).overlay {
             if highlightedEntryID?.uuidString == line.id {
                 RoundedRectangle(cornerRadius: 12).stroke(theme.accent, lineWidth: 2)

@@ -118,7 +118,22 @@ import XCTest
         let after = app.buttons["diary-line-write-after"].firstMatch
         XCTAssertTrue(after.waitForExistence(timeout: 5), app.debugDescription)
         after.tap()
-        XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout: 10), app.debugDescription)
+        // The line is written right on the page, in the field at its foot: no separate writing page.
+        let field = app.textFields["diary-inline-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["diary-inline-chip-clear"].exists, app.debugDescription)
+        field.tap(); field.typeText("سطر بين سطرين")
+        capture(app, "FLOW-inline-composer-L")
+        app.buttons["diary-inline-send"].tap()
+        XCTAssertTrue(app.staticTexts["سطر بين سطرين"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["diary-inline-chip-clear"].exists)
+        // Tap the line you just wrote: it comes back into the same field to change it, no sheet.
+        app.staticTexts["سطر بين سطرين"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["diary-inline-chip-clear"].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(field.value as? String, "سطر بين سطرين")
+        field.tap(); field.typeText(" وأكثر")
+        app.buttons["diary-inline-send"].tap()
+        XCTAssertTrue(app.staticTexts["سطر بين سطرين وأكثر"].waitForExistence(timeout: 10), app.debugDescription)
     }
     func testUnsavedTranscriptRequiresExplicitDiscard() throws {
         try XCTSkipIf(true, "The transcript is edited inline on the page now; the explicit-discard sheet no longer exists.")
