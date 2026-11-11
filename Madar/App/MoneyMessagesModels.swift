@@ -32,6 +32,8 @@ struct MoneyMessageDraft: Identifiable, Equatable {
     /// Exact match against a counterparty learned from a previously confirmed salary.
     var isSalarySuggestion = false
     var isBigExpense = false
+    /// A refund names the purchase it undoes (Phase 3): the linked one and the others it could be.
+    var refund: MoneyRefundLink? = nil
 }
 
 struct MoneyMessageStatement: Identifiable, Equatable {
@@ -130,6 +132,7 @@ extension AppMoneyService {
             let big = row.tripID == nil && dir == .out && bigFrom.map { $0 > 0 && row.homeAmountMinor >= $0 } == true
             let incomingBankDraft = row.source == "bank" && row.reviewState == "needsLook" && dir == .incoming
                 && (message?.kind == BankMessageKind.transferIn.rawValue || message?.kind == BankMessageKind.income.rawValue)
+            let refundLink = MoneyPhase3Reader.refundLink(for: row, repo: repo, zone: zone)
             let clear = row.reviewState == "needsLook" && resolvable && !incomingBankDraft && !big
                 && (row.kind != "expense" || bigFrom != nil) && row.currency == home
             let salarySuggestion = incomingBankDraft && SalarySourceMatcher.matches(row.counterparty, learnedKeys: learnedSalarySources)
@@ -139,7 +142,7 @@ extension AppMoneyService {
                 note: note, clear: clear, at: row.eventAt, categoryID: row.categoryID, categoryName: categories.first { $0.id == row.categoryID }?.name,
                 canCategorize: ["expense", "fee", "withdrawal"].contains(row.kind) && !categories.isEmpty, isSalary: row.kind == "salary",
                 isIncomingBankDraft: incomingBankDraft, isSalarySuggestion: salarySuggestion,
-                isBigExpense: big && row.kind == "expense" && !row.ignoredFromBudget && row.obligationID == nil))
+                isBigExpense: big && row.kind == "expense" && !row.ignoredFromBudget && row.obligationID == nil, refund: refundLink))
         }
         drafts.sort { $0.clear == $1.clear ? $0.at > $1.at : !$0.clear }
         var statementCards: [MoneyMessageStatement] = []

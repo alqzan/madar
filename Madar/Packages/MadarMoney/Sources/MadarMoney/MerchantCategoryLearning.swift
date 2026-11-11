@@ -49,7 +49,7 @@ public enum MerchantCategoryLearning {
         }
 
         public func result(for merchant: String, threshold: Int) -> Result {
-            let key = BankDedupe.normalize(merchant)
+            let key = MerchantKey.key(merchant)
             guard threshold > 0, !key.isEmpty, let counts = countsByMerchant[key] else {
                 return .init(counts: [], suggestedCategoryID: nil, threshold: threshold)
             }
@@ -71,7 +71,7 @@ public enum MerchantCategoryLearning {
                   sample.categorySource == "manual",
                   let categoryID = sample.categoryID, liveCategoryIDs.contains(categoryID),
                   let merchant = sample.merchant else { continue }
-            let key = BankDedupe.normalize(merchant)
+            let key = MerchantKey.key(merchant)
             guard !key.isEmpty, seenByMerchant[key, default: []].insert(sample.transactionID).inserted else { continue }
             countsByMerchant[key, default: [:]][categoryID, default: 0] += 1
         }

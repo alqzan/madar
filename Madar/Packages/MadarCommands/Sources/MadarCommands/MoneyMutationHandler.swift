@@ -38,6 +38,10 @@ public struct MoneyParsedFields: Codable, Sendable {
     public var remainingLimitMinor: Int?
     public var availableLimitMinor: Int?
     public var eventDateOnly: Date?
+    // Phase 3: instalment numbering and the balance owed, only as a Tamara/Tabby message printed them.
+    public var instalmentNumber: Int?
+    public var instalmentCount: Int?
+    public var remainingMinor: Int?
     init(_ p: ParsedBankMessage) {
         kind = p.kind.rawValue; amountMinor = p.amountMinor; currency = p.currency; last4 = p.last4
         cardKind = p.cardKind?.rawValue; merchant = p.merchant; biller = p.biller; provider = p.provider
@@ -47,6 +51,7 @@ public struct MoneyParsedFields: Codable, Sendable {
         declineReason = p.declineReason?.rawValue; feeMinor = p.feeMinor; vatMinor = p.vatMinor; foreignFeeMinor = p.foreignFeeMinor
         exchangeRate = p.exchangeRate; remainingLimitMinor = p.remainingLimitMinor; availableLimitMinor = p.availableLimitMinor
         eventDateOnly = p.eventDateOnly
+        instalmentNumber = p.instalmentNumber; instalmentCount = p.instalmentCount; remainingMinor = p.remainingMinor
     }
     var messageKind: BankMessageKind { BankMessageKind(rawValue: kind) ?? .unknown }
 }
@@ -623,6 +628,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let liveCategoryIDs = Set(try context.fetch(FetchDescriptor<MadarData.Category>()).filter { live($0) }.map(\.id))
         let learningIndex = MerchantCategoryLearning.makeIndex(samples: learningSamples, liveCategoryIDs: liveCategoryIDs)
         let lookups = try BankLookups(context)
+        let ruleIndex = MerchantRuleIndex(rules: try context.fetch(FetchDescriptor<MerchantRule>()).filter { live($0) })
         for (index, pair) in zip(items, placements).enumerated() {
             let (input, placement) = pair, (p, received, parsed, fingerprint) = input
             let occurrence: Int, possibleDuplicate: Bool
@@ -644,6 +650,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             if parsed.kind == .marketing, try recordDue(fields, sender: message.sender, messageID: message.id, at: printedAt, lookups: lookups, context: context, now: now, writer: writer) {
                 message.status = "ok"; try touch(message, now, writer); continue
             }
+            // A card statement is also an upcoming due (statement amount, due date); the message itself stays in review for `money.applyStatement`.
+            if parsed.kind == .statement { _ = try recordDue(fields, sender: message.sender, messageID: message.id, at: printedAt, lookups: lookups, context: context, now: now, writer: writer) }
             guard parsed.kind != .declined && parsed.kind != .unknown && parsed.kind != .statement,
                   let amount = parsed.amountMinor, amount > 0, amount <= 9_007_199_254_740_991, let code = parsed.currency else { continue }
             let row = MoneyTransaction(); row.id = StableIdentity.uuid(for: "BankMovement:\(message.id)")
@@ -662,9 +670,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             }
             // Historical category rules stay stored but never force the next purchase into that category.
             // Budget exclusion remains independent; a unique learned category is only a changeable draft suggestion.
-            if let rule = try rule(for: row.merchant ?? row.counterparty, in: context) {
+            if let rule = ruleIndex.rule(for: row.merchant ?? row.counterparty) {
                 if rule.ignore { row.ignoredFromBudget = true }
             }
+            if row.kind == "refund" { try linkRefund(row, context: context) }
             if row.kind == "expense", !row.ignoredFromBudget,
                let merchant = row.merchant ?? row.counterparty,
                let suggestion = learningIndex.result(for: merchant, threshold: learningThreshold).suggestedCategoryID {
@@ -716,7 +725,9 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     /// a repeated reminder changes nothing; a due the owner dismissed stays dismissed. Returns whether the message was such a notice.
     private static func recordDue(_ fields: MoneyParsedFields, sender: String, messageID: UUID, at: Date, lookups: BankLookups, context: ModelContext, now: Date, writer: String) throws -> Bool {
         guard let amount = fields.statementDueMinor, amount > 0, amount <= 9_007_199_254_740_991, let currency = fields.currency else { return false }
-        let payee = [fields.provider, fields.biller, sender].compactMap { $0 }.first { !$0.isEmpty } ?? ""
+        var payee = [fields.provider, fields.biller, sender].compactMap { $0 }.first { !$0.isEmpty } ?? ""
+        // Two cards of one bank with the same figures stay two dues: the statement's payee carries the card tail.
+        if fields.messageKind == .statement, let tail = fields.last4, !payee.isEmpty { payee += " " + tail }
         guard !payee.isEmpty else { return false }
         let zone = try PrayerRepository(context: context).place(at: at).timeZone
         let dayKey = fields.dueDate.map { GregorianDay.containing($0, in: zone).description }
@@ -735,7 +746,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let dues = try context.fetch(FetchDescriptor<UpcomingDue>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
         guard !dues.isEmpty else { return }
         let payments = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate {
-            $0.deletedAt == nil && $0.mergedInto == nil && ($0.kind == "billPayment" || $0.kind == "repayment") }))
+            $0.deletedAt == nil && $0.mergedInto == nil && ($0.kind == "billPayment" || $0.kind == "repayment" || $0.kind == "cardPayment") }))
         let liveIDs = Set(payments.map(\.id))
         // A closing link to a payment of another kind (it was deleted or changed) no longer counts.
         let linked = Set(dues.compactMap(\.closedByTransactionID)).subtracting(liveIDs)
@@ -751,11 +762,15 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             guard let message = row.messageID.flatMap({ messages[$0] }) else { continue }
             let parsed = message.parsedJSON.flatMap { try? JSONDecoder().decode(MoneyParsedFields.self, from: $0) }
             let names = [parsed?.biller, parsed?.provider, row.merchant, row.counterparty, message.sender].compactMap { $0 }
-            states.append(.init(id: row.id.uuidString, payees: names, amountMinor: row.amountMinor, currency: row.currency, at: row.eventAt))
+            states.append(.init(id: row.id.uuidString, payees: names, amountMinor: row.amountMinor, currency: row.currency, at: row.eventAt,
+                                isCardPayment: row.kind == "cardPayment", tail: parsed?.last4))
         }
         let dueStates = open.map { due in
-            UpcomingDues.Due(id: due.id.uuidString, payee: due.payee, amountMinor: due.amountMinor, currency: due.currency, dueAt: due.dueAt,
-                             announcedAt: due.sourceMessageID.flatMap { messages[$0] }.map { $0.parsedJSON.flatMap { try? JSONDecoder().decode(MoneyParsedFields.self, from: $0).eventAt } ?? $0.receivedAt } ?? due.createdAt)
+            let source = due.sourceMessageID.flatMap { messages[$0] }
+            let sourceFields = source?.parsedJSON.flatMap { try? JSONDecoder().decode(MoneyParsedFields.self, from: $0) }
+            return UpcomingDues.Due(id: due.id.uuidString, payee: due.payee, amountMinor: due.amountMinor, currency: due.currency, dueAt: due.dueAt,
+                             announcedAt: sourceFields?.eventAt ?? source?.receivedAt ?? due.createdAt,
+                             isStatement: source?.kind == BankMessageKind.statement.rawValue, tail: sourceFields?.last4)
         }
         for closure in UpcomingDues.closures(open: dueStates, payments: states) {
             guard let due = open.first(where: { $0.id.uuidString == closure.due }), let payment = UUID(uuidString: closure.payment) else { continue }
@@ -763,19 +778,26 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
     }
 
+    /// Phase 3: a refund or reversal draft is linked to the one purchase it undoes (same merchant key and card, amount within what is left,
+    /// inside the window). Ambiguous or unmatched refunds stay unlinked for the owner to choose; confirm re-validates the link.
+    private static func linkRefund(_ row: MoneyTransaction, context: ModelContext) throws {
+        guard row.relatedTransactionID == nil, (row.merchant ?? row.counterparty) != nil else { return }
+        row.relatedTransactionID = try MoneyRepository(context: context).matchedOriginal(forRefund: row)
+    }
+
     /// One rule per merchant: the pattern is the normalized merchant name (DECISIONS, M5-V07).
     private static func saveRule(merchant: String, category: UUID?, ignore: Bool, context: ModelContext, now: Date, writer: String) throws {
-        let pattern = BankDedupe.normalize(merchant)
-        guard !pattern.isEmpty, category != nil || ignore else { throw MoneyCommandError.invalidReference }
-        let rules = try context.fetch(FetchDescriptor<MerchantRule>()).filter { live($0) && $0.pattern == pattern }
+        let pattern = BankDedupe.normalize(merchant), key = MerchantKey.key(merchant)
+        guard !pattern.isEmpty, !key.isEmpty, category != nil || ignore else { throw MoneyCommandError.invalidReference }
+        // One rule per merchant key: «Starbucks» and «ستاربكس 12» are the same merchant; older rules written with the plain pattern still match.
+        let rules = try context.fetch(FetchDescriptor<MerchantRule>()).filter { live($0) && ($0.pattern == pattern || MerchantKey.key($0.pattern) == key) }
         let rule = rules.first ?? { let r = MerchantRule(); r.pattern = pattern; r.createdAt = now; context.insert(r); return r }()
         rule.categoryID = ignore ? nil : category; rule.ignore = ignore; try touch(rule, now, writer)
         for extra in rules.dropFirst() { try touch(extra, now, writer, deleting: true) }
     }
     static func rule(for merchant: String?, in context: ModelContext) throws -> MerchantRule? {
         guard let merchant, !merchant.isEmpty else { return nil }
-        let pattern = BankDedupe.normalize(merchant)
-        return try context.fetch(FetchDescriptor<MerchantRule>()).filter { live($0) && $0.pattern == pattern }.max { $0.updatedAt < $1.updatedAt }
+        return MerchantRuleIndex(rules: try context.fetch(FetchDescriptor<MerchantRule>()).filter { live($0) }).rule(for: merchant)
     }
 
     /// F07: a statement message updates its card once. Natural key (card, close day); the close day is

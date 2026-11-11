@@ -20,6 +20,8 @@ struct MoneyMessagesView: View {
     @State private var deleteFailureID: UUID?
     @State private var injectedDeleteFailure = false
     @State private var categorizing: MoneyMessageDraft?
+    /// The purchase chosen by hand for a refund draft; it travels with the confirmation.
+    @State private var refundChoice: [UUID: UUID] = [:]
     @State private var guideOpen = false
     @State private var budgetOpen = false
     @State private var salary: SalaryRoute?
@@ -242,6 +244,7 @@ struct MoneyMessagesView: View {
                     Text(note).font(MadarTypography.fine()).padding(.horizontal, 8).padding(.vertical, 4)
                         .overlay { Rectangle().stroke(theme.color("reserveText"), style: .init(lineWidth: 1, dash: [3, 2])) }
                 }
+                if let refund = d.refund { refundOrigin(d, refund) }
             }
             Spacer(minLength: 6)
             VStack(alignment: .trailing, spacing: 6) {
@@ -255,7 +258,7 @@ struct MoneyMessagesView: View {
                         } label: { draftConfirmGlyph }
                             .accessibilityLabel("خيارات اعتماد " + d.title).accessibilityIdentifier("money-draft-confirm")
                     } else {
-                        Button { if d.isSalary { salary = .init(id: d.id) } else if d.isBigExpense { bigExpense = .init(transactionID: d.id) } else { run("money.confirmTransaction", ["id": .string(d.id.uuidString)]) } } label: { draftConfirmGlyph }
+                        Button { if d.isSalary { salary = .init(id: d.id) } else if d.isBigExpense { bigExpense = .init(transactionID: d.id) } else { run("money.confirmTransaction", MoneyPhase3Reader.confirmPayload(d, choice: refundChoice[d.id])) } } label: { draftConfirmGlyph }
                             .buttonStyle(.madarPlain).accessibilityLabel("اعتمد " + d.title).accessibilityIdentifier("money-draft-confirm")
                     }
                     Button { run("money.deleteTransaction", ["id": .string(d.id.uuidString)]) } label: {
@@ -269,6 +272,31 @@ struct MoneyMessagesView: View {
             }
         }.padding(.horizontal, 12).padding(.vertical, 10).background(theme.surface).overlay { TicketEdge().stroke(theme.line, lineWidth: 1) }
             .accessibilityElement(children: .contain).accessibilityIdentifier("money-draft-" + d.title)
+    }
+    /// «مرتجع من: متجر، ٢٣٠ ر.س، التاريخ بالتقويمين»; several candidates offer a small chooser.
+    private func originalText(_ o: MoneyRefundOriginal) -> String { o.name + "، " + amount(o.amountMinor, currency: o.currency) }
+    @ViewBuilder private func refundOrigin(_ d: MoneyMessageDraft, _ link: MoneyRefundLink) -> some View {
+        let chosenID = refundChoice[d.id] ?? link.linked
+        let chosen = link.originals.first { $0.id == chosenID }
+        VStack(alignment: .leading, spacing: 3) {
+            if let chosen {
+                Text(figure: "مرتجع من: " + originalText(chosen)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-refund-origin")
+                MadarDateLabel(app.dateLabels(chosen.day, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine())
+            }
+            if link.originals.count > 1 {
+                Menu {
+                    ForEach(link.originals) { original in
+                        Button { refundChoice[d.id] = original.id } label: {
+                            Text(figure: originalText(original) + "، " + app.dateLabels(original.day, compact: true).combined)
+                        }.accessibilityIdentifier("money-refund-choice-" + original.id.uuidString)
+                    }
+                } label: {
+                    Text(chosen == nil ? "اختر المشتريات الأصلية" : "غيّر المشتريات الأصلية").font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText"))
+                        .padding(.horizontal, 8).padding(.vertical, 4).frame(minHeight: 32)
+                        .overlay { Rectangle().stroke(theme.color("reserveText"), style: .init(lineWidth: 1, dash: [3, 2])) }
+                }.accessibilityIdentifier("money-refund-chooser")
+            }
+        }.accessibilityElement(children: .contain).accessibilityIdentifier("money-refund-" + d.title)
     }
     private var draftConfirmGlyph: some View {
         Image(systemName: "checkmark").font(.body.bold()).foregroundStyle(theme.background).frame(width: 44, height: 44).background(theme.ink, in: .circle)

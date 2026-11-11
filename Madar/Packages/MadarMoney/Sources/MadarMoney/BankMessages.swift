@@ -50,6 +50,10 @@ public struct ParsedBankMessage: Equatable, Sendable {
     /// The other side's account tail when the message prints one apart from a name: the destination of an outgoing transfer
     /// («الى حساب:*7788», «إلى: ***2461»), the source of an incoming one («من:*1357»). `accountLast4` stays the owner's side.
     public var counterpartyAccountLast4: String?
+    /// Tamara/Tabby «القسط ٢ من ٤» / «payment 2 of 4», and the balance still owed when the message prints one. Never inferred.
+    public var instalmentNumber: Int?
+    public var instalmentCount: Int?
+    public var remainingMinor: Int?
 }
 
 /// A small, explicit alias table for bank and wallet identities. The sender remains the authority:
@@ -480,6 +484,9 @@ public enum BankMessageParser {
         }
         if kind == .bnplInstalment {
             result.provider = has(t, ["تمارا", "tamara", "tmra.pe"]) || (sender?.lowercased().contains("tamara") ?? false) ? "Tamara" : "Tabby"
+            if let pair = firstTwo(#"(?i)(?:القسط|الدفعة|دفعة|قسط|payment|instalment|installment)\s*(?:رقم\s*)?(\d{1,2})\s*(?:من|of|/)\s*(\d{1,2})"#, in: t),
+               let n = Int(pair.0), let m = Int(pair.1), n >= 1, m >= n { result.instalmentNumber = n; result.instalmentCount = m }
+            if let rest = labelledAmount(t, ["المبلغ المتبقي", "الرصيد المتبقي", "المتبقي", "Remaining balance", "Remaining"], exponents) { result.remainingMinor = rest.minor }
         }
         if kind == .purchase || kind == .refund || kind == .cashback {
             result.cardKind = has(t, ["ائتمان", "إئتمان", "credit"]) ? .credit : has(t, ["مسبقة الدفع", "prepaid"]) ? .prepaid
@@ -697,6 +704,11 @@ public enum BankMessageParser {
         return nil
     }
 
+    static func firstTwo(_ pattern: String, in text: String) -> (String, String)? {
+        guard let regex = try? NSRegularExpression(pattern: pattern), let m = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              m.numberOfRanges >= 3, let a = Range(m.range(at: 1), in: text), let b = Range(m.range(at: 2), in: text) else { return nil }
+        return (String(text[a]), String(text[b]))
+    }
     static func first(_ pattern: String, in text: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern), let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
         for i in 1..<match.numberOfRanges where match.range(at: i).location != NSNotFound {

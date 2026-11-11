@@ -32,12 +32,34 @@ struct MoneyUpcomingDue: Identifiable, Equatable, Sendable {
     var dueDay: GregorianDay?
     /// Whole civil days from today to the due day: 0 today, 2 in two days, -3 three days late. nil without a due date.
     var daysUntil: Int?
+    // Phase 3 (owner, 11 Nov 2026): what the announcing message printed, shown only when present.
+    var isStatement = false
+    var minimumDueMinor: Int?
+    var cardLast4: String?
+    var merchant: String?
+    var instalmentNumber: Int?
+    var instalmentCount: Int?
+    var remainingMinor: Int?
+}
+
+/// One line of «يتكرر»: a salary or a subscription the bank messages show repeating, with what is expected next.
+struct MoneyRecurringLine: Identifiable, Equatable, Sendable {
+    enum Note: Equatable, Sendable { case priceChange(fromMinor: Int, toMinor: Int), late(days: Int) }
+    var id: String
+    var isSalary: Bool
+    var name: String
+    var amountMinor: Int
+    var currency: String
+    var nextDay: GregorianDay
+    var notes: [Note]
 }
 
 struct MoneyBankInsights: Equatable, Sendable {
     var mismatches: [MoneyBankMismatch] = []
     var dues: [MoneyUpcomingDue] = []
-    var isEmpty: Bool { mismatches.isEmpty && dues.isEmpty }
+    /// Salary first, then subscriptions by next expected date; a pattern that ended is not listed.
+    var recurring: [MoneyRecurringLine] = []
+    var isEmpty: Bool { mismatches.isEmpty && dues.isEmpty && recurring.isEmpty }
 }
 
 /// «بطاقة تنتهي بـ٣٣١٧ من ‹الجهة› — لأي حساب تتبع؟»: one question per (sender, tail).
@@ -87,6 +109,17 @@ enum MoneyBankInsightsCopy {
         default: return "تأخر " + digits.string(-daysUntil) + " يومًا"
         }
     }
+    /// «القسط ٢ من ٤»; only «القسط ٢» when the count was not printed. nil when no number was printed.
+    static func instalmentPhrase(number: Int?, count: Int?, digits: MadarNumberFormatter) -> String? {
+        guard let number else { return nil }
+        return "القسط " + digits.string(number) + (count.map { " من " + digits.string($0) } ?? "")
+    }
+    /// «كشف بطاقة ‎…١٢٣٤»
+    static func statementTitle(last4: String?, digits: MadarNumberFormatter) -> String {
+        "كشف بطاقة" + (last4.map { " \u{200E}…" + digits.localized($0) } ?? "")
+    }
+    /// «ارتفع من ٣٩٫٩٠ إلى ٤٩٫٩٠» / «انخفض من …»; the amounts arrive already formatted (or masked).
+    static func priceChangeSentence(rose: Bool, from: String, to: String) -> String { (rose ? "ارتفع" : "انخفض") + " من " + from + " إلى " + to }
     /// «رصيد البنك ١٬٢٠٠ ومدار ١٬٣٠٠ — فرق ١٠٠». The amounts arrive already formatted (or masked).
     static func mismatchSentence(bank: String, book: String, difference: String) -> String {
         "رصيد البنك " + bank + " ومدار " + book + " — فرق " + difference
@@ -127,10 +160,31 @@ enum MoneyBankInsightsReader {
         let today = GregorianDay.containing(now, in: zone)
         result.dues = try repo.upcomingDues().map { due in
             let day = due.dueAt.map { GregorianDay.containing($0, in: zone) }
-            return MoneyUpcomingDue(id: due.id, payee: due.payee, amountMinor: due.amountMinor, currency: due.currency, dueAt: due.dueAt,
-                                    dueDay: day, daysUntil: day.map { MadarCalendarDays.distance(from: today, to: $0) })
+            var line = MoneyUpcomingDue(id: due.id, payee: due.payee, amountMinor: due.amountMinor, currency: due.currency, dueAt: due.dueAt,
+                                        dueDay: day, daysUntil: day.map { MadarCalendarDays.distance(from: today, to: $0) })
+            line.isStatement = due.isStatement; line.minimumDueMinor = due.minimumDueMinor; line.cardLast4 = due.cardLast4
+            line.merchant = due.merchant; line.instalmentNumber = due.instalmentNumber; line.instalmentCount = due.instalmentCount; line.remainingMinor = due.remainingMinor
+            return line
         }
+        // A failure here must never break the home read: no recurring section is drawn instead.
+        result.recurring = recurringLines(repo: repo, now: now, zone: zone)
         return result
+    }
+    static func recurringLines(repo: MoneyRepository, now: Date, zone: TimeZone) -> [MoneyRecurringLine] {
+        guard let rows = try? repo.recurringCharges(now: now) else { return [] }
+        func line(_ row: MoneyRepository.RecurringRow) -> MoneyRecurringLine {
+            let series = row.series
+            var notes: [MoneyRecurringLine.Note] = []
+            switch series.status {
+            case .late(let days), .missed(let days): notes.append(.late(days: days))
+            case .upcoming, .ended: break
+            }
+            if let change = series.priceChange { notes.append(.priceChange(fromMinor: change.fromMinor, toMinor: change.toMinor)) }
+            return .init(id: row.id, isSalary: row.kind == .salary, name: series.name, amountMinor: series.amountMinor, currency: series.currency,
+                         nextDay: GregorianDay.containing(series.nextExpectedAt, in: zone), notes: notes)
+        }
+        let all = rows.map(line)
+        return all.filter(\.isSalary) + all.filter { !$0.isSalary }
     }
     static func tailQuestions(context: ModelContext) throws -> [MoneyTailQuestion] {
         try MoneyRepository(context: context).unknownTails().map { item in

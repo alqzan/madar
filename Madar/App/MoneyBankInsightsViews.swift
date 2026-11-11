@@ -12,6 +12,7 @@ struct MoneyBankInsightsSection: View {
     var dismissDue: (MoneyUpcomingDue) -> Void
     @Environment(\.roomTheme) private var theme
     @State private var settling: MoneyBankMismatch?
+    @State private var recurringExpanded = false
     private var service: AppMoneyService { .init(app: app) }
     private func amount(_ minor: Int, currency: String? = nil) -> String { visible ? service.amount(minor, currency: currency) : "•••" }
 
@@ -20,6 +21,7 @@ struct MoneyBankInsightsSection: View {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(insights.mismatches) { mismatch in mismatchRow(mismatch) }
                 if !insights.dues.isEmpty { dues }
+                if !insights.recurring.isEmpty { recurring }
             }.padding(.top, 8).accessibilityElement(children: .contain).accessibilityIdentifier("money-bank-insights")
         }
     }
@@ -58,6 +60,55 @@ struct MoneyBankInsightsSection: View {
             ForEach(insights.dues) { due in DueLine(app: app, due: due, visible: visible, dismiss: { dismissDue(due) }) }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("money-dues")
     }
+
+    /// «يتكرر»: the salary first, then subscriptions by next date. At most five until «الكل».
+    private var recurring: some View {
+        let lines = insights.recurring, shown = recurringExpanded ? lines : Array(lines.prefix(5))
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("يتكرر").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("bills")); Rectangle().fill(theme.line).frame(height: 1) }
+                .frame(minHeight: 36)
+            ForEach(shown) { line in RecurringLine(app: app, line: line, visible: visible) }
+            if lines.count > 5 {
+                Button { withAnimation(.smooth(duration: 0.2)) { recurringExpanded.toggle() } } label: {
+                    Text(recurringExpanded ? "أقل" : "الكل").font(MadarTypography.caption()).foregroundStyle(theme.color("accentText")).frame(minHeight: 44).contentShape(Rectangle())
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("money-recurring-all")
+            }
+        }.accessibilityElement(children: .contain).accessibilityIdentifier("money-recurring")
+    }
+}
+
+/// One repeating charge or salary: name, the amount expected, the next date in both calendars, and a note only when something is true.
+private struct RecurringLine: View {
+    let app: AppSession
+    let line: MoneyRecurringLine
+    let visible: Bool
+    @Environment(\.roomTheme) private var theme
+    private var service: AppMoneyService { .init(app: app) }
+    private func amount(_ minor: Int) -> String { visible ? service.amount(minor, currency: line.currency) : "•••" }
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(line.name).font(MadarTypography.body()).lineLimit(1)
+                ForEach(Array(line.notes.enumerated()), id: \.offset) { _, note in
+                    switch note {
+                    case .late(let days):
+                        Text(days > 0 ? MoneyBankInsightsCopy.duePhrase(daysUntil: -days, digits: service.digits) : "تأخر")
+                            .font(MadarTypography.fine()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-recurring-late")
+                    case .priceChange(let from, let to):
+                        Text(figure: MoneyBankInsightsCopy.priceChangeSentence(rose: to > from, from: amount(from), to: amount(to)))
+                            .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-recurring-price-change")
+                    }
+                }
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(figure: amount(line.amountMinor)).font(MadarTypography.cardTitle()).lineLimit(1).minimumScaleFactor(0.7)
+                MadarDateLabel(app.dateLabels(line.nextDay, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine())
+            }
+        }
+        .padding(.vertical, 8).frame(minHeight: 48)
+        .accessibilityElement(children: .combine).accessibilityIdentifier("money-recurring-" + (line.isSalary ? "salary-" : "line-") + line.name)
+    }
 }
 
 /// One due as a single line: payee, amount, due date in both calendars and how near it is. Long-press removes it (a custom swipe was dropped so vertical scrolling is never contested).
@@ -70,11 +121,21 @@ private struct DueLine: View {
     private var service: AppMoneyService { .init(app: app) }
     private var phrase: String { MoneyBankInsightsCopy.duePhrase(daysUntil: due.daysUntil, digits: service.digits) }
     private var late: Bool { (due.daysUntil ?? 0) < 0 }
+    private var instalment: String? { MoneyBankInsightsCopy.instalmentPhrase(number: due.instalmentNumber, count: due.instalmentCount, digits: service.digits) }
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(due.payee).font(MadarTypography.body()).lineLimit(1)
+                Text(due.isStatement ? MoneyBankInsightsCopy.statementTitle(last4: due.cardLast4, digits: service.digits) : (instalment != nil ? due.merchant ?? due.payee : due.payee))
+                    .font(MadarTypography.body()).lineLimit(1)
                 Text(phrase).font(MadarTypography.fine()).foregroundStyle(late ? theme.color("dueText") : theme.secondaryInk)
+                if let instalment {
+                    Text(figure: instalment + (visible ? due.remainingMinor.map { "، المتبقي " + service.amount($0, currency: due.currency) } ?? "" : ""))
+                        .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-instalment-" + due.id.uuidString)
+                }
+                if due.isStatement, let minimum = due.minimumDueMinor {
+                    Text(figure: "الحد الأدنى " + (visible ? service.amount(minimum, currency: due.currency) : "•••")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        .accessibilityIdentifier("money-due-minimum-" + due.id.uuidString)
+                }
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {

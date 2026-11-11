@@ -185,6 +185,7 @@ struct MoneySourceView: View {
     let visible: Bool
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @State private var charges: MoneyChargeLines?
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -193,6 +194,7 @@ struct MoneySourceView: View {
                 if detail.estimated { Text("تقريبًا، تاريخ القفل مقدّر").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                 Text(detail.explanation).font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
                 if let date = detail.date { MadarDateLabel(app.dateLabels(date)).foregroundStyle(theme.secondaryInk) }
+                if let charges { chargeLines(charges) }
                 if let message = detail.message, visible {
                     Divider().overlay(theme.line)
                     Text("الرسالة المصدر").font(MadarTypography.section())
@@ -201,5 +203,30 @@ struct MoneySourceView: View {
             }.padding(22)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .presentationDetents([.medium, .large]).presentationDragIndicator(.visible).accessibilityIdentifier("money-source")
+            .task(id: detail.id) {
+                guard visible, let id = UUID(uuidString: detail.id) else { return }
+                charges = await AppMoneyService(app: app).loadChargeLines(transactionID: id)
+            }
+    }
+    /// Phase 3: what the bank printed beside the movement. A foreign purchase shows its own currency amount and the rate; lines that were not printed are absent.
+    private func chargeLines(_ c: MoneyChargeLines) -> some View {
+        let service = AppMoneyService(app: app)
+        func row(_ title: String, _ value: String, _ id: String) -> some View {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title).font(MadarTypography.body())
+                Spacer(minLength: 8)
+                Text(figure: value).font(MadarTypography.body())
+            }.frame(minHeight: 36).accessibilityElement(children: .combine).accessibilityIdentifier("money-charges-" + id)
+        }
+        return VStack(alignment: .leading, spacing: 2) {
+            Divider().overlay(theme.line)
+            if c.isForeign {
+                row("المبلغ الأصلي", service.amount(c.originalAmountMinor, currency: c.originalCurrency, full: true) + " " + c.originalCurrency, "original")
+                if let rate = c.rate { row("سعر الصرف", service.digits.localized(rate).replacingOccurrences(of: ".", with: service.digits.style == .hindi ? "٫" : "."), "rate") }
+            }
+            if c.feeMinor > 0 { row("الرسوم", service.amount(c.feeMinor, currency: c.chargeCurrency), "fee") }
+            if c.vatMinor > 0 { row("ضريبة القيمة المضافة", service.amount(c.vatMinor, currency: c.chargeCurrency), "vat") }
+            if c.foreignFeeMinor > 0 { row("رسوم العملة الأجنبية", service.amount(c.foreignFeeMinor, currency: c.chargeCurrency), "foreign-fee") }
+        }.accessibilityElement(children: .contain).accessibilityIdentifier("money-charges")
     }
 }

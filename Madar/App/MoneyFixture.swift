@@ -15,7 +15,7 @@ extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
         let environment = ProcessInfo.processInfo.environment
-        guard let variant = environment["MADAR_UI_MONEY_FIXTURE"], ["funding", "goal", "zakat", "zakatHidden", "travel", "travelDupTRY", "travelDupSAR", "travelMissing", "travelHidden", "travelMultiLeg", "travelMultiLegHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "bankInsights", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = environment["MADAR_UI_MONEY_FIXTURE"], ["funding", "goal", "zakat", "zakatHidden", "travel", "travelDupTRY", "travelDupSAR", "travelMissing", "travelHidden", "travelMultiLeg", "travelMultiLegHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "bankInsights", "phase3", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -311,6 +311,41 @@ extension AppSession {
             printed.balanceMinor = account.balanceMinor - 32_000; c.insert(printed)
             let bill = UpcomingDue(); bill.payee = "فاتورة الاختبار"; bill.kind = "bill"; bill.amountMinor = 21_500; bill.currency = "SAR"
             bill.dueAt = today.adding(days: 2).date(in: zone).addingTimeInterval(12 * 3600); c.insert(bill)
+            try c.save()
+        }
+        if variant == "phase3" {
+            // Owner, 11 Nov 2026, phase 3 (invented data): a salary and two subscriptions repeating monthly (one with a price rise, one late),
+            // an instalment and a card statement among the dues, a refund that two purchases could explain, and a foreign purchase with fees.
+            var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+            func at(_ days: Int, months: Int = 0) -> Date { calendar.date(byAdding: .month, value: months, to: today.adding(days: days).date(in: zone))!.addingTimeInterval(12 * 3600) }
+            func movement(_ kind: String, _ merchant: String, _ amount: Int, _ date: Date) -> MoneyTransaction {
+                let row = MoneyTransaction(); row.kind = kind; row.source = "bank"; row.reviewState = "ok"; row.method = "transfer"
+                row.fromAccountID = kind == "salary" ? nil : account.id; row.toAccountID = kind == "salary" ? account.id : nil
+                if kind == "salary" { row.counterparty = merchant } else { row.merchant = merchant }
+                row.amountMinor = amount; row.homeAmountMinor = amount; row.currency = "SAR"; row.homeCurrency = "SAR"
+                row.eventAt = date; row.dayKey = GregorianDay.containing(date, in: zone).description; row.tzID = zone.identifier; row.dayPolicy = "midnight@1"; c.insert(row); return row
+            }
+            for months in [-3, -2, -1] { _ = movement("salary", "جهة العمل", 1_500_000, at(-1, months: months + 1)) }
+            for (index, months) in [-2, -1, 0].enumerated() { _ = movement("expense", "منصة شاهد", index == 2 ? 49_900 : 39_900, at(5, months: months - 1)) }
+            for months in [-3, -2, -1] { _ = movement("expense", "نادي الاختبار", 15_000, at(-2, months: months)) }
+            var messageCount = 0
+            func message(_ kind: String, _ fields: [String: Any]) -> BankMessage {
+                messageCount += 1
+                let m = BankMessage(); m.id = UUID(); m.sender = "بنك الاختبار"; m.kind = kind; m.status = "ok"; m.receivedAt = now.addingTimeInterval(-Double(messageCount) * 3600 - 7200); m.text = "رسالة اختبار مجهّلة رقم \(messageCount) من نوع " + kind
+                m.parsedJSON = try? JSONSerialization.data(withJSONObject: fields.merging(["v": 1, "kind": kind]) { a, _ in a }); c.insert(m); return m
+            }
+            let plan = message("bnplInstalment", ["merchant": "متجر الأدوات", "provider": "Tamara", "instalmentNumber": 2, "instalmentCount": 4, "remainingMinor": 80_000])
+            let instalment = UpcomingDue(); instalment.payee = "Tamara"; instalment.kind = "bnpl"; instalment.amountMinor = 40_000; instalment.currency = "SAR"
+            instalment.dueAt = at(6); instalment.sourceMessageID = plan.id; c.insert(instalment)
+            let statementMessage = message("statement", ["last4": "8844", "minimumDueMinor": 21_300]); statementMessage.kind = "statement"
+            let statementDue = UpcomingDue(); statementDue.payee = "بطاقة المشتريات"; statementDue.kind = "bill"; statementDue.amountMinor = 425_000; statementDue.currency = "SAR"
+            statementDue.dueAt = at(9); statementDue.sourceMessageID = statementMessage.id; c.insert(statementDue)
+            for days in [-9, -4] { _ = movement("expense", "متجر الأدوات", 23_000, at(days)) }
+            let refund = movement("refund", "متجر الأدوات", 23_000, now.addingTimeInterval(-1800)); refund.reviewState = "needsLook"; refund.fromAccountID = nil; refund.toAccountID = account.id
+            refund.messageID = message("refund", ["merchant": "متجر الأدوات"]).id
+            let foreign = movement("expense", "متجر خارجي", 10_000, now.addingTimeInterval(-7200)); foreign.currency = "USD"; foreign.homeAmountMinor = 37_500; foreign.rateAtTime = "3.75"
+            foreign.categoryID = categories[0].id; foreign.cycleID = cycle.id; foreign.messageID = message("purchase", ["feeMinor": 500, "vatMinor": 75, "foreignFeeMinor": 1_125, "exchangeRate": "3.75"]).id
+            allocation(-37_500, "daily", tx: foreign.id, kind: "spend")
             try c.save()
         }
         if variant == "subscriptions" || variant == "subscriptionsHidden" {

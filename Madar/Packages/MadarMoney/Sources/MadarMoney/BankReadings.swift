@@ -157,9 +157,14 @@ public enum UpcomingDues {
         public var announcedAt: Date
         /// The payment that closed it, only while that payment is still live.
         public var closedBy: String?
-        public init(id: String, payee: String, amountMinor: Int, currency: String, dueAt: Date?, announcedAt: Date, closedBy: String? = nil) {
+        /// A credit-card statement: closed by a card payment of at least its amount, never by a bill payment.
+        public var isStatement: Bool
+        /// The card tail a statement names; when both sides name one they must agree.
+        public var tail: String?
+        public init(id: String, payee: String, amountMinor: Int, currency: String, dueAt: Date?, announcedAt: Date, closedBy: String? = nil,
+                    isStatement: Bool = false, tail: String? = nil) {
             self.id = id; self.payee = payee; self.amountMinor = amountMinor; self.currency = currency; self.dueAt = dueAt
-            self.announcedAt = announcedAt; self.closedBy = closedBy
+            self.announcedAt = announcedAt; self.closedBy = closedBy; self.isStatement = isStatement; self.tail = tail
         }
     }
     public struct Payment: Equatable, Sendable {
@@ -169,8 +174,11 @@ public enum UpcomingDues {
         public var amountMinor: Int
         public var currency: String
         public var at: Date
-        public init(id: String, payees: [String], amountMinor: Int, currency: String, at: Date) {
+        public var isCardPayment: Bool
+        public var tail: String?
+        public init(id: String, payees: [String], amountMinor: Int, currency: String, at: Date, isCardPayment: Bool = false, tail: String? = nil) {
             self.id = id; self.payees = payees; self.amountMinor = amountMinor; self.currency = currency; self.at = at
+            self.isCardPayment = isCardPayment; self.tail = tail
         }
     }
 
@@ -213,8 +221,16 @@ public enum UpcomingDues {
         let ordered = sorted(open.filter(isOpen))
         for payment in payments.sorted(by: { ($0.at, $0.id) < ($1.at, $1.id) }) {
             let match = ordered.first { due in
-                guard !taken.contains(due.id), due.amountMinor == payment.amountMinor, due.currency == payment.currency,
+                guard !taken.contains(due.id), due.currency == payment.currency,
                       payment.at >= due.announcedAt, payment.payees.contains(where: { samePayee($0, due.payee) }) else { return false }
+                // A statement is paid by a card payment of at least its amount (a minimum or partial payment leaves it open); every other due by
+                // an exact bill or instalment payment.
+                if due.isStatement {
+                    guard payment.isCardPayment, payment.amountMinor >= due.amountMinor else { return false }
+                    if let a = due.tail, let b = payment.tail, a != b { return false }
+                } else {
+                    guard !payment.isCardPayment, due.amountMinor == payment.amountMinor else { return false }
+                }
                 let deadline = (due.dueAt.map { $0.addingTimeInterval(lateGraceSeconds) }) ?? due.announcedAt.addingTimeInterval(undatedWindowSeconds)
                 return payment.at <= deadline
             }

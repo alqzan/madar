@@ -107,16 +107,35 @@ public extension MoneyRepository {
         public var sourceMessageID: UUID?
         /// The live payment that closed it, if any.
         public var closedByTransactionID: UUID?
+        /// A credit-card statement (closed by a card payment of at least `amountMinor`); `payee` already carries the card tail.
+        public var isStatement: Bool = false
+        public var minimumDueMinor: Int?
+        public var cardLast4: String?
+        /// Tamara/Tabby: the merchant and «القسط ٢ من ٤» when the announcing message printed them.
+        public var merchant: String?
+        public var instalmentNumber: Int?
+        public var instalmentCount: Int?
+        public var remainingMinor: Int?
         public var isOpen: Bool { closedByTransactionID == nil }
     }
 
     /// Announced bills and BNPL reminders sorted by due date (undated last). A due whose closing payment was deleted is open again.
     /// Close one by hand-free means only: a later matching payment closes it at intake; `money.dismissDue {id}` removes one.
     func upcomingDues(includeClosed: Bool = false) throws -> [UpcomingDueRow] {
-        let live = Set(try context.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.map(\.id))
-        let rows = try context.fetch(FetchDescriptor<UpcomingDue>()).filter { ($0.deletedAt == nil && $0.mergedInto == nil) }.map { due in
-            UpcomingDueRow(id: due.id, payee: due.payee, kind: due.kind, amountMinor: due.amountMinor, currency: due.currency, dueAt: due.dueAt,
-                           sourceMessageID: due.sourceMessageID, closedByTransactionID: due.closedByTransactionID.flatMap { live.contains($0) ? $0 : nil })
+        let dues = try context.fetch(FetchDescriptor<UpcomingDue>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+        let live = try liveTransactions(dues.compactMap(\.closedByTransactionID))
+        let messages = try parsedMessages(dues.compactMap(\.sourceMessageID))
+        let rows = dues.map { due -> UpcomingDueRow in
+            let source = due.sourceMessageID.flatMap { messages[$0] }
+            var row = UpcomingDueRow(id: due.id, payee: due.payee, kind: due.kind, amountMinor: due.amountMinor, currency: due.currency, dueAt: due.dueAt,
+                           sourceMessageID: due.sourceMessageID, closedByTransactionID: due.closedByTransactionID.flatMap { live[$0] == nil ? nil : $0 })
+            row.isStatement = source?.message.kind == BankMessageKind.statement.rawValue
+            row.minimumDueMinor = row.isStatement ? source?.fields?.minimumDueMinor : nil
+            row.cardLast4 = row.isStatement ? source?.fields?.last4 : nil
+            row.merchant = source?.fields?.merchant
+            row.instalmentNumber = source?.fields?.instalmentNumber; row.instalmentCount = source?.fields?.instalmentCount
+            row.remainingMinor = source?.fields?.remainingMinor
+            return row
         }
         let shown = includeClosed ? rows : rows.filter(\.isOpen)
         let order = UpcomingDues.sorted(shown.map { .init(id: $0.id.uuidString, payee: $0.payee, amountMinor: $0.amountMinor, currency: $0.currency, dueAt: $0.dueAt, announcedAt: .distantPast) }).map(\.id)
