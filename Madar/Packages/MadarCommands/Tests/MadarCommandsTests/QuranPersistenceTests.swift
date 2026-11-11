@@ -336,6 +336,31 @@ import MadarQuran
         #expect(try ModelContext(container).fetch(FetchDescriptor<HifzSession>()).contains { $0.kind == "futureKind" && $0.deletedAt == nil })
     }
 
+    /// D8 (owner, 11 Nov 2026): a bookmark has a name and a page; saving the same id renames it, delete leaves a tombstone,
+    /// and the list is in page order. A page outside 1...604 or an empty name is refused.
+    @Test func namedMushafBookmarksSaveRenameDeleteAndRefuseBadInput() async throws {
+        let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        let first = UUID(), second = UUID()
+        func save(_ id: UUID, _ page: Double, _ name: String, _ offset: TimeInterval) async throws -> CommandOutcome {
+            try await bus.execute(envelope("quran.saveBookmark", ["id": .string(id.uuidString), "page": .number(page), "name": .string(name)], at: now.addingTimeInterval(offset)), now: now.addingTimeInterval(offset))
+        }
+        #expect(try await save(first, 300, "  الكهف ", 1).status == .applied)
+        #expect(try await save(second, 12, "المراجعة", 2).status == .applied)
+        #expect(try repo(container).bookmarks().map { [$0.name, String($0.page)] } == [["المراجعة", "12"], ["الكهف", "300"]])
+        #expect(try await save(first, 301, "الكهف ٢", 3).status == .applied)
+        #expect(try repo(container).bookmarks().last.map { [$0.name, String($0.page)] } == ["الكهف ٢", "301"])
+        for bad in [(605.0, "x"), (0.0, "x"), (10.0, "   "), (10.5, "x"), (10.0, String(repeating: "ا", count: 41))] {
+            let result = try? await save(UUID(), bad.0, bad.1, 4)
+            #expect(result == nil || result?.status != .applied)
+        }
+        #expect(try repo(container).bookmarks().count == 2)
+        let deleted = try await bus.execute(envelope("quran.deleteBookmark", ["id": .string(second.uuidString)], at: now.addingTimeInterval(5)), now: now.addingTimeInterval(5))
+        #expect(deleted.status == .applied)
+        #expect(try repo(container).bookmarks().map(\.id) == [first])
+        let rows = try ModelContext(container).fetch(FetchDescriptor<MushafBookmark>())
+        #expect(rows.count == 2 && rows.first { $0.id == second }?.deletedAt != nil)
+    }
+
     @Test func discardUnreadableDraftsPreservesBytesAndHealthyDrafts() async throws {
         let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
         let broken = try makeDraft(container)

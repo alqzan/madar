@@ -26,6 +26,10 @@ struct QuranMushafView: View {
     @State private var twoUp = false
     @State private var facing: QuranUIPage?
     @Environment(\.horizontalSizeClass) private var sizeClass
+    /// D8: named bookmarks; `naming` holds the draft name while the name alert is up.
+    @State private var bookmarks: [QuranBookmark] = []
+    @State private var naming = false
+    @State private var bookmarkName = ""
     private var step: Int { twoUp ? 2 : 1 }
     private func sheet(_ page: QuranUIPage) -> some View {
         QuranCoachPage(page: page, coach: reading(page), stage: .grading, reveal: { _ in },
@@ -84,6 +88,7 @@ struct QuranMushafView: View {
         .task { number = min(604, max(1, initialPage)); if let initialAyah { selectedAyah = initialAyah } }
         .task(id: number) { await load() }
         .task { await QuranTafsirLibrary.shared.loadLocal() }
+        .task { await loadBookmarks() }
         .sheet(isPresented: Binding(get: { selectedAyah != nil }, set: { if !$0 { selectedAyah = nil } })) {
             if let selectedAyah {
                 QuranAyahTafsirSheet(app: service.app, ayahID: selectedAyah, digits: service.numerals, select: open, close: { self.selectedAyah = nil })
@@ -119,10 +124,49 @@ struct QuranMushafView: View {
                     .font(MadarTypography.caption()).frame(minHeight: 44).buttonStyle(.madarPlain).disabled(page?.semanticAyat.isEmpty ?? true)
                     .accessibilityIdentifier("quran-mushaf-ayahs")
                 Spacer(minLength: 0)
+                bookmarkMenu
                 icon(zoom == 1 ? "plus.magnifyingglass" : "minus.magnifyingglass", label: zoom == 1 ? "تكبير" : "الحجم الطبيعي", id: "quran-mushaf-zoom") { zoom = zoom == 1 ? 2 : 1; pan = .zero }
             }.padding(8).glassEffect(.regular, in: .capsule)
         }.padding(12)
     }
+    private var marked: [QuranBookmark] { bookmarks.filter { $0.page == number || (twoUp && $0.page == facing?.page) } }
+    private var bookmarkMenu: some View {
+        Menu {
+            Button { bookmarkName = page.map { "علامة " + service.numerals.string($0.page) } ?? ""; naming = true } label: { Label("علامة على هذا الوجه", systemImage: "bookmark") }
+            if !bookmarks.isEmpty {
+                Section("العلامات") {
+                    ForEach(bookmarks) { mark in
+                        Button { move(mark.page - number) } label: { Text(mark.name + "، الوجه " + service.numerals.string(mark.page)) }
+                    }
+                }
+            }
+            if !marked.isEmpty {
+                Section("حذف") {
+                    ForEach(marked) { mark in
+                        Button(role: .destructive) { Task { await deleteBookmark(mark) } } label: { Label("حذف «" + mark.name + "»", systemImage: "trash") }
+                    }
+                }
+            }
+        } label: { Image(systemName: marked.isEmpty ? "bookmark" : "bookmark.fill").font(.system(size: 17, weight: .medium)).frame(width: 44, height: 44) }
+            .buttonStyle(.madarPlain).accessibilityLabel("العلامات").accessibilityIdentifier("quran-mushaf-bookmarks")
+            .alert("اسم العلامة", isPresented: $naming) {
+                TextField("مثل: موضع المراجعة", text: $bookmarkName).accessibilityIdentifier("quran-mushaf-bookmark-name")
+                Button("احفظ") { Task { await saveBookmark() } }.disabled(bookmarkName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("إلغاء", role: .cancel) {}
+            } message: { Text("تظهر العلامة في قائمة العلامات وتعيدك إلى هذا الوجه.") }
+    }
+    private func saveBookmark() async {
+        let name = String(bookmarkName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
+        guard !name.isEmpty else { return }
+        do { try await service.command("quran.saveBookmark", ["id": .string(UUID().uuidString), "page": .number(Double(number)), "name": .string(name)]) }
+        catch { self.error = quranUserMessage(error) }
+        await loadBookmarks()
+    }
+    private func deleteBookmark(_ mark: QuranBookmark) async {
+        do { try await service.command("quran.deleteBookmark", ["id": .string(mark.id.uuidString)]) } catch { self.error = quranUserMessage(error) }
+        await loadBookmarks()
+    }
+    private func loadBookmarks() async { if let rows = try? await service.bookmarks() { bookmarks = rows } }
     private func icon(_ symbol: String, label: String, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: symbol).font(.system(size: 17, weight: .medium)).frame(width: 44, height: 44) }
             .buttonStyle(.madarPlain).accessibilityLabel(label).accessibilityIdentifier(id)

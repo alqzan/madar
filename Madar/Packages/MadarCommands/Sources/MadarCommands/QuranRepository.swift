@@ -289,3 +289,18 @@ public extension QuranReviewRating {
         switch self { case .mastered: "mastered"; case .good: "good"; case .needsMastery: "needs" }
     }
 }
+
+/// D8 (owner, 11 Nov 2026): named Mushaf bookmarks, in page order (then name). The last reading position stays separate.
+public struct QuranBookmark: Equatable, Sendable, Identifiable {
+    public let id: UUID
+    public let page: Int
+    public let name: String
+}
+public extension QuranRepository {
+    func bookmarks() throws -> [QuranBookmark] {
+        try context.fetch(FetchDescriptor<MushafBookmark>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+            .filter { (1...604).contains($0.page) && !$0.name.isEmpty }
+            .map { QuranBookmark(id: $0.id, page: $0.page, name: $0.name) }
+            .sorted { ($0.page, $0.name, $0.id.uuidString) < ($1.page, $1.name, $1.id.uuidString) }
+    }
+}

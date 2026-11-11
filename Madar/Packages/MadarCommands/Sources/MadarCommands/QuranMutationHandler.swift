@@ -127,6 +127,18 @@ public struct QuranStagedResult: Sendable {
             let draftID = try id("draftID")
             if let row = try context.fetch(FetchDescriptor<SessionDraft>()).first(where: { $0.id == draftID && $0.mergedInto == nil && $0.deletedAt == nil }) { try touch(row, deleting: true) }
             else { duplicate = true }
+        case "quran.saveBookmark":
+            let bookmarkID = try id("id")
+            let row = try context.fetch(FetchDescriptor<MushafBookmark>(predicate: #Predicate { $0.id == bookmarkID && $0.mergedInto == nil })).first
+            guard row?.deletedAt == nil else { throw DataError.invalidValue("Quran bookmark deleted") }
+            let bookmark = row ?? MushafBookmark()
+            bookmark.id = bookmarkID; bookmark.page = Int(number("page")); bookmark.name = text("name").trimmingCharacters(in: .whitespacesAndNewlines)
+            if row == nil { bookmark.createdAt = now; context.insert(bookmark) }
+            try touch(bookmark)
+        case "quran.deleteBookmark":
+            let bookmarkID = try id("id")
+            guard let row = try context.fetch(FetchDescriptor<MushafBookmark>(predicate: #Predicate { $0.id == bookmarkID && $0.mergedInto == nil && $0.deletedAt == nil })).first else { duplicate = true; break }
+            try touch(row, deleting: true)
         case "quran.discardUnreadableDrafts":
             undoable = false
             let rows = try context.fetch(FetchDescriptor<SessionDraft>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
@@ -306,6 +318,7 @@ public struct QuranStagedResult: Sendable {
         rows += try context.fetch(FetchDescriptor<QuranDayState>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<QuranAllotment>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<RecoveryPlan>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<MushafBookmark>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<QiyamNight>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Setting>()).filter { $0.key == "quran.restDay" }.map { try $0.record() }
         return rows.filter { $0.fields["mergedInto"] == .null }

@@ -70,6 +70,14 @@ import MadarPrayer
         guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
         return result
     }
+    /// D8: named Mushaf bookmarks, read off the main thread.
+    func bookmarks() async throws -> [QuranBookmark] {
+        guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
+        let container = app.container
+        return try await Task.detached(priority: .userInitiated) {
+            try QuranRepository(context: ModelContext(container), catalog: QuranResources.catalog()).bookmarks()
+        }.value
+    }
     func command(_ name: String, _ payload: [String: MadarCore.JSONValue] = [:]) async throws {
         // A draft save changes only the draft rows; the day, coverage and pages a session action reads stay valid.
         let keepsScope = name == "quran.saveDraft"

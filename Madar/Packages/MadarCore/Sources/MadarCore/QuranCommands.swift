@@ -4,7 +4,7 @@ import Foundation
 public enum QuranCommandPayload {
     public static let names: Set<String> = ["quran.saveDraft", "quran.discardDraft", "quran.discardUnreadableDrafts", "quran.commitSession", "quran.savePlan",
         "quran.setTodayLevel", "quran.forceNewHifz", "quran.resolveMissedDay", "quran.createRecovery", "quran.cancelRecovery",
-        "quran.raisePages", "quran.editSessionGrade", "quran.deleteSession", "quran.freezeTest"]
+        "quran.raisePages", "quran.editSessionGrade", "quran.deleteSession", "quran.freezeTest", "quran.saveBookmark", "quran.deleteBookmark"]
     public static func validate(name: String, payload: [String: JSONValue]) -> Bool {
         func string(_ key: String) -> String? { if case .string(let value) = payload[key] { value } else { nil } }
         func number(_ key: String) -> Double? { if case .number(let value) = payload[key] { value } else { nil } }
@@ -14,6 +14,11 @@ public enum QuranCommandPayload {
         case "quran.saveDraft": return keys(["draft"]) && (string("draft")?.utf8.count ?? 0) > 0 && (string("draft")?.utf8.count ?? 0) <= 4_000_000
         case "quran.discardDraft": return keys(["draftID"]) && uuid("draftID")
         case "quran.discardUnreadableDrafts": return payload.isEmpty
+        // D8 (owner, 11 Nov 2026): a named Mushaf bookmark; saving an existing id renames or moves it.
+        case "quran.saveBookmark":
+            let name = string("name")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return keys(["id", "page", "name"]) && uuid("id") && number("page").map { $0 == $0.rounded() && (1...604).contains($0) } == true && (1...40).contains(name.count)
+        case "quran.deleteBookmark": return keys(["id"]) && uuid("id")
         case "quran.commitSession":
             guard uuid("draftID") else { return false }
             if keys(["draftID"]) { return true }
