@@ -129,7 +129,7 @@ public enum TurathEPUB {
             var body = ""
             for index in range {
                 let page = book.pages[index], ordinal = index + 1
-                let label = page.page.map { multiVolume ? "\(arabicDigits(page.volume))/\(arabicDigits(String($0)))" : arabicDigits(String($0)) }
+                let label = page.page.map { escape(multiVolume ? "\(arabicDigits(page.volume))/\(arabicDigits(String($0)))" : arabicDigits(String($0))) }
                 if let label {
                     body += "<span id=\"p-\(ordinal)\" epub:type=\"pagebreak\" role=\"doc-pagebreak\" title=\"\(label)\" aria-label=\"\(label)\"></span>"
                     pageList += "<li><a href=\"c\(n + 1).xhtml#p-\(ordinal)\">\(label)</a></li>"
@@ -219,6 +219,7 @@ public enum TurathEPUB {
             default:
                 // XML 1.0 forbids most control characters.
                 if let v = c.unicodeScalars.first?.value, c.unicodeScalars.count == 1, v < 0x20, v != 0x09 { continue }
+                if let v = c.unicodeScalars.first?.value, c.unicodeScalars.count == 1, v == 0xFFFE || v == 0xFFFF { continue }
                 out.append(c)
             }
         }

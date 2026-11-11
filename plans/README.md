@@ -64,7 +64,7 @@ under test.
 | 006  | One fast `make check`, a current process test in `make test`, inbox tests on a fixed clock | P2 | S | no | — | DONE (partial: inbox-process-test not swapped into make test — it fails at baseline, its fixed 2026-10-10 prayer day is refused against the real clock; one InboxDrainTests case, test_M4F01_staleHabitCompletion, still uses the real clock) |
 | 010  | The seven tap-crawl tests report a skip instead of a pass | P3 | S | yes (one short run) | — | DONE |
 | 007  | Mihbara looks up one saved word and one reading session without loading the whole table | P3 | S | no (build only) | — | DONE |
-| 011  | Turath EPUB escapes the page label it writes into the book | P3 | S | no | — (owner allowed it, D1) | TODO |
+| 011  | Turath EPUB escapes the page label it writes into the book | P3 | S | no | — (owner allowed it, D1) | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 

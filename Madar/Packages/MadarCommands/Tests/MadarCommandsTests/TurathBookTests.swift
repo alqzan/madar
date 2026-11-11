@@ -35,6 +35,21 @@ struct TurathBookTests {
         #expect(TurathCatalogue.search(books, query: "   ").isEmpty)
     }
 
+    /// A volume name is server text like any other: markup characters in it must not break the book's XML.
+    @Test func volumeNameWithMarkupCharactersStillGivesAReadableBook() throws {
+        let text = try #require(String(data: book, encoding: .utf8)).replacingOccurrences(of: #""vol":"2""#, with: #""vol":"2 & \"<b>""#)
+        let entry = try #require(try TurathCatalogue.decode(catalogue).first { $0.id == 12028 })
+        let document = try TurathBookDocument.decode(Data(text.utf8), catalogue: entry)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("TurathLabel-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("book.epub"); try TurathEPUB.build(document).write(to: file)
+        // Same shape as the plain fixture: three printed pages in two volumes.
+        let shape = try #require(try EPUBBookFiles.printedShape(file: file))
+        #expect(shape.pages == 3); #expect(shape.volumes == 2)
+        #expect(TurathEPUB.escape("a\u{FFFE}b\u{FFFF}c") == "abc")
+    }
+
     @Test func bookBecomesAValidDeterministicEPUBWithIndexPagesAndNotes() throws {
         let entry = try #require(try TurathCatalogue.decode(catalogue).first { $0.id == 12028 })
         let document = try TurathBookDocument.decode(book, catalogue: entry)
