@@ -35,6 +35,11 @@ public enum MerchantKey {
         }
         let compact = tokens.joined()
         guard !compact.isEmpty else { return "" }
+        // D2 (owner, 11 Nov 2026): a brand followed by a distinguishing service word is its own merchant («Uber Eats», «Careem Food»,
+        // «Amazon Web Services»). Any other second word («UBER TRIP», «AMAZON SA») stays with the brand below.
+        if tokens.count > 1, let services = serviceWords[tokens[0]], services.contains(tokens[1]) {
+            return aliases.first { $0.whole.contains(compact) }?.canonical ?? compact
+        }
         // An alias applies when the whole key equals a variant, or the first word is a distinctive brand word. Common words and
         // names (كريم، زين، دواء، apple ...) match only as the whole key, so a person or shop that starts with one is never merged.
         for alias in aliases where alias.whole.contains(compact) || alias.brand.contains(compact)
@@ -63,17 +68,25 @@ public enum MerchantKey {
         return String(out)
     }
 
+    /// Second words that make a brand another business (D2). Folded, lowercased words, as the tokens above.
+    private static let serviceWords: [String: Set<String>] = [
+        "uber": ["eats"], "careem": ["food", "pay"], "amazon": ["web", "prime"], "امازون": ["ويب", "برايم"]
+    ]
+
     /// Well-known merchants printed in Arabic and Latin. Variants are already folded and compact (no spaces). `brand` words are unambiguous
     /// and also match as the first word; `whole` variants match only the entire key.
     private static let aliases: [(canonical: String, brand: [String], whole: [String])] = [
         ("starbucks", ["starbucks", "ستاربكس"], []),
         ("mcdonalds", ["mcdonalds", "mcdonald", "ماكدونالدز", "ماكدونالد"], []),
         ("kfc", ["kfc", "كنتاكي"], []),
-        ("albaik", ["albaik"], ["بيك", "البيك"]),
+        ("albaik", ["albaik"], ["baik", "بيك", "البيك"]),   // «Al Baik» loses the leading «al»: «baik»
         ("hungerstation", ["hungerstation", "هنقرستيشن"], ["هنقر"]),
         ("jahez", [], ["jahez", "جاهز"]),
         ("careem", ["careem"], ["كريم"]),
+        ("careemfood", [], ["careemfood", "كريمفود"]),
         ("uber", ["uber"], ["اوبر"]),
+        ("ubereats", [], ["ubereats", "اوبرايتس"]),
+        ("aws", ["aws"], ["amazonwebservices", "امازونويبسيرفسز", "امازونويبسيرفيسز"]),
         ("noon", [], ["noon", "نون"]),
         ("amazon", ["amazon", "امازون"], []),
         ("netflix", ["netflix", "نتفلكس", "نتفليكس"], []),

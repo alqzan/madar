@@ -33,16 +33,18 @@ public extension MoneyRepository {
         let spend: [RecurringCharges.Occurrence] = expenses.compactMap { row in
             guard let name = row.merchant ?? row.counterparty else { return nil }
             let key = MerchantKey.key(name)
-            return key.isEmpty ? nil : .init(id: row.id.uuidString, key: key, name: name, currency: row.currency, amountMinor: row.amountMinor, at: row.eventAt)
+            return key.isEmpty ? nil : .init(id: row.id.uuidString, key: key, name: name, currency: row.currency, amountMinor: row.amountMinor, at: row.eventAt,
+                                               dayKey: row.dayKey.isEmpty ? nil : row.dayKey)
         }
         let pay: [RecurringCharges.Occurrence] = salaries.map { row in
             let name = row.counterparty ?? row.merchant
             return .init(id: row.id.uuidString, key: SalarySourceMatcher.key(name) ?? "salary", name: name ?? "الراتب",
-                         currency: row.currency, amountMinor: row.amountMinor, at: row.eventAt)
+                         currency: row.currency, amountMinor: row.amountMinor, at: row.eventAt, dayKey: row.dayKey.isEmpty ? nil : row.dayKey)
         }
-        let subscriptions = RecurringCharges.detect(spend, profile: .subscription, now: now, timeZone: zone)
+        let todayKey = try DiaryLineRenderer.today(context: context, now: now).description
+        let subscriptions = RecurringCharges.detect(spend, profile: .subscription, now: now, timeZone: zone, todayKey: todayKey)
             .map { RecurringRow(kind: .subscription, series: $0, isTracked: tracked.contains($0.key)) }
-        let salary = RecurringCharges.detect(pay, profile: .salary, now: now, timeZone: zone)
+        let salary = RecurringCharges.detect(pay, profile: .salary, now: now, timeZone: zone, todayKey: todayKey)
             .map { RecurringRow(kind: .salary, series: $0, isTracked: false) }
         return (subscriptions + salary).filter { includeEnded || $0.series.status != .ended }
             .sorted { ($0.series.nextExpectedAt, $0.id) < ($1.series.nextExpectedAt, $1.id) }
@@ -134,13 +136,21 @@ public extension MoneyRepository {
                 && $0.eventAt <= at && $0.eventAt >= from && $0.amountMinor >= amount && $0.id != selfID }))
         guard !purchases.isEmpty else { return (refund, []) }
         let linked = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate {
-            $0.kind == "refund" && $0.relatedTransactionID != nil && $0.deletedAt == nil && $0.mergedInto == nil && $0.eventAt >= from && $0.id != selfID }))
+            $0.kind == "refund" && $0.reviewState == "ok" && $0.relatedTransactionID != nil && $0.deletedAt == nil && $0.mergedInto == nil && $0.id != selfID }))
         var refunded: [UUID: Int] = [:]
-        for other in linked { if let target = other.relatedTransactionID { refunded[target, default: 0] += other.amountMinor } }
+        for other in linked where Self.countsAsRefunded(other, excluding: selfID) {
+            if let target = other.relatedTransactionID { refunded[target, default: 0] += other.amountMinor }
+        }
         return (refund, purchases.map {
             .init(id: $0.id.uuidString, merchant: $0.merchant ?? $0.counterparty, cardKey: $0.cardID?.uuidString, accountKey: $0.fromAccountID?.uuidString,
                   currency: $0.currency, amountMinor: $0.amountMinor, refundedMinor: refunded[$0.id] ?? 0, at: $0.eventAt)
         })
+    }
+
+    /// The one definition of «already refunded» (audit, 11 Nov 2026): a live, unmerged, confirmed refund linked to the purchase, other than
+    /// the refund being decided. A refund still in review does not use up the purchase, so the suggestion and the confirm path agree.
+    static func countsAsRefunded(_ row: MoneyTransaction, excluding id: UUID) -> Bool {
+        row.kind == "refund" && row.reviewState == "ok" && row.deletedAt == nil && row.mergedInto == nil && row.id != id
     }
 
     // MARK: Fees, VAT, foreign currency

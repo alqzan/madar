@@ -188,8 +188,11 @@ public enum UpcomingDues {
     public static let undatedWindowSeconds: TimeInterval = 45 * 86_400
 
     /// Natural key text of a due. A repeated reminder of one payment (Tamara: «خلال يومين», then «غدًا», then «اليوم») names one due day.
-    public static func naturalKey(payee: String, amountMinor: Int, currency: String, dueDayKey: String?) -> String {
+    public static func naturalKey(payee: String, amountMinor: Int, currency: String, dueDayKey: String?, instalmentNumber: Int? = nil) -> String {
+        // An undated due (D5) carries the printed instalment number, so instalments 2 and 3 of one amount pasted together stay two dues.
+        // Dated keys are unchanged: stored dues keep their identity.
         "UpcomingDue:" + BankDedupe.normalize(payee) + ":" + String(amountMinor) + ":" + currency + ":" + (dueDayKey ?? "none")
+            + (dueDayKey == nil ? instalmentNumber.map { ":n\($0)" } ?? "" : "")
     }
 
     public static func samePayee(_ lhs: String, _ rhs: String) -> Bool {

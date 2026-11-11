@@ -42,10 +42,15 @@ public enum InstalmentPlans {
     }
 
     public static func derive(_ events: [Event]) -> [Plan] {
-        var groups: [String: [Event]] = [:]
+        var base: [String: [Event]] = [:]
         for event in events {
             let key = BankDedupe.normalize(event.provider) + "|" + MerchantKey.key(event.merchant) + "|" + event.currency.uppercased()
-            groups[key, default: []].append(event)
+            base[key, default: []].append(event)
+        }
+        var groups: [String: [Event]] = [:]
+        for (key, rows) in base {
+            let split = splitPlans(rows)
+            if split.count == 1 { groups[key] = split[0].rows } else { for plan in split { groups[key + "|" + plan.tag] = plan.rows } }
         }
         return groups.map { id, rows in
             let paid = rows.filter(\.isPaid), open = rows.filter { !$0.isPaid }.sorted { ($0.at, $0.id) < ($1.at, $1.id) }
@@ -65,5 +70,25 @@ public enum InstalmentPlans {
             default: return l.id < r.id
             }
         }
+    }
+
+    /// D4 (owner, 11 Nov 2026): two plans at one merchant and provider are told apart by the printed instalment count and the instalment
+    /// amount. Amounts within count − 1 minor units are one plan (a total that does not divide evenly puts the remainder on one instalment).
+    /// An instalment with no printed count joins the one plan of its amount; when none or several fit, the uncounted rows stay together.
+    private static func splitPlans(_ rows: [Event]) -> [(tag: String, rows: [Event])] {
+        var plans: [(count: Int, amount: Int, rows: [Event])] = []
+        for event in rows.filter({ $0.count != nil }).sorted(by: { ($0.count!, $0.amountMinor, $0.at, $0.id) < ($1.count!, $1.amountMinor, $1.at, $1.id) }) {
+            let count = event.count!
+            if let i = plans.firstIndex(where: { $0.count == count && abs($0.amount - event.amountMinor) < max(1, count) }) { plans[i].rows.append(event) }
+            else { plans.append((count, event.amountMinor, [event])) }
+        }
+        var uncounted: [Event] = []
+        for event in rows where event.count == nil {
+            let fits = plans.indices.filter { abs(plans[$0].amount - event.amountMinor) < max(1, plans[$0].count) }
+            if fits.count == 1 { plans[fits[0]].rows.append(event) } else { uncounted.append(event) }
+        }
+        var result = plans.map { (tag: "n\($0.count)|\($0.amount)", rows: $0.rows) }
+        if !uncounted.isEmpty { result.append((tag: "uncounted", rows: uncounted)) }
+        return result
     }
 }

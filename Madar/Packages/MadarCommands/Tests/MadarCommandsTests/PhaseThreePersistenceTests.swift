@@ -83,6 +83,45 @@ import MadarMoney
         #expect(found.candidates.first == newest.id)
     }
 
+    @Test func aRefundStillInReviewDoesNotUseUpThePurchaseForTheNextRefund() async throws {
+        // One definition of «already refunded»: confirmed refunds only, in the suggestion as in the confirm path.
+        let f = try P3Fixture(); defer { f.clean() }; try await f.setup()
+        try await f.ingest(f.purchase("Starbucks", "40.00", "2026-10-10 12:00"))
+        let purchase = try #require(try f.rows("expense").first); try await f.confirm(purchase)
+        try await f.ingest(f.refund("STARBUCKS", "40.00", "2026-10-15 12:00"))
+        try await f.ingest(f.refund("STARBUCKS", "40.00", "2026-10-16 12:00"))
+        let refunds = try f.rows("refund")
+        #expect(refunds.count == 2 && refunds.allSatisfy { $0.reviewState != "ok" })
+        // The first draft is linked but unconfirmed: the second refund can still be the purchase's.
+        #expect(try f.repo.refundOriginals(forRefund: refunds[1].id).candidates == [purchase.id])
+        try await f.confirm(refunds[0])
+        #expect(try f.repo.refundOriginals(forRefund: refunds[1].id).candidates.isEmpty)
+    }
+
+    @Test func pastedRelativeRemindersStayUndatedAndInstalmentsOfOneAmountStayApart() async throws {
+        // D5: a pasted message has no arrival time, so «غدًا» gets no date; the shortcut's stated arrival time dates it.
+        let f = try P3Fixture(); defer { f.clean() }; try await f.setup()
+        func reminder(_ n: Int) -> MadarCore.JSONValue {
+            .object(["text": .string("دفعة قادمة بقيمة 125.00 ريال لطلبك من متجر وهمي مستحقة غدا\nالقسط \(n) من 4\ntamara"), "sender": .string("Tamara")])
+        }
+        #expect(try await f.run("money.pasteBankMessages", ["messages": .array([reminder(2), reminder(3)])]).status == .applied)
+        var dues = try f.repo.upcomingDues()
+        #expect(dues.count == 2 && dues.allSatisfy { $0.dueAt == nil && $0.amountMinor == 12_500 })
+        // The same reminder pasted again (another paste) is the same due.
+        #expect(try await f.run("money.pasteBankMessages", ["messages": .array([reminder(2), .object(["text": .string("نص آخر لا يخص المال"), "sender": .string("x")])])]).status == .applied)
+        #expect(try f.repo.upcomingDues().count == 2)
+        // With a stated arrival time the reminder is dated: arrival day + 1.
+        #expect(try await f.run("money.ingestBankMessage", ["text": .string("دفعة قادمة بقيمة 90.00 ريال لطلبك من متجر وهمي مستحقة غدا\ntamara"), "sender": .string("Tamara"),
+                                                           "receivedAt": .string("2026-10-14T09:00:00+03:00")], source: .shortcut).status == .applied)
+        dues = try f.repo.upcomingDues()
+        let dated = try #require(dues.first { $0.amountMinor == 9_000 })
+        #expect(dated.dueAt == ISO8601DateFormatter().date(from: "2026-10-15T09:00:00+03:00"))
+        // The same reminder text pasted later (no sender, no arrival time) is that due, not a second, undated one.
+        #expect(try await f.run("money.pasteBankMessages", ["messages": .array([.object(["text": .string("دفعة قادمة بقيمة 90.00 ريال لطلبك من متجر وهمي مستحقة غدا\ntamara"), "sender": .string("Tamara")]),
+                                                                              .object(["text": .string("نص ثالث لا يخص المال"), "sender": .string("x")])])]).status == .applied)
+        #expect(try f.repo.upcomingDues().filter { $0.amountMinor == 9_000 }.count == 1)
+    }
+
     /// True when the command did not apply, whether it was rejected or threw.
     private func refused(_ f: P3Fixture, _ id: UUID, _ target: UUID?) async -> Bool {
         let payload: [String: MadarCore.JSONValue] = ["id": .string(id.uuidString), "relatedTransactionID": target.map { .string($0.uuidString) } ?? .null]

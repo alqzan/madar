@@ -296,7 +296,8 @@ public enum BankMessageParser {
     }
 
     /// `receivedAt` (the phone's receive time) settles two-digit dates that read both ways, «25-10-19» vs «19-10-25».
-    public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified, homeCurrency: String = "SAR", receivedAt: Date? = nil, sender: String? = nil, trackedWallets: [String] = []) -> ParsedBankMessage {
+    /// `arrivalKnown` is false when `receivedAt` is only the time the owner pasted the message: a relative due day is then left undated.
+    public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified, homeCurrency: String = "SAR", receivedAt: Date? = nil, sender: String? = nil, trackedWallets: [String] = [], arrivalKnown: Bool = true) -> ParsedBankMessage {
         let t = clean(text)
         // Owner, 19 Oct: the telecom sender «stc» (not stc pay / STC Bank) sends balance and offers only — ignore it all.
         let kind = ["stc", "stc-ad"].contains(sender?.lowercased().trimmingCharacters(in: .whitespaces) ?? "") ? .marketing : classify(text)
@@ -464,7 +465,8 @@ public enum BankMessageParser {
             result.counterparty = "Alinma Investment"
         }
         // Tamara/Tabby print the due day relatively: «مستحقة اليوم», «خلال يومين», «tomorrow».
-        if kind == .bnplInstalment, result.dueDate == nil, let base = receivedAt {
+        // D5 (owner, 11 Nov 2026): only from a known arrival time. A message pasted days later has none, so the due stays undated.
+        if kind == .bnplInstalment, result.dueDate == nil, arrivalKnown, let base = receivedAt {
             let days = matches(t, #"مستحقة\s+اليوم|due\s+today"#) ? 0 : matches(t, #"خلال\s+يومين"#) ? 2 : matches(t, #"\btomorrow\b|غدا"#) ? 1 : nil
             if let days { result.dueDate = base.addingTimeInterval(Double(days) * 86_400) }
         }

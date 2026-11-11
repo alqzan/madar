@@ -19,8 +19,11 @@ public enum RecurringCharges {
         public var currency: String
         public var amountMinor: Int
         public var at: Date
-        public init(id: String, key: String, name: String, currency: String, amountMinor: Int, at: Date) {
-            self.id = id; self.key = key; self.name = name; self.currency = currency; self.amountMinor = amountMinor; self.at = at
+        /// The app day stored on the movement («yyyy-MM-dd», `core.dayStart` applied once at write time). When present it is the
+        /// occurrence's day, so a charge between midnight and Fajr counts on the same day as everywhere else in the app.
+        public var dayKey: String?
+        public init(id: String, key: String, name: String, currency: String, amountMinor: Int, at: Date, dayKey: String? = nil) {
+            self.id = id; self.key = key; self.name = name; self.currency = currency; self.amountMinor = amountMinor; self.at = at; self.dayKey = dayKey
         }
     }
 
@@ -82,9 +85,10 @@ public enum RecurringCharges {
 
     public static let minimumOccurrences = 3
 
-    public static func detect(_ input: [Occurrence], profile: Profile, now: Date, timeZone: TimeZone) -> [Series] {
+    /// `todayKey` is today's app day («yyyy-MM-dd»); with it «late» counts in app days like the occurrences' stored days.
+    public static func detect(_ input: [Occurrence], profile: Profile, now: Date, timeZone: TimeZone, todayKey: String? = nil) -> [Series] {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
-        let today = calendar.startOfDay(for: now)
+        let today = dayStart(todayKey, calendar) ?? calendar.startOfDay(for: now)
         var groups: [String: [Occurrence]] = [:]
         for item in input where item.amountMinor > 0 && !item.key.isEmpty && !item.currency.isEmpty {
             groups[item.key + "|" + item.currency.uppercased(), default: []].append(item)
@@ -94,12 +98,12 @@ public enum RecurringCharges {
             // Two equal charges on one day are one event, never a stronger pattern.
             var seen = Set<String>(), unique: [Occurrence] = []
             for row in rows.sorted(by: { ($0.at, $0.id) < ($1.at, $1.id) }) {
-                let day = calendar.startOfDay(for: row.at)
+                let day = appDay(row, calendar)
                 guard seen.insert("\(day.timeIntervalSince1970):\(row.amountMinor)").inserted else { continue }
                 unique.append(row)
             }
             guard unique.count >= minimumOccurrences else { continue }
-            let days = unique.map { calendar.startOfDay(for: $0.at) }
+            let days = unique.map { appDay($0, calendar) }
             // The longest recent run that is regular: an old irregular history never hides a current pattern.
             var found: (start: Int, cadence: Cadence)?
             for start in stride(from: 0, through: unique.count - minimumOccurrences, by: 1) {
@@ -125,6 +129,20 @@ public enum RecurringCharges {
                                 nextExpectedAt: next, status: status))
         }
         return result.sorted { ($0.nextExpectedAt, $0.id) < ($1.nextExpectedAt, $1.id) }
+    }
+
+    /// The stored app day when the movement carries one, else the civil day of its time.
+    private static func appDay(_ row: Occurrence, _ calendar: Calendar) -> Date {
+        dayStart(row.dayKey, calendar) ?? calendar.startOfDay(for: row.at)
+    }
+
+    /// Midnight of a «yyyy-MM-dd» day; nil for a malformed or impossible day («2026-02-31» is not rolled into March).
+    private static func dayStart(_ key: String?, _ calendar: Calendar) -> Date? {
+        guard let key else { return nil }
+        let parts = key.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3, let date = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])) else { return nil }
+        let back = calendar.dateComponents([.year, .month, .day], from: date)
+        return back.year == parts[0] && back.month == parts[1] && back.day == parts[2] ? date : nil
     }
 
     private static func amountsAgree(_ amounts: [Int], profile: Profile) -> Bool {

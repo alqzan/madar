@@ -91,6 +91,10 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 ### Money engine (needs an owner rule or the private corpus, and the strongest model)
 
+**DONE 11 Nov 2026 (one commit, focused review applied):** every row below — brand split (D2, checked on the owner's corpus D3, counts only),
+Al Baik, two instalment plans (D4), undated relative dues (D5), stored app day for recurring charges (also «late» from today's app day),
+one «already refunded» definition, and the missing Phase 3 tests (billing day 29-31 included).
+
 The repository protocol asks for the strongest available reasoning and one
 focused review for money engine and data changes. These are verified in the
 code but are not handed to a mid-level executor.

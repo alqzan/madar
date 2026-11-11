@@ -609,9 +609,11 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             live($0) && $0.ownership == "mine" && $0.tracked && ["wallet", "savings"].contains($0.kind)
         }.flatMap { [$0.name, $0.bank] }
         let items = raw.filter { !discard(text($0, "text")) }.map { p in
-            let at = MoneyCommandPayload.date(p["receivedAt"]) ?? issuedAt
+            let stated = MoneyCommandPayload.date(p["receivedAt"]), at = stated ?? issuedAt
+            // D5: the arrival time is known when the producer stated it, or for a single live intake (the shortcut runs on arrival).
+            // A pasted batch without a stated time knows only when it was pasted.
             let parsed = BankMessageParser.parse(text(p, "text"), timeZone: prayer.place(at: at).timeZone, homeCurrency: homeCurrency,
-                receivedAt: at, sender: text(p, "sender"), trackedWallets: trackedWallets)
+                receivedAt: at, sender: text(p, "sender"), trackedWallets: trackedWallets, arrivalKnown: stated != nil || batch == nil)
             return (p, at, parsed, BankDedupe.fingerprint(sender: text(p, "sender"), text: text(p, "text")))
         }
         let existing = all.map { message -> BankDedupe.Stored in
@@ -648,11 +650,11 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             context.insert(message); try touch(message, now, writer)
             let fields = MoneyParsedFields(parsed), printedAt = parsed.eventAt ?? received
             if parsed.kind != .marketing { try recordReadings(fields, sender: message.sender, messageID: message.id, at: printedAt, lookups: lookups, context: context, now: now, writer: writer) }
-            if parsed.kind == .marketing, try recordDue(fields, sender: message.sender, messageID: message.id, at: printedAt, lookups: lookups, context: context, now: now, writer: writer) {
+            if parsed.kind == .marketing, try recordDue(fields, sender: message.sender, messageID: message.id, normalizedText: message.normalizedText, at: printedAt, lookups: lookups, context: context, now: now, writer: writer) {
                 message.status = "ok"; try touch(message, now, writer); continue
             }
             // A card statement is also an upcoming due (statement amount, due date); the message itself stays in review for `money.applyStatement`.
-            if parsed.kind == .statement { _ = try recordDue(fields, sender: message.sender, messageID: message.id, at: printedAt, lookups: lookups, context: context, now: now, writer: writer) }
+            if parsed.kind == .statement { _ = try recordDue(fields, sender: message.sender, messageID: message.id, normalizedText: message.normalizedText, at: printedAt, lookups: lookups, context: context, now: now, writer: writer) }
             guard parsed.kind != .declined && parsed.kind != .unknown && parsed.kind != .statement,
                   let amount = parsed.amountMinor, amount > 0, amount <= 9_007_199_254_740_991, let code = parsed.currency else { continue }
             let row = MoneyTransaction(); row.id = StableIdentity.uuid(for: "BankMovement:\(message.id)")
@@ -724,7 +726,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
 
     /// A bill-issued notice or a Tamara/Tabby reminder is an upcoming due, never a draft expense. One row per (payee, amount, due day):
     /// a repeated reminder changes nothing; a due the owner dismissed stays dismissed. Returns whether the message was such a notice.
-    private static func recordDue(_ fields: MoneyParsedFields, sender: String, messageID: UUID, at: Date, lookups: BankLookups, context: ModelContext, now: Date, writer: String) throws -> Bool {
+    private static func recordDue(_ fields: MoneyParsedFields, sender: String, messageID: UUID, normalizedText: String, at: Date, lookups: BankLookups, context: ModelContext, now: Date, writer: String) throws -> Bool {
         guard let amount = fields.statementDueMinor, amount > 0, amount <= 9_007_199_254_740_991, let currency = fields.currency else { return false }
         var payee = [fields.provider, fields.biller, sender].compactMap { $0 }.first { !$0.isEmpty } ?? ""
         // Two cards of one bank with the same figures stay two dues: the statement's payee carries the card tail.
@@ -732,8 +734,20 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         guard !payee.isEmpty else { return false }
         let zone = try PrayerRepository(context: context).place(at: at).timeZone
         let dayKey = fields.dueDate.map { GregorianDay.containing($0, in: zone).description }
-        let id = StableIdentity.uuid(for: UpcomingDues.naturalKey(payee: payee, amountMinor: amount, currency: currency, dueDayKey: dayKey))
+        let id = StableIdentity.uuid(for: UpcomingDues.naturalKey(payee: payee, amountMinor: amount, currency: currency, dueDayKey: dayKey,
+                                                                    instalmentNumber: fields.instalmentNumber))
         if lookups.dueIDs.contains(id) { return true }
+        // An undated due (D5) whose announcing text is already stored under another key (dated before D5, from another sender, or
+        // without the instalment number) is the same due, live or dismissed: never a second row.
+        if dayKey == nil, !normalizedText.isEmpty {
+            let normalizedPayee = BankDedupe.normalize(payee)
+            let same = try context.fetch(FetchDescriptor<UpcomingDue>(predicate: #Predicate { $0.amountMinor == amount && $0.currency == currency && $0.mergedInto == nil }))
+                .filter { BankDedupe.normalize($0.payee) == normalizedPayee }
+            let sources = same.compactMap(\.sourceMessageID)
+            if !sources.isEmpty, try context.fetch(FetchDescriptor<BankMessage>(predicate: #Predicate { sources.contains($0.id) && $0.normalizedText == normalizedText })).isEmpty == false {
+                return true
+            }
+        }
         let due = UpcomingDue(); due.id = id; due.payee = payee; due.kind = fields.provider != nil ? "bnpl" : "bill"
         due.amountMinor = amount; due.currency = currency; due.dueAt = fields.dueDate; due.sourceMessageID = messageID; due.createdAt = now
         context.insert(due); lookups.dueIDs.insert(id); try touch(due, now, writer)
@@ -1567,7 +1581,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         guard original.id != row.id, original.mergedInto == nil, original.reviewState == "ok", ["expense", "fee", "transfer"].contains(original.kind),
               original.currency == row.currency, original.cardID == row.cardID else { throw MoneyCommandError.invalidReference }
         let originalID = original.id
-        let previous = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.relatedTransactionID == originalID && $0.deletedAt == nil && $0.mergedInto == nil })).filter { $0.kind == "refund" && $0.reviewState == "ok" && $0.id != row.id }
+        let previous = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.relatedTransactionID == originalID && $0.deletedAt == nil && $0.mergedInto == nil })).filter { MoneyRepository.countsAsRefunded($0, excluding: row.id) }
         let used = try sum(previous.map(\.amountMinor)), usedHome = try sum(previous.map(\.homeAmountMinor))
         guard row.amountMinor <= original.amountMinor - used else { throw MoneyCommandError.invalidAmount }
         return (original, used, usedHome)
