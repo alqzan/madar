@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.removeAccount", "money.confirmClear", "money.markVisit", "money.seedCategories",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.editObligation", "money.renameEnvelope", "money.setCategoryLimit", "money.setCategoryPreferredCard", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.saveZakat", "money.prepareGoal", "money.logTransfer", "money.moveEnvelope", "money.attachTail", "money.dismissDue"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.editObligation", "money.renameEnvelope", "money.setCategoryLimit", "money.setCategoryPreferredCard", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.saveZakat", "money.prepareGoal", "money.logTransfer", "money.moveEnvelope", "money.attachTail", "money.dismissDue", "money.linkRefund"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
     /// M5-X00: the budget-ignore stamp's optional reason.
@@ -83,6 +83,7 @@ public enum MoneyCommandPayload {
                   optionalText("label", max: 30), case .string(let tail) = p["tail"], tail.count == 4, tail.allSatisfy({ ("0"..."9").contains($0) }) else { return false }
             let hasAccount = p["accountID"] != nil && p["accountID"] != .null, hasCard = p["cardID"] != nil && p["cardID"] != .null
             return hasAccount != hasCard && optionalID("accountID") && optionalID("cardID")
+        case "money.linkRefund": return Set(p.keys).subtracting(["relatedTransactionID"]) == ["id"] && id("id") && optionalID("relatedTransactionID")
         case "money.dismissDue": return Set(p.keys) == ["id"] && id("id")
         case "money.setBudgetExclusion":
             // M5-X00 (owner 16 Oct): an optional free-text reason, only when stamping.

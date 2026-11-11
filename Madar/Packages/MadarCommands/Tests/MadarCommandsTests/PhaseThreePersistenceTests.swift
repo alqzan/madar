@@ -83,6 +83,70 @@ import MadarMoney
         #expect(found.candidates.first == newest.id)
     }
 
+    /// True when the command did not apply, whether it was rejected or threw.
+    private func refused(_ f: P3Fixture, _ id: UUID, _ target: UUID?) async -> Bool {
+        let payload: [String: MadarCore.JSONValue] = ["id": .string(id.uuidString), "relatedTransactionID": target.map { .string($0.uuidString) } ?? .null]
+        guard let outcome = try? await f.run("money.linkRefund", payload) else { return true }
+        return outcome.status != .applied
+    }
+
+    @Test func theChosenPurchaseIsSavedOnTheRefundDraftAndClearable() async throws {
+        let f = try P3Fixture(); defer { f.clean() }; try await f.setup()
+        try await f.ingest(f.purchase("Starbucks", "40.00", "2026-10-10 12:00"))
+        try await f.ingest(f.purchase("Starbucks #7", "40.00", "2026-10-12 12:00"))
+        for row in try f.rows("expense") { try await f.confirm(row) }
+        try await f.ingest(f.refund("STARBUCKS", "40.00", "2026-10-16 12:00"))
+        let refund = try #require(try f.rows("refund").first)
+        let older = try #require(try f.rows("expense").first)
+        #expect(refund.relatedTransactionID == nil)   // two identical candidates: nothing chosen yet
+        #expect(try await f.run("money.linkRefund", ["id": .string(refund.id.uuidString), "relatedTransactionID": .string(older.id.uuidString)]).status == .applied)
+        #expect(try f.rows("refund").first?.relatedTransactionID == older.id && f.rows("refund").first?.reviewState != "ok")
+        #expect(try f.repo.refundOriginals(forRefund: refund.id).candidates.contains(older.id))
+        // A null value and an omitted key both clear it.
+        #expect(try await f.run("money.linkRefund", ["id": .string(refund.id.uuidString), "relatedTransactionID": .null]).status == .applied)
+        #expect(try f.rows("refund").first?.relatedTransactionID == nil)
+        #expect(try await f.run("money.linkRefund", ["id": .string(refund.id.uuidString), "relatedTransactionID": .string(older.id.uuidString)]).status == .applied)
+        #expect(try await f.run("money.linkRefund", ["id": .string(refund.id.uuidString)]).status == .applied)
+        #expect(try f.rows("refund").first?.relatedTransactionID == nil)
+        // Leaving the screen loses nothing: confirm with no payload uses the saved link.
+        #expect(try await f.run("money.linkRefund", ["id": .string(refund.id.uuidString), "relatedTransactionID": .string(older.id.uuidString)]).status == .applied)
+        try await f.confirm(refund)
+        #expect(try f.rows("refund").first?.reviewState == "ok" && f.rows("refund").first?.relatedTransactionID == older.id)
+    }
+
+    @Test func aRefundLinkToAnUnfitTargetOrANonRefundRowIsRefused() async throws {
+        let f = try P3Fixture(); defer { f.clean() }; try await f.setup()
+        try await f.ingest(f.purchase("Starbucks", "30.00", "2026-10-10 12:00"))      // smaller than the refund below
+        try await f.ingest(f.purchase("Costa", "60.00", "2026-10-11 12:00"))          // stays in review
+        try await f.ingest(f.purchase("Gone", "60.00", "2026-10-12 12:00"))           // confirmed, then deleted
+        let small = try #require(try f.rows("expense").first { $0.merchant == "Starbucks" })
+        let unconfirmed = try #require(try f.rows("expense").first { $0.merchant == "Costa" })
+        let deleted = try #require(try f.rows("expense").first { $0.merchant == "Gone" })
+        try await f.confirm(small); try await f.confirm(deleted)
+        #expect(try await f.run("money.deleteTransaction", ["id": .string(deleted.id.uuidString)]).status == .applied)
+        try await f.ingest(f.refund("Starbucks", "40.00", "2026-10-16 12:00"))
+        let refund = try #require(try f.rows("refund").first)
+        #expect(await refused(f, refund.id, small.id))            // 40.00 is above the 30.00 that is left
+        #expect(await refused(f, refund.id, unconfirmed.id))      // not a confirmed expense
+        #expect(await refused(f, refund.id, deleted.id))          // deleted
+        #expect(await refused(f, refund.id, UUID()))              // unknown
+        #expect(await refused(f, refund.id, refund.id))           // itself
+        #expect(try f.rows("refund").first?.relatedTransactionID == nil)
+        // Only a refund still in review accepts a link.
+        #expect(await refused(f, unconfirmed.id, small.id))
+        #expect(await refused(f, small.id, nil))
+    }
+
+    @Test func aConfirmedRefundKeepsItsLinkAndRefusesAnotherOne() async throws {
+        let f = try P3Fixture(); defer { f.clean() }; try await f.setup()
+        try await f.ingest(f.purchase("Starbucks", "40.00", "2026-10-10 12:00"))
+        let purchase = try #require(try f.rows("expense").first); try await f.confirm(purchase)
+        try await f.ingest(f.refund("Starbucks", "15.00", "2026-10-16 12:00"))
+        let refund = try #require(try f.rows("refund").first); try await f.confirm(refund)
+        #expect(await refused(f, refund.id, nil))
+        #expect(try f.rows("refund").first?.relatedTransactionID == purchase.id)
+    }
+
     @Test func aDifferentMerchantOrCardIsNeverLinked() async throws {
         let f = try P3Fixture(); defer { f.clean() }; try await f.setup()
         try await f.ingest(f.purchase("Costa", "40.00", "2026-10-10 12:00"))

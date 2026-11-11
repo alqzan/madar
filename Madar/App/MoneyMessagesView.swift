@@ -286,7 +286,7 @@ struct MoneyMessagesView: View {
             if link.originals.count > 1 {
                 Menu {
                     ForEach(link.originals) { original in
-                        Button { refundChoice[d.id] = original.id } label: {
+                        Button { refundChoice[d.id] = original.id; run("money.linkRefund", ["id": .string(d.id.uuidString), "relatedTransactionID": .string(original.id.uuidString)]) } label: {
                             Text(figure: originalText(original) + "، " + app.dateLabels(original.day, compact: true).combined)
                         }.accessibilityIdentifier("money-refund-choice-" + original.id.uuidString)
                     }

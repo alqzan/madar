@@ -26,8 +26,21 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any)["money-recurring-line-منصة شاهد"].firstMatch.exists)
         XCTAssertTrue(app.staticTexts["money-recurring-price-change"].firstMatch.exists, "the price rise is noted")
         XCTAssertTrue(app.staticTexts["money-recurring-late"].firstMatch.exists, "the overdue charge is noted")
-        // The instalment and statement wording is asserted in MoneyPhase3IntegrationTests; here the dues must still be listed.
-        XCTAssertTrue(app.descendants(matching: .any)["money-dues"].firstMatch.exists)
+        let dues = app.descendants(matching: .any)["money-dues"].firstMatch
+        for _ in 0..<6 where !dues.exists { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(dues.waitForExistence(timeout: 10), app.debugDescription)
+        // The Tamara instalment names its number, count and what is left; the statement shows its card and minimum.
+        let instalment = app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH 'money-instalment-'")).firstMatch
+        for _ in 0..<6 where !instalment.exists { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(instalment.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(instalment.label.contains("القسط ٢ من ٤"), instalment.label)
+        XCTAssertTrue(instalment.label.contains("المتبقي"), instalment.label)
+        let minimum = app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH 'money-due-minimum-'")).firstMatch
+        XCTAssertTrue(minimum.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(minimum.label.contains("الحد الأدنى"), minimum.label)
+        XCTAssertTrue(minimum.label.contains("٢١٣"), minimum.label)
+        let statement = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'money-due-' AND label CONTAINS '٨٨٤٤'")).firstMatch
+        XCTAssertTrue(statement.exists, "the statement row names its card tail")
     }
 
     func testRefundDraftNamesItsPurchaseAndOffersAChoice() throws {

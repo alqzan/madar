@@ -332,6 +332,8 @@ extension AppSession {
             func message(_ kind: String, _ fields: [String: Any]) -> BankMessage {
                 messageCount += 1
                 let m = BankMessage(); m.id = UUID(); m.sender = "بنك الاختبار"; m.kind = kind; m.status = "ok"; m.receivedAt = now.addingTimeInterval(-Double(messageCount) * 3600 - 7200); m.text = "رسالة اختبار مجهّلة رقم \(messageCount) من نوع " + kind
+                // A unique fingerprint, as real intake writes: the shared empty one made the post-launch dedupe fold every message into one.
+                m.fingerprint = "phase3-fixture-\(messageCount)"
                 m.parsedJSON = try? JSONSerialization.data(withJSONObject: fields.merging(["v": 1, "kind": kind]) { a, _ in a }); c.insert(m); return m
             }
             let plan = message("bnplInstalment", ["merchant": "متجر الأدوات", "provider": "Tamara", "instalmentNumber": 2, "instalmentCount": 4, "remainingMinor": 80_000])

@@ -248,6 +248,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             guard try MoneyAccountRules.removable(accountID, in: context) else { throw MoneyCommandError.invalidReference }
             try touch(row, now, writer, deleting: true)
         case "money.attachTail": try attachTail(p, context, now, writer)
+        case "money.linkRefund": try saveRefundLink(p, context, now, writer)
         case "money.dismissDue":
             guard let dueID = uuid(p, "id"), let row = try context.fetch(FetchDescriptor<UpcomingDue>()).first(where: { $0.id == dueID && live($0) }) else { throw MoneyCommandError.missingRow }
             try touch(row, now, writer, deleting: true)
@@ -1091,21 +1092,17 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         if let obligation = row.obligationID, !(try context.fetch(FetchDescriptor<Obligation>())).contains(where: { $0.id == obligation && live($0) }) { throw MoneyCommandError.invalidReference }
         let original: MoneyTransaction?
         if row.kind == "refund" {
-            original = try transaction(row.relatedTransactionID, context)
-            guard let original, original.reviewState == "ok", ["expense", "fee", "transfer"].contains(original.kind),
-                  original.currency == row.currency, original.cardID == row.cardID else { throw MoneyCommandError.invalidReference }
-            let originalID = original.id
-            let previous = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.relatedTransactionID == originalID && $0.deletedAt == nil && $0.mergedInto == nil })).filter { $0.kind == "refund" && $0.reviewState == "ok" }
-            let used = try sum(previous.map(\.amountMinor)), usedHome = try sum(previous.map(\.homeAmountMinor))
-            guard row.amountMinor <= original.amountMinor - used else { throw MoneyCommandError.invalidAmount }
+            let checked = try refundTarget(row.relatedTransactionID, for: row, context)
+            let source = checked.original; original = source
+            let used = checked.used, usedHome = checked.usedHome
             let statedHome = row.rateSource == "message" ? row.homeAmountMinor : nil
             row.homeAmountMinor = try FX.refundHomeAmount(refundMinor: row.amountMinor,
-                original: (original.amountMinor, original.homeAmountMinor, original.currency, original.rateAtTime),
+                original: (source.amountMinor, source.homeAmountMinor, source.currency, source.rateAtTime),
                 priorRefundsMinor: used, priorRefundsHomeMinor: usedHome, statedHomeMinor: statedHome, home: row.homeCurrency)
-            if statedHome == nil { row.rateAtTime = original.rateAtTime; row.rateSource = original.rateSource }; row.tripID = original.tripID
-            row.cycleID = original.cycleID // F06: a refund belongs to the original budget day.
-            row.ignoredFromBudget = original.ignoredFromBudget
-            row.categoryID = original.categoryID
+            if statedHome == nil { row.rateAtTime = source.rateAtTime; row.rateSource = source.rateSource }; row.tripID = source.tripID
+            row.cycleID = source.cycleID // F06: a refund belongs to the original budget day.
+            row.ignoredFromBudget = source.ignoredFromBudget
+            row.categoryID = source.categoryID
         } else {
             original = nil
             if row.currency != row.homeCurrency && row.rateAtTime == nil {
@@ -1562,6 +1559,27 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let ids = Set(([row] + (try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.mergedInto == rowID })))).compactMap(\.messageID))
         let wanted = Array(ids)
         return try context.fetch(FetchDescriptor<BankMessage>(predicate: #Predicate { wanted.contains($0.id) })).filter { live($0) }
+    }
+    /// The one rule for a refund's purchase, shared by `money.linkRefund` and confirm: a confirmed expense, fee or transfer,
+    /// same currency, same card, live and unmerged, and the refund fits what earlier refunds left of it.
+    private static func refundTarget(_ id: UUID?, for row: MoneyTransaction, _ context: ModelContext) throws -> (original: MoneyTransaction, used: Int, usedHome: Int) {
+        let original = try transaction(id, context)
+        guard original.id != row.id, original.mergedInto == nil, original.reviewState == "ok", ["expense", "fee", "transfer"].contains(original.kind),
+              original.currency == row.currency, original.cardID == row.cardID else { throw MoneyCommandError.invalidReference }
+        let originalID = original.id
+        let previous = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.relatedTransactionID == originalID && $0.deletedAt == nil && $0.mergedInto == nil })).filter { $0.kind == "refund" && $0.reviewState == "ok" && $0.id != row.id }
+        let used = try sum(previous.map(\.amountMinor)), usedHome = try sum(previous.map(\.homeAmountMinor))
+        guard row.amountMinor <= original.amountMinor - used else { throw MoneyCommandError.invalidAmount }
+        return (original, used, usedHome)
+    }
+    /// `money.linkRefund {id, relatedTransactionID?}`: remember the owner's choice on a refund still in review; null clears it.
+    private static func saveRefundLink(_ p: [String: MadarCore.JSONValue], _ context: ModelContext, _ now: Date, _ writer: String) throws {
+        let row = try transaction(uuid(p, "id"), context)
+        guard row.kind == "refund", row.reviewState != "ok" else { throw MoneyCommandError.invalidReference }
+        let target = uuid(p, "relatedTransactionID")
+        if target != nil { _ = try refundTarget(target, for: row, context) }
+        guard row.relatedTransactionID != target else { return }
+        row.relatedTransactionID = target; try touch(row, now, writer)
     }
     private static func transaction(_ id: UUID?, _ context: ModelContext) throws -> MoneyTransaction {
         guard let id else { throw MoneyCommandError.missingRow }
