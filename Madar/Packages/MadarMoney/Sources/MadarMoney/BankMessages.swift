@@ -254,10 +254,26 @@ public enum BankMessageParser {
     /// Longer phrases come first: the pattern takes the first alternative that matches, so «ريال عماني» must be tried before «ريال».
     /// A bare «دينار» is deliberately absent (Kuwaiti, Bahraini, Jordanian, Iraqi…): the message then carries no amount for review instead of a guess.
     static let currencyWords: [(String, String)] = [("ريال سعودي", "SAR"), ("ريال عماني", "OMR"), ("ريال قطري", "QAR"),
-                                                     ("دينار كويتي", "KWD"), ("دينار بحريني", "BHD"), ("درهم إماراتي", "AED"), ("درهم", "AED"),
+                                                     ("دينار كويتي", "KWD"), ("دينار بحريني", "BHD"), ("درهم إماراتي", "AED"), ("درهم مغربي", "MAD"), ("درهم", "AED"),
+                                                     ("ريال يمني", "YER"), ("ريال إيراني", "IRR"), ("دينار أردني", "JOD"), ("دينار عراقي", "IQD"),
+                                                     ("دينار جزائري", "DZD"), ("دينار تونسي", "TND"), ("دينار ليبي", "LYD"), ("جنيه مصري", "EGP"),
+                                                     ("جنيه إسترليني", "GBP"), ("ليرة تركية", "TRY"), ("دولار أمريكي", "USD"),
                                                      ("ر.س", "SAR"), ("ريال", "SAR"), ("SAR", "SAR"), ("SR", "SAR"), ("USD", "USD"), ("دولار", "USD"),
                                                      ("JPY", "JPY"), ("KWD", "KWD"), ("د.ك", "KWD"), ("BHD", "BHD"), ("OMR", "OMR"), ("QAR", "QAR"),
                                                      ("AED", "AED"), ("EUR", "EUR"), ("GBP", "GBP"), ("EGP", "EGP")]
+
+    /// A bare currency noun that a nationality adjective can follow («ريال يمني»).
+    static let nationalityNouns: Set<String> = ["ريال", "درهم", "دولار"]
+    /// Nationality adjectives (masculine stems; the feminine «…ية» and a leading «ال» are accepted too) that name a currency
+    /// the table does not carry. Only these suppress the bare noun's currency: «ريال الراجحي» or «ريال فوري» stay riyals.
+    static let nationalityStems: [String] = ["سوداني", "سوري", "لبناني", "مصري", "يمني", "إيراني", "ايراني", "عراقي", "أردني", "اردني", "ليبي",
+                                              "تونسي", "جزائري", "مغربي", "كويتي", "بحريني", "عماني", "قطري", "إماراتي", "اماراتي", "تركي",
+                                              "كندي", "أسترالي", "استرالي", "نيوزيلندي", "سنغافوري", "برازيلي", "فلسطيني", "صومالي", "موريتاني"]
+    static func followedByNationality(_ text: String, after end: String.Index) -> Bool {
+        let forms = nationalityStems.flatMap { [$0, String($0.dropLast()) + "ية"] }
+        let alternatives = forms.map { "(?:ال)?" + $0 }.joined(separator: "|")
+        return text[end...].range(of: "^\\s+(?:\(alternatives))(?![\\u0621-\\u064A])", options: .regularExpression) != nil
+    }
 
     /// "42.00 SAR", "SAR 42", "بـ 18.50 ر.س", "15,000.00 ريال" → minor units by the currency's exponent.
     static func amounts(_ text: String, _ exponents: CurrencyExponents) -> [(minor: Int, currency: String, range: Range<String.Index>)] {
@@ -276,6 +292,8 @@ public enum BankMessageParser {
                   let code = words.first(where: { $0.0.caseInsensitiveCompare(word) == .orderedSame })?.1,
                   let exp = exponents.exponent(code), let minor = minorUnits(raw, exponent: exp),
                   let range = Range(match.range, in: text) else { return nil }
+            // «50 ريال سوداني»: an adjective the table does not know must not fall back to the bare word's currency.
+            if group(2) != nil, nationalityNouns.contains(word), followedByNationality(text, after: range.upperBound) { return nil }
             return (minor, code, range)
         }
     }

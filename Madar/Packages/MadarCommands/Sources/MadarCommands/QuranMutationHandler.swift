@@ -222,8 +222,14 @@ public struct QuranStagedResult: Sendable {
             if rows.contains(where: { $0.deletedAt == nil && $0.origin == "missPolicy" && $0.originDayKey == origin.description }) { duplicate = true; break }
             let habitual = QuranDayLevel(rawValue: try repository.settings.value(for: "quran.hifzLevel").string ?? "medium") ?? .medium
             let choice = QuranMissedDayChoice(rawValue: text("choice"))!
+            // A passed day is judged by the plan version that was active on it (same start ayah and unit; the latest saved on or before that day).
+            var dayAmount = plan.plan.amount
+            for row in try context.fetch(FetchDescriptor<HifzPlan>()).sorted(by: { $0.version < $1.version })
+            where row.deletedAt == nil && row.mergedInto == nil && row.startAyah == plan.plan.startAyah && row.unit == plan.plan.unit.rawValue {
+                if try repository.currentDay(at: row.createdAt).date <= origin { dayAmount = row.amount }
+            }
             let targets = try QuranDailyPlanEngine.missedDayAllotments(originDay: origin, resolvingOn: snapshot.day.date, choice: choice,
-                missedAmount: plan.plan.amount * habitual.hifzFactor, restDay: snapshot.restDay)
+                missedAmount: dayAmount * habitual.hifzFactor, restDay: snapshot.restDay)
             if targets.isEmpty {
                 try putAllotment(QuranDailyAllotment(dayKey: snapshot.day.date, kind: .hifzExtra, origin: .missPolicy, originDayKey: origin))
             } else { for target in targets { try putAllotment(target) } }

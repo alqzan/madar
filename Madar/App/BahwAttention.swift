@@ -61,15 +61,14 @@ extension AppBahwService {
     func unloggedPrayerAsk() -> BahwAttention.PrayerAsk? {
         guard let snapshot = try? session.prayerSnapshot(at: now) else { return nil }
         let cells = snapshot.today.cells
-        let inSanctity = cells.contains { cell in
-            guard let time = cell.prayerTime else { return false }
-            let window: TimeInterval = (cell.reference.prayer == .maghrib ? 20 : 30) * 60
-            return now >= time && now < time.addingTimeInterval(window)
+        let entries = cells.map { cell in
+            PrayerLobbyAsk.Entry(prayer: cell.reference.prayer, adhan: cell.prayerTime, isPending: cell.status == .pending, canLog: cell.canLog,
+                                 isFridayNoon: cell.isFriday && cell.reference.prayer == .dhuhr)
         }
-        guard !inSanctity else { return nil }
+        guard let chosen = PrayerLobbyAsk.choose(entries, now: now),
+              let cell = cells.last(where: { $0.reference.prayer == chosen }) else { return nil }
         let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
-        guard let cell = cells.last(where: { $0.status == .pending && $0.canLog && ($0.prayerTime.map { $0 <= now } ?? false) && !($0.isFriday && $0.reference.prayer == .dhuhr) }),
-              let name = names[cell.reference.prayer] else { return nil }
+        guard let name = names[chosen] else { return nil }
         return .init(reference: cell.reference, title: name)
     }
     /// The count alone, from the repository: the whole money reading is far heavier than a pop-up deserves.

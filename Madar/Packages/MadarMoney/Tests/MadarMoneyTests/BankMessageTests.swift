@@ -111,6 +111,30 @@ import Testing
         #expect(BankMessageParser.amounts("مبلغ: 5.000 دينار", exponents).isEmpty)
     }
 
+    @Test func nationalityAdjectivesPickTheirOwnCurrencyOrNone() {
+        let exponents = CurrencyExponents.specified
+        let cases: [(String, Int, String)] = [("مبلغ: 50.00 ريال يمني", 5_000, "YER"), ("مبلغ: 50.00 ريال إيراني", 5_000, "IRR"),
+                                              ("مبلغ: 5.250 دينار أردني", 5_250, "JOD"), ("مبلغ: 5.250 دينار عراقي", 5_250, "IQD"),
+                                              ("مبلغ: 5.25 دينار جزائري", 525, "DZD"), ("مبلغ: 5.250 دينار تونسي", 5_250, "TND"),
+                                              ("مبلغ: 5.250 دينار ليبي", 5_250, "LYD"), ("مبلغ: 75.00 جنيه مصري", 7_500, "EGP"),
+                                              ("مبلغ: 75.00 جنيه إسترليني", 7_500, "GBP"), ("مبلغ: 75.00 ليرة تركية", 7_500, "TRY"),
+                                              ("مبلغ: 75.00 درهم مغربي", 7_500, "MAD"), ("مبلغ: 75.00 درهم إماراتي", 7_500, "AED"),
+                                              ("مبلغ: 75.00 درهم", 7_500, "AED"), ("مبلغ: 75.00 دولار أمريكي", 7_500, "USD"),
+                                              ("مبلغ: 75.00 دولار", 7_500, "USD"), ("مبلغ: 75.00 درهم   مغربي", 7_500, "MAD"),
+                                              ("مبلغ: 15.00 ريال لدى مطعم", 1_500, "SAR"), ("مبلغ: 15.00 ريال في مطعم", 1_500, "SAR"),
+                                              ("مبلغ: 50.00 ريال الراجحي", 5_000, "SAR"), ("مبلغ: 100.00 ريال فوري", 10_000, "SAR"),
+                                              ("مبلغ: 75.00 ريال محلي", 7_500, "SAR"), ("مبلغ: 75.00 ريال دولي", 7_500, "SAR"),
+                                              ("مبلغ: 75.00 ريال إضافي", 7_500, "SAR")]
+        for (text, minor, code) in cases {
+            let found = BankMessageParser.amounts(text, exponents).first
+            #expect(found?.minor == minor && found?.currency == code, "\(text)")
+        }
+        // An adjective the table does not know is never dropped to the bare word's currency.
+        for text in ["مبلغ: 50.00 ريال سوداني", "مبلغ: 5.00 درهم ليبي", "مبلغ: 5.00 دولار كندي", "مبلغ: 5.00 ريال   سوداني"] {
+            #expect(BankMessageParser.amounts(text, exponents).isEmpty, "\(text)")
+        }
+    }
+
     @Test func salaryThousandsAndBillerAndProvider() {
         #expect(BankMessageParser.parse(Self.samples[6].text, timeZone: riyadh).amountMinor == 1_500_000)
         #expect(BankMessageParser.parse(Self.samples[14].text, timeZone: riyadh).biller == "شركة الكهرباء")

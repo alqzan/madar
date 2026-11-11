@@ -153,6 +153,37 @@ import MadarQuran
         #expect(try repo(container).snapshot(at: third.addingTimeInterval(1)).planStartDay == GregorianDay("2026-10-12"))
     }
 
+    /// B2-7 rule: a day already passed stays judged by the plan version that was active on it; the new amount applies from the change day.
+    @Test func changingTheAmountDoesNotRejudgeDaysAlreadyPassed() async throws {
+        let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        func at(_ day: String) -> Date { date("2026-10-\(day)T12:00:00+03:00") }
+        var planA = planPayload; planA["amount"] = .number(1)
+        #expect(try await bus.execute(envelope("quran.savePlan", planA, at: at("05")), now: at("05")).status == .applied)
+        // Followed under A on 5, 6 and 8 Oct; 7 Oct was missed.
+        let catalog = try QuranResources.catalog()
+        for (day, page) in [("05", 1), ("06", 2), ("08", 3)] {
+            let draft = try makeDraft(container, first: catalog.ayahs(on: page).first!.id, last: catalog.ayahs(on: page).last!.id, page: page, at: at(day))
+            try await save(draft, bus: bus, at: at(day))
+            #expect(try await commit(draft, bus: bus, at: at(day).addingTimeInterval(60)).status == .applied)
+        }
+        var planB = planA; planB["amount"] = .number(3)
+        #expect(try await bus.execute(envelope("quran.savePlan", planB, at: at("09")), now: at("09")).status == .applied)
+        let after = at("09").addingTimeInterval(3600)
+        let snapshot = try repo(container).snapshot(at: after)
+        // The plan continues: day one is still 5 Oct, version 2 carries amount B, nothing was created for the days already done.
+        #expect(snapshot.planStartDay == (try GregorianDay("2026-10-05")))
+        #expect(snapshot.plan?.plan.amount == 3 && snapshot.plan?.version == 2)
+        #expect(snapshot.allotments.isEmpty)
+        #expect(Set(snapshot.sessions.map { $0.dayKey.description }) == ["2026-10-05", "2026-10-06", "2026-10-08"])
+        let rows = try ModelContext(container).fetch(FetchDescriptor<HifzPlan>()).sorted { $0.version < $1.version }
+        #expect(rows.map(\.version) == [1, 2] && rows[0].supersededAt == at("09") && rows[1].supersededAt == nil)
+        // The missed 7 Oct was a one-page day under A: settling it owes one page, not B's three.
+        let resolved = try await bus.execute(envelope("quran.resolveMissedDay", ["dayKey": .string("2026-10-07"), "choice": .string("double")], at: after), now: after)
+        #expect(resolved.status == .applied)
+        let owed = try repo(container).snapshot(at: after.addingTimeInterval(1)).allotments.filter { $0.origin == .missPolicy }
+        #expect(owed.count == 1 && owed[0].amount == 1 && owed[0].originDayKey.description == "2026-10-07")
+    }
+
     @Test func needsGradeTurnsTheNextDayIntoConsolidationNotToday() async throws {
         let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
         let planAt = now.addingTimeInterval(-3 * 86400)

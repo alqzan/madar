@@ -47,3 +47,35 @@ struct PrayerQuickLogTests {
         #expect(PrayerQuickLog.timeLeft(prayer: .asr, nextAdhan: next, now: at(180)) == nil)
     }
 }
+
+/// The lobby ask: latest pending prayer, silent inside any sanctity window (adhan + 30, Maghrib + 20).
+struct PrayerLobbyAskTests {
+    private let base = Date(timeIntervalSince1970: 1_792_000_000)
+    private func at(_ minutes: Double) -> Date { base.addingTimeInterval(minutes * 60) }
+    private func entry(_ prayer: Prayer, _ minutes: Double?, pending: Bool = true, canLog: Bool = true, friday: Bool = false) -> PrayerLobbyAsk.Entry {
+        .init(prayer: prayer, adhan: minutes.map(at), isPending: pending, canLog: canLog, isFridayNoon: friday)
+    }
+    @Test func silentInsideTheWindowOfAnyPrayer() {
+        let list = [entry(.fajr, -600), entry(.dhuhr, 0)]
+        #expect(PrayerLobbyAsk.choose(list, now: at(29)) == nil)
+        #expect(PrayerLobbyAsk.choose(list, now: at(31)) == .dhuhr)
+    }
+    @Test func maghribWindowIsTwenty() {
+        let list = [entry(.asr, -300), entry(.maghrib, 0)]
+        #expect(PrayerLobbyAsk.choose(list, now: at(19)) == nil)
+        #expect(PrayerLobbyAsk.choose(list, now: at(21)) == .maghrib)
+    }
+    @Test func fridayNoonIsSkipped() {
+        let list = [entry(.fajr, -600), entry(.dhuhr, -120, friday: true)]
+        #expect(PrayerLobbyAsk.choose(list, now: at(0)) == .fajr)
+    }
+    @Test func latestPendingIsChosen() {
+        let list = [entry(.fajr, -600), entry(.dhuhr, -400), entry(.asr, -200)]
+        #expect(PrayerLobbyAsk.choose(list, now: at(0)) == .asr)
+    }
+    @Test func loggedAndFuturePrayersAreNotAsked() {
+        let list = [entry(.fajr, -600), entry(.dhuhr, -400, pending: false), entry(.asr, 60)]
+        #expect(PrayerLobbyAsk.choose(list, now: at(0)) == .fajr)
+        #expect(PrayerLobbyAsk.choose([entry(.fajr, -600, pending: false)], now: at(0)) == nil)
+    }
+}

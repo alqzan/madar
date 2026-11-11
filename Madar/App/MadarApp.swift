@@ -94,7 +94,7 @@ private struct MadarSceneContent: View {
                     ContentUnavailableView {
                         Label("تعذّر فتح مدار", systemImage: "externaldrive.badge.exclamationmark")
                     } description: {
-                        Text("لم يُفتح مخزن البيانات. بياناتك محفوظة، ويمكنك إعادة المحاولة.\n\(startupError)")
+                        Text("تعذّر على مدار فتح بياناته. لم يحذف هذا الإجراء شيئًا؛ أعِد المحاولة، وإن تكرّر فتواصل معنا.\n\(startupError)")
                     } actions: { Button("أعِد المحاولة") { Task { await runtime.load() } } }
                 } else {
                     MadarLaunchPlaceholder()

@@ -15,3 +15,28 @@ public enum PrayerQuickLog {
         return nextAdhan.timeIntervalSince(now)
     }
 }
+
+/// Which unlogged prayer the lobby asks about on open (RP3: never inside any sanctity window).
+public enum PrayerLobbyAsk {
+    public struct Entry: Sendable {
+        public let prayer: Prayer
+        public let adhan: Date?
+        public let isPending: Bool
+        public let canLog: Bool
+        public let isFridayNoon: Bool
+        public init(prayer: Prayer, adhan: Date?, isPending: Bool, canLog: Bool, isFridayNoon: Bool) {
+            self.prayer = prayer; self.adhan = adhan; self.isPending = isPending; self.canLog = canLog; self.isFridayNoon = isFridayNoon
+        }
+    }
+    /// The last pending, loggable, already-called prayer of today (not Friday noon); nil while any sanctity window is open.
+    public static func choose(_ entries: [Entry], now: Date) -> Prayer? {
+        for entry in entries {
+            guard let adhan = entry.adhan else { continue }
+            if SanctityWindow(prayer: entry.prayer, adhan: adhan).contains(now) { return nil }
+        }
+        return entries.last { entry in
+            guard let adhan = entry.adhan else { return false }
+            return entry.isPending && entry.canLog && adhan <= now && !entry.isFridayNoon
+        }?.prayer
+    }
+}
