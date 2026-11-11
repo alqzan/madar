@@ -26,6 +26,9 @@ struct DiaryDayView: View {
     @State private var arc: DiaryDayArc?
     @State private var intentionsOpen = false
     @State private var niyyaSaved = false
+    @State private var niyyaToken: UUID?
+    @State private var todayBox = TodayBox()
+    @State private var revealedEntryID: UUID?
     @State private var appearance: DiaryDayAppearance?
     /// The page opened on «today»; when the day boundary passes while it is open, it moves on to the new day instead of becoming an old page.
     @State private var followedToday: GregorianDay?
@@ -90,7 +93,13 @@ struct DiaryDayView: View {
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: "\n\n")
     }
-    private var today: GregorianDay { (try? service.currentDay()) ?? day }
+    /// «Today» is read from the store once and kept (every row asks for it on every redraw); the 30-second tick and the foreground refresh renew it.
+    private var today: GregorianDay {
+        if let cached = todayBox.value { return cached }
+        let fresh = (try? service.currentDay()) ?? day
+        todayBox.value = fresh
+        return fresh
+    }
     private var first: FirstCalendar { app.diaryFirstCalendar }
     private var eveningPrimary: Bool { shownDay == today && !intentions.isEmpty && service.intentionEvening(shownDay) }
     private var secondInk: Color {
@@ -360,10 +369,17 @@ struct DiaryDayView: View {
                                 }.padding(.trailing, 12)
                             }
                         }
-                        .onChange(of: page?.lines.map(\.id), initial: true) { _, _ in revealInitialEntry(using: proxy) }
-                        .onChange(of: initialEntryID) { _, _ in revealInitialEntry(using: proxy) }
+                        .onChange(of: page?.lines.map(\.id), initial: true) { old, new in
+                            revealInitialEntry(using: proxy)
+                            // A line just written is brought into view (the keyboard and the composer cover the foot of the page); a whole page loading is not.
+                            if inlineWriting, let old, let new, !old.isEmpty, new.count > old.count, new.count - old.count <= 2,
+                               let added = new.first(where: { !old.contains($0) }) {
+                                withAnimation(.snappy(duration: 0.25)) { proxy.scrollTo("diary-entry-" + added, anchor: .center) }
+                            }
+                        }
+                        .onChange(of: initialEntryID) { _, _ in revealedEntryID = nil; revealInitialEntry(using: proxy) }
                         .onChange(of: initialEntryRouteID) { _, requestID in
-                            if requestID != nil { revealInitialEntry(using: proxy) }
+                            if requestID != nil { revealedEntryID = nil; revealInitialEntry(using: proxy) }
                         }
                     }
                 }
@@ -426,7 +442,7 @@ struct DiaryDayView: View {
                     }.accessibilityLabel("أيامك")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    if niyyaSaved, app.undoToken != nil {
+                    if niyyaSaved, let token = app.undoToken, token.id == niyyaToken {
                         Button("تراجع") {
                             app.undo(); niyyaSaved = false
                         }.accessibilityIdentifier("diary-day-niyya-undo")
@@ -492,6 +508,10 @@ struct DiaryDayView: View {
                 if phase == .active { followToday(); aiAvailability = .checking; retry += 1 }
                 else if phase == .background { aiComposerOpen = false }
             }
+            .onChange(of: shownDay) { _, _ in
+                // A line being edited or a «write after» chip belongs to the page it began on.
+                inlineEdit = nil; insertAt = nil; anchorLabel = nil
+            }
             .onChange(of: canReadDiary) { _, canRead in
                 if canRead {
                     aiAvailability = .checking
@@ -506,8 +526,10 @@ struct DiaryDayView: View {
             .task {
                 while !Task.isCancelled {
                     do {
-                        try await Task.sleep(for: .seconds(30)); displayNow = service.clock(); followToday();
-                        appearance = try service.appearance(shownDay); arc = service.dayArc(shownDay)
+                        try await Task.sleep(for: .seconds(30)); displayNow = service.clock(); followToday()
+                        // One failed read must not end the loop: it is what moves an open page on at the day boundary.
+                        if let fresh = try? service.appearance(shownDay) { appearance = fresh }
+                        arc = service.dayArc(shownDay)
                     } catch { break }
                 }
             }
@@ -531,6 +553,7 @@ struct DiaryDayView: View {
         } catch { failure = madarUserMessage(error) }
     }
     @MainActor private func followToday() {
+        todayBox.value = nil
         guard let followed = followedToday, let now = try? service.currentDay(), now != followed else { return }
         followedToday = now
         if selected == nil || selected == followed { selected = now }
@@ -574,7 +597,8 @@ struct DiaryDayView: View {
         } catch is CancellationError {
             return
         } catch {
-            page = nil
+            // A failed secondary read (intentions, appearance, travel) must not blank a page that already loaded.
+            if page?.day != shownDay { page = nil }
             failure = madarUserMessage(error)
         }
     }
@@ -615,7 +639,7 @@ struct DiaryDayView: View {
                         Task { @MainActor in
                             do {
                                 try await service.setIntentionResult(row.id, result: row.result == value ? nil : value);
-                                intentions = try service.intentions(shownDay); niyyaSaved = true
+                                intentions = try service.intentions(shownDay); niyyaSaved = true; niyyaToken = app.undoToken?.id
                             } catch { failure = madarUserMessage(error) }
                         }
                     } label: {
@@ -798,7 +822,7 @@ struct DiaryDayView: View {
                 if page.editable.contains(line.id) || page.deletable.contains(line.id) {
                     Menu { lineActions(line, page: page) } label: {
                         Image(systemName: "ellipsis").font(.footnote).foregroundStyle(theme.color("ink3Text"))
-                            .frame(width: 36, height: 30).contentShape(Rectangle())
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
                     }.accessibilityLabel("خيارات السطر").accessibilityIdentifier("diary-line-menu").offset(x: 14, y: 2)
                 }
             }
@@ -825,7 +849,7 @@ struct DiaryDayView: View {
         if shownDay == today, ["normal", "late", "ghad"].contains(line.kind), !line.text.isEmpty {
             Button("اجعلها نيّة اليوم") {
                 Task {
-                    do { try await service.saveIntention(line.text, day: shownDay); niyyaSaved = true } catch {
+                    do { try await service.saveIntention(line.text, day: shownDay); niyyaSaved = true; niyyaToken = app.undoToken?.id } catch {
                         failure = madarUserMessage(error)
                     }
                 }
@@ -833,9 +857,11 @@ struct DiaryDayView: View {
         }
     }
     private func revealInitialEntry(using proxy: ScrollViewProxy) {
-        guard let initialEntryID,
+        guard let initialEntryID, revealedEntryID != initialEntryID,
             page?.lines.contains(where: { $0.id == initialEntryID.uuidString }) == true
         else { return }
+        // Once per request: editing a line makes a new revision and used to throw the reader back to the opened entry.
+        revealedEntryID = initialEntryID
         highlightGeneration += 1
         let generation = highlightGeneration
         highlightedEntryID = initialEntryID
@@ -846,3 +872,7 @@ struct DiaryDayView: View {
         }
     }
 }
+
+
+/// A value kept across redraws that is not itself observed: the page renews it at known moments.
+final class TodayBox { var value: GregorianDay? }

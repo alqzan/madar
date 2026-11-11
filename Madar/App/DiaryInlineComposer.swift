@@ -13,6 +13,33 @@ import UIKit
         pending = Task { await previous?.value; await work() }
     }
     static func settle() async { await pending?.value }
+    /// Writing pages still on screen. A swipe back starts the pop long before the page's own flush is queued, so a composer
+    /// waits for the page to be gone (never longer than a second) instead of guessing with a fixed sleep.
+    static var livePages = 0
+    static func settleAfterPages() async {
+        var waited = 0
+        while livePages > 0, waited < 40 { try? await Task.sleep(for: .milliseconds(25)); waited += 1 }
+        await settle()
+    }
+}
+
+/// What the shared voice controller does to the page around the composer: refresh after a take, host the consent ask and the title task.
+private struct InlineVoiceEvents: ViewModifier {
+    @Bindable var voice: DiaryVoiceController
+    let editorOpen: Bool
+    let saved: () -> Void
+    @Binding var notice: String?
+    func body(content: Content) -> some View {
+        content
+            .task { await voice.recoverRecordings() }
+            .onChange(of: voice.lastMedia?.id) { _, id in if id != nil { saved() } }
+            .onChange(of: voice.converting) { _, busy in if !busy { saved() } }
+            .onChange(of: voice.message) { _, value in
+                if !voice.recording, !voice.microphoneDenied, !value.isEmpty { notice = value }
+            }
+            .modifier(DiaryVoiceConsentAlert(controller: voice))
+            .background { if !editorOpen { DiaryVoiceInsightTask(controller: voice).frame(width: 1, height: 1).accessibilityHidden(true) } }
+    }
 }
 
 /// 10 Nov owner: writing in the diary is direct. One quiet field at the foot of today's page — type and send, pick a photo, change a line or write
@@ -46,6 +73,9 @@ struct DiaryInlineComposer: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var focused: Bool
 
+    private var voice: DiaryVoiceController { app.diaryVoice }
+    private var voiceBusy: Bool { voice.recording || voice.savingAudio }
+    private var voiceShown: Bool { voice.recording || voice.savingAudio || voice.converting || voice.needsConsent || voice.microphoneDenied }
     private var service: AppDiaryService { AppDiaryService(app: app, clock: { app.prayerNow() }) }
     private var field: Binding<String> { edit == nil ? $text : $editText }
     private var trimmed: String { field.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -63,6 +93,21 @@ struct DiaryInlineComposer: View {
                 Text(failure).font(MadarTypography.fine()).foregroundStyle(theme.color("late")).frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("diary-inline-failure")
             }
+            if voiceShown {
+                DiaryVoiceFeedback(controller: voice, showsTranscriptEditor: false).accessibilityIdentifier("diary-inline-voice")
+            }
+            if voiceBusy {
+                // One tap records and one tap stops, right here on the page; nothing opens, nothing moves.
+                HStack(spacing: 12) {
+                    Text(voice.recording ? "يُسجَّل صوتك…" : "يُحفظ التسجيل…").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    Spacer(minLength: 4)
+                    Button { Task { await voice.stop() } } label: {
+                        Image(systemName: "stop.fill").font(.system(size: 18)).frame(width: 44, height: 44)
+                            .foregroundStyle(theme.background).background(theme.color("late"), in: .circle).contentShape(Circle())
+                    }.buttonStyle(.madarPlain).disabled(voice.savingAudio)
+                        .accessibilityLabel("أوقف التسجيل واحفظه").accessibilityIdentifier("diary-inline-stop")
+                }.padding(.horizontal, 8).frame(minHeight: 44)
+            } else {
             HStack(alignment: .bottom, spacing: 8) {
                 PhotosPicker(selection: $photo, matching: .images) {
                     Image(systemName: "photo").font(.system(size: 19)).frame(width: 44, height: 44).contentShape(Circle())
@@ -74,20 +119,19 @@ struct DiaryInlineComposer: View {
                     .background(theme.surface, in: .rect(cornerRadius: 22))
                     .overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 0.7) }
                     .accessibilityIdentifier("diary-inline-field")
+                if edit == nil {
+                    // The full page stays one tap away (camera, files, a longer text); the identifiers keep their old meaning.
+                    Button { Task { await keepDraft(); openEditor() } } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 15)).frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text"))
+                        .accessibilityLabel("افتح الورقة الكاملة: كاميرا وملفات").accessibilityIdentifier(trimmed.isEmpty ? "diary-day-write" : "diary-inline-expand")
+                }
                 if trimmed.isEmpty && edit == nil {
-                    Button {
-                        Task { await keepDraft(); openEditor() }
-                    } label: {
+                    Button { Task { await startRecording() } } label: {
                         Image(systemName: "mic").font(.system(size: 19)).frame(width: 44, height: 44).contentShape(Circle())
                     }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text"))
-                        .accessibilityLabel("الورقة الكاملة: صوت وكاميرا وملفات").accessibilityIdentifier("diary-day-write")
+                        .accessibilityLabel("سجّل صوتًا").accessibilityIdentifier("diary-inline-record")
                 } else {
-                    if edit == nil {
-                        Button { Task { await keepDraft(); openEditor() } } label: {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 15)).frame(width: 36, height: 44).contentShape(Rectangle())
-                        }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text"))
-                            .accessibilityLabel("افتح الورقة الكاملة: صوت وكاميرا وملفات").accessibilityIdentifier("diary-inline-expand")
-                    }
                     Button { Task { await send() } } label: {
                         Image(systemName: "arrow.up").font(.system(size: 17, weight: .bold)).frame(width: 44, height: 44)
                             .foregroundStyle(theme.background).background(theme.dark ? theme.accent : theme.ink, in: .circle)
@@ -96,14 +140,14 @@ struct DiaryInlineComposer: View {
                         .accessibilityLabel(edit != nil ? "احفظ التعديل" : "أضف إلى الصفحة").accessibilityIdentifier("diary-inline-send")
                 }
             }
+            }
         }
         .padding(.horizontal, 14).padding(.vertical, 8).frame(maxWidth: 680).frame(maxWidth: .infinity).background(theme.background)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: edit != nil || (insertAt != nil && anchor != nil))
         .task(id: editorOpen) {
             guard !editorOpen else { return }
             // The full page flushes its draft as it closes (a swipe back does it a moment later): read it after that, not before.
-            if loaded { try? await Task.sleep(for: .milliseconds(120)) }
-            await DiaryDraftFlush.settle()
+            await DiaryDraftFlush.settleAfterPages()
             await loadDraft()
         }
         .onDisappear { if loaded, edit == nil, !trimmedText.isEmpty { DiaryDraftFlush.run { await keepDraft() } } }
@@ -112,6 +156,15 @@ struct DiaryInlineComposer: View {
         .onChange(of: edit) { _, value in if let value { editText = value.text; failure = nil; focused = true } }
         .onChange(of: focusTick) { _, _ in focused = true }
         .onChange(of: photo) { _, item in if let item { Task { await addPhoto(item) } } }
+        .modifier(InlineVoiceEvents(voice: voice, editorOpen: editorOpen, saved: saved, notice: $notice))
+    }
+
+    private func startRecording() async {
+        await keepDraft()
+        focused = false
+        guard let writingDay = try? service.currentDay() else { return }
+        insertAt = nil; anchor = nil
+        await voice.start(writingDay: writingDay)
     }
 
     private var chip: some View {
@@ -120,7 +173,7 @@ struct DiaryInlineComposer: View {
                 .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).lineLimit(1)
             Spacer(minLength: 4)
             Button { edit = nil; insertAt = nil; anchor = nil; editText = ""; failure = nil } label: {
-                Image(systemName: "xmark.circle.fill").frame(width: 36, height: 30).contentShape(Rectangle())
+                Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44).contentShape(Rectangle())
             }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text"))
                 .accessibilityLabel("ألغِ").accessibilityIdentifier("diary-inline-chip-clear")
         }.padding(.horizontal, 6)

@@ -160,6 +160,8 @@ struct DiaryMediaCard: View {
     private func togglePlayback() {
         do {
             try AppDiaryService(app: app).authorizeRead()
+            // Playing would take the microphone away from a take in progress.
+            guard !app.diaryVoice.recording, !app.diaryVoice.savingAudio else { self.error = "أوقف التسجيل أولًا ثم شغّل الصوت."; return }
             try playback.toggle(id: media.id, data: media.data)
         } catch { self.error = "تعذّر تشغيل الصوت. الملف محفوظ." }
     }

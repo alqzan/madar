@@ -4,6 +4,17 @@ import MadarCore
 import FoundationModels
 import Translation
 
+/// The one ask before audio may go to Apple for dictation. Whatever surface started the take hosts it.
+struct DiaryVoiceConsentAlert: ViewModifier {
+    @Bindable var controller: DiaryVoiceController
+    func body(content: Content) -> some View {
+        content.alert("يُرسل الصوت إلى Apple للتحويل", isPresented: $controller.needsConsent) {
+            Button("موافق") { Task { await controller.consent(true) } }
+            Button("لا، سجّل فقط", role: .cancel) { Task { await controller.consent(false) } }
+        } message: { Text("تحويل الصوت إلى نص غير متاح لهذه اللغة على جهازك. يبقى الصوت محفوظًا وتكتب بيدك، وتلغي موافقتك من خصّص المذكرات.") }
+    }
+}
+
 struct DiaryVoiceControls: View {
     @Bindable var controller: DiaryVoiceController
     var compact = false
@@ -17,10 +28,7 @@ struct DiaryVoiceControls: View {
             DiaryVoiceFeedback(controller: controller, showsTranscriptEditor: showsTranscriptEditor)
         }
         .task(id: controller.language) { await controller.refreshLanguage() }
-        .alert("يُرسل الصوت إلى Apple للتحويل", isPresented: $controller.needsConsent) {
-            Button("موافق") { Task { await controller.consent(true) } }
-            Button("لا، سجّل فقط", role: .cancel) { Task { await controller.consent(false) } }
-        } message: { Text("تحويل الصوت إلى نص غير متاح لهذه اللغة على جهازك. يبقى الصوت محفوظًا وتكتب بيدك، وتلغي موافقتك من خصّص المذكرات.") }
+        .modifier(DiaryVoiceConsentAlert(controller: controller))
         DiaryVoiceInsightTask(controller: controller).frame(width: 1, height: 1).accessibilityHidden(true)
     }
     private var options: some View {
@@ -142,7 +150,7 @@ enum DiaryAudioTitleGenerator {
     }
 }
 
-private struct DiaryVoiceInsightTask: View {
+struct DiaryVoiceInsightTask: View {
     @Bindable var controller: DiaryVoiceController
     @State private var configuration: TranslationSession.Configuration?
     @State private var englishTitle = ""

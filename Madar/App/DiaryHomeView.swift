@@ -66,8 +66,6 @@ struct DiaryHomeView: View {
     @State private var failure: String?
     @State private var defaultMemoryDay: GregorianDay?
     @State private var intentionFollowUp: DiaryIntentionFollowUp?
-    @State private var intentionReviewText = ""
-    @State private var savingIntentionReview = false
 #if DEBUG
     @State private var injectedReadFailure = false
 #endif
@@ -158,10 +156,14 @@ struct DiaryHomeView: View {
         .background(theme.background).foregroundStyle(theme.ink)
          .safeAreaInset(edge: .bottom, spacing: 0) {
             if let snapshot {
-                if app.string("notes.homeShape") == "margin", let memory { marginBar(snapshot.todayPage, target: memory.day) }
-                else { todayBar(snapshot.todayPage) }
+                Group {
+                    if app.string("notes.homeShape") == "margin", let memory { marginBar(snapshot.todayPage, target: memory.day) }
+                    else { todayBar(snapshot.todayPage) }
+                    // The bar stays where it is when the keyboard comes up for the review field, instead of riding over what is being typed.
+                }.ignoresSafeArea(.keyboard, edges: .bottom)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task(id: [isFrontRoom ? app.prayerRevision : -1, roomVisit]) {
             guard isFrontRoom else { return }
@@ -621,7 +623,6 @@ struct DiaryHomeView: View {
             if let pendingFollowUps = try? await service.dueIntentionFollowUpsOffMain() {
                 guard generation == refreshGeneration, !Task.isCancelled else { return }
                 let next = pendingFollowUps.first
-                if intentionFollowUp?.id != next?.id || intentionFollowUp?.period != next?.period { intentionReviewText = "" }
                 intentionFollowUp = next
             }
         } catch {
@@ -632,6 +633,23 @@ struct DiaryHomeView: View {
         }
     }
     private func intentionFollowUpCard(_ item: DiaryIntentionFollowUp) -> some View {
+        // Its own view with its own text: a keystroke here no longer redraws the whole home page.
+        IntentionReviewCard(app: app, item: item, saved: { intentionFollowUp = $0 })
+            .id("\(item.id)-\(item.period)")
+    }
+}
+
+/// The follow-up of an intention (week or month): the original words, one question and a field for the answer.
+private struct IntentionReviewCard: View {
+    @Bindable var app: AppSession
+    let item: DiaryIntentionFollowUp
+    let saved: (DiaryIntentionFollowUp?) -> Void
+    @Environment(\.roomTheme) private var theme
+    @State private var reviewText = ""
+    @State private var saving = false
+    private var service: AppDiaryService { AppDiaryService(app: app) }
+    private var empty: Bool { !reviewText.contains { !$0.isWhitespace } }
+    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text(item.period.title).font(DiaryType.heading)
@@ -640,32 +658,32 @@ struct DiaryHomeView: View {
             }
             Text(item.intention).font(DiaryType.writing).frame(maxWidth: .infinity, alignment: .leading)
             Text(item.period.question).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
-            TextField("اكتب مراجعتك هنا", text: $intentionReviewText, axis: .vertical)
+            TextField("اكتب مراجعتك هنا", text: $reviewText, axis: .vertical)
                 .lineLimit(2...5).font(DiaryType.writing).padding(12)
                 .background(theme.background, in: .rect(cornerRadius: 12))
                 .accessibilityIdentifier("diary-intention-review-text")
             Button {
-                guard !savingIntentionReview, !intentionReviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                savingIntentionReview = true
+                guard !saving, !empty else { return }
+                saving = true
                 Task { @MainActor in
-                    defer { savingIntentionReview = false }
+                    defer { saving = false }
                     do {
-                        try await service.setIntentionReview(item.id, period: item.period, text: intentionReviewText)
-                        intentionReviewText = ""
-                        intentionFollowUp = try await service.dueIntentionFollowUpsOffMain().first
+                        try await service.setIntentionReview(item.id, period: item.period, text: reviewText)
+                        reviewText = ""
+                        saved(try await service.dueIntentionFollowUpsOffMain().first)
                     } catch { app.errorMessage = madarUserMessage(error) } // the home's own `failure` shows only while nothing is loaded, so a failed save would stay silent
                 }
             } label: {
                 HStack {
-                    if savingIntentionReview { ProgressView().tint(theme.background) }
+                    if saving { ProgressView().tint(theme.background) }
                     Text("احفظ المراجعة")
                 }.font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(theme.background)
                     .background(theme.accent, in: .capsule)
-            }.buttonStyle(.madarPlain).disabled(savingIntentionReview || intentionReviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }.buttonStyle(.madarPlain).disabled(saving || empty)
                 .accessibilityIdentifier("diary-intention-review-save")
         }
         .padding(16).background(theme.surface, in: .rect(cornerRadius: 20)).overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.line) }
         .accessibilityElement(children: .contain).accessibilityIdentifier("diary-intention-follow-up")
-        .diaryRootDraftBlocking(app, isBlocking: !intentionReviewText.isEmpty || savingIntentionReview)
+        .diaryRootDraftBlocking(app, isBlocking: !reviewText.isEmpty || saving)
     }
 }

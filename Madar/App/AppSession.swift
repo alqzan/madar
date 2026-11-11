@@ -19,6 +19,8 @@ struct AppUndoToken { let id: UUID; let expiresAt: Date }
 final class AppSession {
     private static let bahwReturnStateKey = "sys.bahwReturnPlan"
     let diaryPlayback = DiaryPlayback()
+    /// One voice controller for the whole session, so a take survives the writing page being rebuilt or closed.
+    @ObservationIgnored private(set) lazy var diaryVoice = DiaryVoiceController(app: self)
     var diaryRoute: Route?
     /// A diary root link waits for child editors that own an explicit save/discard path.
     var diaryRootRequestID: UUID?

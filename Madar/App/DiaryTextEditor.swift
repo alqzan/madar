@@ -43,6 +43,10 @@ struct DiaryTextEditor: View {
     /// AU-95: a failed «تمّ» stays on screen; the next quiet draft save must not wipe it while the page is uncommitted.
     @State private var commitFailed = false
     @FocusState private var focused: Bool
+    /// Counted when the text changes, not on every redraw.
+    @State private var words = 0
+    /// Whether the page has anything but whitespace; kept here so the toolbar does not scan the text on every keystroke.
+    @State private var hasContent = false
     private var blocksRootRoute: Bool {
         !text.isEmpty || saving || importing || voice?.recording == true || voice?.savingAudio == true || voice?.converting == true
     }
@@ -63,8 +67,9 @@ struct DiaryTextEditor: View {
             loaded = true
             refreshSavedDay()
             if voice == nil {
-                voice = DiaryVoiceController(app: app)
-                await voice?.recoverRecordings()
+                voice = app.diaryVoice
+                // Recovery never holds the keyboard back.
+                Task { await voice?.recoverRecordings() }
             }
             // A room-tab write link presents during the native sheet transition; an earlier
             // focus request can be dropped before the text view joins its window.
@@ -84,7 +89,14 @@ struct DiaryTextEditor: View {
             currentMadarDay = try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()
         }
 #endif
-        .onChange(of: text) { _, _ in scheduleDraft() }
+        .onAppear { DiaryDraftFlush.livePages += 1 }
+        .onChange(of: text) { _, new in
+            scheduleDraft()
+            let count = new.split(whereSeparator: { $0.isWhitespace }).count
+            if count != words { words = count }
+            let has = new.contains { !$0.isWhitespace }
+            if has != hasContent { hasContent = has }
+        }
         .onChange(of: day) { _, _ in scheduleDraft() }
         .onChange(of: photo) { _, item in Task {
             guard let item else { return }; importing = true
@@ -112,7 +124,8 @@ struct DiaryTextEditor: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { voice?.refreshMicrophoneAuthorization() }
             else if phase == .background {
-                Task { draftTask?.cancel(); if loaded { do { try await persistDraft() } catch { draftStatus = "لم تُحفظ المسودة"; failure = madarUserMessage(error) } }; await voice?.stop() }
+                // Owner 11 Nov: leaving the app (lock, Home, a call's banner) saved the words and then ended the take. The words are kept; the recording goes on (background audio).
+                Task { draftTask?.cancel(); if loaded { do { try await persistDraft() } catch { draftStatus = "لم تُحفظ المسودة"; failure = madarUserMessage(error) } } }
             }
         }
         .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app) } }
@@ -120,8 +133,11 @@ struct DiaryTextEditor: View {
         .onDisappear {
             // B2-2: leaving never loses words; a pending 500 ms draft write is flushed unless the page was just saved.
             if loaded, !saving, hasDraftRecord || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { DiaryDraftFlush.run { try? await persistDraft() } }
-            draftTask?.cancel(); savedDayTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
+            DiaryDraftFlush.livePages = max(0, DiaryDraftFlush.livePages - 1)
+            // The voice controller belongs to the session now: a take and its transcription outlive this view's teardown.
+            draftTask?.cancel(); savedDayTask?.cancel() }
         .diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
+        .modifier(EditorVoiceHost(voice: voice))
     }
     @ViewBuilder private var editorContent: some View {
             VStack(spacing: 0) {
@@ -217,7 +233,10 @@ struct DiaryTextEditor: View {
                                 .buttonStyle(.madarPlain).accessibilityLabel("التقط صورة").accessibilityIdentifier("diary-editor-camera")
                         }
                         Button { focused = false; choosingFile = true } label: { Label("مرفق", systemImage: "doc").font(MadarTypography.caption()).frame(minHeight: 44) }.labelStyle(.iconOnly).accessibilityIdentifier("diary-editor-file")
-                        if let voice, focused { recordButton(voice, large: false) }
+                        if let voice {
+                            recordButton(voice, large: false)
+                            languageMenu(voice)
+                        }
                         Spacer(minLength: 0)
                         // B2-2: one «التنسيق» menu replaces five bar buttons; the identifiers stay for tests.
                         Menu {
@@ -231,29 +250,22 @@ struct DiaryTextEditor: View {
                         if focused { Button { focused = false } label: { Image(systemName: "keyboard.chevron.compact.down").frame(width: 44, height: 44) }.accessibilityLabel("أخفِ لوحة الكتابة").accessibilityIdentifier("diary-editor-hide-keyboard") }
                     }.padding(.horizontal, 16) }.scrollBounceBehavior(.basedOnSize)
                 }
-                if margin == nil, let voice, focused, voice.microphoneDenied {
-                    DiaryVoiceFeedback(controller: voice)
-                        .padding(.horizontal, 16).padding(.vertical, 8)
-                }
-                if margin == nil, let voice, !focused {
+                // 11 Nov owner: the keyboard coming up made the screen jump and stutter because a whole block of voice controls swapped in and out with focus.
+                // The bar above is the same with or without the keyboard; this area exists only while the voice has something to say.
+                if margin == nil, let voice, voiceStatusShown(voice) {
                     VStack(alignment: .leading, spacing: 8) {
-                        DiaryVoiceControls(controller: voice, compact: true)
-                        HStack {
-                            Button { focused = true } label: { Label("الكتابة", systemImage: "keyboard").frame(minHeight: 44) }.accessibilityIdentifier("diary-editor-keyboard")
-                            Spacer()
-                            recordButton(voice, large: true)
-                            Spacer()
-                            // AU-45: the row above already offers «صورة»; one button is enough.
-                            Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+                        DiaryVoiceFeedback(controller: voice)
+                        if voice.interrupted, !voice.recording {
+                            Text("قاطع النظام التسجيل وحُفظ ما سُجّل · اضغط الميكروفون لتكمل بتسجيل جديد").font(MadarTypography.fine()).foregroundStyle(theme.color("ink3Text"))
                         }
-                        Text(voice.recording ? "اضغط لإيقاف التسجيل وحفظ الصوت" : "اضغط وتكلّم").font(MadarTypography.fine()).frame(maxWidth: .infinity)
-                        HStack {
-                            if let media = voice.lastMedia, !voice.converting { Button { Task { await voice.transcribe(media) } } label: { Text("حوّله إلى نص").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-editor-transcribe") }
-                        }.font(MadarTypography.caption())
+                        if let media = voice.lastMedia, attachmentSaved, !voice.converting, !voice.recording {
+                            Button { Task { await voice.transcribe(media) } } label: { Text("حوّله إلى نص").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
+                                .accessibilityIdentifier("diary-editor-transcribe")
+                        }
                     }.padding(.horizontal, 16).padding(.vertical, 8)
                 }
                 HStack {
-                    Text(wordCount(text.split(whereSeparator: { $0.isWhitespace }).count)).font(MadarTypography.fine())
+                    Text(wordCount(words)).font(MadarTypography.fine())
                     Spacer()
                     Text(draftStatus).font(MadarTypography.fine()).accessibilityIdentifier("diary-draft-status")
                     if day == "yesterday" { Text("كُتبت لاحقًا").font(MadarTypography.caption()).foregroundStyle(theme.color("late")) }
@@ -268,7 +280,7 @@ struct DiaryTextEditor: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(saving ? "يُحفظ…" : "احفظ الصفحة") { Task { await save() } }.fontWeight(.bold)
-                        .disabled(saving || importing || voice?.savingAudio == true || voice?.converting == true || (!attachmentSaved && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+                        .disabled(saving || importing || voice?.savingAudio == true || voice?.converting == true || (!attachmentSaved && !hasContent))
                         .accessibilityIdentifier("diary-editor-save")
                 }
             }.tint(theme.accent)
@@ -315,11 +327,24 @@ struct DiaryTextEditor: View {
         focused = true
     }
     private func recordButton(_ voice: DiaryVoiceController, large: Bool) -> some View {
-        Button { focused = false; Task { if voice.recording { await voice.stop() } else if let writingDay { await voice.start(writingDay: writingDay) } } } label: {
+        Button { Task { if voice.recording { await voice.stop() } else if let writingDay { await voice.start(writingDay: writingDay) } } } label: {
             Image(systemName: voice.recording ? "stop.fill" : "mic").font(.system(size: large ? 28 : 20)).frame(width: large ? 72 : 44, height: large ? 72 : 44)
                 .foregroundStyle(large ? theme.onAccent : theme.ink).background(large ? theme.accent : .clear, in: .circle)
         }.buttonStyle(.madarPlain).disabled(saving || importing || voice.savingAudio || voice.converting)
             .accessibilityLabel(voice.recording ? "أوقف التسجيل واحفظه" : "سجّل صوتًا").accessibilityIdentifier("diary-editor-record")
+    }
+    private func voiceStatusShown(_ voice: DiaryVoiceController) -> Bool {
+        voice.recording || voice.savingAudio || voice.converting || voice.needsConsent || voice.microphoneDenied || voice.interrupted || (attachmentSaved && voice.lastMedia != nil)
+    }
+    private func languageMenu(_ voice: DiaryVoiceController) -> some View {
+        Menu {
+            Picker("لغة التسجيل", selection: Binding(get: { voice.language }, set: { voice.language = $0 })) {
+                Text("العربية").tag("ar-SA"); Text("الإنجليزية").tag("en-US")
+            }
+            if voice.canDownload, voice.downloadProgress == nil { Button { voice.downloadLanguage() } label: { Label("حمّل لغة الإملاء", systemImage: "arrow.down.circle") } }
+            if voice.downloadProgress != nil { Button { voice.cancelDownload() } label: { Label("ألغِ التحميل", systemImage: "xmark.circle") } }
+        } label: { Image(systemName: "globe").frame(width: 44, height: 44).contentShape(Rectangle()) }
+            .disabled(voice.recording || voice.converting).accessibilityLabel("لغة التسجيل").accessibilityIdentifier("diary-voice-language")
     }
     private func choice(_ value: String, _ label: String) -> some View {
         Button { day = value; writingDay = (try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()).map { value == "yesterday" ? $0.adding(days: -1) : $0 } } label: { Text(label).font(MadarTypography.caption()).padding(.horizontal, 16).frame(minHeight: 42).foregroundStyle(day == value ? theme.background : theme.ink).background(day == value ? theme.ink : theme.surface, in: .capsule).glassEffect(.regular.interactive(), in: .capsule) }
@@ -327,7 +352,7 @@ struct DiaryTextEditor: View {
     }
     private func scheduleDraft() {
         guard loaded, !saving else { return }
-        draftTask?.cancel(); draftStatus = "تُحفظ المسودة…"
+        draftTask?.cancel(); if draftStatus != "تُحفظ المسودة…" { draftStatus = "تُحفظ المسودة…" }
         draftTask = Task {
             do { try await Task.sleep(for: .milliseconds(500)); try Task.checkCancellation(); try await persistDraft(); if !commitFailed { failure = nil }; draftStatus = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "المسودة محفوظة" }
             catch is CancellationError {} catch { draftStatus = "لم تُحفظ المسودة"; failure = madarUserMessage(error) }
@@ -409,5 +434,18 @@ struct DiaryTextEditor: View {
         let digits = AppDiaryService(app: app).digits
         if n == 0 { return "" }; if n == 1 { return "كلمة واحدة" }; if n == 2 { return "كلمتان" }
         switch n % 100 { case 3...10: return digits.string(n) + " كلمات"; case 11...99: return digits.string(n) + " كلمةً"; default: return digits.string(n) + " كلمة" }
+    }
+}
+
+
+/// Hosts what the shared voice controller needs while this page is open: the Apple-dictation consent ask, the title task and the language check.
+private struct EditorVoiceHost: ViewModifier {
+    let voice: DiaryVoiceController?
+    func body(content: Content) -> some View {
+        if let voice {
+            content.modifier(DiaryVoiceConsentAlert(controller: voice))
+                .background { DiaryVoiceInsightTask(controller: voice).frame(width: 1, height: 1).accessibilityHidden(true) }
+                .task(id: voice.language) { await voice.refreshLanguage() }
+        } else { content }
     }
 }

@@ -13,6 +13,8 @@ import MadarCore
     private(set) var savingAudio = false
     private(set) var converting = false
     private(set) var message = ""
+    /// True after the system ended a take (a call, an alarm, a lost microphone): the writing page offers a fresh take.
+    private(set) var interrupted = false
     private(set) var partialText = ""
     private(set) var canDownload = false
     private(set) var downloadProgress: Double?
@@ -78,9 +80,11 @@ import MadarCore
         let recognizer = SFSpeechRecognizer(locale: Locale(identifier: selected))
         runtimeDescription = installed != nil ? "التحويل على الجهاز" : recognizer?.isAvailable == true && recognizer?.supportsOnDeviceRecognition == true ? "التحويل على الجهاز" : recognizer?.isAvailable == true ? "تحويل Apple بعد موافقتك" : "سجّل صوتًا"
     }
+    private var starting = false
     func start(writingDay: GregorianDay) async {
-        guard !recording, !savingAudio else { return }
-        lastMedia = nil; transcriptMedia = nil; transcriptText = ""; savedTranscript = ""; transcriptIsDirty = false
+        guard !recording, !savingAudio, !starting else { return }
+        starting = true; defer { starting = false }
+        lastMedia = nil; transcriptMedia = nil; transcriptText = ""; savedTranscript = ""; transcriptIsDirty = false; interrupted = false
         generatedTitle = nil; insightStatus = ""
         let allowed = await AVAudioApplication.requestRecordPermission()
         guard allowed else { refreshMicrophoneAuthorization(); return }
@@ -98,13 +102,24 @@ import MadarCore
             recording = true
             startMetering()
             observeAudioSession()
-        } catch { recording = false; if sessionActive { endAudioSession() }; message = madarUserMessage(error) }
+        } catch {
+            recording = false; recorder = nil; if sessionActive { endAudioSession() }; message = madarUserMessage(error)
+            // A take that never began leaves nothing staged to be "recovered" later.
+            if let staged = try? FileManager.default.contentsOfDirectory(at: app.diaryStagingDirectory, includingPropertiesForKeys: nil) {
+                for file in staged where file.pathExtension == "caf" && (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0 < 1_024 {
+                    for ext in ["json", "caf"] { try? FileManager.default.removeItem(at: file.deletingPathExtension().appendingPathExtension(ext)) }
+                }
+            }
+        }
     }
     private func startChunk() throws {
         let root = app.diaryStagingDirectory
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.protectionKey: FileProtectionType.complete])
-        let url = root.appending(path: UUID().uuidString + ".m4a")
-        let recorder = try AVAudioRecorder(url: url, settings: [AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 44_100, AVNumberOfChannelsKey: 1, AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue])
+        // 11 Nov: an .m4a has no index until it is closed, so a take cut by a crash or by the system was unplayable. A PCM CAF is readable up to the last byte; it is turned into .m4a when stored.
+        let url = root.appending(path: UUID().uuidString + ".caf")
+        // Linear PCM: unlike AAC it has no packet table written at the end, so a take cut by a crash is still readable. Export turns it into AAC.
+        let recorder = try AVAudioRecorder(url: url, settings: [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 22_050, AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false])
         if let recordingDay {
             try JSONEncoder().encode(RecordingTicket(day: recordingDay.description)).write(to: url.deletingPathExtension().appendingPathExtension("json"), options: [.atomic, .completeFileProtection])
         }
@@ -113,21 +128,36 @@ import MadarCore
         guard recorder.record() else { throw CocoaError(.fileWriteUnknown) }
     }
     private struct RecordingTicket: Codable { let day: String }
+    nonisolated private static func stagedAudio(for ticket: URL) -> URL? {
+        let base = ticket.deletingPathExtension()
+        return ["caf", "m4a"].map { base.appendingPathExtension($0) }.first { FileManager.default.fileExists(atPath: $0.path) }
+    }
+    /// A playable .m4a for a staged take: a CAF is exported, an .m4a is only checked. Throws for audio that cannot be played, so the file stays staged.
+    @concurrent private static func playableM4A(from url: URL) async throws -> URL {
+        let asset = AVURLAsset(url: url)
+        guard try await asset.load(.isPlayable), try await asset.load(.duration).seconds > 0 else { throw CocoaError(.fileReadCorruptFile) }
+        if url.pathExtension == "m4a" { return url }
+        let output = url.deletingPathExtension().appendingPathExtension("m4a")
+        try? FileManager.default.removeItem(at: output)
+        guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else { throw CocoaError(.fileWriteUnknown) }
+        try await session.export(to: output, as: .m4a)
+        return output
+    }
     func recoverRecordings() async {
         guard !recording, !savingAudio else { return }
         do {
             try AppDiaryService(app: app).authorizeRead()
             let files = try FileManager.default.contentsOfDirectory(at: app.diaryStagingDirectory, includingPropertiesForKeys: nil)
             for ticket in files where ticket.pathExtension == "json" {
-                let url = ticket.deletingPathExtension().appendingPathExtension("m4a")
-                guard FileManager.default.fileExists(atPath: url.path), let record = try? JSONDecoder().decode(RecordingTicket.self, from: Data(contentsOf: ticket)), let day = try? GregorianDay(record.day) else { continue }
-                recordingDay = day; await storeChunk(url: url, successful: true)
+                guard let url = Self.stagedAudio(for: ticket), let record = try? JSONDecoder().decode(RecordingTicket.self, from: Data(contentsOf: ticket)), let day = try? GregorianDay(record.day) else { continue }
+                guard !recording, !savingAudio else { return }
+                await storeChunk(url: url, successful: true, day: day, levels: [])
             }
         } catch { if FileManager.default.fileExists(atPath: app.diaryStagingDirectory.path) { message = "تعذّر فتح التسجيلات المؤقتة. ملفاتها محفوظة لإعادة المحاولة." } }
     }
     private func refreshPendingAudio() {
         guard let files = try? FileManager.default.contentsOfDirectory(at: app.diaryStagingDirectory, includingPropertiesForKeys: nil) else { return }
-        pendingAudioCount = files.filter { $0.pathExtension == "json" && FileManager.default.fileExists(atPath: $0.deletingPathExtension().appendingPathExtension("m4a").path) }.count
+        pendingAudioCount = files.filter { $0.pathExtension == "json" && Self.stagedAudio(for: $0) != nil }.count
     }
     /// Every way a take ends hands the audio session back, so other apps' audio can resume.
     private func endAudioSession() { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
@@ -135,8 +165,9 @@ import MadarCore
         guard let recorder else { return }; recording = false
         stopMetering(); stopObservingAudioSession(); elapsedSeconds = Int(recorder.currentTime.rounded(.down))
         let url = recorder.url; recorder.stop(); self.recorder = nil
-        await storeChunk(url: url, successful: true)
+        // Other apps' audio resumes at once, not after the file is exported.
         endAudioSession()
+        await storeChunk(url: url, successful: true)
         if let lastMedia { await transcribe(lastMedia) }
     }
     // MARK: Interruptions (B1-11): a call, an alarm or a lost microphone ends the take cleanly with what was recorded.
@@ -149,7 +180,8 @@ import MadarCore
                     group.addTask { [weak self] in
                         for await note in center.notifications(named: name, object: session) {
                             guard !Task.isCancelled, let event = DiaryVoiceInterruption.event(from: note) else { continue }
-                            await self?.handleAudioEvent(event)
+                            // Unstructured: stopping cancels this observer, and the save that follows must not run inside a cancelled task.
+                            Task { @MainActor [weak self] in await self?.handleAudioEvent(event) }
                         }
                     }
                 }
@@ -160,6 +192,7 @@ import MadarCore
     func handleAudioEvent(_ event: DiaryVoiceInterruption.Event) async {
         guard DiaryVoiceInterruption.action(recording: recording, event: event) == .stopAndSave else { return }
         await stop()
+        interrupted = true
         message = "توقف التسجيل لأن النظام قاطعه؛ حُفظ ما سُجّل"
     }
     private func startMetering() {
@@ -169,6 +202,11 @@ import MadarCore
                 guard let self, self.recording, let recorder = self.recorder else { return }
                 recorder.updateMeters()
                 self.elapsedSeconds = Int(recorder.currentTime.rounded(.down))
+                // A take forgotten in the background ends by itself; two hours is far beyond a diary entry.
+                if self.elapsedSeconds >= 7_200 {
+                    Task { @MainActor in await self.stop(); self.message = "بلغ التسجيل ساعتين فتوقف وحُفظ ما سُجّل" }
+                    return
+                }
                 let decibels = Double(recorder.averagePower(forChannel: 0))
                 let level = min(1, max(0, (decibels + 54) / 54))
                 self.meterLevels.append(level)
@@ -193,21 +231,23 @@ import MadarCore
         if recordedAudioLevels.count > 36_000 { recordedAudioLevels.removeFirst(recordedAudioLevels.count - 36_000) }
         meterWindowTotal = 0; meterWindowCount = 0
     }
-    fileprivate func storeChunk(url: URL, successful: Bool) async {
-        guard processed.insert(url).inserted, let day = recordingDay else { return }
+    fileprivate func storeChunk(url: URL, successful: Bool, day explicitDay: GregorianDay? = nil, levels: [Double]? = nil) async {
+        guard processed.insert(url).inserted, let day = explicitDay ?? recordingDay else { return }
         savingAudio = true
         defer { savingAudio = false; refreshPendingAudio() }
         do {
             // A long take is read off the main actor, so the screen keeps answering while it is saved.
-            let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
+            let playable = try await Self.playableM4A(from: url)
+            let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: playable) }.value
             guard !data.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-            let duration = (try? await AVURLAsset(url: url).load(.duration).seconds) ?? 0
+            let duration = (try? await AVURLAsset(url: playable).load(.duration).seconds) ?? 0
             let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent) ?? UUID()
             _ = try await AppDiaryService(app: app).appendMedia(data: data, kind: "audio", contentType: "audio/mp4", day: "today", writingDay: day, duration: Int(duration.rounded()), id: id)
-            let samples = recordedAudioLevels
+            let samples = levels ?? recordedAudioLevels
             lastMedia = .init(id: id, entryID: id.uuidString, kind: "audio", contentType: "audio/mp4", data: data, duration: Int(duration.rounded()), title: nil, levelSamples: samples)
             try? await saveAudioInsights(mediaID: id, title: nil, levels: samples)
-            try? FileManager.default.removeItem(at: url.deletingPathExtension().appendingPathExtension("json"))
+            // Only now, after the durable media write, is the staged take released.
+            for ext in ["json", "caf", "m4a"] { try? FileManager.default.removeItem(at: url.deletingPathExtension().appendingPathExtension(ext)) }
             message = successful ? "حُفظ التسجيل · يبدأ التفريغ الآن" : "توقف التسجيل؛ حُفظ ما أمكن من الصوت"
             // The staged file is removed only by a successful durable media write.
         } catch { processed.remove(url); message = "تعذّر إدخال الصوت في الصفحة؛ الملف محفوظ لإعادة المحاولة. " + madarUserDetail(error) }
@@ -229,7 +269,8 @@ import MadarCore
         guard route != .audioOnly else { cancelConversion(); message = "التحويل غير متاح لهذه اللغة أو الإذن. الصوت محفوظ، والكتابة متاحة."; return }
         if route == .needsConsent { cancelConversion(); consentMedia = media; needsConsent = true; return }
         message = "يُحوّل الصوت المحفوظ…"
-        let timeoutSeconds = min(240, max(20, (media.duration ?? 0) + 20))
+        // Scales with the take (a long one used to be cut at 4 minutes and reported as failed).
+        let timeoutSeconds = max(60, (media.duration ?? 0) * 2 + 60)
         timeout = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(timeoutSeconds)) } catch { return }
             guard let self, self.job == token else { return }; self.cancelConversion(); self.message = "لم يتحوّل؛ الصوت محفوظ · أعد المحاولة"
@@ -363,7 +404,7 @@ extension DiaryVoiceController: AVAudioRecorderDelegate {
             if !flag { self.message = "توقف التسجيل؛ نحفظ المقطع الذي اكتمل" }
             await self.storeChunk(url: url, successful: flag)
             if endedHere, !self.recording { self.endAudioSession() }
-            if !self.recording, let media = self.lastMedia { await self.transcribe(media) }
+            if endedHere, !self.recording, let media = self.lastMedia { await self.transcribe(media) }
         }
     }
     nonisolated func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
