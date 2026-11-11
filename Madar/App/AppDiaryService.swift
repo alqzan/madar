@@ -434,9 +434,9 @@ private struct DiaryDayReadConfiguration: Sendable {
             }
         }
         return .init(day: day, lines: lines.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at }, photo: photo,
-            place: configuration.showPlace ? entries.compactMap(\.place).first : nil, dayOne: page?.origin == "dayOne", photoID: photoID, media: attachments, marginDays: Dictionary(uniqueKeysWithValues: margins.compactMap { margin in
+            place: configuration.showPlace ? entries.compactMap(\.place).first : nil, dayOne: page?.origin == "dayOne", photoID: photoID, media: attachments, marginDays: Dictionary(margins.compactMap { margin in
                 guard let day = try? GregorianDay(margin.writtenDayKey) else { return nil }; return ("margin." + margin.id.uuidString, day)
-            }), originals: Dictionary(uniqueKeysWithValues: chains.originals.compactMap { head, root in all.first { $0.id == root }.map { (head.uuidString, $0.text) } }),
+            }, uniquingKeysWith: { first, _ in first }), originals: Dictionary(chains.originals.compactMap { head, root in all.first { $0.id == root }.map { (head.uuidString, $0.text) } }, uniquingKeysWith: { first, _ in first }),
             editable: Set(entries.filter { $0.mediaID == nil && $0.source != "autoPinned" && ["normal", "late", "ghad"].contains($0.ink) }.map(\.id.uuidString)),
             deletable: deletable)
     }

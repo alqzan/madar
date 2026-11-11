@@ -5928,30 +5928,6 @@
         "kind": "N04: orphaned → sealed on a date trigger; undo restores",
         "auth": "app-only + diary unlocked"
       },
-      "diary.saveProject": {
-        "intent": null,
-        "payload": "{id: UUID, name: String, intention: String, keyword?: String}",
-        "kind": "N04: create or edit a Project with undo",
-        "auth": "app-only + diary unlocked"
-      },
-      "diary.finishProject": {
-        "intent": null,
-        "payload": "{id: UUID, reflection?: String}",
-        "kind": "N04: set finishedAt once; finished projects show under «الفصول»",
-        "auth": "app-only + diary unlocked"
-      },
-      "diary.deleteProject": {
-        "intent": null,
-        "payload": "{id: UUID}",
-        "kind": "N04: tombstone the Project; entries keep text and projectID; undo restores the links",
-        "auth": "app-only + diary unlocked"
-      },
-      "diary.linkEntry": {
-        "intent": null,
-        "payload": "{entryID: UUID, projectID: UUID|null}",
-        "kind": "N04: set Entry.projectID by one tap from the suggestion; undo restores",
-        "auth": "app-only + diary unlocked"
-      },
       "diary.editEntry": {
         "intent": null,
         "payload": "{entryID: UUID, revisionID: UUID, text: String}",

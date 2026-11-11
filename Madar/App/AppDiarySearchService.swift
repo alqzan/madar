@@ -49,7 +49,7 @@ extension AppDiaryService {
         let entries=Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil })))
         let trips=try context.fetch(FetchDescriptor<Trip>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil && !$0.dismissed }))
         var mediaDescriptor=FetchDescriptor<Media>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil }); mediaDescriptor.propertiesToFetch=[\.id,\.kind]
-        let media=Dictionary(uniqueKeysWithValues:try context.fetch(mediaDescriptor).map{($0.id,$0.kind)})
+        let media=Dictionary(try context.fetch(mediaDescriptor).map{($0.id,$0.kind)}, uniquingKeysWith: { first, _ in first })
         var documents:[DiarySearchDocument]=[]
         for row in entries {
             guard let day=try? GregorianDay(row.dayKey) else { continue }
@@ -75,8 +75,6 @@ extension AppDiaryService {
         for row in try context.fetch(FetchDescriptor<Letter>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.state == "opened" })) {
             documents.append(.init(id:row.id.uuidString,day:GregorianDay.containing(row.openedAt ?? row.createdAt,in:zone),text:row.text,kind:"letter"))
         }
-        var projects:[String:UUID]=[:]
-        for row in try context.fetch(FetchDescriptor<Project>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil },sortBy:[SortDescriptor(\.createdAt)])) where !row.name.isEmpty { projects[row.name]=row.id }
-        return try .init(documents:documents.sorted{$0.day > $1.day},parser:.init(today:today,zone:zone,weekStart:grid.weekStart,sightingOffset:grid.offset,places:Set(documents.compactMap(\.place)).sorted(),projects:projects,tags:Set(documents.flatMap(\.tags)).sorted()))
+        return try .init(documents:documents.sorted{$0.day > $1.day},parser:.init(today:today,zone:zone,weekStart:grid.weekStart,sightingOffset:grid.offset,places:Set(documents.compactMap(\.place)).sorted(),tags:Set(documents.flatMap(\.tags)).sorted()))
     }
 }

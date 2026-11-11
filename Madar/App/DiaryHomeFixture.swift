@@ -33,13 +33,11 @@ extension AppSession {
         }
         if variant == "echoes" || variant == "margin" { _ = try settings.stage(["notes.homeShape": .string(variant)]) }
         if variant == "letters" || variant == "lettersRoutes" {
-            // N04: one letter due since yesterday, one sealed today, and a project whose keyword today's line mentions.
+            // N04: one letter due since yesterday, and one sealed today.
             let now=prayerUITestClock(.now),today=GregorianDay.containing(now,in:.riyadh)
             let due=Letter();due.id=UUID(uuidString:"33333333-3333-4333-8333-333333333331")!;due.text="أرجو أن تكون أخفّ مما كنت يوم كتبتها.";due.triggerKind="date";due.triggerValue=today.adding(days:-1).description;due.openAt=today.adding(days:-1).date(in:.riyadh);due.createdAt=now.addingTimeInterval(-40*86400);context.insert(due)
             let sealed=Letter();sealed.id=UUID(uuidString:"33333333-3333-4333-8333-333333333332")!;sealed.text="لا تُقرأ قبل وقتها";sealed.triggerKind="date";sealed.triggerValue=today.adding(days:60).description;sealed.createdAt=now.addingTimeInterval(-3600);context.insert(sealed)
-            let project=Project();project.id=UUID(uuidString:"44444444-4444-4444-8444-444444444441")!;project.name="ترتيب البيت";project.intention="بيت أهدأ قبل رمضان";project.keyword="البيت";context.insert(project)
             if variant == "lettersRoutes" {
-                let second=Project();second.id=UUID(uuidString:"44444444-4444-4444-8444-444444444442")!;second.name="المشروع الثاني";second.intention="وجهة ثانية للرابط";second.keyword="الثاني";context.insert(second)
                 let orphan=Letter();orphan.id=UUID(uuidString:"33333333-3333-4333-8333-333333333333")!;orphan.text="رسالة فقدت مشروعها";orphan.triggerKind="projectFinished";orphan.triggerTargetID=UUID(uuidString:"55555555-5555-4555-8555-555555555551")!;orphan.createdAt=now.addingTimeInterval(-1800);context.insert(orphan)
             }
             let row=Entry();row.dayKey=today.description;row.text="دهنّا غرفة البيت الصغيرة.";row.eventAt=now.addingTimeInterval(-2*3600);row.tzID="Asia/Riyadh";row.dayPolicy="midnight@1";context.insert(row)

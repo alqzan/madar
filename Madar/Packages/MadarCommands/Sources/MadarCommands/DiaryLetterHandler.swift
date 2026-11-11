@@ -72,41 +72,6 @@ import MadarPrayer
         try touch(row, now, writer) { $0.triggerKind = DiaryLetterTrigger.date.rawValue; $0.triggerValue = day; $0.triggerTargetID = nil; $0.openAt = key.date(in: zone); $0.state = DiaryLetterState.sealed.rawValue }
         return try JSONEncoder().encode(DiaryInverse(model: "Letter", after: row.record(), dayKey: day, previousOrigin: nil, before: before))
     }
-    static func saveProject(_ id: UUID, name: String, intention: String, keyword: String?, context: ModelContext, now: Date, writer: String) throws -> Data? {
-        let rows = try context.fetch(FetchDescriptor<Project>())
-        if let row = rows.first(where: { $0.id == id }) {
-            guard row.deletedAt == nil, row.mergedInto == nil else { throw DataError.invalidValue("missing project") }
-            guard row.name != name || row.intention != intention || row.keyword != keyword else { return nil }
-            let before = try row.record()
-            try touch(row, now, writer) { $0.name = name; $0.intention = intention; $0.keyword = keyword }
-            return try JSONEncoder().encode(DiaryInverse(model: "Project", after: row.record(), dayKey: "", previousOrigin: nil, before: before))
-        }
-        let row = Project(); row.id = id; row.name = name; row.intention = intention; row.keyword = keyword; row.createdAt = now; row.updatedAt = now; row.writerID = writer; context.insert(row)
-        return try JSONEncoder().encode(DiaryInverse(model: "Project", after: row.record(), dayKey: "", previousOrigin: nil))
-    }
-    static func finishProject(_ id: UUID, reflection: String?, context: ModelContext, now: Date, writer: String) throws -> Data? {
-        guard let row = try context.fetch(FetchDescriptor<Project>()).first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("missing project") }
-        guard row.finishedAt == nil else { return nil }
-        let before = try row.record()
-        try touch(row, now, writer) { $0.finishedAt = now; $0.reflection = reflection?.isEmpty == true ? nil : reflection }
-        return try JSONEncoder().encode(DiaryInverse(model: "Project", after: row.record(), dayKey: "", previousOrigin: nil, before: before))
-    }
-    /// Deleting a project tombstones it; its entries keep their text and projectID, so undo brings the links back.
-    static func deleteProject(_ id: UUID, context: ModelContext, now: Date, writer: String) throws -> Data? {
-        guard let row = try context.fetch(FetchDescriptor<Project>()).first(where: { $0.id == id && $0.mergedInto == nil }) else { throw DataError.invalidValue("missing project") }
-        guard row.deletedAt == nil else { return nil }
-        let before = try row.record(), stamp = StableIdentity.monotonic(now: now, previous: row.updatedAt)
-        try touch(row, now, writer) { $0.deletedAt = stamp; $0.deletionBarrierAt = stamp }
-        return try JSONEncoder().encode(DiaryInverse(model: "Project", after: row.record(), dayKey: "", previousOrigin: nil, before: before))
-    }
-    static func link(_ entry: UUID, project: UUID?, context: ModelContext, now: Date, writer: String) throws -> Data? {
-        guard let row = try context.fetch(FetchDescriptor<Entry>()).first(where: { $0.id == entry && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("missing diary entry") }
-        if let project, !(try context.fetch(FetchDescriptor<Project>()).contains { $0.id == project && $0.deletedAt == nil && $0.mergedInto == nil }) { throw DataError.invalidValue("missing project") }
-        guard row.projectID != project else { return nil }
-        let before = try row.record()
-        try touch(row, now, writer) { $0.projectID = project }
-        return try JSONEncoder().encode(DiaryInverse(model: "Entry", after: row.record(), dayKey: row.dayKey, previousOrigin: nil, before: before))
-    }
 }
 
 /// Read-only: whether `diary.refreshLetters` would move any letter. Callers skip the write otherwise.

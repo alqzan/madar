@@ -99,8 +99,8 @@ import MadarCommands
         let app=try AppSession(container:container,groupDirectory:root),service=AppQuranService(session:app,clock:{now})
         let input=QuranUIPlanInput(startAyah:1,unit:.page,amount:1,rhythm:.balanced,restDay:"none",missPolicy:"ask")
         // 604 faces, one per day, no rest: today plus 603 days; three ayahs do not complete the first face.
-        let expected=app.dateLabels(try GregorianDay("2028-06-09"), first: .hijri).primary
-        let partial = try await service.previewPlan(input); XCTAssertEqual(partial.title,expected); XCTAssertEqual(partial.secondaryDate,"٩ يونيو ٢٠٢٨ م")
+        let expected=app.dateLabels(try GregorianDay("2028-06-09"), first: .gregorian).primary // Quran follows core.firstCalendar, Gregorian by default (owner, 8 Nov).
+        let partial = try await service.previewPlan(input); XCTAssertEqual(partial.title,expected); XCTAssertEqual(partial.title,"٩ يونيو ٢٠٢٨ م"); XCTAssertEqual(partial.secondaryDate,"١٦ محرم ١٤٥٠ هـ")
         row.toAyah=7;try context.save() // Whole first face: 603 remain, starting tomorrow gives the same date.
         let complete = try await service.previewPlan(input); XCTAssertEqual(complete.title,expected)
         let overview=try await service.planOverview()

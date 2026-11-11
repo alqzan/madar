@@ -31,8 +31,13 @@ struct DiaryMediaCard: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if media.kind == "photo", let image = UIImage(data: media.data) {
-                Button { open() } label: { Image(uiImage: image).resizable().scaledToFit().frame(maxWidth: 150).padding(8).background(theme.surface).rotationEffect(.degrees(-2)).shadow(color: theme.ink.opacity(0.1), radius: 5, y: 4) }
+            if media.kind == "photo" {
+                // Shrunk off the main thread once, instead of decoding a camera photo again at every redraw of the day.
+                Button { open() } label: {
+                    DiaryDataThumbnail(data: media.data, maxPixel: 450) { image in
+                        image.resizable().scaledToFit().frame(maxWidth: 150).padding(8).background(theme.surface).rotationEffect(.degrees(-2)).shadow(color: theme.ink.opacity(0.1), radius: 5, y: 4)
+                    }
+                }
                     .buttonStyle(.madarPlain).accessibilityLabel("افتح الصورة").accessibilityIdentifier("diary-media-" + media.id.uuidString)
             } else if media.kind == "audio" {
                 if editingTitle {

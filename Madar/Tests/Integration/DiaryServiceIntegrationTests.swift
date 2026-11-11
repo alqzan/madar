@@ -55,32 +55,6 @@ import UIKit
         XCTAssertThrowsError(try service.home())
     }
 
-    func testProjectLinesGroupOnceAndKeepTheirDateOrder() throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryProjects-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
-        let app = try AppSession(container: container, groupDirectory: root)
-        app.authorizeProtectedData()
-        let context = ModelContext(container), first = Project(), second = Project()
-        first.name = "العمل"; first.createdAt = Date(timeIntervalSince1970: 1)
-        second.name = "العائلة"; second.createdAt = Date(timeIntervalSince1970: 2)
-        context.insert(first); context.insert(second)
-
-        func entry(_ project: Project, day: String, text: String, secondOfDay: TimeInterval) {
-            let row = Entry(); row.projectID = project.id; row.dayKey = day; row.text = text
-            row.eventAt = Date(timeIntervalSince1970: secondOfDay); context.insert(row)
-        }
-        entry(first, day: "2026-10-02", text: "السطر الأحدث", secondOfDay: 2)
-        entry(second, day: "2026-10-03", text: "سطر العائلة", secondOfDay: 3)
-        entry(first, day: "2026-10-01", text: "السطر الأقدم", secondOfDay: 1)
-        let unlinked = Entry(); unlinked.dayKey = "2026-10-04"; unlinked.text = "بلا مشروع"; context.insert(unlinked)
-        try context.save()
-
-        let cards = try AppDiaryService(app: app).projects()
-        XCTAssertEqual(cards.map(\.name), ["العمل", "العائلة"])
-        XCTAssertEqual(cards[0].lines.map(\.text), ["السطر الأقدم", "السطر الأحدث"])
-        XCTAssertEqual(cards[1].lines.map(\.text), ["سطر العائلة"])
-    }
     func testHomeOffMainMatchesTheCurrentDiarySnapshot() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "DiaryHomeOffMain-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

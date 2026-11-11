@@ -4,6 +4,17 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+/// A draft write begun as a page closes or the day tab changes. The next composer or the full page waits for it before it reads the draft,
+/// so leaving a page never shows an older draft for a moment (or loses the last words).
+@MainActor enum DiaryDraftFlush {
+    private static var pending: Task<Void, Never>?
+    static func run(_ work: @escaping @MainActor () async -> Void) {
+        let previous = pending
+        pending = Task { await previous?.value; await work() }
+    }
+    static func settle() async { await pending?.value }
+}
+
 /// 10 Nov owner: writing in the diary is direct. One quiet field at the foot of today's page — type and send, pick a photo, change a line or write
 /// after one right here. The full page (voice, camera, files) is one tap away and shares the same draft, so nothing typed is lost.
 struct DiaryInlineComposer: View {
@@ -25,19 +36,29 @@ struct DiaryInlineComposer: View {
     @State private var draftWritingDay: GregorianDay?
     @State private var saving = false
     @State private var failure: String?
+    /// A quiet, non-error line (for example where a photo went).
+    @State private var notice: String?
     @State private var draftTask: Task<Void, Never>?
     @State private var photo: PhotosPickerItem?
     @State private var loaded = false
+    /// The text last written to the store, so reopening or leaving never rewrites an unchanged draft.
+    @State private var lastSaved = ""
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var focused: Bool
 
     private var service: AppDiaryService { AppDiaryService(app: app, clock: { app.prayerNow() }) }
     private var field: Binding<String> { edit == nil ? $text : $editText }
     private var trimmed: String { field.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmedText: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var canSend: Bool { !trimmed.isEmpty && !saving && (edit == nil || editText != edit?.text) }
 
     var body: some View {
         VStack(spacing: 6) {
             if edit != nil || (insertAt != nil && anchor != nil) { chip }
+            if let notice, failure == nil {
+                Text(notice).font(MadarTypography.fine()).foregroundStyle(theme.color("ink3Text")).frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("diary-inline-notice")
+            }
             if let failure {
                 Text(failure).font(MadarTypography.fine()).foregroundStyle(theme.color("late")).frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("diary-inline-failure")
@@ -53,7 +74,7 @@ struct DiaryInlineComposer: View {
                     .background(theme.surface, in: .rect(cornerRadius: 22))
                     .overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 0.7) }
                     .accessibilityIdentifier("diary-inline-field")
-                if trimmed.isEmpty {
+                if trimmed.isEmpty && edit == nil {
                     Button {
                         Task { await keepDraft(); openEditor() }
                     } label: {
@@ -61,6 +82,12 @@ struct DiaryInlineComposer: View {
                     }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text"))
                         .accessibilityLabel("الورقة الكاملة: صوت وكاميرا وملفات").accessibilityIdentifier("diary-day-write")
                 } else {
+                    if edit == nil {
+                        Button { Task { await keepDraft(); openEditor() } } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 15)).frame(width: 36, height: 44).contentShape(Rectangle())
+                        }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text"))
+                            .accessibilityLabel("افتح الورقة الكاملة: صوت وكاميرا وملفات").accessibilityIdentifier("diary-inline-expand")
+                    }
                     Button { Task { await send() } } label: {
                         Image(systemName: "arrow.up").font(.system(size: 17, weight: .bold)).frame(width: 44, height: 44)
                             .foregroundStyle(theme.background).background(theme.dark ? theme.accent : theme.ink, in: .circle)
@@ -70,10 +97,19 @@ struct DiaryInlineComposer: View {
                 }
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 8).frame(maxWidth: 640).frame(maxWidth: .infinity).background(theme.background)
-        .task(id: editorOpen) { if !editorOpen { await loadDraft() } }
-        .onChange(of: text) { _, _ in if edit == nil { scheduleDraft() } }
-        .onChange(of: edit) { _, value in if let value { editText = value.text; focused = true } }
+        .padding(.horizontal, 14).padding(.vertical, 8).frame(maxWidth: 680).frame(maxWidth: .infinity).background(theme.background)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: edit != nil || (insertAt != nil && anchor != nil))
+        .task(id: editorOpen) {
+            guard !editorOpen else { return }
+            // The full page flushes its draft as it closes (a swipe back does it a moment later): read it after that, not before.
+            if loaded { try? await Task.sleep(for: .milliseconds(120)) }
+            await DiaryDraftFlush.settle()
+            await loadDraft()
+        }
+        .onDisappear { if loaded, edit == nil, !trimmedText.isEmpty { DiaryDraftFlush.run { await keepDraft() } } }
+        .onChange(of: text) { _, _ in if edit == nil { failure = nil; notice = nil; scheduleDraft() } }
+        .onChange(of: editText) { _, _ in failure = nil }
+        .onChange(of: edit) { _, value in if let value { editText = value.text; failure = nil; focused = true } }
         .onChange(of: focusTick) { _, _ in focused = true }
         .onChange(of: photo) { _, item in if let item { Task { await addPhoto(item) } } }
     }
@@ -83,7 +119,7 @@ struct DiaryInlineComposer: View {
             Text(edit != nil ? "تعدّل هذا السطر" : "بعد: «" + (anchor ?? "") + "»")
                 .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).lineLimit(1)
             Spacer(minLength: 4)
-            Button { edit = nil; insertAt = nil; anchor = nil; editText = "" } label: {
+            Button { edit = nil; insertAt = nil; anchor = nil; editText = ""; failure = nil } label: {
                 Image(systemName: "xmark.circle.fill").frame(width: 36, height: 30).contentShape(Rectangle())
             }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text"))
                 .accessibilityLabel("ألغِ").accessibilityIdentifier("diary-inline-chip-clear")
@@ -93,8 +129,8 @@ struct DiaryInlineComposer: View {
     private func loadDraft() async {
         do {
             if let draft = try service.draft(margin: nil) {
-                draftID = draft.id; hasDraftRecord = true; text = draft.text; draftDay = draft.day; draftWritingDay = draft.writingDay
-            } else { hasDraftRecord = false; text = ""; draftID = UUID(); draftDay = "today"; draftWritingDay = nil }
+                draftID = draft.id; hasDraftRecord = true; text = draft.text; lastSaved = draft.text; draftDay = draft.day; draftWritingDay = draft.writingDay
+            } else { hasDraftRecord = false; text = ""; lastSaved = ""; draftID = UUID(); draftDay = "today"; draftWritingDay = nil }
         } catch { failure = madarUserMessage(error) }
         loaded = true
     }
@@ -103,7 +139,7 @@ struct DiaryInlineComposer: View {
         return try service.currentDay()
     }
     private func scheduleDraft() {
-        guard loaded, !saving else { return }
+        guard loaded, !saving, text != lastSaved else { return }
         draftTask?.cancel()
         draftTask = Task {
             do { try await Task.sleep(for: .milliseconds(600)); try Task.checkCancellation(); try await persistDraft() }
@@ -111,28 +147,37 @@ struct DiaryInlineComposer: View {
         }
     }
     private func persistDraft() async throws {
-        guard hasDraftRecord || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        try await service.saveDraft(id: draftID, text: text, day: draftDay, margin: nil, writingDay: try currentWritingDay())
-        hasDraftRecord = true
+        guard hasDraftRecord || !trimmedText.isEmpty else { return }
+        guard text != lastSaved || !hasDraftRecord else { return }
+        let value = text
+        try await service.saveDraft(id: draftID, text: value, day: draftDay, margin: nil, writingDay: try currentWritingDay())
+        hasDraftRecord = true; lastSaved = value
+    }
+    /// Cancels the pending debounce and waits for a write already under way, so an old write can never land after the commit.
+    private func settleDraftTask() async {
+        let pending = draftTask
+        pending?.cancel(); await pending?.value
+        draftTask = nil
     }
     private func keepDraft() async {
-        draftTask?.cancel()
+        await settleDraftTask()
         do { try await persistDraft() } catch { failure = madarUserMessage(error) }
     }
     private func send() async {
         guard canSend else { return }
-        saving = true; failure = nil; draftTask?.cancel()
+        saving = true; failure = nil
         defer { saving = false }
+        await settleDraftTask()
         do {
             if let edit {
                 try await service.edit(edit.id, text: editText)
-                self.edit = nil; editText = ""
+                self.edit = nil; editText = ""; focused = false
             } else {
                 try await persistDraft()
                 var payload: [String: MadarCore.JSONValue] = ["id": .string(draftID.uuidString)]
                 if let insertAt, draftDay == "today", insertAt < app.prayerNow() { payload["at"] = .number(insertAt.timeIntervalSince1970) }
                 try await app.executeDiaryCommand("diary.commitDraft", payload: payload, id: draftID)
-                text = ""; hasDraftRecord = false; draftID = UUID(); draftDay = "today"; draftWritingDay = nil
+                text = ""; lastSaved = ""; hasDraftRecord = false; draftID = UUID(); draftDay = "today"; draftWritingDay = nil
                 insertAt = nil; anchor = nil
             }
             saved()
@@ -141,12 +186,15 @@ struct DiaryInlineComposer: View {
     private func addPhoto(_ item: PhotosPickerItem) async {
         defer { photo = nil }
         do {
-            guard let data = try await item.loadTransferable(type: Data.self), let copy = DiaryPhotoLibrary.smallCopy(of: data) else {
-                failure = "تعذّر فتح الصورة."; return
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let copy = await Task.detached(priority: .userInitiated, operation: { DiaryPhotoLibrary.smallCopy(of: data) }).value else {
+                failure = "تعذّر فتح الصورة. اخترها مرة أخرى."; return
             }
             let writingDay = try service.currentDay()
             try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", day: "today", writingDay: writingDay)
             failure = nil; saved()
+            // The photo API stores no time, so it goes to the end of the page; the «بعد» chip is cleared and says so.
+            if insertAt != nil { insertAt = nil; anchor = nil; notice = "أُضيفت الصورة في آخر الصفحة" }
         } catch { failure = madarUserMessage(error) }
     }
 }

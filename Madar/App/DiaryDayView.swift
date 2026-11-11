@@ -27,6 +27,10 @@ struct DiaryDayView: View {
     @State private var intentionsOpen = false
     @State private var niyyaSaved = false
     @State private var appearance: DiaryDayAppearance?
+    /// The page opened on «today»; when the day boundary passes while it is open, it moves on to the new day instead of becoming an old page.
+    @State private var followedToday: GregorianDay?
+    /// The same page a year ago, shown quietly on an empty today page (only when something was written then).
+    @State private var echo: DiaryDisplayDay?
     @State private var returnDay: GregorianDay?
     @State private var returnDismissed = false
     @State private var archiveOpen = false
@@ -45,13 +49,13 @@ struct DiaryDayView: View {
     @State private var waitingLetter: DiaryLetterCard?
     @State private var openingLetter: DiaryLetterCard?
     @State private var sealedHere = 0
-    @State private var projectLinks: [String: String] = [:]
-    @State private var projectSuggestions: [String: DiaryProjectCard] = [:]
 #if DEBUG
     @State private var injectedReadFailures: Set<String> = []
 #endif
     /// Travel days wear the air-mail paper everywhere on the page and in its sheets (§7.3).
     private var theme: RoomTheme { travel == nil ? roomTheme : RoomTheme(room: "notes.travel", dark: roomTheme.dark) }
+    /// Writing happens in the one inline composer of the root page; a day opened in a sheet (search, hub, week, import) reads, and its pencil opens the full page.
+    private var inlineWriting: Bool { shownDay == today && travel == nil && embeddedInNavigationStack }
     private var friday: Bool { appearance?.friday == true && travel == nil }
     private var shownDay: GregorianDay { selected ?? day }
     private var fridayStyle: DiaryFridayStyle { DiaryFridayStyle(app) }
@@ -77,7 +81,7 @@ struct DiaryDayView: View {
     private var pageReloadID: String {
         [shownDay.description, String(app.prayerRevision), String(retry), canReadDiary ? "open" : "closed"].joined(separator: ":")
     }
-    private var aiAvailabilityID: String { [page?.id ?? "loading", String(retry), String(intentions.count)].joined(separator: ":") }
+    private var aiAvailabilityID: String { [page?.id ?? "loading", String(retry), String(intentions.count), String(page?.lines.count ?? 0)].joined(separator: ":") }
     private var analysisText: String {
         guard let page else { return "" }
         return page.lines
@@ -195,7 +199,7 @@ struct DiaryDayView: View {
                 }
                 if shownDay == today, let waitingLetter {
                     DiaryLetterWaitingCard(
-                        letter: waitingLetter, digitsTitle: service.bothDates(waitingLetter.writtenDay)
+                        letter: waitingLetter, digitsTitle: service.diaryDates(waitingLetter.writtenDay)
                     ) { openingLetter = waitingLetter }.padding(.horizontal, 18).padding(.vertical, 6)
                 }
                 if shownDay == today, travel == nil, let arc {
@@ -232,8 +236,9 @@ struct DiaryDayView: View {
                                     // 10 Nov owner design: the day is one flow — the day's library photos on top, then every line, recording and attachment in the order it happened.
                                     if shownDay == today, travel == nil { dayPhotoStrip }
                                     let flow = page.lines.filter { $0.kind != "intention" }
+                                    let mediaByEntry = Dictionary(grouping: page.media, by: \.entryID)
                                     ForEach(Array(flow.enumerated()), id: \.element.id) { index, line in
-                                        let attached = page.media.filter { $0.entryID == line.id }
+                                        let attached = mediaByEntry[line.id] ?? []
                                         let hasAudio = attached.contains { $0.kind == "audio" }
                                         // A recording's text is its transcript: the card below shows it whole and editable, so the line itself is not repeated.
                                         if !hasAudio { lineRow(line, page: page).id("diary-entry-" + line.id) }
@@ -283,6 +288,7 @@ struct DiaryDayView: View {
                                             .font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(
                                                 .vertical, 40
                                             ).padding(.horizontal, 54)
+                                        if shownDay == today, let echo { echoBlock(echo) }
                                     }
                                 } else if failure == nil {
                                     ProgressView("تُفتح الصفحة…").padding(30)
@@ -362,6 +368,8 @@ struct DiaryDayView: View {
                     }
                 }
             }
+            // iPad: the page is a column of paper in the middle, not lines stretched across the screen.
+            .frame(maxWidth: 680).frame(maxWidth: .infinity)
             .background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme, theme).scrollDismissesKeyboard(.interactively)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 8) {
@@ -369,9 +377,9 @@ struct DiaryDayView: View {
                         UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
                             .accessibilityIdentifier("diary-day-undo")
                     }
-                    if shownDay == today, travel == nil {
+                    if inlineWriting {
                         DiaryInlineComposer(app: app, insertAt: $insertAt, anchor: $anchorLabel, edit: $inlineEdit, focusTick: $focusTick,
-                                            editorOpen: writing, openEditor: { insertAt = nil; anchorLabel = nil; writing = true }, saved: { retry += 1 })
+                                            editorOpen: writing, openEditor: { insertAt = nil; anchorLabel = nil; writing = true }, saved: { Task { await refreshLines() } })
                     } else { HStack(spacing: 10) {
                         if let travel, shownDay == today {
                             Button {
@@ -481,7 +489,7 @@ struct DiaryDayView: View {
             }
             // N04: letters are checked when the diary is open and the app comes to the foreground.
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { aiAvailability = .checking; retry += 1 }
+                if phase == .active { followToday(); aiAvailability = .checking; retry += 1 }
                 else if phase == .background { aiComposerOpen = false }
             }
             .onChange(of: canReadDiary) { _, canRead in
@@ -498,7 +506,7 @@ struct DiaryDayView: View {
             .task {
                 while !Task.isCancelled {
                     do {
-                        try await Task.sleep(for: .seconds(30)); displayNow = service.clock();
+                        try await Task.sleep(for: .seconds(30)); displayNow = service.clock(); followToday();
                         appearance = try service.appearance(shownDay); arc = service.dayArc(shownDay)
                     } catch { break }
                 }
@@ -506,12 +514,29 @@ struct DiaryDayView: View {
             .task(id: pageReloadID) { await loadDiaryPage() }
             .task(id: aiAvailabilityID) {
                 guard page != nil, (!analysisText.isEmpty || !intentions.isEmpty) else { aiAvailability = .checking; return }
-                aiAvailability = .checking
+                // No reset to «checking» here: the button stays put while a new line is saved, instead of blinking away and back.
                 aiAvailability = await MadarAIAvailabilityChecker.check()
             }
     }
 
+    /// After a line or photo is added only the page's lines are read again; closed-day preparation, letters and the AI check stay as they were.
+    @MainActor private func refreshLines() async {
+        guard canReadDiary else { return }
+        let target = shownDay
+        do {
+            let fresh = try await service.dayOffMain(target)
+            guard target == shownDay, canReadDiary else { return }
+            page = fresh; arc = service.dayArc(target); echo = nil
+        } catch is CancellationError {
+        } catch { failure = madarUserMessage(error) }
+    }
+    @MainActor private func followToday() {
+        guard let followed = followedToday, let now = try? service.currentDay(), now != followed else { return }
+        followedToday = now
+        if selected == nil || selected == followed { selected = now }
+    }
     @MainActor private func loadDiaryPage() async {
+        if followedToday == nil, selected == nil, day == today { followedToday = day }
         do {
             guard canReadDiary else { page = nil; aiComposerOpen = false; return }
             if page?.day != shownDay { page = nil; aiComposerOpen = false; aiAvailability = .checking }
@@ -525,6 +550,9 @@ struct DiaryDayView: View {
             arc = service.dayArc(shownDay)
             appearance = try service.appearance(shownDay)
             displayNow = service.clock()
+            echo = nil
+            if shownDay == today, displayPage.lines.isEmpty, displayPage.photo == nil,
+               let old = try? await service.dayOffMain(aYearAgo), old.excerpt != "صفحة بلا كتابة" { echo = old }
             returnDay = try service.returnAfterAbsence(shownDay)
             travel = try service.travel(shownDay)
             travelReturn = travel == nil ? try service.travelReturn(shownDay) : nil
@@ -539,16 +567,6 @@ struct DiaryDayView: View {
                 sealedHere = letters.filter { $0.writtenDay == shownDay && $0.state != .opened }.count
             } catch {
                 waitingLetter = nil; sealedHere = 0
-                failure = madarUserMessage(error)
-                return
-            }
-            do {
-#if DEBUG
-                try injectReadFailureOnce("projects")
-#endif
-                (projectLinks, projectSuggestions) = ([:], [:])
-            } catch {
-                projectLinks = [:]; projectSuggestions = [:]
                 failure = madarUserMessage(error)
                 return
             }
@@ -614,6 +632,18 @@ struct DiaryDayView: View {
             RoundedRectangle(cornerRadius: 18).stroke(theme.line)
         }.padding(.horizontal, 18).padding(.vertical, 6).accessibilityElement(children: .contain)
             .accessibilityIdentifier("diary-niyya-evening")
+    }
+    /// «في مثل هذا اليوم»: one quiet line from the same day a year ago, on a page that has nothing yet. A tap opens that day.
+    private func echoBlock(_ old: DiaryDisplayDay) -> some View {
+        Button { selected = old.day } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("في مثل هذا اليوم قبل سنة").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                Text(old.excerpt).font(DiaryType.writing).italic().lineSpacing(8).lineLimit(3).multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(service.bothDates(old.day, calendar: first)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+            }.padding(.top, 14).overlay(alignment: .top) { Rectangle().fill(theme.line).frame(height: 1) }
+                .padding(.horizontal, 54).contentShape(Rectangle())
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-echo")
     }
     private func ribbon(_ title: String, color: Color, height: CGFloat) -> some View {
         Text(title).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(
@@ -701,13 +731,13 @@ struct DiaryDayView: View {
     @ViewBuilder private var dayPhotoStrip: some View {
         DiaryDayPhotos(app: app, day: shownDay) { asset in
             guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { return false }
-            do { try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", day: "today", writingDay: shownDay, assetID: asset.localIdentifier); retry += 1; return true }
+            do { try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", day: "today", writingDay: shownDay, assetID: asset.localIdentifier); await refreshLines(); return true }
             catch { failure = madarUserMessage(error); return false }
         }.padding(.horizontal, 18).padding(.bottom, 10).accessibilityIdentifier("diary-day-photo-strip")
     }
     /// 10 Nov owner: no permanent «اكتب هنا» between every item. Any line is the place to write: its menu (or a tap on a room's own line) writes right after it, in time.
     private func writeAfter(_ line: DiaryDisplayLine, page: DiaryDisplayDay) {
-        guard shownDay == today, travel == nil else { return }
+        guard inlineWriting else { return }
         let flow = page.lines.filter { $0.kind != "intention" }
         if let index = flow.firstIndex(where: { $0.id == line.id }), index < flow.count - 1 {
             let gap = flow[index + 1].at.timeIntervalSince(line.at)
@@ -718,7 +748,7 @@ struct DiaryDayView: View {
     }
     /// A tap on a line you wrote changes it in the field at the foot of today's page; older days use the sheet (it explains the «عُدّل» mark).
     private func editLine(_ line: DiaryDisplayLine) {
-        if shownDay == today, travel == nil { insertAt = nil; anchorLabel = nil; inlineEdit = .init(id: line.id, text: line.text) }
+        if inlineWriting { insertAt = nil; anchorLabel = nil; inlineEdit = .init(id: line.id, text: line.text) }
         else { editing = .init(id: line.id, text: line.text) }
     }
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
@@ -747,7 +777,7 @@ struct DiaryDayView: View {
                 if line.kind == "margin" {
                     Text(
                         MadarInlineText.joined([
-                            "هامش", page.marginDays[line.id].map { service.bothDates($0) } ?? "تاريخ الكتابة غير متاح",
+                            "هامش", page.marginDays[line.id].map { service.diaryDates($0) } ?? "تاريخ الكتابة غير متاح",
                         ])
                     ).font(DiaryType.label)
                 }
@@ -777,7 +807,7 @@ struct DiaryDayView: View {
             ).frame(minHeight: 34)
     }
     @ViewBuilder private func lineActions(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
-        if shownDay == today, travel == nil {
+        if inlineWriting {
             Button("اكتب بعده", systemImage: "text.append") { writeAfter(line, page: page) }.accessibilityIdentifier("diary-line-write-after")
         }
         if !line.text.isEmpty { Button("انسخ", systemImage: "doc.on.doc") { UIPasteboard.general.string = line.text } }

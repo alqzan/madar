@@ -154,7 +154,7 @@ public enum BankMessageParser {
         // Owner, 19 Oct: a charity platform's thank-you receipt is not a movement; the bank's own debit records the gift.
         if has(t, ["وصل تبرعك", "Ehsan.sa"]) { return .marketing }
         if has(t, ["مرفوضة", "رفض العملية", "لم تتم العملية", "declined", "Rejected transaction", "رصيد غير كافي", "رصيد غير كاف", "Insufficient"]) { return .declined }
-        if has(t, ["عكس عملية", "إلغاء عملية", "عكس العملية", "reversal", "reversed"]) || matches(t, #"عكس\s+(?:ال)?عملية"#) { return .reversal }
+        if has(t, ["عكس عملية", "إلغاء عملية", "عكس العملية", "reversal", "reversed"]) || matches(t, #"عكس\s+(?:ال)?عملية|عملية\s+عكسية"#) { return .reversal }
         // Owner special cases: «تأكيد دفعة مقسمة» only confirms a plan (recording it double-counts); a bank purchase
         // «لدى:Tamara» is an ordinary purchase.
         if has(t, ["دفعة مقسمة"]) { return .marketing }
@@ -187,6 +187,8 @@ public enum BankMessageParser {
         if has(t, ["سحب صراف", "سحب نقدي", "ATM", "cash withdrawal"]) { return .withdrawal }
         // Al Rajhi: «بطاقة ائتمانية:تحويل … الى حساب:*1234»: money moved from the credit card to an account.
         if matches(t, #"ائتمانية\s*:\s*تحويل"#) { return .transferOut }
+        // stc pay: «Debit via wallet transfer» is money leaving the wallet (owner, 11 Nov); the endpoint is read when printed.
+        if matches(t, #"Debit\s+via\s+wallet\s+transfer"#) { return .transferOut }
         if has(t, ["حوالة صادرة", "تحويل صادر", "تحويل إلى", "تحويل الى", "outgoing transfer"])
             || matches(t, #"\boutgoing\b[\s\S]{0,80}\btransfer\b"#) { return .transferOut }
         if has(t, ["حوالة واردة", "تحويل وارد", "incoming transfer"]) { return .transferIn }
@@ -211,10 +213,15 @@ public enum BankMessageParser {
         }
         // «حوالة داخلية … الى:1234 … من:Drahim»: into the owner's own account from a named source.
         if has(t, ["حوالة داخلية", "حوالة محلية"]) && matches(t, #"(?m)^\s*(?:الى|إلى)\s*:\s*\*?\d"#) && matches(t, #"(?m)^\s*من\s*:\s*[^\d\s*]"#) { return .transferIn }
+        // Al Rajhi: «خصم USD 7.66 من حساب 004*318 للبطاقة *1234 في … والرصيد USD 10.00»: a foreign-currency card debit.
+        if matches(t, #"^\s*خصم\s+[A-Za-z]{3}\s+[\d.,]+\s+من\s+حساب\s+\S+\s+للبطاقة\s*\*"#) { return .purchase }
         if has(t, ["خصم عبر حوالة", "بين حساباتي", "بين حساباتك", "للحساب *", "للبطاقة *"]) || (has(t, ["خصم"]) && has(t, ["من حسابك", "من حساب"]) && has(t, ["تحويل"])) { return .transferOut }
         if has(t, ["اضافة", "إضافة"]) && has(t, ["الى حسابك", "إلى حسابك"]) { return .income }
         // Alinma Investment: a share sale pays the portfolio; a share purchase is an ordinary purchase below.
-        if matches(t, #"^\s*تنفيذ\s+بيع"#) { return .income }
+        // Owner, 11 Nov: a sale credits the investment account and a purchase debits it, both as moves to/from the owner's own
+        // «Alinma Investment» account (neutral when that wallet is tracked), not income and not spending.
+        if matches(t, #"^\s*تنفيذ\s+بيع"#) { return .transferIn }
+        if matches(t, #"^\s*تنفيذ\s+شراء"#) { return .transferOut }
         if has(t, ["شراء", "مشتريات", "purchase", "purchases", "Apple Pay", "مدى", "POS"]) { return .purchase }
         // STC Bank: «دفع قطة» pays a friend's share of a shared bill (the mirror of «استلام قطة»).
         if matches(t, #"^\s*دفع\s+قطة"#) { return .transferOut }
@@ -285,6 +292,15 @@ public enum BankMessageParser {
         // Owner, 19 Oct: the telecom sender «stc» (not stc pay / STC Bank) sends balance and offers only — ignore it all.
         let kind = ["stc", "stc-ad"].contains(sender?.lowercased().trimmingCharacters(in: .whitespaces) ?? "") ? .marketing : classify(text)
         var result = ParsedBankMessage(kind: kind)
+        // Bill-issued notices («تم إصدار فاتورتك … والمبلغ المطلوب N ريال») are not payments, but they become upcoming dues later:
+        // the amount and the due date, when printed, are kept in the statement-due fields.
+        if kind == .marketing, matches(t, #"صدور\s+فاتورة|فاتورة\s+جديدة|تم\s+إصدار\s+فاتورتك|invoice\s+(?:generated|due)|new\s+bill"#) {
+            if let due = labelledAmount(t, ["المبلغ المطلوب", "المبلغ المستحق", "Amount due"], exponents) ?? firstAmount(t, exponents) {
+                result.statementDueMinor = due.minor; result.currency = due.currency
+            }
+            result.dueDate = labelledDate(t, ["تاريخ الاستحقاق", "Due date", "آخر موعد للسداد"], timeZone)
+            return result
+        }
         // OTP and marketing: nothing is read out of them.
         guard kind != .otp, kind != .marketing else { return result }
         if kind == .statement {
@@ -298,23 +314,44 @@ public enum BankMessageParser {
         if let stated = labelledAmount(t, ["بما يعادل", "ما يعادل", "equivalent", "المبلغ بالريال"], exponents), stated.currency == homeCurrency, result.currency != homeCurrency {
             result.statedHomeMinor = stated.minor
         }
-        result.balanceMinor = labelledAmount(t, ["الرصيد المتوفر", "الرصيد المتاح", "الرصيد", "رصيد", "Balance", "Avl Bal"], exponents)?.minor
-        // A balance line may print a bare number («رصيد: 1250.00», «Wallet balance: 80.5»): the account's own currency is meant,
-        // so it is read only when the message's currency has the home currency's exponent, and never on statements.
-        if result.balanceMinor == nil, kind != .statement, kind != .declined, let homeExp = exponents.exponent(homeCurrency),
-           result.currency == nil || exponents.exponent(result.currency!) == homeExp,
-           let raw = first(#"(?mi)^[^\n]*?(?:الرصيد المتوفر|الرصيد المتاح|رصيد المحفظ[هة]|رصيد|(?<!الحد )المتاح|Avl\.?\s*Bal(?:ance)?|Available\s+Balance|Wallet\s+balance|Balance)\s*[:：]?\s*(-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?)\s*$"#, in: t) {
-            result.balanceMinor = minorUnits(raw.replacingOccurrences(of: "-", with: ""), exponent: homeExp).map { raw.hasPrefix("-") ? -$0 : $0 }
+        // The balance is the figure that follows its own label («الرصيد المتوفر: SAR -12.50», «رصيد: 1250.00», «والرصيد USD 10.00»),
+        // never another figure on the same line, and the printed sign is kept. A currency word before the number is allowed.
+        if let raw = first(#"(?mi)^[^\n]*?(?:الرصيد المتوفر|الرصيد المتاح|رصيد المحفظ[هة]|الرصيد|رصيد|(?<!الحد )المتاح|Avl\.?\s*Bal(?:ance)?|Available\s+Balance|Wallet\s+balance|Balance)\s*[:：]?\s*(?:(?:SAR|SR|USD|EUR|AED|GBP|ر\.س)\s*)?(-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?)"#, in: t),
+           let exp = exponents.exponent(result.currency ?? homeCurrency), let minor = minorUnits(raw.replacingOccurrences(of: "-", with: ""), exponent: exp) {
+            result.balanceMinor = raw.hasPrefix("-") ? -minor : minor
+            // BSF credit card: «الرصيد المتوفر» printed after the «total due» line is the available credit, not a balance.
+            if matches(t, #"ائتمانية"#), matches(t, #"(?:المبلغ\s+)?الإجمالي\s+المستحق|إجمالي\s+المبلغ\s+المستحق"#), matches(t, #"الرصيد\s+المتوفر|الرصيد\s+المتاح"#) {
+                result.availableLimitMinor = result.balanceMinor; result.balanceMinor = nil
+            }
         }
-        result.last4 = first(#"\*\s?(\d{4})\b|\b(\d{4})\s?\*"#, in: t)
+        // A starred number after the word «بطاقة» is the card even when an account tail is printed first («من حساب *1234 / الى بطاقة **5678»).
+        result.last4 = first(#"(?:بطاقة|ببطاقة|للبطاقة)\s*:?\s*\*+\s?(\d{4})(?!\d)"#, in: t)
+            ?? first(#"\*\s?(\d{4})\b|\b(\d{4})\s?\*"#, in: t)
             // Al Rajhi: «بطاقة:1234;مدى», «عبر:1234;مدى».
             ?? first(#"(?:بطاقة|ببطاقة|عبر)\s*:?\s*(\d{4})(?!\d)"#, in: t)
             ?? first(#"المنتهية\s*ب\s*:?\s*(\d{4})(?!\d)"#, in: t)
+            // Al Rajhi card payment: «بطاقة:فيزا 1234» (the network word comes before the tail, no colon after it).
+            ?? first(#"بطاقة\s*:\s*(?:فيزا|ماستر\s*كارد|ماستركارد|مدى)[\s-]*(\d{4})(?!\d)"#, in: t)
+            // Alinma: «من البطاقة الائتمانية: 1234»; Al Rajhi: «عبر:فيزا;1234».
+            ?? first(#"البطاقة\s+الائتمانية\s*:\s*\**(\d{4})(?!\d)"#, in: t)
+            ?? first(#"عبر\s*:\s*(?:فيزا|ماستر\s*كارد|مدى)\s*;\s*(\d{4})(?!\d)"#, in: t)
         result.accountLast4 = ownAccountTail(t, kind)
-        if kind == .transferOut {
+        if kind == .transferOut || kind == .withdrawal {
             result.counterpartyAccountLast4 = first(#"(?mi)^\s*(?:الى حساب|إلى حساب|الى|إلى|To|للحساب|لحساب)\s*:?\s*\**\s*(\d{3,4})\s*\**\s*$"#, in: t)
+                ?? first(#"(?m)^\s*ل\s*(\d{3,4})\s*;"#, in: t)
+                // SNB «إلى 706*691», D360 «رقم الحساب: ****1234 - <bank>», Al Rajhi «الى حساب:*1234 مبلغ:SAR 1.00».
+                ?? first(#"(?m)^\s*(?:إلى|الى)\s+\d+\*(\d{3,4})\s*$"#, in: t)
+                ?? first(#"(?m)^\s*رقم\s+الحساب\s*:\s*\**(\d{3,4})(?!\d)"#, in: t)
+                ?? first(#"(?m)^\s*الى\s+حساب\s*:\s*\**(\d{3,4})(?=\s+مبلغ)"#, in: t)
+                // Al Rajhi Capital: «تحويل N ريال إلى الحساب الإستثماري المنتهي ب ***677 في …».
+                ?? first(#"المنتهي\s*ب\s*\*+(\d{3,4})"#, in: t)
         } else if kind == .transferIn {
             result.counterpartyAccountLast4 = first(#"(?mi)^\s*(?:من|من حساب|From)\s*:?\s*\**\s*(\d{3,4})\s*\**\s*$"#, in: t)
+                ?? first(#"(?m)^\s*من\s*(\d{3,4})\s*;"#, in: t)
+                // Al Rajhi Capital: «… من الحساب الإستثماري المنتهي ب ***677 في 09-06-2021 15:48:47».
+                ?? first(#"المنتهي\s*ب\s*\*+(\d{3,4})"#, in: t)
+                // Al Rajhi incoming: «من ايبان:*1234».
+                ?? first(#"(?m)^\s*من\s+ايبان\s*:\s*\**(\d{3,4})"#, in: t)
         }
         // Sukuk prints its account number as «رقم: 1234».
         if result.last4 == nil { result.last4 = first(#"(?m)^\s*رقم\s*:\s*(\d{4})\s*$"#, in: t) }
@@ -326,9 +363,9 @@ public enum BankMessageParser {
         }
         result.eventAt = eventDate(t, timeZone, near: receivedAt ?? Date(), referenceIsDelivery: receivedAt != nil)
         result.merchant = labelled(t, ["لدى", "من متجر", "at", "التاجر"])
-        result.biller = labelled(t, ["المفوتر", "Biller"])
+        result.biller = labelled(t, ["المفوتر", "مفوتر", "Biller"])
         result.counterparty = kind == .transferIn ? (partyLabelled(t, ["من", "From", "اسم المرسل", "المرسل"]) ?? partyLine(t, ["من", "From"]))
-            : kind == .transferOut ? (partyLabelled(t, ["إلى", "الى", "To", "المستفيد", "اسم المستفيد", "اسم المستلم", "المستلم"]) ?? transferOutPartyAfterAmount(t) ?? partyLine(t, ["إلى", "الى", "To"])) : nil
+            : kind == .transferOut ? (partyLabelled(t, ["إلى", "الى", "To", "المستفيد", "اسم المستفيد", "اسم المستلم", "المستلم"]) ?? transferOutPartyAfterAmount(t) ?? partyLine(t, ["إلى", "الى", "To", "مستفيد"])) : nil
         if kind == .refund, result.merchant == nil { result.merchant = labelled(t, ["من"]) }
         // Al Rajhi: «… الى بطاقة *1234 من <merchant> في 25-10-19 10:30 والحد المتبقي …».
         if kind == .refund, result.merchant == nil {
@@ -361,6 +398,17 @@ public enum BankMessageParser {
         if kind == .transferOut, result.counterparty == nil,
            let name = first(#"للحساب\s*\*?\d{3,4}\s+\d{1,4}[-/]\d{1,2}[-/]\d{1,4}\s+\d{1,2}:\d{2}(?::\d{2})?\s+(\S[^\n]*)$"#, in: t) { result.counterparty = name.trimmingCharacters(in: .whitespaces) }
         if kind == .transferIn, result.counterparty == nil { result.counterparty = transferInPartyAfterAmount(t) }
+        // Al Rajhi new layout: «ل7635;<name>» (recipient tail and name) on an outgoing transfer, «من7524;<name>» on an incoming one.
+        if kind == .transferOut, result.counterparty == nil, let m = first(#"(?m)^\s*ل\s*\d{3,4}\s*;\s*(\S.*?)\s*$"#, in: t) { result.counterparty = m }
+        if kind == .transferIn, result.counterparty == nil, let m = first(#"(?m)^\s*من\s*\d{3,4}\s*;\s*(\S.*?)\s*$"#, in: t) { result.counterparty = m }
+        // «الحساب الإستثماري المنتهي ب ***677 في 09-06-2021 15:48:47»: the name stops before the tail and the date.
+        if kind == .transferIn || kind == .transferOut, let party = result.counterparty {
+            let cut = party.replacingOccurrences(of: #"\s+في\s+\d.*$"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: #"\s+المنتهي\s*ب\s*\*+\d+$"#, with: "", options: .regularExpression)
+            if !cut.isEmpty { result.counterparty = cut }
+        }
+        // «تم تحويل مبلغ 100 SAR إلى NAME.»: the sentence's full stop is not part of the name.
+        if let party = result.counterparty, party.hasSuffix("."), party.count > 1 { result.counterparty = String(party.dropLast()).trimmingCharacters(in: .whitespaces) }
         // Alinma: «حوالة N ريال لحساب **1234 من <name> 2026-01-05 10:30».
         if kind == .transferIn, result.counterparty == nil {
             result.counterparty = first(#"(?m)^\s*حوالة\s+[\d.,]+\s*(?:ريال|SAR)\s+لحساب\s*\*+\d+\s+من\s+(.+?)\s+\d{4}-\d{1,2}-\d{1,2}"#, in: t)
@@ -391,7 +439,7 @@ public enum BankMessageParser {
         result.foreignFeeMinor = labelledMoney(t, #"(?:رسوم تحويل العملة|FX Markup|Currency conversion fee)"#, exponents.exponent(homeCurrency))
         result.exchangeRate = first(#"(?:سعر الصرف|Exchange Rate)\s*[≈~:]*\s*(\d+(?:\.\d+)?)"#, in: t)
         result.remainingLimitMinor = labelledMoney(t, #"(?:حد الصرف المتبقي|الصرف المتبقي|الحد المتبقي)"#, exponents.exponent(homeCurrency))
-        result.availableLimitMinor = labelledMoney(t, #"(?:الحد المتاح|Avl\.?\s*limit|Available limit)"#, exponents.exponent(homeCurrency))
+        result.availableLimitMinor = result.availableLimitMinor ?? labelledMoney(t, #"(?:الحد المتاح|Avl\.?\s*limit|Available limit)"#, exponents.exponent(homeCurrency))
         if kind == .declined {
             result.declineReason = matches(t, #"غير\s+كاف\p{M}*|لعدم\s+وجود\s+رصيد|Insufficient"#) ? .insufficientBalance
                 : matches(t, #"limit\s+exceeded|تجاوز[^\n]*الحد|تجاوز\s+الحد"#) ? .limitExceeded
@@ -404,6 +452,7 @@ public enum BankMessageParser {
            let cur = result.currency, let exp = exponents.exponent(cur), let minor = minorUnits(total, exponent: exp) {
             result.amountMinor = minor
             result.merchant = first(#"^\s*تنفيذ\s+(?:بيع|شراء)\s+(.+?)\s+لمحفظتك"#, in: t)
+            result.counterparty = "Alinma Investment"
         }
         // Tamara/Tabby print the due day relatively: «مستحقة اليوم», «خلال يومين», «tomorrow».
         if kind == .bnplInstalment, result.dueDate == nil, let base = receivedAt {
@@ -430,6 +479,11 @@ public enum BankMessageParser {
         if kind == .purchase || kind == .refund || kind == .cashback {
             result.cardKind = has(t, ["ائتمان", "إئتمان", "credit"]) ? .credit : has(t, ["مسبقة الدفع", "prepaid"]) ? .prepaid
                 : has(t, ["مدى", "mada", "Apple Pay"]) ? .debit : nil
+        }
+        // Tamara/Tabby reminders of a payment still to come («دفعة قادمة بقيمة…», «دفعتك … مستحقة اليوم», «will be charged tomorrow»)
+        // move no money. They are notices; the figure and due day stay in the statement-due fields.
+        if result.kind == .bnplInstalment, matches(t, #"(?:دفعة\s+قادمة|دفعتك)\s+بقيمة|will\s+be\s+charged"#) {
+            result.statementDueMinor = result.amountMinor; result.amountMinor = nil; result.kind = .marketing
         }
         // A movement kind with no amount and no statement due is not a movement: an offer, a tariff or terms update, or a
         // cancelled-for-non-payment notice is a notice; anything else is left for review. Never recorded as an amount-less expense.
@@ -572,17 +626,26 @@ public enum BankMessageParser {
         return nearest(candidates, reference)
     }
 
-    /// The owner's own account tail: «من:*1234» / «من حساب: **0000» / «حساب 1234*» / «A/C:**1234» on a debit,
+    /// The owner's own account tail: «من:*1234» / «من حساب: **7391» / «حساب 1234*» / «A/C:**1234» on a debit,
     /// «الى:5678» / «إلى **0019» / «حساب *…» on an incoming transfer. The other party's account is never taken.
     static func ownAccountTail(_ text: String, _ kind: BankMessageKind) -> String? {
         let tail = #"\s*:?\s*\**\s*(\d{3,4})\s*\**\s*$"#
-        if kind == .transferIn || kind == .income || kind == .salary {
-            return first(#"(?mi)^\s*(?:الى|إلى|To|إلى حساب|الى حساب|حساب|الحساب)"# + tail, in: text)
-        }
-        guard [.purchase, .withdrawal, .transferOut, .cardPayment, .billPayment, .fee, .declined, .reversal, .bnplInstalment, .refund, .cashback].contains(kind) else { return nil }
-        return first(#"(?mi)^\s*(?:من|من حساب|من الحساب|From|A/C|حساب|رقم حساب|الحساب)"# + tail, in: text)
+        // SNB prints «حساب 706*691»: the digits after the star are the tail.
+        let starred = first(#"(?m)^\s*(?:حساب|من)\s*\d+\*(\d{3,4})\s*$"#, in: text)
+        let source: String? = first(#"(?mi)^\s*(?:من|من حساب|من الحساب|From|A/C|حساب|رقم حساب|الحساب|ر\.ح|خصمت من حساب)"# + tail, in: text)
             // Al Rajhi: «خصم SAR 23.00 من حسابك *1234 في 20-08-25 09:42 - <label>».
             ?? first(#"من\s+حسابك\s*\*+(\d{3,4})(?!\d)"#, in: text)
+            ?? starred
+            // Al Rajhi: «من حساب 004*318»: the digits after the star.
+            ?? first(#"من\s+حساب\s+\d+\*(\d{3,4})(?!\d)"#, in: text)
+        let destination: String? = first(#"(?mi)^\s*(?:الى|إلى|To|إلى حساب|الى حساب|حساب|الحساب)"# + tail, in: text) ?? starred
+            // Al Rajhi new layout: «ل7746» (the receiving account, tatweel removed); ATM deposits glue the machine's bank to the tail.
+            ?? first(#"(?m)^\s*ل\s*(\d{3,4})\s*$"#, in: text)
+            ?? first(#"(?m)^\s*الى\s*:\s*\*+(\d{4})(?=[A-Za-z])"#, in: text)
+        if kind == .transferIn || kind == .income || kind == .salary { return destination }
+        if kind == .reversal || kind == .refund || kind == .cashback { return destination ?? source }
+        guard [.purchase, .withdrawal, .transferOut, .cardPayment, .billPayment, .fee, .declined, .bnplInstalment].contains(kind) else { return nil }
+        return source
     }
 
     /// A person, company or wallet name behind a label: «الى:<name>». A value that starts with a digit or «*» is an account, and one

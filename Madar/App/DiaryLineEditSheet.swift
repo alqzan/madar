@@ -20,7 +20,7 @@ struct DiaryLineEditSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
-                Text("إن كان اليوم قد أُغلق، يبقى نصّك الأول محفوظًا ويظهر السطر بعلامة «عُدّل».").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                Text("يبقى نصّك الأول محفوظًا، ويظهر السطر بعلامة «عُدّل».").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                 TextEditor(text: $text).font(DiaryType.writing).scrollContentBackground(.hidden).focused($focused)
                     .padding(12).background(theme.surface, in: .rect(cornerRadius: 14)).overlay { RoundedRectangle(cornerRadius: 14).stroke(theme.line) }
                     .accessibilityIdentifier("diary-line-edit-text")

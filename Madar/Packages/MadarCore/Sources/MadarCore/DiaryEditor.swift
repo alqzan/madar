@@ -13,21 +13,17 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case deleteIntention(UUID)
     case edit(entry: UUID, revision: UUID, text: String)
     case deleteEntry(UUID)
-    // §7.3 N04 letters and projects.
+    // §7.3 N04 letters. (Project commands were removed on 11 Nov 2026; old queued ones are rejected as unknown.)
     case sealLetter(id: UUID, text: String, trigger: DiaryLetterTrigger, value: String?, target: UUID?)
     case refreshLetters
     case openLetter(UUID)
     case rescheduleLetter(id: UUID, day: String)
-    case saveProject(id: UUID, name: String, intention: String, keyword: String?)
-    case finishProject(id: UUID, reflection: String?)
-    case deleteProject(UUID)
-    case linkEntry(entry: UUID, project: UUID?)
     // §7.1 B03 «يوم تنتظره»: the row stores the rule; occurrences are derived.
     case saveUpcomingDay(id: UUID, title: String, calendar: String, year: Int?, month: Int, day: Int, repeats: String, countFrom: String, countUpAfter: Bool)
     case deleteUpcomingDay(UUID)
     case saveWidget(id: UUID, name: String, familyID: String, items: [String], style: WidgetMakerStyle)
     case deleteWidget(UUID)
-    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setAudioInsights", "diary.setIntention", "diary.setIntentionResult", "diary.setIntentionReview", "diary.deleteIntention", "diary.editEntry", "diary.deleteEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay", "widget.save", "widget.delete"]
+    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setAudioInsights", "diary.setIntention", "diary.setIntentionResult", "diary.setIntentionReview", "diary.deleteIntention", "diary.editEntry", "diary.deleteEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay", "widget.save", "widget.delete"]
     public static func parse(_ name: String, _ value: [String: JSONValue]) -> Self? {
         func uuid(_ key: String) -> UUID? { value[key]?.string.flatMap(UUID.init(uuidString:)) }
         switch name {
@@ -89,13 +85,6 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
         case "diary.rescheduleLetter":
             guard Set(value.keys) == ["id", "dayKey"], let id = uuid("id"), let day = value["dayKey"]?.string, (try? GregorianDay(day)) != nil else { return nil }
             return .rescheduleLetter(id: id, day: day)
-        case "diary.saveProject":
-            guard Set(value.keys).isSubset(of: ["id", "name", "intention", "keyword"]), let id = uuid("id"), let name = value["name"]?.string, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  let intention = value["intention"]?.string else { return nil }
-            let keyword = value["keyword"]?.string.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            return .saveProject(id: id, name: name, intention: intention, keyword: keyword?.isEmpty == true ? nil : keyword)
-        case "diary.finishProject":
-            guard Set(value.keys).isSubset(of: ["id", "reflection"]), let id = uuid("id") else { return nil }; return .finishProject(id: id, reflection: value["reflection"]?.string)
         case "bahw.saveUpcomingDay":
             guard Set(value.keys).isSubset(of: ["id", "title", "calendar", "year", "month", "day", "repeats", "countFromDayKey", "countUpAfter"]), let id = uuid("id"),
                   let title = value["title"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 80,
@@ -126,10 +115,6 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
             guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }
             return .deleteWidget(id)
         case "bahw.deleteUpcomingDay": guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }; return .deleteUpcomingDay(id)
-        case "diary.deleteProject": guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }; return .deleteProject(id)
-        case "diary.linkEntry":
-            guard Set(value.keys) == ["entryID", "projectID"], let entry = uuid("entryID"), value["projectID"] == .null || uuid("projectID") != nil else { return nil }
-            return .linkEntry(entry: entry, project: uuid("projectID"))
         case "diary.setTranscript":
             guard Set(value.keys) == ["entryID", "text"], let id = uuid("entryID"), let text = value["text"]?.string else { return nil }; return .transcript(entry: id, text: text)
         case "diary.setAudioInsights":

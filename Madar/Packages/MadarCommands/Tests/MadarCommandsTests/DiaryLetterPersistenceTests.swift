@@ -16,14 +16,15 @@ import MadarData
         try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
     }
     private func letter(_ container: ModelContainer, _ id: UUID) throws -> Letter { try #require(ModelContext(container).fetch(FetchDescriptor<Letter>()).first { $0.id == id }) }
-    // N04 acceptance: a date letter is not due before its day and opens once; a project letter whose project is
-    // deleted becomes orphaned and never opens by itself; rescheduling waits for the new date.
+    // N04 acceptance: a date letter is not due before its day and opens once; a stored project letter whose project is
+    // gone becomes orphaned and never opens by itself; rescheduling waits for the new date. (Projects can no longer be
+    // made in the app; the project rows here are seeded straight into the store, as an older store would hold them.)
     @Test func dateLetterOpensOnceAndProjectLetterOrphans() async throws {
         let (container, bus, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let written = date("2026-10-15T20:00:00+03:00"), dated = UUID(), project = UUID(), onProject = UUID()
         #expect(try await run(bus, "diary.sealLetter", ["id": .string(dated.uuidString), "text": .string("إلى نفسي بعد شهر"), "trigger": .string("date"), "value": .string("2026-11-15")], at: written).status == .applied)
         await #expect(throws: (any Error).self) { _ = try await run(bus, "diary.sealLetter", ["id": .string(UUID().uuidString), "text": .string("أمس"), "trigger": .string("date"), "value": .string("2026-10-14")], at: written) }
-        #expect(try await run(bus, "diary.saveProject", ["id": .string(project.uuidString), "name": .string("البيت"), "intention": .string("نرتّب البيت"), "keyword": .string("البيت")], at: written).status == .applied)
+        do { let seed = ModelContext(container), row = Project(); row.id = project; row.name = "البيت"; row.createdAt = written; row.updatedAt = written; seed.insert(row); try seed.save() }
         #expect(try await run(bus, "diary.sealLetter", ["id": .string(onProject.uuidString), "text": .string("حين ينتهي البيت"), "trigger": .string("projectFinished"), "targetID": .string(project.uuidString)], at: written).status == .applied)
         // Before the day: sealed, and opening is refused.
         let before = date("2026-11-14T12:00:00+03:00")
@@ -31,7 +32,7 @@ import MadarData
         #expect(try letter(container, dated).state == "sealed")
         await #expect(throws: (any Error).self) { _ = try await run(bus, "diary.openLetter", ["id": .string(dated.uuidString)], at: before) }
         // Deleting the target project orphans its letter; it is not opened.
-        _ = try await run(bus, "diary.deleteProject", ["id": .string(project.uuidString)], at: before)
+        do { let gone = ModelContext(container); let row = try #require(gone.fetch(FetchDescriptor<Project>()).first { $0.id == project }); row.deletedAt = before; row.updatedAt = before; try gone.save() }
         _ = try await run(bus, "diary.refreshLetters", [:], at: before.addingTimeInterval(60))
         #expect(try letter(container, onProject).state == "orphaned"); #expect(try letter(container, onProject).openedAt == nil)
         // On the day: eligible, opens once, a second opening keeps the first time.
@@ -48,20 +49,14 @@ import MadarData
         _ = try await run(bus, "diary.refreshLetters", [:], at: later.addingTimeInterval(60))
         #expect(try letter(container, onProject).state == "sealed")
     }
-    // N04: deleting a project keeps the entry text and its link; undo restores the project and the link shows again.
-    @Test func projectLinkSurvivesDeleteAndUndo() async throws {
+    // 11 Nov 2026: the project commands are gone; an old queued one is refused and touches nothing.
+    @Test func oldProjectCommandsAreRefusedAndChangeNothing() async throws {
         let (container, bus, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
-        let now = date("2026-10-15T20:00:00+03:00"), project = UUID(), line = UUID(), delete = UUID()
-        _ = try await run(bus, "diary.appendLine", ["text": .string("دهنّا غرفة البيت"), "day": .string("today")], at: now, id: line)
-        _ = try await run(bus, "diary.saveProject", ["id": .string(project.uuidString), "name": .string("البيت"), "intention": .string(""), "keyword": .string("البيت")], at: now)
-        _ = try await run(bus, "diary.linkEntry", ["entryID": .string(line.uuidString), "projectID": .string(project.uuidString)], at: now)
-        _ = try await run(bus, "diary.deleteProject", ["id": .string(project.uuidString)], at: now.addingTimeInterval(1), id: delete)
-        let entry = try #require(ModelContext(container).fetch(FetchDescriptor<Entry>()).first)
-        #expect(entry.text == "دهنّا غرفة البيت"); #expect(entry.projectID == project)
-        #expect(try ModelContext(container).fetch(FetchDescriptor<Project>()).first?.deletedAt != nil)
-        _ = try await run(bus, "system.undo", ["undoToken": .string(delete.uuidString)], at: now.addingTimeInterval(2))
-        #expect(try ModelContext(container).fetch(FetchDescriptor<Project>()).first?.deletedAt == nil)
-        _ = try await run(bus, "diary.finishProject", ["id": .string(project.uuidString), "reflection": .string("انتهينا")], at: now.addingTimeInterval(3))
-        #expect(try ModelContext(container).fetch(FetchDescriptor<Project>()).first?.finishedAt != nil)
+        let now = date("2026-10-15T20:00:00+03:00"), project = UUID()
+        for name in ["diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry"] {
+            let outcome = try? await run(bus, name, ["id": .string(project.uuidString), "name": .string("البيت"), "intention": .string("")], at: now)
+            #expect(outcome?.status != .applied)
+        }
+        #expect(try ModelContext(container).fetch(FetchDescriptor<Project>()).isEmpty)
     }
 }

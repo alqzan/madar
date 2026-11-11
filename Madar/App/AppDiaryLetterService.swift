@@ -14,16 +14,6 @@ struct DiaryLetterCard: Identifiable, Equatable {
     let text: String?
     let openedAt: Date?
 }
-struct DiaryProjectCard: Identifiable, Equatable {
-    struct Line: Identifiable, Equatable { let id: UUID; let day: GregorianDay; let text: String }
-    let id: UUID
-    let name: String
-    let intention: String
-    let keyword: String?
-    let finishedAt: Date?
-    let reflection: String?
-    let lines: [Line]
-}
 struct DiaryLetterChoice: Identifiable, Equatable { let id: String; let title: String; let trigger: DiaryLetterTrigger; let target: UUID? }
 
 extension AppDiaryService {
@@ -37,7 +27,7 @@ extension AppDiaryService {
     func letters() throws -> [DiaryLetterCard] {
         try authorizeRead()
         let context = ModelContext(app.container)
-        let projects = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<Project>()).map { ($0.id, $0.name) })
+        let projects = Dictionary(try context.fetch(FetchDescriptor<Project>()).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         return try context.fetch(FetchDescriptor<Letter>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.createdAt, order: .reverse)])).compactMap { row in
             guard let state = DiaryLetterState(rawValue: row.state), let trigger = DiaryLetterTrigger(rawValue: row.triggerKind) else { return nil }
             return .init(id: row.id, state: state, writtenDay: writtenDay(row.createdAt), waitingFor: waitingFor(trigger, value: row.triggerValue, target: row.triggerTargetID.flatMap { projects[$0] }),
@@ -121,33 +111,5 @@ extension AppDiaryService {
     }
     func rescheduleLetter(_ id: UUID, to date: Date) async throws {
         try await command("diary.rescheduleLetter", ["id": .string(id.uuidString), "dayKey": .string(GregorianDay.containing(date, in: app.activePlace.timeZone).description)])
-    }
-
-    func projects() throws -> [DiaryProjectCard] {
-        try authorizeRead()
-        let context = ModelContext(app.container)
-        let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.projectID != nil }, sortBy: [SortDescriptor(\.eventAt)])))
-        var entriesByProject: [UUID: [Entry]] = [:]
-        for entry in entries {
-            guard let projectID = entry.projectID else { continue }
-            entriesByProject[projectID, default: []].append(entry)
-        }
-        return try context.fetch(FetchDescriptor<Project>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.createdAt)])).map { project in
-            .init(id: project.id, name: project.name, intention: project.intention, keyword: project.keyword, finishedAt: project.finishedAt, reflection: project.reflection,
-                  lines: (entriesByProject[project.id] ?? []).compactMap { row in (try? GregorianDay(row.dayKey)).map { .init(id: row.id, day: $0, text: row.text) } })
-        }
-    }
-    /// «يتعلّق بـ«…»؟» for one line: open projects whose keyword the line mentions, unless it is linked already.
-    func suggestions(for text: String, linked: UUID?) throws -> [DiaryProjectCard] {
-        guard linked == nil else { return [] }
-        return try projects().filter { $0.finishedAt == nil && $0.keyword.map { DiaryProjectKeyword.mentions(text, keyword: $0) } == true }
-    }
-    func saveProject(_ id: UUID = UUID(), name: String, intention: String, keyword: String) async throws {
-        try await command("diary.saveProject", ["id": .string(id.uuidString), "name": .string(name), "intention": .string(intention), "keyword": .string(keyword)])
-    }
-    func finishProject(_ id: UUID, reflection: String) async throws { try await command("diary.finishProject", ["id": .string(id.uuidString), "reflection": .string(reflection)]) }
-    func deleteProject(_ id: UUID) async throws { try await command("diary.deleteProject", ["id": .string(id.uuidString)]) }
-    func link(_ entry: String, to project: UUID?) async throws {
-        try await command("diary.linkEntry", ["entryID": .string(entry), "projectID": project.map { .string($0.uuidString) } ?? .null])
     }
 }

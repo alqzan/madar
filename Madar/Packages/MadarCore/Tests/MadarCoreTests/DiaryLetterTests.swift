@@ -50,15 +50,3 @@ struct DiaryLetterTests {
         #expect(DiaryLetters.evaluate(l,in:try world("2027-02-08T10:00:00+03:00",today:"2027-02-08",hijri:.init(year:1448,month:9,day:1))) == .eligible)
     }
 }
-
-struct DiaryProjectKeywordTests {
-    // N04: whole word after Arabic normalisation; a longer word is not a match.
-    @Test func wholeWordAfterNormalisation() {
-        #expect(DiaryProjectKeyword.mentions("دهنّا غرفة البيت اليوم",keyword:"البيت"))
-        #expect(DiaryProjectKeyword.mentions("ورجعنا للبيت",keyword:"للبيت"))
-        #expect(DiaryProjectKeyword.mentions("واُسرة البيت",keyword:"اسرة البيت"))
-        #expect(DiaryProjectKeyword.mentions("والبيت أهدأ",keyword:"البيت"))
-        #expect(!DiaryProjectKeyword.mentions("البيتين متقابلان",keyword:"البيت"))
-        #expect(!DiaryProjectKeyword.mentions("بيت",keyword:""))
-    }
-}

@@ -194,7 +194,8 @@ import MadarCore
         savingAudio = true
         defer { savingAudio = false; refreshPendingAudio() }
         do {
-            let data = try Data(contentsOf: url)
+            // A long take is read off the main actor, so the screen keeps answering while it is saved.
+            let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
             guard !data.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
             let duration = (try? await AVURLAsset(url: url).load(.duration).seconds) ?? 0
             let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent) ?? UUID()

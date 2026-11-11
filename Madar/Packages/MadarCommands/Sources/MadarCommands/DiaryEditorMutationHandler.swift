@@ -50,16 +50,12 @@ import MadarData
         case .refreshLetters: try DiaryLetterHandler.refresh(context: context, now: now, writer: writer); return nil
         case .openLetter(let letter): try DiaryLetterHandler.open(letter, context: context, now: now, writer: writer); return nil
         case .rescheduleLetter(let letter, let day): return try DiaryLetterHandler.reschedule(letter, day: day, context: context, now: now, writer: writer)
-        case .saveProject(let project, let name, let intention, let keyword): return try DiaryLetterHandler.saveProject(project, name: name, intention: intention, keyword: keyword, context: context, now: now, writer: writer)
-        case .finishProject(let project, let reflection): return try DiaryLetterHandler.finishProject(project, reflection: reflection, context: context, now: now, writer: writer)
-        case .deleteProject(let project): return try DiaryLetterHandler.deleteProject(project, context: context, now: now, writer: writer)
         case .saveUpcomingDay(let id, let title, let calendar, let year, let month, let day, let repeats, let from, let countUp):
             return try BahwUpcomingHandler.save(id, title: title, calendar: calendar, year: year, month: month, day: day, repeats: repeats, countFrom: from, countUpAfter: countUp, context: context, now: now, writer: writer)
         case .saveWidget(let id, let name, let family, let items, let style):
             return try WidgetConfigMutation.save(id, name: name, family: family, items: items, style: style, context: context, now: now, writer: writer)
         case .deleteWidget(let id): return try WidgetConfigMutation.delete(id, context: context, now: now, writer: writer)
         case .deleteUpcomingDay(let id): return try BahwUpcomingHandler.delete(id, context: context, now: now, writer: writer)
-        case .linkEntry(let entry, let project): return try DiaryLetterHandler.link(entry, project: project, context: context, now: now, writer: writer)
         case .edit(let entry, let revision, let text): return try DiaryMutationHandler.edit(entry: entry, revision: revision, text: text, context: context, now: now, writer: writer)
         case .deleteEntry(let entry): return try DiaryMutationHandler.deleteEntry(entry, context: context, now: now, writer: writer)
         case .transcript(let entry, let text): return try DiaryMutationHandler.setTranscript(entry: entry, text: text, context: context, now: now, writer: writer)

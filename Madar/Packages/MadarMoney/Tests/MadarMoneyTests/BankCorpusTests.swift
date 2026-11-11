@@ -96,6 +96,27 @@ final class BankCorpusTests: XCTestCase {
             let figures = Self.printedFigures(operationLines.joined(separator: "\n"))
             if !figures.isEmpty && !figures.contains(parsedMinor) && !(p.statedHomeMinor.map(figures.contains) ?? false) { strictMiss.append("miss.amountNotOperation") }
         }
+        // Printed card/account tails must be captured (any masked shape), a balance must not repeat the amount when the text prints
+        // two different figures, «available» must not become a balance on a credit card, a future-payment reminder is no movement.
+        if BankIntake.decision(p.kind) == .record {
+            let captured = Set([p.last4, p.accountLast4, p.counterpartyAccountLast4].compactMap { $0 })
+            let ignoredLine = #"(IBAN|آيبان|الأيبان|الايبان|لآيبان|مرجع|Reference|Ref\b|المخالفة|الفاتورة|الطلب|الهوية|شيك|رقم الفرصة)"#
+            let shapes = [#"(?:بطاقة|ببطاقة|للبطاقة|[Cc]ard|عبر|ائتمانية|إئتمانية)[^\n\d]{0,14}\**\s*(\d{4})(?!\d|\.\d|,\d)"#, #"\*+\s?(\d{3,4})(?!\d)"#, #"(?<!\d)(\d{4})\s?\*"#,
+                          #"(?m)^\s*(?:من|الى|إلى|ل|حساب|رقم حساب|A/C|من حساب|الى حساب|إلى حساب)\s*:?\s*\**\s*(\d{3,4})\s*(?:\**|;.*)$"#, #"\d+\*(\d{3})(?!\d)"#]
+            var printed = Set<String>()
+            for line in t.split(separator: "\n").map(String.init) where !has(line, ignoredLine) {
+                for shape in shapes {
+                    guard let regex = try? NSRegularExpression(pattern: shape) else { continue }
+                    for m in regex.matches(in: line, range: NSRange(line.startIndex..., in: line)) { if let r = Range(m.range(at: 1), in: line) { printed.insert(String(line[r])) } }
+                }
+            }
+            if !printed.isSubset(of: captured) { strictMiss.append("miss.tail") }
+            let figures = Self.printedFigures(t)
+            if let b = p.balanceMinor, let a = p.amountMinor, b == a, figures.count > 1 { strictMiss.append("miss.balanceEqualsAmount") }
+            if p.balanceMinor != nil, has(t, "ائتمانية"), has(t, #"الإجمالي المستحق|إجمالي المبلغ المستحق"#), has(t, #"الرصيد (المتوفر|المتاح)"#) { strictMiss.append("miss.availableAsBalance") }
+            if has(t, #"(?:دفعة\s+قادمة|دفعتك)\s+بقيمة|will\s+be\s+charged"#) { strictMiss.append("miss.reminderRecorded") }
+            if p.balanceMinor == nil, has(t, #"(?m)^[^\n]*(الرصيد|رصيد|Balance)\s*:?\s*(SAR\s*)?-\d"#) { strictMiss.append("miss.negativeBalanceDropped") }
+        }
         out["strict.total"] = 1
         if strictMiss.isEmpty { out["strict.read"] = 1 } else { for m in strictMiss { out["strict." + m, default: 0] += 1 } }
         // Source/destination account and printed balance are counted apart so the transaction-level number stays comparable.

@@ -33,36 +33,3 @@ struct FoundationPrayerTimesPresentation {
         } ?? []
     }
 }
-
-private struct FoundationPrayerTimesCard: View {
-    let rows: [FoundationPrayerTimeRow]
-    let cityName: String
-    @Environment(\.roomTheme) private var theme
-    @Environment(\.dynamicTypeSize) private var dynamicType
-    var body: some View {
-        MadarCard {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("مواقيت اليوم").font(MadarTypography.cardTitle()).accessibilityAddTraits(.isHeader)
-                    Text(cityName).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                }
-                ForEach(rows) { row in
-                    Group {
-                        if dynamicType.isAccessibilitySize {
-                            VStack(alignment: .leading, spacing: 4) { Text(row.title); clock(row) }
-                        } else {
-                            HStack { Text(row.title); Spacer(); clock(row) }
-                        }
-                    }
-                    .font(MadarTypography.body()).frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(row.accessibilityLabel)
-                    .accessibilityIdentifier("foundation-prayer-time-\(row.prayer.rawValue)")
-                }
-            }
-        }
-    }
-    private func clock(_ row: FoundationPrayerTimeRow) -> some View {
-        Text("\u{2068}\(row.clock)\u{2069}").monospacedDigit().fixedSize(horizontal: false, vertical: true)
-    }
-}

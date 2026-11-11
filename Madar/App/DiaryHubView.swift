@@ -7,9 +7,7 @@ struct DiaryHubView: View {
     @Bindable var app: AppSession
     var initialTab: String? = nil
     var initialLetterID: UUID? = nil
-    var initialProjectID: UUID? = nil
     var initialLetterRequestID: UUID? = nil
-    var initialProjectRequestID: UUID? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -45,7 +43,7 @@ struct DiaryHubView: View {
     }
     private let tabs = [
         ("calendar", "الشهر"), ("timeline", "الأيام"), ("memories", "الذكريات"), ("photos", "الصور"),
-        // Owner, 5 Nov 2026: «اي شي له علاقه بالمشاريع احذفه… معاد ابيه». The tab left; stored projects stay untouched.
+        // Owner, 11 Nov 2026: projects are gone from the app for good; stored project rows stay in the store untouched.
         ("letters", "الرسائل"), ("index", "الفهرس"),
     ]
     var body: some View {
@@ -82,10 +80,6 @@ struct DiaryHubView: View {
                                 DiaryLettersPanel(
                                     app: app, initialLetterID: initialLetterID,
                                     initialLetterRequestID: initialLetterRequestID)
-                            case "projects":
-                                DiaryProjectsPanel(
-                                    app: app, initialProjectID: initialProjectID,
-                                    initialProjectRequestID: initialProjectRequestID)
                             default: timeline(archive.days)
                             }
                         } else if let failure {
@@ -112,7 +106,7 @@ struct DiaryHubView: View {
                                     minHeight: 44)
                             }.accessibilityIdentifier("diary-export")
                         }
-                    }.padding(18)
+                    }.padding(18).frame(maxWidth: 720).frame(maxWidth: .infinity)
                 }
                 .scrollPosition($contentPosition)
                 .onChange(of: month) { contentPosition.scrollTo(edge: .top) }
@@ -304,7 +298,7 @@ struct DiaryHubView: View {
     }
     private func miniMonth(_ archive: DiaryArchiveSnapshot, month: Int) -> some View {
         let days = grid.days(year: selectedYear, month: month),
-            counts = Dictionary(uniqueKeysWithValues: archive.days.map { ($0.day, $0.writings) })
+            counts = Dictionary(archive.days.map { ($0.day, $0.writings) }, uniquingKeysWith: { first, _ in first })
         let current = grid.parts(archive.today)
         return Button {
             self.month = month
@@ -396,11 +390,11 @@ struct DiaryHubView: View {
             timeline(
                 archive.days.filter {
                     let parts = grid.parts($0.day); return parts.year == selectedYear && parts.month == month
-                })
+                }, empty: "لا كتابة في هذا الشهر.")
         }
     }
     private func timeline(
-        _ days: [DiaryDaySummary], empty: String = "لا كتابة في هذه الفترة. يمكنك فتح أي يوم من التقويم."
+        _ days: [DiaryDaySummary], empty: String = "لم تكتب بعد. صفحة اليوم تنتظرك في المذكرات."
     ) -> some View {
         LazyVStack(alignment: .leading, spacing: 0) {
             if days.isEmpty { Text(empty).font(DiaryType.writing).padding(.vertical, 24) }

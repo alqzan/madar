@@ -1254,7 +1254,7 @@ final class AppSession {
         defer { endWrite() }
 #if DEBUG
         try await holdWriteForUITest("MADAR_UI_HABIT_WRITE_HOLD_MS", when: name == "habit.complete")
-        try await holdWriteForUITest("MADAR_UI_DIARY_COMMAND_HOLD_MS", when: ["diary.sealLetter", "diary.finishProject", "diary.deleteProject", "widget.delete"].contains(name))
+        try await holdWriteForUITest("MADAR_UI_DIARY_COMMAND_HOLD_MS", when: ["diary.sealLetter", "widget.delete"].contains(name))
 #endif
         let now = prayerNow()
         func run() async throws -> CommandOutcome {
@@ -1347,10 +1347,6 @@ final class AppSession {
     }
     /// Lifecycle asks (launch, return, unlock, a save) share one plan that runs once they settle; see `requestRefresh`.
     func requestPrayerNotificationRefresh() { prayerNotifications?.requestRefresh() }
-    func refreshPrayerNotifications() async {
-        do { try await prayerNotifications?.refresh() }
-        catch { errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(madarUserMessage(error))" }
-    }
     private func withSerializedPrayerNotificationMutation<T>(
         shouldRefresh: (T) -> Bool = { _ in true },
         _ operation: @MainActor () async throws -> T

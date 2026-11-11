@@ -19,18 +19,6 @@ import XCTest
         XCTAssertTrue(app.staticTexts["diary-hub-year"].waitForExistence(timeout: 10), app.debugDescription)
         shot(app, "AU-74-hub-retried-L")
     }
-    func testProjectListDoesNotClaimEmptyWhenReadFailsAndCanRetry() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_DIARY_PROJECTS_READ_FAILURE_ONCE": "1"]
-        app.launch()
-        XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
-        XCTAssertTrue(app.buttons["diary-hub-projects"].waitForExistence(timeout: 10)); app.buttons["diary-hub-projects"].tap()
-        XCTAssertTrue(app.staticTexts["diary-project-read-error"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لا مشاريع بعد")).firstMatch.exists)
-        app.buttons["diary-project-retry"].tap()
-        XCTAssertTrue(app.buttons["diary-project-row"].waitForExistence(timeout: 10), app.debugDescription)
-    }
     func testDayPageKeepsItsContentAndRetriesWhenLetterReadFails() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -44,88 +32,9 @@ import XCTest
         XCTAssertTrue(app.buttons["diary-letter-waiting"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(error.waitForNonExistence(timeout: 5), app.debugDescription)
     }
-    func testDayPageRetriesWhenProjectContextReadFails() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_DIARY_DAY_READ_FAILURE_ONCE": "projects"]
-        app.launch()
-        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 25), app.debugDescription); app.buttons["diary-today"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["diary-day-line"].waitForExistence(timeout: 10), app.debugDescription)
-        let error = app.staticTexts["diary-day-read-error"]
-        XCTAssertTrue(error.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertFalse(app.buttons["diary-line-project-suggest"].exists, app.debugDescription)
-        app.buttons["diary-day-read-retry"].tap()
-        XCTAssertTrue(app.buttons["diary-line-project-suggest"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(error.waitForNonExistence(timeout: 5), app.debugDescription)
-    }
-    func testUnsavedProjectReflectionIsKeptWhenCloseIsCancelled() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
-        app.launch()
-        XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
-        XCTAssertTrue(app.buttons["diary-hub-projects"].waitForExistence(timeout: 10)); app.buttons["diary-hub-projects"].tap()
-        let project = app.buttons["diary-project-row"]; XCTAssertTrue(project.waitForExistence(timeout: 10)); project.tap()
-        app.buttons["diary-project-finish"].tap()
-        let reflection = app.textFields["diary-project-reflection"]; XCTAssertTrue(reflection.waitForExistence(timeout: 5)); reflection.tap(); reflection.typeText("سطر أخير أحفظه")
-        app.buttons["diary-project-detail-close"].tap()
-        let keep = app.buttons.matching(identifier: "diary-project-reflection-continue").firstMatch; XCTAssertTrue(keep.waitForExistence(timeout: 5)); shot(app, "AU-95-diary-project-reflection-confirm-L"); keep.tap()
-        XCTAssertEqual(reflection.value as? String, "سطر أخير أحفظه")
-        app.buttons["diary-project-detail-close"].tap()
-        let discard = app.buttons.matching(identifier: "diary-project-reflection-discard").firstMatch; XCTAssertTrue(discard.waitForExistence(timeout: 5)); discard.tap()
-        XCTAssertTrue(app.buttons["diary-project-row"].waitForExistence(timeout: 10))
-    }
-    func testSwipeCannotDiscardAnUnsavedProjectDraft() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
-        app.launch()
-        XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
-        XCTAssertTrue(app.buttons["diary-hub-projects"].waitForExistence(timeout: 10)); app.buttons["diary-hub-projects"].tap()
-        app.buttons["diary-project-new"].tap()
-        let name = app.textFields["diary-project-name"]
-        XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("مسودة محفوظة من السحب")
-        shot(app, "AU-70-project-draft-before-L")
-        app.swipeDown()
-        XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertEqual(name.value as? String, "مسودة محفوظة من السحب")
-        app.buttons["إلغاء"].tap()
-        let discard = app.buttons["diary-project-discard"]
-        XCTAssertTrue(discard.waitForExistence(timeout: 5), app.debugDescription)
-        shot(app, "AU-70-project-discard-confirm-L")
-        app.buttons["أكمل الكتابة"].tap()
-        XCTAssertTrue(name.exists, app.debugDescription)
-        XCTAssertEqual(name.value as? String, "مسودة محفوظة من السحب")
-        shot(app, "AU-70-project-draft-kept-L")
-        app.buttons["إلغاء"].tap()
-        XCTAssertTrue(discard.firstMatch.waitForExistence(timeout: 5)); discard.firstMatch.tap()
-        XCTAssertTrue(name.waitForNonExistence(timeout: 8))
-    }
-    func testProjectRapidSaveCreatesOneRowAndHijriComposerKeepsBothDates() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
-        app.launch()
-        XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
-        XCTAssertTrue(app.buttons["diary-hub-projects"].waitForExistence(timeout: 10)); app.buttons["diary-hub-projects"].tap()
-        app.buttons["diary-project-new"].tap()
-        let name = app.textFields["diary-project-name"]
-        XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("مشروع بلا تكرار")
-        capture(app, "Final-project-before-save-L")
-        app.buttons["diary-project-save"].doubleTap()
-        XCTAssertTrue(name.waitForNonExistence(timeout: 10))
-        let rows = app.buttons.matching(identifier: "diary-project-row").matching(NSPredicate(format: "label CONTAINS %@", "مشروع بلا تكرار"))
-        XCTAssertEqual(rows.count, 1)
-        capture(app, "Final-project-single-L")
-        app.buttons["diary-hub-letters"].tap(); app.buttons["diary-letter-compose"].tap()
-        XCTAssertTrue(app.buttons["diary-letter-trigger-hijri"].waitForExistence(timeout: 5))
-        app.buttons["diary-letter-trigger-hijri"].tap()
-        XCTAssertTrue(app.datePickers["diary-letter-date"].waitForExistence(timeout: 5))
-        capture(app, "Final-letter-hijri-L")
-    }
     // N04: a due letter waits on today's page and opens once; a sealed one shows only as a blurred line;
-    // a project keyword is a suggestion that links by one tap; the mailbox and projects live in «أيامك».
-    func testLettersProjectsAndMailbox() throws {
+    // the mailbox lives in «أيامك». (Projects were removed from the app on 11 Nov 2026; their UI tests went with them.)
+    func testLettersAndMailbox() throws {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"letters","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00"];app.launch()
         XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout:25));app.buttons["diary-today"].tap()
@@ -133,7 +42,6 @@ import XCTest
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-sealed-letter-line").firstMatch.exists)
         XCTAssertFalse(app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@","لا تُقرأ قبل وقتها")).firstMatch.exists)
         capture(app,"F01-today-letters-L")
-        app.buttons["diary-line-project-suggest"].tap();XCTAssertTrue(app.staticTexts["diary-line-project"].waitForExistence(timeout:10))
         app.buttons["diary-letter-waiting"].tap();XCTAssertTrue(app.buttons["diary-letter-open"].waitForExistence(timeout:10));capture(app,"F01-letter-sealed-L")
         app.buttons["diary-letter-open"].tap();let text=app.staticTexts["diary-letter-text"];XCTAssertTrue(text.waitForExistence(timeout:10))
         XCTAssertTrue(text.label.hasPrefix("أرجو أن تكون"));capture(app,"F01-letter-open-L")
@@ -142,7 +50,6 @@ import XCTest
         app.buttons.matching(identifier:"أيامك").firstMatch.tap();XCTAssertTrue(app.buttons["diary-hub-letters"].waitForExistence(timeout:10));app.buttons["diary-hub-letters"].tap()
         XCTAssertTrue(app.buttons["diary-letter-opened"].waitForExistence(timeout:10));XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-letter-sealed").firstMatch.exists)
         capture(app,"F01-mailbox-L")
-        app.buttons["diary-hub-projects"].tap();XCTAssertTrue(app.buttons["diary-project-row"].waitForExistence(timeout:10));capture(app,"F01-projects-L")
     }
     private func capture(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
 }

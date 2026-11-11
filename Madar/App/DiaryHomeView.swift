@@ -60,8 +60,6 @@ struct DiaryHomeView: View {
     @State private var routedHubTab: String?
     @State private var routedLetterID: UUID?
     @State private var routedLetterRequestID: UUID?
-    @State private var routedProjectID: UUID?
-    @State private var routedProjectRequestID: UUID?
     @State private var routedSearchQuery: String?
     @State private var routedSearchRequestID: UUID?
     @State private var readerEntryRouteID: UUID?
@@ -190,8 +188,8 @@ struct DiaryHomeView: View {
         .onChange(of: selected) { _, day in if let day { Task { try? await service.prepareClosedDay(day); await refresh() } } }
         .fullScreenCover(isPresented: $searchOpen, onDismiss: { routedSearchQuery = nil; routedSearchRequestID = nil; applyPendingDiaryRootIfReady() }) { DiarySearchView(app: app, initialQuery: routedSearchQuery, initialQueryRequestID: routedSearchRequestID).environment(\.roomTheme, theme) }
         .fullScreenCover(isPresented: $archiveOpen, onDismiss: { clearHubRoute(); applyPendingDiaryRootIfReady() }) {
-            DiaryHubView(app: app, initialTab: routedHubTab, initialLetterID: routedLetterID, initialProjectID: routedProjectID,
-                initialLetterRequestID: routedLetterRequestID, initialProjectRequestID: routedProjectRequestID)
+            DiaryHubView(app: app, initialTab: routedHubTab, initialLetterID: routedLetterID,
+                initialLetterRequestID: routedLetterRequestID)
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
         }
         .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() }; applyPendingDiaryRootIfReady() }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
@@ -244,7 +242,7 @@ struct DiaryHomeView: View {
             searchOpen = true
         }
     }
-    private func clearHubRoute() { routedHubTab = nil; routedLetterID = nil; routedProjectID = nil; routedLetterRequestID = nil; routedProjectRequestID = nil }
+    private func clearHubRoute() { routedHubTab = nil; routedLetterID = nil; routedLetterRequestID = nil }
     private func editorDidDismiss() {
         if pendingDiaryRootRequestID != nil {
             queuedDiaryRoute = nil
@@ -655,7 +653,7 @@ struct DiaryHomeView: View {
                         try await service.setIntentionReview(item.id, period: item.period, text: intentionReviewText)
                         intentionReviewText = ""
                         intentionFollowUp = try await service.dueIntentionFollowUpsOffMain().first
-                    } catch { failure = madarUserMessage(error) }
+                    } catch { app.errorMessage = madarUserMessage(error) } // the home's own `failure` shows only while nothing is loaded, so a failed save would stay silent
                 }
             } label: {
                 HStack {

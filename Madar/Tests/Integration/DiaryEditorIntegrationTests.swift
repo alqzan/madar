@@ -77,4 +77,26 @@ import MadarData
         XCTAssertNil(DiaryVoiceInterruption.event(from: ended))
         XCTAssertNil(DiaryVoiceInterruption.event(from: Notification(name: .init("other"))))
     }
+
+    /// A draft write begun as a page closes must finish before the next reader looks at the draft.
+    func testDraftFlushSettlesBeforeTheNextReaderContinues() async {
+        @MainActor final class Log { var items: [String] = [] }
+        let log = Log()
+        DiaryDraftFlush.run { try? await Task.sleep(for: .milliseconds(60)); log.items.append("first") }
+        DiaryDraftFlush.run { log.items.append("second") }
+        await DiaryDraftFlush.settle()
+        log.items.append("reader")
+        XCTAssertEqual(log.items, ["first", "second", "reader"])
+    }
+    /// Diary dates lead with the diary's own calendar (`notes.calendarFirst`), whatever the app-wide first calendar is.
+    func testDiaryDatesFollowTheDiaryCalendarNotTheAppOne() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryDates-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        _ = try SettingsStore(context: context).stage(["core.firstCalendar": .string("hijri"), "notes.calendarFirst": .string("gregorian"), "core.numerals": .string("arabicIndic")])
+        try context.save()
+        let app = try AppSession(container: container, groupDirectory: root); app.authorizeProtectedData()
+        let text = AppDiaryService(app: app).diaryDates(try GregorianDay("2026-10-09"))
+        XCTAssertEqual(text, "٩ أكتوبر ٢٠٢٦ م، ٢٨ ربيع الآخر ١٤٤٨ هـ")
+    }
 }

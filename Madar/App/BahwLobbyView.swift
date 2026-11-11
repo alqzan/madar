@@ -217,8 +217,6 @@ struct BahwLobbyView: View {
     private var greeting: String {
         service.greeting
     }
-    /// Both dates, the first calendar first; joined with «، », never "·" beside a digit (RU1).
-    private var dateLine: String { session.dateLabels(service.today).combined }
 
     @ViewBuilder private func tile(_ block: BahwBlock, size: BahwBlockSize) -> some View {
         if arranging {

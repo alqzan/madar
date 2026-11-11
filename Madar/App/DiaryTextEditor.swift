@@ -119,7 +119,7 @@ struct DiaryTextEditor: View {
         .madarSheetLock(saving: saving || importing || voice?.savingAudio == true || voice?.converting == true, draft: !text.isEmpty || voice?.recording == true)
         .onDisappear {
             // B2-2: leaving never loses words; a pending 500 ms draft write is flushed unless the page was just saved.
-            if loaded, !saving, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Task { try? await persistDraft() } }
+            if loaded, !saving, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { DiaryDraftFlush.run { try? await persistDraft() } }
             draftTask?.cancel(); savedDayTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
         .diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
     }
@@ -147,7 +147,7 @@ struct DiaryTextEditor: View {
                 }
 #endif
                 if let margin {
-                    Text("هامش " + AppDiaryService(app: app).bothDates(margin)).font(MadarTypography.caption()).padding(14)
+                    Text("هامش " + AppDiaryService(app: app).diaryDates(margin)).font(MadarTypography.caption()).padding(14)
                 } else {
                     HStack(spacing: 8) {
                         choice("today", "اليوم"); choice("yesterday", "أمس")
@@ -156,7 +156,7 @@ struct DiaryTextEditor: View {
                 }
                 if let writingDay, let today = currentMadarDay,
                    (day == "today" && writingDay < today || day == "yesterday" && writingDay < today.adding(days: -1)) {
-                    Text(MadarInlineText.joined(["مسودة عن " + AppDiaryService(app: app).bothDates(writingDay), "تُحفظ في صفحتها الأصلية"])).font(MadarTypography.fine()).padding(.horizontal, 16)
+                    Text(MadarInlineText.joined(["مسودة عن " + AppDiaryService(app: app).diaryDates(writingDay), "تُحفظ في صفحتها الأصلية"])).font(MadarTypography.fine()).padding(.horizontal, 16)
                 }
                 if let prompt {
                     Text(prompt).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).foregroundStyle(theme.color("ink3Text"))
@@ -339,8 +339,14 @@ struct DiaryTextEditor: View {
         try await AppDiaryService(app: app).saveDraft(id: draftID, text: text, day: day, margin: margin, writingDay: writingDay)
         hasDraftRecord = true
     }
+    /// Cancels the pending debounce and waits for a write already under way, so an old write never lands after the commit.
+    private func settleDraftTask() async {
+        let pending = draftTask
+        pending?.cancel(); await pending?.value
+        draftTask = nil
+    }
     private func close() async {
-        draftTask?.cancel(); saving = true; failure = nil
+        saving = true; failure = nil; await settleDraftTask()
         do { await voice?.stop(); if loaded { try await persistDraft() }; dismiss() }
         catch { failure = madarUserMessage(error); saving = false }
     }
@@ -353,7 +359,8 @@ struct DiaryTextEditor: View {
         refreshSavedDay()
     }
     private func save() async {
-        guard !saving else { return }; saving = true; failure = nil; commitFailed = false; draftTask?.cancel()
+        guard !saving else { return }; saving = true; failure = nil; commitFailed = false
+        await settleDraftTask()
         do {
             await voice?.stop()
             if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

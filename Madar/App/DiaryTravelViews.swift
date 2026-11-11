@@ -216,7 +216,7 @@ extension AppDiaryService {
         value.formatted(.number.locale(Locale(identifier: "ar_SA@numbers=" + (app.string("core.numerals") == "western" ? "latn" : "arab"))))
     }
     func stampDate(_ day: GregorianDay) -> String { app.dateLabels(day, compact: true).combined }
-    func shortDate(_ day: GregorianDay) -> String {
-        bothDates(day)
-    }
+    func shortDate(_ day: GregorianDay) -> String { diaryDates(day) }
+    /// Both calendars, in the diary's own order (`notes.calendarFirst`, Gregorian first by default) rather than the app-wide first calendar.
+    func diaryDates(_ day: GregorianDay) -> String { bothDates(day, calendar: app.diaryFirstCalendar) }
 }

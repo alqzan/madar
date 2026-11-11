@@ -1059,9 +1059,13 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
     }
     static func writeAllocations(_ rows: [AllocationRow], context: ModelContext, now: Date, writer: String) throws {
-        let stored = try context.fetch(FetchDescriptor<Allocation>())
+        guard !rows.isEmpty else { return }
+        // B1-7: only the rows that could collide are read (a store keeps one allocation per expense, so the whole table grows without limit).
+        // The lookup runs once before the loop, as the full read did: a key repeated inside this batch is still not a collision.
+        let keys = rows.map(\.idempotencyKey)
+        let stored = Set(try context.fetch(FetchDescriptor<Allocation>(predicate: #Predicate { keys.contains($0.idempotencyKey) })).map(\.idempotencyKey))
         for value in rows {
-            guard !stored.contains(where: { $0.idempotencyKey == value.idempotencyKey }) else { throw MoneyCommandError.invalidReference }
+            guard !stored.contains(value.idempotencyKey) else { throw MoneyCommandError.invalidReference }
             let row = Allocation(); row.id = StableIdentity.uuid(for: "Allocation:\(value.idempotencyKey)")
             row.transactionID = value.transactionID.flatMap(UUID.init(uuidString:)); row.groupID = value.groupID.map { StableIdentity.uuid(for: $0) }
             row.cycleID = value.cycleID.flatMap(UUID.init(uuidString:)); row.amountMinor = value.amountMinor
@@ -1295,7 +1299,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     private static func messages(for row: MoneyTransaction, _ context: ModelContext) throws -> [BankMessage] {
         let rowID: UUID? = row.id
         let ids = Set(([row] + (try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.mergedInto == rowID })))).compactMap(\.messageID))
-        return try context.fetch(FetchDescriptor<BankMessage>()).filter { ids.contains($0.id) && live($0) }
+        let wanted = Array(ids)
+        return try context.fetch(FetchDescriptor<BankMessage>(predicate: #Predicate { wanted.contains($0.id) })).filter { live($0) }
     }
     private static func transaction(_ id: UUID?, _ context: ModelContext) throws -> MoneyTransaction {
         guard let id else { throw MoneyCommandError.missingRow }

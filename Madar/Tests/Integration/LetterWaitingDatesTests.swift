@@ -29,18 +29,6 @@ import SwiftData
         }
     }
 
-    func testRetryingTheSameProjectIdentityDoesNotCreateAnotherProject() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("ProjectSave-" + UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let store = try ManagedDataStore(root: root)
-        let app = try AppSession(container: store.container, managedStore: store, groupDirectory: root)
-        app.authorizeProtectedData()
-        let service = AppDiaryService(app: app), id = UUID()
-        for _ in 0..<2 { try await service.saveProject(id, name: "مشروع واحد", intention: "على مهل", keyword: "مشروعي") }
-        XCTAssertEqual(try service.projects().filter { $0.id == id }.count, 1)
-        XCTAssertEqual(try ModelContext(app.container).fetchCount(FetchDescriptor<Project>()), 1)
-    }
-
     func testHijriTriggerShowsBothCalendars() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("LetterDates-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

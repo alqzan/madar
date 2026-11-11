@@ -22,7 +22,7 @@ struct DiaryMarginView: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("ذكرى اليوم").font(DiaryType.heading).foregroundStyle(theme.accent)
-                    MadarDateLabel("من صفحتك في " + service.bothDates(page.day))
+                    MadarDateLabel("من صفحتك في " + service.diaryDates(page.day))
                         .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                 }
                 Spacer(minLength: 0)
@@ -48,7 +48,7 @@ struct DiaryMarginView: View {
                     if originals.isEmpty { Text("ذكرى حفظتها بالصورة.").font(DiaryType.writing).padding(.vertical, 24) }
                     ForEach(replies) { line in
                         VStack(alignment: .leading, spacing: 7) {
-                            Text(MadarInlineText.joined(["في هامشها", page.marginDays[line.id].map { service.bothDates($0) } ?? "تاريخ الكتابة غير متاح"])).font(DiaryType.label)
+                            Text(MadarInlineText.joined(["في هامشها", page.marginDays[line.id].map { service.diaryDates($0) } ?? "تاريخ الكتابة غير متاح"])).font(DiaryType.label)
                             Text(line.text).font(DiaryType.writing).italic().lineSpacing(11)
                         }.foregroundStyle(ink).padding(14).frame(maxWidth: .infinity, alignment: .leading)
                             .overlay(alignment: .leading) { Rectangle().fill(ink).frame(width: 2) }

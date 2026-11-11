@@ -24,7 +24,9 @@ import MadarData
     func testUnperformedPrayerWindowsDoNotCreateLobbyAttention() throws {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-15T14:00:00+03:00"))
         let app = try session(trackingStart: "2026-10-14")
-        XCTAssertTrue(AppBahwService(session: app, evaluationDate: now).attention().isEmpty)
+        // The lobby may ask about an unlogged prayer (owner, 4 Nov); asking never writes a record (RP1).
+        let attention = AppBahwService(session: app, evaluationDate: now).attention()
+        XCTAssertEqual(attention.moneyCount, 0)
         XCTAssertTrue(try ModelContext(app.container).fetch(FetchDescriptor<PrayerLog>()).isEmpty)
     }
 

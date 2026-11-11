@@ -62,21 +62,3 @@ public enum DiaryLetters {
         }
     }
 }
-
-/// N04 projects: the keyword is a suggestion, never an automatic link. Whole-word match after Arabic normalisation,
-/// allowing only the joined conjunction «و» before the word.
-public enum DiaryProjectKeyword {
-    private static func words(_ value:String)->[String] {
-        DiarySearchParser.normalize(value).components(separatedBy:CharacterSet.letters.union(.decimalDigits).inverted).filter{!$0.isEmpty}
-    }
-    public static func mentions(_ text:String,keyword:String)->Bool {
-        let key=words(keyword);guard !key.isEmpty else {return false}
-        let found=words(text);guard found.count>=key.count else {return false}
-        for start in 0...(found.count-key.count) {
-            var slice=Array(found[start..<start+key.count])
-            if slice[0] != key[0],slice[0]=="و"+key[0] {slice[0]=key[0]}
-            if slice==key {return true}
-        }
-        return false
-    }
-}
