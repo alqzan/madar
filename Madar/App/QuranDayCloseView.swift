@@ -18,7 +18,7 @@ struct QuranDayCloseView: View {
                     Button(action: close) {
                         Image(systemName: "chevron.backward").font(.system(size: 17, weight: .semibold)).frame(width: 44, height: 44)
                     }.buttonStyle(.madarPlain).accessibilityLabel("رجوع إلى الرئيسية").accessibilityIdentifier("quran-day-close-back")
-                    Text("ختام اليوم").font(serif(28)).accessibilityAddTraits(.isHeader)
+                    Text("ختام اليوم").font(quranSerif(28)).accessibilityAddTraits(.isHeader)
                     Spacer(minLength: 0)
                 }.padding(.horizontal, 4).padding(.bottom, 8)
                 if let summary {
@@ -38,7 +38,7 @@ struct QuranDayCloseView: View {
         .task { load() }
         .sheet(isPresented: $explainStrength) {
             VStack(alignment: .leading, spacing: 16) {
-                Text("المتانة قبل وبعد").font(serif(23))
+                Text("المتانة قبل وبعد").font(quranSerif(23))
                 if let summary {
                     Text("المتانة العامة: " + percent(summary.strengthBefore) + " ← " + percent(summary.strengthAfter))
                         .font(font(14, bold: true)).accessibilityIdentifier("quran-day-close-strength")
@@ -57,7 +57,7 @@ struct QuranDayCloseView: View {
                 Image(systemName: value.title == "أتممت يومك" ? "checkmark" : "leaf")
                     .font(.system(size: 30, weight: .bold)).foregroundStyle(theme.color("onGold"))
             }.frame(width: 66, height: 66).padding(.top, 4).padding(.bottom, 8).accessibilityHidden(true)
-            Text(value.title).font(serif(30)).accessibilityIdentifier("quran-day-close-title")
+            Text(value.title).font(quranSerif(30)).accessibilityIdentifier("quran-day-close-title")
             // Both calendars: the primary date as the main line, the other smaller beneath it;
             // the streak stands apart in the same mark as the Quran home instead of trailing the date.
             VStack(spacing: 3) {
@@ -95,7 +95,7 @@ struct QuranDayCloseView: View {
                     .font(font(12, bold: true)).foregroundStyle(theme.color("hifzText"))
             }
             Text(service.numerals.string(value.beforeFaces) + " ← " + faces(value.afterFaces))
-                .font(serif(24)).accessibilityLabel(faces(value.beforeFaces) + " ← " + faces(value.afterFaces))
+                .font(quranSerif(24)).accessibilityLabel(faces(value.beforeFaces) + " ← " + faces(value.afterFaces))
                 .accessibilityIdentifier("quran-day-close-coverage")
             if value.addedAyahs > 0 && value.addedFaces == 0 {
                 Text(QuranDayCloseCopy.ayahs(value.addedAyahs, digits: service.numerals) + "، والوجه لم يكتمل بعد")
@@ -143,7 +143,6 @@ struct QuranDayCloseView: View {
     private func percent(_ value: Int?) -> String { value.map { "\u{2066}" + service.numerals.percent($0) + "\u{2069}" } ?? "—" }
     private func faces(_ value: Int) -> String { QuranDayCloseCopy.faces(value, digits: service.numerals) }
     private func font(_ size: CGFloat, bold: Bool = false) -> Font { .custom(bold ? "thmanyahsans-Bold" : "thmanyahsans-Regular", size: size, relativeTo: .body) }
-    private func serif(_ size: CGFloat) -> Font { .custom("Amiri-Bold", size: size, relativeTo: .title2) }
     private func load() { do { summary = try service.dayClose(); error = nil } catch { self.error = quranUserMessage(error) } }
 }
 

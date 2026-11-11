@@ -91,7 +91,7 @@ struct QuranWirdReferenceView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("مرجع وردك").font(serif(27)).accessibilityIdentifier("quran-reference-title")
+                        Text("مرجع وردك").font(quranSerif(27)).accessibilityIdentifier("quran-reference-title")
                         Text(rangeTitle).font(bodyFont(14, bold: true)).foregroundStyle(theme.color("hifzText"))
                             .accessibilityIdentifier("quran-reference-range")
                         Text("اقرأ التفاسير التي اخترتها لكل آيات هذا الورد، مع بقاء أسباب النزول والسياق في موضعيهما.")
@@ -491,7 +491,6 @@ struct QuranWirdReferenceView: View {
             .shadow(color: theme.ink.opacity(0.04), radius: 14, x: 0, y: 7)
     }
 
-    private func serif(_ size: CGFloat) -> Font { .custom("Amiri-Bold", size: size, relativeTo: .title2) }
     private func bodyFont(_ size: CGFloat, bold: Bool = false) -> Font {
         .custom(bold ? "thmanyahsans-Bold" : "thmanyahsans-Regular", size: size, relativeTo: .body)
     }

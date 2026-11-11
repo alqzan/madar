@@ -74,7 +74,7 @@ struct PrayerCustomizeView: View {
     private var theme: RoomTheme { RoomTheme(room: "salah", dark: inheritedTheme.dark, calmPaper: inheritedTheme.calmPaper) }
     private var layout: PrayerHomeLayout { PrayerHomeLayout(session.values["salah.layout"]) }
     private var salahKeys: [String] { ["salah.layout"] + AppSession.supportedKeys.filter { $0.hasPrefix("salah.") } }
-    private func serif(_ size: CGFloat) -> Font { .custom("thmanyahserifdisplay-Bold", size: size, relativeTo: .title) }
+
 
     private struct CustomizeGroup: Identifiable {
         let id: String, title: String, symbol: String, keys: [String]
@@ -152,7 +152,7 @@ struct PrayerCustomizeView: View {
                     Text("الصلاة").font(PrayerHomeType.strong)
                 }.frame(minHeight: 44).contentShape(.rect)
             }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-customize-back")
-            Text("خصّص الصلاة").font(serif(40)).accessibilityAddTraits(.isHeader)
+            Text("خصّص الصلاة").font(prayerSerif(40)).accessibilityAddTraits(.isHeader)
             Text("كل تعديل يُحفظ وحده").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
         }
     }
@@ -165,7 +165,7 @@ struct PrayerCustomizeView: View {
                         Circle().fill(theme.accent).frame(width: 8, height: 8)
                         Text("معاينة حيّة").font(PrayerHomeType.smallBold).foregroundStyle(theme.color("accentText"))
                     }
-                    Text("الصلاة كما ستظهر").font(serif(26))
+                    Text("الصلاة كما ستظهر").font(prayerSerif(26))
                     previewLine("الأجزاء", arabicCount(layout.visibleCount, ["جزء واحد ظاهر", "جزآن ظاهران", "أجزاء ظاهرة", "جزءًا ظاهرًا"], MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi))) // AU-37: «٥ أجزاء ظاهرة», not «٥ ظاهرة».
                     previewLine("طريقة الحساب", label("salah.method"))
                     previewLine("وقت العصر", label("salah.asr"))
@@ -230,7 +230,7 @@ struct PrayerCustomizeView: View {
                     Image(systemName: symbol).font(.system(size: 20)).foregroundStyle(theme.color("accentText"))
                         .frame(width: 52, height: 52).background(theme.surface, in: .rect(cornerRadius: 16))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(title).font(serif(22))
+                        Text(title).font(prayerSerif(22))
                         Text(subtitle).font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
                     }
                     Spacer(minLength: 8)

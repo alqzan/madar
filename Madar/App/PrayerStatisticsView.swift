@@ -47,7 +47,7 @@ struct PrayerStatisticsView: View {
         let due = cells.filter { [.jamaah, .alone, .qada].contains($0.status) }
         return (due.filter { $0.status == .jamaah || $0.status == .alone }.count, due.count, cells.filter { $0.status == .pending }.count)
     }
-    private func serif(_ size: CGFloat) -> Font { .custom("thmanyahserifdisplay-Bold", size: size, relativeTo: .title) }
+
     private func summaryCard<C: View>(@ViewBuilder _ content: () -> C) -> some View {
         content().frame(maxWidth: .infinity)
             .background(theme.color("goldSoft"), in: .rect(cornerRadius: 26))
@@ -65,7 +65,7 @@ struct PrayerStatisticsView: View {
                         }.frame(minHeight: 44).contentShape(.rect)
                     }
                     .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-hali-back")
-                    Text("حالي").font(serif(44)).accessibilityAddTraits(.isHeader)
+                    Text("حالي").font(prayerSerif(44)).accessibilityAddTraits(.isHeader)
                 }
                 if snapshot.statistics.denominator >= 5 {
                     metrics
@@ -135,7 +135,7 @@ struct PrayerStatisticsView: View {
     }
     private func metric(_ title: String, value: String, id: String) -> some View {
         VStack(spacing: 6) {
-            Text(value).font(serif(28)).minimumScaleFactor(0.7).lineLimit(1).accessibilityIdentifier(id)
+            Text(value).font(prayerSerif(28)).minimumScaleFactor(0.7).lineLimit(1).accessibilityIdentifier(id)
             Text(title).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
         }
         .frame(maxWidth: .infinity, minHeight: 78).padding(.vertical, 8)
@@ -160,7 +160,7 @@ struct PrayerStatisticsView: View {
                         PrayerRecentBeads(cells: snapshot.statistics.last25, compact: false)
                         VStack(spacing: 4) {
                             Text(mizan.due == 0 ? "—" : formatter.percent(Int((Double(mizan.onTime) / Double(mizan.due) * 100).rounded())))
-                                .font(serif(46))
+                                .font(prayerSerif(46))
                             let labels = [mizan.onTime > 0 ? "أوفيت \(formatter.string(mizan.onTime))" : nil,
                                           mizan.pending > 0 ? "معلّقة \(formatter.string(mizan.pending))" : nil]
                             Text(labels.compactMap { $0 }.joined(separator: "، "))
@@ -187,12 +187,12 @@ struct PrayerStatisticsView: View {
             if session.string("core.firstCalendar") == "gregorian" {
                 // The month is still the Hijri one the statistics group by; the Gregorian span leads when it is the first calendar.
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(monthSpan).font(serif(22)).lineLimit(1).minimumScaleFactor(0.6).accessibilityIdentifier("prayer-history-month-span")
+                    Text(monthSpan).font(prayerSerif(22)).lineLimit(1).minimumScaleFactor(0.6).accessibilityIdentifier("prayer-history-month-span")
                     Text(monthTitle).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(1).accessibilityIdentifier("prayer-history-month")
                 }
             } else {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(monthTitle).font(serif(26)).lineLimit(1).minimumScaleFactor(0.7).layoutPriority(1).accessibilityIdentifier("prayer-history-month")
+                    Text(monthTitle).font(prayerSerif(26)).lineLimit(1).minimumScaleFactor(0.7).layoutPriority(1).accessibilityIdentifier("prayer-history-month")
                     Spacer(minLength: 8)
                     Text(monthSpan).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(2).multilineTextAlignment(.trailing).accessibilityIdentifier("prayer-history-month-span")
                 }
@@ -640,3 +640,6 @@ private struct PrayerSummarySection<Content: View>: View {
         }
     }
 }
+
+/// Shared by the prayer statistics and customize screens (one definition of the display serif).
+func prayerSerif(_ size: CGFloat) -> Font { .custom("thmanyahserifdisplay-Bold", size: size, relativeTo: .title) }

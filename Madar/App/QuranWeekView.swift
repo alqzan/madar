@@ -21,7 +21,7 @@ struct QuranWeekView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 14) {
                     Button(action: close) { Image(systemName: "chevron.backward").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("رجوع").accessibilityIdentifier("quran-week-close")
-                    Text("السجلّ").font(serif(28)); Spacer()
+                    Text("السجلّ").font(quranSerif(28)); Spacer()
                 }.padding(.vertical, 4)
                 if let selection { QuranLogTabs(selection: selection) }
                 if let week {
@@ -53,7 +53,7 @@ struct QuranWeekView: View {
             .sheet(item: $selected) { day in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        Text(day.date).font(serif(22))
+                        Text(day.date).font(quranSerif(22))
                         Text(day.rest ? "يوم راحة، مراجعة فقط" : day.active ? "يوم عمل" : "لا جلسات مسجّلة").font(font(15, bold: true))
                         // AU-23: a quiet day says so once, not as two zeros.
                         if day.hifz > 0 || day.review > 0 {
@@ -117,7 +117,7 @@ struct QuranWeekView: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(font(12)).foregroundStyle(theme.secondaryInk)
-                Text(amount).font(serif(25)).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier(id)
+                Text(amount).font(quranSerif(25)).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier(id)
                 Text(change).font(font(11, bold: true)).foregroundStyle(theme.color("reviewText")).fixedSize(horizontal: false, vertical: true)
             }.frame(maxWidth: .infinity, alignment: .leading)
             if !type.isAccessibilitySize {
@@ -132,7 +132,6 @@ struct QuranWeekView: View {
     private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View { content().padding(16).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 24)).shadow(color: theme.ink.opacity(0.04), radius: 14, y: 8) }
     private func faces(_ value: Int) -> String { QuranDayCloseCopy.faces(value, digits: service.numerals) }
     private func font(_ size: CGFloat, bold: Bool = false) -> Font { .custom(bold ? "thmanyahsans-Bold" : "thmanyahsans-Regular", size: size, relativeTo: .body) }
-    private func serif(_ size: CGFloat) -> Font { .custom("Amiri-Bold", size: size, relativeTo: .title2) }
     @MainActor private func reload() {
         reloadTask?.cancel()
         let requestID = UUID()
