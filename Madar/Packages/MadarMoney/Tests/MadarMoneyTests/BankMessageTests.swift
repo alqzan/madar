@@ -435,3 +435,153 @@ import Testing
         #expect(bsfLayout.merchant == "TEST CAFE")
     }
 }
+
+/// Layouts seen in a real corpus (shapes only; every merchant, name, number and amount below is invented).
+@Suite struct RealCorpusLayoutTests {
+    let riyadh = TimeZone(identifier: "Asia/Riyadh")!
+    func at(_ y: Int, _ m: Int, _ d: Int, _ h: Int, _ min: Int) -> Date {
+        var c = Calendar(identifier: .gregorian); c.timeZone = riyadh
+        return c.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min))!
+    }
+
+    // MARK: Layouts seen in a real corpus (shapes only; every merchant, name, number and amount below is invented)
+
+    private func parse(_ text: String, sender: String? = nil) -> ParsedBankMessage {
+        BankMessageParser.parse(text, timeZone: riyadh, receivedAt: at(2026, 10, 15, 13, 0), sender: sender,
+                                trackedWallets: ["STC Pay", "STC Bank", "Sukuk", "Alinma Investment"])
+    }
+
+    @Test func tamaraDueNoticesAndPaymentConfirmationsAreInstalments() {
+        let upcoming = parse("دفعة قادمة بقيمة 123.45 SAR لطلبك من متجر وهمي مستحقة خلال يومين. سددها الحين: https://tmra.pe/abc", sender: "Tamara")
+        #expect(upcoming.kind == .bnplInstalment)
+        #expect(upcoming.amountMinor == 12_345)
+        #expect(upcoming.provider == "Tamara")
+        let today = parse("دفعتك بقيمة 80.00 SAR لطلبك من متجر وهمي مستحقة اليوم، تجنب التأثير على سجلك الائتماني وادفع الحين https://tmra.pe/abc", sender: "Tamara")
+        #expect(today.kind == .bnplInstalment)
+        #expect(today.amountMinor == 8_000)
+        let confirmed = parse("تأكيد الدفع\r\nمن: Example Store\r\nبقيمة: 2,347.18 SAR\r\nفي: 17/12/2025", sender: "Tamara")
+        #expect(confirmed.kind == .bnplInstalment)
+        #expect(confirmed.amountMinor == 234_718)
+        #expect(confirmed.provider == "Tamara")
+    }
+
+    @Test func alRajhiAccountDebitsDeclinedMerchantAndTransferRecipient() {
+        let sawa = parse("خصم SAR 25.00 من حسابك *1111 في 26-10-15 13:05 - مدفوعات سوا", sender: "alrajhibank")
+        #expect(sawa.kind == .billPayment)
+        #expect(sawa.amountMinor == 2_500)
+        let bills = parse("خصم SAR 1200.50 من حسابك *1111 في 26-10-15 13:05 - فواتير", sender: "alrajhibank")
+        #expect(bills.kind == .billPayment)
+        #expect(bills.amountMinor == 120_050)
+        let unlabelled = parse("خصم SAR 7.00 من حسابك *1111 في 26-10-15 13:05 -", sender: "alrajhibank")
+        #expect(unlabelled.kind == .withdrawal)
+        #expect(unlabelled.amountMinor == 700)
+        #expect(unlabelled.last4 == "1111")
+        let declined = parse("إشعار: عملية مرفوضة لعدم وجود رصيد كاف\nالعملية : شراء\nبطاقة : 1111\nمبلغ : 9.50 SAR\nعلى : EXAMPLE.COM\nفي :15-10-2026 13:05", sender: "alrajhibank")
+        #expect(declined.kind == .declined)
+        #expect(declined.merchant == "EXAMPLE.COM")
+        #expect(declined.amountMinor == 950)
+        let transfer = parse("تحويل SAR 60.00 للحساب *1111 26-10-15 13:05 فلان الفلاني", sender: "alrajhibank")
+        #expect(transfer.kind == .transferOut)
+        #expect(transfer.amountMinor == 6_000)
+        #expect(transfer.counterparty == "فلان الفلاني")
+    }
+
+    @Test func stcPayDeclinedPurchaseMerchantsAndWalletOperations() {
+        let declined = parse("Notification: Declined due to Insufficient balance\nTransaction: POS Purchase\nCard: ***1111\nAmount: SAR 45.25\nDate: 2026-10-15 13:05:00", sender: "stcpay")
+        #expect(declined.kind == .declined)
+        #expect(declined.amountMinor == 4_525)
+        let declinedAbroad = parse("Notification: Declined due to Insufficient balance\nTransaction: Online Purchase\nCard: ***1111\nAmount: INR 99.00\nAt: Example Store RIYADH SA\nDate: 2026-10-15 13:05:00", sender: "stcpay")
+        #expect(declinedAbroad.amountMinor == 9_900)
+        #expect(declinedAbroad.merchant == "Example Store RIYADH SA")
+        let online = parse("مشتريات إنترنت\nالبطاقة: ***1111؛ ApplePay\nالمبلغ: SAR 32.00\nفي: samplefood RIYADH SA\nبتاريخ: 2026-10-15 13:05:00", sender: "stcpay")
+        #expect(online.kind == .purchase)
+        #expect(online.merchant == "samplefood")
+        let recharge = parse("عمليات محفظة\nمحفظة: stc pay\nشحن رصيد سوا\nالمبلغ: 30.00 ر.س\nبتاريخ: 2026-10-15 13:05:00", sender: "stcpay")
+        #expect(recharge.kind == .billPayment)
+        #expect(recharge.amountMinor == 3_000)
+        let rechargeEnglish = parse("Wallet operations\nWallet name: stc pay\nsawa recharge\nAmount: SAR 30.00\nDate: 2026-10-15 13:05:00", sender: "stcpay")
+        #expect(rechargeEnglish.kind == .billPayment)
+    }
+
+    @Test func snbSalaryDepositAndAutomaticSettlement() {
+        let salary = parse("ايداع رواتب\nمبلغ SAR 8000\nحساب111*222\nفي 15/10/2026 13:05", sender: "snb-alahli")
+        #expect(salary.kind == .income)
+        #expect(salary.amountMinor == 800_000)
+        let settlement = parse("تسديد آلي\nبطاقة **1111\nمبلغ 250.75 ريال\nفي 15/10 13:05\nالصرف المتبقي 4000.00 ريال", sender: "snb-alahli")
+        #expect(settlement.kind == .cardPayment)
+        #expect(settlement.amountMinor == 25_075)
+        #expect(settlement.last4 == "1111")
+    }
+
+    @Test func sukukDepositsWithoutCurrencyAndInvestmentOperations() {
+        let deposit = parse("إيداع إلى حساب استثماري\nرقم: 1111\nالمبلغ: 5,000\nفي: 15-10-2026 13:05:00", sender: "SUKUK")
+        #expect(deposit.kind == .income)
+        #expect(deposit.amountMinor == 500_000)
+        #expect(deposit.currency == "SAR")
+        let decimal = parse("إيداع إلى حساب استثماري\nرقم: 1111\nالمبلغ: 1,250.50\nفي: 15-10-2026 13:05:00", sender: "SUKUK")
+        #expect(decimal.amountMinor == 125_050)
+        let invest = parse("عملية استثمارية\nمن حساب: 1111\nفي: مشروع وهمي 7\nعدد: 2\nالمبلغ: SAR 2,000.00\nفي: 15-10-2026 13:05:00", sender: "SUKUK")
+        #expect(invest.kind == .transferOut)
+        #expect(invest.amountMinor == 200_000)
+        #expect(invest.counterparty == "مشروع وهمي 7")
+        let withdraw = parse("سحب من حساب استثماري\nرقم: 1111\nإلى حساب: 2222\nالمبلغ: SAR 900\nفي: 15-10-2026 13:05:00", sender: "SUKUK")
+        #expect(withdraw.kind == .withdrawal)
+        #expect(withdraw.amountMinor == 90_000)
+    }
+
+    @Test func stcBankSharedBillInternetOperationAndInsufficientBalanceMerchant() {
+        let share = parse("دفع قطة\nمبلغ:45.00 ر.س\nإلى:EXAMPLE PERSON\nفي:15/10/26 13:05", sender: "STC_Bank")
+        #expect(share.kind == .transferOut)
+        #expect(share.amountMinor == 4_500)
+        #expect(share.counterparty == "EXAMPLE PERSON")
+        let internet = parse("عملية انترنت\nب: 150 SAR\nمن:Example Shop \nبطاقة:*1111\nفي:15/10/26 13:05", sender: "STC_Bank")
+        #expect(internet.kind == .purchase)
+        #expect(internet.amountMinor == 15_000)
+        #expect(internet.merchant == "Example Shop")
+        #expect(internet.last4 == "1111")
+        let declined = parse("رصيد غير كافي\n120.00 ر.س\nFAT*Example \n15/10/26 13:05\nرصيدك 30", sender: "STC_Bank")
+        #expect(declined.kind == .declined)
+        #expect(declined.amountMinor == 12_000)
+        #expect(declined.merchant == "FAT*Example")
+    }
+
+    @Test func alinmaIpoRefundDebitPurchaseMerchantAndInvestmentTransfer() {
+        let refund = parse("تم رد فائض اكتتاب بقيمة 1,500 ريال الى الحساب **1111", sender: "alinmabank")
+        #expect(refund.kind == .refund)
+        #expect(refund.amountMinor == 150_000)
+        let debit = parse("خصم 2000 ريال عمليات الاكتتاب من حسابك **1111 في 2026-10-15 13:05", sender: "alinmabank")
+        #expect(debit.kind == .transferOut)
+        #expect(debit.amountMinor == 200_000)
+        #expect(debit.counterparty != nil)
+        let purchase = parse("شراء 35 ريال (مدى أثير) ببطاقة 1111* من Example Mart 2026-10-15 13:05", sender: "alinmabank")
+        #expect(purchase.kind == .purchase)
+        #expect(purchase.amountMinor == 3_500)
+        #expect(purchase.merchant == "Example Mart")
+        #expect(purchase.last4 == "1111")
+        let fromInvestment = parse("تحويل 400.00 ريال من الحساب الإستثماري المنتهي ب ***111 في 15-10-2026 13:05:00", sender: "alrajhicptl")
+        #expect(fromInvestment.kind == .transferIn)
+        #expect(fromInvestment.amountMinor == 40_000)
+        #expect(fromInvestment.counterparty?.hasPrefix("الحساب") == true)
+    }
+
+    @Test func statementsTakeTheTotalDueAmount() {
+        let bsf = parse("تم إصدار كشف حساب بطاقة ائتمانية 1111**\nالرصيد القائم 900.00 SAR حتى تاريخه\nالمبلغ المستحق 450.25 SAR\nتاريخ الاستحقاق 05-11-2026", sender: "BSF")
+        #expect(bsf.kind == .statement)
+        #expect(bsf.statementDueMinor == 45_025)
+        #expect(bsf.last4 == "1111")
+        let alinma = parse("إصدار كشف حساب\nتفاصيل البطاقة **1111\nإجمالي المبلغ المستحق: SAR 1,200.00\nالحد الأدنى للسداد: SAR 100\nتاريخ الاستحقاق: 2026-11-05", sender: "alinma")
+        #expect(alinma.kind == .statement)
+        #expect(alinma.statementDueMinor == 120_000)
+        #expect(alinma.minimumDueMinor == 10_000)
+        let snb = parse("تم اصدار الكشف الإلكتروني لبطاقتك الائتمانية **1111 \nمبلغ كشف الحساب 300.00 ريال\nالمبلغ المستحق 150.00 ريال \nتاريخ الاستحقاق 05/11/2026", sender: "snb-alahli")
+        #expect(snb.kind == .statement)
+        #expect(snb.statementDueMinor == 15_000)
+    }
+
+    @Test func mobilyPayReceivedAmountIsIncoming() {
+        let received = parse("You have received amount : 75.00 SAR \nFrom: EXAMPLE PERSON 0500000000 \nOn: 15/10/2026 13:05:00 \nDownload Mobily Pay App to collect the amount\n\nلقد تلقيت مبلغ: SAR 75.00 \nمن: EXAMPLE PERSON 0500000000 \nفي: 15/10/2026 13:05:00", sender: "Mobily_Pay")
+        #expect(received.kind == .transferIn)
+        #expect(received.amountMinor == 7_500)
+        #expect(received.counterparty?.hasPrefix("EXAMPLE PERSON") == true)
+    }
+}

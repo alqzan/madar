@@ -131,6 +131,8 @@ public enum BankMessageParser {
         // Owner special cases: «تأكيد دفعة مقسمة» only confirms a plan (recording it double-counts); a bank purchase
         // «لدى:Tamara» is an ordinary purchase.
         if has(t, ["دفعة مقسمة"]) { return .marketing }
+        // Tamara's own texts: «دفعة قادمة بقيمة …» / «دفعتك بقيمة …» (a due notice) and «تأكيد الدفع … بقيمة:» carry no brand word, only a link.
+        if matches(t, #"(?:دفعة\s+قادمة|دفعتك)\s+بقيمة|(?m)^\s*تأكيد\s+الدفع[ \t]*[\r\n][\s\S]*?بقيمة\s*:"#) { return .bnplInstalment }
         if has(t, ["تمارا", "tamara", "تابي", "tabby"]) && !has(t, ["شراء"]) { return .bnplInstalment }
         if has(t, ["كشف حساب البطاقة", "كشف البطاقة", "statement", "الحد الأدنى للسداد", "المبلغ المستحق"]) && !has(t, ["شراء"]) { return .statement }
         if has(t, ["سداد بطاقة", "سداد البطاقة", "ائتمانية:سداد", "ائتمانية: سداد", "فيزا:سداد", "ماستركارد:سداد", "تسديد بطاقة", "تسديد البطاقة", "card payment"]) { return .cardPayment }
@@ -138,8 +140,17 @@ public enum BankMessageParser {
         if has(t, ["قسط تمويل"]) { return .billPayment }
         if has(t, ["سداد فاتورة", "سداد", "SADAD", "المفوتر"]) { return .billPayment }
         if has(t, ["استرداد نقدي", "استرجاع نقدي", "cashback", "cash back", "cash-back", "مكافأة نقدية"]) { return .cashback }
-        if has(t, ["استرداد", "refund", "مرتجع"]) { return .refund }
+        if has(t, ["استرداد", "refund", "مرتجع"]) || matches(t, #"رد\s+فائض\s+اكتتاب"#) { return .refund }
         if has(t, ["راتب", "salary", "payroll"]) { return .salary }
+        // SNB: «ايداع رواتب» (no hamza, plural) is a salary-like income deposit.
+        if matches(t, #"^\s*[اإ]يداع\s+رواتب"#) { return .income }
+        // stc pay: a Sawa recharge is a bill-like payment out of the wallet.
+        if matches(t, #"شحن\s+رصيد\s+سوا|sawa\s+recharge"#) { return .billPayment }
+        // SNB: «تسديد آلي» is the automatic settlement of the credit card.
+        if matches(t, #"^\s*تسديد\s+آلي"#) { return .cardPayment }
+        // Sukuk: an investment into a project leaves the account; a withdrawal from the investment account too.
+        if matches(t, #"^\s*عملية\s+استثمارية"#) { return .transferOut }
+        if matches(t, #"^\s*سحب\s+من\s+حساب\s+استثماري"#) { return .withdrawal }
         if has(t, ["سحب صراف", "سحب نقدي", "ATM", "cash withdrawal"]) { return .withdrawal }
         if has(t, ["حوالة صادرة", "تحويل صادر", "تحويل إلى", "outgoing transfer"])
             || matches(t, #"\boutgoing\b[\s\S]{0,80}\btransfer\b"#) { return .transferOut }
@@ -168,6 +179,21 @@ public enum BankMessageParser {
         if has(t, ["خصم عبر حوالة", "بين حساباتي", "بين حساباتك", "للحساب *", "للبطاقة *"]) || (has(t, ["خصم"]) && has(t, ["من حسابك", "من حساب"]) && has(t, ["تحويل"])) { return .transferOut }
         if has(t, ["اضافة", "إضافة"]) && has(t, ["الى حسابك", "إلى حسابك"]) { return .income }
         if has(t, ["شراء", "مشتريات", "purchase", "Apple Pay", "مدى", "POS"]) { return .purchase }
+        // STC Bank: «دفع قطة» pays a friend's share of a shared bill (the mirror of «استلام قطة»).
+        if matches(t, #"^\s*دفع\s+قطة"#) { return .transferOut }
+        // Mobily Pay: «You have received amount».
+        if matches(t, #"received\s+amount|تلقيت\s+مبلغ"#) { return .transferIn }
+        // Alinma / Al Rajhi: IPO subscription debit; Al Rajhi: «خصم SAR N من حسابك … - <label>» (the label says what it was).
+        if matches(t, #"^\s*خصم\s+[\d.,]+\s*(?:ريال|SAR)[^\n]*اكتتاب"#) { return .transferOut }
+        if matches(t, #"^\s*خصم\s+[A-Za-z]{3}\s+[\d.,]+\s+من\s+حسابك"#) {
+            if has(t, ["الاكتتاب", "اكتتاب"]) { return .transferOut }
+            if has(t, ["فواتير", "مدفوعات سوا"]) { return .billPayment }
+            return .withdrawal
+        }
+        // Al Rajhi Capital: «تحويل N ريال من الحساب …» arrives from the named account.
+        if transferInPartyAfterAmount(t) != nil { return .transferIn }
+        // STC Bank: «عملية انترنت  ب: N SAR  من:<merchant>».
+        if matches(t, #"^\s*عملية\s+(?:انترنت|إنترنت)"#) { return .purchase }
         // After the movements: a transfer that mentions its fee is still the transfer.
         if has(t, ["رسوم", "عمولة", "fee"]) { return .fee }
         if has(t, ["إيداع", "deposit", "credited"]) { return .income }
@@ -202,6 +228,18 @@ public enum BankMessageParser {
         return nil
     }
 
+    /// «تحويل ١٢٠ ريال من الحساب …»: a source after the amount and no recipient later on the line.
+    private static func transferInPartyAfterAmount(_ text: String) -> String? {
+        for line in text.split(separator: "\n").map(String.init) where has(line, ["حوالة", "تحويل"]) {
+            guard let amount = amounts(line, .specified).first else { continue }
+            let tail = line[amount.range.upperBound...].trimmingCharacters(in: .whitespaces)
+            guard tail.hasPrefix("من"), let afterLabel = tail.dropFirst(2).first, afterLabel.isWhitespace else { continue }
+            let value = String(tail.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+            if !value.isEmpty, !matches(value, #"\s(?:إلى|الى|ل)\s"#) { return value }
+        }
+        return nil
+    }
+
     /// `receivedAt` (the phone's receive time) settles two-digit dates that read both ways, «25-10-19» vs «19-10-25».
     public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified, homeCurrency: String = "SAR", receivedAt: Date? = nil, sender: String? = nil, trackedWallets: [String] = []) -> ParsedBankMessage {
         let t = clean(text)
@@ -225,13 +263,47 @@ public enum BankMessageParser {
         result.last4 = first(#"\*\s?(\d{4})\b|\b(\d{4})\s?\*"#, in: t)
             // Al Rajhi: «بطاقة:1234;مدى», «عبر:1234;مدى».
             ?? first(#"(?:بطاقة|ببطاقة|عبر)\s*:?\s*(\d{4})(?!\d)"#, in: t)
+        // Sukuk prints its account number as «رقم: 1234».
+        if result.last4 == nil { result.last4 = first(#"(?m)^\s*رقم\s*:\s*(\d{4})\s*$"#, in: t) }
+        // Sukuk (a Saudi platform) prints «المبلغ: 1,500.00» with no currency word: the home currency is meant.
+        if result.amountMinor == nil, kind != .statement, BankMessageIdentity.matches(sender ?? "", "sukuk"),
+           let raw = first(#"(?m)^\s*المبلغ\s*:\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*$"#, in: t),
+           let exp = exponents.exponent(homeCurrency), let minor = minorUnits(raw, exponent: exp) {
+            result.amountMinor = minor; result.currency = homeCurrency
+        }
         result.eventAt = eventDate(t, timeZone, near: receivedAt ?? Date())
         result.merchant = labelled(t, ["لدى", "من متجر", "at"])
         result.biller = labelled(t, ["المفوتر", "Biller"])
         result.counterparty = kind == .transferIn ? labelled(t, ["من", "From"]) : kind == .transferOut ? (labelled(t, ["إلى", "To"]) ?? transferOutPartyAfterAmount(t)) : nil
         if kind == .refund, result.merchant == nil { result.merchant = labelled(t, ["من"]) }
+        if kind == .refund, result.merchant == nil, matches(t, #"رد\s+فائض\s+اكتتاب"#) { result.merchant = "اكتتاب" }
+        // Al Rajhi: «على : <merchant>» names the merchant of a declined card operation.
+        if kind == .declined, result.merchant == nil { result.merchant = labelled(t, ["على"]) }
         // BSF, SNB, Alinma, barq: the merchant opens its own line after «من», «لـ», «لدى» or «At», with or without a colon.
         if [.purchase, .refund, .declined, .reversal].contains(kind), result.merchant == nil { result.merchant = lineMerchant(t) }
+        // stc pay: «في: <merchant> <city> SA» (the line label «في:» also prints dates elsewhere, so only a non-digit value counts).
+        if kind == .purchase, result.merchant == nil, has(t, ["بتاريخ"]),
+           let value = first(#"(?m)^\s*في\s*:\s*([^\d\s][^\n]*?)\s*$"#, in: t) { result.merchant = stripCountryAndCity(value) }
+        // Alinma: «شراء N ريال (مدى أثير) ببطاقة 1234* من <merchant> 2026-1-5 10:30».
+        if kind == .purchase, result.merchant == nil,
+           let value = first(#"ببطاقة\s*\d{4}\*?\s+من\s+(.+?)\s+\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}"#, in: t) { result.merchant = value }
+        // STC Bank: «رصيد غير كافي / N ر.س / <merchant> / date»: the merchant is the line after the amount.
+        if kind == .declined, result.merchant == nil, matches(t, #"^\s*رصيد\s+غير\s+كاف"#) {
+            let lines = t.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+            if let amountLine = lines.firstIndex(where: { !amounts($0, exponents).isEmpty }), lines.indices.contains(amountLine + 1) {
+                let candidate = lines[amountLine + 1]
+                if let head = candidate.first, !head.isNumber, !has(candidate, ["رصيدك"]) { result.merchant = candidate }
+            }
+        }
+        // Al Rajhi: «تحويل SAR N للحساب *1234 15-10-26 13:05 <name>»: the recipient name follows the time.
+        if kind == .transferOut, result.counterparty == nil,
+           let name = first(#"للحساب\s*\*?\d{3,4}\s+\d{1,4}[-/]\d{1,2}[-/]\d{1,4}\s+\d{1,2}:\d{2}(?::\d{2})?\s+(\S[^\n]*)$"#, in: t) { result.counterparty = name.trimmingCharacters(in: .whitespaces) }
+        if kind == .transferIn, result.counterparty == nil { result.counterparty = transferInPartyAfterAmount(t) }
+        // An IPO subscription debit has no recipient line: the subscription itself is the party.
+        if kind == .transferOut, result.counterparty == nil, has(t, ["الاكتتاب", "اكتتاب"]) { result.counterparty = "اكتتاب" }
+        // Sukuk: the project an investment goes into («في: <project>», the one «في:» line that is not a date).
+        if kind == .transferOut, result.counterparty == nil, matches(t, #"^\s*عملية\s+استثمارية"#),
+           let project = first(#"(?m)^\s*في\s*:\s*([^\d\s][^\n]*?)\s*$"#, in: t) { result.counterparty = project }
         // The same wallet can be tracked (internal transfer) or untracked (spending); use the owner's existing account choice.
         if kind == .purchase, BankWalletIdentity.matches(result.merchant, trackedWallets: trackedWallets) {
             result.kind = .transferOut
@@ -241,7 +313,9 @@ public enum BankMessageParser {
         if result.currency != homeCurrency, result.statedHomeMinor == nil,
            let match = t.range(of: #"\(\s*\d[\d.,]*\s*(?:ريال|SAR|SR|ر\.س)\s*\)"#, options: .regularExpression),
            let home = amounts(String(t[match]), exponents).first, home.currency == homeCurrency { result.statedHomeMinor = home.minor }
-        if kind == .bnplInstalment { result.provider = has(t, ["تمارا", "tamara"]) ? "Tamara" : "Tabby" }
+        if kind == .bnplInstalment {
+            result.provider = has(t, ["تمارا", "tamara", "tmra.pe"]) || (sender?.lowercased().contains("tamara") ?? false) ? "Tamara" : "Tabby"
+        }
         if kind == .purchase || kind == .refund || kind == .cashback {
             result.cardKind = has(t, ["ائتمان", "إئتمان", "credit"]) ? .credit : has(t, ["مسبقة الدفع", "prepaid"]) ? .prepaid
                 : has(t, ["مدى", "mada", "Apple Pay"]) ? .debit : nil
@@ -250,6 +324,15 @@ public enum BankMessageParser {
     }
 
     // MARK: Fields
+
+    /// «jahez RIYADH SA» → «jahez»: a trailing two-letter country code and a known Saudi city are the card network's, not the shop's name.
+    static func stripCountryAndCity(_ value: String) -> String {
+        var words = value.split(separator: " ").map(String.init)
+        if words.count > 1, let last = words.last, last.count == 2, last == last.uppercased(), last.allSatisfy(\.isLetter) { words.removeLast() }
+        let cities: Set<String> = ["RIYADH", "JEDDAH", "DAMMAM", "MAKKAH", "MADINAH", "KHOBAR", "DHAHRAN", "ABHA", "TABUK", "BURAIDAH", "HOFUF", "TAIF", "JUBAIL", "YANBU"]
+        if words.count > 1, let last = words.last, cities.contains(last.uppercased()) { words.removeLast() }
+        return words.joined(separator: " ")
+    }
 
     /// Longer phrases come first: the pattern takes the first alternative that matches, so «ريال عماني» must be tried before «ريال».
     /// A bare «دينار» is deliberately absent (Kuwaiti, Bahraini, Jordanian, Iraqi…): the message then carries no amount for review instead of a guess.
