@@ -154,6 +154,7 @@ struct MoneyHomeView: View {
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task(id: roomVisit) {
             await app.seedMoneyDefaults()
+            await app.rereadStoredBankMessages()
             // Show the saved reading before the bounded accrual command; refresh it when that write settles.
             await loadAndWait()
             guard !Task.isCancelled else { return }

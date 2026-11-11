@@ -146,15 +146,17 @@ code but are not handed to a mid-level executor.
 
 ## Direction — options for the owner, not problems
 
-- **Mushaf bookmarks.** `docs/PROGRESS.md` (FB-39, item 6) still says the
-  question «لم تُسأل بعد». Named bookmarks need a new field, so it is an owner
-  decision.
-- **Re-read stored bank messages with the new reader.** Older stored messages
-  get the new fields only if entered again; the stored rows keep their text, so
-  a one-time re-read is cheap to design now that Phase 3 has landed.
-- **A time for media added with «اكتب بعده».** `diary.appendMedia` takes no
-  time, so such a photo lands at the end of the page. The Money session that
-  owned `MadarCommands` is finished, so this can now be done.
+- **DONE 11 Nov (D8) Mushaf bookmarks.** Model `MushafBookmark` (schema V18);
+  `quran.saveBookmark` / `quran.deleteBookmark` (undoable); a bookmark menu in the
+  Mushaf controls marks the open page with a name, jumps to any bookmark and deletes.
+- **DONE 11 Nov (D8) Re-read stored bank messages.** Parser version 3; on opening
+  Money, `money.rereadStoredMessages` re-reads rows below it once and only fills
+  printed extras the stored reading lacked, when kind, amount and currency agree.
+  Amounts, dates, merchants, transactions and dues are never changed.
+- **DONE 11 Nov (D8) A time for media added with «اكتب بعده».** `diary.appendMedia`
+  takes an optional past `at`; the photo lands between its two lines.
+- **BLOCKED 11 Nov (D8) The bank-message screen in the background:** see the
+  Backlog row (main-actor dry-run confirm).
 
 ## Findings considered and rejected
 

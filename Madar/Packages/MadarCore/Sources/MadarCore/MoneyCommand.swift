@@ -7,7 +7,7 @@ public enum MoneyCommandPayload {
     public static let intakeName = "money.ingestBankMessage"
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
-        "money.applyStatement", "money.ignoreMessage", "money.removeAccount", "money.confirmClear", "money.markVisit", "money.seedCategories",
+        "money.applyStatement", "money.ignoreMessage", "money.removeAccount", "money.confirmClear", "money.markVisit", "money.seedCategories", "money.rereadStoredMessages",
         "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.editObligation", "money.renameEnvelope", "money.setCategoryLimit", "money.setCategoryPreferredCard", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.saveZakat", "money.prepareGoal", "money.logTransfer", "money.moveEnvelope", "money.attachTail", "money.dismissDue", "money.linkRefund"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
@@ -104,7 +104,7 @@ public enum MoneyCommandPayload {
             guard Set(p.keys) == ["ids"], case .array(let rows) = p["ids"], !rows.isEmpty, rows.count <= 100 else { return false }
             let ids = rows.compactMap { if case .string(let raw) = $0 { UUID(uuidString: raw) } else { nil } }
             return ids.count == rows.count && Set(ids).count == ids.count
-        case "money.accruePlans", "money.markVisit", "money.seedCategories": return p.isEmpty
+        case "money.accruePlans", "money.markVisit", "money.seedCategories", "money.rereadStoredMessages": return p.isEmpty
         case "money.categorize":
             let keys = Set(p.keys)
             let hasRequiredKeys: Set<String> = ["id", "categoryID"]

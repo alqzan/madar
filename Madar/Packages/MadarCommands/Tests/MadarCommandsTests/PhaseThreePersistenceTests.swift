@@ -56,6 +56,41 @@ import MadarMoney
         #expect(try f.repo.upcomingDues(includeClosed: true).first?.closedByTransactionID != nil)
     }
 
+    /// D8 (owner, 11 Nov 2026): a message stored by an older reader is re-read once. Only a printed extra the old reading lacked is
+    /// added (here the account tail); the stored merchant, amount and every transaction stay byte-for-byte; a reading of another kind
+    /// is not touched; a second run changes nothing.
+    @Test func storedMessagesAreReReadOnceAddingOnlyMissingPrintedExtras() async throws {
+        let f = try P3Fixture(); defer { f.clean() }; try await f.setup()
+        try await f.ingest("ايداع:صراف آلي\nالى:*1234\nمبلغ:SAR 175.00\nفي:26-10-14 10:00")
+        try await f.ingest(f.purchase("متجر تجريبي", "50.00", "في:26-10-14 11:00"))
+        let context = f.context
+        let messages = try context.fetch(FetchDescriptor<BankMessage>()).sorted { $0.receivedAt < $1.receivedAt || ($0.receivedAt == $1.receivedAt && $0.kind < $1.kind) }
+        let deposit = try #require(messages.first { $0.kind == "income" }), purchase = try #require(messages.first { $0.kind != "income" })
+        var old = try JSONDecoder().decode(MoneyParsedFields.self, from: #require(deposit.parsedJSON))
+        #expect(old.accountLast4 == "1234")
+        old.accountLast4 = nil; old.merchant = "اسم قديم"
+        deposit.parsedJSON = try JSONEncoder().encode(old); deposit.parseVersion = 2
+        // Another kind than the new reading: nothing may be filled from it.
+        var other = try JSONDecoder().decode(MoneyParsedFields.self, from: #require(purchase.parsedJSON))
+        other.kind = "transferOut"; other.accountLast4 = nil
+        let otherBytes = try JSONEncoder().encode(other)
+        purchase.parsedJSON = otherBytes; purchase.parseVersion = 1
+        try context.save()
+        let transactionsBefore = try f.context.fetch(FetchDescriptor<MoneyTransaction>()).map { try $0.record() }.sorted { $0.id.uuidString < $1.id.uuidString }
+
+        #expect(try await f.run("money.rereadStoredMessages", [:]).status == .applied)
+        let fresh = f.context
+        let reread = try fresh.fetch(FetchDescriptor<BankMessage>())
+        let newDeposit = try #require(reread.first { $0.id == deposit.id }), newPurchase = try #require(reread.first { $0.id == purchase.id })
+        let fields = try JSONDecoder().decode(MoneyParsedFields.self, from: #require(newDeposit.parsedJSON))
+        #expect(fields.accountLast4 == "1234" && fields.merchant == "اسم قديم" && fields.amountMinor == 17_500)
+        #expect(newPurchase.parsedJSON == otherBytes)
+        #expect(reread.allSatisfy { $0.parseVersion == BankMessageParser.version })
+        let transactionsAfter = try fresh.fetch(FetchDescriptor<MoneyTransaction>()).map { try $0.record() }.sorted { $0.id.uuidString < $1.id.uuidString }
+        #expect(transactionsAfter == transactionsBefore)
+        #expect(try await f.run("money.rereadStoredMessages", [:]).status == .duplicate)
+    }
+
     @Test func aRefundLinksToItsOnePurchaseAndConfirmNetsIt() async throws {
         let f = try P3Fixture(); defer { f.clean() }; try await f.setup()
         try await f.ingest(f.purchase("SQ *STARBUCKS 12", "40.00", "2026-10-10 12:00"))

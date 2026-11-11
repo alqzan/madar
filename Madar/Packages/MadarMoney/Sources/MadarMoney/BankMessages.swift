@@ -110,7 +110,8 @@ public enum BankWalletIdentity {
 }
 
 public enum BankMessageParser {
-    public static let version = 2
+    /// 3 (11 Nov 2026): printed extras, instalments and service-word merchants; stored rows below it are re-read once (D8).
+    public static let version = 3
 
     /// Digits and separators unified (Arabic-Indic → ASCII, «٫» → ".", «٬» → ","), tatweel removed; lines kept.
     public static func clean(_ text: String) -> String {

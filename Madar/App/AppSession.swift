@@ -8,6 +8,7 @@ import MadarSnapshots
 import WidgetKit
 import MadarCommands
 import MadarInbox
+import MadarMoney
 import MadarPrayer
 import UIKit
 
@@ -1151,6 +1152,12 @@ final class AppSession {
         moneySeed = task; await task.value; moneySeed = nil
     }
     private var moneySeed: Task<Void, Never>?
+    /// D8: messages stored by an older bank reader are re-read once (the handler adds only printed extras). Cheap when none are left.
+    func rereadStoredBankMessages() async {
+        let current = BankMessageParser.version
+        guard ((try? ModelContext(container).fetchCount(FetchDescriptor<BankMessage>(predicate: #Predicate { $0.parseVersion < current && $0.mergedInto == nil && $0.deletedAt == nil }))) ?? 0) > 0 else { return }
+        _ = try? await executeMoneyCommand("money.rereadStoredMessages")
+    }
 
     /// The old-Madar move (item 24) and its DEBUG trial: one command through the bus without the per-command reload and
     /// reminder re-plan; the caller holds the write and reloads once at the end. Returns the bus status.

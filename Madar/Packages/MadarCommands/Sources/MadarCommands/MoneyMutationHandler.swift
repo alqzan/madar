@@ -10,7 +10,7 @@ public enum MoneyCommandError: String, Error, Sendable {
     case invalidSplit, invalidReference, alreadyConfirmed, salaryNeedsCycleConfirmation, undoSuperseded
 }
 
-public struct MoneyParsedFields: Codable, Sendable {
+public struct MoneyParsedFields: Codable, Sendable, Equatable {
     public var v = 1
     public var kind: String
     public var amountMinor: Int?
@@ -54,6 +54,19 @@ public struct MoneyParsedFields: Codable, Sendable {
         instalmentNumber = p.instalmentNumber; instalmentCount = p.instalmentCount; remainingMinor = p.remainingMinor
     }
     var messageKind: BankMessageKind { BankMessageKind(rawValue: kind) ?? .unknown }
+    /// D8 re-read: fills only the printed extras the stored reading lacks, and only when both readings agree on the kind,
+    /// the amount and the currency. Every field that made a transaction or a due (kind, amount, currency, card, merchant,
+    /// dates, statement amounts, balance) is never changed.
+    func fillingPrintedExtras(from fresh: MoneyParsedFields) -> MoneyParsedFields {
+        guard fresh.kind == kind, fresh.amountMinor == amountMinor, fresh.currency == currency else { return self }
+        var out = self
+        func fill<T>(_ key: WritableKeyPath<MoneyParsedFields, T?>) { if out[keyPath: key] == nil { out[keyPath: key] = fresh[keyPath: key] } }
+        fill(\.accountLast4); fill(\.counterparty); fill(\.counterpartyAccountLast4); fill(\.declineReason)
+        fill(\.feeMinor); fill(\.vatMinor); fill(\.foreignFeeMinor); fill(\.exchangeRate)
+        fill(\.remainingLimitMinor); fill(\.availableLimitMinor)
+        fill(\.instalmentNumber); fill(\.instalmentCount); fill(\.remainingMinor)
+        return out
+    }
 }
 
 /// The six categories of the approved design (`mal/12-Z-R18-cat-1`), seeded once into an empty store.
@@ -106,6 +119,26 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             let key = "sys.moneyLastVisit", value = Data(("\"" + ISO8601DateFormatter().string(from: now) + "\"").utf8)
             let row = try context.fetch(FetchDescriptor<DeviceSetting>()).first { $0.key == key && $0.deletedAt == nil } ?? { let r = DeviceSetting(); r.key = key; r.createdAt = now; context.insert(r); return r }()
             row.valueJSON = value; try touch(row, now, writer)
+            return .init(inverse: nil, duplicate: false)
+        }
+        if name == "money.rereadStoredMessages" {
+            // D8 (owner, 11 Nov 2026): one re-read of messages stored by an older reader. Only what the bank also printed and the
+            // old reader did not keep is added; the amount, kind, dates, merchant, transactions and dues already made stay as they are.
+            let current = BankMessageParser.version
+            let stale = try context.fetch(FetchDescriptor<BankMessage>(predicate: #Predicate { $0.parseVersion < current && $0.mergedInto == nil && $0.deletedAt == nil }))
+            guard !stale.isEmpty else { return .init(inverse: nil, duplicate: true) }
+            let prayer = try PrayerRepository(context: context)
+            let homeCurrency = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
+            for message in stale {
+                if let bytes = message.parsedJSON, let stored = try? JSONDecoder().decode(MoneyParsedFields.self, from: bytes) {
+                    let fresh = MoneyParsedFields(BankMessageParser.parse(message.text, timeZone: prayer.place(at: message.receivedAt).timeZone,
+                        homeCurrency: homeCurrency, receivedAt: message.receivedAt, sender: message.sender, arrivalKnown: false))
+                    let merged = stored.fillingPrintedExtras(from: fresh)
+                    if merged != stored { message.parsedJSON = try JSONEncoder().encode(merged) }
+                }
+                // An unreadable stored reading is left as it is; only its version moves, so it is not read again on every open.
+                message.parseVersion = current; try touch(message, now, writer)
+            }
             return .init(inverse: nil, duplicate: false)
         }
         if name == "money.seedCategories" {
