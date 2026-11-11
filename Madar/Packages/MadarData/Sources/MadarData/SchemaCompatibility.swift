@@ -27,6 +27,7 @@ enum SchemaCompatibility {
         case 14: MadarSchemaV14.syncedNames
         case 15: MadarSchemaV15.syncedNames
         case 16: MadarSchemaV16.syncedNames
+        case 17: MadarSchemaV17.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -92,6 +93,8 @@ enum SchemaCompatibility {
                     row.fields["title"] = .null; row.fields["voiceTone"] = .null; row.fields["audioLevelsJSON"] = .null
                 }
             }
+            // V18 (D7): a trip recorded before the dismissal date has none.
+            if version < 18, row.model == "Trip", row.fields["dismissedAt"] == nil { row.fields["dismissedAt"] = .null }
             return row
         }
     }

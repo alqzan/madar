@@ -262,7 +262,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 17)
+        #expect(MadarSchema.version == 18)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -285,7 +285,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 17)
+        #expect(MadarSchema.version == 18)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
@@ -842,6 +842,50 @@ import Testing
         #expect(try context.fetchCount(FetchDescriptor<UpcomingDue>()) == 0)
         let expected = try SchemaCompatibility.currentRecords(before, from: 16)
         #expect(expected == before)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(context, syncedOnly: false)) == RecordFingerprint.hash(expected))
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+    }
+
+    /// V18 adds the optional `Trip.dismissedAt` (D7) and `MushafBookmark` (D8): a stored V17 trip keeps every value, gets no dismissal
+    /// date, and the bookmark table starts empty.
+    @Test func schemaV17UpgradeKeepsTripsWithNoDismissalDateAndStartsWithNoBookmarks() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV18-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let stamp = Date(timeIntervalSince1970: 1_797_000_000), tripID = UUID(), accountID = UUID()
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV17.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV17.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV17.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+            let trip = MadarFrozenTripV17.Trip(); trip.id = tripID; trip.city = "synthetic city"; trip.tzID = "Asia/Riyadh"; trip.dismissed = true
+            trip.start = stamp; trip.createdAt = stamp; trip.updatedAt = stamp; trip.writerID = "synthetic-v17"
+            old.mainContext.insert(trip)
+            let account = Account(); account.id = accountID; account.name = "synthetic account"; account.createdAt = stamp; account.updatedAt = stamp
+            account.writerID = "synthetic-v17"; old.mainContext.insert(account); before.append(try account.record())
+            try old.mainContext.save()
+            // The V17 trip as a record: the live shape without the new field.
+            let live = Trip(); live.id = tripID; live.city = "synthetic city"; live.tzID = "Asia/Riyadh"; live.dismissed = true; live.start = stamp
+            live.createdAt = stamp; live.updatedAt = stamp; live.writerID = "synthetic-v17"
+            var record = try live.record(); record.fields["dismissedAt"] = nil; before.append(record)
+        }
+        try DurableFiles.encode(17, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: stamp), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        let context = upgraded.container.mainContext
+        let trip = try #require(try context.fetch(FetchDescriptor<Trip>()).first { $0.id == tripID })
+        #expect(trip.city == "synthetic city" && trip.dismissed && trip.start == stamp && trip.dismissedAt == nil)
+        #expect(try context.fetchCount(FetchDescriptor<MushafBookmark>()) == 0)
+        let expected = try SchemaCompatibility.currentRecords(before, from: 17)
+        #expect(expected.first { $0.model == "Trip" }?.fields["dismissedAt"] == .null)
         #expect(try RecordFingerprint.hash(RecordBridge.all(context, syncedOnly: false)) == RecordFingerprint.hash(expected))
         let reopened = try ManagedDataStore(root: root)
         #expect(reopened.binding.generationID == upgraded.binding.generationID)

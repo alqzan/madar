@@ -113,18 +113,21 @@ public struct HabitRepository {
             let epochs=habitEvents.filter{$0.calendarSource != nil}.sorted { $0.dayKey == $1.dayKey ? $0.updatedAt < $1.updatedAt : $0.dayKey < $1.dayKey }
             var breaks = try (pausesByHabit[habit.id] ?? []).map { p -> HabitBreak in
                 var until = try p.toDayKey.map(GregorianDay.init)
+                // D7 (owner, 27 Oct / 11 Nov 2026): a trip dismissed with a recorded date ends its pause on that day.
                 if let tripID = p.tripID, let trip = trips.first(where: { $0.id == tripID }),
-                   let end = trip.end,
+                   let end = trip.dismissed && trip.dismissedAt != nil ? min(trip.end ?? .distantFuture, trip.dismissedAt!) : trip.end,
                    let tripPlace = try? ActivePlace(latitude: trip.lat, longitude: trip.lon, timeZoneID: trip.tzID) {
                     until = Self.travelDay(at: end, place: tripPlace, boundary: boundary, options: prayers.tripOptions)
                 }
                 return .init(from: try GregorianDay(p.fromDayKey), until: until)
             }
             if habit.homeOnly, (try settings.value(for: "bahw.travelFreezesHome")) == .bool(true) {
-                breaks += trips.filter { !$0.dismissed }.compactMap { trip in
+                // A dismissed trip freezes the habit only up to its dismissal day (D7); one dismissed before V18 has no date and none.
+                breaks += trips.filter { !$0.dismissed || $0.dismissedAt != nil }.compactMap { trip in
                     guard let start = trip.start,
                           let tripPlace = try? ActivePlace(latitude: trip.lat, longitude: trip.lon, timeZoneID: trip.tzID) else { return nil }
-                    return Self.travelBreak(start: start, end: trip.end, place: tripPlace, boundary: boundary, options: prayers.tripOptions)
+                    let end = trip.dismissed ? min(trip.end ?? .distantFuture, trip.dismissedAt ?? .distantFuture) : trip.end
+                    return Self.travelBreak(start: start, end: end, place: tripPlace, boundary: boundary, options: prayers.tripOptions)
                 }
             }
             var facts = try habitEvents.filter { $0.delta != 0 }.map { HabitFact(id: $0.id, day: try GregorianDay($0.dayKey), periodKey: $0.periodKey, delta: $0.delta, unit: $0.unit) }

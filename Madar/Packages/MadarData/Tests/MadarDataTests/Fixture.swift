@@ -62,6 +62,7 @@ import CryptoKit
     let rowAccountTail = AccountTail(); rowAccountTail.id = StableIdentity.uuid(for:"fixture:AccountTail"); context.insert(rowAccountTail)
     let rowBankReading = BankReading(); rowBankReading.id = StableIdentity.uuid(for:"fixture:BankReading"); context.insert(rowBankReading)
     let rowUpcomingDue = UpcomingDue(); rowUpcomingDue.id = StableIdentity.uuid(for:"fixture:UpcomingDue"); context.insert(rowUpcomingDue)
+    let rowMushafBookmark = MushafBookmark(); rowMushafBookmark.id = StableIdentity.uuid(for:"fixture:MushafBookmark"); context.insert(rowMushafBookmark)
     rowLayoutState.room = "bahw"
     rowMedia.data = Data([1,2,3,4]); rowMedia.sizeBytes = 4; rowMedia.sha256 = SHA256.hash(data:rowMedia.data!).map { String(format:"%02x",$0) }.joined()
     let audio = Media(); audio.kind = "audio"; audio.data = Data([5,6,7]); audio.sizeBytes = 3; audio.sha256 = SHA256.hash(data:audio.data!).map { String(format:"%02x",$0) }.joined(); context.insert(audio)

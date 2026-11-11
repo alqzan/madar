@@ -110,7 +110,7 @@ import Testing
         #expect(media?.fields["state"] == .string("missing")); #expect(media?.fields["data"] == .null)
         #expect(try RecordBridge.all(result.container.mainContext).contains { $0.model == "Book" && $0.id == ids.book && $0.isLive })
     }
-    @Test func logicalAdoptionPreservesAll64ModelsAndSourceAndReopens() throws {
+    @Test func logicalAdoptionPreservesAll65ModelsAndSourceAndReopens() throws {
         let base = try scratch(); defer { try? FileManager.default.removeItem(at:base) }
         let source = try MadarContainerFactory.makeLocal(at:base.appendingPathComponent("FlatNewMadar")); source.mainContext.autosaveEnabled = false; try fixture(source.mainContext)
         let setting = DeviceSetting(); setting.key = "core.theme"; setting.valueJSON = try JSONEncoder().encode("dark"); source.mainContext.insert(setting)
@@ -120,7 +120,7 @@ import Testing
         let adopted = try ManagedDataStore.adopt(from:source,at:root,commandLockURL:lock)
         #expect(try RecordFingerprint.hash(RecordBridge.all(adopted.container.mainContext,syncedOnly:false)) == fingerprint)
         #expect(try RecordFingerprint.hash(RecordBridge.all(source.mainContext,syncedOnly:false)) == fingerprint)
-        #expect(Set(before.map(\.model)).count == 64)
+        #expect(Set(before.map(\.model)).count == 65)
         let reopened = try ManagedDataStore(root:root,commandLockURL:lock)
         #expect(try RecordFingerprint.hash(RecordBridge.all(reopened.container.mainContext,syncedOnly:false)) == fingerprint)
         #expect(reopened.binding.deviceStoreURL == root.appendingPathComponent("Device.store"))
@@ -143,7 +143,7 @@ import Testing
         let source = try MadarContainerFactory.makeInMemory(); try fixture(source.mainContext); let expected = try RecordBridge.all(source.mainContext)
         let file = try backupFile(expected,base:base); let (store,coordinator,_) = try await makeCoordinator(base:base)
         let deviceURL = store.binding.deviceStoreURL; let preview = try await coordinator.preview(file:file,passphrase:"correct long password")
-        #expect(preview.counts.count == 59); #expect(preview.additions == expected.count)
+        #expect(preview.counts.count == 60); #expect(preview.additions == expected.count)
         let result = try await coordinator.restore(preview:preview,mode:.replace)
         #expect(result.warnings.isEmpty); #expect(try RecordFingerprint.hash(RecordBridge.all(result.container.mainContext)) == RecordFingerprint.hash(expected))
         #expect(store.binding.deviceStoreURL == deviceURL); #expect(FileManager.default.fileExists(atPath:result.automaticBackup.fileURL.path))

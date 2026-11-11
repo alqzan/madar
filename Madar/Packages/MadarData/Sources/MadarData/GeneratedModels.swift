@@ -155,6 +155,9 @@ extension Preset: MadarRecordModel {
     public var end: Date? = nil
     public var homeKm: Double? = nil
     public var journeyID: UUID? = nil
+    /// V18 (D7, owner 27 Oct / 11 Nov 2026): when the owner dismissed the trip; a habit it paused resumes from that day. Nil for a live
+    /// trip and for one dismissed before V18.
+    public var dismissedAt: Date? = nil
     public init() {}
 }
 extension Trip: MadarRecordModel {
@@ -182,6 +185,7 @@ extension Trip: MadarRecordModel {
             "end": JSONValue.encode(end),
             "homeKm": JSONValue.encode(homeKm),
             "journeyID": JSONValue.encode(journeyID),
+            "dismissedAt": JSONValue.encode(dismissedAt),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -207,6 +211,7 @@ extension Trip: MadarRecordModel {
         end = try record.decode("end", as: Date?.self)
         homeKm = try record.decode("homeKm", as: Double?.self)
         journeyID = try record.fields["journeyID"]?.decode(UUID?.self)
+        dismissedAt = try record.fields["dismissedAt"]?.decode(Date?.self) ?? nil
     }
 }
 @Model public final class UpcomingDay {
@@ -3930,5 +3935,47 @@ extension UpcomingDue: MadarRecordModel {
         sourceMessageID = try record.decode("sourceMessageID", as: UUID?.self)
         closedByTransactionID = try record.decode("closedByTransactionID", as: UUID?.self)
         closedAt = try record.decode("closedAt", as: Date?.self)
+    }
+}
+/// V18 (D8, owner 11 Nov 2026): a named bookmark on a Mushaf page. Several per page are allowed; deleting is a tombstone.
+@Model public final class MushafBookmark {
+    public var id: UUID = UUID()
+    public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
+    public var deletedAt: Date? = nil
+    public var writerID: String = ""
+    public var mergedInto: UUID? = nil
+    public var deletionBarrierAt: Date? = nil
+    public var restoredAt: Date? = nil
+    public var page: Int = 1
+    public var name: String = ""
+    public init() {}
+}
+extension MushafBookmark: MadarRecordModel {
+    public func record() throws -> DataRecord {
+        try DataRecord(model: "MushafBookmark", fields: [
+            "id": JSONValue.encode(id),
+            "createdAt": JSONValue.encode(createdAt),
+            "updatedAt": JSONValue.encode(updatedAt),
+            "deletedAt": JSONValue.encode(deletedAt),
+            "writerID": JSONValue.encode(writerID),
+            "mergedInto": JSONValue.encode(mergedInto),
+            "deletionBarrierAt": JSONValue.encode(deletionBarrierAt),
+            "restoredAt": JSONValue.encode(restoredAt),
+            "page": JSONValue.encode(page),
+            "name": JSONValue.encode(name),
+        ])
+    }
+    public func apply(_ record: DataRecord) throws {
+        id = try record.decode("id", as: UUID.self)
+        createdAt = try record.decode("createdAt", as: Date.self)
+        updatedAt = try record.decode("updatedAt", as: Date.self)
+        deletedAt = try record.decode("deletedAt", as: Date?.self)
+        writerID = try record.decode("writerID", as: String.self)
+        mergedInto = try record.decode("mergedInto", as: UUID?.self)
+        deletionBarrierAt = try record.decode("deletionBarrierAt", as: Date?.self)
+        restoredAt = try record.decode("restoredAt", as: Date?.self)
+        page = try record.decode("page", as: Int.self)
+        name = try record.decode("name", as: String.self)
     }
 }

@@ -136,7 +136,7 @@ code but are not handed to a mid-level executor.
 
 | Finding | Evidence | Verdict |
 |---|---|---|
-| A habit paused by a trip that was later dismissed never resumes (owner, 27 Oct: resume on the dismissal day) | `Madar/Packages/MadarCommands/Sources/MadarCommands/HabitRepository.swift:112-116` | The store has no dismissal date, so "the dismissal day" cannot be derived without a new field. The current UI cannot produce this state. Needs a small design first |
+| **DONE 11 Nov (D7, schema V18)** A habit paused by a trip that was later dismissed never resumes (owner, 27 Oct: resume on the dismissal day) | `Madar/Packages/MadarCommands/Sources/MadarCommands/HabitRepository.swift:112-116` | The store has no dismissal date, so "the dismissal day" cannot be derived without a new field. The current UI cannot produce this state. Needs a small design first |
 | The coalesced widget snapshot publish swallows a failure and still reloads the widgets | `Madar/App/AppSession.swift:1477-1479,1486-1487` | Failure trigger is hypothetical; not worth a change in the highest-churn file now |
 | One undecodable `diary.deleteEntry` receipt makes the whole receipt purge throw on every drain | `Madar/Packages/MadarCommands/Sources/MadarCommands/DurableCommandAdapter.swift:481-493` | Low likelihood; fix together with the next change in that function |
 | Abandoned Turath downloads and failed PDF-conversion checkpoints are never swept | `MihbaraTurathView.swift:293`, `Madar/App/MihbaraConversions.swift:192-195` (auditor-reported) | Storage only; Turath part needs the owner's yes |

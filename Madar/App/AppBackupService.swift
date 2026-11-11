@@ -264,7 +264,7 @@ import WidgetKit
         let groups: [(String, [String])] = [
             ("الإعدادات والأنماط", ["Setting", "LayoutState", "Preset"]),
             ("الصلاة", ["PrayerLog", "QadaItem", "QiyamNight"]),
-            ("القرآن", ["HifzPlan", "HifzSession", "PageGrade", "MistakeSpot", "MistakeEvent", "QuranDayState", "QuranAllotment", "RecoveryPlan"]),
+            ("القرآن", ["HifzPlan", "HifzSession", "PageGrade", "MistakeSpot", "MistakeEvent", "QuranDayState", "QuranAllotment", "RecoveryPlan", "MushafBookmark"]),
             ("المذكرات", ["DayPage", "Niyya", "Entry", "HiddenAutoLine", "MarginNote", "Letter", "Project"]),
             ("الصور والصوت والملفات", ["Media"]),
             ("المال", ["Account", "Card", "Statement", "CashbackEntry", "MoneyTransaction", "Allocation", "Reconciliation", "BankMessage", "AccountTail", "BankReading", "UpcomingDue", "Cycle", "CyclePolicy", "Envelope", "EnvelopePlan", "Obligation", "InstallmentItem", "Category", "CategoryLimit", "MerchantRule", "ZakatProfile"]),

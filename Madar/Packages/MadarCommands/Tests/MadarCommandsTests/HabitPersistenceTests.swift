@@ -242,6 +242,46 @@ import MadarData
         let returnDay = try #require(try HabitRepository(context: ModelContext(container)).readings(at: dismissal).first)
         #expect(!returnDay.paused)
     }
+    /// D7 (owner, 27 Oct / 11 Nov 2026): a habit paused by a trip that was then dismissed resumes on the dismissal day; a dismissed trip
+    /// with no recorded date (before V18) changes nothing.
+    @Test func aHabitPausedByADismissedTripResumesOnTheDismissalDay() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitTripDismissed-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let bus = CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 }))
+        let departure = ISO8601DateFormatter().date(from: "2026-10-14T20:00:00+03:00")!
+        let dismissal = ISO8601DateFormatter().date(from: "2026-10-16T10:00:00+03:00")!
+        _ = try SettingsStore(context: ModelContext(container)).stage(["core.dayStart": .string("midnight")], now: departure)
+        func run(_ name: String, _ payload: [String: MadarCore.JSONValue], at date: Date) async throws -> CommandOutcome {
+            try await bus.execute(.init(name: name, payload: .object(payload), issuedAt: date), now: date)
+        }
+        let paused = UUID(), home = UUID()
+        #expect(try await run("habit.save", payload(paused, HabitRule(effectiveFrom: try GregorianDay("2026-10-14"))), at: departure).status == .applied)
+        var homeRule = try payload(home, HabitRule(effectiveFrom: try GregorianDay("2026-10-14"))); homeRule["homeOnly"] = .bool(true)
+        #expect(try await run("habit.save", homeRule, at: departure).status == .applied)
+        _ = try SettingsStore(context: ModelContext(container)).stage(["bahw.travelFreezesHome": .bool(true)], now: departure)
+        #expect(try await run("prayer.startTrip", ["city": .string("جدة"), "country": .string("SA"), "lat": .number(21.4858), "lon": .number(39.1925), "tzID": .string("Asia/Riyadh")], at: departure).status == .applied)
+        #expect(try await run("habit.pause", ["id": .string(paused.uuidString), "from": .string("2026-10-14"), "trip": .bool(true)], at: departure).status == .applied)
+        // The trip is dismissed (no end) on 16 Oct.
+        let context = ModelContext(container)
+        let trip = try #require(try context.fetch(FetchDescriptor<Trip>()).first)
+        trip.dismissed = true; trip.end = nil; try context.save()
+        let day17 = ISO8601DateFormatter().date(from: "2026-10-17T12:00:00+03:00")!
+        // Before V18 there is no dismissal date: the linked pause never ends and the home-only freeze is dropped, as before.
+        var readings = try HabitRepository(context: ModelContext(container)).readings(at: day17)
+        #expect(readings.first { $0.id == paused }?.paused == true)
+        #expect(readings.first { $0.id == home }?.paused == false)
+        // With the date: both are frozen up to the dismissal day and count again from it.
+        trip.dismissedAt = dismissal; try context.save()
+        readings = try HabitRepository(context: ModelContext(container)).readings(at: day17)
+        #expect(readings.first { $0.id == paused }?.paused == false)
+        #expect(readings.first { $0.id == home }?.paused == false)
+        let day15 = ISO8601DateFormatter().date(from: "2026-10-15T12:00:00+03:00")!
+        readings = try HabitRepository(context: ModelContext(container)).readings(at: day15)
+        #expect(readings.first { $0.id == paused }?.paused == true)
+        #expect(readings.first { $0.id == home }?.paused == true)
+        let day16 = try #require(try HabitRepository(context: ModelContext(container)).readings(at: dismissal).first { $0.id == paused })
+        #expect(!day16.paused)
+    }
     @Test func homeOnlyHabitIsFrozenForSameDayTravel() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitSameDayTrip-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

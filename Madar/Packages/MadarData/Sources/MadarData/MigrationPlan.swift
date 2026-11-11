@@ -12,9 +12,10 @@ import SwiftData
 /// V16 adds optional diary intention reviews and generated audio insights; existing diary text, outcomes, and media bytes are retained.
 /// V17 adds only three models for bank messages: `AccountTail` (extra card/account tails), `BankReading` (last printed balance and limit)
 /// and `UpcomingDue` (announced bills and reminders); no stored row of an existing model changes (owner, 11 Nov 2026).
+/// V18 adds the optional `Trip.dismissedAt` (D7) and one model, `MushafBookmark` (D8); every existing value is kept.
 /// V10 adds optional Category.preferredCardID to guide future expense entry without rewriting historical card IDs (M5-V16, owner-approved, 18 Oct).
 public enum MadarMigrationPlan: SchemaMigrationPlan {
-    public static var schemas: [any VersionedSchema.Type] { [MadarSchemaV2.self, MadarSchemaV3.self, MadarSchemaV4.self, MadarSchemaV5.self, MadarSchemaV6.self, MadarSchemaV7.self, MadarSchemaV8.self, MadarSchemaV9.self, MadarSchemaV10.self, MadarSchemaV11.self, MadarSchemaV12.self, MadarSchemaV13.self, MadarSchemaV14.self, MadarSchemaV15.self, MadarSchemaV16.self, MadarSchema.self] }
+    public static var schemas: [any VersionedSchema.Type] { [MadarSchemaV2.self, MadarSchemaV3.self, MadarSchemaV4.self, MadarSchemaV5.self, MadarSchemaV6.self, MadarSchemaV7.self, MadarSchemaV8.self, MadarSchemaV9.self, MadarSchemaV10.self, MadarSchemaV11.self, MadarSchemaV12.self, MadarSchemaV13.self, MadarSchemaV14.self, MadarSchemaV15.self, MadarSchemaV16.self, MadarSchemaV17.self, MadarSchema.self] }
     public static var stages: [MigrationStage] {
         [.lightweight(fromVersion: MadarSchemaV2.self, toVersion: MadarSchemaV3.self),
          .lightweight(fromVersion: MadarSchemaV3.self, toVersion: MadarSchemaV4.self),
@@ -30,6 +31,7 @@ public enum MadarMigrationPlan: SchemaMigrationPlan {
          .lightweight(fromVersion: MadarSchemaV13.self, toVersion: MadarSchemaV14.self),
          .lightweight(fromVersion: MadarSchemaV14.self, toVersion: MadarSchemaV15.self),
          .lightweight(fromVersion: MadarSchemaV15.self, toVersion: MadarSchemaV16.self),
-         .lightweight(fromVersion: MadarSchemaV16.self, toVersion: MadarSchema.self)]
+         .lightweight(fromVersion: MadarSchemaV16.self, toVersion: MadarSchemaV17.self),
+         .lightweight(fromVersion: MadarSchemaV17.self, toVersion: MadarSchema.self)]
     }
 }
