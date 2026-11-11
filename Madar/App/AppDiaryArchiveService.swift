@@ -3,7 +3,7 @@ import SwiftData
 import MadarCore
 import MadarData
 
-struct DiaryDaySummary: Identifiable {
+struct DiaryDaySummary: Identifiable, Sendable {
     var id: String { day.description }
     let day: GregorianDay
     let excerpt: String
@@ -12,7 +12,7 @@ struct DiaryDaySummary: Identifiable {
     let places: Set<String>
     let projectIDs: Set<UUID>
 }
-struct DiaryArchiveSnapshot {
+struct DiaryArchiveSnapshot: Sendable {
     let today: GregorianDay
     let days: [DiaryDaySummary]
 }
@@ -62,7 +62,25 @@ extension AppDiaryService {
     }
     func archive() throws -> DiaryArchiveSnapshot {
         try authorizeRead()
-        let context = ModelContext(app.container)
+        let days = try Self.archiveDays(context: ModelContext(app.container))
+        return try .init(today: currentDay(), days: days)
+    }
+    /// The same read without holding the main actor: the fetches and grouping run in a detached task with its own context.
+    func archiveOffMain() async throws -> DiaryArchiveSnapshot {
+        try authorizeRead()
+        let container = app.container
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let days = try Self.archiveDays(context: ModelContext(container))
+            try Task.checkCancellation()
+            return days
+        }
+        let days = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+        let today = try await currentDayOffMain()
+        try authorizeRead()
+        return .init(today: today, days: days)
+    }
+    nonisolated private static func archiveDays(context: ModelContext) throws -> [DiaryDaySummary] {
         let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)])))
         let pages = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
         let margins = try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
@@ -80,7 +98,7 @@ extension AppDiaryService {
             let excerpt:String=written.last.map{ $0.textFormat == "markdown" ? DayOneMarkdown.plain($0.text) : $0.text } ?? intentions.last?.text ?? notes.last?.text ?? fallback
             return DiaryDaySummary(day:day,excerpt:excerpt,writings:written.count+notes.count+intentions.count,photoIDs:ids.sorted{$0.uuidString<$1.uuidString},places:Set(rows.compactMap(\.place)),projectIDs:Set(rows.compactMap(\.projectID)))
         }.sorted { $0.day > $1.day }
-        return try .init(today: currentDay(), days: days)
+        return days
     }
     func archivePhoto(_ id: UUID) throws -> Data? {
         try authorizeRead()

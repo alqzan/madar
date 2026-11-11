@@ -26,6 +26,7 @@ struct DiaryHubView: View {
     @State private var memoryReadFailurePending = false
     /// The memories read runs once per data change, not once per redraw of the open tab (a plain box: filling it must not redraw).
     @State private var memoryCache = MemoryReadBox()
+    @State private var memoryTick = 0
     #if DEBUG
         @State private var injectedMemoryReadFailure = false
     #endif
@@ -185,7 +186,7 @@ struct DiaryHubView: View {
                                 throw CocoaError(.fileReadUnknown)
                             }
                         #endif
-                        archive = try service.archive()
+                        archive = try await service.archiveOffMain()
                         travelDays = (try? service.travelDays()) ?? []
                         failure = nil
                         if !initialRouteApplied, let initialTab, tabs.contains(where: { $0.0 == initialTab }) {
@@ -439,33 +440,37 @@ struct DiaryHubView: View {
         }
     }
     private func memories(_ archive: DiaryArchiveSnapshot) -> some View {
-        let loaded: Result<DiaryHomeSnapshot, Error>
+        _ = memoryTick
+        let key = "\(app.prayerRevision)-\(loadAttempt)"
+        let loaded: Result<DiaryHomeSnapshot, Error>?
         if memoryReadFailurePending {
             loaded = .failure(CocoaError(.fileReadUnknown))
-        } else {
-            let key = "\(app.prayerRevision)-\(loadAttempt)"
-            if memoryCache.key == key, let cached = memoryCache.result { loaded = cached }
-            else {
-                loaded = Result { try service.home() }
-                if case .success = loaded { memoryCache.key = key; memoryCache.result = loaded }
-            }
-        }
-        let home = try? loaded.get()
+        } else if memoryCache.key == key { loaded = memoryCache.result }
+        else { loaded = nil }
+        let home = try? loaded?.get()
         return VStack(alignment: .leading, spacing: 14) {
             Text("رف الذكريات").font(DiaryType.heading)
             Text(home?.selection.match == .echo ? "أقرب ما كتبتَه إلى اليوم" : "من مثل هذا اليوم").font(DiaryType.label)
                 .foregroundStyle(theme.color("ink3Text"))
             // A read that failed says so; «لا ذكريات» is only for a day that truly has none.
-            if case .failure(let error) = loaded {
+            if case .failure(let error)? = loaded {
                 Text(madarUserMessage(error)).font(DiaryType.writing).accessibilityIdentifier("diary-hub-memory-error")
                 // A real failure leaves the flag false already: bumping the attempt is what reads again.
                 Button { memoryReadFailurePending = false; loadAttempt += 1 } label: { Text("أعد المحاولة")
                     .frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-hub-memories-retry")
-            } else {
+            } else if loaded != nil {
                 timeline(
                     archive.days.filter { home?.selection.days.contains($0.day) == true },
                     empty: "حين تكتب في أيام مثل هذا اليوم، تعود إليك صفحاتها هنا مع السنين.")
             }
+        }
+        // The read runs off the main actor, once per data change; the box fill redraws the tab when it lands.
+        .task(id: key) {
+            guard !memoryReadFailurePending, memoryCache.key != key else { return }
+            let result: Result<DiaryHomeSnapshot, Error>
+            do { result = .success(try await service.homeOffMain()) } catch { result = .failure(error) }
+            guard !Task.isCancelled else { return }
+            memoryCache.key = key; memoryCache.result = result; memoryTick += 1
         }
     }
     private func index(_ archive: DiaryArchiveSnapshot) -> some View {
