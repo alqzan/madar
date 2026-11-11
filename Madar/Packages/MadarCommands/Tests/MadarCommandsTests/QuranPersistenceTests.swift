@@ -305,6 +305,37 @@ import MadarQuran
         #expect(preserved.deletedAt == nil)
     }
 
+    /// Audit (11 Nov 2026): an unreadable stored row (an unknown session kind, grade or allotment origin) is skipped and counted, as drafts
+    /// are; the Quran snapshot and the habits linked to it still read, and the row stays stored as it is.
+    @Test func unreadableQuranRowsAreSkippedAndCountedWithoutBlockingTheRoomOrHabits() async throws {
+        let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        let draft = try makeDraft(container)
+        try await save(draft, bus: bus)
+        #expect(try await commit(draft, bus: bus).status == .applied)
+        let context = ModelContext(container)
+        let good = try #require(context.fetch(FetchDescriptor<HifzSession>()).first)
+        let badSession = HifzSession(); badSession.kind = "futureKind"; badSession.dayKey = good.dayKey; badSession.fromAyah = 1; badSession.toAyah = 7
+        badSession.endedAt = good.endedAt; badSession.pages = [1]; context.insert(badSession)
+        let badGrade = PageGrade(); badGrade.sessionID = good.id; badGrade.page = 2; badGrade.grade = "futureGrade"; context.insert(badGrade)
+        let badAllotment = QuranAllotment(); badAllotment.dayKey = good.dayKey; badAllotment.kind = "hifzExtra"; badAllotment.origin = "futureOrigin"
+        badAllotment.originDayKey = good.dayKey; badAllotment.amount = 1; context.insert(badAllotment)
+        try context.save()
+        let later = good.endedAt.addingTimeInterval(60)
+        let snapshot = try repo(container).snapshot(at: later)
+        #expect(snapshot.unreadableRowCount == 3)
+        #expect(snapshot.sessions.map(\.id) == [good.id] && snapshot.allotments.isEmpty)
+        #expect(snapshot.sessions.first?.grades.contains { $0.page == 2 } == false)
+        // A habit linked to the Quran still reads.
+        let habit = UUID(); var rule = HabitRule(effectiveFrom: try GregorianDay(good.dayKey)); rule.measure = .count; rule.unit = "وجه"
+        let payload: [String: MadarCore.JSONValue] = ["id": .string(habit.uuidString), "name": .string("المراجعة"), "source": .string("review"),
+            "rule": try JSONDecoder().decode(MadarCore.JSONValue.self, from: JSONEncoder().encode(rule))]
+        let saved = try await bus.execute(envelope("habit.save", payload, at: later), now: later)
+        #expect(saved.status == .applied, "\(saved.reason ?? "")")
+        #expect(try HabitRepository(context: ModelContext(container)).readings(at: later).contains { $0.id == habit })
+        // Nothing was changed or deleted.
+        #expect(try ModelContext(container).fetch(FetchDescriptor<HifzSession>()).contains { $0.kind == "futureKind" && $0.deletedAt == nil })
+    }
+
     @Test func discardUnreadableDraftsPreservesBytesAndHealthyDrafts() async throws {
         let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
         let broken = try makeDraft(container)

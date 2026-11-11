@@ -109,6 +109,29 @@ import MadarCommands
             }
         }
     }
+    /// Audit (11 Nov 2026): once the plan's range is fully memorised there is no wird to miss. The look-back shows no card, writes no
+    /// allotment under «وزّعه», and the command itself refuses.
+    func testACompletedPlanHasNoMissedWird() async throws {
+        for policy in ["spread", "ask"] {
+            let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+            // The plan is the last surah, all six ayahs in one wird.
+            try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 6231, unit: .ayah, amount: 6, rhythm: .balanced, restDay: "none", missPolicy: "ask")))
+            let started = try await service.start(kind: .hifz, stepID: "hifz", range: nil, rakaat: nil, spotID: nil)
+            try await learnPage(service, id: started.id)
+            _ = try await service.session(draftID: started.id, action: .advance)
+            _ = try await service.session(draftID: started.id, action: .commit)
+            let done = try await service.load()
+            XCTAssertNil(done.draft)
+            XCTAssertEqual(done.balanceTitle, "اكتمل نطاق الخطّة", "the fixture must finish the plan")
+            try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 6231, unit: .ayah, amount: 6, rhythm: .balanced, restDay: "none", missPolicy: policy)))
+            let context = ModelContext(app.container)
+            for plan in try context.fetch(FetchDescriptor<HifzPlan>()) { plan.activeFrom = plan.activeFrom.addingTimeInterval(-3 * 86400) }
+            try context.save()
+            let state = try await service.load()
+            XCTAssertNil(state.missedDayKey, policy)
+            XCTAssertTrue(try ModelContext(app.container).fetch(FetchDescriptor<QuranAllotment>()).filter { $0.origin == "missPolicy" && $0.deletedAt == nil }.isEmpty, policy)
+        }
+    }
     /// §7.4: a word slip keeps its wordIndex, counts once, and becomes a word spot for «مواضع الخطأ».
     func testWordSlipInReviewIsStoredOnceAndBecomesAWordDrillSpot() async throws {
         let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }

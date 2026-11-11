@@ -215,7 +215,7 @@ public struct QuranStagedResult: Sendable {
             try touch(row)
         case "quran.resolveMissedDay":
             let origin = try GregorianDay(text("dayKey")), snapshot = try repository.snapshot(at: now)
-            guard origin < snapshot.day.date, let plan = snapshot.plan,
+            guard origin < snapshot.day.date, let plan = snapshot.plan, snapshot.hifz?.balance != .complete,
                   origin >= snapshot.planStartDay ?? origin,
                   !snapshot.restDay.contains(origin), !snapshot.sessions.contains(where: { $0.kind == .hifz && $0.dayKey == origin }) else { throw DataError.invalidValue("Quran missed day") }
             let rows = try context.fetch(FetchDescriptor<QuranAllotment>()).filter { $0.mergedInto == nil }

@@ -132,6 +132,8 @@ struct QuranRoomState: Sendable {
     var numeralLocale: String
     var dayCloseAvailable = false
     var unreadableDraftCount = 0
+    /// Stored Quran rows this version could not read; skipped from every number and kept as they are.
+    var unreadableRowCount = 0
 }
 enum QuranUICommand: Sendable {
     case setTodayLevel(kind: QuranUIKind, level: QuranUILevel)

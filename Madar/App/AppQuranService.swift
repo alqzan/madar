@@ -194,7 +194,8 @@ import MadarPrayer
         let balance = switch snapshot.hifz?.balance { case .half: "نصف ورد"; case .consolidation: "تثبيت"; case .rest: "يوم راحة"; case .complete: "اكتمل نطاق الخطّة"; default: "ورد كامل" }
         let draft = snapshot.drafts.sorted { $0.startedAt > $1.startedAt }.first.map { QuranUIDraft(id: $0.id, title: "تابع جلستك", isPastDay: $0.storedDay.date != today) }
         var missedDay: GregorianDay?
-        if let plan = snapshot.plan {
+        // A plan whose range is fully memorised has no wird left to miss (audit, 11 Nov 2026).
+        if let plan = snapshot.plan, snapshot.hifz?.balance != .complete {
             // Days away: look back over the last 14 days since the plan began and settle the oldest unresolved one first; the next load takes the next.
             let firstDay = snapshot.planStartDay ?? today
             for offset in 1...14 {
@@ -242,7 +243,7 @@ import MadarPrayer
             recovery: QuranUIRecovery(distantLabel: { n in faceCount(n) + (n == 1 ? " بعيد" : n == 2 ? " بعيدان" : " بعيدة") }(snapshot.pages.filter(\.isFar).count), activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
             errors: errors, toolsOrder: [], availableTools: [], blockOrder: ["sadr", "path", "log14", "tools"], hiddenBlocks: [],
             sessionUnavailableReason: nil, readerUnavailableReason: nil, numeralLocale: app.values["core.numerals"]?.string == "western" ? "en" : "ar",
-            dayCloseAvailable: snapshot.sessions.contains { $0.dayKey == today }, unreadableDraftCount: snapshot.unreadableDraftCount)
+            dayCloseAvailable: snapshot.sessions.contains { $0.dayKey == today }, unreadableDraftCount: snapshot.unreadableDraftCount, unreadableRowCount: snapshot.unreadableRowCount)
     }
     func perform(_ value: QuranUICommand) async throws {
         switch value {

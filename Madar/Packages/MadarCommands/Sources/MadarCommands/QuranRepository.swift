@@ -49,6 +49,8 @@ public struct QuranDataSnapshot: Sendable {
     public let drafts: [QuranSessionDraft]
     /// Draft rows whose JSON could not be decoded remain stored and are reported without blocking the room.
     public let unreadableDraftCount: Int
+    /// Stored sessions, grades and allotments this version could not read; skipped, kept as they are, and counted for the room.
+    public var unreadableRowCount = 0
     public let lastTest: GregorianDay?
     public let testPages: [Int]
 }
@@ -148,14 +150,16 @@ public final class QuranRepository {
         }
         let gradeRows = try context.fetch(FetchDescriptor<PageGrade>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let gradesBySession = Dictionary(grouping: gradeRows.compactMap { row -> PageGrade? in row.sessionID == nil ? nil : row }, by: { $0.sessionID! })
-        var sessions: [QuranSessionFact] = try sessionRows.map { row -> QuranSessionFact in
-            guard let kind = QuranSessionKind(rawValue: row.kind) else { throw DataError.invalidValue("Quran session kind") }
-            let grades = try (gradesBySession[row.id] ?? []).map { grade -> QuranDraftGrade in
-                guard (1...604).contains(grade.page), let rating = QuranReviewRating(storedRaw: grade.grade) else { throw DataError.invalidValue("Quran grade") }
+        // Audit (11 Nov 2026): a row this version cannot read (an unknown kind, grade or origin, or an invalid day or range) is skipped
+        // and counted, as unreadable drafts are; it stays stored as it is and never blanks the room, the habits or the widgets.
+        var unreadableRowCount = 0
+        var sessions: [QuranSessionFact] = sessionRows.compactMap { row -> QuranSessionFact? in
+            guard let kind = QuranSessionKind(rawValue: row.kind), let key = try? GregorianDay(row.dayKey),
+                  let range = try? QuranAyahRange(first: row.fromAyah, last: row.toAyah) else { unreadableRowCount += 1; return nil }
+            let grades = (gradesBySession[row.id] ?? []).compactMap { grade -> QuranDraftGrade? in
+                guard (1...604).contains(grade.page), let rating = QuranReviewRating(storedRaw: grade.grade) else { unreadableRowCount += 1; return nil }
                 return QuranDraftGrade(page: grade.page, rating: rating, isTest: grade.role == "test")
             }
-            let key = try GregorianDay(row.dayKey)
-            let range = try QuranAyahRange(first: row.fromAyah, last: row.toAyah)
             return QuranSessionFact(id: row.id, commitID: row.commitID, kind: kind, dayKey: key,
                 endedAt: row.endedAt, ayahs: range, pages: row.pages, grades: grades, mistakes: row.mistakes)
         }
@@ -194,9 +198,11 @@ public final class QuranRepository {
         let hifzLevel = try previewHifzLevel ?? QuranDayLevel(rawValue: dayState?.hifzLevel ?? settings.value(for: "quran.hifzLevel").string ?? "medium") ?? .medium
         let reviewLevel = try QuranDayLevel(rawValue: dayState?.reviewLevel ?? settings.value(for: "quran.reviewLevel").string ?? "medium") ?? .medium
         let restDay = try QuranRestDay(rawValue: settings.value(for: "quran.restDay").string ?? "friday") ?? .friday
-        let allotments = try context.fetch(FetchDescriptor<QuranAllotment>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.map { row in
-            guard let kind = QuranDailyAllotment.Kind(rawValue: row.kind), let origin = QuranDailyAllotment.Origin(rawValue: row.origin) else { throw DataError.invalidValue("Quran allotment") }
-            return try QuranDailyAllotment(dayKey: GregorianDay(row.dayKey), kind: kind, amount: row.amount, pages: row.pages, origin: origin, originDayKey: GregorianDay(row.originDayKey))
+        let allotments = try context.fetch(FetchDescriptor<QuranAllotment>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.compactMap { row -> QuranDailyAllotment? in
+            guard let kind = QuranDailyAllotment.Kind(rawValue: row.kind), let origin = QuranDailyAllotment.Origin(rawValue: row.origin),
+                  let value = try? QuranDailyAllotment(dayKey: GregorianDay(row.dayKey), kind: kind, amount: row.amount, pages: row.pages, origin: origin,
+                                                       originDayKey: GregorianDay(row.originDayKey)) else { unreadableRowCount += 1; return nil }
+            return value
         }
         let recoveryRow = try context.fetch(FetchDescriptor<RecoveryPlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.cancelledAt == nil }.max { $0.updatedAt < $1.updatedAt }
         let recovery = try recoveryRow.map { try QuranRecoveryPlan(startDayKey: GregorianDay($0.startDayKey), days: $0.days, pages: $0.pages) }
@@ -263,13 +269,15 @@ public final class QuranRepository {
                 throw error
             }
         }
-        return QuranDataSnapshot(day: storedDay, plan: plan, coverage: coverage, sessions: sessions, pages: pages, memories: memories, completedOn: completedOn,
+        var snapshot = QuranDataSnapshot(day: storedDay, plan: plan, coverage: coverage, sessions: sessions, pages: pages, memories: memories, completedOn: completedOn,
             activities: activities, hifzLevel: hifzLevel, reviewLevel: reviewLevel, restDay: restDay, forceNewHifz: dayState?.forceNewHifz ?? false,
             hifz: hifz, review: review, recentPages: recent, partialRecent: coverage.partialRecentPortions.filter { !completedToday.contains($0.page) }, allotments: allotments, recovery: recovery,
             mistakes: QuranMistakeEngine.summaries(seeds: seeds, events: mistakeEvents, sessions: mistakeSessions),
             drillBoard: QuranMistakeEngine.drillBoard(seeds: seeds, events: mistakeEvents, sessions: mistakeSessions, dayKey: today, intensity: plan?.plan.intensity ?? .balanced),
             planStartDay: planStartDay, habitualHifzLevel: QuranDayLevel(rawValue: try settings.value(for: "quran.hifzLevel").string ?? "medium") ?? .medium,
             drafts: drafts, unreadableDraftCount: unreadableDraftCount, lastTest: lastTest, testPages: tests)
+        snapshot.unreadableRowCount = unreadableRowCount
+        return snapshot
     }
 }
 

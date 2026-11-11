@@ -150,6 +150,13 @@ struct QuranHomeView: View {
                             }
                         }
                     }
+                    if state.unreadableRowCount > 0 {
+                        // Rows from a newer version or a damaged import: said once, quietly, with the count; nothing to do here.
+                        Text("تعذّرت قراءة " + service.numerals.string(state.unreadableRowCount) + (state.unreadableRowCount == 1 ? " سجلّ محفوظ" : " سجلّات محفوظة")
+                             + "؛ بقيت كما هي ولم تدخل في الأرقام.")
+                            .font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
+                            .accessibilityIdentifier("quran-unreadable-rows-notice")
+                    }
                     header(state)
                     let blocks = RoomHomeLayout(session: service.app, key: "quran.layout").visible
                     if wide {
