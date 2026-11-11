@@ -96,6 +96,14 @@
       "skillPath": "widgets/SKILL.md",
       "computedHash": "f32061c8b79bcec6e8ef6399589b213a0b62dc4fd3534264ba41615e2da5791b",
       "installMode": "copy"
+    },
+    "improve": {
+      "source": "shadcn/improve",
+      "ref": "cac56e1ebd3c279aa9153616cfeac7b174ab90f9",
+      "sourceType": "github",
+      "skillPath": "skills/improve/SKILL.md",
+      "computedHash": "9e8fe9ea4f9a0e4155801d1624e38ca23798467bb88b447efaa5120f7b1fe802",
+      "installMode": "copy"
     }
   }
 }
