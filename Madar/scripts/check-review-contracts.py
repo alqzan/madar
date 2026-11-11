@@ -65,7 +65,7 @@ for required in ['Current work', 'Board', 'Later', 'Handovers']:
     require(f'# {required}' in (ROOT / 'docs/PROGRESS.md').read_text(), f'progress heading missing: {required}')
 require((ROOT / 'docs/OWNER-RUNBOOK.md').exists(), 'RA6 runbook missing')
 if args.require_ra4:
-    dictionary = json.loads((handoff / 'data-dictionary.json').read_text())
+    dictionary = json.loads((ROOT / 'Madar/Specification/data-dictionary.json').read_text())
     names = {row['name'] for row in dictionary['models']}
     require('MoneyTransaction' in names and 'Transaction' not in names, 'RA4 model rename missing')
     require('@Model Transaction ' not in html and '@Model MoneyTransaction ' in html, 'RA4 working HTML model not amended')

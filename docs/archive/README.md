@@ -10,6 +10,7 @@ History only. Nothing here is an instruction. The current protocol is the root `
 | `START-M0.md`, `START-M0-history.md` | Former start notes |
 | `madar-docs/` | Former status, roadmap and decision notes from `Madar/docs/` |
 | `PROGRESS-2026-10-27-finished-sections.md` | Board sections whose rows were all approved, done or deferred (M1-V, M1-F, M2 preflight, M2 Quran, UX owner trial, Done — software), archived 27 Oct 2026 with statuses unchanged, plus the replaced «Current milestone» paragraph |
+| `PROGRESS-2026-11-11-handovers.md` | Handovers older than the newest three, moved unchanged from the board (8–11 Nov 2026) |
 | `progress-last-checked.md` | Older «Last checked» lines (19–25 Oct 2026) moved off the board on 27 Oct 2026 |
 | `handovers-2026-10-26.md` | The two oldest handovers (25–26 Oct 2026) moved off the board on 27 Oct 2026 |
 | `handovers/`, `handovers.md`, `handovers-2026-10*.md` | Older session handovers by date (13–26 Oct 2026) |
