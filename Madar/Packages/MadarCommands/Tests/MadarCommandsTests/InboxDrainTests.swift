@@ -377,7 +377,7 @@ import MadarInbox
     /// M4-F01: a Shortcut habit completion whose period closed before the drain is refused and
     /// quarantined; it must not block the valid completion and the prayer queued after it.
     @Test func test_M4F01_staleHabitCompletionDoesNotBlockLaterCommands() async throws {
-        let (container, adapter, inbox) = try fixture(), generation = UUID(), now = Date()
+        let (container, adapter, inbox) = try fixture(), generation = UUID(), now = Self.fixedNow
         let bus = CommandBus(adapter: adapter), habit = UUID()
         var rule = HabitRule(effectiveFrom: prayerDay(now)); rule.measure = .count; rule.target = 2
         let ruleJSON = try JSONDecoder().decode(MadarCore.JSONValue.self, from: JSONEncoder().encode(rule))
@@ -391,7 +391,7 @@ import MadarInbox
         let unscoped = try await bus.execute(.init(name: "habit.complete", payload: .object(["id": .string(habit.uuidString)]), source: .widget, issuedAt: now), now: now)
         #expect(unscoped.status == .rejected)
         let drainer = InboxDrainer(inbox: inbox, bus: bus, generation: { .init(generationID: generation, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: {})
-        try await drainer.drain()
+        try await drainer.drain(now: now)
         #expect(drainer.needsWidgetHabitRefresh, "Applied and terminally rejected deliveries both release the snapshot action after the drain.")
         #expect(try inbox.claimBatch().isEmpty)
         #expect(try HabitRepository(context: ModelContext(container)).readings(at: now).first?.summary.current?.value == 1)
