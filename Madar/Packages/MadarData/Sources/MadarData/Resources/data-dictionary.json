@@ -5996,6 +5996,18 @@
         "kind": "tombstone device-only draft; no session facts",
         "auth": "app"
       },
+      "quran.saveBookmark": {
+        "intent": null,
+        "payload": "{id: UUID, page: Int 1...604, name: String trimmed 1...40}",
+        "kind": "D8 (11 Nov 2026): create or rename/move a named MushafBookmark; undoable",
+        "auth": "app"
+      },
+      "quran.deleteBookmark": {
+        "intent": null,
+        "payload": "{id: UUID}",
+        "kind": "D8: tombstone a MushafBookmark; undoable",
+        "auth": "app"
+      },
       "quran.discardUnreadableDrafts": {
         "payload": "{}",
         "kind": "tombstone unreadable device-only SessionDraft rows; preserve stored bytes and create no session facts",
@@ -6161,7 +6173,7 @@
       },
       "diary.appendMedia": {
         "intent": null,
-        "payload": "{fileID: UUID, kind: photo|audio|video|document, contentType: String, caption: String, day: today|yesterday, writingDayKey: YYYY-MM-DD, durationS?: Int >= 0, assetID?: String (photo only; Photos-library local identifier, stored as Media.sourceID \"photos:<id>\" with a small copy in data — owner 24 Oct 2026)}",
+        "payload": "{fileID: UUID, kind: photo|audio|video|document, contentType: String, caption: String, day: today|yesterday, writingDayKey: YYYY-MM-DD, durationS?: Int >= 0, assetID?: String (photo only; Photos-library local identifier, stored as Media.sourceID \"photos:<id>\" with a small copy in data — owner 24 Oct 2026), at?: epoch seconds, not in the future (D8, 11 Nov 2026: a photo after «اكتب بعده» takes the in-between time)}",
         "kind": "append Entry and referenced Media from private staged UUID file; sha256; original audio before transcription",
         "auth": "app-only + diary unlocked"
       },

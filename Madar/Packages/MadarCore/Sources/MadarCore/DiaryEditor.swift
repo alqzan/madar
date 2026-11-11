@@ -4,7 +4,7 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case saveDraft(id: UUID, text: String, day: String, target: String?, writingDay: String)
     /// `at` places the new line at a chosen moment between two lines of the same day (never in the future).
     case commitDraft(UUID, at: Double? = nil)
-    case appendMedia(file: UUID, kind: String, type: String, caption: String, day: String, writingDay: String, duration: Int?, asset: String? = nil)
+    case appendMedia(file: UUID, kind: String, type: String, caption: String, day: String, writingDay: String, duration: Int?, asset: String? = nil, at: Double? = nil)
     case transcript(entry: UUID, text: String)
     case audioInsights(media: UUID, title: String?, levels: [Double])
     case intention(id: UUID, day: String, text: String)
@@ -38,7 +38,7 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
             if value["at"] != nil { guard let at = value["at"]?.number, at.isFinite, at > 0 else { return nil }; return .commitDraft(id, at: at) }
             return .commitDraft(id)
         case "diary.appendMedia":
-            guard Set(value.keys).isSubset(of: ["fileID", "kind", "contentType", "caption", "day", "durationS", "writingDayKey", "assetID"]), let id = uuid("fileID"), let kind = value["kind"]?.string, ["photo", "audio", "video", "document"].contains(kind),
+            guard Set(value.keys).isSubset(of: ["fileID", "kind", "contentType", "caption", "day", "durationS", "writingDayKey", "assetID", "at"]), let id = uuid("fileID"), let kind = value["kind"]?.string, ["photo", "audio", "video", "document"].contains(kind),
                 let type = value["contentType"]?.string, !type.isEmpty, let caption = value["caption"]?.string, let day = value["day"]?.string, ["today", "yesterday"].contains(day) else { return nil }
             guard let writingDay = value["writingDayKey"]?.string, (try? GregorianDay(writingDay)) != nil else { return nil }
             let duration = value["durationS"]?.number
@@ -46,7 +46,10 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
             // Owner, 24 Oct 2026: a photo can stay in the Photos library; Madar keeps its identifier and a small copy.
             let asset = value["assetID"]?.string
             guard value["assetID"] == nil || (kind == "photo" && asset.map { !$0.isEmpty && $0.count <= 200 } == true) else { return nil }
-            return .appendMedia(file: id, kind: kind, type: type, caption: caption, day: day, writingDay: writingDay, duration: duration.map(Int.init), asset: asset)
+            // D8 (owner, 11 Nov 2026): «اكتب بعده» gives a photo the time between its two lines, as a written line gets.
+            let at = value["at"]?.number
+            guard value["at"] == nil || at.map({ $0.isFinite && $0 > 0 }) == true else { return nil }
+            return .appendMedia(file: id, kind: kind, type: type, caption: caption, day: day, writingDay: writingDay, duration: duration.map(Int.init), asset: asset, at: at)
         case "diary.setIntention":
             guard Set(value.keys) == ["id","dayKey","text"],let id=uuid("id"),let day=value["dayKey"]?.string,(try? GregorianDay(day)) != nil,let text=value["text"]?.string,!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{return nil}
             return .intention(id:id,day:day,text:text)

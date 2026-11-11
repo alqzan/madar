@@ -34,7 +34,7 @@ extension AppDiaryService {
         if let margin { payload["targetDayKey"] = .string(margin.description) }
         try await app.executeDiaryCommand("diary.saveDraft", payload: payload, updatesPresentation: false)
     }
-    @discardableResult func appendMedia(data: Data, kind: String, contentType: String, caption: String = "", day: String, writingDay: GregorianDay, duration: Int? = nil, assetID: String? = nil, id: UUID = UUID()) async throws -> UUID {
+    @discardableResult func appendMedia(data: Data, kind: String, contentType: String, caption: String = "", day: String, writingDay: GregorianDay, duration: Int? = nil, assetID: String? = nil, at: Date? = nil, id: UUID = UUID()) async throws -> UUID {
         try authorizeRead()
         let root = app.diaryStagingDirectory
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.protectionKey: FileProtectionType.complete])
@@ -43,6 +43,7 @@ extension AppDiaryService {
         var payload: [String:MadarCore.JSONValue] = ["fileID": .string(id.uuidString), "kind": .string(kind), "contentType": .string(contentType), "caption": .string(caption), "day": .string(day), "writingDayKey": .string(writingDay.description)]
         if let duration { payload["durationS"] = .number(Double(duration)) }
         if let assetID { payload["assetID"] = .string(assetID) }
+        if let at { payload["at"] = .number(at.timeIntervalSince1970) }
         try await app.executeDiaryCommand("diary.appendMedia", payload: payload, id: id)
         try? FileManager.default.removeItem(at: file)
         return id

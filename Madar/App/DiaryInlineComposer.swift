@@ -191,10 +191,11 @@ struct DiaryInlineComposer: View {
                 failure = "تعذّر فتح الصورة. اخترها مرة أخرى."; return
             }
             let writingDay = try service.currentDay()
-            try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", day: "today", writingDay: writingDay)
+            // D8: after «اكتب بعده» the photo takes the same in-between time a written line would, on today's page only.
+            let at = insertAt.flatMap { $0 < app.prayerNow() ? $0 : nil }
+            try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", day: "today", writingDay: writingDay, at: at)
             failure = nil; saved()
-            // The photo API stores no time, so it goes to the end of the page; the «بعد» chip is cleared and says so.
-            if insertAt != nil { insertAt = nil; anchor = nil; notice = "أُضيفت الصورة في آخر الصفحة" }
+            if insertAt != nil { insertAt = nil; anchor = nil }
         } catch { failure = madarUserMessage(error) }
     }
 }

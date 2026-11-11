@@ -98,4 +98,21 @@ import MadarData
         let photo = try #require(ModelContext(container).fetch(FetchDescriptor<Media>()).first)
         #expect(photo.sourceID == "photos:ABC-123/L0/001"); #expect(photo.data == bytes); #expect(photo.kind == "photo")
     }
+    /// D8 (owner, 11 Nov 2026): a photo added after «اكتب بعده» keeps the time it was given, as a written line does; a future time is refused.
+    @Test func photoAddedAfterALineKeepsItsGivenTime() async throws {
+        let (container, bus, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let now = date("2026-10-24T12:00:00+03:00"), moment = date("2026-10-24T09:30:00+03:00")
+        let directory = root.appending(path: "DiaryStaging"); try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        func append(_ id: UUID, at: Date) async throws -> CommandOutcome {
+            try Data("abc".utf8).write(to: directory.appending(path: id.uuidString + ".blob"))
+            return try await bus.execute(.init(commandID: id, name: "diary.appendMedia", payload: .object(["fileID": .string(id.uuidString), "kind": .string("photo"), "contentType": .string("image/jpeg"), "caption": .string(""), "day": .string("today"), "writingDayKey": .string("2026-10-24"), "at": .number(at.timeIntervalSince1970)]), issuedAt: now), now: now)
+        }
+        let placed = UUID()
+        #expect(try await append(placed, at: moment).status == .applied)
+        let entry = try #require(ModelContext(container).fetch(FetchDescriptor<Entry>()).first)
+        #expect(entry.eventAt == moment && entry.dayKey == "2026-10-24")
+        let refused = UUID()
+        do { let result = try await append(refused, at: now.addingTimeInterval(3600)); #expect(result.status != .applied) } catch {}
+        #expect(try ModelContext(container).fetch(FetchDescriptor<Media>()).allSatisfy { $0.id != refused })
+    }
 }

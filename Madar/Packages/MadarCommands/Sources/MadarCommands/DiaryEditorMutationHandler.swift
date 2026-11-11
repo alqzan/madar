@@ -30,7 +30,7 @@ import MadarData
             })
             draft.deletedAt = now; draft.deletionBarrierAt = now; draft.updatedAt = StableIdentity.monotonic(now: now, previous: draft.updatedAt); draft.writerID = writer
             return inverse
-        case .appendMedia(let file, let kind, let type, let caption, let day, let writingDay, let duration, let asset):
+        case .appendMedia(let file, let kind, let type, let caption, let day, let writingDay, let duration, let asset, let at):
             guard try context.fetchCount(FetchDescriptor<Media>(predicate: #Predicate { $0.id == file })) == 0 else { throw DataError.invalidValue("media already exists") }
             let url = root.appending(path: file.uuidString + (kind == "audio" ? ".m4a" : ".blob"))
             let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
@@ -41,7 +41,11 @@ import MadarData
             // A linked photo: `data` is the small copy and the natural key is the library asset (Media.naturalKeyRule).
             media.sourceID = asset.map { DiaryPhotoLink.prefix + $0 }
             media.createdAt = now; media.updatedAt = now; media.writerID = writer; context.insert(media)
-            return try DiaryMutationHandler.stage(text: caption, day: day, targetDay: nil, id: id, context: context, now: now, writer: writer, mediaIDs: kind == "audio" ? [] : [file], audioID: kind == "audio" ? file : nil, storedDay: try GregorianDay(writingDay))
+            return try DiaryMutationHandler.stage(text: caption, day: day, targetDay: nil, id: id, context: context, now: now, writer: writer, mediaIDs: kind == "audio" ? [] : [file], audioID: kind == "audio" ? file : nil, storedDay: try GregorianDay(writingDay), eventAt: try at.map { value in
+                let moment = Date(timeIntervalSince1970: value)
+                guard moment <= now else { throw DataError.invalidValue("future diary time") }
+                return moment
+            })
         case .intention(let id,let day,let text): return try DiaryMutationHandler.setIntention(id:id,day:day,text:text,context:context,now:now,writer:writer)
         case .intentionResult(let id,let result): return try DiaryMutationHandler.setIntentionResult(id:id,result:result,context:context,now:now,writer:writer)
         case .intentionReview(let id, let period, let text): return try DiaryMutationHandler.setIntentionReview(id: id, period: period, text: text, context: context, now: now, writer: writer)
