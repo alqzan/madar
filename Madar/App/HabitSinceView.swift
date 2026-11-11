@@ -138,7 +138,7 @@ struct HabitPastDaySheet:View {
     private var day:GregorianDay { GregorianDay.containing(date,in:.gmt) }
     private var selectedPeriod: HabitPeriodResult? { reading.summary.periods.last { $0.start <= day && day < $0.end } }
     private var selectedRule: HabitRule? { selectedPeriod?.rule }
-    private var hasSelectedTarget: Bool { day >= reading.firstEffectiveFrom && (selectedPeriod?.target ?? 0) > 0 }
+    private var hasSelectedTarget: Bool { day >= reading.firstEffectiveFrom && (selectedPeriod?.target ?? 0) > 0 && !reading.breaks.contains { $0.contains(day) } }
     private var delta: Int { selectedRule?.measure == .duration ? 15 : 1 }
     private var saveTitle: String {
         guard let rule = selectedRule, rule.measure != .once else { return "سجّلها في يومها" }

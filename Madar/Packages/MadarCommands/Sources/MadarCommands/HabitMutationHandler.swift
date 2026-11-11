@@ -53,6 +53,7 @@ private struct HabitUndo: Codable {
                 guard day < today else { throw DataError.invalidValue("لا يُسجّل يوم لم يأتِ بعد") }
                 guard let reading, day >= reading.firstEffectiveFrom,
                       let period = reading.summary.periods.last(where: { $0.start <= day && day < $0.end }), period.target > 0 else { throw DataError.invalidValue("هذا اليوم قبل بداية العادة") }
+                guard !reading.breaks.contains(where: { $0.contains(day) }) else { throw DataError.invalidValue("العادة كانت موقوفة في هذا اليوم") }
                 target = period; logDay = day
                 event.eventAt = day.date(in: prayers.place(at: now).timeZone).addingTimeInterval(43200)
             } else {

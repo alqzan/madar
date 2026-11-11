@@ -19,6 +19,8 @@ public struct HabitReading: Identifiable, Sendable {
     /// Days the habit was done, newest first, each with the diary line linked to it (item 26 «منذ آخر مرة»).
     public var times: [HabitTime] = []
     public var lastTime: HabitTime? { times.first }
+    /// Every pause and home-only trip freeze of this habit; a day inside one never counts.
+    public var breaks: [HabitBreak] = []
     public func refreshed(in readings: [HabitReading]) -> HabitReading? {
         readings.first { $0.id == id }
     }
@@ -220,7 +222,7 @@ public struct HabitRepository {
             let links = Dictionary(habitEvents.filter { $0.delta > 0 && $0.entryID != nil }.sorted { $0.updatedAt < $1.updatedAt }.map { ($0.dayKey, $0.entryID!) }, uniquingKeysWith: { _, b in b })
             let net = Dictionary(facts.map { ($0.day, $0.delta) }, uniquingKeysWith: +)
             let times = net.filter { $0.value > 0 && $0.key <= today }.keys.sorted(by: >).map { HabitTime(day: $0, entryID: links[$0.description]) }
-            result.append(.init(id: habit.id, name: habit.name, source: habit.linkedSource, archived: habit.archivedAt != nil, homeOnly: habit.homeOnly, reminder: habit.reminder, summary: summary, firstEffectiveFrom: firstDay, paused: breaks.contains { $0.contains(today) }, isNow: summary.current.map { HabitEngine.isNow($0, today: today, instant: now, window: window, pauses: breaks) } ?? false, times: times))
+            result.append(.init(id: habit.id, name: habit.name, source: habit.linkedSource, archived: habit.archivedAt != nil, homeOnly: habit.homeOnly, reminder: habit.reminder, summary: summary, firstEffectiveFrom: firstDay, paused: breaks.contains { $0.contains(today) }, isNow: summary.current.map { HabitEngine.isNow($0, today: today, instant: now, window: window, pauses: breaks) } ?? false, times: times, breaks: breaks))
         }
         return result
     }
