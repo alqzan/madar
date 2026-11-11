@@ -1,9 +1,9 @@
 import Foundation
 
 /// B1-17: unpacked books, import caches and export folders were left in the temporary directory when a screen was closed
-/// abnormally. At launch, items this app creates there (known names only) that are over an hour old are removed.
+/// abnormally. At launch, items this app creates there (known names only) that are over an hour old are removed. Interrupted backup and legacy-read folders (which hold unencrypted data) are included.
 enum TemporaryFilesCleanup {
-    static let knownPrefixes = ["MadarReader", "DayOneImport", "DiaryExport", "MadarImport-", "MadarSearch-", "DiaryPreview-", "Journal.zip"]
+    static let knownPrefixes = ["MadarReader", "DayOneImport", "DiaryExport", "MadarImport-", "MadarSearch-", "DiaryPreview-", "Journal.zip", "MadarBackup-", "MadarLegacyRead-"]
     static let knownSuffixes = [".epub", ".m4a"]
 
     @discardableResult

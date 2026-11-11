@@ -314,6 +314,25 @@ final class TemporaryFilesCleanupTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: freshBook.path), "A recent file may still be in use")
         XCTAssertTrue(FileManager.default.fileExists(atPath: stranger.path), "Unknown names are never touched")
     }
+
+    func testInterruptedBackupAndLegacyReadFoldersAreRemoved() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("CleanupFixture-\(UUID())", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        func makeFolder(_ name: String, age: TimeInterval) throws -> URL {
+            let url = root.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            try Data("x".utf8).write(to: url.appendingPathComponent("archive.aar"))
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: url.path)
+            return url
+        }
+        let oldBackup = try makeFolder("MadarBackup-\(UUID())", age: 7200), freshBackup = try makeFolder("MadarBackup-\(UUID())", age: 60)
+        let oldLegacy = try makeFolder("MadarLegacyRead-\(UUID())", age: 7200), stranger = try makeFolder("SomeoneElse-\(UUID())", age: 7200)
+        XCTAssertEqual(TemporaryFilesCleanup.run(in: root), 2)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldBackup.path)); XCTAssertFalse(FileManager.default.fileExists(atPath: oldLegacy.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: freshBackup.path), "A backup in progress may still be using it")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: stranger.path), "Unknown names are never touched")
+    }
 }
 
 /// B1-13
