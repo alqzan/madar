@@ -19,6 +19,9 @@ struct MoneyMessagesView: View {
     @State private var note: String?
     @State private var deleteFailureID: UUID?
     @State private var injectedDeleteFailure = false
+    /// Commands in flight, keyed by name and row, so a second tap on the same button is ignored instead of
+    /// reaching the handler as a duplicate and showing a false «لم يُحفظ».
+    @State private var inFlight: Set<String> = []
     @State private var categorizing: MoneyMessageDraft?
     /// The purchase chosen by hand for a refund draft; it travels with the confirmation.
     @State private var refundChoice: [UUID: UUID] = [:]
@@ -361,6 +364,8 @@ struct MoneyMessagesView: View {
         }.padding(.top, 8)
     }
     private func run(_ name: String, _ payload: [String: MadarCore.JSONValue], successNote: String? = nil) {
+        let key = name + "|" + (payload["id"].map { "\($0)" } ?? "")
+        guard inFlight.insert(key).inserted else { return }
         Task {
             do {
                 #if DEBUG
@@ -384,6 +389,7 @@ struct MoneyMessagesView: View {
                 else if name == "money.applyStatement" { note = "المبلغ يختلف عن كشف قريب لهذه البطاقة؛ راجع البطاقة أو تجاهل الرسالة" }
                 else { note = "لم يُحفظ: " + madarUserMessage(error) }
             }
+            inFlight.remove(key)
             load()
         }
     }

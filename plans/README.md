@@ -55,7 +55,7 @@ under test.
 |------|-------|----------|--------|-----------------|------------|--------|
 | 001  | The merge pass keeps the media of a diary entry that can still be undeleted | P1 | S | no | — | DONE |
 | 002  | The launch sweep removes plaintext backup folders left in the temporary directory | P1 | S | yes | — | DONE |
-| 008  | The bank-message screen ignores a second tap while a command is running | P1 | S | yes | — | TODO |
+| 008  | The bank-message screen ignores a second tap while a command is running | P1 | S | yes | — | DONE |
 | 003  | The lobby reads «القادم» and the year block once per store generation | P2 | S | yes | — | TODO |
 | 004  | A cleared diary draft stays cleared; a recording that ends on its own releases the audio session | P2 | S | yes | — | TODO |
 | 012  | A habit cannot be logged on a past day that was inside a pause | P2 | S | no (build only) | — | TODO |
