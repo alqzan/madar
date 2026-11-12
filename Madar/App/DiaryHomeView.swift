@@ -255,10 +255,8 @@ struct DiaryHomeView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
+                // Today's date lives in the today card right below; repeating it here said the same thing twice.
                 Text("المذكرات").font(DiaryType.title).accessibilityIdentifier("diary-home-title")
-                if let snapshot {
-                    MadarDateLabel(app.dateLabels(snapshot.today, weekday: true)).foregroundStyle(theme.color("ink3Text"))
-                }
             }.frame(maxWidth: .infinity, alignment: .leading)
             Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
             Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("أيامك").accessibilityIdentifier("diary-days")
