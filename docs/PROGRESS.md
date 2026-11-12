@@ -251,3 +251,9 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - **Delivery:** بناء ٣٥ أُرشف ورُفع إلى TestFlight الداخلي (Upload succeeded في `Madar/Artifacts/OWNER-TestFlight-35/upload.log`، 2026-11-11 22:11)؛ معالجة Apple وقبول جهاز المالك لم يُتحقق منهما.
 - **Model/effort:** claude-sonnet-5-5، مراجعة claude-fable-5-2؛ effort not exposed.
 - **Usage:** الخمس ساعات ١٣٪ مستعمل، الأسبوعي ٤٥٪ عند البدء بالبناء.
+
+### Handover — 12 Nov (photos on every day, build 42)
+- **Works now:** diary day pages (any day, not only today) show that day's Photos-library images automatically; permission asked once on first day open; tap pins a photo to the page.
+- **Verified:** Release build; `DiaryEditorUITests` 8 run / 3 skipped / 0 failed (`Madar/Artifacts/CLAUDE-day-photos.xcresult`). Build 42 archived and uploaded: «Upload succeeded» 16:08 in `Madar/Artifacts/OWNER-TestFlight-42/upload.log`.
+- **Not verified:** real-device library with many photos; the first-open system prompt (skipped under UI tests); Apple processing.
+- **Model/effort:** claude-sonnet-5-5, not exposed.

@@ -85,14 +85,20 @@ struct DiaryDayPhotos: View {
                 }.buttonStyle(.madarPlain).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("diary-day-photos-allow")
             } else if !visible.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("صور هذا اليوم").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    Text("صور هذا اليوم · المس صورة لتثبيتها في الصفحة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) { ForEach(visible, id: \.localIdentifier) { DiaryDayPhotoThumb(asset: $0, busy: busy == $0.localIdentifier, pick: pick) } }
                     }
                 }.accessibilityIdentifier("diary-day-photos")
             }
         }
-        .task(id: day.description) { load() }
+        .task(id: day.description) {
+            // Owner 12 Nov: the day's photos appear by default; the one system prompt is asked the first time a day opens.
+            if PHPhotoLibrary.authorizationStatus(for: .readWrite) == .notDetermined, ProcessInfo.processInfo.environment["MADAR_UI_NOW"] == nil {
+                status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            }
+            load()
+        }
         .onChange(of: scenePhase) { _, phase in if phase == .active { load() } }
     }
     private var visible: [PHAsset] { assets.filter { !linked.contains($0.localIdentifier) } }
@@ -119,9 +125,9 @@ private struct DiaryDayPhotoThumb: View {
             ZStack {
                 if let image { Image(uiImage: image).resizable().scaledToFill() } else { theme.surface }
                 if busy { ProgressView() }
-            }.frame(width: 64, height: 64).clipShape(.rect(cornerRadius: 8)).overlay { RoundedRectangle(cornerRadius: 8).stroke(theme.line) }
+            }.frame(width: 88, height: 88).clipShape(.rect(cornerRadius: 8)).overlay { RoundedRectangle(cornerRadius: 8).stroke(theme.line) }
         }.buttonStyle(.madarPlain).accessibilityLabel("أضف هذه الصورة إلى صفحة اليوم").accessibilityIdentifier("diary-day-photo")
-            .task { image = await DiaryPhotoLibrary.image(asset, side: 128) }
+            .task { image = await DiaryPhotoLibrary.image(asset, side: 200) }
     }
 }
 

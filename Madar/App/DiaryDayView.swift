@@ -200,7 +200,7 @@ struct DiaryDayView: View {
                             LazyVStack(alignment: .leading, spacing: 0) {
                                 if let page {
                                     // 10 Nov owner design: the day is one flow — the day's library photos on top, then every line, recording and attachment in the order it happened.
-                                    if shownDay == today, travel == nil { dayPhotoStrip }
+                                    if travel == nil { dayPhotoStrip }
                                     let flow = page.lines.filter { $0.kind != "intention" }
                                     let mediaByEntry = Dictionary(grouping: page.media, by: \.entryID)
                                     ForEach(Array(flow.enumerated()), id: \.element.id) { index, line in
