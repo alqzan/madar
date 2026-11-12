@@ -1,7 +1,7 @@
 import XCTest
 @MainActor final class DiarySeasonUITests:XCTestCase {
     private func launch(_ variant:String,_ now:String,_ theme:String="light",styles:String?=nil)->XCUIApplication {
-        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":variant,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":theme,"MADAR_UI_NOW":now];if let styles{app.launchEnvironment["MADAR_UI_STYLE_SETTINGS"]=styles};app.launch();XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout:25));app.buttons["diary-today"].tap();XCTAssertTrue(app.staticTexts["diary-day-title"].waitForExistence(timeout:10));return app
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":variant,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":theme,"MADAR_UI_NOW":now];if let styles{app.launchEnvironment["MADAR_UI_STYLE_SETTINGS"]=styles};app.launch();let opener=app.buttons["diary-today"].waitForExistence(timeout:25) ? app.buttons["diary-today"] : app.buttons["diary-write"];XCTAssertTrue(opener.waitForExistence(timeout:10));opener.tap();XCTAssertTrue(app.staticTexts["diary-day-title"].waitForExistence(timeout:10));return app
     }
     func testFridayFrameAndActualWeekRoute() throws {
         continueAfterFailure=false

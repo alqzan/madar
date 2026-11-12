@@ -55,6 +55,8 @@ struct DiaryHomeView: View {
     @State private var editor: DiaryEditorTarget?
     @State private var queuedDiaryRoute: Route?
     @State private var reader: GregorianDay?
+    /// Set by the write buttons: the day page opens with the cursor already in its one writing field.
+    @State private var focusReaderComposer = false
     @State private var pendingDiaryRootRequestID: UUID?
     @State private var readerEntryID: UUID?
     @State private var routedHubTab: String?
@@ -201,14 +203,14 @@ struct DiaryHomeView: View {
                 .hidesRoomAccessory(app, id: "diary-editor-destination")
         }
         .navigationDestination(item: $reader) { day in
-            DiaryDayView(app: app, day: day, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID, embeddedInNavigationStack: true)
+            DiaryDayView(app: app, day: day, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID, embeddedInNavigationStack: true, focusComposerOnOpen: focusReaderComposer)
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
                 .hidesRoomAccessory(app, id: "diary-day-destination")
         }
         .onChange(of: editor) { old, new in if old != nil, new == nil { editorDidDismiss() } }
         .onChange(of: reader) { old, new in
             if old != nil, new == nil {
-                readerEntryID = nil; readerEntryRouteID = nil
+                readerEntryID = nil; readerEntryRouteID = nil; focusReaderComposer = false
                 applyPendingDiaryRootIfReady()
             }
         }
@@ -549,7 +551,7 @@ struct DiaryHomeView: View {
                     VStack(alignment: .leading, spacing: 3) { Text("صفحة اليوم").font(MadarTypography.section()); Text(day.excerpt).font(DiaryType.label).lineLimit(2) }
                         .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-today")
-                Button { editor = .init(margin: nil) } label: { Image(systemName: "plus").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
+                Button { writeToday(day.day) } label: { Image(systemName: "plus").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                     .buttonStyle(.madarPlain).accessibilityLabel("اكتب في صفحة اليوم").accessibilityIdentifier("diary-write")
             }.padding(.horizontal, 12).background(theme.surface, in: .capsule).glassEffect(.regular.interactive(), in: .capsule)
             Button { editor = .init(margin: target) } label: {
@@ -557,10 +559,15 @@ struct DiaryHomeView: View {
             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-add-margin")
         }.padding(.horizontal, 14).padding(.vertical, 8).background(theme.background)
     }
+    /// One place to write: today's page, with its field focused. The full page (camera, files, formatting) is one tap from there.
+    private func writeToday(_ day: GregorianDay) {
+        focusReaderComposer = true
+        reader = day
+    }
     private func todayBar(_ day: DiaryDisplayDay) -> some View {
         // FB-39 (FB-28): with nothing written today the bar is one clear action that opens the editor; «صفحة اليوم» opened an empty reader.
         if day.lines.isEmpty && day.media.isEmpty && day.photo == nil && (try? service.travel(day.day)) == nil {
-            return AnyView(Button { editor = .init(margin: nil) } label: {
+            return AnyView(Button { writeToday(day.day) } label: {
                 Label("اكتب سطرك الأول اليوم", systemImage: "pencil").font(MadarTypography.section())
                     .frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-write")
@@ -572,7 +579,7 @@ struct DiaryHomeView: View {
                     .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading).padding(.horizontal, 18)
                     .background(theme.surface, in: .capsule).glassEffect(.regular.interactive(), in: .capsule)
             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-today")
-            Button { editor = .init(margin: nil) } label: { Label("اكتب", systemImage: "pencil").font(MadarTypography.section()).padding(.horizontal, 22).frame(minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }
+            Button { writeToday(day.day) } label: { Label("اكتب", systemImage: "pencil").font(MadarTypography.section()).padding(.horizontal, 22).frame(minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }
                 .buttonStyle(.madarPlain).accessibilityIdentifier("diary-write")
         }.padding(.horizontal, 14).padding(.vertical, 8).background(theme.background))
     }

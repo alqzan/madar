@@ -11,7 +11,7 @@ import XCTest
         XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
-        app.buttons["diary-write"].tap(); XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))
+        app.openDiaryEditorFromHome(); XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))
     }
     func testRestoredDiaryOpensWithoutWelcomeAndNamesItsMissingPhoto() throws {
         continueAfterFailure = false
@@ -48,10 +48,11 @@ import XCTest
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "عشاء عند أهلي")).firstMatch.waitForExistence(timeout: 10))
         app.buttons["diary-day-yesterday"].tap()
         XCTAssertTrue(app.staticTexts["دوام طويل. وصلت البيت قبل العشاء بدقائق."].waitForExistence(timeout: 10))
-        app.closeDiaryDay(); app.buttons["diary-write"].tap()
+        app.closeDiaryDay(); app.openDiaryEditorFromHome()
         let editor = app.textViews["diary-editor-text"]; XCTAssertTrue(editor.waitForExistence(timeout: 10))
         app.buttons["diary-editor-yesterday"].tap(); editor.tap(); editor.typeText("سطر متأخر محفوظ في أمس"); app.buttons["diary-editor-save"].tap()
-        app.buttons["diary-today"].tap(); app.buttons["diary-day-yesterday"].tap()
+        // Saving returns to today's page, where the tabs are.
+        app.buttons["diary-day-yesterday"].tap()
         let late = app.staticTexts["سطر متأخر محفوظ في أمس"]; for _ in 0..<4 where !late.isHittable { app.swipeUp() }
         XCTAssertTrue(late.exists); XCTAssertTrue(app.staticTexts["كُتبت لاحقًا"].exists)
     }

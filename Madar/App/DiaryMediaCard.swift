@@ -139,7 +139,8 @@ struct DiaryMediaCard: View {
             if let error { Text(error).font(MadarTypography.fine()) }
         }.padding(.vertical, 10).padding(.leading, 58).padding(.trailing, 18)
             .task(id: media.id) {
-                if voice == nil { voice = DiaryVoiceController(app: app) }
+                // Only a recording needs the voice controller; photos and files no longer each build one.
+                if voice == nil, media.kind == "audio" { voice = DiaryVoiceController(app: app) }
                 voice?.loadExistingTranscript(media, text: transcript)
                 if savedTitle == nil { savedTitle = media.title }
             }

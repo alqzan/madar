@@ -159,7 +159,7 @@ struct DiarySearchView: View {
                     }
                     Button("إلغاء", role: .cancel) { editing = nil }
                 }
-                .sheet(isPresented:Binding(get:{reader != nil},set:{if !$0{reader=nil;readerEntryID=nil;readerEntryRouteID=nil}})){if let reader {DiaryDayView(app:app,day:reader,initialEntryID:readerEntryID,initialEntryRouteID:readerEntryRouteID).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}}
+                .sheet(isPresented:Binding(get:{reader != nil},set:{if !$0{reader=nil;readerEntryID=nil;readerEntryRouteID=nil}})){if let reader {DiaryDayView(app:app,day:reader,initialEntryID:readerEntryID,initialEntryRouteID:readerEntryRouteID,showsNavigationTools:false).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}}
                 .fullScreenCover(isPresented: $letterHubOpen, onDismiss: { routedLetterID = nil }) {
                     DiaryHubView(app: app, initialTab: "letters", initialLetterID: routedLetterID).environment(\.roomTheme, theme).madarSheetErrorAlert(app)
                 }

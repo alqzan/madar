@@ -379,7 +379,7 @@ import XCTest
         writer.typeText("بداية هادئة من البهو")
         capture(app, "UX-07-writer-L")
         app.buttons["diary-editor-cancel"].tap()
-        app.buttons["diary-write"].tap()
+        app.openDiaryEditorFromHome()
         XCTAssertTrue(writer.waitForExistence(timeout: 5))
         XCTAssertEqual(writer.value as? String, "بداية هادئة من البهو")
     }

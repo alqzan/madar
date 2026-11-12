@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import MadarDesign
 import MadarData
+import MadarCore
 
 @MainActor private final class StoreSettleBackgroundTask {
     private var identifier: UIBackgroundTaskIdentifier = .invalid
@@ -359,6 +360,7 @@ struct MadarRootView: View {
             session.requestPrayerNotificationRefresh()
         }
         .overlay { AnchoredUndo(session: session) }
+        .overlay(alignment: .top) { RecordingBadge(session: session) }
         .fullScreenCover(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in })) { FirstRunView(session: session).environment(\.roomTheme, theme).madarSheetErrorAlert(session) }
         .alert("لم تكتمل العملية", isPresented: Binding(get: {
             session.errorMessage != nil && !(session.mihbaraOpen && readingSaveCoordinator.canRetryPendingWriteErrorNow)
@@ -540,5 +542,33 @@ private struct MadarSidebar: View {
         .buttonStyle(.madarPlain)
         .accessibilityIdentifier("tab-" + tab.id)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+
+/// A take goes on while the user moves between rooms (it survives Home and the lock screen too). This is its one visible sign outside the diary:
+/// a small pill with the running time, a tap to go back to the diary, and a stop that saves.
+private struct RecordingBadge: View {
+    @Bindable var session: AppSession
+    @Environment(\.roomTheme) private var theme
+    var body: some View {
+        let voice = session.diaryVoice
+        if voice.recording, session.selectedTab != "notes" {
+            HStack(spacing: 10) {
+                Button { session.selectedTab = "notes" } label: {
+                    HStack(spacing: 8) {
+                        Circle().fill(theme.color("late")).frame(width: 9, height: 9)
+                        Text("يُسجَّل صوتك · " + DiaryDurationFormat.elapsed(voice.elapsedSeconds, digits: AppDiaryService(app: session).digits))
+                            .font(MadarTypography.caption()).monospacedDigit().foregroundStyle(theme.ink)
+                    }.frame(minHeight: 44).contentShape(Rectangle())
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("recording-badge-open")
+                Button { Task { await voice.stop() } } label: {
+                    Text("أوقف واحفظ").font(MadarTypography.caption()).foregroundStyle(theme.background).padding(.horizontal, 12).frame(minHeight: 32)
+                        .background(theme.color("late"), in: .capsule).frame(minHeight: 44).contentShape(Rectangle())
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("recording-badge-stop")
+            }
+            .padding(.horizontal, 14).background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line, lineWidth: 0.7) }
+            .padding(.top, 6).transition(.move(edge: .top).combined(with: .opacity))
+        }
     }
 }

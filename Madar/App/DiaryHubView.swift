@@ -166,7 +166,7 @@ struct DiaryHubView: View {
                 }
                 .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) {
                     if let reader {
-                        DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme).madarSheetErrorAlert(app)
+                        DiaryDayView(app: app, day: reader, showsNavigationTools: false).environment(\.roomTheme, theme).madarSheetErrorAlert(app)
                     }
                 }
                 .onChange(of: initialTab) { _, target in

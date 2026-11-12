@@ -8,6 +8,10 @@ struct DiaryDayView: View {
     var initialEntryID: UUID? = nil
     var initialEntryRouteID: UUID? = nil
     var embeddedInNavigationStack = false
+    /// The write buttons on the home open this page with the cursor in the composer.
+    var focusComposerOnOpen = false
+    /// A day opened from the archive, search or a week is already inside that screen: it does not offer the same screens again on top of themselves.
+    var showsNavigationTools = true
     @Environment(\.roomTheme) private var roomTheme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -176,13 +180,13 @@ struct DiaryDayView: View {
                         Text("آخر صفحة كتبتها: " + service.bothDates(returnDay, calendar: first)).font(DiaryType.label)
                         Text("لا تحتاج إلى تعويض شيء.").font(MadarTypography.body())
                         HStack(spacing: 8) {
-                            Button {
+                            if showsNavigationTools { Button {
                                 archiveOpen = true
                             } label: {
                                 Text("افتح يومًا سابقًا").frame(maxWidth: .infinity, minHeight: 44).overlay {
                                     Capsule().stroke(theme.line)
                                 }
-                            }.accessibilityIdentifier("diary-return-days")
+                            }.accessibilityIdentifier("diary-return-days") }
                             Button {
                                 returnDismissed = true; writing = true
                             } label: {
@@ -430,16 +434,18 @@ struct DiaryDayView: View {
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button {
-                        searchOpen = true
-                    } label: {
-                        Image(systemName: "magnifyingglass")
-                    }.accessibilityLabel("ابحث في مذكراتك");
-                    Button {
-                        archiveOpen = true
-                    } label: {
-                        Image(systemName: "book.closed")
-                    }.accessibilityLabel("أيامك")
+                    if showsNavigationTools {
+                        Button {
+                            searchOpen = true
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                        }.accessibilityLabel("ابحث في مذكراتك")
+                        Button {
+                            archiveOpen = true
+                        } label: {
+                            Image(systemName: "book.closed")
+                        }.accessibilityLabel("أيامك")
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if niyyaSaved, let token = app.undoToken, token.id == niyyaToken {
@@ -534,6 +540,12 @@ struct DiaryDayView: View {
                 }
             }
             .task(id: pageReloadID) { await loadDiaryPage() }
+            .task {
+                guard focusComposerOnOpen else { return }
+                // After the push settles; an earlier focus request is dropped before the field joins its window.
+                try? await Task.sleep(for: .milliseconds(450))
+                if inlineWriting { focusTick += 1 }
+            }
             .task(id: aiAvailabilityID) {
                 guard page != nil, (!analysisText.isEmpty || !intentions.isEmpty) else { aiAvailability = .checking; return }
                 // No reset to «checking» here: the button stays put while a new line is saved, instead of blinking away and back.
