@@ -35,8 +35,9 @@ import XCTest
         photos.firstMatch.tap()
         XCTAssertTrue(photos.firstMatch.waitForNonExistence(timeout: 15), app.debugDescription)
         capture(app, "M3-20-day-photos-linked-L")
-        app.buttons["diary-editor-save"].tap()
-        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 10)); app.buttons["diary-today"].tap()
+        // The photo is saved the moment it is linked; the page has nothing else to save, so «تمّ» closes it.
+        app.buttons["diary-editor-cancel"].tap()
+        if app.buttons["diary-today"].waitForExistence(timeout: 5) { app.buttons["diary-today"].tap() }
         XCTAssertTrue(app.buttons["افتح الصورة"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == %@", "افتح الصورة")).count, 1)
         capture(app, "M3-20-day-photo-saved-L")
@@ -52,6 +53,24 @@ import XCTest
     private func launch(_ fixture: String) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
         app.launch(); XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25)); return app
+    }
+    /// Owner 12 Nov: every day shows its own library photos by default, not only today.
+    func testPastDayShowsItsLibraryPhotosAutomatically() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["MADAR_TEST_PHOTOS_SEEDED"] == "1", "Requires the explicit synthetic simulator Photos fixture")
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2001-04-18T15:00:00+03:00"]
+        app.launch()
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25), app.debugDescription)
+        app.openDiaryEditorFromHome()
+        let photos = app.buttons.matching(identifier: "diary-day-photo")
+        XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 15), "Today (18 April) shows its own photo")
+        app.buttons["diary-editor-cancel"].tap()
+        let yesterday = app.buttons["diary-day-yesterday"]
+        XCTAssertTrue(yesterday.waitForExistence(timeout: 10), app.debugDescription)
+        yesterday.tap()
+        XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 10), "A past day shows its photo too: " + app.debugDescription)
     }
     func testClosingBlankEditorDoesNotRestoreAnEmptyDraft() throws {
         continueAfterFailure = false

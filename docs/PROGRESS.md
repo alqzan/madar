@@ -257,3 +257,4 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - **Verified:** Release build; `DiaryEditorUITests` 8 run / 3 skipped / 0 failed (`Madar/Artifacts/CLAUDE-day-photos.xcresult`). Build 42 archived and uploaded: «Upload succeeded» 16:08 in `Madar/Artifacts/OWNER-TestFlight-42/upload.log`.
 - **Not verified:** real-device library with many photos; the first-open system prompt (skipped under UI tests); Apple processing.
 - **Model/effort:** claude-sonnet-5-5, not exposed.
+- **Addendum (12 Nov, photos):** with the synthetic Photos fixture seeded (`TEST_RUNNER_MADAR_TEST_PHOTOS_SEEDED=1`), `testDayPhotosLinkOnce` (stale save step fixed: «تمّ» closes) and new `testPastDayShowsItsLibraryPhotosAutomatically` pass; all Diary UI classes: 70 run / 3 skipped (2 intentional, 1 other) / 0 failed (`Madar/Artifacts/CLAUDE-diary-photos-all.xcresult`). Test-only change after build 42; no new build.
