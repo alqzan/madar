@@ -46,9 +46,11 @@ struct DiaryHomeView: View {
     @Environment(\.isFrontRoom) private var isFrontRoom
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var roomWidth: CGFloat = 0
+    /// False once today's card has scrolled out of sight: the bottom bar then offers the same write control.
+    @State private var todayCardVisible = true
+    @State private var todayIntention: String?
     private var wide: Bool { isPadWide(sizeClass) && roomWidth >= 960 }
     @State private var snapshot: DiaryHomeSnapshot?
-    @State private var selected: GregorianDay?
     @State private var customizing = false
     @State private var archiveOpen = false
     @State private var searchOpen = false
@@ -58,6 +60,7 @@ struct DiaryHomeView: View {
     /// Set by the write buttons: the day page opens with the cursor already in its one writing field.
     @State private var focusReaderComposer = false
     @State private var readerPrompt: String?
+    @State private var readerExpandComposer = false
     @State private var pendingDiaryRootRequestID: UUID?
     @State private var readerEntryID: UUID?
     @State private var routedHubTab: String?
@@ -67,25 +70,12 @@ struct DiaryHomeView: View {
     @State private var routedSearchRequestID: UUID?
     @State private var readerEntryRouteID: UUID?
     @State private var failure: String?
-    @State private var defaultMemoryDay: GregorianDay?
     @State private var intentionFollowUp: DiaryIntentionFollowUp?
 #if DEBUG
     @State private var injectedReadFailure = false
 #endif
     @State private var refreshGeneration = 0
     private var service: AppDiaryService { AppDiaryService(app: app) }
-    private var memory: DiaryDisplayDay? {
-        guard let snapshot else { return nil }
-        guard let day = selected ?? defaultMemoryDay ?? snapshot.selection.days.first else { return nil }
-        return snapshot.days.first { $0.day == day }
-    }
-    /// Tour 25 Oct on the owner's data: the nearest year was a page with neither words nor a moved photo, so the
-    /// memory opened on «صورة هذا اليوم لم تُنقل». It now opens on the nearest year that has something to show.
-    private func preferredOpeningDay(in snapshot: DiaryHomeSnapshot, pages: [String: DiaryDisplayDay]) -> GregorianDay? {
-        snapshot.selection.days.first { day in
-            pages[day.description].map { page in page.photo != nil || page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } } ?? false
-        } ?? snapshot.selection.days.first
-    }
     var body: some View {
         VStack(spacing: 0) {
             header.padding(.horizontal, 14).padding(.top, 8)
@@ -93,55 +83,15 @@ struct DiaryHomeView: View {
             VStack(alignment: .leading, spacing: 14) {
                 if let snapshot {
                     if let intentionFollowUp { intentionFollowUpCard(intentionFollowUp) }
-                    if app.string("notes.homeShape") == "echoes" {
-                        DiaryEchoesView(snapshot: snapshot, service: service, open: { reader = $0 })
-                        if !hidden("days") { recentDays(snapshot) }
-                    } else if app.string("notes.homeShape") == "margin", let memory {
-                        DiaryMarginView(page: memory, snapshot: snapshot, service: service, showAuto: app.bool("notes.showAutoSections"), showLines: !hidden("thatDay"), ink: secondInk,
-                            another: snapshot.selection.days.count > 1 ? { nextMemory(snapshot) } : nil, open: { reader = memory.day })
-                        if !memory.dayOne, !hidden("sinceThatDay") { since(memory) }
-                        if !hidden("days") { recentDays(snapshot) }
-                    } else {
                     if wide {
-                        // iPad, wide: the years stand on the right and the recent days run beside them.
+                        // iPad, wide: today stands on the right, the years strip and the recent days run beside it.
                         HStack(alignment: .top, spacing: 28) {
-                            VStack(alignment: .leading, spacing: 14) {
-                    // A brand-new diary has no years to switch between: the first-page card below is the only thing to read (owner, 4 Nov).
-                    if snapshot.days.contains(where: { $0.photo != nil || $0.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }) {
-                    HStack {
-                        Text(snapshot.selection.match == .echo ? "أقرب ما كتبتَه إلى اليوم" : "هذا اليوم عبر السنين").font(DiaryType.heading).lineLimit(1).minimumScaleFactor(0.8)
-                        Spacer()
-                        HStack(spacing: 2) {
-                            calendarButton(.gregorian, "بالميلادي")
-                            calendarButton(.hijri, "بالهجري")
-                        }.padding(3).background(theme.ink.opacity(0.06), in: .capsule)
-                    }
-                    }
-                                if blocks.contains("memory") { years(snapshot) }
-                            }.frame(maxWidth: .infinity, alignment: .leading)
-                            if blocks.contains("days"), !hidden("days") { recentDays(snapshot).frame(width: 380) }
+                            todayCard(snapshot).frame(width: 440)
+                            VStack(alignment: .leading, spacing: 14) { homeBlocks(snapshot) }.frame(maxWidth: .infinity, alignment: .leading)
                         }
                     } else {
-                    // A brand-new diary has no years to switch between: the first-page card below is the only thing to read (owner, 4 Nov).
-                    if snapshot.days.contains(where: { $0.photo != nil || $0.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }) {
-                    HStack {
-                        Text(snapshot.selection.match == .echo ? "أقرب ما كتبتَه إلى اليوم" : "هذا اليوم عبر السنين").font(DiaryType.heading).lineLimit(1).minimumScaleFactor(0.8)
-                        Spacer()
-                        HStack(spacing: 2) {
-                            calendarButton(.gregorian, "بالميلادي")
-                            calendarButton(.hijri, "بالهجري")
-                        }.padding(3).background(theme.ink.opacity(0.06), in: .capsule)
-                    }
-                    }
-                    ForEach(blocks, id: \.self) { block in
-                        switch block {
-                        // OR-10 (owner picked mockup A, 26 Oct): one card per past year replaces the year drag, «ذاك اليوم» and «منذ ذاك اليوم».
-                        case "memory": years(snapshot)
-                        case "days": if !hidden(block) { recentDays(snapshot) }
-                        default: EmptyView()
-                        }
-                    }
-                    }
+                        todayCard(snapshot)
+                        homeBlocks(snapshot)
                     }
                     DiaryQuestionsCard(app: app) { question in writeToday(snapshot.today, prompt: question) }
                 } else if let failure {
@@ -157,15 +107,13 @@ struct DiaryHomeView: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
         }
         .background(theme.background).foregroundStyle(theme.ink)
-         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let snapshot {
-                Group {
-                    if app.string("notes.homeShape") == "margin", let memory { marginBar(snapshot.todayPage, target: memory.day) }
-                    else { todayBar(snapshot.todayPage) }
-                    // The bar stays where it is when the keyboard comes up for the review field, instead of riding over what is being typed.
-                }.ignoresSafeArea(.keyboard, edges: .bottom)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // The write control lives in today's card; the bar only stands in for it once the card has scrolled away (never two on screen).
+            if let snapshot, !todayCardVisible, !wide {
+                todayBar(snapshot.todayPage).ignoresSafeArea(.keyboard, edges: .bottom).transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .animation(.snappy(duration: 0.2), value: todayCardVisible)
         .scrollDismissesKeyboard(.interactively)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task(id: [isFrontRoom ? app.prayerRevision : -1, roomVisit]) {
@@ -190,28 +138,27 @@ struct DiaryHomeView: View {
                 }
             }
         }
-        .onChange(of: selected) { _, day in if let day { Task { try? await service.prepareClosedDay(day); await refresh() } } }
         .fullScreenCover(isPresented: $searchOpen, onDismiss: { routedSearchQuery = nil; routedSearchRequestID = nil; applyPendingDiaryRootIfReady() }) { DiarySearchView(app: app, initialQuery: routedSearchQuery, initialQueryRequestID: routedSearchRequestID).environment(\.roomTheme, theme) }
         .fullScreenCover(isPresented: $archiveOpen, onDismiss: { clearHubRoute(); applyPendingDiaryRootIfReady() }) {
             DiaryHubView(app: app, initialTab: routedHubTab, initialLetterID: routedLetterID,
                 initialLetterRequestID: routedLetterRequestID)
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
         }
-        .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() }; applyPendingDiaryRootIfReady() }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
+        .sheet(isPresented: $customizing, onDismiss: { Task { await refresh() }; applyPendingDiaryRootIfReady() }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
         .navigationDestination(item: $editor) { target in
             DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day, prompt: target.prompt, embeddedInNavigationStack: true)
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
                 .hidesRoomAccessory(app, id: "diary-editor-destination")
         }
         .navigationDestination(item: $reader) { day in
-            DiaryDayView(app: app, day: day, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID, embeddedInNavigationStack: true, focusComposerOnOpen: focusReaderComposer, prompt: readerPrompt)
+            DiaryDayView(app: app, day: day, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID, embeddedInNavigationStack: true, focusComposerOnOpen: focusReaderComposer, prompt: readerPrompt, expandComposerOnOpen: readerExpandComposer)
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
                 .hidesRoomAccessory(app, id: "diary-day-destination")
         }
         .onChange(of: editor) { old, new in if old != nil, new == nil { editorDidDismiss() } }
         .onChange(of: reader) { old, new in
             if old != nil, new == nil {
-                readerEntryID = nil; readerEntryRouteID = nil; focusReaderComposer = false; readerPrompt = nil
+                readerEntryID = nil; readerEntryRouteID = nil; focusReaderComposer = false; readerPrompt = nil; readerExpandComposer = false
                 applyPendingDiaryRootIfReady()
             }
         }
@@ -266,7 +213,10 @@ struct DiaryHomeView: View {
     }
     private func openDiaryRoute(_ route: Route) {
         if route.path.first == "write", route.path.count == 1 {
-            editor = .init(margin: nil, day: route.parameters["day"] ?? "today")
+            let day = route.parameters["day"] ?? "today"
+            // Today is written on today's page, with the composer already grown; «أمس» keeps its own writing page.
+            if day == "today", let today = try? service.currentDay() { writeToday(today, expand: true) }
+            else { editor = .init(margin: nil, day: day) }
         }
         else if route.path.first == "day", let key = route.path.last, let day = try? GregorianDay(key) {
             readerEntryID = nil; readerEntryRouteID = nil; reader = day
@@ -300,7 +250,6 @@ struct DiaryHomeView: View {
         reader = nil
         readerEntryID = nil
         readerEntryRouteID = nil
-        selected = nil
         clearHubRoute()
     }
     private var header: some View {
@@ -317,77 +266,115 @@ struct DiaryHomeView: View {
                 .buttonStyle(.madarPlain).accessibilityLabel("خصّص المذكرات").accessibilityIdentifier("diary-customize")
         }.padding(.vertical, 4)
     }
+    /// The two blocks below today's card, in the order the owner chose in the customize screen.
+    @ViewBuilder private func homeBlocks(_ snapshot: DiaryHomeSnapshot) -> some View {
+        ForEach(blocks, id: \.self) { block in
+            switch block {
+            case "memory": if !hidden("memory") { years(snapshot) }
+            case "days": if !hidden(block) { recentDays(snapshot) }
+            default: EmptyView()
+            }
+        }
+    }
+
+    // MARK: Today
+
+    /// 12 Nov, owner: the home opens on today's page, alive: both dates, the intention, the latest lines, the day's photos and the one write control.
+    /// A tap anywhere on the card opens the page; the write capsule opens it with the cursor in the composer.
+    private func todayCard(_ snapshot: DiaryHomeSnapshot) -> some View {
+        let day = snapshot.todayPage
+        let lines = day.lines.filter { $0.kind != "intention" && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.suffix(3)
+        let travelling = (try? service.travel(day.day)) != nil
+        let empty = lines.isEmpty && day.media.isEmpty && day.photo == nil && !travelling
+        let auto: Set<String> = ["salah", "quran", "mihbara", "mal", "habits"]
+        return VStack(alignment: .leading, spacing: 12) {
+            MadarDateLabel(app.dateLabels(day.day, weekday: true), primaryFont: DiaryType.heading, secondaryFont: DiaryType.label)
+                .accessibilityIdentifier("diary-today-date")
+            if let todayIntention {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("النيّة").font(DiaryType.label).foregroundStyle(theme.color("accentText"))
+                    Text(todayIntention).font(DiaryType.writing).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                }.accessibilityIdentifier("diary-today-intention")
+            }
+            if empty {
+                Text("صفحة اليوم تنتظر سطرك الأول.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-today-invitation")
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(lines)) { line in
+                        let isAuto = auto.contains(line.kind)
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text(service.time(line.at, zone: line.tzID)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).frame(width: 46, alignment: .center)
+                            Text(line.markdown == true ? DayOneMarkdown.plain(line.text) : line.text)
+                                .font(.custom("thmanyahseriftext-Regular", size: isAuto ? 15 : 17, relativeTo: .body)).italic(isAuto).lineLimit(2)
+                                .foregroundStyle(isAuto ? theme.color("autoInkText") : theme.ink).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }.accessibilityIdentifier("diary-today-lines")
+                recentMedia(day)
+            }
+            HStack {
+                Spacer(minLength: 0)
+                Button { writeToday(day.day) } label: {
+                    Label(empty ? "اكتب سطرك الأول" : "اكتب", systemImage: "pencil").font(MadarTypography.section())
+                        .padding(.horizontal, 20).frame(minHeight: 48).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-write")
+            }
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            Button { reader = day.day } label: {
+                RoundedRectangle(cornerRadius: 24).fill(theme.surface).overlay { RoundedRectangle(cornerRadius: 24).stroke(theme.line) }
+            }.buttonStyle(.madarPlain).accessibilityLabel("صفحة اليوم").accessibilityIdentifier("diary-today")
+        }
+        .onScrollVisibilityChange(threshold: 0.2) { visible in todayCardVisible = visible }
+    }
+
+    /// «في مثل هذا اليوم»: one compact strip of year cards, newest year first; a year with neither words nor a photo is skipped; a card opens that day.
+    @ViewBuilder private func years(_ snapshot: DiaryHomeSnapshot) -> some View {
+        let pages = snapshot.selection.days.compactMap { day in snapshot.days.first { $0.day == day } }
+            .filter { page in page.photo != nil || page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
+        if !pages.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(snapshot.selection.match == .echo ? "أقرب ما كتبتَه إلى اليوم" : "في مثل هذا اليوم").font(DiaryType.heading).lineLimit(1).minimumScaleFactor(0.8)
+                    Spacer()
+                    HStack(spacing: 2) { calendarButton(.gregorian, "بالميلادي"); calendarButton(.hijri, "بالهجري") }
+                        .padding(3).background(theme.ink.opacity(0.06), in: .capsule)
+                }
+                ScrollView(.horizontal) {
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(pages) { page in yearCard(page, snapshot: snapshot) }
+                    }.padding(.vertical, 2)
+                }.scrollIndicators(.hidden).accessibilityIdentifier("diary-years")
+            }
+        }
+    }
     private func calendarButton(_ calendar: FirstCalendar, _ title: String) -> some View {
-        Button { app.set(.string(calendar.rawValue), key: "notes.match") { selected = nil } } label: {
+        Button { app.set(.string(calendar.rawValue), key: "notes.match") { Task { await refresh() } } } label: {
             Text(title).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption))
                 .padding(.horizontal, 10).frame(minHeight: 36)
                 .background { if service.preferredMatch == calendar { Capsule().fill(theme.surface.opacity(0.6)).glassEffect(.regular.interactive(), in: .capsule) } }
         }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-match-" + calendar.rawValue)
     }
-    /// OR-10: «هذا اليوم عبر السنين». Newest year first; a year with neither words nor a photo is skipped; a card opens that day.
-    private func years(_ snapshot: DiaryHomeSnapshot) -> some View {
-        let pages = snapshot.selection.days.compactMap { day in snapshot.days.first { $0.day == day } }
-            .filter { page in page.photo != nil || page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
-        return LazyVStack(alignment: .leading, spacing: 0) {
-            if pages.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("صفحتك الأولى").font(DiaryType.heading)
-                    Text("اكتب ما تيسّر من يومك؛ ستجده هنا في مثل هذا اليوم من العام القادم.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).fixedSize(horizontal: false, vertical: true)
-                }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line) }
-            }
-            ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
-                HStack(alignment: .top, spacing: 12) {
-                    // The thread that ties the years: a bead per year, the line running on to the next card.
-                    VStack(spacing: 0) {
-                        Circle().fill(index == 0 ? theme.accent : theme.surface).glassEffect(.regular.interactive(), in: .circle).frame(width: 11, height: 11).padding(.top, 22)
-                        if index < pages.count - 1 { Rectangle().fill(theme.line).frame(width: 1.5).frame(maxHeight: .infinity) }
-                    }.frame(width: 12).accessibilityHidden(true)
-                    yearCard(page, snapshot: snapshot).padding(.bottom, 12)
-                }
-            }
-        }
-    }
     private func yearCard(_ page: DiaryDisplayDay, snapshot: DiaryHomeSnapshot) -> some View {
-        return Button { reader = page.day } label: {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(service.distance(page.day, snapshot.today)).font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)).foregroundStyle(theme.color("accentText"))
-                        Text(service.weekday(page.day)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
-                    }
+        Button { reader = page.day } label: {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(service.distance(page.day, snapshot.today)).font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)).foregroundStyle(theme.color("accentText"))
                     MadarDateLabel(app.dateLabels(page.day)).foregroundStyle(theme.color("ink3Text"))
-                    Text(page.excerpt).font(.custom("thmanyahseriftext-Regular", size: 18, relativeTo: .body)).lineSpacing(6).lineLimit(3).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
-                    if let place = page.place { Label(place, systemImage: "mappin").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
-                    // Owner trial, 22 Oct: a photo the import did not carry is named, never invented.
+                    Text(page.excerpt).font(.custom("thmanyahseriftext-Regular", size: 16, relativeTo: .body)).lineSpacing(4).lineLimit(2).multilineTextAlignment(.leading)
+                    // A photo the import did not carry is named, never invented.
                     if page.photo == nil, page.missingPhotos > 0 { Label(page.missingPhotos == 1 ? "صورة هذا اليوم لم تُنقل" : page.missingPhotos == 2 ? "صورتا هذا اليوم لم تُنقلا" : "صور هذا اليوم لم تُنقل", systemImage: "photo.on.rectangle.angled").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 if let data = page.photo, !typeSize.isAccessibilitySize {
-                    DiaryDataThumbnail(data: data, maxPixel: 192) { image in
-                        image.resizable().scaledToFill().frame(width: 76, height: 96).clipShape(.rect(cornerRadius: 14)).accessibilityHidden(true)
-                    }.id(page.photoID?.uuidString ?? page.id).frame(width: 76, height: 96)
+                    DiaryDataThumbnail(data: data, maxPixel: 144) { image in
+                        image.resizable().scaledToFill().frame(width: 52, height: 64).clipShape(.rect(cornerRadius: 10)).accessibilityHidden(true)
+                    }.id(page.photoID?.uuidString ?? page.id).frame(width: 52, height: 64)
                 }
-            }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                .background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line) }
-                .contentShape(.rect(cornerRadius: 22))
+            }.padding(14).frame(width: typeSize.isAccessibilitySize ? 300 : 260, alignment: .leading)
+                .background(theme.surface, in: .rect(cornerRadius: 20)).overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.line) }
+                .contentShape(.rect(cornerRadius: 20))
         }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-year-" + page.day.description)
-    }
-    private func since(_ day: DiaryDisplayDay) -> some View {
-        let metrics = (try? service.comparisons(since: day.day)) ?? []
-        return Group {
-            if !metrics.isEmpty {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack { Text("منذ ذاك اليوم").font(MadarTypography.section()); Text(service.distance(day.day, snapshot?.today ?? day.day)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
-                    ForEach(metrics, id: \.0) { title, value in
-                        Divider().overlay(theme.line)
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text(title).font(MadarTypography.section())
-                            Text(figure: value).font(DiaryType.label).foregroundStyle(theme.color("autoInkText")).fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(theme.surface, in: .rect(cornerRadius: 24)).overlay { RoundedRectangle(cornerRadius: 24).stroke(theme.line) }
-            }
-        }
     }
     /// «أيامك» appears once a past day exists; before that the bottom bar and the first-page card are the only way in.
     @ViewBuilder private func recentDays(_ snapshot: DiaryHomeSnapshot) -> some View {
@@ -454,24 +441,10 @@ struct DiaryHomeView: View {
             .accessibilityIdentifier("diary-recent-media-" + day.day.description)
         }
     }
-    private var secondInk: Color {
-        switch app.string("notes.secondInk") { case "green": theme.color("ghad"); case "brown": theme.color("autoInkText"); default: theme.color("pencil") }
-    }
-    private func nextMemory(_ snapshot: DiaryHomeSnapshot) {
-        guard let memory, let index = snapshot.selection.days.firstIndex(of: memory.day) else { return }
-        selected = snapshot.selection.days[(index + 1) % snapshot.selection.days.count]
-    }
-    private func marginBar(_ day: DiaryDisplayDay, target: GregorianDay) -> some View {
-        HStack(spacing: 8) {
-            todayButton(day).frame(maxWidth: .infinity)
-            Button { editor = .init(margin: target) } label: {
-                Label("اكتب في هامشها", systemImage: "pencil").font(MadarTypography.caption()).padding(.horizontal, 15).frame(minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
-            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-add-margin")
-        }.padding(.horizontal, 14).padding(.vertical, 8).background(theme.background)
-    }
     /// One place to write: today's page, with its field focused. The full page (camera, files, formatting) is one tap from there.
-    private func writeToday(_ day: GregorianDay, prompt: String? = nil) {
+    private func writeToday(_ day: GregorianDay, prompt: String? = nil, expand: Bool = false) {
         readerPrompt = prompt
+        readerExpandComposer = expand
         focusReaderComposer = true
         reader = day
     }
@@ -527,17 +500,15 @@ struct DiaryHomeView: View {
             }
 #endif
             var value = try await service.homeOffMain()
-            let shape = app.string("notes.homeShape")
-            let initialPages = Dictionary(value.days.map { ($0.day.description, $0) }, uniquingKeysWith: { first, _ in first })
-            let displayed = shape == "echoes" ? value.echoes.compactMap(\.day) : shape == "margin" ? [selected ?? preferredOpeningDay(in: value, pages: initialPages)].compactMap { $0 } : value.selection.days
+            let displayed = value.selection.days
             let changed = try await service.prepareClosedDays(Set(displayed))
             guard generation == refreshGeneration, !Task.isCancelled else { return }
             if changed {
                 value = try await service.homeOffMain()
                 guard generation == refreshGeneration, !Task.isCancelled else { return }
             }
-            let pages = Dictionary(value.days.map { ($0.day.description, $0) }, uniquingKeysWith: { first, _ in first })
-            snapshot = value; defaultMemoryDay = preferredOpeningDay(in: value, pages: pages); failure = nil
+            snapshot = value; failure = nil
+            todayIntention = (try? service.intentions(value.today))?.first?.text
             if let pendingFollowUps = try? await service.dueIntentionFollowUpsOffMain() {
                 guard generation == refreshGeneration, !Task.isCancelled else { return }
                 let next = pendingFollowUps.first
@@ -546,7 +517,6 @@ struct DiaryHomeView: View {
         } catch {
             guard generation == refreshGeneration, !Task.isCancelled else { return }
             snapshot = nil
-            defaultMemoryDay = nil
             failure = madarUserMessage(error)
         }
     }

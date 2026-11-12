@@ -12,6 +12,8 @@ struct DiaryDayView: View {
     var focusComposerOnOpen = false
     /// A question chosen on the home: shown above the composer, never saved into the text.
     var prompt: String? = nil
+    /// madar://notes/write opens today's page with the composer already grown.
+    var expandComposerOnOpen = false
     /// A day opened from the archive, search or a week is already inside that screen: it does not offer the same screens again on top of themselves.
     var showsNavigationTools = true
     @Environment(\.roomTheme) private var roomTheme
@@ -23,6 +25,7 @@ struct DiaryDayView: View {
     @State private var highlightGeneration = 0
     @State private var failure: String?
     @State private var writing = false
+    @State private var composerExpanded = false
     @State private var promptDismissed = false
     @State private var insertAt: Date?
     @State private var anchorLabel: String?
@@ -122,6 +125,7 @@ struct DiaryDayView: View {
                 } else {
                     DiaryDayHeader(app: app, theme: theme, shownDay: shownDay, today: today, yearAgo: aYearAgo, appearance: appearance, friday: friday, selected: $selected)
                 }
+                if !composerExpanded {
                 if let returnDay, !returnDismissed {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("آخر صفحة كتبتها: " + service.bothDates(returnDay, calendar: first)).font(DiaryType.label)
@@ -135,7 +139,7 @@ struct DiaryDayView: View {
                                 }
                             }.accessibilityIdentifier("diary-return-days") }
                             Button {
-                                returnDismissed = true; writing = true
+                                returnDismissed = true; if inlineWriting { composerExpanded = true } else { writing = true }
                             } label: {
                                 Text("ابدأ من اليوم").frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(
                                     theme.background
@@ -184,6 +188,7 @@ struct DiaryDayView: View {
                             Image(systemName: "chevron.backward").font(.caption)
                         }.padding(.horizontal, 18).frame(minHeight: 40).contentShape(.rect)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-niyya-open")
+                }
                 }
                 GeometryReader { geometry in
                     ScrollViewReader { proxy in
@@ -326,60 +331,12 @@ struct DiaryDayView: View {
                             if requestID != nil { revealedEntryID = nil; revealInitialEntry(using: proxy) }
                         }
                     }
-                }
+                }.frame(maxHeight: composerExpanded ? 0 : .infinity).clipped()
+                writingArea
             }
             // iPad: the page is a column of paper in the middle, not lines stretched across the screen.
             .frame(maxWidth: 680).frame(maxWidth: .infinity)
             .background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme, theme).scrollDismissesKeyboard(.interactively)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(spacing: 8) {
-                    if app.undoToastVisible {
-                        UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
-                            .accessibilityIdentifier("diary-day-undo")
-                    }
-                    if inlineWriting, let prompt, !promptDismissed {
-                        HStack(alignment: .top, spacing: 8) {
-                            Text(prompt).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).foregroundStyle(theme.color("ink3Text"))
-                                .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("diary-day-prompt")
-                            Button { promptDismissed = true } label: { Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44).contentShape(Rectangle()) }
-                                .buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text")).accessibilityLabel("أخفِ السؤال")
-                        }.padding(.horizontal, 22)
-                    }
-                    if inlineWriting {
-                        DiaryInlineComposer(app: app, insertAt: $insertAt, anchor: $anchorLabel, edit: $inlineEdit, focusTick: $focusTick,
-                                            editorOpen: writing, openEditor: { insertAt = nil; anchorLabel = nil; writing = true }, saved: { Task { await refreshLines() } })
-                    } else { HStack(spacing: 10) {
-                        if let travel, shownDay == today {
-                            Button {
-                                insertAt = nil; writing = true
-                            } label: {
-                                Text("اكتب من " + travel.city).font(MadarTypography.section()).frame(
-                                    maxWidth: .infinity, minHeight: 54
-                                ).foregroundStyle(theme.color("onButton")).background(
-                                    theme.color("button"), in: .capsule)
-                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-write")
-                        } else {
-                            Button {
-                                insertAt = nil; writing = true
-                            } label: {
-                                Label(shownDay == today ? "اكتب" : "اكتب في هامشها", systemImage: "pencil").font(
-                                    MadarTypography.section()
-                                ).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background)
-                                    .background(theme.dark ? theme.accent : theme.ink, in: .capsule)
-                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-write")
-
-                        }
-                        if travel != nil {
-                            Button {
-                                stampsOpen = true
-                            } label: {
-                                Text("الأختام").font(DiaryType.label).frame(minHeight: 54).padding(.horizontal, 18)
-                                    .glassEffect(.regular.interactive(), in: .capsule)
-                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-stamps-open")
-                        }
-                    }.padding(.horizontal, 18).padding(.vertical, 8).background(theme.background) }
-                }.background(theme.background)
-            }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if showsNavigationTools {
@@ -459,9 +416,10 @@ struct DiaryDayView: View {
                 if phase == .active { followToday(); aiAvailability = .checking; retry += 1 }
                 else if phase == .background { aiComposerOpen = false }
             }
+            .onChange(of: expandComposerOnOpen) { _, open in if open, inlineWriting { composerExpanded = true } }
             .onChange(of: shownDay) { _, _ in
                 // A line being edited or a «write after» chip belongs to the page it began on.
-                inlineEdit = nil; insertAt = nil; anchorLabel = nil
+                inlineEdit = nil; insertAt = nil; anchorLabel = nil; composerExpanded = false
             }
             .onChange(of: canReadDiary) { _, canRead in
                 if canRead {
@@ -485,10 +443,10 @@ struct DiaryDayView: View {
             }
             .task(id: pageReloadID) { await loadDiaryPage() }
             .task {
-                guard focusComposerOnOpen else { return }
+                guard focusComposerOnOpen || expandComposerOnOpen else { return }
                 // After the push settles; an earlier focus request is dropped before the field joins its window.
                 try? await Task.sleep(for: .milliseconds(450))
-                if inlineWriting { focusTick += 1 }
+                if inlineWriting { if expandComposerOnOpen { composerExpanded = true } else { focusTick += 1 } }
             }
             .task(id: aiAvailabilityID) {
                 guard page != nil, (!analysisText.isEmpty || !intentions.isEmpty) else { aiAvailability = .checking; return }
@@ -497,6 +455,56 @@ struct DiaryDayView: View {
             }
     }
 
+    /// The foot of the page: the undo line, a chosen question and the writing area (the composer on today's root page).
+    @ViewBuilder private var writingArea: some View {
+                VStack(spacing: 8) {
+                    if app.undoToastVisible {
+                        UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
+                            .accessibilityIdentifier("diary-day-undo")
+                    }
+                    if inlineWriting, let prompt, !promptDismissed {
+                        HStack(alignment: .top, spacing: 8) {
+                            Text(prompt).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).foregroundStyle(theme.color("ink3Text"))
+                                .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("diary-day-prompt")
+                            Button { promptDismissed = true } label: { Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44).contentShape(Rectangle()) }
+                                .buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text")).accessibilityLabel("أخفِ السؤال")
+                        }.padding(.horizontal, 22)
+                    }
+                    if inlineWriting {
+                        DiaryInlineComposer(app: app, insertAt: $insertAt, anchor: $anchorLabel, edit: $inlineEdit, focusTick: $focusTick,
+                                            expanded: $composerExpanded, page: page, saved: { Task { await refreshLines() } })
+                    } else { HStack(spacing: 10) {
+                        if let travel, shownDay == today {
+                            Button {
+                                insertAt = nil; writing = true
+                            } label: {
+                                Text("اكتب من " + travel.city).font(MadarTypography.section()).frame(
+                                    maxWidth: .infinity, minHeight: 54
+                                ).foregroundStyle(theme.color("onButton")).background(
+                                    theme.color("button"), in: .capsule)
+                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-write")
+                        } else {
+                            Button {
+                                insertAt = nil; writing = true
+                            } label: {
+                                Label(shownDay == today ? "اكتب" : "اكتب في هامشها", systemImage: "pencil").font(
+                                    MadarTypography.section()
+                                ).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background)
+                                    .background(theme.dark ? theme.accent : theme.ink, in: .capsule)
+                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-write")
+
+                        }
+                        if travel != nil {
+                            Button {
+                                stampsOpen = true
+                            } label: {
+                                Text("الأختام").font(DiaryType.label).frame(minHeight: 54).padding(.horizontal, 18)
+                                    .glassEffect(.regular.interactive(), in: .capsule)
+                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-stamps-open")
+                        }
+                    }.padding(.horizontal, 18).padding(.vertical, 8).background(theme.background) }
+                }.background(theme.background)
+    }
     private var editorDestination: some View {
         DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay, insertAt: insertAt, embeddedInNavigationStack: true)
             .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)

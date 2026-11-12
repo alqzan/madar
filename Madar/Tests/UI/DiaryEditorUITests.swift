@@ -83,7 +83,7 @@ import XCTest
         continueAfterFailure = false
         let app = launch("empty"); app.openDiaryEditorFromHome()
         let text = app.textViews["diary-editor-text"]; XCTAssertTrue(text.waitForExistence(timeout: 10)); text.typeText("مسودة من الصفحة")
-        XCTAssertTrue(app.staticTexts["المسودة محفوظة"].waitForExistence(timeout: 10)); capture(app, "M3-V06-editor-keyboard-L")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "المسودة محفوظة")).firstMatch.waitForExistence(timeout: 10)); capture(app, "M3-V06-editor-keyboard-L")
         app.buttons["diary-editor-hide-keyboard"].tap(); capture(app, "M3-V06-editor-L")
         app.terminate(); app.launch(); XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25)); app.openDiaryEditorFromHome()
         XCTAssertTrue(text.waitForExistence(timeout: 10)); XCTAssertEqual(text.value as? String, "مسودة من الصفحة")

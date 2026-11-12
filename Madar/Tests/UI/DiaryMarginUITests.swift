@@ -6,19 +6,18 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "margin", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
         app.launch()
-        XCTAssertTrue(app.buttons["diary-add-margin"].waitForExistence(timeout: 25))
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.68)).press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.43)))
-        app.swipeDown()
-        app.buttons["diary-another-memory"].tap()
+        // 12 Nov: the home has no margin shape; a past year's card opens that day, and its «اكتب في هامشها» writes the margin.
+        XCTAssertTrue(app.buttons["diary-year-2024-10-15"].waitForExistence(timeout: 25), app.debugDescription)
+        app.buttons["diary-year-2024-10-15"].tap()
         let originalText = "مشينا بعد المغرب، والجو صار يحتمل."
         XCTAssertTrue(app.staticTexts[originalText].waitForExistence(timeout: 8))
-        app.buttons["diary-add-margin"].tap()
+        app.buttons["diary-day-write"].tap()
         let editor = app.textViews["diary-editor-text"]; XCTAssertTrue(editor.waitForExistence(timeout: 10))
         let marginText = "ما زلت أذكر ذلك المساء."
         editor.typeText(marginText)
         app.buttons["diary-editor-save"].tap()
-        XCTAssertTrue(app.staticTexts[marginText].waitForExistence(timeout: 10))
-
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", marginText)).firstMatch.waitForExistence(timeout: 10))
+        app.closeDiaryDay()
         app.buttons["diary-today"].tap()
         let targetText = "ما زال في اليوم متّسع."
         let target = app.staticTexts.matching(identifier: "diary-day-line").matching(NSPredicate(format: "label == %@", targetText)).firstMatch
@@ -51,24 +50,22 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "margin", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
         app.launch()
-        XCTAssertTrue(app.buttons["diary-add-margin"].waitForExistence(timeout: 25))
+        XCTAssertTrue(app.buttons["diary-year-2024-10-15"].waitForExistence(timeout: 25), app.debugDescription)
         capture(app, "M3-V03-margin-L")
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.68)).press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.43)))
-        capture(app, "M3-V03-margin-scrolled-L")
-        app.swipeDown()
-        app.buttons["diary-another-memory"].tap()
+        app.buttons["diary-year-2024-10-15"].tap()
         XCTAssertTrue(app.staticTexts["مشينا بعد المغرب، والجو صار يحتمل."].waitForExistence(timeout: 8))
-        app.buttons["diary-add-margin"].tap()
+        app.buttons["diary-day-write"].tap()
         let text = app.textViews["diary-editor-text"]; XCTAssertTrue(text.waitForExistence(timeout: 10)); text.typeText("ما زلت أذكر ذلك المساء.")
         app.buttons["diary-editor-save"].tap()
-        XCTAssertTrue(app.staticTexts["ما زلت أذكر ذلك المساء."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "ما زلت أذكر ذلك المساء.")).firstMatch.waitForExistence(timeout: 10))
         capture(app, "M3-V03-dated-reply-L")
+        app.closeDiaryDay()
         app.buttons["diary-today"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "ما زلت أذكر ذلك المساء.")).firstMatch.waitForExistence(timeout: 10))
         app.closeDiaryDay()
         app.terminate(); app.launch()
-        XCTAssertTrue(app.buttons["diary-another-memory"].waitForExistence(timeout: 25)); app.buttons["diary-another-memory"].tap()
-        XCTAssertTrue(app.staticTexts["ما زلت أذكر ذلك المساء."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["diary-year-2024-10-15"].waitForExistence(timeout: 25)); app.buttons["diary-year-2024-10-15"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "ما زلت أذكر ذلك المساء.")).firstMatch.waitForExistence(timeout: 10))
     }
     private func capture(_ app: XCUIApplication, _ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = name; shot.lifetime = .keepAlways; add(shot)

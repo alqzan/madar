@@ -271,6 +271,7 @@ struct DiaryTextEditor: View {
                 if let failure { Text(failure).font(MadarTypography.caption()).padding(12).accessibilityIdentifier("diary-editor-error") }
             }
             .foregroundStyle(theme.ink).background(theme.background)
+            .background { if embeddedInNavigationStack { DiarySwipeBackEnabler().frame(width: 0, height: 0) } }
             .navigationTitle(margin == nil ? "الورقة الكاملة" : "اكتب في هامشها").navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {
@@ -421,4 +422,17 @@ private struct EditorVoiceHost: ViewModifier {
                 .task(id: voice.language) { await voice.refreshLanguage() }
         } else { content }
     }
+}
+
+/// A pushed page that hides the system back button loses the swipe-back with it. This brings the edge swipe back (the draft is flushed as the page leaves).
+struct DiarySwipeBackEnabler: UIViewControllerRepresentable {
+    final class Controller: UIViewController {
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            navigationController?.interactivePopGestureRecognizer?.delegate = nil
+            navigationController?.interactivePopGestureRecognizer?.isEnabled = (navigationController?.viewControllers.count ?? 0) > 1
+        }
+    }
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ controller: Controller, context: Context) {}
 }

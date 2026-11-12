@@ -13,7 +13,8 @@ import XCTest
         app.launch(); XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 25), app.debugDescription)
         return app
     }
-    func testDiaryRootRouteClosesSearchAndWaitsForTextDraft() throws {
+    /// 12 Nov: the words live in today's composer, not in a page of their own: the root route goes home and the draft is kept for the next visit.
+    func testDiaryRootRouteClosesSearchAndKeepsTheComposerDraft() throws {
         continueAfterFailure = false
         let app = launch("empty", rootRouteHarness: true)
         app.buttons["diary-search"].tap()
@@ -26,19 +27,16 @@ import XCTest
         let editor = app.textViews["diary-editor-text"]
         XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
         editor.tap(); editor.typeText("مسودة تحفظ قبل الرجوع")
-        let rootLink = app.buttons["ui-test-open-diary-root"]
-        XCTAssertTrue(rootLink.label.contains("مع مسودة"), "The active editor must register as a diary-root blocker.")
-        rootLink.tap()
-        XCTAssertTrue(editor.waitForExistence(timeout: 5), "The root route must wait while a diary editor owns a draft.\n" + app.debugDescription)
-        app.buttons["diary-editor-save"].tap()
-        let write = app.diaryOpener
-        XCTAssertTrue(write.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(write.isHittable, app.debugDescription)
+        app.buttons["ui-test-open-diary-root"].tap()
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 12), app.debugDescription)
         XCTAssertFalse(editor.exists)
-        app.buttons["diary-today"].tap()
-        XCTAssertTrue(app.staticTexts["مسودة تحفظ قبل الرجوع"].waitForExistence(timeout: 10), app.debugDescription)
+        app.diaryOpener.tap()
+        let field = app.textFields["diary-inline-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 15), app.debugDescription)
+        let predicate = NSPredicate(format: "value CONTAINS %@", "مسودة تحفظ قبل الرجوع")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: field)], timeout: 10), .completed, "The draft is read again when today's page reopens: \(String(describing: field.value))")
     }
-    func testDiaryWriteRouteQueuesDifferentDayUntilCurrentDraftIsSaved() {
+    func testDiaryWriteRouteKeepsTheGrownComposerAndYesterdayOpensTheSameDraft() {
         continueAfterFailure = false
         let app = launch("empty", rootRouteHarness: true)
         app.openDiaryEditorFromHome()
@@ -50,14 +48,11 @@ import XCTest
         XCTAssertEqual(editor.value as? String, "مسودة اليوم", "The same write target must not replace its live draft.")
         XCTAssertEqual(app.textViews.matching(identifier: "diary-editor-text").count, 1, "Repeating the same route must not stack a second editor.")
         app.buttons["ui-test-open-diary-yesterday"].tap()
-        XCTAssertTrue(editor.waitForExistence(timeout: 5), "A different day route must wait for the current editor.")
-        XCTAssertEqual(editor.value as? String, "مسودة اليوم")
+        // «أمس» keeps its own writing page; it opens on the draft already begun, still for today.
+        let page = app.textViews["diary-editor-text"]
+        XCTAssertTrue(page.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(NSPredicate(format: "value CONTAINS %@", "مسودة اليوم").evaluate(with: page), "\(String(describing: page.value))")
         XCTAssertTrue(app.buttons["diary-editor-today"].isSelected, app.debugDescription)
-        app.buttons["diary-editor-save"].tap()
-        let yesterday = app.buttons["diary-editor-yesterday"]
-        XCTAssertTrue(yesterday.waitForExistence(timeout: 12), app.debugDescription)
-        XCTAssertTrue(yesterday.isSelected, app.debugDescription)
-        XCTAssertFalse((app.textViews["diary-editor-text"].value as? String)?.contains("مسودة اليوم") ?? false)
         app.terminate()
     }
     func testDiaryTodayDraftDisclosesAndKeepsItsOriginalDayAfterFajr() {
@@ -68,16 +63,20 @@ import XCTest
         XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons["diary-editor-today"].isSelected, app.debugDescription)
         editor.tap(); editor.typeText("كتابة عبر فجر اليوم")
+        // The draft is written (with its day) before the day turns.
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "المسودة محفوظة")).firstMatch.waitForExistence(timeout: 10), app.debugDescription)
         app.buttons["ui-test-advance-diary-clock"].tap()
         let originalDayNotice = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "تُحفظ في صفحتها الأصلية")).firstMatch
         XCTAssertTrue(originalDayNotice.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons["diary-editor-today"].isSelected, app.debugDescription)
-        app.buttons["ui-test-open-diary-original-day"].tap()
-        XCTAssertTrue(editor.exists, "The original-day route waits while the draft remains open.")
         app.buttons["diary-editor-save"].tap()
-        let savedLine = app.staticTexts["diary-day-line"]
+        // The words went to the page they were begun on (the 14th, before the day turned), not to the new day.
+        app.open(URL(string: "madar://notes/day/2026-10-14")!)
+        let savedLine = app.staticTexts.matching(identifier: "diary-day-line").matching(NSPredicate(format: "label CONTAINS %@", "كتابة عبر فجر اليوم")).firstMatch
         XCTAssertTrue(savedLine.waitForExistence(timeout: 15), app.debugDescription)
-        XCTAssertTrue(savedLine.label.contains("كتابة عبر فجر اليوم"), savedLine.label)
+        app.open(URL(string: "madar://notes/day/2026-10-15")!)
+        XCTAssertTrue(app.staticTexts["diary-day-title"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "كتابة عبر فجر اليوم")).firstMatch.waitForExistence(timeout: 3), "The new day's page must not take the old day's draft")
         app.terminate()
     }
     func testDiaryRootClosesCleanYearbookAndExport() {
@@ -180,7 +179,8 @@ import XCTest
         capture(app, "M3-V01-window-L")
         // OR-10: one card per past year, newest first; a card opens that day, whose «اكتب في هامشها» writes the margin.
         XCTAssertTrue(app.buttons["diary-year-2024-10-15"].exists, app.debugDescription)
-        XCTAssertLessThan(app.buttons["diary-year-2025-10-15"].frame.minY, app.buttons["diary-year-2024-10-15"].frame.minY)
+        // The strip runs right to left: the newest year is the rightmost card.
+        XCTAssertGreaterThan(app.buttons["diary-year-2025-10-15"].frame.minX, app.buttons["diary-year-2024-10-15"].frame.minX)
         XCTAssertFalse(app.buttons["diary-year-previous"].exists)
         app.swipeUp()
         capture(app, "M3-V01-window-scrolled-L")
@@ -291,30 +291,33 @@ import XCTest
         XCTAssertTrue(app.staticTexts["diary-home-title"].exists, app.debugDescription)
         app.terminate()
     }
-    /// OR-13 (12 Nov): the editor's tools never leave raw Markdown marks in the text. Heading, bold and italic were removed because a plain text field
-    /// cannot show them formatted; the list and time tools stay and write plain text.
-    func testEditorToolsLeaveNoRawMarks() throws {
+    /// OR-13 (12 Nov): heading, bold and italic show formatted while writing and are stored as Markdown; no raw mark is ever visible.
+    func testEditorFormattingNeverShowsRawMarks() throws {
         continueAfterFailure = false
         let app = launch("home")
         app.openDiaryEditorFromHome()
         let editor = app.textViews["diary-editor-text"]; XCTAssertTrue(editor.waitForExistence(timeout: 10))
-        func waitValue(_ contains: String) { _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", contains), object: editor)], timeout: 8) }
-        editor.tap(); editor.typeText("مساء هادئ"); waitValue("مساء هادئ")
-        app.buttons["diary-editor-format"].tap()
-        XCTAssertFalse(app.buttons["diary-editor-bold"].exists || app.buttons["diary-editor-italic"].exists || app.buttons["diary-editor-heading"].exists, "No tool may insert raw Markdown marks.")
-        app.buttons["سطر في قائمة"].tap()
-        editor.typeText("كان يومًا طويلًا"); waitValue("طويلًا")
+        editor.tap(); editor.typeText("مساء هادئ")
+        app.buttons["diary-editor-heading"].tap()
+        editor.typeText("\n")
+        app.buttons["diary-editor-heading"].tap()
+        editor.typeText("كان يومًا ")
+        app.buttons["diary-editor-bold"].tap()
+        editor.typeText("طويلًا")
+        let value = (editor.value as? String) ?? ""
+        XCTAssertFalse(value.contains("*") || value.contains("#"), "The writing surface shows formatting, never marks: \(value)")
         capture(app, "OR-13-editor-tools-L")
         app.buttons["diary-editor-save"].tap()
-        let line = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "كان يومًا طويلًا")).firstMatch
+        let line = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "كان يومًا")).firstMatch
         XCTAssertTrue(line.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(line.label.contains("*") || line.label.contains("#"), line.label)
-        XCTAssertTrue(line.label.contains("مساء هادئ"), line.label)
+        XCTAssertTrue(line.label.contains("طويلًا"), line.label)
+        capture(app, "OR-13-formatted-page-L")
     }
     func testFirstDayHasWorkingOneTapKeyboardAndCancelWritesNothing() throws {
         continueAfterFailure = false
         let app = launch("empty")
-        XCTAssertTrue(app.staticTexts["صفحتك الأولى"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["diary-today-invitation"].waitForExistence(timeout: 10))
         capture(app, "M3-V01-first-day-L")
         app.openDiaryEditorFromHome()
         XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout: 10))

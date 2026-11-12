@@ -4,7 +4,7 @@ import MadarDesign
 
 struct DiaryHomeLayout {
     static let all = ["memory", "thatDay", "sinceThatDay", "days", "todayBar"]
-    static let titles = ["memory": "الذكرى", "thatDay": "ذاك اليوم", "sinceThatDay": "منذ ذاك اليوم", "days": "أيامك", "todayBar": "شريط صفحة اليوم"]
+    static let titles = ["memory": "الذكرى", "thatDay": "ذاك اليوم", "sinceThatDay": "منذ ذاك اليوم", "days": "أيامك", "todayBar": "بطاقة اليوم"]
     var order: [String]
     var hidden: Set<String>
     init(_ value: JSONValue?) {
@@ -41,12 +41,13 @@ struct DiaryCustomizeView: View {
     @State private var confirmReset = false
     @State private var transfer: String?
     private var layout: DiaryHomeLayout { .init(app.values["notes.layout"]) }
-    private var shape: String { app.string("notes.homeShape") }
+    /// 12 Nov: the three home shapes are gone; the home is always today first. `notes.homeShape` stays in the schema and is ignored.
+    private var shape: String { "window" }
     private var activeOrder: [String] { layout.activeOrder(for: shape) }
     private var visibleOrder: [String] { activeOrder.filter { !layout.hidden.contains($0) } }
     private func blockTitle(_ id: String) -> String {
         if id == "memory" {
-            return shape == "echoes" ? "أصداء السنين" : shape == "margin" ? "صفحة الذكرى" : "هذا اليوم عبر السنين"
+            return "في مثل هذا اليوم"
         }
         return id == "thatDay" ? "سطور ذاك اليوم" : DiaryHomeLayout.titles[id] ?? id
     }
@@ -58,7 +59,7 @@ struct DiaryCustomizeView: View {
         ("seasons", "الجمعة ورمضان", "moon.stars", ["notes.fridayStyle", "notes.ramadanStyle"]),
         ("outside", "خارج التطبيق", "rectangle.on.rectangle", ["notes.widgetContent"])
     ]
-    private var keys: [String] { ["notes.homeShape", "notes.layout"] + groups.flatMap(\.3) }
+    private var keys: [String] { ["notes.layout"] + groups.flatMap(\.3) }
     private var changed: Int { app.schema.settings.filter { keys.contains($0.key) && app.values[$0.key] != $0.defaultValue }.count }
     var body: some View {
         ScrollView {
@@ -142,7 +143,6 @@ struct DiaryCustomizeView: View {
                 Label("معاينة حيّة", systemImage: "circle.fill").font(DiaryType.label).foregroundStyle(theme.accent)
                 Text("المذكرات كما ستظهر").font(DiaryType.heading)
                 previewLine("الأجزاء", visiblePartsText).accessibilityElement(children: .combine).accessibilityIdentifier("diary-preview-parts")
-                previewLine("شكل الرئيسية", label("notes.homeShape"))
                 previewLine("المطابقة", label("notes.match"))
                 previewLine("إذا لا ذكرى", label("notes.noMemory"))
                 Text(CustomizationCopy.changes(count: changed, formattedCount: app.digits(changed))).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
@@ -171,8 +171,8 @@ struct DiaryCustomizeView: View {
     private var visiblePartsText: String { let n = visibleOrder.count; return n == 1 ? "جزء واحد ظاهر" : n == 2 ? "جزءان ظاهران" : app.digits(n) + ((3...10).contains(n % 100) ? " أجزاء ظاهرة" : " جزءًا ظاهرًا") }
     private func previewLine(_ title: String, _ value: String) -> some View { HStack { Text(title).foregroundStyle(theme.color("ink3Text")); Spacer(minLength: 5); Text(figure: value) }.font(DiaryType.label) }
     private var homeCard: some View {
-        section("home", title: "الرئيسية", subtitle: label("notes.homeShape") + "، " + visiblePartsText, symbol: "square.grid.2x2") {
-            Text(shape == "window" ? "قدّم بطاقات السنين أو أيامك بما يناسبك. شريط صفحة اليوم ثابت في الأسفل." : shape == "margin" ? "الصفحة وشريط اليوم ثابتان. اختر ما يظهر حول الذكرى؛ ترتيب الهامش ثابت." : "الأصداء أولًا وشريط صفحة اليوم في الأسفل. يمكنك إظهار أيامك أو إخفاؤها.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+        section("home", title: "الرئيسية", subtitle: visiblePartsText, symbol: "square.grid.2x2") {
+            Text("اليوم أولًا في الأعلى. قدّم بطاقات السنين أو أيامك بما يناسبك؛ زر الكتابة يظهر في الأسفل حين تغيب بطاقة اليوم عن الشاشة.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
             ForEach(activeOrder, id: \.self) { id in
                 Divider().overlay(theme.line)
                 HStack {
@@ -187,8 +187,6 @@ struct DiaryCustomizeView: View {
                     }
                 }.frame(minHeight: 48)
             }
-            Divider().overlay(theme.line)
-            if let definition = app.schema.settings.first(where: { $0.key == "notes.homeShape" }) { SettingControl(definition: definition, session: app) }
         }
     }
     private func arrow(_ id: String, offset: Int) -> some View {

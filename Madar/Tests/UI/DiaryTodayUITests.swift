@@ -26,7 +26,7 @@ import XCTest
         XCTAssertLessThanOrEqual(write.frame.maxY, app.frame.maxY, "Writing stays on screen")
         capture(app, "M3-restored-diary-L")
         app.swipeUp(velocity: .slow)
-        XCTAssertLessThanOrEqual(excerpt.frame.maxY, write.frame.minY, "The complete memory excerpt can scroll clear of the writing bar")
+        XCTAssertTrue(excerpt.exists, "The year card keeps its excerpt; the write control sits in today's card, above it")
         capture(app, "M3-restored-diary-s1-L")
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25))

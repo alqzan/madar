@@ -1,7 +1,7 @@
 import XCTest
 
 extension XCUIApplication {
-    /// The home's one write control: «اكتب سطرك الأول اليوم» (`diary-write`) on an empty day, the «اكتب في صفحة اليوم» bar (`diary-today`) once something is there.
+    /// The home's write control: the capsule in today's card (`diary-write`) or the card itself / the bottom bar (`diary-today`); both open today's page.
     var diaryOpener: XCUIElement { buttons.matching(NSPredicate(format: "identifier IN %@", ["diary-write", "diary-today"])).firstMatch }
     /// The day page closes with its own button when it is presented alone, and with the navigation back button when the diary home embeds it.
     func closeDiaryDay() {
