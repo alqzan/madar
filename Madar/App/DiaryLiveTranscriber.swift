@@ -47,9 +47,11 @@ import Observation
                 if offset != nil, let size = try? handle.seekToEnd(), size > read + 2 {
                     let length = ((size - read) / 2) * 2
                     try? handle.seek(toOffset: read)
-                    if let data = try? handle.read(upToCount: Int(min(length, 200_000))), !data.isEmpty {
+                    if var data = try? handle.read(upToCount: Int(min(length, 200_000))) {
+                        // Whole frames only: a partial frame stays in the file and is read with the next chunk.
+                        data = data.prefix(data.count - data.count % 2)
                         read += UInt64(data.count)
-                        if let buffer = Self.convert(data, from: source, converter: converter, to: target) { continuation.yield(AnalyzerInput(buffer: buffer)) }
+                        if !data.isEmpty, let buffer = Self.convert(data, from: source, converter: converter, to: target) { continuation.yield(AnalyzerInput(buffer: buffer)) }
                     }
                 }
             }
@@ -65,6 +67,7 @@ import Observation
     nonisolated private static func samplesOffset(_ handle: FileHandle) -> UInt64? {
         var position: UInt64 = 8
         for _ in 0..<12 {
+            if position == 8 { guard formatMatches(handle) else { return nil } }
             guard (try? handle.seek(toOffset: position)) != nil, let head = try? handle.read(upToCount: 12), head.count == 12 else { return nil }
             let kind = String(decoding: head.prefix(4), as: UTF8.self)
             let size = head.suffix(8).reduce(Int64(0)) { ($0 << 8) | Int64($1) }
@@ -75,11 +78,25 @@ import Observation
         return nil
     }
 
+    /// The recorder writes 22.05 kHz, mono, interleaved 16-bit little-endian integer PCM; anything else is not converted.
+    nonisolated private static func formatMatches(_ handle: FileHandle) -> Bool {
+        guard (try? handle.seek(toOffset: 8)) != nil, let head = try? handle.read(upToCount: 12 + 32), head.count == 44,
+              String(decoding: head.prefix(4), as: UTF8.self) == "desc" else { return false }
+        let body = [UInt8](head.suffix(32))
+        func u32(_ at: Int) -> UInt32 { body[at..<at + 4].reduce(UInt32(0)) { ($0 << 8) | UInt32($1) } }
+        let rate = Double(bitPattern: body[0..<8].reduce(UInt64(0)) { ($0 << 8) | UInt64($1) })
+        let flags = u32(12)
+        return rate == 22_050 && String(decoding: body[8..<12], as: UTF8.self) == "lpcm" && flags & 1 == 0 && flags & 2 != 0
+            && u32(16) == 2 && u32(20) == 1 && u32(24) == 1 && u32(28) == 16
+    }
+
     nonisolated private static func convert(_ data: Data, from source: AVAudioFormat, converter: AVAudioConverter, to target: AVAudioFormat) -> AVAudioPCMBuffer? {
         let frames = AVAudioFrameCount(data.count / 2)
         guard frames > 0, let input = AVAudioPCMBuffer(pcmFormat: source, frameCapacity: frames), let channel = input.int16ChannelData else { return nil }
         input.frameLength = frames
-        data.withUnsafeBytes { raw in _ = memcpy(channel[0], raw.baseAddress!, data.count) }
+        let bytes = Int(frames) * 2 * Int(source.channelCount)
+        guard source.channelCount == 1, data.count >= bytes else { return nil }
+        data.withUnsafeBytes { raw in _ = memcpy(channel[0], raw.baseAddress!, bytes) }
         let capacity = AVAudioFrameCount(Double(frames) * target.sampleRate / source.sampleRate) + 1_024
         guard let output = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return nil }
         var fed = false
