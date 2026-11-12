@@ -69,6 +69,8 @@ struct DiaryDayPhotos: View {
     @Bindable var app: AppSession
     let day: GregorianDay
     let link: (PHAsset) async -> Bool
+    /// On the day page a tap shows the photo full size (pin or comment there); in the editors a tap pins it.
+    var open: ((PHAsset) -> Void)? = nil
     @Environment(\.roomTheme) private var theme
     @Environment(\.scenePhase) private var scenePhase
     @State private var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -85,9 +87,9 @@ struct DiaryDayPhotos: View {
                 }.buttonStyle(.madarPlain).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("diary-day-photos-allow")
             } else if !visible.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("صور هذا اليوم · المس صورة لتثبيتها في الصفحة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    Text(open == nil ? "صور هذا اليوم · المس صورة لتثبيتها في الصفحة" : "صور هذا اليوم · المس صورة لتراها وتعلّق عليها").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) { ForEach(visible, id: \.localIdentifier) { DiaryDayPhotoThumb(asset: $0, busy: busy == $0.localIdentifier, pick: pick) } }
+                        HStack(spacing: 8) { ForEach(visible, id: \.localIdentifier) { asset in DiaryDayPhotoThumb(asset: asset, busy: busy == asset.localIdentifier, pick: { if let open { open($0) } else { pick($0) } }) } }
                     }
                 }.accessibilityIdentifier("diary-day-photos")
             }

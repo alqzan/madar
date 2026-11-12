@@ -201,7 +201,7 @@ import XCTest
         // The floating «اكتب» bar covers the bottom of the page; scroll until the button sits above it.
         let write = app.buttons["diary-day-write"]
         for _ in 0..<5 where !edit.isHittable || (write.exists && edit.frame.maxY > write.frame.minY) { app.swipeUp() }; edit.tap()
-        let text = app.textViews["diary-audio-transcript-edit"]; XCTAssertTrue(text.waitForExistence(timeout: 10)); text.tap(); text.typeText(" أضفت تصحيحًا.")
+        let text = app.descendants(matching: .any)["diary-audio-transcript-edit"].firstMatch; XCTAssertTrue(text.waitForExistence(timeout: 10)); text.tap(); text.typeText(" أضفت تصحيحًا.")
         let saveInline = app.buttons["diary-audio-transcript-save-inline"]
         for _ in 0..<5 where !saveInline.isHittable || (write.exists && saveInline.frame.maxY > write.frame.minY) { app.swipeUp() }
         saveInline.tap()

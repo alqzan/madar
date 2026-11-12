@@ -8,7 +8,7 @@ import XCTest
         XCTAssertEqual(app.staticTexts["diary-audio-duration-label"].waitForExistence(timeout:10) ? app.staticTexts["diary-audio-duration-label"].label : "", "مدة التسجيل: ١ ثانية")
         XCTAssertFalse(app.descendants(matching:.any)["diary-audio-tone"].exists, "The diary shows volume and duration without emotion labels")
         XCTAssertTrue(app.descendants(matching:.any)["diary-audio-transcript-text"].waitForExistence(timeout:10));app.buttons["diary-audio-transcript-open"].tap()
-        XCTAssertTrue(app.textViews["diary-audio-transcript-edit"].waitForExistence(timeout:5));app.buttons["diary-audio-transcript-cancel"].tap();app.buttons["diary-niyya-open"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["diary-audio-transcript-edit"].firstMatch.waitForExistence(timeout:5));app.buttons["diary-audio-transcript-cancel"].tap();app.buttons["diary-niyya-open"].tap()
         let text=app.textFields["diary-niyya-text"];XCTAssertTrue(text.waitForExistence(timeout:10));capture(app,"OWNER-notes-intention-inline-L");text.tap();text.typeText("أُنهي ما بدأت");app.buttons["diary-niyya-save"].tap()
         XCTAssertTrue(app.buttons["diary-niyya-undo"].waitForExistence(timeout:10));app.buttons["diary-niyya-close-inline"].tap();XCTAssertTrue(app.staticTexts["أسألك عنها بعد العشاء"].waitForExistence(timeout:10));capture(app,"M3-V13-morning-L")
         let back=app.navigationBars.buttons.firstMatch;XCTAssertTrue(back.waitForExistence(timeout:5));back.tap();XCTAssertTrue(app.diaryOpener.waitForExistence(timeout:10),"Popping the day must reveal the same diary home without a covering page")

@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import Speech
 import Observation
+import MadarCore
 
 /// Live words under the recorder (volatile results). It never touches the microphone: it only reads the audio file the recorder is
 /// already writing (PCM CAF, readable up to its last byte), so the recorder, its staging file and its interruption save are unchanged.
@@ -10,18 +11,21 @@ import Observation
     private(set) var text = ""
     private var task: Task<Void, Never>?
 
-    func start(url: URL, locale: Locale?, active: @escaping @MainActor () -> Bool) {
+    func start(url: URL, locale: Locale?, dictation: Bool = false, active: @escaping @MainActor () -> Bool) {
         stop()
         guard let locale else { return }
         task = Task { [weak self] in
-            await self?.run(url: url, locale: locale, active: active)
+            await self?.run(url: url, locale: locale, dictation: dictation, active: active)
             self?.text = ""
         }
     }
     func stop() { task?.cancel(); task = nil; text = "" }
 
-    private func run(url: URL, locale: Locale, active: @escaping @MainActor () -> Bool) async {
-        let module = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: [])
+    private func run(url: URL, locale: Locale, dictation: Bool, active: @escaping @MainActor () -> Bool) async {
+        // Arabic is a dictation language, not a `SpeechTranscriber` one (owner 12 Nov: live words never appeared for Arabic).
+        let speech = dictation ? nil : SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: [])
+        let spoken = dictation ? DictationTranscriber(locale: locale, preset: .progressiveLongDictation) : nil
+        let module: any SpeechModule = speech ?? spoken!
         guard let target = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [module]),
               let source = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 22_050, channels: 1, interleaved: true),
               let converter = AVAudioConverter(from: source, to: target) else { return }
@@ -29,12 +33,13 @@ import Observation
         let (stream, continuation) = AsyncStream.makeStream(of: AnalyzerInput.self)
         let results = Task { [weak self] in
             var finalized = ""
+            @MainActor func show(_ words: String, final: Bool) {
+                if final { DiaryTranscriptJoin.append(words, to: &finalized); self?.text = finalized }
+                else { var shown = finalized; DiaryTranscriptJoin.append(words, to: &shown); self?.text = shown }
+            }
             do {
-                for try await result in module.results {
-                    let words = String(result.text.characters)
-                    if result.isFinal { finalized += (finalized.isEmpty ? "" : " ") + words; self?.text = finalized }
-                    else { self?.text = finalized + (finalized.isEmpty ? "" : " ") + words }
-                }
+                if let speech { for try await result in speech.results { show(String(result.text.characters), final: result.isFinal) } }
+                else if let spoken { for try await result in spoken.results { show(String(result.text.characters), final: result.isFinal) } }
             } catch {}
         }
         do { try await analyzer.start(inputSequence: stream) } catch { continuation.finish(); results.cancel(); return }

@@ -32,7 +32,11 @@ import MadarCore
     private(set) var runtimeDescription = "سجّل صوتًا"
     private var installedLocale: Locale?
     private var supportedLocale: Locale?
-    private var recorder: AVAudioRecorder?
+    /// Owner 12 Nov: Arabic is not a `SpeechTranscriber` language, so it fell back to the old recognizer, which keeps only part of a long take. `DictationTranscriber` covers Arabic on the device and returns the whole take.
+    private var dictationEngine = false
+    private var recorder: (any DiaryTakeRecorder)?
+    /// True while the take goes through the system voice processing (call-style noise suppression; Voice Isolation can apply).
+    private(set) var voiceProcessing = false
     /// Live words while recording (read from the recorder's own file; never a second microphone session).
     let live = DiaryLiveTranscriber()
     private var recordingDay: GregorianDay?
@@ -71,14 +75,19 @@ import MadarCore
 
     func refreshLanguage() async {
         let selected = language
-        var installed: Locale?, supported: Locale?
+        var installed: Locale?, supported: Locale?, dictation = false
         if SpeechTranscriber.isAvailable {
             supported = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: selected))
             let locales = await SpeechTranscriber.installedLocales
             if let supported, locales.contains(where: { $0.identifier == supported.identifier }) { installed = supported }
         }
+        if supported == nil, let spoken = await DictationTranscriber.supportedLocale(equivalentTo: Locale(identifier: selected)) {
+            supported = spoken; dictation = true
+            let locales = await DictationTranscriber.installedLocales
+            if locales.contains(where: { $0.identifier == spoken.identifier }) { installed = spoken }
+        }
         guard selected == language else { return }
-        installedLocale = installed; supportedLocale = supported; canDownload = supported != nil && installed == nil
+        installedLocale = installed; supportedLocale = supported; dictationEngine = dictation; canDownload = supported != nil && installed == nil
         let recognizer = SFSpeechRecognizer(locale: Locale(identifier: selected))
         runtimeDescription = installed != nil ? "التحويل على الجهاز" : recognizer?.isAvailable == true && recognizer?.supportsOnDeviceRecognition == true ? "التحويل على الجهاز" : recognizer?.isAvailable == true ? "تحويل Apple بعد موافقتك" : "سجّل صوتًا"
     }
@@ -102,7 +111,7 @@ import MadarCore
         meterWindowSecond = 0; meterWindowTotal = 0; meterWindowCount = 0
             try startChunk()
             recording = true
-            if let url = recorder?.url { live.start(url: url, locale: installedLocale) { [weak self] in self?.recording == true } }
+            if let url = recorder?.url { live.start(url: url, locale: installedLocale, dictation: dictationEngine) { [weak self] in self?.recording == true } }
             startMetering()
             observeAudioSession()
         } catch {
@@ -112,6 +121,7 @@ import MadarCore
                 for file in staged where file.pathExtension == "caf" && (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0 < 1_024 {
                     for ext in ["json", "caf"] { try? FileManager.default.removeItem(at: file.deletingPathExtension().appendingPathExtension(ext)) }
                 }
+                for ticket in staged where ticket.pathExtension == "json" && Self.stagedAudio(for: ticket) == nil { try? FileManager.default.removeItem(at: ticket) }
             }
         }
     }
@@ -121,11 +131,25 @@ import MadarCore
         // 11 Nov: an .m4a has no index until it is closed, so a take cut by a crash or by the system was unplayable. A PCM CAF is readable up to the last byte; it is turned into .m4a when stored.
         let url = root.appending(path: UUID().uuidString + ".caf")
         // Linear PCM: unlike AAC it has no packet table written at the end, so a take cut by a crash is still readable. Export turns it into AAC.
-        let recorder = try AVAudioRecorder(url: url, settings: [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 22_050, AVNumberOfChannelsKey: 1,
-            AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false])
-        if let recordingDay {
+        // The ticket is written once the audio file exists, so a take that never began leaves no ticket without audio.
+        let recordingDay = recordingDay
+        func writeTicket() throws {
+            guard let recordingDay else { return }
             try JSONEncoder().encode(RecordingTicket(day: recordingDay.description, startedAt: Date().timeIntervalSince1970)).write(to: url.deletingPathExtension().appendingPathExtension("json"), options: [.atomic, .completeFileProtection])
         }
+        // Owner 12 Nov: call-style clean voice first; the plain recorder (same file format) whenever voice processing cannot start.
+        if let clean = try? DiaryCleanRecorder(url: url) {
+            do {
+                try writeTicket()
+                try clean.record()
+                clean.onEnded = { [weak self] in Task { @MainActor in await self?.handleAudioEvent(.interruptionBegan) } }
+                self.recorder = clean; voiceProcessing = true
+                return
+            } catch { clean.stop() }
+        }
+        voiceProcessing = false
+        let recorder = try AVAudioRecorder(url: url, settings: DiaryCleanRecorder.fileSettings)
+        try writeTicket()
         recorder.delegate = self; self.recorder = recorder
         recorder.isMeteringEnabled = true
         guard recorder.record() else { throw CocoaError(.fileWriteUnknown) }
@@ -282,7 +306,7 @@ import MadarCore
             do { try await Task.sleep(for: .seconds(timeoutSeconds)) } catch { return }
             guard let self, self.job == token else { return }; self.cancelConversion(); self.message = "لم يتحوّل؛ الصوت محفوظ · أعد المحاولة"
         }
-        let locale = installedLocale, language = language
+        let locale = installedLocale, language = language, dictation = dictationEngine
         analysis = Task { [weak self] in
             guard let self else { return }
             do {
@@ -291,9 +315,10 @@ import MadarCore
                 defer { try? FileManager.default.removeItem(at: root) }
                 let url = root.appending(path: media.id.uuidString + ".m4a"); try media.data.write(to: url, options: [.atomic, .completeFileProtection])
                 let text: String
-                if route == .transcriber, let locale { text = try await Self.onDevice(url: url, locale: locale) }
+                if route == .transcriber, let locale { text = try await Self.onDevice(url: url, locale: locale, dictation: dictation) }
                 else {
-                    let files = route == .appleServer ? try await Self.serverChunks(url: url, root: root) : [url]
+                    // Under a minute per request on every recognizer route: one long request kept only the last stretch of a take with pauses.
+                    let files = try await Self.serverChunks(url: url, root: root)
                     var parts: [String] = []
                     for file in files {
                         try Task.checkCancellation(); guard self.job == token else { return }
@@ -361,7 +386,7 @@ import MadarCore
         download = Task { [weak self] in
             guard let self else { return }
             do {
-                let module = SpeechTranscriber(locale: supportedLocale, preset: .transcription)
+                let module: any SpeechModule = self.dictationEngine ? DictationTranscriber(locale: supportedLocale, preset: .longDictation) : SpeechTranscriber(locale: supportedLocale, preset: .transcription)
                 guard let request = try await AssetInventory.assetInstallationRequest(supporting: [module]) else { self.downloadProgress = nil; self.download = nil; await self.refreshLanguage(); return }
                 self.installation = request
                 let progress = Task { [weak self] in
@@ -391,11 +416,20 @@ import MadarCore
         }
         return files
     }
-    @concurrent private static func onDevice(url: URL, locale: Locale) async throws -> String {
+    @concurrent private static func onDevice(url: URL, locale: Locale, dictation: Bool) async throws -> String {
+        if dictation {
+            let module = DictationTranscriber(locale: locale, preset: .longDictation)
+            let analyzer = SpeechAnalyzer(modules: [module])
+            return try await withTaskCancellationHandler {
+                let results = Task { var text = ""; for try await result in module.results { try Task.checkCancellation(); DiaryTranscriptJoin.append(String(result.text.characters), to: &text) }; return text }
+                do { try await analyzer.start(inputAudioFile: AVAudioFile(forReading: url), finishAfterFile: true); return try await results.value }
+                catch { results.cancel(); await analyzer.cancelAndFinishNow(); throw error }
+            } onCancel: { Task { await analyzer.cancelAndFinishNow() } }
+        }
         let module = SpeechTranscriber(locale: locale, preset: .transcription)
         let analyzer = SpeechAnalyzer(modules: [module])
         return try await withTaskCancellationHandler {
-            let results = Task { var text = ""; for try await result in module.results { try Task.checkCancellation(); text += String(result.text.characters) }; return text }
+            let results = Task { var text = ""; for try await result in module.results { try Task.checkCancellation(); DiaryTranscriptJoin.append(String(result.text.characters), to: &text) }; return text }
             do { try await analyzer.start(inputAudioFile: AVAudioFile(forReading: url), finishAfterFile: true); return try await results.value }
             catch { results.cancel(); await analyzer.cancelAndFinishNow(); throw error }
         } onCancel: { Task { await analyzer.cancelAndFinishNow() } }

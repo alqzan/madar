@@ -21,6 +21,8 @@ struct DiaryDayView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selected: GregorianDay?
     @State private var page: DiaryDisplayDay?
+    @State private var photoViewer: DiaryPhotoViewerStart?
+    @State private var photoStripToken = 0
     @State private var highlightedEntryID: UUID?
     @State private var highlightGeneration = 0
     @State private var failure: String?
@@ -210,7 +212,7 @@ struct DiaryDayView: View {
                                         if let label = periodLabels[line.id] { DiaryPeriodHeadingRow(label: label) }
                                         if !hasAudio { lineRow(line, page: page).id("diary-entry-" + line.id) }
                                         ForEach(attached.filter { $0.kind != "missing" }) { media in
-                                            DiaryMediaCard(app: app, media: media, transcript: line.text)
+                                            DiaryMediaCard(app: app, media: media, transcript: line.text, openPhoto: { photoViewer = .init(id: $0.id.uuidString) })
                                                 .overlay(alignment: .topLeading) {
                                                     if media.kind == "audio" { Text(service.time(line.at, zone: line.tzID)).font(DiaryType.label).lineLimit(1).minimumScaleFactor(0.92).foregroundStyle(theme.color("ink3Text")).frame(width: DiaryDayMetrics.timeColumn).padding(.leading, 6).padding(.top, 20) }
                                                 }
@@ -408,6 +410,9 @@ struct DiaryDayView: View {
                 Text("تبقى الهوامش في يوم كتابتها، ويمكنك التراجع فور الحذف من زر «تراجع».")
             }
             .fullScreenCover(isPresented: $searchOpen) { DiarySearchView(app: app).environment(\.roomTheme, theme) }
+            .fullScreenCover(item: $photoViewer, onDismiss: { photoStripToken += 1 }) { start in
+                DiaryPhotoViewer(app: app, day: shownDay, load: { await refreshLines(); return viewerItems() }, selection: start.id).environment(\.roomTheme, theme)
+            }
             .fullScreenCover(isPresented: $archiveOpen) {
                 DiaryHubView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app)
             }
@@ -730,7 +735,26 @@ struct DiaryDayView: View {
             guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { return false }
             do { try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", day: "today", writingDay: shownDay, assetID: asset.localIdentifier); await refreshLines(); return true }
             catch { failure = madarUserMessage(error); return false }
-        }.padding(.leading, DiaryDayMetrics.contentLeading).padding(.trailing, 18).padding(.bottom, 10).accessibilityIdentifier("diary-day-photo-strip")
+        } open: { asset in photoViewer = .init(id: "asset:" + asset.localIdentifier) }
+            .id(photoStripToken).padding(.leading, DiaryDayMetrics.contentLeading).padding(.trailing, 18).padding(.bottom, 10).accessibilityIdentifier("diary-day-photo-strip")
+    }
+    /// The day's photos for the viewer: those on the page in the order they happened, then the day's library photos not on any page.
+    private func viewerItems() -> [DiaryViewerItem] {
+        var items: [DiaryViewerItem] = []
+        if let page {
+            let mediaByEntry = Dictionary(grouping: page.media, by: \.entryID)
+            for line in page.lines where line.kind != "intention" {
+                for media in mediaByEntry[line.id] ?? [] where media.kind == "photo" {
+                    items.append(.init(id: media.id.uuidString, mediaID: media.id, assetID: media.assetID, lineID: line.id, comment: line.text, data: media.data))
+                }
+            }
+        }
+        guard travel == nil else { return items }
+        let linked = DiaryPhotoLibrary.linkedIDs(app)
+        for asset in DiaryPhotoLibrary.assets(on: shownDay, timeZone: app.activePlace.timeZone) where !linked.contains(asset.localIdentifier) {
+            items.append(.init(id: "asset:" + asset.localIdentifier, assetID: asset.localIdentifier, comment: ""))
+        }
+        return items
     }
     /// 10 Nov owner: no permanent «اكتب هنا» between every item. Any line is the place to write: its menu (or a tap on a room's own line) writes right after it, in time.
     private func writeAfter(_ line: DiaryDisplayLine, page: DiaryDisplayDay) {

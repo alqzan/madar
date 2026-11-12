@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 import MadarDesign
 import MadarCore
 import FoundationModels
@@ -86,18 +87,15 @@ struct DiaryVoiceFeedback: View {
             }
             if !controller.insightStatus.isEmpty { Text(controller.insightStatus).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
             if !controller.message.isEmpty { Text(controller.message).font(MadarTypography.caption()).accessibilityIdentifier("diary-voice-status") }
-            if controller.recording, !controller.live.text.isEmpty {
-                Text(controller.live.text).font(DiaryType.writing).foregroundStyle(.secondary).lineLimit(4)
-                    .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("diary-voice-live")
-            }
+            DiaryLiveWords(controller: controller)
             if !controller.partialText.isEmpty { Text(controller.partialText).font(DiaryType.writing).foregroundStyle(.secondary) }
             if controller.converting { Button { controller.cancelConversion() } label: { Text("ألغِ التحويل؛ أبقِ الصوت").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-voice-cancel") }
             if showsTranscriptEditor, !controller.transcriptText.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("نص التسجيل · عدّله هنا").font(MadarTypography.fine())
-                    TextEditor(text: Binding(get: { controller.transcriptText }, set: { controller.editTranscript($0) }))
-                        .font(DiaryType.writing).scrollContentBackground(.hidden)
-                        .frame(minHeight: 100, maxHeight: 190)
+                    // Grows with the text: the whole transcript is visible while it is edited, never behind an inner scroll.
+                    TextField("نص التسجيل", text: Binding(get: { controller.transcriptText }, set: { controller.editTranscript($0) }), axis: .vertical)
+                        .font(DiaryType.writing).lineLimit(4...).lineSpacing(6)
                         .padding(8).background(.thinMaterial, in: .rect(cornerRadius: 14))
                         .accessibilityIdentifier("diary-voice-transcript")
                     if controller.transcriptIsDirty {
@@ -258,6 +256,32 @@ struct DiaryVoiceInsightTask: View {
                 }
             } catch is CancellationError { return }
             catch { await completion(.failed) }
+        }
+    }
+}
+
+/// While a take records: the whole of what was heard so far (owner 12 Nov: never just its first lines), following the newest words,
+/// and the system mic-mode picker when the take goes through voice processing, so Voice Isolation can be chosen as in a call.
+struct DiaryLiveWords: View {
+    let controller: DiaryVoiceController
+    @Environment(\.roomTheme) private var theme
+    var body: some View {
+        if controller.recording {
+            VStack(alignment: .leading, spacing: 8) {
+                if controller.voiceProcessing {
+                    Button { AVCaptureDevice.showSystemUserInterface(.microphoneModes) } label: {
+                        Label(AVCaptureDevice.activeMicrophoneMode == .voiceIsolation ? "عزل الصوت يعمل" : "اعزل صوتك عن الضجيج", systemImage: "person.wave.2")
+                            .font(DiaryType.label).frame(minHeight: 44).contentShape(Rectangle())
+                    }.buttonStyle(.madarPlain).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("diary-voice-isolation")
+                }
+                if !controller.live.text.isEmpty {
+                    ScrollView {
+                        Text(controller.live.text).font(DiaryType.writing).lineSpacing(6).foregroundStyle(theme.secondaryInk)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }.frame(maxHeight: 260).defaultScrollAnchor(.bottom).scrollBounceBehavior(.basedOnSize)
+                        .accessibilityIdentifier("diary-voice-live")
+                }
+            }
         }
     }
 }

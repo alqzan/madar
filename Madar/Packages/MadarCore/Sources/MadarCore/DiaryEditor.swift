@@ -148,6 +148,17 @@ public enum DiarySpeechPolicy {
     }
 }
 
+/// Joins the pieces a speech engine returns for one take: one space between pieces, never words glued together,
+/// and no stray direction marks or blank pieces (Arabic dictation opens each piece with a right-to-left mark).
+public enum DiaryTranscriptJoin {
+    public static func append(_ piece: String, to text: inout String) {
+        let marks = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{200E}\u{200F}\u{061C}"))
+        let clean = piece.trimmingCharacters(in: marks)
+        guard !clean.isEmpty else { return }
+        text += (text.isEmpty ? "" : " ") + clean
+    }
+}
+
 private extension JSONValue {
     var string: String? { if case .string(let value) = self { value } else { nil } }
     var number: Double? { if case .number(let value) = self { value } else { nil } }

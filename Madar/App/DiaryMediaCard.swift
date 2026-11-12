@@ -13,6 +13,8 @@ struct DiaryMediaCard: View {
     let media: DiaryDisplayMedia
     let transcript: String
     var missingCount = 1
+    /// The day page opens its photo viewer (swipe through the day, comment); elsewhere a photo opens on its own.
+    var openPhoto: ((DiaryDisplayMedia) -> Void)? = nil
     @Environment(\.roomTheme) private var theme
     @State private var preview: DiaryPreview?
     @State private var error: String?
@@ -33,7 +35,7 @@ struct DiaryMediaCard: View {
         VStack(alignment: .leading, spacing: 8) {
             if media.kind == "photo" {
                 // Shrunk off the main thread once, instead of decoding a camera photo again at every redraw of the day.
-                Button { open() } label: {
+                Button { if let openPhoto { openPhoto(media) } else { open() } } label: {
                     DiaryDataThumbnail(data: media.data, maxPixel: 450) { image in
                         image.resizable().scaledToFit().frame(maxWidth: 150).padding(8).background(theme.surface).rotationEffect(.degrees(-2)).shadow(color: theme.ink.opacity(0.1), radius: 5, y: 4)
                     }
@@ -42,16 +44,24 @@ struct DiaryMediaCard: View {
             } else if media.kind == "audio" {
                 if editingTitle {
                     HStack(spacing: 8) {
-                        TextField("عنوان التسجيل", text: $titleDraft).font(DiaryType.writing).accessibilityIdentifier("diary-audio-title-edit")
+                        TextField("عنوان التسجيل", text: $titleDraft).font(DiaryType.heading).submitLabel(.done).onSubmit { saveTitle() }
+                            .accessibilityIdentifier("diary-audio-title-edit")
+                        Button("إلغاء") { editingTitle = false }.font(DiaryType.label).frame(minHeight: 44)
                         Button("احفظ") { saveTitle() }.disabled(savingTitle || titleDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             .accessibilityIdentifier("diary-audio-title-save")
                     }
-                } else if let title = savedTitle ?? media.title {
-                    HStack {
-                        Text(title).font(DiaryType.heading).frame(maxWidth: .infinity, alignment: .leading)
-                        Button("عدّل العنوان") { titleDraft = title; editingTitle = true }
-                            .font(MadarTypography.fine()).frame(minHeight: 44).accessibilityIdentifier("diary-audio-title-open")
-                    }
+                } else {
+                    // Owner 12 Nov: the title always sits above its recording, and a tap edits it, even before it has one.
+                    let title = (savedTitle ?? media.title).flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+                    Button { titleDraft = title ?? ""; editingTitle = true } label: {
+                        HStack(spacing: 8) {
+                            Text(title ?? "أضف عنوانًا للتسجيل").font(title == nil ? DiaryType.writing : DiaryType.heading)
+                                .foregroundStyle(title == nil ? theme.color("ink3Text") : theme.ink)
+                                .multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
+                            Image(systemName: "pencil").font(MadarTypography.fine()).foregroundStyle(theme.color("ink3Text"))
+                        }.frame(minHeight: 44).contentShape(Rectangle())
+                    }.buttonStyle(.madarPlain).accessibilityLabel(title.map { "عنوان التسجيل: " + $0 + "، عدّله" } ?? "أضف عنوانًا للتسجيل")
+                        .accessibilityIdentifier("diary-audio-title-open")
                 }
                 HStack(spacing: 12) {
                     Button { togglePlayback() } label: { Image(systemName: playing ? "pause.fill" : "play.fill").frame(width: 44, height: 44).foregroundStyle(theme.onAccent).background(theme.accent, in: .circle) }
@@ -80,8 +90,8 @@ struct DiaryMediaCard: View {
                             }
                         }
                         if editingTranscript {
-                            TextEditor(text: $transcriptDraft).font(DiaryType.writing).scrollContentBackground(.hidden)
-                                .frame(minHeight: 110, maxHeight: 220).padding(8)
+                            // Grows with the text (owner 12 Nov: the whole recording's text, never a clipped box).
+                            TextField("نص التسجيل", text: $transcriptDraft, axis: .vertical).font(DiaryType.writing).lineLimit(4...).lineSpacing(6).padding(8)
                                 .background(theme.background, in: .rect(cornerRadius: 12))
                                 .accessibilityIdentifier("diary-audio-transcript-edit")
                             Button {

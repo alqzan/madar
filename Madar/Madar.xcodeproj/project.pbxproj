@@ -37,6 +37,7 @@
 		0E5178BFC24EF9E828C9A534 /* MoneyGoalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C159C1767DBE54725029BBFE /* MoneyGoalView.swift */; };
 		100DABC4B3046AFDD716FA82 /* MadarGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA770813B3F76287BD061E21 /* MadarGlyph.swift */; };
 		1086EA11FA1FAD2EACA0490F /* QuickRoomControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 594C5DE48240D569567EC201 /* QuickRoomControls.swift */; };
+		108857D96E1818DEB69D61ED /* DiaryPhotoVoiceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECD44DA20EBF39E16D63A24 /* DiaryPhotoVoiceUITests.swift */; };
 		109F9B32E208A8EDA1E87D1C /* AppMihbaraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 613F23E7A67DB5AF1B342B4A /* AppMihbaraService.swift */; };
 		10BA9ACCEDE467D0114EF478 /* AppQuranService+Drill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52735133758CAE2D8945A464 /* AppQuranService+Drill.swift */; };
 		12F77A5D723E19178224B8C4 /* AppQuranService+Year.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EABD6DD57A637E613F8174 /* AppQuranService+Year.swift */; };
@@ -291,6 +292,7 @@
 		8AFEF693B46EE0AFD61ADF6E /* QuranFreeIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5530CFCEB8EEF7F56BE18E26 /* QuranFreeIntegrationTests.swift */; };
 		8C394D8C60E8C0E6316C36FE /* AppInboxLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3F6E4B2C320BA85D0C94586 /* AppInboxLifecycleTests.swift */; };
 		8C8613CD8A6637BF93559366 /* DiaryQuestionsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1334733B509CB3E2A906EE34 /* DiaryQuestionsCard.swift */; };
+		8E4A95F0F09D5DA303EE3194 /* DiaryPhotoViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55AEBE884B936AF7F8602754 /* DiaryPhotoViewer.swift */; };
 		8E69837C2908FFB2F294C309 /* MadarCore in Frameworks */ = {isa = PBXBuildFile; productRef = AE6E58837C0C15E3A481E001 /* MadarCore */; };
 		8EA81EF21026EB5F56098887 /* RoomSymbols.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EF38D2DD4E05D7F8F402281E /* RoomSymbols.xcassets */; };
 		8FE2463637B9421352B04668 /* PrayerLogControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = C465C55A47592A6081EE8186 /* PrayerLogControl.swift */; };
@@ -346,6 +348,7 @@
 		A317972461951D017A640FA5 /* DiaryLaunchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B2CC9EAC4D3F8E39E52351 /* DiaryLaunchView.swift */; };
 		A4449F78D3AF004852413A17 /* MoneyReconcileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D61EF73C792AC67AE1D74FE3 /* MoneyReconcileView.swift */; };
 		A44A6C744C7BCFAA082D426D /* BahwYearUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B031AA8A32A509374B4BC38 /* BahwYearUITests.swift */; };
+		A522D1F361FFAABA47646095 /* DiaryCleanRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11633DCB291C84031CDB0D39 /* DiaryCleanRecorder.swift */; };
 		A5649FF04B9320113B940A6C /* AppQuranService+Index.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6315081179D81A3DD8BF942A /* AppQuranService+Index.swift */; };
 		A728D23CC6DFF5D4A5049EA8 /* LegacyPersonalTrialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1225DCC15EC207F81AE50852 /* LegacyPersonalTrialTests.swift */; };
 		A7D446DB23DAEEF4660F9D14 /* MoneyEnvelopeDrawings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DB07EF6EBB7A860FCC0F6A1 /* MoneyEnvelopeDrawings.swift */; };
@@ -590,6 +593,7 @@
 		0FBE1448D1219609C2020B02 /* Prayer.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Prayer.xcstrings; sourceTree = "<group>"; };
 		103AF2A7E044A34C910A3A86 /* MihbaraQuoteFlowRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraQuoteFlowRows.swift; sourceTree = "<group>"; };
 		10F2982EAFE340CFC5C7B9FD /* WidgetMakerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetMakerView.swift; sourceTree = "<group>"; };
+		11633DCB291C84031CDB0D39 /* DiaryCleanRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryCleanRecorder.swift; sourceTree = "<group>"; };
 		11F123B2D3B43B936627F0D6 /* QuranWeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranWeekView.swift; sourceTree = "<group>"; };
 		1211FC88133B747FB9340458 /* QuranTafsirLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranTafsirLibrary.swift; sourceTree = "<group>"; };
 		1225DCC15EC207F81AE50852 /* LegacyPersonalTrialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyPersonalTrialTests.swift; sourceTree = "<group>"; };
@@ -723,6 +727,7 @@
 		54CAED3F538D952FE59BBE34 /* QuranPageMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranPageMap.swift; sourceTree = "<group>"; };
 		5530CFCEB8EEF7F56BE18E26 /* QuranFreeIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranFreeIntegrationTests.swift; sourceTree = "<group>"; };
 		553B8E01D18F85CA08BB1E22 /* MihbaraContentsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraContentsSheet.swift; sourceTree = "<group>"; };
+		55AEBE884B936AF7F8602754 /* DiaryPhotoViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryPhotoViewer.swift; sourceTree = "<group>"; };
 		56174C04CFE7BB474B46291C /* Amiri-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Amiri-OFL.txt"; sourceTree = "<group>"; };
 		56508C963EC5A941DE375B7C /* DiaryRichText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryRichText.swift; sourceTree = "<group>"; };
 		566844F2238653E3802E5D22 /* RoomGlyphTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomGlyphTests.swift; sourceTree = "<group>"; };
@@ -811,6 +816,7 @@
 		7CF2E3379E32EA600D74CFDE /* SettingsHome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsHome.swift; sourceTree = "<group>"; };
 		7E2322CEC281AFD3E505F2BE /* CityCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityCatalogTests.swift; sourceTree = "<group>"; };
 		7E6EB1F3F05F6A4C2B4D1002 /* AppBackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackupService.swift; sourceTree = "<group>"; };
+		7ECD44DA20EBF39E16D63A24 /* DiaryPhotoVoiceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryPhotoVoiceUITests.swift; sourceTree = "<group>"; };
 		7F8E0D1E0A3C1A24D4213E29 /* MoneyEnvelopeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyEnvelopeModels.swift; sourceTree = "<group>"; };
 		7FDD9F0FEA0450FB18B73B1D /* IBMPlexSerif-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "IBMPlexSerif-Bold.ttf"; sourceTree = "<group>"; };
 		8051E5425FAD913A445F3DC2 /* PrayerPillToggleStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerPillToggleStyle.swift; sourceTree = "<group>"; };
@@ -1204,6 +1210,7 @@
 				DD050864F8C550A9BEA27784 /* CityLocator.swift */,
 				68E6E87340ED90E80146719D /* CustomizationCopy.swift */,
 				722D1062D9A8B6E0872B2931 /* CustomizeMadar.swift */,
+				11633DCB291C84031CDB0D39 /* DiaryCleanRecorder.swift */,
 				2234F4C1215CD275CE96CFAD /* DiaryCustomizeView.swift */,
 				5C4ADAC119D4D84DB32549E3 /* DiaryDayHeader.swift */,
 				B5DC3D2395EF3C228E3454A0 /* DiaryDayOneImportView.swift */,
@@ -1224,6 +1231,7 @@
 				8CB13CF1DECBD36DFF5E68C4 /* DiaryNightReview.swift */,
 				C7DEC0048B04AF62E8D5EDE5 /* DiaryPeriodHeadings.swift */,
 				5219589675789A4DFFDA07ED /* DiaryPhotoLibrary.swift */,
+				55AEBE884B936AF7F8602754 /* DiaryPhotoViewer.swift */,
 				1334733B509CB3E2A906EE34 /* DiaryQuestionsCard.swift */,
 				CADD2E6E80FA520955249DBA /* DiaryReadingView.swift */,
 				56508C963EC5A941DE375B7C /* DiaryRichText.swift */,
@@ -1474,6 +1482,7 @@
 				A25C0D6BA40AA1BEA7F9ABDB /* DiaryIntentionUITests.swift */,
 				2D6BDBE1B148E61E09296C50 /* DiaryLettersUITests.swift */,
 				42DA4C49434D107B02E1810F /* DiaryMarginUITests.swift */,
+				7ECD44DA20EBF39E16D63A24 /* DiaryPhotoVoiceUITests.swift */,
 				A0101738752502D6818310CA /* DiaryRevisionUITests.swift */,
 				DA46B4CDAC5516908264FB88 /* DiarySearchUITests.swift */,
 				62A1A46778A8E38A5339986E /* DiarySeasonUITests.swift */,
@@ -2061,6 +2070,7 @@
 				BFA4A93FF8F56E0AFF93E327 /* DiaryIntentionUITests.swift in Sources */,
 				70716D3FA2A6D7E3768B6F3A /* DiaryLettersUITests.swift in Sources */,
 				A2DDB78E4B7498CD651D360F /* DiaryMarginUITests.swift in Sources */,
+				108857D96E1818DEB69D61ED /* DiaryPhotoVoiceUITests.swift in Sources */,
 				25B1B904AF1F1EB89C461DF1 /* DiaryRevisionUITests.swift in Sources */,
 				738F3EBC7827BEBEE7E0F7F4 /* DiarySearchUITests.swift in Sources */,
 				5896B12F88D3C188ABF089B8 /* DiarySeasonUITests.swift in Sources */,
@@ -2189,6 +2199,7 @@
 				ADAA3E8FB93656DDB250C1E7 /* CompleteHabitIntent.swift in Sources */,
 				D368F59501A24EEC8D475168 /* CustomizationCopy.swift in Sources */,
 				E54CDC268D4A484E1FA4F78C /* CustomizeMadar.swift in Sources */,
+				A522D1F361FFAABA47646095 /* DiaryCleanRecorder.swift in Sources */,
 				558826CF5417CE461670FC22 /* DiaryCustomizeView.swift in Sources */,
 				035903357ABD96246AA794D2 /* DiaryDayHeader.swift in Sources */,
 				F13B4F45487252CB1DAF833A /* DiaryDayOneImportView.swift in Sources */,
@@ -2209,6 +2220,7 @@
 				731F8DDB98058AC90477DB13 /* DiaryNightReview.swift in Sources */,
 				9BD69570B93FAA02801CED58 /* DiaryPeriodHeadings.swift in Sources */,
 				9FC6B026A10D39B53B8CB17C /* DiaryPhotoLibrary.swift in Sources */,
+				8E4A95F0F09D5DA303EE3194 /* DiaryPhotoViewer.swift in Sources */,
 				8C8613CD8A6637BF93559366 /* DiaryQuestionsCard.swift in Sources */,
 				206F1999A27678D703DC0BD5 /* DiaryReadingView.swift in Sources */,
 				DD9282B183EA95404EC90713 /* DiaryRichText.swift in Sources */,
