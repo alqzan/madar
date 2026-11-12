@@ -119,7 +119,8 @@ struct DiaryQuestionsCard: View {
         })
         .task { availability = await MadarAIAvailabilityChecker.check() }
         .onChange(of: scenePhase) { _, value in if value == .background { reset() } }
-        .onDisappear { reset() }
+        // Finished questions stay while the card merely scrolls away or the editor opens over it; only unfinished work is abandoned.
+        .onDisappear { if phase == .loading || phase == .translatingOut { reset() } }
     }
 
     private var list: some View {

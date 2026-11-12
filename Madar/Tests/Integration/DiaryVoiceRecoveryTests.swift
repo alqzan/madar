@@ -24,7 +24,9 @@ import MadarData
         let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)); buffer.frameLength = frames
         for i in 0..<Int(frames) { buffer.int16ChannelData![0][i] = Int16(8_000 * sin(Double(i) * 2 * .pi * 440 / 22_050)) }
         try open.write(from: buffer)
-        try JSONEncoder().encode(["day": day.description]).write(to: caf.deletingPathExtension().appendingPathExtension("json"))
+        // The take began two hours ago; recovery must keep that time, not stamp the time of recovery.
+        let began = Date().addingTimeInterval(-7_200).timeIntervalSince1970.rounded()
+        try JSONSerialization.data(withJSONObject: ["day": day.description, "startedAt": began]).write(to: caf.deletingPathExtension().appendingPathExtension("json"))
 
         let nextLaunch = DiaryVoiceController(app: app)
         await nextLaunch.recoverRecordings()
@@ -33,6 +35,8 @@ import MadarData
         XCTAssertGreaterThanOrEqual(media.duration ?? 0, 1, "About two seconds were recorded")
         XCTAssertNoThrow(try AVAudioPlayer(data: media.data), "The saved bytes must play")
         XCTAssertEqual(try ModelContext(container).fetch(FetchDescriptor<Media>()).filter { $0.id == id }.count, 1)
+        let entry = try XCTUnwrap(try ModelContext(container).fetch(FetchDescriptor<Entry>()).first { $0.mediaID == id }, "The recovered take is a line of the day")
+        XCTAssertEqual(entry.eventAt.timeIntervalSince1970, began, accuracy: 2, "A recovered take keeps the time it was recorded")
         let staged = (try? FileManager.default.contentsOfDirectory(at: app.diaryStagingDirectory, includingPropertiesForKeys: nil)) ?? []
         XCTAssertTrue(staged.filter { ["json", "caf", "m4a"].contains($0.pathExtension) }.isEmpty, "Nothing stays staged after the save: \(staged.map(\.lastPathComponent))")
         withExtendedLifetime(open) {}

@@ -244,7 +244,7 @@ struct DiaryDayView: View {
                 GeometryReader { geometry in
                     ScrollViewReader { proxy in
                         ScrollView {
-                            VStack(alignment: .leading, spacing: 0) {
+                            LazyVStack(alignment: .leading, spacing: 0) {
                                 if let page {
                                     // 10 Nov owner design: the day is one flow — the day's library photos on top, then every line, recording and attachment in the order it happened.
                                     if shownDay == today, travel == nil { dayPhotoStrip }
@@ -588,7 +588,7 @@ struct DiaryDayView: View {
             echo = nil
             if shownDay == today, displayPage.lines.isEmpty, displayPage.photo == nil,
                let old = try? await service.dayOffMain(aYearAgo), old.excerpt != "صفحة بلا كتابة" { echo = old }
-            returnDay = try service.returnAfterAbsence(shownDay)
+            returnDay = try await service.returnAfterAbsenceOffMain(shownDay)
             travel = try service.travel(shownDay)
             travelReturn = travel == nil ? try service.travelReturn(shownDay) : nil
             if shownDay == today { try? await service.refreshLetters() }

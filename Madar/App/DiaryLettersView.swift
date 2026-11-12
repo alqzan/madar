@@ -15,7 +15,8 @@ struct DiaryLettersPanel: View {
     @State private var rescheduling: DiaryLetterCard?
     @State private var failure: String?
     @State private var routeMessage: String?
-    @State private var handledRouteID: UUID?
+    /// Owned by the hub: leaving the Letters tab and coming back must not open the routed letter a second time.
+    @Binding var handledRouteID: UUID?
     private var service: AppDiaryService { .init(app: app) }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {

@@ -121,13 +121,14 @@ import MadarCore
         let recorder = try AVAudioRecorder(url: url, settings: [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 22_050, AVNumberOfChannelsKey: 1,
             AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false])
         if let recordingDay {
-            try JSONEncoder().encode(RecordingTicket(day: recordingDay.description)).write(to: url.deletingPathExtension().appendingPathExtension("json"), options: [.atomic, .completeFileProtection])
+            try JSONEncoder().encode(RecordingTicket(day: recordingDay.description, startedAt: Date().timeIntervalSince1970)).write(to: url.deletingPathExtension().appendingPathExtension("json"), options: [.atomic, .completeFileProtection])
         }
         recorder.delegate = self; self.recorder = recorder
         recorder.isMeteringEnabled = true
         guard recorder.record() else { throw CocoaError(.fileWriteUnknown) }
     }
-    private struct RecordingTicket: Codable { let day: String }
+    /// `startedAt` lets a recovered take keep the time (and so the ink) it was recorded at, not the time it was recovered; old tickets have none.
+    private struct RecordingTicket: Codable { let day: String; var startedAt: Double? = nil }
     nonisolated private static func stagedAudio(for ticket: URL) -> URL? {
         let base = ticket.deletingPathExtension()
         return ["caf", "m4a"].map { base.appendingPathExtension($0) }.first { FileManager.default.fileExists(atPath: $0.path) }
@@ -151,7 +152,7 @@ import MadarCore
             for ticket in files where ticket.pathExtension == "json" {
                 guard let url = Self.stagedAudio(for: ticket), let record = try? JSONDecoder().decode(RecordingTicket.self, from: Data(contentsOf: ticket)), let day = try? GregorianDay(record.day) else { continue }
                 guard !recording, !savingAudio else { return }
-                await storeChunk(url: url, successful: true, day: day, levels: [])
+                await storeChunk(url: url, successful: true, day: day, levels: [], startedAt: record.startedAt.map { Date(timeIntervalSince1970: $0) })
             }
         } catch { if FileManager.default.fileExists(atPath: app.diaryStagingDirectory.path) { message = "تعذّر فتح التسجيلات المؤقتة. ملفاتها محفوظة لإعادة المحاولة." } }
     }
@@ -234,7 +235,7 @@ import MadarCore
         if recordedAudioLevels.count > 36_000 { recordedAudioLevels.removeFirst(recordedAudioLevels.count - 36_000) }
         meterWindowTotal = 0; meterWindowCount = 0
     }
-    fileprivate func storeChunk(url: URL, successful: Bool, day explicitDay: GregorianDay? = nil, levels: [Double]? = nil) async {
+    fileprivate func storeChunk(url: URL, successful: Bool, day explicitDay: GregorianDay? = nil, levels: [Double]? = nil, startedAt: Date? = nil) async {
         guard processed.insert(url).inserted, let day = explicitDay ?? recordingDay else { return }
         savingAudio = true
         defer { savingAudio = false; refreshPendingAudio() }
@@ -245,7 +246,7 @@ import MadarCore
             guard !data.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
             let duration = (try? await AVURLAsset(url: playable).load(.duration).seconds) ?? 0
             let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent) ?? UUID()
-            _ = try await AppDiaryService(app: app).appendMedia(data: data, kind: "audio", contentType: "audio/mp4", day: "today", writingDay: day, duration: Int(duration.rounded()), id: id)
+            _ = try await AppDiaryService(app: app).appendMedia(data: data, kind: "audio", contentType: "audio/mp4", day: "today", writingDay: day, duration: Int(duration.rounded()), at: startedAt, id: id)
             let samples = levels ?? recordedAudioLevels
             lastMedia = .init(id: id, entryID: id.uuidString, kind: "audio", contentType: "audio/mp4", data: data, duration: Int(duration.rounded()), title: nil, levelSamples: samples)
             try? await saveAudioInsights(mediaID: id, title: nil, levels: samples)

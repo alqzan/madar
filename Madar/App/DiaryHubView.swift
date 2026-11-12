@@ -32,6 +32,10 @@ struct DiaryHubView: View {
     #endif
     @State private var injectedArchiveReadFailure = false
     @State private var initialRouteApplied = false
+    @State private var handledLetterRoute: UUID?
+    /// Per-day counts and the written-day set, built once when the archive loads: twelve month tiles used to rebuild them on every redraw.
+    @State private var dayCounts: [GregorianDay: Int] = [:]
+    @State private var writtenDays: Set<GregorianDay> = []
     @State private var aiComposerOpen = false
     @State private var aiAvailability: MadarAIAvailability = .checking
     private var service: AppDiaryService { .init(app: app) }
@@ -43,7 +47,7 @@ struct DiaryHubView: View {
         ).year ?? Calendar.current.component(.year, from: .now)
     }
     private let tabs = [
-        ("calendar", "الشهر"), ("timeline", "الأيام"), ("memories", "الذكريات"), ("photos", "الصور"),
+        ("calendar", "التقويم"), ("timeline", "السجل"), ("memories", "الذكريات"), ("photos", "الصور"),
         // Owner, 11 Nov 2026: projects are gone from the app for good; stored project rows stay in the store untouched.
         ("letters", "الرسائل"), ("index", "الفهرس"),
     ]
@@ -80,7 +84,7 @@ struct DiaryHubView: View {
                             case "letters":
                                 DiaryLettersPanel(
                                     app: app, initialLetterID: initialLetterID,
-                                    initialLetterRequestID: initialLetterRequestID)
+                                    initialLetterRequestID: initialLetterRequestID, handledRouteID: $handledLetterRoute)
                             default: timeline(archive.days)
                             }
                         } else if let failure {
@@ -186,7 +190,10 @@ struct DiaryHubView: View {
                                 throw CocoaError(.fileReadUnknown)
                             }
                         #endif
-                        archive = try await service.archiveOffMain()
+                        let loaded = try await service.archiveOffMain()
+                        dayCounts = Dictionary(loaded.days.map { ($0.day, $0.writings) }, uniquingKeysWith: { first, _ in first })
+                        writtenDays = Set(loaded.days.filter { $0.writings > 0 || !$0.photoIDs.isEmpty }.map(\.day))
+                        archive = loaded
                         travelDays = (try? service.travelDays()) ?? []
                         failure = nil
                         if !initialRouteApplied, let initialTab, tabs.contains(where: { $0.0 == initialTab }) {
@@ -298,8 +305,7 @@ struct DiaryHubView: View {
         service.alternateMonthTitle(year: selectedYear, month: month)
     }
     private func miniMonth(_ archive: DiaryArchiveSnapshot, month: Int) -> some View {
-        let days = grid.days(year: selectedYear, month: month),
-            counts = Dictionary(archive.days.map { ($0.day, $0.writings) }, uniquingKeysWith: { first, _ in first })
+        let days = grid.days(year: selectedYear, month: month), counts = dayCounts
         let current = grid.parts(archive.today)
         return Button {
             self.month = month
@@ -339,8 +345,7 @@ struct DiaryHubView: View {
         ).accessibilityIdentifier("diary-month-" + String(month))
     }
     private func monthPage(_ archive: DiaryArchiveSnapshot, month: Int) -> some View {
-        let days = grid.days(year: selectedYear, month: month),
-            written = Set(archive.days.filter { $0.writings > 0 || !$0.photoIDs.isEmpty }.map(\.day))
+        let days = grid.days(year: selectedYear, month: month), written = writtenDays
         return VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Button {
