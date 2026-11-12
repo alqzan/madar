@@ -163,6 +163,9 @@ import MadarCore
     private func endAudioSession() { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
     func stop() async {
         guard let recorder else { return }; recording = false
+        // A call or the lock screen sends the app to the background right as the take ends; this asks the system for the time to finish saving it.
+        let background = UIApplication.shared.beginBackgroundTask(withName: "diary-take-save")
+        defer { if background != .invalid { UIApplication.shared.endBackgroundTask(background) } }
         stopMetering(); stopObservingAudioSession(); elapsedSeconds = Int(recorder.currentTime.rounded(.down))
         let url = recorder.url; recorder.stop(); self.recorder = nil
         // Other apps' audio resumes at once, not after the file is exported.

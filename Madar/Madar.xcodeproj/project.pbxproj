@@ -158,6 +158,7 @@
 		473BB399E7231B3D8A776C9D /* MoneyLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 631CC93A3ECB0A77AB05DAD1 /* MoneyLogView.swift */; };
 		480BD2C79400EEB50F82AEB9 /* MoneyHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F51146B8D82E4901217281C /* MoneyHomeView.swift */; };
 		48F35CA79681B1883AA6DE30 /* MadarSnapshots in Frameworks */ = {isa = PBXBuildFile; productRef = D9E009A01CE49E91ECD42040 /* MadarSnapshots */; };
+		4997AD5B59C97923E03B5057 /* DiaryVoiceRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2040152FCB2727367876DE86 /* DiaryVoiceRecoveryTests.swift */; };
 		49A2937603382FC1A62CE171 /* MihbaraCoverImages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E947582C7A75E5778E0F0A /* MihbaraCoverImages.swift */; };
 		4A403E7720EA985BB9FF3AED /* DiaryHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B32E22D47EB8FE84B717D27 /* DiaryHomeView.swift */; };
 		4A82C01CDEB4D50ECE7E726D /* MoneyBankInsightsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8FD1CD4881AC79A92D8FE7E /* MoneyBankInsightsViews.swift */; };
@@ -607,6 +608,7 @@
 		1F9E40A347AD27478E3FA224 /* thmanyahseriftext-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahseriftext-Regular.otf"; sourceTree = "<group>"; };
 		20050D7E49F0E7285176152C /* DiaryInlineComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryInlineComposer.swift; sourceTree = "<group>"; };
 		20304C3F7DCC7BAAB0C5632E /* BahwCustomizeParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BahwCustomizeParts.swift; sourceTree = "<group>"; };
+		2040152FCB2727367876DE86 /* DiaryVoiceRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryVoiceRecoveryTests.swift; sourceTree = "<group>"; };
 		2120D9CCB35FD19F23C35DD4 /* PrayerSnapshotSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerSnapshotSheet.swift; sourceTree = "<group>"; };
 		21EC9D062BEF92CC0282CAFE /* MadarAIMoneyNumberGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadarAIMoneyNumberGuardTests.swift; sourceTree = "<group>"; };
 		22009EDA3EF09A49926268E5 /* MoneyTripSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyTripSheets.swift; sourceTree = "<group>"; };
@@ -1595,6 +1597,7 @@
 				97C5186966B3BE345A9B38A1 /* DiarySeasonIntegrationTests.swift */,
 				E2133677F509BE825A66C00D /* DiaryServiceIntegrationTests.swift */,
 				9CB01E6837C74E167DE5E222 /* DiaryTravelIntegrationTests.swift */,
+				2040152FCB2727367876DE86 /* DiaryVoiceRecoveryTests.swift */,
 				D469796404360B49B02BC5E1 /* DiaryYearbookIntegrationTests.swift */,
 				1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */,
 				41D68577D1E6FA5223FD92FE /* HabitRhythmTests.swift */,
@@ -1962,6 +1965,7 @@
 				2D17AE3E488BB68C5E1D8650 /* DiarySeasonIntegrationTests.swift in Sources */,
 				08EE79187A4247518D825917 /* DiaryServiceIntegrationTests.swift in Sources */,
 				2C9554D2ACAEB6F56BDF9E15 /* DiaryTravelIntegrationTests.swift in Sources */,
+				4997AD5B59C97923E03B5057 /* DiaryVoiceRecoveryTests.swift in Sources */,
 				ACF8D45E7B47DF98E40E506D /* DiaryYearbookIntegrationTests.swift in Sources */,
 				16A45A0199AD6A2B5E9EC744 /* ExportPrivacyTests.swift in Sources */,
 				A0561536CAB91FAF9E90D622 /* HabitRhythmTests.swift in Sources */,
@@ -2476,7 +2480,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 38;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = V8YZL4R65K;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -2570,7 +2574,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 38;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = V8YZL4R65K;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
