@@ -5,7 +5,7 @@ import XCTest
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
-        app.launch(); XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 20))
+        app.launch(); XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 20))
         capture(app, "UX-13-diary-L")
         for (tabID,id,name) in [("tab-foundation","bahw-block-salah","lobby"),("tab-prayer","prayer-today-header","prayer"),("tab-quran","quran-coverage-title","quran"),("tab-money","money-home","money"),("tab-mihbara","mihbara-add-paper","mihbara")] {
             app.buttons[tabID].tap()

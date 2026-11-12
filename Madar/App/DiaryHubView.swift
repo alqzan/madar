@@ -23,13 +23,6 @@ struct DiaryHubView: View {
     @State private var bookOpen = false
     @State private var failure: String?
     @State private var loadAttempt = 0
-    @State private var memoryReadFailurePending = false
-    /// The memories read runs once per data change, not once per redraw of the open tab (a plain box: filling it must not redraw).
-    @State private var memoryCache = MemoryReadBox()
-    @State private var memoryTick = 0
-    #if DEBUG
-        @State private var injectedMemoryReadFailure = false
-    #endif
     @State private var injectedArchiveReadFailure = false
     @State private var initialRouteApplied = false
     @State private var handledLetterRoute: UUID?
@@ -47,9 +40,10 @@ struct DiaryHubView: View {
         ).year ?? Calendar.current.component(.year, from: .now)
     }
     private let tabs = [
-        ("calendar", "التقويم"), ("timeline", "السجل"), ("memories", "الذكريات"), ("photos", "الصور"),
+        ("calendar", "التقويم"), ("timeline", "السجل"), ("letters", "الرسائل"), ("photos", "الصور"),
         // Owner, 11 Nov 2026: projects are gone from the app for good; stored project rows stay in the store untouched.
-        ("letters", "الرسائل"), ("index", "الفهرس"),
+        // 12 Nov: «الذكريات» repeated the home's «هذا اليوم عبر السنين» and is gone; letters moved up and also have a toolbar button.
+        ("index", "الفهرس"),
     ]
     var body: some View {
         NavigationStack {
@@ -79,7 +73,6 @@ struct DiaryHubView: View {
                             switch tab {
                             case "calendar": calendar(archive)
                             case "photos": photos(archive)
-                            case "memories": memories(archive)
                             case "index": index(archive)
                             case "letters":
                                 DiaryLettersPanel(
@@ -97,38 +90,12 @@ struct DiaryHubView: View {
                         } else {
                             ProgressView("تُفتح أيامك…")
                         }
-                        // Nothing to bind into a yearbook or export until a day has been written (owner, 4 Nov 2026).
-                        if archive?.days.isEmpty == false {
-                            Button {
-                                bookOpen = true
-                            } label: {
-                                Label("كتاب السنة", systemImage: "book.closed").font(DiaryType.label).frame(minHeight: 44)
-                            }.accessibilityIdentifier("diary-yearbook")
-                            Button {
-                                exportOpen = true
-                            } label: {
-                                Label("تصدير المذكرات", systemImage: "square.and.arrow.up").font(DiaryType.label).frame(
-                                    minHeight: 44)
-                            }.accessibilityIdentifier("diary-export")
-                        }
                     }.padding(18).frame(maxWidth: 720).frame(maxWidth: .infinity)
                 }
                 .scrollPosition($contentPosition)
                 .onChange(of: month) { contentPosition.scrollTo(edge: .top) }
                 .onChange(of: selectedYear) { contentPosition.scrollTo(edge: .top) }
-                .onChange(of: tab) { _, value in
-                    contentPosition.scrollTo(edge: .top)
-                    #if DEBUG
-                        let environment = ProcessInfo.processInfo.environment
-                        if value == "memories", !injectedMemoryReadFailure,
-                            environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
-                            environment["MADAR_UI_DIARY_MEMORIES_READ_FAILURE_ONCE"] == "1"
-                        {
-                            injectedMemoryReadFailure = true
-                            memoryReadFailurePending = true
-                        }
-                    #endif
-                }
+                .onChange(of: tab) { contentPosition.scrollTo(edge: .top) }
             }.background(theme.background).foregroundStyle(theme.ink)
                 .fullScreenCover(isPresented: $bookOpen) { DiaryYearbookView(app: app).environment(\.roomTheme, theme) }
                 .fullScreenCover(isPresented: $exportOpen) { DiaryExportView(app: app).environment(\.roomTheme, theme) }
@@ -144,6 +111,19 @@ struct DiaryHubView: View {
                                 .accessibilityLabel("اسأل يومياتك")
                                 .accessibilityIdentifier("diary-hub-ai")
                         }
+                    }
+                    if archive?.days.isEmpty == false {
+                        // Shown once here, not under every tab (nothing to bind into a yearbook or export until a day is written).
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Menu {
+                                Button { bookOpen = true } label: { Label("كتاب السنة", systemImage: "book.closed") }.accessibilityIdentifier("diary-yearbook")
+                                Button { exportOpen = true } label: { Label("تصدير المذكرات", systemImage: "square.and.arrow.up") }.accessibilityIdentifier("diary-export")
+                            } label: { Image(systemName: "ellipsis.circle") }.accessibilityLabel("المزيد").accessibilityIdentifier("diary-hub-more")
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { tab = "letters" } label: { Image(systemName: "envelope") }
+                            .accessibilityLabel("رسائلك إلى المستقبل").accessibilityIdentifier("diary-hub-letters-open")
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -408,11 +388,18 @@ struct DiaryHubView: View {
                 Button {
                     reader = day.day
                 } label: {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(service.weekday(day.day) + "، " + service.bothDates(day.day, calendar: grid.first)).font(
-                            DiaryType.label
-                        ).foregroundStyle(theme.color("ink3Text"));
-                        Text(day.excerpt).font(DiaryType.writing).lineLimit(3).multilineTextAlignment(.leading)
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(service.weekday(day.day) + "، " + service.bothDates(day.day, calendar: grid.first)).font(
+                                DiaryType.label
+                            ).foregroundStyle(theme.color("ink3Text"));
+                            Text(day.excerpt).font(DiaryType.writing).lineLimit(3).multilineTextAlignment(.leading)
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        if let id = day.photoIDs.first, !typeSize.isAccessibilitySize {
+                            DiaryArchiveThumbnail(service: service, id: id) { photo in
+                                photo.resizable().scaledToFill().frame(width: 52, height: 52).clipShape(.rect(cornerRadius: 10)).accessibilityHidden(true)
+                            }.frame(width: 52, height: 52)
+                        }
                     }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-hub-day-" + day.id)
                 Divider().overlay(theme.line)
@@ -442,40 +429,6 @@ struct DiaryHubView: View {
                     }
                 }
             }
-        }
-    }
-    private func memories(_ archive: DiaryArchiveSnapshot) -> some View {
-        _ = memoryTick
-        let key = "\(app.prayerRevision)-\(loadAttempt)"
-        let loaded: Result<DiaryHomeSnapshot, Error>?
-        if memoryReadFailurePending {
-            loaded = .failure(CocoaError(.fileReadUnknown))
-        } else if memoryCache.key == key { loaded = memoryCache.result }
-        else { loaded = nil }
-        let home = try? loaded?.get()
-        return VStack(alignment: .leading, spacing: 14) {
-            Text("رف الذكريات").font(DiaryType.heading)
-            Text(home?.selection.match == .echo ? "أقرب ما كتبتَه إلى اليوم" : "من مثل هذا اليوم").font(DiaryType.label)
-                .foregroundStyle(theme.color("ink3Text"))
-            // A read that failed says so; «لا ذكريات» is only for a day that truly has none.
-            if case .failure(let error)? = loaded {
-                Text(madarUserMessage(error)).font(DiaryType.writing).accessibilityIdentifier("diary-hub-memory-error")
-                // A real failure leaves the flag false already: bumping the attempt is what reads again.
-                Button { memoryReadFailurePending = false; loadAttempt += 1 } label: { Text("أعد المحاولة")
-                    .frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-hub-memories-retry")
-            } else if loaded != nil {
-                timeline(
-                    archive.days.filter { home?.selection.days.contains($0.day) == true },
-                    empty: "حين تكتب في أيام مثل هذا اليوم، تعود إليك صفحاتها هنا مع السنين.")
-            }
-        }
-        // The read runs off the main actor, once per data change; the box fill redraws the tab when it lands.
-        .task(id: key) {
-            guard !memoryReadFailurePending, memoryCache.key != key else { return }
-            let result: Result<DiaryHomeSnapshot, Error>
-            do { result = .success(try await service.homeOffMain()) } catch { result = .failure(error) }
-            guard !Task.isCancelled else { return }
-            memoryCache.key = key; memoryCache.result = result; memoryTick += 1
         }
     }
     private func index(_ archive: DiaryArchiveSnapshot) -> some View {
@@ -531,9 +484,4 @@ private struct DiaryArchiveThumbnail<Content: View>: View {
             }.value
         }
     }
-}
-
-@MainActor private final class MemoryReadBox {
-    var key = ""
-    var result: Result<DiaryHomeSnapshot, Error>?
 }

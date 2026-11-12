@@ -95,7 +95,9 @@ extension AppDiaryService {
             let notes = margins.filter { $0.writtenDayKey == key }
             let intentions=niyyas.filter{$0.dayKey==key}
             let fallback=ids.isEmpty ? "صفحة من يومك" : "صورة من هذا اليوم"
-            let excerpt:String=written.last.map{ $0.textFormat == "markdown" ? DayOneMarkdown.plain($0.text) : $0.text } ?? intentions.last?.text ?? notes.last?.text ?? fallback
+            // The newest line written (by when it was written, not by the moment it describes: a line added «بعد» an earlier one sits in the middle of the day); the user's own lines come before the app's.
+            let newest=(written.filter{["normal","late","ghad"].contains($0.ink)}.max{$0.createdAt<$1.createdAt}) ?? written.max{$0.createdAt<$1.createdAt}
+            let excerpt:String=newest.map{ $0.textFormat == "markdown" ? DayOneMarkdown.plain($0.text) : $0.text } ?? intentions.last?.text ?? notes.last?.text ?? fallback
             return DiaryDaySummary(day:day,excerpt:excerpt,writings:written.count+notes.count+intentions.count,photoIDs:ids.sorted{$0.uuidString<$1.uuidString},places:Set(rows.compactMap(\.place)),projectIDs:Set(rows.compactMap(\.projectID)))
         }.sorted { $0.day > $1.day }
         return days

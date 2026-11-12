@@ -146,9 +146,15 @@ struct DiaryInlineComposer: View {
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: edit != nil || (insertAt != nil && anchor != nil))
         .task(id: editorOpen) {
             guard !editorOpen else { return }
+            // What the field held when the wait began: anything different afterwards was typed by the user in the meantime.
+            let before = text
             // The full page flushes its draft as it closes (a swipe back does it a moment later): read it after that, not before.
             await DiaryDraftFlush.settleAfterPages()
-            await loadDraft()
+            await loadDraft(typedSince: before)
+        }
+        .onChange(of: editorOpen) { old, open in
+            // Back from the full page (saved or closed) the keyboard goes down: the field above it would otherwise sit hidden behind it.
+            if old, !open { focused = false; UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
         }
         .onDisappear { if loaded, edit == nil, !trimmedText.isEmpty { DiaryDraftFlush.run { await keepDraft() } } }
         .onChange(of: text) { _, _ in if edit == nil { failure = nil; notice = nil; scheduleDraft() } }
@@ -179,13 +185,27 @@ struct DiaryInlineComposer: View {
         }.padding(.horizontal, 6)
     }
 
-    private func loadDraft() async {
+    /// Reads the shared draft into the field, but never over words the user typed after the field appeared (`typedSince` is what it held before).
+    private func loadDraft(typedSince before: String) async {
+        let typed = text != before ? text : nil
         do {
             if let draft = try service.draft(margin: nil) {
-                draftID = draft.id; hasDraftRecord = true; text = draft.text; lastSaved = draft.text; draftDay = draft.day; draftWritingDay = draft.writingDay
-            } else { hasDraftRecord = false; text = ""; lastSaved = ""; draftID = UUID(); draftDay = "today"; draftWritingDay = nil }
+                draftID = draft.id; hasDraftRecord = true; lastSaved = draft.text; draftDay = draft.day; draftWritingDay = draft.writingDay
+                text = Self.merged(stored: draft.text, typed: typed)
+            } else {
+                hasDraftRecord = false; lastSaved = ""; draftID = UUID(); draftDay = "today"; draftWritingDay = nil
+                text = typed ?? ""
+            }
         } catch { failure = madarUserMessage(error) }
         loaded = true
+        // Typed words that arrived before the draft was read are written like any other edit.
+        if typed != nil { scheduleDraft() }
+    }
+    /// The stored draft with the words typed meanwhile after it; with nothing typed, the stored draft as it is.
+    static func merged(stored: String, typed: String?) -> String {
+        guard let typed, !typed.isEmpty else { return stored }
+        if stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || stored == typed { return typed }
+        return stored + "\n" + typed
     }
     private func currentWritingDay() throws -> GregorianDay {
         if let draftWritingDay { return draftWritingDay }

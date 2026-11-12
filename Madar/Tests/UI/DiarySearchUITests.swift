@@ -22,7 +22,7 @@ import XCTest
         app.launch();XCTAssertTrue(app.buttons["diary-search"].waitForExistence(timeout:25));app.buttons["diary-search"].tap()
         XCTAssertTrue(app.staticTexts["diary-search-read-error"].waitForExistence(timeout:10),app.debugDescription)
         app.buttons["diary-search-retry"].tap()
-        XCTAssertTrue(app.staticTexts["فهرس الكتاب"].waitForExistence(timeout:10),app.debugDescription)
+        XCTAssertTrue(app.buttons["العام الماضي"].waitForExistence(timeout:10),app.debugDescription)
     }
     func testChipsOpenSourceEditRemoveAndNoResults() throws {
         continueAfterFailure=false

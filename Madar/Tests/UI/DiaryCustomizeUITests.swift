@@ -26,7 +26,7 @@ import XCTest
         // Owner 5 Nov: a settings reset is simply done (no undo chip; only removals offer one). The echoes home shape goes back to the default.
         XCTAssertFalse(app.buttons.matching(identifier: "undo-button").firstMatch.waitForExistence(timeout: 2), "A reset shows no undo chip")
         reveal(back, app, down: true); back.tap()
-        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 10) || app.buttons["diary-write"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 10) || app.diaryOpener.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["diary-echo-1y"].exists, "The echoes shape is gone after the reset")
         app.buttons["diary-customize"].tap()
         let margin = app.buttons["option-notes.homeShape-margin"]; reveal(margin, app); margin.tap()

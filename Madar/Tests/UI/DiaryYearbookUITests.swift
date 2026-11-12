@@ -4,7 +4,7 @@ import XCTest
         continueAfterFailure=false
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"editor","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00"]
         app.launch();XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout:25));app.buttons["diary-days"].tap()
-        let book=app.buttons["diary-yearbook"];for _ in 0..<4 where !book.isHittable{app.swipeUp()};book.tap()
+        app.buttons["diary-hub-more"].tap();let book=app.buttons["diary-yearbook"];book.tap()
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-book-cover").firstMatch.waitForExistence(timeout:10));capture(app,"M3-V11-book-L")
         let yearPicker=app.buttons["diary-book-year"];yearPicker.tap()
         let pairedYears=app.buttons.matching(NSPredicate(format:"label CONTAINS 'هـ' AND label CONTAINS ' م'"))
@@ -21,7 +21,7 @@ import XCTest
             "MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00",
             "MADAR_UI_DIARY_YEARBOOK_READ_FAILURE_AFTER_FIRST":"1"]
         app.launch();XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout:25));app.buttons["diary-days"].tap()
-        let book=app.buttons["diary-yearbook"];for _ in 0..<4 where !book.isHittable{app.swipeUp()};book.tap()
+        app.buttons["diary-hub-more"].tap();let book=app.buttons["diary-yearbook"];book.tap()
         XCTAssertTrue(app.staticTexts["diary-book-error"].waitForExistence(timeout:10),app.debugDescription)
         XCTAssertTrue(app.buttons["diary-book-retry"].waitForExistence(timeout:5),app.debugDescription)
         capture(app,"AU-95-yearbook-read-failure-L")

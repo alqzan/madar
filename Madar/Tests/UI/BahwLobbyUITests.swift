@@ -394,7 +394,7 @@ import XCTest
             "MADAR_UI_THEME": "light"
         ]
         app.launch()
-        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 20), app.debugDescription)
         app.buttons["tab-foundation"].tap()
         XCTAssertTrue(app.staticTexts["bahw-greeting"].waitForExistence(timeout: 10))
         capture(app, "UX-10-glass-shortcuts-expanded-L")

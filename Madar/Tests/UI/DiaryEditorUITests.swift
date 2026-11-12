@@ -11,7 +11,7 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty",
             "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2001-04-17T15:00:00+03:00"]
         app.launch()
-        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25), app.debugDescription)
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25), app.debugDescription)
         app.openDiaryEditorFromHome()
         let hideKeyboard = app.buttons["diary-editor-hide-keyboard"]
         if hideKeyboard.waitForExistence(timeout: 5) { hideKeyboard.tap() }
@@ -41,7 +41,7 @@ import XCTest
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == %@", "افتح الصورة")).count, 1)
         capture(app, "M3-20-day-photo-saved-L")
         app.terminate(); app.launch()
-        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); app.openDiaryEditorFromHome()
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25)); app.openDiaryEditorFromHome()
         if hideKeyboard.waitForExistence(timeout: 5) { hideKeyboard.tap() }
         XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout: 10))
         XCTAssertFalse(photos.firstMatch.exists, "A linked asset must not be suggested again after relaunch")
@@ -51,13 +51,13 @@ import XCTest
 
     private func launch(_ fixture: String) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
-        app.launch(); XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); return app
+        app.launch(); XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25)); return app
     }
     func testClosingBlankEditorDoesNotRestoreAnEmptyDraft() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); app.resetAuthorizationStatus(for: .microphone)
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
-        app.launch(); XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25), app.debugDescription)
+        app.launch(); XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25), app.debugDescription)
         app.openDiaryEditorFromHome()
         let text = app.textViews["diary-editor-text"]
         XCTAssertTrue(text.waitForExistence(timeout: 10), app.debugDescription)
@@ -68,7 +68,7 @@ import XCTest
         app.buttons["diary-editor-cancel"].tap()
         // Closing the page returns to today's page, where the writing began; one more step is home.
         app.closeDiaryDay()
-        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 10), app.debugDescription)
 
         app.openDiaryEditorFromHome()
         XCTAssertTrue(text.waitForExistence(timeout: 10), app.debugDescription)
@@ -85,7 +85,7 @@ import XCTest
         let text = app.textViews["diary-editor-text"]; XCTAssertTrue(text.waitForExistence(timeout: 10)); text.typeText("مسودة من الصفحة")
         XCTAssertTrue(app.staticTexts["المسودة محفوظة"].waitForExistence(timeout: 10)); capture(app, "M3-V06-editor-keyboard-L")
         app.buttons["diary-editor-hide-keyboard"].tap(); capture(app, "M3-V06-editor-L")
-        app.terminate(); app.launch(); XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); app.openDiaryEditorFromHome()
+        app.terminate(); app.launch(); XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25)); app.openDiaryEditorFromHome()
         XCTAssertTrue(text.waitForExistence(timeout: 10)); XCTAssertEqual(text.value as? String, "مسودة من الصفحة")
         app.buttons["diary-editor-photo"].tap()
         let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "إلغاء"])).firstMatch
@@ -101,12 +101,12 @@ import XCTest
         XCTAssertTrue(context.waitForExistence(timeout: 10), app.debugDescription)
         let media = app.descendants(matching: .any).matching(identifier: "diary-editor-saved-media").firstMatch
         XCTAssertTrue(media.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertEqual(app.buttons["diary-editor-cancel"].label, "إغلاق")
+        XCTAssertEqual(app.buttons["diary-editor-cancel"].label, "تمّ")
         XCTAssertEqual(app.buttons["diary-editor-save"].label, "احفظ الصفحة")
         capture(app, "OWNER-writing-context-media-L")
         app.buttons["diary-editor-cancel"].tap()
         app.closeDiaryDay()
-        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 10), app.debugDescription)
     }
     func testDayIsOneFlowWithTheWholeTranscriptAndInsertBetweenLines() throws {
         continueAfterFailure = false
@@ -202,7 +202,7 @@ import XCTest
         continueAfterFailure = false
         let app = XCUIApplication(); app.resetAuthorizationStatus(for: .microphone)
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
-        app.launch(); XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); app.openDiaryEditorFromHome(); app.buttons["diary-editor-record"].tap()
+        app.launch(); XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25)); app.openDiaryEditorFromHome(); app.buttons["diary-editor-record"].tap()
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let deny = springboard.alerts.buttons.matching(NSPredicate(format: "label IN %@", ["Don't Allow", "عدم السماح", "لا تسمح"])).firstMatch
         XCTAssertTrue(deny.waitForExistence(timeout: 10), springboard.debugDescription); deny.tap()

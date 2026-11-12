@@ -137,7 +137,7 @@ struct DiaryMediaCard: View {
                     .buttonStyle(.madarPlain).accessibilityIdentifier("diary-media-" + media.id.uuidString)
             }
             if let error { Text(error).font(MadarTypography.fine()) }
-        }.padding(.vertical, 10).padding(.leading, 58).padding(.trailing, 18)
+        }.padding(.vertical, 10).padding(.leading, DiaryDayMetrics.contentLeading).padding(.trailing, 18)
             .task(id: media.id) {
                 // Only a recording needs the voice controller; photos and files no longer each build one.
                 if voice == nil, media.kind == "audio" { voice = DiaryVoiceController(app: app) }

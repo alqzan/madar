@@ -57,6 +57,7 @@ struct DiaryHomeView: View {
     @State private var reader: GregorianDay?
     /// Set by the write buttons: the day page opens with the cursor already in its one writing field.
     @State private var focusReaderComposer = false
+    @State private var readerPrompt: String?
     @State private var pendingDiaryRootRequestID: UUID?
     @State private var readerEntryID: UUID?
     @State private var routedHubTab: String?
@@ -142,7 +143,7 @@ struct DiaryHomeView: View {
                     }
                     }
                     }
-                    DiaryQuestionsCard(app: app) { question in editor = .init(margin: nil, day: "today", prompt: question) }
+                    DiaryQuestionsCard(app: app) { question in writeToday(snapshot.today, prompt: question) }
                 } else if let failure {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(failure).font(DiaryType.writing)
@@ -203,14 +204,14 @@ struct DiaryHomeView: View {
                 .hidesRoomAccessory(app, id: "diary-editor-destination")
         }
         .navigationDestination(item: $reader) { day in
-            DiaryDayView(app: app, day: day, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID, embeddedInNavigationStack: true, focusComposerOnOpen: focusReaderComposer)
+            DiaryDayView(app: app, day: day, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID, embeddedInNavigationStack: true, focusComposerOnOpen: focusReaderComposer, prompt: readerPrompt)
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
                 .hidesRoomAccessory(app, id: "diary-day-destination")
         }
         .onChange(of: editor) { old, new in if old != nil, new == nil { editorDidDismiss() } }
         .onChange(of: reader) { old, new in
             if old != nil, new == nil {
-                readerEntryID = nil; readerEntryRouteID = nil; focusReaderComposer = false
+                readerEntryID = nil; readerEntryRouteID = nil; focusReaderComposer = false; readerPrompt = nil
                 applyPendingDiaryRootIfReady()
             }
         }
@@ -311,7 +312,7 @@ struct DiaryHomeView: View {
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
             Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
-            Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("التقويم").accessibilityIdentifier("diary-days")
+            Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("أيامك").accessibilityIdentifier("diary-days")
             Button { customizing = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                 .buttonStyle(.madarPlain).accessibilityLabel("خصّص المذكرات").accessibilityIdentifier("diary-customize")
         }.padding(.vertical, 4)
@@ -322,73 +323,6 @@ struct DiaryHomeView: View {
                 .padding(.horizontal, 10).frame(minHeight: 36)
                 .background { if service.preferredMatch == calendar { Capsule().fill(theme.surface.opacity(0.6)).glassEffect(.regular.interactive(), in: .capsule) } }
         }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-match-" + calendar.rawValue)
-    }
-    private func hero(_ snapshot: DiaryHomeSnapshot) -> some View {
-        let page = memory ?? snapshot.todayPage
-        let image = page.photo.flatMap(UIImage.init(data:))
-        let hasPhoto = image != nil && !typeSize.isAccessibilitySize
-        return ZStack(alignment: .bottomLeading) {
-            if let image, hasPhoto {
-                GeometryReader { geometry in Image(uiImage: image).resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped() }
-                LinearGradient(colors: [.black.opacity(0.08), .black.opacity(0.62)], startPoint: .top, endPoint: .bottom)
-            } else {
-                theme.surface
-                // Owner trial, 22 Oct 2026: a past page whose photos did not come with the import says so, instead of
-                // «صفحة تنتظر ما تعيشه», which reads as if nothing was lived that day.
-                let past = page.day != snapshot.today, missing = page.missingPhotos
-                // A page with words lets its words lead; the centred note would sit under a long excerpt (tour 25 Oct).
-                let worded = page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-                if !worded {
-                VStack(spacing: 12) {
-                    Image(systemName: past && missing > 0 ? "photo.on.rectangle.angled" : "book.closed").font(.system(size: 46, weight: .ultraLight))
-                    Text(past && missing > 0 ? (missing == 1 ? "صورة هذا اليوم لم تُنقل" : missing == 2 ? "صورتا هذا اليوم لم تُنقلا" : "صور هذا اليوم لم تُنقل") : past ? "من دفترك ذاك اليوم" : "صفحة تنتظر ما تعيشه").font(DiaryType.writing)
-                }
-                    .foregroundStyle(theme.color("ink3Text")).frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            }
-            VStack(alignment: .leading, spacing: 9) {
-                if !snapshot.selection.days.isEmpty {
-                    HStack(spacing: 5) {
-                        ForEach(snapshot.selection.days, id: \.description) { day in
-                            Capsule().fill(day == page.day ? (hasPhoto ? Color.white : theme.accent) : (hasPhoto ? Color.white.opacity(0.4) : theme.line)).frame(height: 3)
-                        }
-                    }.padding(.bottom, 1)
-                    HStack(spacing: 7) {
-                        ForEach(snapshot.selection.days, id: \.description) { day in
-                            Button { selected = day } label: {
-                                MadarDateLabel(yearTitle(day, snapshot: snapshot))
-                                    .frame(minWidth: 42, minHeight: 36).padding(.horizontal, 4)
-                                    .foregroundStyle(day == page.day ? theme.ink : hasPhoto ? .white : theme.ink)
-                                    .background(day == page.day ? theme.surface : hasPhoto ? Color.black.opacity(0.62) : theme.background, in: .capsule)
-                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-year-" + day.description)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                }
-                Spacer(minLength: 90)
-                HStack(spacing: 8) {
-                    Text(snapshot.selection.days.isEmpty ? "صفحتك الأولى" : service.distance(page.day, snapshot.today)).font(DiaryType.label)
-                        .padding(.horizontal, 9).padding(.vertical, 4).background(hasPhoto ? Color.black.opacity(0.3) : theme.background, in: .capsule)
-                    Text(service.weekday(page.day)).font(DiaryType.label)
-                }
-                Text(service.dateTitle(page.day, calendar: app.diaryFirstCalendar)).font(DiaryType.title)
-                Text(MadarInlineText.joined([service.dateTitle(page.day, calendar: app.diaryFirstCalendar == .gregorian ? .hijri : .gregorian)] + (page.place.map { [$0] } ?? [])))
-                    .font(DiaryType.label).opacity(hasPhoto ? 1 : 0.8)
-                Text(snapshot.selection.days.isEmpty && page.lines.isEmpty ? "اكتب ما تيسّر من يومك." : page.excerpt)
-                    .font(DiaryType.writing).lineSpacing(8).lineLimit(4).fixedSize(horizontal: false, vertical: true)
-            }.padding(16)
-        }
-        .foregroundStyle(hasPhoto ? .white : theme.ink)
-        .frame(minHeight: 250)
-        .frame(height: typeSize.isAccessibilitySize ? nil : app.string("notes.memorySize") == "medium" ? 280 : 403)
-        .clipShape(.rect(cornerRadius: 30))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("diary-memory")
-        .gesture(DragGesture(minimumDistance: 30).onEnded { value in
-            let days = snapshot.selection.days
-            guard let index = days.firstIndex(of: page.day), days.count > 1 else { return }
-            selected = days[(index + (value.translation.width < 0 ? 1 : days.count - 1)) % days.count]
-        })
     }
     /// OR-10: «هذا اليوم عبر السنين». Newest year first; a year with neither words nor a photo is skipped; a card opens that day.
     private func years(_ snapshot: DiaryHomeSnapshot) -> some View {
@@ -421,7 +355,7 @@ struct DiaryHomeView: View {
                         Text(service.distance(page.day, snapshot.today)).font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)).foregroundStyle(theme.color("accentText"))
                         Text(service.weekday(page.day)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     }
-                    MadarDateLabel(app.dateLabels(page.day, compact: true)).foregroundStyle(theme.color("ink3Text"))
+                    MadarDateLabel(app.dateLabels(page.day)).foregroundStyle(theme.color("ink3Text"))
                     Text(page.excerpt).font(.custom("thmanyahseriftext-Regular", size: 18, relativeTo: .body)).lineSpacing(6).lineLimit(3).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                     if let place = page.place { Label(place, systemImage: "mappin").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                     // Owner trial, 22 Oct: a photo the import did not carry is named, never invented.
@@ -436,23 +370,6 @@ struct DiaryHomeView: View {
                 .background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line) }
                 .contentShape(.rect(cornerRadius: 22))
         }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-year-" + page.day.description)
-    }
-    private func thatDay(_ day: DiaryDisplayDay) -> some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack { Text("ذاك اليوم").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)); Text("كتبه مدار وكتبته أنت").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")); Spacer() }
-            ForEach(Array(day.lines.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (app.bool("notes.showAutoSections") || !["salah", "quran"].contains($0.kind)) }.prefix(3))) { line in
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(service.time(line.at, zone: line.tzID)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).frame(width: 48, alignment: .leading)
-                    Text(line.markdown == true ? DayOneMarkdown.plain(line.text) : line.text).font(.custom("thmanyahseriftext-Regular", size: 16, relativeTo: .body)).italic().lineSpacing(5).fixedSize(horizontal: false, vertical: true)
-                        .foregroundStyle(line.kind == "normal" || line.kind == "late" ? theme.ink : theme.color("autoInkText"))
-                    Spacer(minLength: 0)
-                }
-            }
-            HStack(spacing: 8) {
-                pill("افتح اليوم كاملًا", id: "diary-open-memory") { reader = day.day }
-                pill("اكتب في هامشها", id: "diary-add-margin", ink: secondInk) { editor = .init(margin: day.day) }
-            }
-        }.padding(16).background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 1) }
     }
     private func since(_ day: DiaryDisplayDay) -> some View {
         let metrics = (try? service.comparisons(since: day.day)) ?? []
@@ -546,54 +463,48 @@ struct DiaryHomeView: View {
     }
     private func marginBar(_ day: DiaryDisplayDay, target: GregorianDay) -> some View {
         HStack(spacing: 8) {
-            HStack(spacing: 0) {
-                Button { reader = day.day } label: {
-                    VStack(alignment: .leading, spacing: 3) { Text("صفحة اليوم").font(MadarTypography.section()); Text(day.excerpt).font(DiaryType.label).lineLimit(2) }
-                        .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
-                }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-today")
-                Button { writeToday(day.day) } label: { Image(systemName: "plus").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
-                    .buttonStyle(.madarPlain).accessibilityLabel("اكتب في صفحة اليوم").accessibilityIdentifier("diary-write")
-            }.padding(.horizontal, 12).background(theme.surface, in: .capsule).glassEffect(.regular.interactive(), in: .capsule)
+            todayButton(day).frame(maxWidth: .infinity)
             Button { editor = .init(margin: target) } label: {
                 Label("اكتب في هامشها", systemImage: "pencil").font(MadarTypography.caption()).padding(.horizontal, 15).frame(minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-add-margin")
         }.padding(.horizontal, 14).padding(.vertical, 8).background(theme.background)
     }
     /// One place to write: today's page, with its field focused. The full page (camera, files, formatting) is one tap from there.
-    private func writeToday(_ day: GregorianDay) {
+    private func writeToday(_ day: GregorianDay, prompt: String? = nil) {
+        readerPrompt = prompt
         focusReaderComposer = true
         reader = day
     }
+    /// 12 Nov: one control (it used to be two that opened the same page). A tap opens today's page with the cursor in the composer;
+    /// the latest line and its time say what is already there.
     private func todayBar(_ day: DiaryDisplayDay) -> some View {
-        // FB-39 (FB-28): with nothing written today the bar is one clear action that opens the editor; «صفحة اليوم» opened an empty reader.
-        if day.lines.isEmpty && day.media.isEmpty && day.photo == nil && (try? service.travel(day.day)) == nil {
-            return AnyView(Button { writeToday(day.day) } label: {
-                Label("اكتب سطرك الأول اليوم", systemImage: "pencil").font(MadarTypography.section())
-                    .frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
-            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-write")
-                .padding(.horizontal, 14).padding(.vertical, 8).background(theme.background))
-        }
-        return AnyView(HStack(spacing: 10) {
-            Button { reader = day.day } label: {
-                VStack(alignment: .leading, spacing: 2) { Text("صفحة اليوم").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)); Text(day.lines.isEmpty ? "اكتب سطرك الأول" : "آخرها " + service.time(day.lines.last!.at)).font(DiaryType.label) }
-                    .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading).padding(.horizontal, 18)
-                    .background(theme.surface, in: .capsule).glassEffect(.regular.interactive(), in: .capsule)
-            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-today")
-            Button { writeToday(day.day) } label: { Label("اكتب", systemImage: "pencil").font(MadarTypography.section()).padding(.horizontal, 22).frame(minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }
-                .buttonStyle(.madarPlain).accessibilityIdentifier("diary-write")
-        }.padding(.horizontal, 14).padding(.vertical, 8).background(theme.background))
+        todayButton(day).padding(.horizontal, 14).padding(.vertical, 8).background(theme.background)
     }
-    private func pill(_ title: String, id: String, ink: Color? = nil, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Text(title).font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(ink ?? theme.ink).overlay { Capsule().stroke(ink ?? theme.line, lineWidth: 1) } }
-            .buttonStyle(.madarPlain).accessibilityIdentifier(id)
+    private func todayButton(_ day: DiaryDisplayDay) -> some View {
+        let travelling = (try? service.travel(day.day)) != nil
+        let empty = day.lines.isEmpty && day.media.isEmpty && day.photo == nil && !travelling
+        let latest = day.lines.last(where: { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+        return Button { writeToday(day.day) } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "pencil").font(.system(size: 18, weight: .semibold))
+                if empty {
+                    Text("اكتب سطرك الأول اليوم").font(MadarTypography.section())
+                } else {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("اكتب في صفحة اليوم").font(MadarTypography.section())
+                        if let latest {
+                            Text("آخرها " + service.time(latest.at, zone: latest.tzID) + "، " + (latest.markdown == true ? DayOneMarkdown.plain(latest.text) : latest.text))
+                                .font(DiaryType.label).lineLimit(1).opacity(0.85)
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
+            }.padding(.horizontal, 22).frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+                .foregroundStyle(theme.background).background(theme.ink, in: .capsule)
+        }.buttonStyle(.madarPlain).accessibilityIdentifier(empty ? "diary-write" : "diary-today")
     }
     private var blocks: [String] { DiaryHomeLayout(app.values["notes.layout"]).order }
     private func hidden(_ block: String) -> Bool { app.values["notes.layout"]?.object?["hidden"]?.array?.contains(.string(block)) == true }
-    private func yearTitle(_ day: GregorianDay, snapshot: DiaryHomeSnapshot) -> String {
-        let labels = service.dateLabels(day)
-        return labels.primary.split(separator: " ").suffix(2).joined(separator: " ") + "، " + labels.secondary.split(separator: " ").suffix(2).joined(separator: " ")
-    }
-
     private func refresh(retrying: Bool = false) async {
 #if DEBUG
         let environment = ProcessInfo.processInfo.environment

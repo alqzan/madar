@@ -4,7 +4,7 @@ import XCTest
         continueAfterFailure=false
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"editor","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00"]
         app.launch();XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout:25));app.buttons["diary-days"].tap()
-        let open=app.buttons["diary-export"];for _ in 0..<4 where !open.isHittable {app.swipeUp()};open.tap()
+        app.buttons["diary-hub-more"].tap();let open=app.buttons["diary-export"];open.tap()
         XCTAssertTrue(app.buttons["diary-export-prepare"].waitForExistence(timeout:10));capture(app,"M3-V10-export-L")
         let yearPicker=app.buttons["diary-export-year"];yearPicker.tap()
         let pairedYears=app.buttons.matching(NSPredicate(format:"label CONTAINS 'هـ' AND label CONTAINS ' م'"))

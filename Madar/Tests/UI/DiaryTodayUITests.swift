@@ -7,10 +7,10 @@ import XCTest
     func testFirstOpenShowsTodayDirectlyAndKeyboardOpensWithoutWelcome() throws {
         continueAfterFailure = false
         let app = launch("welcome")
-        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25), app.debugDescription)
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25), app.debugDescription)
         XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
         app.terminate(); app.launch()
-        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25)); XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
         app.openDiaryEditorFromHome(); XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))
     }
     func testRestoredDiaryOpensWithoutWelcomeAndNamesItsMissingPhoto() throws {
@@ -21,7 +21,7 @@ import XCTest
         let excerpt = app.staticTexts.matching(NSPredicate(format: "label == %@", "ذكرى مستوردة بقيت بتاريخها")).firstMatch
         XCTAssertTrue(excerpt.exists)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "صورة هذا اليوم لم تُنقل")).firstMatch.exists)
-        let write = app.buttons["diary-write"]
+        let write = app.diaryOpener
         XCTAssertTrue(write.isHittable, "The writing bar is reachable above the bottom of the screen")
         XCTAssertLessThanOrEqual(write.frame.maxY, app.frame.maxY, "Writing stays on screen")
         capture(app, "M3-restored-diary-L")

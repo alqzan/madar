@@ -16,7 +16,7 @@ import XCTest
         app.buttons["diary-echo-1m"].tap()
         XCTAssertTrue(app.staticTexts["قهوة وحديث طويل مع أخي."].waitForExistence(timeout: 10))
         app.closeDiaryDay()
-        XCTAssertTrue(app.buttons["diary-write"].isHittable)
+        XCTAssertTrue(app.diaryOpener.isHittable)
         capture(app, "M3-V02-echoes-scrolled-L")
     }
     private func capture(_ app: XCUIApplication, _ name: String) {

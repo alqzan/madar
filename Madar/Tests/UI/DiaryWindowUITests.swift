@@ -31,7 +31,7 @@ import XCTest
         rootLink.tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 5), "The root route must wait while a diary editor owns a draft.\n" + app.debugDescription)
         app.buttons["diary-editor-save"].tap()
-        let write = app.buttons["diary-write"]
+        let write = app.diaryOpener
         XCTAssertTrue(write.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(write.isHittable, app.debugDescription)
         XCTAssertFalse(editor.exists)
@@ -85,8 +85,8 @@ import XCTest
         let app = launch("home", rootRouteHarness: true)
         let days = app.buttons["diary-days"]
         XCTAssertTrue(days.waitForExistence(timeout: 8), app.debugDescription); days.tap()
+        app.buttons["diary-hub-more"].tap()
         let yearbook = app.buttons["diary-yearbook"]
-        for _ in 0..<8 where !yearbook.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(yearbook.isHittable, app.debugDescription); yearbook.tap()
         let bookRoot = app.buttons["diary-book-root-route"]
         XCTAssertTrue(bookRoot.waitForExistence(timeout: 8), app.debugDescription); bookRoot.tap()
@@ -94,8 +94,8 @@ import XCTest
         XCTAssertFalse(app.buttons["diary-book-close"].exists, app.debugDescription)
 
         app.buttons["diary-days"].tap()
+        app.buttons["diary-hub-more"].tap()
         let export = app.buttons["diary-export"]
-        for _ in 0..<8 where !export.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(export.isHittable, app.debugDescription); export.tap()
         let exportRoot = app.buttons["diary-export-root-route"]
         XCTAssertTrue(exportRoot.waitForExistence(timeout: 8), app.debugDescription); exportRoot.tap()
@@ -285,47 +285,31 @@ import XCTest
         app.open(URL(string: "madar://notes/letter/33333333-3333-4333-8333-333333333331")!)
         XCTAssertTrue(app.buttons["diary-letter-open"].waitForExistence(timeout: 15), app.debugDescription)
         app.buttons["diary-letter-done"].tap()
-        XCTAssertTrue(app.buttons["diary-hub-memories"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["diary-hub-timeline"].waitForExistence(timeout: 10), app.debugDescription)
         app.open(URL(string: "madar://notes")!)
-        XCTAssertTrue(app.buttons["diary-hub-memories"].waitForNonExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(app.buttons["diary-hub-timeline"].waitForNonExistence(timeout: 12), app.debugDescription)
         XCTAssertTrue(app.staticTexts["diary-home-title"].exists, app.debugDescription)
         app.terminate()
     }
-    func testMemoriesReadFailureCanRetryInTheArchive() throws {
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters",
-            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00",
-            "MADAR_UI_DIARY_MEMORIES_READ_FAILURE_ONCE": "1"]
-        app.launch(); XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 25), app.debugDescription)
-        app.open(URL(string: "madar://notes/letters")!)
-        let memories = app.buttons["diary-hub-memories"]
-        XCTAssertTrue(memories.waitForExistence(timeout: 15), app.debugDescription)
-        memories.tap()
-        XCTAssertTrue(app.staticTexts["diary-hub-memory-error"].waitForExistence(timeout: 10), app.debugDescription)
-        app.buttons["diary-hub-memories-retry"].tap()
-        XCTAssertTrue(app.staticTexts["diary-hub-memory-error"].waitForNonExistence(timeout: 10), app.debugDescription)
-        app.terminate()
-    }
-    /// OR-13: a heading and bold written with the editor's tools show formatted on the page, never as raw marks.
-    func testEditorHeadingAndBoldShowFormatted() throws {
+    /// OR-13 (12 Nov): the editor's tools never leave raw Markdown marks in the text. Heading, bold and italic were removed because a plain text field
+    /// cannot show them formatted; the list and time tools stay and write plain text.
+    func testEditorToolsLeaveNoRawMarks() throws {
         continueAfterFailure = false
         let app = launch("home")
         app.openDiaryEditorFromHome()
         let editor = app.textViews["diary-editor-text"]; XCTAssertTrue(editor.waitForExistence(timeout: 10))
         func waitValue(_ contains: String) { _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", contains), object: editor)], timeout: 8) }
-        // The text view's accessibility value lags programmatic edits, so the result is checked on the saved page.
         editor.tap(); editor.typeText("مساء هادئ"); waitValue("مساء هادئ")
-        app.buttons["diary-editor-format"].tap(); app.buttons["diary-editor-heading"].tap()
-        editor.typeText("\nكان يومًا طويلًا"); waitValue("طويلًا")
-        app.buttons["diary-editor-format"].tap(); app.buttons["diary-editor-bold"].tap()
+        app.buttons["diary-editor-format"].tap()
+        XCTAssertFalse(app.buttons["diary-editor-bold"].exists || app.buttons["diary-editor-italic"].exists || app.buttons["diary-editor-heading"].exists, "No tool may insert raw Markdown marks.")
+        app.buttons["سطر في قائمة"].tap()
+        editor.typeText("كان يومًا طويلًا"); waitValue("طويلًا")
         capture(app, "OR-13-editor-tools-L")
         app.buttons["diary-editor-save"].tap()
-        // Saving returns to today's page, which already shows the line.
         let line = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "كان يومًا طويلًا")).firstMatch
         XCTAssertTrue(line.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(line.label.contains("*") || line.label.contains("#"), line.label)
         XCTAssertTrue(line.label.contains("مساء هادئ"), line.label)
-        capture(app, "OR-13-formatted-page-L")
     }
     func testFirstDayHasWorkingOneTapKeyboardAndCancelWritesNothing() throws {
         continueAfterFailure = false
@@ -339,7 +323,7 @@ import XCTest
         app.buttons["diary-editor-cancel"].tap()
         app.closeDiaryDay()
         // An empty day offers one «اكتب» action and no page to read; the closed draft wrote nothing visible.
-        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["لن يحفظ"].exists)
     }
     private func capture(_ app: XCUIApplication, _ name: String) {

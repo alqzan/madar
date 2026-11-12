@@ -10,6 +10,8 @@ struct DiaryDayView: View {
     var embeddedInNavigationStack = false
     /// The write buttons on the home open this page with the cursor in the composer.
     var focusComposerOnOpen = false
+    /// A question chosen on the home: shown above the composer, never saved into the text.
+    var prompt: String? = nil
     /// A day opened from the archive, search or a week is already inside that screen: it does not offer the same screens again on top of themselves.
     var showsNavigationTools = true
     @Environment(\.roomTheme) private var roomTheme
@@ -21,13 +23,13 @@ struct DiaryDayView: View {
     @State private var highlightGeneration = 0
     @State private var failure: String?
     @State private var writing = false
+    @State private var promptDismissed = false
     @State private var insertAt: Date?
     @State private var anchorLabel: String?
     @State private var inlineEdit: DiaryLineEdit?
     @State private var focusTick = 0
     @State private var retry = 0
     @State private var intentions: [DiaryIntention] = []
-    @State private var arc: DiaryDayArc?
     @State private var intentionsOpen = false
     @State private var niyyaSaved = false
     @State private var niyyaToken: UUID?
@@ -66,23 +68,6 @@ struct DiaryDayView: View {
     private var friday: Bool { appearance?.friday == true && travel == nil }
     private var shownDay: GregorianDay { selected ?? day }
     private var fridayStyle: DiaryFridayStyle { DiaryFridayStyle(app) }
-    /// OR-16: the Friday title wears the look chosen in the diary settings.
-    @ViewBuilder private var fridayOrnament: some View {
-        switch fridayStyle {
-        case .ribbon: DiaryFridayFrame().stroke(theme.accent.opacity(0.65), lineWidth: 0.7).padding(.horizontal, 12)
-        case .mihrab:
-            ZStack(alignment: .top) {
-                DiaryMihrabShape().stroke(theme.accent.opacity(0.55), lineWidth: 1).padding(.horizontal, 56);
-                DiaryStarShape().fill(theme.accent).frame(width: 22, height: 22).padding(.top, 16)
-            }.accessibilityHidden(true).accessibilityIdentifier("diary-friday-mihrab")
-        case .medallion:
-            ZStack {
-                Circle().stroke(theme.accent.opacity(0.6), lineWidth: 1);
-                DiaryStarShape().fill(theme.accent).frame(width: 18, height: 18)
-            }.frame(width: 36, height: 36).frame(maxHeight: .infinity, alignment: .top).accessibilityHidden(true)
-                .accessibilityIdentifier("diary-friday-medallion")
-        }
-    }
     private var service: AppDiaryService { AppDiaryService(app: app) }
     private var canReadDiary: Bool { app.protectedDataAuthorized }
     private var pageReloadID: String {
@@ -135,45 +120,7 @@ struct DiaryDayView: View {
                         page: travel, subtitle: service.bothDates(shownDay, calendar: first),
                         distance: service.kilometres(travel.kilometres), digits: service.digits)
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(
-                            service.weekday(shownDay) + "، "
-                                + (first == .gregorian && appearance?.night == true ? "ليلة " : "")
-                                + service.dateTitle(
-                                    first == .gregorian ? appearance?.hijriDisplayDay ?? shownDay : shownDay,
-                                    calendar: first == .hijri ? .gregorian : .hijri)
-                                + (friday ? "، " + service.dateTitle(shownDay, calendar: first) : "")
-                        )
-                        .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier(
-                            "diary-day-secondary-date")
-                        // OR-12: the date and its three tabs share one row, as the canonical today page; «حتى الآن» left (lighter header).
-                        let title = Text(
-                            friday
-                                ? "جمعة مباركة"
-                                : (first == .hijri && appearance?.night == true ? "ليلة " : "")
-                                    + service.dateTitle(
-                                        first == .hijri ? appearance?.hijriDisplayDay ?? shownDay : shownDay,
-                                        calendar: first)
-                        ).foregroundStyle(friday ? theme.accent : theme.ink).font(
-                            .custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .largeTitle)
-                        ).lineLimit(1).minimumScaleFactor(0.7).accessibilityIdentifier("diary-day-title")
-                        if friday {
-                            title
-                        } else {
-                            ViewThatFits(in: .horizontal) {
-                                HStack(alignment: .bottom, spacing: 8) {
-                                    title; Spacer(minLength: 4); tabs
-                                }
-                                VStack(alignment: .leading, spacing: 8) {
-                                    title; tabs
-                                }
-                            }
-                        }
-                    }.padding(.horizontal, 18).padding(.vertical, 10).frame(
-                        maxWidth: .infinity, alignment: friday ? .center : .leading
-                    ).padding(.top, friday && fridayStyle != .ribbon ? 34 : 0).background {
-                        if friday { fridayOrnament }
-                    }
+                    DiaryDayHeader(app: app, theme: theme, shownDay: shownDay, today: today, yearAgo: aYearAgo, appearance: appearance, friday: friday, selected: $selected)
                 }
                 if let returnDay, !returnDismissed {
                     VStack(alignment: .leading, spacing: 8) {
@@ -215,9 +162,6 @@ struct DiaryDayView: View {
                         letter: waitingLetter, digitsTitle: service.diaryDates(waitingLetter.writtenDay)
                     ) { openingLetter = waitingLetter }.padding(.horizontal, 18).padding(.vertical, 6)
                 }
-                if shownDay == today, travel == nil, let arc {
-                    DiaryDayArcView(arc: arc).padding(.horizontal, 18).padding(.top, 2)
-                }
                 if intentionsOpen {
                     DiaryIntentionsView(app: app, day: shownDay, evening: service.intentionEvening(shownDay), inline: true, onClose: { intentionsOpen = false })
                         .environment(\.roomTheme, theme).padding(.horizontal, 12)
@@ -238,7 +182,7 @@ struct DiaryDayView: View {
                                 }
                             }.frame(maxWidth: .infinity, alignment: .leading);
                             Image(systemName: "chevron.backward").font(.caption)
-                        }.padding(.horizontal, 18).frame(minHeight: 54).contentShape(.rect)
+                        }.padding(.horizontal, 18).frame(minHeight: 40).contentShape(.rect)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-niyya-open")
                 }
                 GeometryReader { geometry in
@@ -258,7 +202,7 @@ struct DiaryDayView: View {
                                         ForEach(attached.filter { $0.kind != "missing" }) { media in
                                             DiaryMediaCard(app: app, media: media, transcript: line.text)
                                                 .overlay(alignment: .topLeading) {
-                                                    if media.kind == "audio" { Text(service.time(line.at, zone: line.tzID)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 38).padding(.leading, 6).padding(.top, 20) }
+                                                    if media.kind == "audio" { Text(service.time(line.at, zone: line.tzID)).font(DiaryType.label).lineLimit(1).minimumScaleFactor(0.92).foregroundStyle(theme.color("ink3Text")).frame(width: DiaryDayMetrics.timeColumn).padding(.leading, 6).padding(.top, 20) }
                                                 }
                                                 .id(hasAudio ? "diary-entry-" + line.id : media.id.uuidString)
                                                 // 10 Nov owner: a photo or recording is as free as a line — hold it to delete, copy or write after it.
@@ -273,7 +217,7 @@ struct DiaryDayView: View {
                                     }
                                     ForEach(0..<sealedHere, id: \.self) { _ in
                                         HStack(alignment: .center, spacing: 12) {
-                                            DiaryEnvelope(sealed: true).frame(width: 38, height: 26)
+                                            DiaryEnvelope(sealed: true).frame(width: DiaryDayMetrics.timeColumn, height: 26)
                                             Text("رسالة مختومة تُفتح في وقتها، ولا تُقرأ قبله").font(DiaryType.writing)
                                                 .redacted(reason: .placeholder).blur(radius: 2.2).accessibilityHidden(
                                                     true)
@@ -328,7 +272,7 @@ struct DiaryDayView: View {
                                             .glassEffect(.regular.interactive(), in: .capsule)
                                     }
                                     .buttonStyle(.madarPlain)
-                                    .padding(.horizontal, 18).padding(.top, 8)
+                                    .padding(.leading, DiaryDayMetrics.contentLeading).padding(.trailing, 18).padding(.top, 8)
                                     .accessibilityIdentifier("diary-ai-analysis")
                                 }
                                 Spacer(minLength: 70)
@@ -336,18 +280,14 @@ struct DiaryDayView: View {
                                 minHeight: geometry.size.height, alignment: .topLeading
                             ).background {
                                 Canvas { context, size in
-                                    var rules = Path()
-                                    for y in stride(from: 14.0, through: size.height, by: 34) {
-                                        rules.move(to: .init(x: 0, y: y)); rules.addLine(to: .init(x: size.width, y: y))
-                                    }
-                                    context.stroke(rules, with: .color(theme.line), lineWidth: 0.7)
+                                    // Entries differ in height, so a fixed grid of rules cut through letters: each line row draws its own rule instead.
                                     if shownDay == today, travel == nil {
                                         // The flow's rail: one thin line beside the times, the way the day runs (RTL: the time column is on the right).
-                                        var rail = Path(); rail.move(to: .init(x: size.width - 50, y: 8)); rail.addLine(to: .init(x: size.width - 50, y: size.height - 70))
+                                        var rail = Path(); rail.move(to: .init(x: size.width - DiaryDayMetrics.marginX, y: 8)); rail.addLine(to: .init(x: size.width - DiaryDayMetrics.marginX, y: size.height - 70))
                                         context.stroke(rail, with: .color(theme.accent.opacity(0.35)), lineWidth: 1)
                                     }
-                                    var margin = Path(); margin.move(to: .init(x: size.width - 50, y: 0));
-                                    margin.addLine(to: .init(x: size.width - 50, y: size.height))
+                                    var margin = Path(); margin.move(to: .init(x: size.width - DiaryDayMetrics.marginX, y: 0));
+                                    margin.addLine(to: .init(x: size.width - DiaryDayMetrics.marginX, y: size.height))
                                     context.stroke(margin, with: .color(theme.color("margin")), lineWidth: 1)
                                 }
                             }
@@ -397,6 +337,14 @@ struct DiaryDayView: View {
                         UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
                             .accessibilityIdentifier("diary-day-undo")
                     }
+                    if inlineWriting, let prompt, !promptDismissed {
+                        HStack(alignment: .top, spacing: 8) {
+                            Text(prompt).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).foregroundStyle(theme.color("ink3Text"))
+                                .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("diary-day-prompt")
+                            Button { promptDismissed = true } label: { Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44).contentShape(Rectangle()) }
+                                .buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text")).accessibilityLabel("أخفِ السؤال")
+                        }.padding(.horizontal, 22)
+                    }
                     if inlineWriting {
                         DiaryInlineComposer(app: app, insertAt: $insertAt, anchor: $anchorLabel, edit: $inlineEdit, focusTick: $focusTick,
                                             editorOpen: writing, openEditor: { insertAt = nil; anchorLabel = nil; writing = true }, saved: { Task { await refreshLines() } })
@@ -443,8 +391,8 @@ struct DiaryDayView: View {
                         Button {
                             archiveOpen = true
                         } label: {
-                            Image(systemName: "book.closed")
-                        }.accessibilityLabel("أيامك")
+                            Image(systemName: "calendar")
+                        }.accessibilityLabel("أيامك").accessibilityIdentifier("diary-day-archive")
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -505,10 +453,7 @@ struct DiaryDayView: View {
             }
             .sheet(isPresented: $stampsOpen) { DiaryStampsView(app: app).environment(\.roomTheme, theme) }
             .sheet(isPresented: $weekOpen) { DiaryWeekView(app: app, day: shownDay).environment(\.roomTheme, theme) }
-            .navigationDestination(isPresented: $writing) {
-                DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay, insertAt: insertAt, embeddedInNavigationStack: true)
-                    .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
-            }
+            .navigationDestination(isPresented: $writing) { editorDestination }
             // N04: letters are checked when the diary is open and the app comes to the foreground.
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { followToday(); aiAvailability = .checking; retry += 1 }
@@ -535,7 +480,6 @@ struct DiaryDayView: View {
                         try await Task.sleep(for: .seconds(30)); displayNow = service.clock(); followToday()
                         // One failed read must not end the loop: it is what moves an open page on at the day boundary.
                         if let fresh = try? service.appearance(shownDay) { appearance = fresh }
-                        arc = service.dayArc(shownDay)
                     } catch { break }
                 }
             }
@@ -553,6 +497,11 @@ struct DiaryDayView: View {
             }
     }
 
+    private var editorDestination: some View {
+        DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay, insertAt: insertAt, embeddedInNavigationStack: true)
+            .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
+            .hidesRoomAccessory(app, id: "diary-editor-from-day")
+    }
     /// After a line or photo is added only the page's lines are read again; closed-day preparation, letters and the AI check stay as they were.
     @MainActor private func refreshLines() async {
         guard canReadDiary else { return }
@@ -560,7 +509,7 @@ struct DiaryDayView: View {
         do {
             let fresh = try await service.dayOffMain(target)
             guard target == shownDay, canReadDiary else { return }
-            page = fresh; arc = service.dayArc(target); echo = nil
+            page = fresh; echo = nil
         } catch is CancellationError {
         } catch { failure = madarUserMessage(error) }
     }
@@ -582,7 +531,6 @@ struct DiaryDayView: View {
             guard canReadDiary, displayPage.day == shownDay else { return }
             page = displayPage
             intentions = try service.intentions(shownDay)
-            arc = service.dayArc(shownDay)
             appearance = try service.appearance(shownDay)
             displayNow = service.clock()
             echo = nil
@@ -704,27 +652,6 @@ struct DiaryDayView: View {
             GregorianDay.containing($0, in: app.activePlace.timeZone)
         } ?? today.adding(days: -365)
     }
-    private var tabs: some View {
-        HStack(spacing: 4) {
-            dateChoice("اليوم", id: "today", value: today)
-            dateChoice("أمس", id: "yesterday", value: today.adding(days: -1))
-            dateChoice("قبل سنة", id: "year", value: aYearAgo)
-        }.fixedSize()
-    }
-    private func dateChoice(_ title: String, id: String, value: GregorianDay) -> some View {
-        Button {
-            selected = value
-        } label: {
-            Text(title).font(DiaryType.label).frame(minHeight: 44).padding(.horizontal, 10).background(
-                shownDay == value ? theme.surface : .clear, in: .rect(topLeadingRadius: 10, topTrailingRadius: 10)
-            ).overlay {
-                UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10).stroke(
-                    shownDay == value ? theme.color("ink3Text") : theme.line)
-            }
-        }
-        .buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-" + id).accessibilityAddTraits(
-            shownDay == value ? .isSelected : [])
-    }
     /// Arabic counted noun: يوم واحد، يومان، ٣–١٠ أيام، ١١–٩٩ يومًا، ١٠٠ يوم.
     private func dayCount(_ n: Int) -> String {
         if n == 1 { return "يوم واحد" }; if n == 2 { return "يومان" }
@@ -769,7 +696,7 @@ struct DiaryDayView: View {
             guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { return false }
             do { try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", day: "today", writingDay: shownDay, assetID: asset.localIdentifier); await refreshLines(); return true }
             catch { failure = madarUserMessage(error); return false }
-        }.padding(.horizontal, 18).padding(.bottom, 10).accessibilityIdentifier("diary-day-photo-strip")
+        }.padding(.leading, DiaryDayMetrics.contentLeading).padding(.trailing, 18).padding(.bottom, 10).accessibilityIdentifier("diary-day-photo-strip")
     }
     /// 10 Nov owner: no permanent «اكتب هنا» between every item. Any line is the place to write: its menu (or a tap on a room's own line) writes right after it, in time.
     private func writeAfter(_ line: DiaryDisplayLine, page: DiaryDisplayDay) {
@@ -790,9 +717,8 @@ struct DiaryDayView: View {
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
         let auto = ["salah", "quran", "mihbara", "mal", "habits"].contains(line.kind)
         return HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(service.time(line.at, zone: line.tzID)).font(
-                .custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)
-            ).foregroundStyle(theme.color("ink3Text")).frame(width: 38, alignment: .center).accessibilityIdentifier(
+            Text(service.time(line.at, zone: line.tzID)).font(DiaryType.label).lineLimit(1).minimumScaleFactor(0.92)
+                .foregroundStyle(theme.color("ink3Text")).frame(width: DiaryDayMetrics.timeColumn, alignment: .center).accessibilityIdentifier(
                 "diary-day-line-time")
             VStack(alignment: .leading, spacing: 5) {
                 // OR-12: the room's name follows its line, small and in the same light ink («· الصلاة»), as the canonical.
@@ -840,7 +766,7 @@ struct DiaryDayView: View {
             }
             .contextMenu { lineActions(line, page: page) }.padding(.leading, 6).padding(.trailing, travel == nil || typeSize.isAccessibilitySize ? 18 : 92).padding(
                 .vertical, 10
-            ).frame(minHeight: 34)
+            ).frame(minHeight: 34).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 0.7) }
     }
     @ViewBuilder private func lineActions(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
         if inlineWriting {
@@ -848,7 +774,7 @@ struct DiaryDayView: View {
         }
         if !line.text.isEmpty { Button("انسخ", systemImage: "doc.on.doc") { UIPasteboard.general.string = line.text } }
         if page.editable.contains(line.id) {
-            Button("عدّل السطر", systemImage: "pencil") { editing = .init(id: line.id, text: line.text) }
+            Button("عدّل السطر", systemImage: "pencil") { editLine(line) }
         }
         if page.deletable.contains(line.id), let id = UUID(uuidString: line.id) {
             Button(role: .destructive) {
@@ -885,6 +811,15 @@ struct DiaryDayView: View {
     }
 }
 
+
+/// The day page's paper: one column for the time and the margin line right after it, the text after that.
+enum DiaryDayMetrics {
+    static let timeColumn: CGFloat = 46
+    /// Distance of the red margin line from the leading (right, RTL) edge: after the 6 pt inset and the time column.
+    static let marginX: CGFloat = 58
+    /// Where free content (photo strip, buttons) starts so it never crosses the margin line.
+    static let contentLeading: CGFloat = 70
+}
 
 /// A value kept across redraws that is not itself observed: the page renews it at known moments.
 final class TodayBox { var value: GregorianDay? }

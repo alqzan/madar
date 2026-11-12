@@ -98,9 +98,12 @@ struct DiarySearchView: View {
                     } else if let index {
                         if index.documents.isEmpty { Text("لم تكتب شيئًا بعد. تظهر هنا نتائج بحثك حين تكتب أول يوم.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 12) }
                         else { ForEach(["العام الماضي","صور","هوامش"],id:\.self) { example in Button {beginSearch(example)} label:{Text(example).font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).padding(16).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}}.buttonStyle(.madarPlain) } }
-                        Text("فهرس الكتاب").font(DiaryType.heading).foregroundStyle(theme.accent).padding(.top,12)
-                        if index.terms.isEmpty {Text("تظهر هنا الأماكن والوسوم التي استخدمتها.").font(DiaryType.writing)}
-                        ForEach(index.terms,id:\.1) { name,filter,count in Button {beginSearch(filter)} label:{HStack{Text(name).font(DiaryType.writing);Rectangle().fill(theme.line).frame(height:1);Text(PrayerCopy.days(count, digits: service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.frame(minHeight:44)}.buttonStyle(.madarPlain) }
+                        // The app has no way to add tags (only imports carry them), so no tag filter is offered; places show only when some exist.
+                        let places = index.terms.filter { !$0.1.hasPrefix("#") }
+                        if !places.isEmpty {
+                            Text("الأماكن").font(DiaryType.heading).foregroundStyle(theme.accent).padding(.top,12)
+                            ForEach(places,id:\.1) { name,filter,count in Button {beginSearch(filter)} label:{HStack{Text(name).font(DiaryType.writing);Rectangle().fill(theme.line).frame(height:1);Text(PrayerCopy.days(count, digits: service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.frame(minHeight:44)}.buttonStyle(.madarPlain) }
+                        }
                     } else if failure == nil {
                         ProgressView("نجهّز فهرس مذكراتك…").font(DiaryType.label).padding(.vertical, 12).accessibilityIdentifier("diary-search-index-loading")
                     }

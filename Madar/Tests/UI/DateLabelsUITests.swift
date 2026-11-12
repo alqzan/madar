@@ -5,7 +5,7 @@ import XCTest
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "editor", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
-        app.launch(); XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 20)); capture(app, "UX-11-diary-L")
+        app.launch(); XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 20)); capture(app, "UX-11-diary-L")
         app.buttons["tab-foundation"].tap()
         let date = app.descendants(matching: .any).matching(identifier: "bahw-date").firstMatch
         XCTAssertTrue(date.waitForExistence(timeout: 10)); XCTAssertTrue(date.label.contains("١٤٤٨")); XCTAssertTrue(date.label.contains("٢٠٢٦"))

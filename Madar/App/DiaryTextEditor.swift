@@ -60,9 +60,10 @@ struct DiaryTextEditor: View {
             writingDay = (try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()).map { initialDay == "yesterday" ? $0.adding(days: -1) : $0 }
             do { if let draft = try AppDiaryService(app: app).draft(margin: margin) { draftID = draft.id; hasDraftRecord = true; text = draft.text
                 // 10 Nov owner report: a draft left on an old day used to pull the writer back to that day. Only today and the late-writing «أمس» keep their own page; anything older moves to the page chosen now.
-                if let today = writingDay?.adding(days: initialDay == "yesterday" ? 1 : 0), draft.writingDay >= today.adding(days: -1) { day = draft.day; writingDay = draft.writingDay } else { day = initialDay }; draftStatus = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "مسودة مستعادة" } }
+                if let today = writingDay?.adding(days: initialDay == "yesterday" ? 1 : 0), draft.writingDay >= today.adding(days: -1) { day = draft.day; writingDay = draft.writingDay } else { day = initialDay }; // «مستعادة» is for a real recovery only: a draft left on an earlier day. Words moved here from the page's composer a moment ago are not "recovered".
+                draftStatus = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : (draft.writingDay < (currentMadarDay ?? (try? AppDiaryService(app: app, clock: { app.prayerNow() }).currentDay()) ?? draft.writingDay) ? "مسودة مستعادة" : "") } }
             catch { failure = madarUserMessage(error) }
-            // AU-38: let the restored text's onChange pass first, so «مسودة مستعادة» stays until the user types.
+            // AU-38: let the restored text's onChange pass first, so the status stays until the user types.
             await Task.yield()
             loaded = true
             refreshSavedDay()
@@ -242,11 +243,8 @@ struct DiaryTextEditor: View {
                         Menu {
                             Button { insertAtCursor(AppDiaryService(app: app).time(app.prayerNow()) + " ") } label: { Label("أدرج الوقت", systemImage: "clock") }
                             Button { insertAtCursor("• ") } label: { Label("سطر في قائمة", systemImage: "list.bullet") }
-                            Button { heading() } label: { Label("عنوان", systemImage: "textformat.size") }.accessibilityIdentifier("diary-editor-heading")
-                            Button { wrap("**") } label: { Label("خط عريض", systemImage: "bold") }.accessibilityIdentifier("diary-editor-bold")
-                            Button { wrap("*") } label: { Label("خط مائل", systemImage: "italic") }.accessibilityIdentifier("diary-editor-italic")
-                        } label: { Image(systemName: "textformat").frame(width: 44, height: 44).contentShape(Rectangle()) }
-                            .accessibilityLabel("التنسيق").accessibilityIdentifier("diary-editor-format")
+                                                    } label: { Image(systemName: "textformat").frame(width: 44, height: 44).contentShape(Rectangle()) }
+                            .accessibilityLabel("أدوات الكتابة").accessibilityIdentifier("diary-editor-format")
                         if focused { Button { focused = false } label: { Image(systemName: "keyboard.chevron.compact.down").frame(width: 44, height: 44) }.accessibilityLabel("أخفِ لوحة الكتابة").accessibilityIdentifier("diary-editor-hide-keyboard") }
                     }.padding(.horizontal, 16) }.scrollBounceBehavior(.basedOnSize)
                 }
@@ -273,10 +271,10 @@ struct DiaryTextEditor: View {
                 if let failure { Text(failure).font(MadarTypography.caption()).padding(12).accessibilityIdentifier("diary-editor-error") }
             }
             .foregroundStyle(theme.ink).background(theme.background)
-            .navigationTitle(margin == nil ? "صفحة اليوم" : "اكتب في هامشها").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(margin == nil ? "الورقة الكاملة" : "اكتب في هامشها").navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {
-                    Button("إغلاق") { Task { await close() } }.disabled(saving || importing || voice?.savingAudio == true || voice?.converting == true).accessibilityIdentifier("diary-editor-cancel")
+                    Button("تمّ") { Task { await close() } }.disabled(saving || importing || voice?.savingAudio == true || voice?.converting == true).accessibilityIdentifier("diary-editor-cancel")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(saving ? "يُحفظ…" : "احفظ الصفحة") { Task { await save() } }.fontWeight(.bold)
@@ -293,20 +291,6 @@ struct DiaryTextEditor: View {
         }
         return text.count..<text.count
     }
-    /// Emphasis around the selection; with no selection, around the word just written (write the word, then tap B).
-    private func wrap(_ mark: String) {
-        var r = selectedOffsets
-        if r.isEmpty {
-            let chars = Array(text); var start = r.lowerBound
-            while start > 0, !chars[start - 1].isWhitespace, chars[start - 1] != "*" { start -= 1 }
-            r = start..<r.lowerBound
-        }
-        let lower = text.index(text.startIndex, offsetBy: r.lowerBound), upper = text.index(text.startIndex, offsetBy: r.upperBound)
-        let inner = String(text[lower..<upper])
-        text.replaceSubrange(lower..<upper, with: mark + inner + mark)
-        let start = text.index(text.startIndex, offsetBy: r.lowerBound + mark.count), end = text.index(start, offsetBy: inner.count)
-        selection = TextSelection(range: start..<end); focused = true
-    }
     /// Text goes where the cursor is, on its own line; an empty page or a line already empty takes no extra line break.
     private func insertAtCursor(_ piece: String) {
         let offset = min(text.count, selectedOffsets.upperBound)
@@ -314,17 +298,6 @@ struct DiaryTextEditor: View {
         let lead = (at == text.startIndex || text[..<at].last == "\n") ? "" : "\n"
         text.insert(contentsOf: lead + piece, at: at)
         selection = TextSelection(insertionPoint: text.index(text.startIndex, offsetBy: offset + lead.count + piece.count)); focused = true
-    }
-    /// The cursor's line becomes a heading, or stops being one.
-    private func heading() {
-        let at = text.index(text.startIndex, offsetBy: selectedOffsets.lowerBound)
-        let lineStart = text[..<at].lastIndex(of: "\n").map { text.index(after: $0) } ?? text.startIndex
-        let offset = selectedOffsets.lowerBound, removing = text[lineStart...].hasPrefix("## ")
-        if removing { text.removeSubrange(lineStart..<text.index(lineStart, offsetBy: 3)) }
-        else { text.insert(contentsOf: "## ", at: lineStart) }
-        // A fresh cursor in the new text; the old selection's indices belong to the text before the change.
-        selection = TextSelection(insertionPoint: text.index(text.startIndex, offsetBy: min(text.count, max(0, offset + (removing ? -3 : 3)))))
-        focused = true
     }
     private func recordButton(_ voice: DiaryVoiceController, large: Bool) -> some View {
         Button { Task { if voice.recording { await voice.stop() } else if let writingDay { await voice.start(writingDay: writingDay) } } } label: {
