@@ -29,6 +29,8 @@ struct DiaryHubView: View {
     /// Per-day counts and the written-day set, built once when the archive loads: twelve month tiles used to rebuild them on every redraw.
     @State private var dayCounts: [GregorianDay: Int] = [:]
     @State private var writtenDays: Set<GregorianDay> = []
+    /// Each day's first photo, for the month sheet's thumbnails and the year grid's photo marks.
+    @State private var photoByDay: [GregorianDay: UUID] = [:]
     @State private var aiComposerOpen = false
     @State private var aiAvailability: MadarAIAvailability = .checking
     private var service: AppDiaryService { .init(app: app) }
@@ -173,6 +175,7 @@ struct DiaryHubView: View {
                         let loaded = try await service.archiveOffMain()
                         dayCounts = Dictionary(loaded.days.map { ($0.day, $0.writings) }, uniquingKeysWith: { first, _ in first })
                         writtenDays = Set(loaded.days.filter { $0.writings > 0 || !$0.photoIDs.isEmpty }.map(\.day))
+                        photoByDay = Dictionary(loaded.days.compactMap { d in d.photoIDs.first.map { (d.day, $0) } }, uniquingKeysWith: { first, _ in first })
                         archive = loaded
                         travelDays = (try? service.travelDays()) ?? []
                         failure = nil
@@ -237,7 +240,7 @@ struct DiaryHubView: View {
                     ForEach(1...12, id: \.self) { month in miniMonth(archive, month: month) }
                 }
             }
-            Text("الأغمق كتابة أكثر. افتح أي شهر لترى ورقته.").font(DiaryType.label).foregroundStyle(
+            Text("الأغمق كتابة أكثر، والملوّن يوم فيه صورة. افتح أي شهر لترى ورقته.").font(DiaryType.label).foregroundStyle(
                 theme.color("ink3Text"))
             if travelDays.contains(where: { grid.parts($0).year == selectedYear }) {
                 HStack(spacing: 8) {
@@ -299,11 +302,11 @@ struct DiaryHubView: View {
                     ForEach(0..<grid.leading(days), id: \.self) { _ in Color.clear.aspectRatio(1, contentMode: .fit) }
                     ForEach(days, id: \.description) { day in
                         RoundedRectangle(cornerRadius: 1).fill(
-                            theme.ink.opacity(
+                            photoByDay[day] != nil ? AnyShapeStyle(theme.accent) : AnyShapeStyle(theme.ink.opacity(
                                 day > archive.today
                                     ? 0.015
                                     : (counts[day] ?? 0) == 0 ? 0.06 : min(0.85, 0.25 + Double(counts[day] ?? 0) * 0.15)
-                            )
+                            ))
                         )
                         .aspectRatio(1, contentMode: .fit).overlay {
                             if day == archive.today {
@@ -349,34 +352,51 @@ struct DiaryHubView: View {
                     Button {
                         reader = day
                     } label: {
-                        VStack(spacing: 3) {
-                            Text(service.digits.string(grid.parts(day).day ?? day.day)).font(MadarTypography.body());
-                            Text(
-                                service.digits.string(
-                                    grid.first == .gregorian
-                                        ? HijriCalendar.date(
-                                            for: day.date(in: grid.zone).addingTimeInterval(43200), timeZone: grid.zone,
-                                            source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura,
-                                            sightingOffset: grid.offset
-                                        ).day : day.day)
-                            ).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk);
-                            Circle().fill(written.contains(day) ? theme.accent : .clear).frame(width: 4, height: 4)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 44).background(
-                            day == archive.today ? theme.surface : .clear, in: .rect(cornerRadius: 10)
-                        )
-                        .overlay {
-                            if travelDays.contains(day) { DiaryAirmailFrame(lineWidth: 1.6, dash: 4).padding(2) }
-                        }
+                        monthCell(day, today: archive.today, written: written.contains(day))
+                            .overlay {
+                                if travelDays.contains(day) { DiaryAirmailFrame(lineWidth: 1.6, dash: 4).padding(2) }
+                            }
                     }.buttonStyle(.madarPlain).disabled(day > archive.today).accessibilityLabel(
                         service.bothDates(day, calendar: grid.first) + (travelDays.contains(day) ? "، يوم سفر" : "")
-                    ).accessibilityIdentifier("diary-calendar-day-" + day.description)
+                    ).accessibilityValue(photoByDay[day] != nil ? "فيه صورة" : "").accessibilityIdentifier("diary-calendar-day-" + day.description)
                 }
             }
             timeline(
                 archive.days.filter {
                     let parts = grid.parts($0.day); return parts.year == selectedYear && parts.month == month
                 }, empty: "لا كتابة في هذا الشهر.")
+        }
+    }
+    /// One day of the month sheet: its first photo fills the cell under the day number, a written day without a photo keeps the ink tint.
+    private func monthCell(_ day: GregorianDay, today: GregorianDay, written: Bool) -> some View {
+        let photo = typeSize.isAccessibilitySize ? nil : photoByDay[day]
+        let primary = service.digits.string(grid.parts(day).day ?? day.day)
+        let secondary = service.digits.string(
+            grid.first == .gregorian
+                ? HijriCalendar.date(
+                    for: day.date(in: grid.zone).addingTimeInterval(43200), timeZone: grid.zone,
+                    source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: grid.offset
+                ).day : day.day)
+        return VStack(spacing: 3) {
+            Text(primary).font(MadarTypography.body())
+            Text(secondary).font(MadarTypography.fine()).foregroundStyle(photo == nil ? theme.secondaryInk : .white.opacity(0.9))
+            Circle().fill(written && photo == nil ? theme.accent : .clear).frame(width: 4, height: 4)
+        }
+        .foregroundStyle(photo == nil ? theme.ink : .white)
+        .frame(maxWidth: .infinity, minHeight: photo == nil ? 44 : 58)
+        .background {
+            if let photo {
+                ZStack {
+                    DiaryArchiveThumbnail(service: service, id: photo, maxPixel: 160, placeholderHeight: 58) { image in
+                        image.resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: 58).clipped()
+                    }
+                    LinearGradient(colors: [.black.opacity(0.18), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+                }.clipShape(.rect(cornerRadius: 10)).accessibilityHidden(true)
+            } else if day == today {
+                theme.surface.clipShape(.rect(cornerRadius: 10))
+            } else if written {
+                theme.ink.opacity(0.07).clipShape(.rect(cornerRadius: 10))
+            }
         }
     }
     private func timeline(
@@ -470,15 +490,18 @@ struct DiaryHubView: View {
 private struct DiaryArchiveThumbnail<Content: View>: View {
     let service: AppDiaryService
     let id: UUID
+    var maxPixel: Int = 600
+    var placeholderHeight: CGFloat = 150
     @ViewBuilder let content: (Image) -> Content
     @State private var image: UIImage?
     var body: some View {
         Group {
-            if let image { content(Image(uiImage: image)) } else { Color.clear.frame(height: 150) }
+            if let image { content(Image(uiImage: image)) } else { Color.clear.frame(height: placeholderHeight) }
         }.task(id: id) {
             guard image == nil, let data = try? service.archivePhoto(id) else { return }
+            let maxPixel = maxPixel
             image = await Task.detached(priority: .utility) { () -> UIImage? in
-                let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: 600]
+                let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: maxPixel]
                 guard let source = CGImageSourceCreateWithData(data as CFData, nil), let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return UIImage(data: data) }
                 return UIImage(cgImage: cg)
             }.value

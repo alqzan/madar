@@ -61,6 +61,10 @@ struct DiaryDayView: View {
     @State private var waitingLetter: DiaryLetterCard?
     @State private var openingLetter: DiaryLetterCard?
     @State private var sealedHere = 0
+    @State private var periodLabels: [String: DiaryPeriodLabel] = [:]
+    @State private var readingOpen = false
+    @State private var reviewOpen = false
+    @State private var afterIsha = false
 #if DEBUG
     @State private var injectedReadFailures: Set<String> = []
 #endif
@@ -203,6 +207,7 @@ struct DiaryDayView: View {
                                         let attached = mediaByEntry[line.id] ?? []
                                         let hasAudio = attached.contains { $0.kind == "audio" }
                                         // A recording's text is its transcript: the card below shows it whole and editable, so the line itself is not repeated.
+                                        if let label = periodLabels[line.id] { DiaryPeriodHeadingRow(label: label) }
                                         if !hasAudio { lineRow(line, page: page).id("diary-entry-" + line.id) }
                                         ForEach(attached.filter { $0.kind != "missing" }) { media in
                                             DiaryMediaCard(app: app, media: media, transcript: line.text)
@@ -261,6 +266,12 @@ struct DiaryDayView: View {
                                         Button { retry += 1 } label: { Text("حاول مرة أخرى").frame(minHeight: 44).contentShape(Rectangle()) }
                                             .accessibilityIdentifier("diary-day-read-retry")
                                     }.padding(20)
+                                }
+                                if afterIsha, shownDay == today, travel == nil, canReadDiary {
+                                    Button { reviewOpen = true } label: {
+                                        Text("محاسبة اليوم").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).frame(minHeight: 44).contentShape(.rect)
+                                    }.buttonStyle(.madarPlain).padding(.leading, DiaryDayMetrics.contentLeading).padding(.trailing, 18)
+                                        .accessibilityIdentifier("diary-review-link")
                                 }
                 if canReadDiary, (!analysisText.isEmpty || !intentions.isEmpty),
                                    (aiAvailability == .ready || aiAvailability == .needsDownload) {
@@ -353,6 +364,14 @@ struct DiaryDayView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button { readingOpen = true } label: { Label("اقرأ", systemImage: "book") }.accessibilityIdentifier("diary-day-read")
+                        if shownDay == today, travel == nil {
+                            Button { reviewOpen = true } label: { Label("محاسبة اليوم", systemImage: "moon.stars") }.accessibilityIdentifier("diary-day-review")
+                        }
+                    } label: { Image(systemName: "ellipsis.circle") }.accessibilityLabel("المزيد").accessibilityIdentifier("diary-day-more")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     if niyyaSaved, let token = app.undoToken, token.id == niyyaToken {
                         Button("تراجع") {
                             app.undo(); niyyaSaved = false
@@ -407,6 +426,11 @@ struct DiaryDayView: View {
                 DiaryOriginalSheet(text: first.text).environment(\.roomTheme, theme).presentationDetents([
                     .medium, .large,
                 ])
+            }
+            .fullScreenCover(isPresented: $readingOpen) { DiaryReadingView(app: app, start: shownDay).environment(\.roomTheme, theme) }
+            .sheet(isPresented: $reviewOpen) {
+                DiaryNightReviewView(app: app, day: shownDay, page: page, intention: intentions.first) { Task { await refreshLines() } }
+                    .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
             }
             .sheet(isPresented: $stampsOpen) { DiaryStampsView(app: app).environment(\.roomTheme, theme) }
             .sheet(isPresented: $weekOpen) { DiaryWeekView(app: app, day: shownDay).environment(\.roomTheme, theme) }
@@ -517,7 +541,7 @@ struct DiaryDayView: View {
         do {
             let fresh = try await service.dayOffMain(target)
             guard target == shownDay, canReadDiary else { return }
-            page = fresh; echo = nil
+            page = fresh; periodLabels = service.periodLabels(for: fresh); echo = nil
         } catch is CancellationError {
         } catch { failure = madarUserMessage(error) }
     }
@@ -538,6 +562,8 @@ struct DiaryDayView: View {
             try Task.checkCancellation()
             guard canReadDiary, displayPage.day == shownDay else { return }
             page = displayPage
+            periodLabels = service.periodLabels(for: displayPage)
+            afterIsha = shownDay == today && service.ishaPassed(on: shownDay)
             intentions = try service.intentions(shownDay)
             appearance = try service.appearance(shownDay)
             displayNow = service.clock()

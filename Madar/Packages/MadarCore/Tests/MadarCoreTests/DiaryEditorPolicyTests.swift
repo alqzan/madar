@@ -52,7 +52,7 @@ struct DiaryEditorPolicyTests {
     /// Owner, 24 Oct 2026: a photo may be linked to the Photos library by its identifier; audio may not, nor an empty one.
     @Test func appendMediaAcceptsALibraryLinkOnlyForPhotos() {
         let base: [String:JSONValue] = ["fileID": .string(UUID().uuidString), "kind": .string("photo"), "contentType": .string("image/jpeg"), "caption": .string(""), "day": .string("today"), "writingDayKey": .string("2026-10-24")]
-        guard case .appendMedia(_, _, _, _, _, _, _, let asset)? = DiaryEditorCommand.parse("diary.appendMedia", base.merging(["assetID": .string("ABC-123/L0/001")]) { _, new in new }) else { Issue.record("A linked photo must parse"); return }
+        guard case .appendMedia(_, _, _, _, _, _, _, let asset, _)? = DiaryEditorCommand.parse("diary.appendMedia", base.merging(["assetID": .string("ABC-123/L0/001")]) { _, new in new }) else { Issue.record("A linked photo must parse"); return }
         #expect(asset == "ABC-123/L0/001")
         #expect(DiaryEditorCommand.parse("diary.appendMedia", base.merging(["assetID": .string("")]) { _, new in new }) == nil)
         #expect(DiaryEditorCommand.parse("diary.appendMedia", base.merging(["kind": .string("audio"), "assetID": .string("ABC")]) { _, new in new }) == nil)

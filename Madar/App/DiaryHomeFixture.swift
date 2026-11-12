@@ -10,7 +10,7 @@ import MadarDesign
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "restored", "today", "editor", "entryRoute", "return", "travel", "travelClock", "letters", "lettersRoutes", "intentionReview"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "restored", "today", "editor", "entryRoute", "return", "travel", "travelClock", "letters", "lettersRoutes", "intentionReview", "periods"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -82,6 +82,23 @@ extension AppSession {
         }
         if variant == "return" {
             let day=GregorianDay.containing(prayerUITestClock(.now),in:.riyadh).adding(days:-5),row=Entry();row.dayKey=day.description;row.text="آخر سطر محفوظ قبل الانقطاع";row.tzID="Asia/Riyadh";row.eventAt=day.date(in:.riyadh).addingTimeInterval(12*3600);context.insert(row);try context.save();return
+        }
+        if variant == "periods" {
+            // Lines across the day (midnight day start): before Fajr to after Isha, a prayer log for the review, and yesterday's photo page for the calendar.
+            let today = GregorianDay.containing(prayerUITestClock(.now), in: .riyadh), base = today.date(in: .riyadh)
+            for (minutes, text) in [(180, "استيقظت قبل الفجر."), (330, "جلست بعد الفجر قليلًا."), (480, "قهوة الضحى."), (780, "غداء مع العائلة."), (960, "مشوار بعد العصر."), (1080, "جلسة بعد المغرب."), (1260, "ختمت اليوم بهدوء.")] {
+                let row = Entry(); row.dayKey = today.description; row.text = text; row.eventAt = base.addingTimeInterval(Double(minutes) * 60)
+                row.tzID = "Asia/Riyadh"; row.dayPolicy = "midnight@1"; row.source = "native"; context.insert(row)
+            }
+            let prayer = PrayerLog(); prayer.dayKey = today.description; prayer.prayer = "fajr"; prayer.status = "jamaah"; prayer.eventAt = base.addingTimeInterval(4.6 * 3600); context.insert(prayer)
+            let yesterday = today.adding(days: -1), photoPage = DayPage(); photoPage.dayKey = yesterday.description
+            let media = Media(); media.kind = "photo"; media.contentType = "image/jpeg"; media.data = Self.diaryFixturePhoto(variant: 1); media.sizeBytes = media.data?.count ?? 0
+            context.insert(media); photoPage.photoMediaID = media.id; context.insert(photoPage)
+            for (age, text) in [(1, "يوم أمس فيه صورة."), (3, "يوم قبل ثلاثة أيام.")] {
+                let day = today.adding(days: -age), row = Entry(); row.dayKey = day.description; row.text = text
+                row.eventAt = day.date(in: .riyadh).addingTimeInterval(10 * 3600); row.tzID = "Asia/Riyadh"; row.dayPolicy = "midnight@1"; row.source = "native"; context.insert(row)
+            }
+            try context.save(); return
         }
         if variant == "intentionReview" {
             let today = GregorianDay.containing(prayerUITestClock(.now), in: .riyadh)

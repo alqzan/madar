@@ -33,6 +33,8 @@ import MadarCore
     private var installedLocale: Locale?
     private var supportedLocale: Locale?
     private var recorder: AVAudioRecorder?
+    /// Live words while recording (read from the recorder's own file; never a second microphone session).
+    let live = DiaryLiveTranscriber()
     private var recordingDay: GregorianDay?
     private var meterWindowSecond = 0
     private var meterWindowTotal = 0.0
@@ -100,6 +102,7 @@ import MadarCore
         meterWindowSecond = 0; meterWindowTotal = 0; meterWindowCount = 0
             try startChunk()
             recording = true
+            if let url = recorder?.url { live.start(url: url, locale: installedLocale) { [weak self] in self?.recording == true } }
             startMetering()
             observeAudioSession()
         } catch {

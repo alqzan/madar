@@ -86,6 +86,10 @@ struct DiaryVoiceFeedback: View {
             }
             if !controller.insightStatus.isEmpty { Text(controller.insightStatus).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
             if !controller.message.isEmpty { Text(controller.message).font(MadarTypography.caption()).accessibilityIdentifier("diary-voice-status") }
+            if controller.recording, !controller.live.text.isEmpty {
+                Text(controller.live.text).font(DiaryType.writing).foregroundStyle(.secondary).lineLimit(4)
+                    .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("diary-voice-live")
+            }
             if !controller.partialText.isEmpty { Text(controller.partialText).font(DiaryType.writing).foregroundStyle(.secondary) }
             if controller.converting { Button { controller.cancelConversion() } label: { Text("ألغِ التحويل؛ أبقِ الصوت").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-voice-cancel") }
             if showsTranscriptEditor, !controller.transcriptText.isEmpty {
