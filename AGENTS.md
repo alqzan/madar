@@ -20,9 +20,11 @@ You are building **Madar**, a native iPhone app (SwiftUI, Arabic RTL). The appro
 ## Delivery — standing owner authorization
 
 - Complete, validate and commit directly requested changes on `main`, then archive/export/upload to internal TestFlight without another permission step. Public App Store release and App Review submission are separate.
+- **One request, one build, at the end (owner, 12 Nov 2026).** Upload only after every part of the owner's request is finished and verified; never upload more than one build for the same request. Upload and stop: do not wait for Apple processing or TestFlight availability before reporting (check it on the next request if relevant).
+- **Push to GitHub last (owner, 12 Nov 2026).** After the request's upload (or its final commit when there is no upload), push `main` to `origin` without asking. A cheap helper may run the push. Never force-push; if the push is rejected, fetch and rebase local commits onto `origin/main` only when there are no conflicts, otherwise record the blocker.
 - Use an existing card when relevant. For a direct request without a matching card, use one descriptive `[OWNER]` commit and record the result in the current work section and handover; no invented card IDs.
-- Keep `MARKETING_VERSION` unless requested; increment `CURRENT_PROJECT_VERSION` once per upload. Batch this whole-app improvement request into coherent validated commits and a delivery build, rather than uploading every small fix.
-- Treat signing, provisioning and Apple processing as technical requirements. Verify them live; do not carry an old blocker forward without checking. Record archive, upload, processing and owner-device acceptance separately.
+- Keep `MARKETING_VERSION` unless requested; increment `CURRENT_PROJECT_VERSION` once per upload, and commit the bump with the request's handover.
+- Treat signing, provisioning and Apple processing as technical requirements. Verify them live; do not carry an old blocker forward without checking. Record archive, upload, processing and owner-device acceptance separately; processing is not awaited (see above).
 - iOS deployment target and the sole test runtime are 27.0. Use an installed Xcode that supports them; no exact Xcode patch version is pinned by this protocol. A newer installed Xcode alone is not a blocker.
 
 ## What to read: per task, never everything

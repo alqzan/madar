@@ -1,5 +1,15 @@
 # Archived handovers — November 2026
 
+## Handover — المرحلة ٣ للمال: المتكرر، الأقساط والكشوف، المرتجعات والرسوم، توحيد التجار — 2026-11-11 — Claude
+- **Works now:** قسم «يتكرر» في غرفة المال (الراتب ثم الاشتراكات، الموعد القادم بالتقويمين، ملاحظة تغيّر السعر أو التأخر، ٥ ثم «الكل»)؛ صف المستحق يعرض «القسط ٢ من ٤» والمتبقي إن طُبعا، وكشف البطاقة مع الحد الأدنى؛ مسودة المرتجع تعرض «مرتجع من» مع اختيار عند تعدد المرشحين؛ تفاصيل الحركة تعرض الرسوم والضريبة ورسم العملة والمبلغ الأصلي وسعر الصرف؛ مفتاح تاجر موحّد لقواعد التاجر وتعلّم التصنيف.
+- **Verified** (محاكي iPhone 15 Pro Max، الحزم في `/private/tmp/claude-501/phase3/`): MadarMoney 294 passed (BankCorpusTests skipped)، MadarCommands 304 passed، MadarCore 207، MadarData 122 (تقرير الوكلاء)؛ 18.xcresult: MoneyPhase3IntegrationTests 5/0، MoneyBankInsightsIntegrationTests 3/0، MoneyLogIntegrationTests 6/0، MoneyPhase3UITests 3/0، MoneyBankInsightsUITests 1/0؛ 21.xcresult: MoneyHomeUITests 13/0، MoneyMessagesUITests 7/0. بعد الإصلاح: MadarCommands 307, MadarCore 207, MadarMoney 294 passed; MoneyPhase3UITests 3/0 (fix-4), MoneyMessagesUITests 7/0 (fix-6), MoneyHomeUITests 13/0 (fix-7), MoneyPhase3IntegrationTests 6/0 (fix-8).
+- **Differences left:** اختيار مشتريات المرتجع يُحفظ فور اختياره بأمر `money.linkRefund`؛ الرسائل المخزنة قديمًا لا تأخذ الحقول الجديدة إلا بإعادة إدخالها.
+- **Not verified:** نص القسط والكشف مختبر الآن في واجهة المال (كان الخلل في بيانات الاختبار: رسائل بلا بصمة تُدمج)؛ لا اختبار واجهة لبقاء اختيار المرتجع بعد مغادرة الشاشة؛ صيغ تمارا/تابي الحقيقية لـ«القسط ٢ من ٤»؛ BankCorpusTests لم تُشغَّل؛ لا لقطات، لا iPad، لا جهاز المالك؛ لم يُرفع بناء ٣٤.
+- **Next:** بناء ٣٤ إلى TestFlight الداخلي؛ الصورة مع «اكتب بعده»؛ ب١-١٥، ب١-١٦، ب٣-٣.
+- **Delivery:** بناء ٣٤ أُرشف ورُفع إلى TestFlight الداخلي (2026-11-11)؛ معالجة Apple وقبول جهاز المالك لم يُتحقق منهما.
+- **Model/effort:** claude-sonnet-5-5 subagents، claude-haiku-5-5 للتوثيق والإيداع والدفع، مراجعة claude-fable-5-2؛ effort not exposed.
+- **Usage:** حد الخمس ساعات بلغ نهايته أثناء العمل (تجدد ٨ مساءً بتوقيت الرياض)؛ الأسبوعي ٥٨٪ عند آخر قراءة.
+
 ## Handover — تسهيل بحث المذكرات والتحقق المتبقي — 2026-11-08 — Codex
 - **Works now:** البحث العادي جاهز للكتابة فور فتحه؛ تعديل/حذف الفلتر يحدّث النص الظاهر ويحافظ على بقية القواعد، ولا يرجع الفلتر بعد تحديث الفهرس إثر حفظ مصدر. لكل تعديل/حذف/مسح مساحة لمس ٤٤ نقطة على الأقل، مع إشارة قلم واضحة. التغيير في `e0578d9d`؛ إصلاح تحقق PERF-04 في `7731e1ff`. رُفع 0.1.0 (15) داخليًا؛ نجحت الأرشفة والتصدير والرفع وبدأت معالجة Apple.
 - **Verified:** `DiarySearchUITests` 4/4 في `OWNER-search-clarity-20261108-r1.xcresult`، ومنها حذف فلتر ثم فتح مصدر وتعديله وحفظه؛ الرابط الوارد وتحديث البحث المفتوح 1/1 في `OWNER-search-route-20261108-r1.xcresult`. بناء الاختبار نجح، والمخازن اصطناعية. أرشيف Release للبناء 15 نجح، ونسخة التطبيق/الودجت وتوقيعهما صحيحان، ثم `Upload succeeded` و`EXPORT SUCCEEDED` في `OWNER-TestFlight-15-upload.log`. PERF-04: ست حالات مميزة ناجحة، موزعة 2/2 + 2/2 + حالتي الجمعة/التتبّع داخل حزمة 2 passed/1 failed، كما في Current work؛ لا ادعاء بنجاح الحزمة المختلطة كاملة.
