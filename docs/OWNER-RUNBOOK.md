@@ -27,7 +27,7 @@ python3 Madar/scripts/prepare-workspace.py
 إذا كانت ناقصة، مرّر صراحةً مسار نسخة محلية تحتوي الخطوط المعتمدة، مثل النسخة الرئيسية على هذا الجهاز:
 
 ```sh
-python3 Madar/scripts/prepare-workspace.py --source '/Users/abdulrahman/Documents/ChatGPT/بناء مدار 2.0'
+python3 Madar/scripts/prepare-workspace.py --source '<repo>'
 ```
 
 تفحص الأداة الخطوط العشرة في `UIAppFonts` وملف ترخيص Amiri مقابل بصمات `Madar/docs/font-provenance.json` قبل النسخ. تنسخ المفقود فقط؛ الملف المختلف يبقى كما هو وتتوقف العملية. لا تنزيل ولا إضافة لملفات الخطوط إلى Git. أوامر Make التي تُولد المشروع تفحص الموارد تلقائيًا قبل XcodeGen؛ البناء المباشر بـ`xcodebuild` يحتاج الأمر السابق أولًا. نجاح الفحص لا يثبت التوقيع أو نجاح البناء أو قبول الواجهة.

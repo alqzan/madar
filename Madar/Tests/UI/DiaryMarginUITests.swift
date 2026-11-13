@@ -29,10 +29,7 @@ import XCTest
         let deleteAction = app.buttons["diary-line-delete"]
         XCTAssertTrue(deleteAction.waitForExistence(timeout: 5))
         deleteAction.tap()
-        let confirm = app.alerts.buttons.matching(identifier: "diary-line-delete-confirm").firstMatch
-        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
-        capture(app, "M3-J05-delete-confirm-L")
-        confirm.tap()
+        // Quick win 4: deleting a line needs no confirmation; the undo badge below is the safety net.
         XCTAssertTrue(target.waitForNonExistence(timeout: 8))
         XCTAssertTrue(marginReference.waitForExistence(timeout: 8))
         capture(app, "M3-J05-delete-margin-remains-L")

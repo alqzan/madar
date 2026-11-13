@@ -94,6 +94,10 @@ private struct PrayerInverse: Codable {
                 try touch(existing)
                 return
             }
+            // A prayer logged in its time (jamaah or alone) is never made up.
+            if let logged = try repository.log(ref), logged.status == PrayerStoredStatus.jamaah.rawValue || logged.status == PrayerStoredStatus.alone.rawValue {
+                throw PrayerDomainError.invalidRecord
+            }
             let madeUpAt = eventAt ?? now
             guard madeUpAt <= now else { throw PrayerDomainError.invalidRecord }
             _ = try validate(ref)

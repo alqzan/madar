@@ -29,7 +29,10 @@ import MadarData
                 return moment
             })
             draft.deletedAt = now; draft.deletionBarrierAt = now; draft.updatedAt = StableIdentity.monotonic(now: now, previous: draft.updatedAt); draft.writerID = writer
-            return inverse
+            guard let inverse else { return nil }
+            var revived = try JSONDecoder().decode(DiaryInverse.self, from: inverse)
+            revived.restoredDraftID = draftID
+            return try JSONEncoder().encode(revived)
         case .appendMedia(let file, let kind, let type, let caption, let day, let writingDay, let duration, let asset, let at):
             guard try context.fetchCount(FetchDescriptor<Media>(predicate: #Predicate { $0.id == file })) == 0 else { throw DataError.invalidValue("media already exists") }
             let url = root.appending(path: file.uuidString + (kind == "audio" ? ".m4a" : ".blob"))

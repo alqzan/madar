@@ -296,7 +296,7 @@ struct MoneyLogView: View {
         readingLoadTask?.cancel()
         let loadID = UUID()
         activeReadingLoadID = loadID
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { isRefreshing = true }
+        withAnimation(MadarMotion.quick.animation(reduceMotion: reduceMotion)) { isRefreshing = true }
         routeRequestTracker.stage(initialRouteRequestID)
         let requestID = routeRequestTracker.pendingRequestID
         let appliesNewRoute = routeRequestTracker.hasPendingRequest
@@ -355,12 +355,12 @@ struct MoneyLogView: View {
                 }
                 if appliesNewRoute { routeRequestTracker.markApplied(requestID) }
                 failure = nil
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { isRefreshing = false }
+                withAnimation(MadarMotion.quick.animation(reduceMotion: reduceMotion)) { isRefreshing = false }
             } catch {
                 guard !Task.isCancelled, activeReadingLoadID == loadID else { return }
                 reading = nil
                 failure = "لم تكتمل قراءة السجل. حاول مرة أخرى."
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { isRefreshing = false }
+                withAnimation(MadarMotion.quick.animation(reduceMotion: reduceMotion)) { isRefreshing = false }
             }
         }
     }

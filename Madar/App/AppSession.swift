@@ -123,6 +123,17 @@ final class AppSession {
     /// Raised by a lobby suggestion to open the «شيء ينتظرك» sheet instead of a room.
     var attentionRequest = 0
     private(set) var prayerRevision = 0
+    /// T08: the lobby money tile reads this cached payload; the store is read again only when a write (a revision or a money
+    /// command) or the five-minute bucket changes, never inside a view's `body` on every render.
+    private(set) var moneyPayloadEpoch = 0
+    @ObservationIgnored private var moneyPayloadCache: (revision: Int, epoch: Int, bucket: Int, hidden: Bool, value: RoomWidgetSnapshot)?
+    func cachedMoneyWidgetPayload(hidden: Bool, at now: Date) -> RoomWidgetSnapshot {
+        let revision = prayerRevision, epoch = moneyPayloadEpoch, bucket = Int(now.timeIntervalSince1970 / 300)
+        if let cache = moneyPayloadCache, cache.revision == revision, cache.epoch == epoch, cache.bucket == bucket, cache.hidden == hidden { return cache.value }
+        let value = moneyWidgetPayload(hidden: hidden, at: now)
+        moneyPayloadCache = (revision, epoch, bucket, hidden, value)
+        return value
+    }
     /// The lobby asks for habit readings from several tiles every minute; the answer only changes after a write (a new revision)
     /// or when the five-minute bucket turns over, so it is read once per such change.
     @ObservationIgnored private var habitReadingsCache: (revision: Int, bucket: Int, rows: [HabitReading])?
@@ -1054,6 +1065,14 @@ final class AppSession {
     }
     /// Count the drain as an app writer so export/restore can quiesce it cooperatively.
     @discardableResult
+    /// T11: «تمّت» from a habit reminder is written through the same inbox queue the widgets use. The command id comes from the
+    /// notification and the action, so a repeated delivery is the same command and records once.
+    func completeHabitFromNotification(habitID: UUID, dayKey: String, requestID: String) async throws {
+        let day = try GregorianDay(dayKey)
+        _ = try HabitInboxCommandWriter.complete(inbox: pendingInbox, habitID: habitID, delta: 1, periodKey: dayKey, source: .notification,
+                                                 issuedAt: Date(), day: day, commandID: StableIdentity.uuid(for: "notification." + requestID + ".habit.done"))
+        _ = try await drainInbox()
+    }
     func drainInbox() async throws -> Bool {
         guard !maintenanceInProgress, !inboxDrainer.isDraining else { return false }
         pendingWrites += 1; defer { pendingWrites -= 1 }
@@ -1192,7 +1211,7 @@ final class AppSession {
         }
 #endif
         guard beginWrite() else { throw BackupOperationError.busy }
-        defer { endWrite() }
+        defer { endWrite(); moneyPayloadEpoch &+= 1 }
 #if DEBUG
         try await holdWriteForUITest("MADAR_UI_MONEY_WRITE_HOLD_MS", when: ["money.saveAccount", "money.saveCard", "money.saveZakat", "money.saveObligation", "money.setReserveGoal", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.confirmSalary", "money.reconcile", "money.prepareGoal", "money.setEnvelopeSaving", "money.adoptRepayment", "money.repayEnvelopeNow"].contains(name))
 #endif

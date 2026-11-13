@@ -40,7 +40,7 @@ struct QuranIndexView: View {
                         Button {
                             guard unit != option else { return }
                             items = []; selected = nil; error = nil; isLoading = true
-                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                            withAnimation(MadarMotion.quick.animation(reduceMotion: reduceMotion)) {
                                 unit = option; query = ""
                             }
                         } label: {

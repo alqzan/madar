@@ -75,7 +75,16 @@ struct LogPrayerIntent: AppIntent {
             throw LogPrayerIntentError.refreshMadar
         }
         let day: String
-        if let dayKey, !dayKey.isEmpty { day = dayKey }
+        if let dayKey, !dayKey.isEmpty {
+            // T07: a prayer whose adhan has not come yet cannot be logged, whichever day is named.
+            var civil = Calendar(identifier: .gregorian); civil.timeZone = timeZone
+            let parts = civil.dateComponents([.year, .month, .day], from: now)
+            let today = String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+            if dayKey > today { throw LogPrayerIntentError.prayerNotOccurred }
+            if let item = snapshot.payload.items.first(where: { $0.prayer == prayer.rawValue }), item.at > now,
+               civil.isDate(item.at, inSameDayAs: now), dayKey == today { throw LogPrayerIntentError.prayerNotOccurred }
+            day = dayKey
+        }
         else {
             do {
                 day = try PrayerInboxCommandWriter.currentPrayerDayKey(

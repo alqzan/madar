@@ -70,7 +70,8 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     func exportPlain(progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL
     func export(passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL
     func share(file: URL) async throws
-    func previewRestore(file: URL, passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestorePreview
+    func previewRestore(file: URL, passphrase: String?, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestorePreview
+    func changePassphrase(_ passphrase: String) async throws
     func restore(previewID: UUID, mode: BackupUIRestoreMode, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestoreResult
     /// Stops cooperatively, removes staging and partial outputs, retains prior successful backups.
     func cancel() async
@@ -166,9 +167,22 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
         try Task.checkCancellation()
         guard operationID == id else { throw CancellationError() }
     }
-    func inspect() {
-        guard canInspect, let file = selectedFile else { return }
-        let passphrase = restorePassphrase
+    /// T04: this device's own backups open with the key kept on the device, no passphrase typed.
+    var canInspectWithDeviceKey: Bool { !busy && selectedFile != nil && status?.keyConfigured == true && restorePassphrase.isEmpty }
+    func inspectWithDeviceKey() { inspect(useDeviceKey: true) }
+    var canChangePassphrase: Bool { canExport && status?.keyConfigured == true }
+    func changePassphrase() {
+        guard canChangePassphrase else { return }
+        let passphrase = exportPassphrase
+        run(initial: "يغيّر كلمة المرور…") { [self] _, _ in
+            try await service.changePassphrase(passphrase)
+            exportPassphrase = ""; exportConfirmation = ""
+            if let current = try? await service.status() { status = current }
+        }
+    }
+    func inspect(useDeviceKey: Bool = false) {
+        guard useDeviceKey ? canInspectWithDeviceKey : canInspect, let file = selectedFile else { return }
+        let passphrase: String? = useDeviceKey ? nil : restorePassphrase
         preview = nil
         run(initial: "يفحص النسخة دون تغيير بياناتك…") { [self] report, _ in
             let access = file.startAccessingSecurityScopedResource()
@@ -434,6 +448,10 @@ struct BackupSettingsView: View {
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("backup-export-waiting")
                 }
                 exportButton.buttonStyle(MadarPrimaryButton())
+                if model.status?.keyConfigured == true {
+                    Button("اجعلها كلمة المرور الجديدة", action: model.changePassphrase).frame(minHeight: 44).disabled(!model.canChangePassphrase).accessibilityIdentifier("backup-change-password")
+                    note("تغيير كلمة المرور يشفّر النسخ الجديدة بها. النسخ القديمة تبقى بكلمتها القديمة.")
+                }
                 if model.exportedURL != nil {
                     Button(action: model.shareEncrypted) { Label("احفظ النسخة أو شاركها", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }.disabled(model.busy).accessibilityIdentifier("backup-export")
                 }
@@ -454,7 +472,10 @@ struct BackupSettingsView: View {
                 if !model.busy && !model.canInspect {
                     Text(model.selectedFile == nil ? "اختر ملف النسخة ثم أدخل كلمة مرورها" : "أدخل كلمة مرور النسخة لتفحصها").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("restore-waiting")
                 }
-                Button("افحص وعاين", action: model.inspect).frame(minHeight: 44).disabled(!model.canInspect).accessibilityIdentifier("restore-inspect")
+                Button("افحص وعاين") { model.inspect() }.frame(minHeight: 44).disabled(!model.canInspect).accessibilityIdentifier("restore-inspect")
+                if model.canInspectWithDeviceKey {
+                    Button("نسخة من هذا الجهاز؟ افحصها بلا كلمة مرور", action: model.inspectWithDeviceKey).frame(minHeight: 44).accessibilityIdentifier("restore-inspect-device-key")
+                }
                 if let preview = model.preview { Divider().overlay(theme.line); previewRows(preview) }
             }
         }

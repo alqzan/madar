@@ -161,6 +161,12 @@ public enum MadarMetric {
         "motion.numericText.curve.1": 0.8,
         "motion.numericText.curve.2": 0.2,
         "motion.numericText.curve.3": 1,
+        "motion.quick.duration": 0.18,
+        "motion.standard.duration": 0.28,
+        "motion.settle.response": 0.38,
+        "motion.settle.dampingFraction": 0.86,
+        "motion.celebrate.duration": 0.6,
+        "motion.reduced.duration": 0.2,
     ]
     public static let screenMargin: CGFloat = CGFloat(values["spacing.screenMargin"]!)
     public static let cardPadding: CGFloat = CGFloat(values["spacing.cardPadding.1"]!)

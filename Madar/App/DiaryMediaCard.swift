@@ -37,8 +37,9 @@ struct DiaryMediaCard: View {
                 // Shrunk off the main thread once, instead of decoding a camera photo again at every redraw of the day.
                 Button { if let openPhoto { openPhoto(media) } else { open() } } label: {
                     DiaryDataThumbnail(data: media.data, maxPixel: 450) { image in
-                        image.resizable().scaledToFit().frame(maxWidth: 150).padding(8).background(theme.surface).rotationEffect(.degrees(-2)).shadow(color: theme.ink.opacity(0.1), radius: 5, y: 4)
+                        image.resizable().scaledToFill()
                     }
+                    .frame(maxWidth: .infinity).aspectRatio(4 / 3, contentMode: .fit).clipShape(.rect(cornerRadius: 16))
                 }
                     .buttonStyle(.madarPlain).accessibilityLabel("افتح الصورة").accessibilityIdentifier("diary-media-" + media.id.uuidString)
             } else if media.kind == "audio" {

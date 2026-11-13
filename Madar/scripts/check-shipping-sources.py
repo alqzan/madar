@@ -14,6 +14,9 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+# T09: warnings first (they do not fail the check): raw motion durations and corner radii outside the approved set.
+WARNINGS = []
+APPROVED_RADII = {2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28}
 DIGIT_DOT = re.compile(r"[0-9٠-٩۰-۹][\s\u2066-\u2069]*·|·[\s\u2066-\u2069]*[0-9٠-٩۰-۹]")
 SWIFT_STRING = re.compile(r'"(?:\\.|[^"\\])*"')
 SWIFT_RAW_OPEN = re.compile(r'(#+)("""|")')
@@ -380,6 +383,10 @@ def scan_source(text, path, definitions):
         spot = f'{path}:{number}'
         decoded = re.sub(r'\\u\{([0-9a-fA-F]+)\}', lambda m: chr(int(m[1], 16)), line)
         if DIGIT_DOT.search(decoded): failures.append(f'{spot}: numeric middle dot')
+        if not path.endswith('MadarMotion.swift') and re.search(r'(?:animation|withAnimation|\.ease(?:In|Out|InOut)|\.spring|\.snappy|\.smooth)', line) and re.search(r'(?:duration:\s*|\.ease(?:In|Out|InOut)\(duration:\s*)\d*\.?\d+', line):
+            WARNINGS.append(f'{spot}: raw motion duration; use MadarMotion')
+        for radius in re.findall(r'cornerRadius:\s*(\d+)', line):
+            if int(radius) not in APPROVED_RADII: WARNINGS.append(f'{spot}: cornerRadius {radius} is outside the approved set')
         numeric_formatter = r'(?:formatter\.string|digits\.string|session\.digits|app\.digits|arabicNumber|digits)'
         numeric_interpolation = r'\\\(' + numeric_formatter + r'\([^"\n]*?\)\)'
         if re.search(numeric_interpolation + r'\s*·|·\s*' + numeric_interpolation, decoded):
@@ -516,6 +523,8 @@ def main():
         args.json_output.write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')
     for finding in result['findings']: print(f'FAIL: {finding}')
     print(f"STATIC {'FAIL' if result['findings'] else 'PASS'}: {len(result['sources'])} shipping Swift files, {len(result['catalogs'])} catalogs, {len(result['tokenPairsMeasured'])} independently measured M0 token pairs")
+    print(f'MOTION/RADIUS WARNINGS (not failures): {len(WARNINGS)}')
+    for warning in WARNINGS[:20]: print(f'WARN: {warning}')
     print(f"MANUAL TRACE REQUIRED: {len(result['manualTrace'])} source lines; no complete string/key/colour/action or M0 acceptance claim")
     return 1 if result['findings'] else 2 if args.require_complete and result['manualTrace'] else 0
 

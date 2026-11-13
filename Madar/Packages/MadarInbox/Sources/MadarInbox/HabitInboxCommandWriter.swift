@@ -9,13 +9,13 @@ public enum HabitInboxCommandError: Error, Equatable, Sendable { case invalidDel
 public enum HabitInboxCommandWriter {
     @discardableResult
     public static func complete(inbox: PendingInbox, habitID: UUID, delta: Int, periodKey: String,
-                                source: CommandSource, issuedAt: Date = .now, day: GregorianDay? = nil) throws -> InboxTicket {
+                                source: CommandSource, issuedAt: Date = .now, day: GregorianDay? = nil, commandID: UUID = UUID()) throws -> InboxTicket {
         guard delta > 0, delta <= 100_000 else { throw HabitInboxCommandError.invalidDelta }
         guard !periodKey.isEmpty else { throw HabitInboxCommandError.missingPeriod }
         var fields: [String: JSONValue] = ["id": .string(habitID.uuidString), "delta": .number(Double(delta))]
         if let day { fields["day"] = .string(day.description) } else { fields["periodKey"] = .string(periodKey) }
         let payload: JSONValue = .object(fields)
-        let command = CommandEnvelope(name: "habit.complete", payload: payload, source: source, issuedAt: issuedAt)
+        let command = CommandEnvelope(commandID: commandID, name: "habit.complete", payload: payload, source: source, issuedAt: issuedAt)
         return try inbox.enqueue(.init(expectedGenerationID: try inbox.currentGeneration()?.generationID, command: command))
     }
 }

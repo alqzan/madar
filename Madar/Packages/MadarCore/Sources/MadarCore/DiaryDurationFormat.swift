@@ -5,7 +5,7 @@ public enum DiaryDurationFormat {
     public static func elapsed(_ totalSeconds: Int, digits: MadarNumberFormatter = .init()) -> String {
         let value = max(0, totalSeconds)
         if value < 60 {
-            return digits.string(value) + (value == 1 ? " ثانية" : value >= 3 && value <= 10 ? " ثوانٍ" : " ثانية")
+            return value == 2 ? "ثانيتان" : digits.string(value) + (value == 1 ? " ثانية" : value >= 3 && value <= 10 ? " ثوانٍ" : " ثانية")
         }
         let seconds = twoDigits(value % 60, digits: digits)
         let totalMinutes = value / 60

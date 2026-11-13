@@ -89,9 +89,9 @@ struct BahwBlockView: View {
 
     @ViewBuilder private var money: some View {
         if size == .icon {
-            let payload = service.session.moneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now)
+            let payload = service.session.cachedMoneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now)
             VStack(spacing: 2) { Text("لك الآن").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)); displayFigure(payload.rows.first?.value ?? "افتح", "thmanyahserifdisplay-Bold", size: 22, relativeTo: .largeTitle).lineLimit(1).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, maxHeight: .infinity).foregroundStyle(MadarToken.colors["widgetIdentity.room.mal.\(dark ? "dark" : "light").ink"] ?? lobby.ink)
-        } else { MoneyWidgetContent(snapshot: service.session.moneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now), family: size == .icon ? .accessoryCircular : size == .small ? .systemSmall : size == .wide ? .systemMedium : .systemLarge, template: size == .wide ? "basis" : "now") }
+        } else { MoneyWidgetContent(snapshot: service.session.cachedMoneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now), family: size == .icon ? .accessoryCircular : size == .small ? .systemSmall : size == .wide ? .systemMedium : .systemLarge, template: size == .wide ? "basis" : "now") }
     }
 
     private func periodRing(_ f: HabitFrequency, rows: [HabitReading], selected: Bool) -> some View {
@@ -515,8 +515,8 @@ struct BahwBlockView: View {
             VStack(spacing: 2) { MadarGlyph("MadarDiary", size: 22).foregroundStyle(room.accent); Text(count == 0 ? "اكتب" : service.lineCount(count)).font(small).multilineTextAlignment(.center).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(alignment: .leading, spacing: 0) {
-                if let data = model?.photo, let image = UIImage(data: data) {
-                    Color.clear.overlay { Image(uiImage: image).resizable().scaledToFill() }.clipShape(.rect(cornerRadius: 14)).padding(.bottom, 8).accessibilityHidden(true)
+                if let data = model?.photo {
+                    Color.clear.overlay { DiaryDataThumbnail(data: data, maxPixel: 600) { image in image.resizable().scaledToFill() } }.clipShape(.rect(cornerRadius: 14)).padding(.bottom, 8).accessibilityHidden(true)
                 }
                 title(room.accent)
                 Text(count == 0 ? "اكتب سطر اليوم" : service.lineCount(count)).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).lineLimit(2).minimumScaleFactor(0.7).accessibilityIdentifier("bahw-notes-count")

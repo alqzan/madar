@@ -237,19 +237,10 @@ struct DiaryDayView: View {
                                             .accessibilityElement(children: .ignore).accessibilityLabel("رسالة مختومة")
                                             .accessibilityIdentifier("diary-sealed-letter-line")
                                     }
-                                    if !page.media.contains(where: { $0.id == page.photoID }), let data = page.photo,
-                                        let image = UIImage(data: data)
-                                    {
-                                        Image(uiImage: image).resizable().scaledToFit().frame(maxWidth: 150).padding(8)
-                                            .background(theme.surface)
-                                            .overlay(alignment: .top) {
-                                                Rectangle().fill(theme.line).frame(width: 48, height: 16)
-                                                    .rotationEffect(.degrees(-5)).offset(y: -8)
-                                            }
-                                            .rotationEffect(.degrees(-2)).shadow(
-                                                color: theme.ink.opacity(0.1), radius: 5, y: 5
-                                            )
-                                            .padding(.vertical, 24).frame(maxWidth: .infinity, alignment: .center)
+                                    if !page.media.contains(where: { $0.id == page.photoID }), let data = page.photo {
+                                        DiaryDataThumbnail(data: data, maxPixel: 900) { image in image.resizable().scaledToFill() }
+                                            .frame(maxWidth: .infinity).aspectRatio(4 / 3, contentMode: .fit)
+                                            .clipShape(.rect(cornerRadius: 16)).padding(.vertical, 12)
                                             .accessibilityLabel("صورة من هذا اليوم")
                                     }
                                     if page.lines.isEmpty && page.photo == nil {
@@ -281,7 +272,7 @@ struct DiaryDayView: View {
                         aiComposerOpen = true
                                     } label: {
                                         Label(
-                            aiAvailability == .ready ? "اسأل عن هذا اليوم" : "جهّز الترجمة على الجهاز",
+                            aiAvailability == .ready ? "اسأل عن هذا اليوم" : "جهّز المساعد على جهازك",
                                             systemImage: "sparkles"
                                         )
                                             .font(DiaryType.label).foregroundStyle(theme.accent)
@@ -391,23 +382,14 @@ struct DiaryDayView: View {
                 }
             }
             .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
-            .alert(
-                "احذف السطر؟",
-                isPresented: Binding(get: { deleteConfirmation != nil }, set: { if !$0 { deleteConfirmation = nil } })
-            ) {
-                Button("إلغاء", role: .cancel) { deleteConfirmation = nil }
-                Button("احذف", role: .destructive) {
-                    guard let id = deleteConfirmation else { return }
-                    deleteConfirmation = nil
-                    Task {
-                        do {
-                            try await app.executeDiaryCommand(
-                                "diary.deleteEntry", payload: ["entryID": .string(id.uuidString)])
-                        } catch { failure = madarUserMessage(error) }
-                    }
-                }.accessibilityIdentifier("diary-line-delete-confirm")
-            } message: {
-                Text("تبقى الهوامش في يوم كتابتها، ويمكنك التراجع فور الحذف من زر «تراجع».")
+            // Deleting a line needs no confirmation: the «تراجع» badge that follows is enough.
+            .onChange(of: deleteConfirmation) { _, id in
+                guard let id else { return }
+                deleteConfirmation = nil
+                Task {
+                    do { try await app.executeDiaryCommand("diary.deleteEntry", payload: ["entryID": .string(id.uuidString)]) }
+                    catch { failure = madarUserMessage(error) }
+                }
             }
             .fullScreenCover(isPresented: $searchOpen) { DiarySearchView(app: app).environment(\.roomTheme, theme) }
             .fullScreenCover(item: $photoViewer, onDismiss: { photoStripToken += 1 }) { start in
@@ -574,7 +556,7 @@ struct DiaryDayView: View {
             displayNow = service.clock()
             echo = nil
             if shownDay == today, displayPage.lines.isEmpty, displayPage.photo == nil,
-               let old = try? await service.dayOffMain(aYearAgo), old.excerpt != "صفحة بلا كتابة" { echo = old }
+               let old = try? await service.dayOffMain(aYearAgo), (!old.lines.isEmpty || old.photo != nil) { echo = old }
             returnDay = try await service.returnAfterAbsenceOffMain(shownDay)
             travel = try service.travel(shownDay)
             travelReturn = travel == nil ? try service.travelReturn(shownDay) : nil
@@ -732,7 +714,7 @@ struct DiaryDayView: View {
     /// The day's photos from the library, on top of the flow: a tap adds one to the page, the rest stay a preview.
     @ViewBuilder private var dayPhotoStrip: some View {
         DiaryDayPhotos(app: app, day: shownDay) { asset in
-            guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { return false }
+            guard let data = await DiaryPhotoLibrary.data(asset), let copy = await Task.detached(priority: .userInitiated, operation: { DiaryPhotoLibrary.smallCopy(of: data) }).value else { return false }
             do { try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", day: "today", writingDay: shownDay, assetID: asset.localIdentifier); await refreshLines(); return true }
             catch { failure = madarUserMessage(error); return false }
         } open: { asset in photoViewer = .init(id: "asset:" + asset.localIdentifier) }
@@ -806,22 +788,13 @@ struct DiaryDayView: View {
                     ? secondInk
                     : line.kind == "late" ? theme.color("late") : auto ? theme.color("autoInkText") : theme.ink)
         }.contentShape(Rectangle()).onTapGesture {
-            // Tap a line you wrote to change it right there; tap a room's own line (prayer, Quran…) to write after it.
-            if page.editable.contains(line.id) { editLine(line) } else { writeAfter(line, page: page) }
+            // Tap a line to write after it; changing a line lives in its long-press menu.
+            writeAfter(line, page: page)
         }.accessibilityElement(children: .contain).accessibilityIdentifier("diary-entry-" + line.id).overlay {
             if highlightedEntryID?.uuidString == line.id {
                 RoundedRectangle(cornerRadius: 12).stroke(theme.accent, lineWidth: 2)
             }
         }.animation(.easeInOut(duration: 0.2), value: highlightedEntryID)
-            // FB-39: editing and deleting a line lived only in a long press; a quiet «⋯» shows that the line can be changed.
-            .overlay(alignment: .topTrailing) {
-                if page.editable.contains(line.id) || page.deletable.contains(line.id) {
-                    Menu { lineActions(line, page: page) } label: {
-                        Image(systemName: "ellipsis").font(.footnote).foregroundStyle(theme.color("ink3Text"))
-                            .frame(width: 44, height: 44).contentShape(Rectangle())
-                    }.accessibilityLabel("خيارات السطر").accessibilityIdentifier("diary-line-menu").offset(x: 14, y: 2)
-                }
-            }
             .contextMenu { lineActions(line, page: page) }.padding(.leading, 6).padding(.trailing, travel == nil || typeSize.isAccessibilitySize ? 18 : 92).padding(
                 .vertical, 10
             ).frame(minHeight: 34).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 0.7) }

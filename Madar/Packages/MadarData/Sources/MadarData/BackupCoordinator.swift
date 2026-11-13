@@ -24,6 +24,10 @@ import Darwin
         try Task.checkCancellation(); try validation()
         try keyStore.save(credential)
     }
+    /// T04: a new passphrase replaces the stored key. New backups open with it; older ones still need the passphrase they were made with.
+    public func replacePassphrase(_ passphrase: String, validation: @MainActor () throws -> Void = {}) async throws {
+        try await configurePassphrase(passphrase, validation: validation)
+    }
     public func catalog() throws -> [BackupReceipt] {
         guard FileManager.default.fileExists(atPath:catalogURL.path) else { return [] }
         return try JSONDecoder().decode([BackupReceipt].self,from:Data(contentsOf:catalogURL)).sorted { a,b in a.createdAt == b.createdAt ? a.id.uuidString > b.id.uuidString : a.createdAt > b.createdAt }
@@ -86,10 +90,13 @@ import Darwin
             return destination
         }
     }
-    public func preview(file: URL, passphrase: String, progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation()) async throws -> RestorePreview {
+    public func preview(file: URL, passphrase: String? = nil, progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation()) async throws -> RestorePreview {
+        // T04: without a typed passphrase the key kept on this device (Keychain, this device only) opens this device's backups.
+        let storedCredential = passphrase == nil ? try keyStore.load() : nil
+        guard passphrase != nil || storedCredential != nil else { throw BackupOperationError.backupNotConfigured }
         let value = try await background(cancellation) {
             try cancellation.check()
-            let validated = try BackupArtifact.validateContents(file: file, passphrase: passphrase, cancellation: cancellation, progress: progress)
+            let validated = try BackupArtifact.validateContents(file: file, passphrase: passphrase, credential: storedCredential, cancellation: cancellation, progress: progress)
             return (validated, try BackupArtifact.fingerprint(file: file))
         }
         try cancellation.check(); try BackupCodec.validateTypedRows(value.0.records)

@@ -91,11 +91,10 @@ private struct MadarSceneContent: View {
                     MadarRootView(session: session).modelContainer(session.container).environment(session)
                 }
                 else if let startupError {
-                    ContentUnavailableView {
-                        Label("تعذّر فتح مدار", systemImage: "externaldrive.badge.exclamationmark")
-                    } description: {
-                        Text("تعذّر على مدار فتح بياناته. لم يحذف هذا الإجراء شيئًا؛ أعِد المحاولة، وإن تكرّر فتواصل معنا.\n\(startupError)")
-                    } actions: { Button("أعِد المحاولة") { Task { await runtime.load() } } }
+                    StartupRecoveryView(error: startupError,
+                                        groupDirectory: FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2"),
+                                        retry: { Task { await runtime.load() } },
+                                        startFresh: { await runtime.startWithFreshStore() })
                 } else {
                     MadarLaunchPlaceholder()
                 }
@@ -140,6 +139,22 @@ struct MadarLaunchPlaceholder: View {
         loading = task
         await task.value
         loading = nil
+    }
+    /// T03: the unreadable store is set aside, never deleted; if a clean one cannot open either, it is put back.
+    func startWithFreshStore() async {
+        guard session == nil, let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else { return }
+        do {
+            let aside = try StartupRecovery.setAsideStore(groupDirectory: group)
+            startupError = nil
+            await load()
+            if session == nil {
+                let failure = startupError
+                try StartupRecovery.putBack(aside, groupDirectory: group)
+                startupError = failure
+            } else {
+                session?.errorMessage = "فُتح مخزن جديد. لاستعادة بياناتك افتح الإعدادات ← النسخ الاحتياطي واختر نسخة."
+            }
+        } catch { startupError = madarUserMessage(error) }
     }
     private func openSession() async {
         do {

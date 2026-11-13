@@ -165,7 +165,7 @@ public final class PrayerRepository {
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
             let friday = prayer == .dhuhr && calendar.component(.weekday, from: day.date(in: zone)) == 6 && row?.shortened != true
             let windowEnded = missedWindowEnd(ref).map { now >= $0 } ?? false
-            return PrayerCell(reference: ref, status: status, heart: row?.heart.flatMap(PrayerHeart.init(rawValue:)), time: occurrence == nil ? nil : row?.eventAt ?? occurrence?.time, prayerTime: occurrence?.time, shortened: row?.shortened == true, fridayKind: row?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), pairID: row?.pairID, isFriday: friday, canLog: day >= start && (due || occurrence == nil), canMarkMissed: false, canMakeUp: day >= start && windowEnded)
+            return PrayerCell(reference: ref, status: status, heart: row?.heart.flatMap(PrayerHeart.init(rawValue:)), time: occurrence == nil ? nil : row?.eventAt ?? occurrence?.time, prayerTime: occurrence?.time, shortened: row?.shortened == true, fridayKind: row?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), pairID: row?.pairID, isFriday: friday, canLog: day >= start && (due || occurrence == nil), canMarkMissed: false, canMakeUp: day >= start && windowEnded && status != .jamaah && status != .alone)
         })
     }
     public func nightRequiresRestore(_ night: GregorianDay) throws -> Bool {

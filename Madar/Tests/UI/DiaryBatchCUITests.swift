@@ -41,7 +41,7 @@ import XCTest
         openMenuItem(app, "diary-day-read")
         XCTAssertTrue(app.buttons["diary-reading-close"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.staticTexts["قهوة الضحى."].waitForExistence(timeout: 15), app.debugDescription)
-        XCTAssertFalse(app.buttons["diary-line-menu"].firstMatch.isHittable, "Reading mode has no editing controls")
+        XCTAssertFalse(app.buttons["diary-line-write-after"].firstMatch.exists, "Reading mode has no editing controls")
         // RTL book order: a swipe to the right turns to the next page; to the left, back to an earlier day.
         let pager = app.descendants(matching: .any)["diary-reading-pager"]
         XCTAssertTrue(pager.waitForExistence(timeout: 10))

@@ -55,6 +55,10 @@ private struct FoundationWidget: Widget {
 private struct PrayerCountdownActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: PrayerCountdownAttributes.self) { context in
+            // Sanctity (T01): from the adhan nothing is drawn, even if the app never reopens.
+            if context.isStale || Date() >= context.state.prayerAt {
+                EmptyView()
+            } else {
             HStack(spacing: 12) {
                 Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width: 24, height: 24).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
@@ -68,22 +72,26 @@ private struct PrayerCountdownActivityWidget: Widget {
             .padding()
             .activityBackgroundTint(Color(uiColor: .secondarySystemBackground))
             .activitySystemActionForegroundColor(Color(uiColor: .label))
+            }
         } dynamicIsland: { context in
-            DynamicIsland {
+            let gone = context.isStale || Date() >= context.state.prayerAt
+            return DynamicIsland {
                 DynamicIslandExpandedRegion(.center) {
+                    if !gone {
                     HStack {
                         Text(context.state.prayerName).font(.headline)
                         Spacer()
                         PrayerActivityTimer(start: context.attributes.scheduledStartAt, end: context.state.prayerAt, numerals: context.attributes.numerals)
                     }
                     .environment(\.layoutDirection, .rightToLeft)
+                    }
                 }
             } compactLeading: {
-                Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
+                if !gone { Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18) }
             } compactTrailing: {
-                PrayerActivityTimer(start: context.attributes.scheduledStartAt, end: context.state.prayerAt, numerals: context.attributes.numerals)
+                if !gone { PrayerActivityTimer(start: context.attributes.scheduledStartAt, end: context.state.prayerAt, numerals: context.attributes.numerals) }
             } minimal: {
-                Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
+                if !gone { Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18) }
             }
             .widgetURL(URL(string: "madar://prayer"))
             .keylineTint(.teal)
@@ -94,6 +102,9 @@ private struct PrayerCountdownActivityWidget: Widget {
 private struct MadarContextActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: MadarContextActivityAttributes.self) { context in
+            if context.isStale {
+                EmptyView()
+            } else {
             HStack(spacing: 12) {
                 ContextActivityIcon(kind: context.attributes.kind).frame(width: 24, height: 24)
                 VStack(alignment: .leading, spacing: 4) {
@@ -116,6 +127,7 @@ private struct MadarContextActivityWidget: Widget {
             .activityBackgroundTint(.black.opacity(0.92))
             .activitySystemActionForegroundColor(.white)
             .widgetURL(context.attributes.kind.destination)
+            }
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {

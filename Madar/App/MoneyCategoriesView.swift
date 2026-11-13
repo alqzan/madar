@@ -191,7 +191,7 @@ struct MoneyCategoriesView: View {
     // MARK: Actions
 
     private func pick(_ s: MoneyCategoryShelf) {
-        withAnimation(.easeOut(duration: 0.2)) { selected = s.id }
+        withAnimation(MadarMotion.quick.animation) { selected = s.id }
         percentMode = s.mode == "percent" && (reading?.incomeMinor ?? 0) > 0
         draftBp = s.percentBp ?? 0
         draftBase = s.mode == "percent" ? s.base : "income"

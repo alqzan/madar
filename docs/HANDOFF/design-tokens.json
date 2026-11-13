@@ -348,7 +348,35 @@
   "systemWidgets": "system (WidgetKit) widgets keep the family the OS chose and drop lowest-priority items (p11 §9); they never resize"
  },
  "motion": {
-  "reference": "each token names ONE curve. SwiftUI: .timingCurve(c1x, c1y, c2x, c2y, duration: d). CSS references use cubic-bezier with the same four numbers. No spring is used anywhere, so the prototype and the app animate identically.",
+  "reference": "each token names ONE curve. SwiftUI: .timingCurve(c1x, c1y, c2x, c2y, duration: d). CSS references use cubic-bezier with the same four numbers. Springs appear only in motion.settle (owner T09); every other token is one timing curve.",
+  "quick": {
+   "duration": 0.18,
+   "curve": [0.2, 0.8, 0.2, 1],
+   "note": "small state changes: a toggle, a chip, a check mark",
+   "reduceMotion": {"fallback": "crossfade 0.2"}
+  },
+  "standard": {
+   "duration": 0.28,
+   "curve": [0.2, 0.8, 0.2, 1],
+   "note": "default for content that appears, moves or changes",
+   "reduceMotion": {"fallback": "crossfade 0.2"}
+  },
+  "settle": {
+   "spring": {"response": 0.38, "dampingFraction": 0.86},
+   "note": "a sheet or card that lands; the only spring",
+   "reduceMotion": {"fallback": "crossfade 0.2"}
+  },
+  "celebrate": {
+   "duration": 0.6,
+   "curve": [0.4, 0, 0.2, 1],
+   "note": "a finished wird, a closed day; never on a repeated action",
+   "reduceMotion": {"fallback": "no movement; haptic and state change only"}
+  },
+  "reduced": {
+   "duration": 0.2,
+   "note": "what every token becomes under Reduce Motion: a crossfade",
+   "curve": "none"
+  },
   "rearrange": {
    "duration": 0.38,
    "curve": [

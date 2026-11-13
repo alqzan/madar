@@ -368,7 +368,7 @@ struct MoneySettingsView: View {
             Image(systemName: "seal.fill").foregroundStyle(theme.color("reserveText")).position(
                 x: 119 + sin(Double(dialDay) * 2 * .pi / Double(dialDays)) * 113,
                 y: 119 - cos(Double(dialDay) * 2 * .pi / Double(dialDays)) * 113
-            ).animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: dialDay)
+            ).madarAnimation(.standard, value: dialDay)
             VStack(spacing: 4) {
                 Text(flexible ? "أول موعد" : "يوم الراتب").font(MadarTypography.caption()).foregroundStyle(
                     theme.secondaryInk);

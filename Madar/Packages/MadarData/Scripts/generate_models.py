@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Regenerate models and schema from the approved dictionary. Does not change the specification."""
-import json, pathlib
+import json, pathlib, sys
+# T05 guard: the committed GeneratedModels.swift / GeneratedSchema.swift carry parts this script does not emit yet
+# (isLiveRow, the V17/V18 doc comments, the AccountTail/BankReading/UpcomingDue/MushafBookmark backup rows, schema 18).
+# Running it unreviewed would delete them, so it refuses to write without --force. After --force, review `git diff` first.
+if '--force' not in sys.argv:
+    sys.exit('generate_models.py refuses to overwrite the committed models (it is behind them). Pass --force and review the diff.')
 base = pathlib.Path(__file__).resolve().parents[1]
 spec = base.parents[1] / 'Specification' / 'data-dictionary.json'
 p = json.loads(spec.read_text())

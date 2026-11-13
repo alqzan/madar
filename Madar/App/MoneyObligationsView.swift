@@ -161,7 +161,7 @@ struct MoneyObligationsView: View {
                         ForEach(Array(r.cycle.enumerated()), id: \.element.id) { index, due in
                             Path { p in p.move(to: CGPoint(x: trueX[index], y: 31)); p.addLine(to: CGPoint(x: shownX[index], y: 41)) }
                                 .stroke(theme.color("reserveText"), lineWidth: 1)
-                            Button { withAnimation(.easeOut(duration: 0.2)) { selected = due.id } } label: { lantern(due, drop: 14 + CGFloat(levels[index]) * 76, active: current(r)?.id == due.id) }
+                            Button { withAnimation(MadarMotion.quick.animation) { selected = due.id } } label: { lantern(due, drop: 14 + CGFloat(levels[index]) * 76, active: current(r)?.id == due.id) }
                                 .buttonStyle(.madarPlain).frame(width: 74).offset(x: shownX[index] - 37, y: 31)
                                 // Higher lanterns sit above the strings of the ones hanging below them.
                                 .zIndex(-Double(levels[index]))
@@ -343,7 +343,7 @@ struct MoneyObligationsView: View {
                 Text("لا شيء على هذا الرفّ.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.vertical, 10)
             }
             ForEach(dues) { due in
-                Button { withAnimation(.easeOut(duration: 0.2)) { selected = due.id } } label: {
+                Button { withAnimation(MadarMotion.quick.animation) { selected = due.id } } label: {
                     HStack(spacing: 12) {
                         RoundedRectangle(cornerRadius: 2).fill(color(due.group)).frame(width: 40, height: 28)
                             .overlay { RoundedRectangle(cornerRadius: 2).stroke(theme.color("reserve"), lineWidth: 1) }

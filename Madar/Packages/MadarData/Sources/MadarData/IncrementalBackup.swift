@@ -64,7 +64,7 @@ public enum BackupArtifact {
         guard prefixes.count == hashes.count + 1 else { throw DataError.invalidBackup }
         // A damaged, differently keyed or older cache is never authoritative.
         var cached: [String: URL] = [:]
-        if let previous, let old = try? readPackage(previous, credential: credential, cancellation: cancellation) {
+        if let previous, let old = try? readPackage(previous, credential: credential, hydrateMedia: false, cancellation: cancellation) {
             for link in old.links {
                 if let descriptor = old.backup.manifest.files.first(where: { $0.path == link.path }) {
                     cached[descriptor.sha256] = previous.appendingPathComponent(mediaDirectory).appendingPathComponent(link.object)

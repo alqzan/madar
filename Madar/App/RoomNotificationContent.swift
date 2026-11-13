@@ -226,6 +226,7 @@ import MadarPrayer
             let streak = (try? HabitRepository(context: ModelContext(session.container)).readings(at: Date()))?.first { $0.id.uuidString == habitID }?.summary.streak ?? 0
             content.body = NudgeWording.body(streak > 0 ? .habitKeepStreak : .habitFirstStep, dayKey: candidate.dayKey)
             content.userInfo = ["dayKey": candidate.dayKey, "room": "habits", "habit": habitID]
+            content.categoryIdentifier = PrayerNotificationCoordinator.habitCategoryID
         } else if id.hasPrefix("notes.") {
             // §8 item 10 matrix copy. Never diary text.
             content.title = "المذكرات"

@@ -275,7 +275,9 @@ public enum PDFBookEPUB {
         func headingPage(_ title: String, from: Int, to: Int) -> Int? {
             let key = letters(title.drop { $0.isNumber || $0 == " " || $0 == "-" }.description)
             guard key.count >= 4 else { return nil }
-            return (max(0, from)..<min(texts.count, to)).first { i in
+            let lower = max(0, from), upper = min(texts.count, to)
+            guard lower < upper else { return nil }
+            return (lower..<upper).first { i in
                 !contents.contains(i) && lines(i).prefix(2).contains { similar(letters($0), key) }
             }
         }

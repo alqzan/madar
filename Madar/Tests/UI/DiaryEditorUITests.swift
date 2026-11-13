@@ -134,9 +134,10 @@ import XCTest
         capture(app, "FLOW-day-L")
         // 10 Nov owner: no «اكتب هنا» capsule between every item; a line's own menu writes right after it.
         XCTAssertFalse(app.buttons["diary-flow-insert"].exists)
-        let menu = app.buttons["diary-line-menu"].firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 5), app.debugDescription)
-        menu.tap()
+        // Quick win 6: no «⋯» above each line; the long-press menu holds the line's actions.
+        let firstLine = app.staticTexts.matching(identifier: "diary-day-line").firstMatch
+        XCTAssertTrue(firstLine.waitForExistence(timeout: 5), app.debugDescription)
+        firstLine.press(forDuration: 1.1)
         let after = app.buttons["diary-line-write-after"].firstMatch
         XCTAssertTrue(after.waitForExistence(timeout: 5), app.debugDescription)
         after.tap()
@@ -149,8 +150,9 @@ import XCTest
         app.buttons["diary-inline-send"].tap()
         XCTAssertTrue(app.staticTexts["سطر بين سطرين"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.buttons["diary-inline-chip-clear"].exists)
-        // Tap the line you just wrote: it comes back into the same field to change it, no sheet.
-        app.staticTexts["سطر بين سطرين"].firstMatch.tap()
+        // Quick win 5: a tap writes after the line; changing it is in the long-press menu («عدّل السطر»), same field, no sheet.
+        app.staticTexts["سطر بين سطرين"].firstMatch.press(forDuration: 1.1)
+        app.buttons["عدّل السطر"].firstMatch.tap()
         XCTAssertTrue(app.buttons["diary-inline-chip-clear"].waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertEqual(field.value as? String, "سطر بين سطرين")
         field.tap(); field.typeText(" وأكثر")

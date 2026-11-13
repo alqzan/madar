@@ -129,7 +129,8 @@
     "WidgetConfig",
     "AccountTail",
     "BankReading",
-    "UpcomingDue"
+    "UpcomingDue",
+    "MushafBookmark"
   ],
   "models": [
     {
@@ -357,6 +358,13 @@
           "optional": true,
           "default": null,
           "note": "Owner-approved 26 Oct 2026 (OR-09, multi-country trips): a later leg of one trip points to the first leg's id; nil on the first or only leg. Journey key = journeyID ?? id. Never backfilled."
+        },
+        {
+          "name": "dismissedAt",
+          "type": "Date?",
+          "optional": true,
+          "default": null,
+          "note": "Owner-approved 27 Oct / 11 Nov 2026 (D7, schema V18): when the owner dismissed the trip; a habit the trip paused resumes from that day. Nil for a live trip and for one dismissed before V18."
         }
       ]
     },
@@ -5722,6 +5730,40 @@
         }
       ]
     }
+,
+    {
+      "name": "MushafBookmark",
+      "room": "quran",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [
+        "1 <= page <= 604",
+        "name is trimmed, 1...40 characters"
+      ],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "a named bookmark on a Mushaf page; several per page allowed; the last reading position stays separate",
+      "amendedBy": "owner 11 Nov 2026, D8 named Mushaf bookmarks (schema V18)",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "page",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "note": "Madinah Mushaf page, 1...604"
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "the owner's name for the bookmark"
+        }
+      ]
+    }
   ],
   "snapshotEnvelope": {
     "fields": {
@@ -5954,6 +5996,18 @@
         "kind": "tombstone device-only draft; no session facts",
         "auth": "app"
       },
+      "quran.saveBookmark": {
+        "intent": null,
+        "payload": "{id: UUID, page: Int 1...604, name: String trimmed 1...40}",
+        "kind": "D8 (11 Nov 2026): create or rename/move a named MushafBookmark; undoable",
+        "auth": "app"
+      },
+      "quran.deleteBookmark": {
+        "intent": null,
+        "payload": "{id: UUID}",
+        "kind": "D8: tombstone a MushafBookmark; undoable",
+        "auth": "app"
+      },
       "quran.discardUnreadableDrafts": {
         "payload": "{}",
         "kind": "tombstone unreadable device-only SessionDraft rows; preserve stored bytes and create no session facts",
@@ -6119,7 +6173,7 @@
       },
       "diary.appendMedia": {
         "intent": null,
-        "payload": "{fileID: UUID, kind: photo|audio|video|document, contentType: String, caption: String, day: today|yesterday, writingDayKey: YYYY-MM-DD, durationS?: Int >= 0, assetID?: String (photo only; Photos-library local identifier, stored as Media.sourceID \"photos:<id>\" with a small copy in data — owner 24 Oct 2026)}",
+        "payload": "{fileID: UUID, kind: photo|audio|video|document, contentType: String, caption: String, day: today|yesterday, writingDayKey: YYYY-MM-DD, durationS?: Int >= 0, assetID?: String (photo only; Photos-library local identifier, stored as Media.sourceID \"photos:<id>\" with a small copy in data — owner 24 Oct 2026), at?: epoch seconds, not in the future (D8, 11 Nov 2026: a photo after «اكتب بعده» takes the in-between time)}",
         "kind": "append Entry and referenced Media from private staged UUID file; sha256; original audio before transcription",
         "auth": "app-only + diary unlocked"
       },
@@ -6238,5 +6292,5 @@
       "execution": "Immediately on press, within undo window"
     }
   },
-  "storeSchemaVersion": 17
+  "storeSchemaVersion": 18
 }

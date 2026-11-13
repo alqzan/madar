@@ -531,6 +531,7 @@ struct DiaryInlineComposer: View {
         guard canSend else { return }
         saving = true; failure = nil
         defer { saving = false }
+        let sent = text   // T02: only what was sent is cleared; words typed during the send stay.
         await settleDraftTask()
         do {
             if let edit {
@@ -542,8 +543,11 @@ struct DiaryInlineComposer: View {
                 var payload: [String: MadarCore.JSONValue] = ["id": .string(draftID.uuidString)]
                 if let insertAt, draftDay == "today", insertAt < app.prayerNow() { payload["at"] = .number(insertAt.timeIntervalSince1970) }
                 try await app.executeDiaryCommand("diary.commitDraft", payload: payload, id: draftID)
-                text = ""; lastSaved = ""; hasDraftRecord = false; draftID = UUID(); draftDay = "today"; draftWritingDay = nil
-                insertAt = nil; anchor = nil; draftStatus = ""; rich = AttributedString(); richBaseline = ""
+                let remainder = DiaryDraftRemainder.remaining(current: text, sent: sent)
+                text = remainder; lastSaved = ""; hasDraftRecord = false; draftID = UUID(); draftDay = "today"; draftWritingDay = nil
+                insertAt = nil; anchor = nil; draftStatus = ""
+                rich = remainder.isEmpty ? AttributedString() : DiaryRichText.attributed(fromMarkdown: remainder)
+                richBaseline = remainder.isEmpty ? "" : DiaryRichText.markdown(from: rich)
                 if expanded { toggle(false) }
             }
             saved()
@@ -565,7 +569,7 @@ struct DiaryInlineComposer: View {
         } catch { failure = madarUserMessage(error) }
     }
     private func linkLibraryPhoto(_ asset: PHAsset) async -> Bool {
-        guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { failure = "تعذّر فتح الصورة من تطبيق الصور."; return false }
+        guard let data = await DiaryPhotoLibrary.data(asset), let copy = await Task.detached(priority: .userInitiated, operation: { DiaryPhotoLibrary.smallCopy(of: data) }).value else { failure = "تعذّر فتح الصورة من تطبيق الصور."; return false }
         do {
             try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", day: "today", writingDay: try service.currentDay(), assetID: asset.localIdentifier)
             failure = nil; saved(); return true
@@ -575,7 +579,10 @@ struct DiaryInlineComposer: View {
         do {
             let url = try result.get(); let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
             let type = try url.resourceValues(forKeys: [.contentTypeKey]).contentType ?? .data
-            let data = try Data(contentsOf: url)
+            // The file is read off the main thread and refused above 50 MB before anything is loaded.
+            let bytes = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            guard bytes <= 50_000_000 else { failure = "الملف أكبر من ٥٠ ميغابايت."; return }
+            let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
             try await service.appendMedia(data: data, kind: type.conforms(to: .image) ? "photo" : type.conforms(to: .audio) ? "audio" : type.conforms(to: .movie) ? "video" : "document",
                 contentType: type.preferredMIMEType ?? "application/octet-stream", caption: url.lastPathComponent, day: "today", writingDay: try service.currentDay())
             failure = nil; saved()

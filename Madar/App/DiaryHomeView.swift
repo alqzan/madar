@@ -113,7 +113,7 @@ struct DiaryHomeView: View {
                 todayBar(snapshot.todayPage).ignoresSafeArea(.keyboard, edges: .bottom).transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.snappy(duration: 0.2), value: todayCardVisible)
+        .madarAnimation(.quick, value: todayCardVisible)
         .scrollDismissesKeyboard(.interactively)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task(id: [isFrontRoom ? app.prayerRevision : -1, roomVisit]) {

@@ -141,7 +141,8 @@ public struct QuranStagedResult: Sendable {
             try touch(row, deleting: true)
         case "quran.discardUnreadableDrafts":
             undoable = false
-            let rows = try context.fetch(FetchDescriptor<SessionDraft>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            // T02: diary drafts share this table and are never Quran drafts.
+            let rows = try context.fetch(FetchDescriptor<SessionDraft>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && !$0.kind.hasPrefix("diary.") }
             var discardedAny = false
             for row in rows {
                 let value: QuranSessionDraft

@@ -11,6 +11,8 @@ struct DiaryInverse: Codable {
     let previousOrigin: String?
     var before: DataRecord? = nil
     var deletedEntries: [DiaryEntryDeletion]? = nil
+    /// T02: a sent draft is revived when its line is undone, so the text returns to the field.
+    var restoredDraftID: UUID? = nil
 }
 struct DiaryEntryDeletion: Codable {
     let before: DataRecord
@@ -190,6 +192,15 @@ struct DiaryEntryDeletion: Codable {
         return freeze
     }
     static func undo(_ data: Data, context: ModelContext, now: Date, writer: String) throws {
+        try undoRows(data, context: context, now: now, writer: writer)
+        guard let draftID = try JSONDecoder().decode(DiaryInverse.self, from: data).restoredDraftID,
+              let draft = try context.fetch(FetchDescriptor<SessionDraft>()).first(where: { $0.id == draftID && $0.kind.hasPrefix("diary.") && $0.mergedInto == nil }),
+              draft.deletedAt != nil else { return }
+        let stamp = StableIdentity.monotonic(now: now, previous: draft.updatedAt)
+        draft.deletedAt = nil; draft.deletionBarrierAt = nil; draft.restoredAt = max(now, stamp)
+        draft.updatedAt = stamp; draft.writerID = writer
+    }
+    private static func undoRows(_ data: Data, context: ModelContext, now: Date, writer: String) throws {
         let inverse = try JSONDecoder().decode(DiaryInverse.self, from: data)
         func tombstone<T: MadarRecordModel>(_ row: T) throws {
             guard try row.record() == inverse.after else { throw DataError.invalidValue("undo superseded: diary") }

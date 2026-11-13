@@ -80,7 +80,7 @@ enum MoneyHomeProjectionBuilder {
         })
         var caps: [String: Int] = [:]
         for plan in sorted where plan.source == "daily" {
-            guard let envelope = envelopes.first(where: { $0.id == plan.id && $0.id == plan.envelopeID && $0.role == "goal" }), let target = envelope.targetMinor else { continue }
+            guard let envelope = envelopes.first(where: { $0.id == plan.envelopeID && $0.role == "goal" }), let target = envelope.targetMinor else { continue }
             let funded = allocations.filter { $0.targetID == envelope.id && $0.kind == "fund" && $0.amountMinor > 0 }.reduce(0) { $0 + $1.amountMinor }
             caps[plan.id.uuidString] = max(0, target - funded)
         }

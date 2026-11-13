@@ -558,7 +558,7 @@ private struct RecordingBadge: View {
                 Button { session.selectedTab = "notes" } label: {
                     HStack(spacing: 8) {
                         Circle().fill(theme.color("late")).frame(width: 9, height: 9)
-                        Text("يُسجَّل صوتك · " + DiaryDurationFormat.elapsed(voice.elapsedSeconds, digits: AppDiaryService(app: session).digits))
+                        Text("يُسجَّل صوتك، " + DiaryDurationFormat.elapsed(voice.elapsedSeconds, digits: AppDiaryService(app: session).digits))
                             .font(MadarTypography.caption()).monospacedDigit().foregroundStyle(theme.ink)
                     }.frame(minHeight: 44).contentShape(Rectangle())
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("recording-badge-open")

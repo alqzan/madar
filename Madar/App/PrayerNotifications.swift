@@ -108,6 +108,8 @@ struct PrayerNotificationSlot: Equatable {
 @MainActor
 final class PrayerNotificationCoordinator {
     static let categoryID = "salah.ask"
+    static let habitCategoryID = "habits.reminder"
+    static let habitDoneActionID = "habits.done"
     /// Friday noon: «في جماعة» needs the Jumu'ah/Dhuhr choice (RP5), so that button opens the app on the choice instead of recording.
     static let fridayCategoryID = "salah.ask.friday"
     static let snoozeActionID = "salah.snooze"
@@ -133,7 +135,10 @@ final class PrayerNotificationCoordinator {
         // FB-39: the old Friday «في جماعة» ran in the background, could not open the app, and so recorded nothing.
         let fridayJamaah = UNNotificationAction(identifier: Self.jamaahActionID, title: "في جماعة", options: [.foreground])
         let friday = UNNotificationCategory(identifier: Self.fridayCategoryID, actions: [fridayJamaah, alone, snooze], intentIdentifiers: [], options: [])
-        center.setNotificationCategories([category, friday])
+        // T11: a habit reminder can be finished from the notification itself.
+        let habitDone = UNNotificationAction(identifier: Self.habitDoneActionID, title: "تمّت", options: [])
+        let habit = UNNotificationCategory(identifier: Self.habitCategoryID, actions: [habitDone], intentIdentifiers: [], options: [])
+        center.setNotificationCategories([category, friday, habit])
     }
 
     func attach(to session: AppSession) async {
@@ -341,6 +346,10 @@ final class PrayerNotificationCoordinator {
                 } else {
                     session.recordPrayer(reference, status: alone ? .alone : .jamaah, fridayKind: friday ? .dhuhr : nil)
                 }
+            } else if response.actionIdentifier == Self.habitDoneActionID {
+                let info = response.notification.request.content.userInfo
+                guard let dayKey = info["dayKey"] as? String, let habit = (info["habit"] as? String).flatMap(UUID.init(uuidString:)) else { return }
+                try await session.completeHabitFromNotification(habitID: habit, dayKey: dayKey, requestID: response.notification.request.identifier)
             } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
                 let request = response.notification.request
                 if RoomNotificationContent.isRoomRequest(request.identifier) { RoomNotificationContent.open(request.identifier, userInfo: request.content.userInfo, session: session) }
@@ -609,8 +618,11 @@ final class PrayerNotificationCoordinator {
             $0.activityState == .active || $0.activityState == .pending || $0.activityState == .stale
         }
         let stale = activities.filter { $0.activityState == .stale }
-        let active = activities.filter { $0.activityState == .active || $0.activityState == .pending }
+        let liveActivities = activities.filter { $0.activityState == .active || $0.activityState == .pending }
         for activity in stale { try await endPrayerActivity(activity, now: now) }
+        // T01: any countdown whose adhan has passed is ended immediately on every refresh.
+        for activity in liveActivities where activity.content.state.prayerAt <= now { try await endPrayerActivity(activity, now: now) }
+        let active = liveActivities.filter { $0.content.state.prayerAt > now }
         guard session.bool("salah.liveActivity"), session.bool("notif.thisDeviceReminders"),
               ActivityAuthorizationInfo().areActivitiesEnabled else {
             for activity in active { try await endPrayerActivity(activity, now: now) }
@@ -749,7 +761,7 @@ final class PrayerNotificationCoordinator {
                 continue
             }
             let staleAt = Self.contextActivityStaleDate(plan: plan, startedAt: activity.attributes.startedAt,
-                                                        prayerSlots: prayerSlots, timeZone: zone, quietFromMinutes: quietFrom)
+                                                        prayerSlots: prayerSlots, timeZone: zone, quietFromMinutes: quietFrom, sanctityWindows: sanctityWindows)
             let content = ActivityContent(state: plan.state, staleDate: staleAt, relevanceScore: 0.7)
             if activity.content.state != plan.state || activity.content.staleDate != staleAt {
                 await activity.update(content)
@@ -769,7 +781,7 @@ final class PrayerNotificationCoordinator {
             let attributes = MadarContextActivityAttributes(activityKey: plan.activityKey, kind: plan.kind,
                                                              startedAt: now, numerals: numerals)
             let staleAt = Self.contextActivityStaleDate(plan: plan, startedAt: now, prayerSlots: prayerSlots,
-                                                        timeZone: zone, quietFromMinutes: quietFrom)
+                                                        timeZone: zone, quietFromMinutes: quietFrom, sanctityWindows: sanctityWindows)
             let content = ActivityContent(state: plan.state, staleDate: staleAt, relevanceScore: 0.7)
             do {
                 try updateLedger(requestID: requestID, dayKey: reservation.dayKey, dueAt: reservation.scheduledAt,
@@ -789,9 +801,14 @@ final class PrayerNotificationCoordinator {
 
     private static func contextActivityStaleDate(plan: MadarContextActivityPlan, startedAt: Date,
                                                  prayerSlots: [PrayerNotificationSlot], timeZone: TimeZone,
-                                                 quietFromMinutes: Int?) -> Date {
+                                                 quietFromMinutes: Int?, sanctityWindows: [SanctityWindow] = []) -> Date {
         let maximumEnd = startedAt.addingTimeInterval(MadarContextActivityPlanner.maximumActiveDuration)
         var end = min(plan.staleAt ?? maximumEnd, maximumEnd)
+        // T01: a stale activity still draws until the app reopens, so it must go stale
+        // at the start of the nearest sanctity window of any prayer, not only Isha.
+        if let nextWindow = sanctityWindows.map(\.start).filter({ $0 > startedAt }).min() {
+            end = min(end, nextWindow)
+        }
         if let nextIsha = prayerSlots.filter({ $0.prayer == .isha }).map(\.occurrence.time).filter({ $0 > startedAt }).min() {
             end = min(end, nextIsha)
         }

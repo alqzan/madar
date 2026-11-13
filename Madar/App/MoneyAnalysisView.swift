@@ -70,7 +70,7 @@ struct MoneyAnalysisView: View {
                             aiComposerOpen = true
                         } label: {
                             Label(
-                                aiAvailability == .ready ? "اسأل عن مالك" : "جهّز الترجمة على الجهاز",
+                                aiAvailability == .ready ? "اسأل عن مالك" : "جهّز المساعد على جهازك",
                                 systemImage: "sparkles"
                             )
                                 .font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText"))

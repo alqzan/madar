@@ -113,10 +113,13 @@ import WidgetKit
             token.cancel(); throw error
         }
     }
+    func changePassphrase(_ passphrase: String) async throws {
+        try await coordinator.replacePassphrase(passphrase)
+    }
     func share(file: URL) async throws {
         try presentShare(file)
     }
-    func previewRestore(file: URL, passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestorePreview {
+    func previewRestore(file: URL, passphrase: String?, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestorePreview {
         clearPreviews()
         cancellation = BackupCancellation()
         let cache = FileManager.default.temporaryDirectory.appending(path: "MadarImport-\(UUID().uuidString).madarbackup")
@@ -125,7 +128,7 @@ import WidgetKit
             let preview = try await coordinator.preview(file: cache, passphrase: passphrase, progress: reporter(progress), cancellation: cancellation)
             previews[preview.id] = preview
             // Retained only until explicit restoration when an automatic safety key is not configured.
-            if try !coordinator.hasConfiguredKey() { previewPasswords[preview.id] = passphrase }
+            if let passphrase, try !coordinator.hasConfiguredKey() { previewPasswords[preview.id] = passphrase }
             return BackupRestorePreview(id: preview.id, fileName: file.lastPathComponent, createdAt: preview.createdAt,
                 counts: Self.displayCounts(preview),
                 additions: preview.additions, updates: preview.updates, deletions: preview.deletions,

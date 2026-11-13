@@ -9,8 +9,6 @@ public enum UserWordIdentity {
             .map(String.init).joined()
         return stripped
             .replacingOccurrences(of: "[أإآ]", with: "ا", options: .regularExpression)
-            .replacingOccurrences(of: "ى", with: "ي")
-            .replacingOccurrences(of: "ة", with: "ه")
     }
 
     public static func key(language: String, word: String) -> String {

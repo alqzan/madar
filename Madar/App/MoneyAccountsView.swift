@@ -212,7 +212,7 @@ private struct MoneyTransferView: View {
     private var withdrawal: Bool { to?.edit?.kind == "cash" && from?.edit?.kind != "cash" }
     private var amountMinor: Int? {
         guard let currency = from?.currency, let exponent = CurrencyExponents.specified.exponent(currency) else { return nil }
-        let raw = BankMessageParser.clean(input).replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let raw = BankMessageParser.clean(input).trimmingCharacters(in: .whitespacesAndNewlines)
         guard let minor = MoneyAmountInput.minor(raw, exponent: exponent), minor > 0 else { return nil }
         return minor
     }
