@@ -123,14 +123,16 @@ struct HabitEditorView:View {
                         }
                         if rule.measure != .once {
                             // FB-39: a step of one up to 100000 meant 2000 taps to move a walking goal from 6000 to 8000 steps; type it, or step by a sensible amount.
-                            HStack(spacing:10) {
+                            let daysPicked = (!rule.weekdays.isEmpty && rule.frequency == .weekly) || (!monthDays.isEmpty && rule.frequency == .monthly)
+                            if daysPicked { Text("في الأيام التي اخترتها").font(MadarTypography.caption()).frame(minHeight:44) }
+                            else { HStack(spacing:10) {
                                 Stepper("الهدف: "+habitUnitCount(rule.target,rule.unit,digits),value:$rule.target,in:1...targetLimit,step:targetStep).frame(minHeight:44).accessibilityIdentifier("habit-target")
                                 if source != "jamaah" {
                                     TextField("الهدف",value:Binding(get:{rule.target},set:{rule.target=min(targetLimit,max(1,$0))}),format:.number)
                                         .keyboardType(.numberPad).multilineTextAlignment(.center).frame(width:76,height:40)
                                         .background(theme.surface,in:.rect(cornerRadius:10)).accessibilityIdentifier("habit-target-field")
                                 }
-                            }
+                            }}
                             if !rule.weekdays.isEmpty && rule.frequency == .weekly || !monthDays.isEmpty && rule.frequency == .monthly { Text("عدد الأيام هو هدف الفترة، وما زاد فضل.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             Toggle("أقلّ القليل يحفظ السلسلة",isOn:$minimumOn).frame(minHeight:44).accessibilityIdentifier("habit-minimum-toggle")
                             if minimumOn { Stepper("أقلّ القليل: "+habitUnitCount(min(rule.target,rule.minimum ?? 1),rule.unit,digits),value:Binding(get:{min(rule.target,rule.minimum ?? 1)},set:{rule.minimum=$0}),in:1...max(1,rule.target)).frame(minHeight:44) }
