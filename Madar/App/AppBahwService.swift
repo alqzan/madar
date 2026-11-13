@@ -345,6 +345,13 @@ extension AppBahwService {
         if session.roomEnabled(.habits), let habit = due.first(where: \.isNow) ?? (includesToday ? due.first : nil) {
             result.append(.init(id: "habit", title: habit.name, detail: habit.isNow ? "وقتها الآن" : habitRemainingPhrase(habit), symbol: "MadarHabits", destination: .habit(habit.id)))
         }
+        // T13: a bill, instalment, subscription or card statement due within two days enters the order (never an amount).
+        if session.roomEnabled(.mal), let reading = try? AppMoneyService(app: session).loadObligations() {
+            let all = reading.cycle + reading.installments + reading.bills + reading.subscriptions + reading.statements
+            if let due = all.filter({ $0.due <= today.adding(days: 2) }).min(by: { $0.due < $1.due }) {
+                result.append(.init(id: "obligation", title: "موعد " + due.name, detail: due.due <= today ? "يستحق اليوم أو تأخّر" : "يستحق خلال يومين", symbol: "banknote", destination: .money))
+            }
+        }
         if includesToday, session.roomEnabled(.quran), let quran = try? AppQuranService(session: session).widgetSnapshot().payload,
            quran.done < quran.total {
             // Same shape as the habit row above («الماء / بقي ٨ أكواب»): the step's name, then the passage.

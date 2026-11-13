@@ -346,7 +346,7 @@ struct MihbaraReaderView: View {
                             recordInteraction()
                             lastDecorationTap = Date()
                             if wordCard != nil { closeWordCard() }
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { footnote = note }
+                            withAnimation(MadarMotion.settle.animation(reduceMotion: reduceMotion)) { footnote = note }
                         },
                         onReady: { navigator in
                             navigatorController = navigator
@@ -1090,7 +1090,7 @@ struct MihbaraReaderView: View {
                     ForEach(MihbaraListeningSpeed.allCases, id: \.self) { speed in
                         let selected = speechController.speed == speed.rawValue
                         Button { speechController.setSpeed(speed.rawValue) } label: {
-                            Text(digits.localized(speed.numberText + "×"))
+                            Text(speed.wordText)
                                 .font(MadarTypography.fine())
                                 .foregroundStyle(selected ? palette.bg : palette.ink2)
                                 .frame(maxWidth: .infinity, minHeight: 40)
@@ -1325,7 +1325,7 @@ struct MihbaraReaderView: View {
             copiedAt = nil
             wordAlreadySaved = savedWordExists(state.word, language: isEnglish ? "en" : "ar")
             translationAvailability = isEnglish ? .checking : .unsupported
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { wordCard = state }
+            withAnimation(MadarMotion.settle.animation(reduceMotion: reduceMotion)) { wordCard = state }
             if isEnglish { Task { await refreshTranslationAvailability(for: state.id) } }
         }
     }
@@ -2493,6 +2493,15 @@ private enum MihbaraListeningSpeed: Double, CaseIterable, Hashable {
     case quicker = 1.5
     case double = 2
 
+    /// Quick win 31: words instead of a multiplier, so the chip says what it does.
+    var wordText: String {
+        switch self {
+        case .normal: "عادي"
+        case .quick: "أسرع قليلًا"
+        case .quicker: "أسرع"
+        case .double: "ضعف السرعة"
+        }
+    }
     var numberText: String {
         switch self {
         case .normal: "1"

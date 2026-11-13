@@ -88,7 +88,7 @@ struct MoneyAccountSheet: View {
                     // An account that is not mine is outside zakat already (the caption above says so).
                     if draft.ownership == "mine" { Toggle("أدخله في حساب الزكاة", isOn: $draft.zakatInclude).disabled(saving).accessibilityIdentifier("money-account-zakat") }
                     field("أسماء مرسلي رسائل البنك، اسم في كل سطر") { TextField("أسماء المرسل", text: $senders, axis: .vertical).lineLimit(2...5).focused($editing).accessibilityIdentifier("money-account-senders") }
-                    if !balanceReadable { Text("لم أفهم الرصيد؛ اكتب أرقامًا وفاصلة واحدة على الأكثر.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
+                    if !balanceReadable { Text("لم أفهم الرصيد؛ اكتبه مثل ١٢٥٠٫٥٠.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                     // AU-34: the reason sits beside the dimmed save, not only mid-form.
                     if !saving && !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && balanceIsRequired && balanceIsEmpty { Text(draft.openingKnown ? "أدخل رصيد البداية لتحفظ الحساب" : "أدخل رصيد البنك لتحفظ الحساب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-account-waiting") }

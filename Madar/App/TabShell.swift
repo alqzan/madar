@@ -413,9 +413,12 @@ struct MadarRootView: View {
                     do {
                         try await session.drainInbox()
                         try (session.syncService as? AppSyncService)?.processLocalHistory()
-                        try await (session.backupService as? AppBackupService)?.runScheduledBackup()
                     } catch BackupOperationError.busy { }
                     catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
+                    // A failed automatic backup is named as such, not as a data refresh.
+                    do { try await (session.backupService as? AppBackupService)?.runScheduledBackup() }
+                    catch BackupOperationError.busy { }
+                    catch { session.errorMessage = "لم تكتمل النسخة التلقائية. \(madarUserMessage(error))" }
                     session.requestPrayerNotificationRefresh()
                 }
             }

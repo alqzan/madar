@@ -180,8 +180,10 @@ struct QuranStrengthView: View {
                 }.frame(height: 24).accessibilityHidden(true)
                 Button { details = true } label: { Text("تفاصيل الأوجه").font(quranFont(13)).frame(minHeight: 44).contentShape(Rectangle()) }
                     .accessibilityIdentifier("quran-strength-details")
-                Text("في هذا الجزء: " + service.faceCount(p.faces.filter(\.far).count) + " بعيدة وفق تعريف المنسوب")
-                    .font(quranFont(12)).foregroundStyle(theme.secondaryInk)
+                if !p.faces.filter(\.far).isEmpty {
+                    Text("في هذا الجزء: " + service.faceCount(p.faces.filter(\.far).count) + " بعيدة وفق تعريف المنسوب")
+                        .font(quranFont(12)).foregroundStyle(theme.secondaryInk)
+                }
                 if p.scheduled {
                     Text("أُضيفت إلى الغد").font(quranFont(14, bold: true)).accessibilityIdentifier(
                         "quran-strength-raised")
