@@ -17,6 +17,7 @@ struct MoneyCategoriesView: View {
     @State private var selected: UUID?
     @State private var percentMode = false
     @State private var draftMinor = 0
+    @State private var typedLimit = ""
     @State private var draftBp = 0
     @State private var draftBase = "income"
     @State private var saving = false
@@ -153,6 +154,16 @@ struct MoneyCategoriesView: View {
                 Spacer()
                 step("plus") { if percentMode { draftBp = min(10_000, draftBp + 100) } else { draftMinor += 10_000 } }
             }.environment(\.layoutDirection, .leftToRight)
+            if !percentMode && visible {
+                // Quick win 25: type the limit instead of tapping the step many times.
+                TextField("اكتب المبلغ", text: $typedLimit)
+                    .keyboardType(.decimalPad).multilineTextAlignment(.center).frame(minHeight: 44)
+                    .onChange(of: typedLimit) { _, raw in
+                        let exponent = CurrencyExponents.specified.exponent(app.string("core.currency")) ?? 2
+                        if let minor = MoneyAmountInput.minor(raw, exponent: exponent) { draftMinor = minor }
+                    }
+                    .accessibilityIdentifier("money-limit-field")
+            }
             Text(figure: percentMode ? "= " + amount(limit) + " هذه الدورة" : r.incomeMinor > 0 && visible ? "= " + service.percent(draftMinor, of: r.incomeMinor) + " من راتبك" : "")
                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             Text(figure: left >= 0 ? "باقي " + amount(left) + "، يكفيك " + amount(left / max(1, r.daysLeft)) + " في اليوم" : "تجاوزت الحد بـ" + amount(-left))
