@@ -110,6 +110,8 @@ final class PrayerNotificationCoordinator {
     static let categoryID = "salah.ask"
     static let habitCategoryID = "habits.reminder"
     static let habitDoneActionID = "habits.done"
+    static let wirdCategoryID = "quran.wird"
+    static let wirdDoneActionID = "quran.wirdDone"
     /// Friday noon: «في جماعة» needs the Jumu'ah/Dhuhr choice (RP5), so that button opens the app on the choice instead of recording.
     static let fridayCategoryID = "salah.ask.friday"
     static let snoozeActionID = "salah.snooze"
@@ -138,7 +140,10 @@ final class PrayerNotificationCoordinator {
         // T11: a habit reminder can be finished from the notification itself.
         let habitDone = UNNotificationAction(identifier: Self.habitDoneActionID, title: "تمّت", options: [])
         let habit = UNNotificationCategory(identifier: Self.habitCategoryID, actions: [habitDone], intentIdentifiers: [], options: [])
-        center.setNotificationCategories([category, friday, habit])
+        // 14 Nov owner: finish the whole wird from its reminder. It opens Madar on the grade question; nothing is recorded in the background.
+        let wirdDone = UNNotificationAction(identifier: Self.wirdDoneActionID, title: "أتممته", options: [.foreground])
+        let wird = UNNotificationCategory(identifier: Self.wirdCategoryID, actions: [wirdDone], intentIdentifiers: [], options: [])
+        center.setNotificationCategories([category, friday, habit, wird])
     }
 
     func attach(to session: AppSession) async {
@@ -350,6 +355,8 @@ final class PrayerNotificationCoordinator {
                 let info = response.notification.request.content.userInfo
                 guard let dayKey = info["dayKey"] as? String, let habit = (info["habit"] as? String).flatMap(UUID.init(uuidString:)) else { return }
                 try await session.completeHabitFromNotification(habitID: habit, dayKey: dayKey, requestID: response.notification.request.identifier)
+            } else if response.actionIdentifier == Self.wirdDoneActionID {
+                session.open(URL(string: "madar://quran/finish-whole")!)
             } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
                 let request = response.notification.request
                 if RoomNotificationContent.isRoomRequest(request.identifier) { RoomNotificationContent.open(request.identifier, userInfo: request.content.userInfo, session: session) }

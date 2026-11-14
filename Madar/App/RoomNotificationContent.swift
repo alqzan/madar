@@ -214,6 +214,7 @@ import MadarPrayer
             content.title = late ? QuranReminderCopy.lateTitle : QuranReminderCopy.title
             content.body = late ? NudgeWording.body(.quranReview, dayKey: candidate.dayKey) : NudgeWording.body(.quranWird, dayKey: candidate.dayKey)
             content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
+            if !late { content.categoryIdentifier = PrayerNotificationCoordinator.wirdCategoryID }
         } else if id.hasPrefix("digest.") {
             content.title = "ملخّص تذكيراتك"
             let members = plan.digestMembers[id] ?? [], kinds = RoomReminders.digestKinds(memberIDs: members)

@@ -56,6 +56,10 @@ struct DiaryInlineComposer: View {
     @Binding var expanded: Bool
     /// The page behind the grown field, so the surface can say what is already written there.
     var page: DiaryDisplayDay? = nil
+    /// An older page takes a note in its margin: no photos, voice or day choice, and its own draft.
+    var margin: GregorianDay? = nil
+    /// «أمس» asked by a route: the composer starts on that day when the page has no draft yet.
+    var presetDay: String? = nil
     let saved: () -> Void
     @Environment(\.roomTheme) private var theme
     @State private var text = ""
@@ -176,6 +180,7 @@ struct DiaryInlineComposer: View {
             // One bar above the keyboard, only while this composer's field has the cursor.
             ToolbarItemGroup(placement: .keyboard) {
                 if focused, edit == nil, !expanded {
+                    if margin == nil {
                     PhotosPicker(selection: $photo, matching: .images) { Image(systemName: "photo") }.accessibilityLabel("أضف صورة").accessibilityIdentifier("diary-keyboard-photo")
                         .simultaneousGesture(TapGesture().onEnded { holdCommit = true })
                     if UIImagePickerController.isSourceTypeAvailable(.camera) {
@@ -185,6 +190,7 @@ struct DiaryInlineComposer: View {
                     if trimmed.isEmpty {
                         Button { holdCommit = true; Task { await startRecording(); holdCommit = false } } label: { Image(systemName: "mic") }
                             .accessibilityLabel("سجّل صوتًا").accessibilityIdentifier("diary-keyboard-record")
+                    }
                     }
                     Spacer()
                     Button("تمّ") { focused = false }.accessibilityIdentifier("diary-keyboard-done")
@@ -293,7 +299,7 @@ struct DiaryInlineComposer: View {
     }
     /// «اليوم» or «أمس»: the late-writing choice, only on the grown surface (today's page itself takes today's lines).
     @ViewBuilder private var dayChoice: some View {
-        if edit == nil {
+        if edit == nil, margin == nil {
             HStack(spacing: 8) {
                 dayButton("today", "اليوم"); dayButton("yesterday", "أمس")
                 if draftDay == "yesterday" { Text("كُتبت لاحقًا").font(MadarTypography.caption()).foregroundStyle(theme.color("late")) }
@@ -359,10 +365,12 @@ struct DiaryInlineComposer: View {
 
     private var collapsedRow: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            PhotosPicker(selection: $photo, matching: .images) {
-                Image(systemName: "photo").font(.system(size: 19)).frame(width: 44, height: 44).contentShape(Circle())
-            }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text")).disabled(edit != nil || saving)
-                .accessibilityLabel("أضف صورة").accessibilityIdentifier("diary-inline-photo")
+            if margin == nil {
+                PhotosPicker(selection: $photo, matching: .images) {
+                    Image(systemName: "photo").font(.system(size: 19)).frame(width: 44, height: 44).contentShape(Circle())
+                }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text")).disabled(edit != nil || saving)
+                    .accessibilityLabel("أضف صورة").accessibilityIdentifier("diary-inline-photo")
+            }
             Group {
                 if formatted {
                     Text(DiaryRichText.attributed(fromMarkdown: field.wrappedValue)).lineLimit(3).frame(maxWidth: .infinity, alignment: .leading)
@@ -382,7 +390,7 @@ struct DiaryInlineComposer: View {
                 }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text"))
                     .accessibilityLabel("كبّر الحقل: كاميرا وملفات وتنسيق").accessibilityIdentifier(trimmed.isEmpty ? "diary-day-write" : "diary-inline-expand")
             }
-            if trimmed.isEmpty && edit == nil {
+            if trimmed.isEmpty && edit == nil && margin == nil {
                 Button { Task { await startRecording() } } label: {
                     Image(systemName: "mic").font(.system(size: 19)).frame(width: 44, height: 44).contentShape(Circle())
                 }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text"))
@@ -402,16 +410,20 @@ struct DiaryInlineComposer: View {
     private var toolsRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
+                if margin == nil {
                 PhotosPicker(selection: $photo, matching: .images, photoLibrary: .shared()) {
                     Image(systemName: "photo").frame(width: 44, height: 44).contentShape(Rectangle())
                 }.buttonStyle(.madarPlain).disabled(edit != nil || saving).accessibilityLabel("أضف صورة").accessibilityIdentifier("diary-editor-photo")
-                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                }
+                if margin == nil, UIImagePickerController.isSourceTypeAvailable(.camera) {
                     Button { focused = false; cameraOpen = true } label: { Image(systemName: "camera").frame(width: 44, height: 44).contentShape(Rectangle()) }
                         .buttonStyle(.madarPlain).disabled(edit != nil || saving).accessibilityLabel("التقط صورة").accessibilityIdentifier("diary-editor-camera")
                 }
+                if margin == nil {
                 Button { focused = false; choosingFile = true } label: { Image(systemName: "doc").frame(width: 44, height: 44).contentShape(Rectangle()) }
                     .buttonStyle(.madarPlain).disabled(edit != nil || saving).accessibilityLabel("أرفق ملفًا").accessibilityIdentifier("diary-editor-file")
-                if edit == nil {
+                }
+                if edit == nil, margin == nil {
                     Button { Task { await startRecording() } } label: { Image(systemName: "mic").frame(width: 44, height: 44).contentShape(Rectangle()) }
                         .buttonStyle(.madarPlain).accessibilityLabel("سجّل صوتًا").accessibilityIdentifier("diary-editor-record")
                     languageMenu
@@ -519,7 +531,7 @@ struct DiaryInlineComposer: View {
     private func loadDraft(typedSince before: String) async {
         let typed = text != before ? text : nil
         do {
-            if let draft = try service.draft(margin: nil) {
+            if let draft = try service.draft(margin: margin) {
                 draftID = draft.id; hasDraftRecord = true; lastSaved = draft.text; draftDay = draft.day; draftWritingDay = draft.writingDay
                 // A draft left more than a day behind moves to the page chosen now (it used to pull the writer back to an old day, 10 Nov).
                 if let now = try? service.currentDay(), draft.writingDay < now.adding(days: -1) {
@@ -528,6 +540,7 @@ struct DiaryInlineComposer: View {
                 text = Self.merged(stored: draft.text, typed: typed)
             } else {
                 hasDraftRecord = false; lastSaved = ""; draftID = UUID(); draftDay = "today"; draftWritingDay = nil
+                if margin == nil, presetDay == "yesterday", let now = try? service.currentDay() { draftDay = "yesterday"; draftWritingDay = now.adding(days: -1) }
                 text = typed ?? ""
             }
         } catch { failure = madarUserMessage(error) }
@@ -559,7 +572,7 @@ struct DiaryInlineComposer: View {
         guard text != lastSaved || !hasDraftRecord else { return }
         let value = text
         let writing = try currentWritingDay()
-        try await service.saveDraft(id: draftID, text: value, day: draftDay, margin: nil, writingDay: writing)
+        try await service.saveDraft(id: draftID, text: value, day: draftDay, margin: margin, writingDay: writing)
         // The page the words were begun on stays theirs, even when the day turns at Fajr while they are open.
         draftWritingDay = writing
         hasDraftRecord = true; lastSaved = value
@@ -589,7 +602,7 @@ struct DiaryInlineComposer: View {
             } else {
                 try await persistDraft()
                 var payload: [String: MadarCore.JSONValue] = ["id": .string(draftID.uuidString)]
-                if let insertAt, draftDay == "today", insertAt < app.prayerNow() { payload["at"] = .number(insertAt.timeIntervalSince1970) }
+                if let insertAt, margin == nil, draftDay == "today", insertAt < app.prayerNow() { payload["at"] = .number(insertAt.timeIntervalSince1970) }
                 try await app.executeDiaryCommand("diary.commitDraft", payload: payload, id: draftID)
                 let remainder = DiaryDraftRemainder.remaining(current: text, sent: sent)
                 text = remainder; lastSaved = ""; hasDraftRecord = false; draftID = UUID(); draftDay = "today"; draftWritingDay = nil

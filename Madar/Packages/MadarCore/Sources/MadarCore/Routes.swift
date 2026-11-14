@@ -51,7 +51,7 @@ public enum RouteRegistry {
                 case (.bahw, "year", 3): guard path[1] == "day" else { throw CoreError.invalidRoute }; room = .year; try uuid(path[2])
                 case (.bahw, "widget-maker", 1): allowed = ["template"]; if let t = p["template"], Room(rawValue: t) == nil { throw CoreError.invalidRoute }
                 case (.salah, "day", 2), (.salah, "qiyam", 2), (.notes, "day", 2): try date(path[1])
-                case (.salah, "hali", 1), (.notes, "today", 1), (.notes, "letters", 1), (.quran, "fihris", 1), (.mal, "now", 1), (.mal, "messages", 1), (.mal, "categories", 1), (.mal, "reconcile", 1), (.mal, "zakat", 1), (.mihbara, "desk", 1), (.mihbara, "continue", 1): break
+                case (.salah, "hali", 1), (.notes, "today", 1), (.notes, "letters", 1), (.quran, "fihris", 1), (.quran, "finish-whole", 1), (.mal, "now", 1), (.mal, "messages", 1), (.mal, "categories", 1), (.mal, "reconcile", 1), (.mal, "zakat", 1), (.mihbara, "desk", 1), (.mihbara, "continue", 1): break
                 case (.salah, "log", 1):
                     allowed = ["prayer", "day", "status", "heart"]; mode = .prefill
                     guard let value = p["prayer"], Prayer(rawValue: value) != nil else { throw CoreError.invalidRoute }

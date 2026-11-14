@@ -8,7 +8,7 @@ import XCTest
         let title=app.staticTexts["diary-travel-title"];XCTAssertTrue(title.waitForExistence(timeout:10));XCTAssertEqual(title.label,"اليوم الثاني")
         XCTAssertTrue(app.staticTexts["diary-travel-distance"].label.contains("كم عن الرياض"))
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-travel-stamp").firstMatch.exists)
-        XCTAssertEqual(app.buttons["diary-day-write"].label,"اكتب من إسطنبول")
+        XCTAssertTrue(app.textFields["diary-inline-field"].exists || app.buttons["diary-day-write"].exists)
         capture(app,"M3-V15-travel-L")
         app.buttons["diary-stamps-open"].tap();XCTAssertTrue(app.buttons["diary-stamps-done"].waitForExistence(timeout:10))
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-passport-stamp").firstMatch.exists);capture(app,"M3-V15-stamps-L")

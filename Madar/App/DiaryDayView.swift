@@ -18,6 +18,8 @@ struct DiaryDayView: View {
     var showsNavigationTools = true
     /// The room root offers its customize screen from the menu (the home that used to carry that button is gone).
     var onCustomize: (() -> Void)? = nil
+    /// «أمس» from madar://notes/write?day=yesterday: the composer starts on that day when it has no draft yet.
+    var writeDayPreset: String? = nil
     @Environment(\.roomTheme) private var roomTheme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -28,7 +30,6 @@ struct DiaryDayView: View {
     @State private var highlightedEntryID: UUID?
     @State private var highlightGeneration = 0
     @State private var failure: String?
-    @State private var writing = false
     @State private var composerExpanded = false
     @State private var promptDismissed = false
     @State private var insertAt: Date?
@@ -77,7 +78,7 @@ struct DiaryDayView: View {
     /// Travel days wear the air-mail paper everywhere on the page and in its sheets (§7.3).
     private var theme: RoomTheme { travel == nil ? roomTheme : RoomTheme(room: "notes.travel", dark: roomTheme.dark) }
     /// Writing happens in the one inline composer of the root page; a day opened in a sheet (search, hub, week, import) reads, and its pencil opens the full page.
-    private var inlineWriting: Bool { shownDay == today && travel == nil && embeddedInNavigationStack }
+    private var inlineWriting: Bool { shownDay == today }
     private var friday: Bool { appearance?.friday == true && travel == nil }
     private var shownDay: GregorianDay { selected ?? day }
     private var fridayStyle: DiaryFridayStyle { DiaryFridayStyle(app) }
@@ -149,7 +150,7 @@ struct DiaryDayView: View {
                                 }
                             }.accessibilityIdentifier("diary-return-days") }
                             Button {
-                                returnDismissed = true; if inlineWriting { composerExpanded = true } else { writing = true }
+                                returnDismissed = true; composerExpanded = true
                             } label: {
                                 Text("ابدأ من اليوم").frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(
                                     theme.background
@@ -433,7 +434,6 @@ struct DiaryDayView: View {
             }
             .sheet(isPresented: $stampsOpen) { DiaryStampsView(app: app).environment(\.roomTheme, theme) }
             .sheet(isPresented: $weekOpen) { DiaryWeekView(app: app, day: shownDay).environment(\.roomTheme, theme) }
-            .navigationDestination(isPresented: $writing) { editorDestination }
             // N04: letters are checked when the diary is open and the app comes to the foreground.
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { followToday(); aiAvailability = .checking; retry += 1 }
@@ -493,45 +493,17 @@ struct DiaryDayView: View {
                                 .buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text")).accessibilityLabel("أخفِ السؤال")
                         }.padding(.horizontal, 22)
                     }
-                    if inlineWriting {
-                        DiaryInlineComposer(app: app, insertAt: $insertAt, anchor: $anchorLabel, edit: $inlineEdit, focusTick: $focusTick,
-                                            expanded: $composerExpanded, page: page, saved: { Task { await refreshLines() } })
-                    } else { HStack(spacing: 10) {
-                        if let travel, shownDay == today {
-                            Button {
-                                insertAt = nil; writing = true
-                            } label: {
-                                Text("اكتب من " + travel.city).font(MadarTypography.section()).frame(
-                                    maxWidth: .infinity, minHeight: 54
-                                ).foregroundStyle(theme.color("onButton")).background(
-                                    theme.color("button"), in: .capsule)
-                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-write")
-                        } else {
-                            Button {
-                                insertAt = nil; writing = true
-                            } label: {
-                                Label(shownDay == today ? "اكتب" : "اكتب في هامشها", systemImage: "pencil").font(
-                                    MadarTypography.section()
-                                ).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background)
-                                    .background(theme.dark ? theme.accent : theme.ink, in: .capsule)
-                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-write")
-
-                        }
-                        if travel != nil {
-                            Button {
-                                stampsOpen = true
-                            } label: {
-                                Text("الأختام").font(DiaryType.label).frame(minHeight: 54).padding(.horizontal, 18)
-                                    .glassEffect(.regular.interactive(), in: .capsule)
-                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-stamps-open")
-                        }
-                    }.padding(.horizontal, 18).padding(.vertical, 8).background(theme.background) }
+                    // 14 Nov (T10/T12): every page is written in the one composer; an older page takes a note in its margin (no second editor).
+                    DiaryInlineComposer(app: app, insertAt: $insertAt, anchor: $anchorLabel, edit: $inlineEdit, focusTick: $focusTick,
+                                        expanded: $composerExpanded, page: page, margin: shownDay == today ? nil : shownDay,
+                                        presetDay: writeDayPreset, saved: { Task { await refreshLines() } })
+                        .id(shownDay)
+                    if travel != nil {
+                        Button { stampsOpen = true } label: {
+                            Text("الأختام").font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 44).glassEffect(.regular.interactive(), in: .capsule)
+                        }.buttonStyle(.madarPlain).padding(.horizontal, 18).accessibilityIdentifier("diary-stamps-open")
+                    }
                 }.background(theme.background)
-    }
-    private var editorDestination: some View {
-        DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay, insertAt: insertAt, embeddedInNavigationStack: true)
-            .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
-            .hidesRoomAccessory(app, id: "diary-editor-from-day")
     }
     /// After a line or photo is added only the page's lines are read again; closed-day preparation, letters and the AI check stay as they were.
     @MainActor private func refreshLines() async {

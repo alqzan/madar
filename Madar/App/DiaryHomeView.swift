@@ -17,12 +17,6 @@ struct DiaryRoomView: View {
         .environment(\.roomTheme, RoomTheme(room: "notes", dark: outerTheme.dark, calmPaper: app.string("core.roomIdentity") == "calmPaper"))
     }
 }
-private struct DiaryEditorTarget: Identifiable, Hashable {
-    var id: String { margin.map { "margin-\($0.description)" } ?? "write-\(day)" }
-    let margin: GregorianDay?
-    var day = "today"
-    var prompt: String?
-}
 private struct DiaryRootDraftBlocking: ViewModifier {
     @Bindable var app: AppSession
     let isBlocking: Bool
@@ -59,18 +53,20 @@ struct DiaryHomeView: View {
 #endif
         return true
     }
-    private struct RootParams { var entryID: UUID?; var routeID: UUID?; var focus = false; var prompt: String?; var expand = false; var token = UUID() }
+    private struct RootParams { var entryID: UUID?; var routeID: UUID?; var focus = false; var prompt: String?; var expand = false; var preset: String?; var token = UUID() }
     @State private var rootParams = RootParams()
+    @State private var stripPull: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var snapshot: DiaryHomeSnapshot?
     @State private var customizing = false
     @State private var archiveOpen = false
     @State private var searchOpen = false
-    @State private var editor: DiaryEditorTarget?
     @State private var queuedDiaryRoute: Route?
     @State private var reader: GregorianDay?
     /// Set by the write buttons: the day page opens with the cursor already in its one writing field.
     @State private var focusReaderComposer = false
     @State private var readerPrompt: String?
+    @State private var readerPreset: String?
     @State private var readerExpandComposer = false
     @State private var pendingDiaryRootRequestID: UUID?
     @State private var readerEntryID: UUID?
@@ -94,7 +90,7 @@ struct DiaryHomeView: View {
                 if !typeSize.isAccessibilitySize, let past = yearStripPage(snapshot) { yearStrip(past, snapshot: snapshot) }
                 DiaryDayView(app: app, day: snapshot.today, initialEntryID: rootParams.entryID, initialEntryRouteID: rootParams.routeID,
                              embeddedInNavigationStack: true, focusComposerOnOpen: rootParams.focus, prompt: rootParams.prompt,
-                             expandComposerOnOpen: rootParams.expand, onCustomize: { customizing = true })
+                             expandComposerOnOpen: rootParams.expand, onCustomize: { customizing = true }, writeDayPreset: rootParams.preset)
                     .id(rootParams.token).environment(\.roomTheme, theme)
             } else if rootEnabled && !wide && snapshot == nil && failure == nil {
                 ProgressView("تُفتح صفحتك…").frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -167,50 +163,37 @@ struct DiaryHomeView: View {
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
         }
         .sheet(isPresented: $customizing, onDismiss: { Task { await refresh() }; applyPendingDiaryRootIfReady() }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
-        .navigationDestination(item: $editor) { target in
-            DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day, prompt: target.prompt, embeddedInNavigationStack: true)
-                .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
-                .hidesRoomAccessory(app, id: "diary-editor-destination")
-        }
         .navigationDestination(item: $reader) { day in
-            DiaryDayView(app: app, day: day, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID, embeddedInNavigationStack: true, focusComposerOnOpen: focusReaderComposer, prompt: readerPrompt, expandComposerOnOpen: readerExpandComposer)
+            DiaryDayView(app: app, day: day, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID, embeddedInNavigationStack: true, focusComposerOnOpen: focusReaderComposer, prompt: readerPrompt, expandComposerOnOpen: readerExpandComposer, writeDayPreset: readerPreset)
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
                 .hidesRoomAccessory(app, id: "diary-day-destination")
         }
-        .onChange(of: editor) { old, new in if old != nil, new == nil { editorDidDismiss() } }
         .onChange(of: rootToday) { _, on in
             if on {
                 // A route that arrived before the first load pushed nothing yet to show: hand it to the root instead of a second copy of today.
                 if let r = reader, r == snapshot?.today {
-                    rootParams = RootParams(entryID: readerEntryID, routeID: readerEntryRouteID, focus: focusReaderComposer, prompt: readerPrompt, expand: readerExpandComposer)
+                    rootParams = RootParams(entryID: readerEntryID, routeID: readerEntryRouteID, focus: focusReaderComposer, prompt: readerPrompt, expand: readerExpandComposer, preset: readerPreset)
                     reader = nil
                 }
             } else {
                 // A recreated root page must not replay an old request.
-                rootParams.focus = false; rootParams.prompt = nil; rootParams.entryID = nil; rootParams.routeID = nil; rootParams.expand = false
+                rootParams.focus = false; rootParams.preset = nil; rootParams.prompt = nil; rootParams.entryID = nil; rootParams.routeID = nil; rootParams.expand = false
             }
         }
         .onChange(of: reader) { old, new in
             if rootToday, let new, new == snapshot?.today {
                 // Today is the root page: the same request (entry, prompt, cursor) is handed to it instead of pushing a second copy.
-                rootParams = RootParams(entryID: readerEntryID, routeID: readerEntryRouteID, focus: focusReaderComposer, prompt: readerPrompt, expand: readerExpandComposer)
+                rootParams = RootParams(entryID: readerEntryID, routeID: readerEntryRouteID, focus: focusReaderComposer, prompt: readerPrompt, expand: readerExpandComposer, preset: readerPreset)
                 reader = nil
                 return
             }
             if old != nil, new == nil {
-                readerEntryID = nil; readerEntryRouteID = nil; focusReaderComposer = false; readerPrompt = nil; readerExpandComposer = false
+                readerEntryID = nil; readerEntryRouteID = nil; focusReaderComposer = false; readerPrompt = nil; readerPreset = nil; readerExpandComposer = false
                 applyPendingDiaryRootIfReady()
             }
         }
         .onChange(of: app.diaryRoute, initial: true) { _, route in
             guard let route else { return }; app.diaryRoute = nil
-            if editor != nil {
-                if route.path.first == "write", route.path.count == 1,
-                   editor?.id == DiaryEditorTarget(margin: nil, day: route.parameters["day"] ?? "today").id { return }
-                queuedDiaryRoute = route
-                if app.diaryRootDraftBlockers.isEmpty { editor = nil }
-                return
-            }
             if !app.diaryRootDraftBlockers.isEmpty {
                 queuedDiaryRoute = route
                 return
@@ -235,18 +218,8 @@ struct DiaryHomeView: View {
         }
     }
     private func clearHubRoute() { routedHubTab = nil; routedLetterID = nil; routedLetterRequestID = nil }
-    private func editorDidDismiss() {
-        if pendingDiaryRootRequestID != nil {
-            queuedDiaryRoute = nil
-            applyPendingDiaryRootIfReady()
-        } else if queuedDiaryRoute != nil {
-            applyQueuedDiaryRouteIfReady()
-        } else {
-            applyPendingDiaryRootIfReady()
-        }
-    }
     private func applyQueuedDiaryRouteIfReady() {
-        guard editor == nil, pendingDiaryRootRequestID == nil,
+        guard pendingDiaryRootRequestID == nil,
               app.diaryRootDraftBlockers.isEmpty, let route = queuedDiaryRoute else { return }
         queuedDiaryRoute = nil
         openDiaryRoute(route)
@@ -254,9 +227,8 @@ struct DiaryHomeView: View {
     private func openDiaryRoute(_ route: Route) {
         if route.path.first == "write", route.path.count == 1 {
             let day = route.parameters["day"] ?? "today"
-            // Today is written on today's page, with the composer already grown; «أمس» keeps its own writing page.
-            if day == "today", let today = try? service.currentDay() { writeToday(today, expand: true) }
-            else { editor = .init(margin: nil, day: day) }
+            // Today is written on today's page, with the composer already grown; «أمس» is the same composer started on that day.
+            if let today = try? service.currentDay() { writeToday(today, expand: true, preset: day == "today" ? nil : day) }
         }
         else if route.path.first == "day", let key = route.path.last, let day = try? GregorianDay(key) {
             readerEntryID = nil; readerEntryRouteID = nil; reader = day
@@ -280,7 +252,6 @@ struct DiaryHomeView: View {
         guard let requestID = pendingDiaryRootRequestID,
               app.diaryRootRequestID == requestID,
               app.diaryRootDraftBlockers.isEmpty else { return }
-        if editor != nil { editor = nil; return }
         pendingDiaryRootRequestID = nil
         app.diaryRootRequestID = nil
         queuedDiaryRoute = nil
@@ -392,22 +363,32 @@ struct DiaryHomeView: View {
         snapshot.selection.days.compactMap { day in snapshot.days.first { $0.day == day } }
             .first { page in page.photo != nil || page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
     }
-    /// 96 pt: the photo dimmed, one line over it; a tap or a pull down opens that page (the window).
+    /// 96 pt: the photo dimmed, one line over it. A pull down stretches it toward the full window and a long pull (or a tap) opens that page.
     private func yearStrip(_ page: DiaryDisplayDay, snapshot: DiaryHomeSnapshot) -> some View {
-        ZStack(alignment: .bottomLeading) {
+        let height = 96 + stripPull
+        return ZStack(alignment: .bottomLeading) {
             if let data = page.photo {
-                DiaryDataThumbnail(data: data, maxPixel: 600) { image in
-                    image.resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: 96).clipped().overlay(theme.background.opacity(0.55))
+                DiaryDataThumbnail(data: data, maxPixel: 900) { image in
+                    image.resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: height).clipped().overlay(theme.background.opacity(0.55 - Double(stripPull) / 800))
                 }.id(page.photoID?.uuidString ?? page.id)
             } else { Rectangle().fill(theme.surface) }
             VStack(alignment: .leading, spacing: 2) {
-                Text(service.distance(page.day, snapshot.today) + ": " + page.excerpt).font(.custom("thmanyahseriftext-Regular", size: 16, relativeTo: .body)).lineLimit(1)
+                Text(service.distance(page.day, snapshot.today) + ": " + page.excerpt).font(.custom("thmanyahseriftext-Regular", size: 16, relativeTo: .body)).lineLimit(stripPull > 40 ? 3 : 1)
                 MadarDateLabel(app.dateLabels(page.day)).foregroundStyle(theme.color("ink3Text"))
             }.padding(.horizontal, 16).padding(.bottom, 8).frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: 96).frame(maxWidth: .infinity).clipped().contentShape(Rectangle())
+        .frame(height: height).frame(maxWidth: .infinity).clipped().contentShape(Rectangle())
         .onTapGesture { reader = page.day }
-        .gesture(DragGesture(minimumDistance: 20).onEnded { value in if value.translation.height > 40 { reader = page.day } })
+        .gesture(DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                // Reduce Motion: no stretch, the gesture still opens the page.
+                if !reduceMotion, value.translation.height > 0 { stripPull = min(260, value.translation.height * 0.9) }
+            }
+            .onEnded { value in
+                let open = value.translation.height > 110
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) { stripPull = 0 }
+                if open { reader = page.day }
+            })
         .accessibilityElement(children: .combine).accessibilityAddTraits(.isButton).accessibilityIdentifier("diary-year-strip")
     }
     private func calendarButton(_ calendar: FirstCalendar, _ title: String) -> some View {
@@ -503,7 +484,8 @@ struct DiaryHomeView: View {
         }
     }
     /// One place to write: today's page, with its field focused. The full page (camera, files, formatting) is one tap from there.
-    private func writeToday(_ day: GregorianDay, prompt: String? = nil, expand: Bool = false) {
+    private func writeToday(_ day: GregorianDay, prompt: String? = nil, expand: Bool = false, preset: String? = nil) {
+        readerPreset = preset
         readerPrompt = prompt
         readerExpandComposer = expand
         focusReaderComposer = true

@@ -651,6 +651,10 @@ struct QuranHomeView: View {
             logRouteRequestID = UUID()
             showWeek = true
         }
+        else if route.path == ["finish-whole"] {
+            // The wird notification's «أتممته»: open on the grade question, never record in the background.
+            if state?.draft == nil, let step = state?.steps.first(where: { $0.kind == .hifz && $0.range != nil && !$0.completed }) { wholeStep = step }
+        }
         else if route.path.first == "session" {
             if route.path.last == "qiyam" { return }
             else if let draft = state?.draft { active = try await service.resume(draftID: draft.id) }

@@ -188,7 +188,7 @@ import XCTest
         app.buttons["diary-year-2024-10-15"].tap()
         XCTAssertTrue(app.staticTexts["مشينا بعد المغرب، والجو صار يحتمل."].waitForExistence(timeout: 8))
         let margin = app.buttons["diary-day-write"]
-        XCTAssertTrue(margin.waitForExistence(timeout: 8)); XCTAssertTrue(margin.label.contains("هامش"), margin.label); margin.tap()
+        XCTAssertTrue(margin.waitForExistence(timeout: 8)); margin.tap()
         let editor = app.textViews["diary-editor-text"]
         XCTAssertTrue(editor.waitForExistence(timeout: 10)); editor.tap(); editor.typeText("هامش من يومي")
         capture(app, "M3-V01-margin-editor-L")

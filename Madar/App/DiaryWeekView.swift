@@ -25,7 +25,7 @@ struct DiaryWeekView:View {
                 .toolbar{ToolbarItem(placement:.topBarLeading){Button("الصفحة"){dismiss()}.accessibilityIdentifier("diary-week-close")}}.tint(theme.accent)
                 .task{do{days=try await service.weekDaysOffMain(ending:day)}catch{failure=madarUserMessage(error)}}
                 .sheet(isPresented:Binding(get:{reader != nil},set:{if !$0{reader=nil}})){if let reader{DiaryDayView(app:app,day:reader,showsNavigationTools:false).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}}
-                .sheet(isPresented:$writing){DiaryTextEditor(app:app,margin:nil).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}
+                .sheet(isPresented:$writing){if let today=try? service.currentDay(){DiaryDayView(app:app,day:today,focusComposerOnOpen:true,showsNavigationTools:false).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}}
         }
     }
 }
