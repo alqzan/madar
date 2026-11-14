@@ -500,7 +500,9 @@ extension DiaryVoiceController: AVAudioRecorderDelegate {
                 // Silence (a quiet chunk, or quiet at the end of a take) is not a failure: the chunk answers with what it heard, possibly nothing,
                 // so one quiet piece never throws away the pieces before it. Any other error with words kept is a cut-off take and fails.
                 let error = task.error as NSError?
-                let noSpeech = error?.domain == "kAFAssistantErrorDomain" && error?.code == 1110
+                let code = error?.code ?? 0
+                // 1110 no speech; 1101 closes an on-device take that did succeed; 203 «retry» is what a silent server chunk reports.
+                let noSpeech = error?.domain == "kAFAssistantErrorDomain" && ([1101, 1110].contains(code) || (code == 203 && text.isEmpty))
                 if successfully || noSpeech || error == nil { return .success(text) }
                 return .failure(error ?? NSError(domain: "DiarySpeech", code: 1, userInfo: [NSLocalizedDescriptionKey: "لم يُسمع كلام"]))
             }
