@@ -128,6 +128,7 @@ struct DiaryPhotoViewer: View {
         guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { error = "تعذّر قراءة الصورة من تطبيق الصور."; return }
         do {
             try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", caption: comment, day: "today", writingDay: day, assetID: id)
+            app.diaryPhotoEpoch += 1
             editing = false; focused = false
             await reload(keeping: item)
         } catch { self.error = madarUserMessage(error) }

@@ -100,6 +100,12 @@ final class PadLayoutUITests: XCTestCase {
         let side = app.descendants(matching: .any)["diary-pad-sidebar"].frame, field = app.textFields["diary-inline-field"].frame
         XCTAssertLessThan(side.width, 420, "The sidebar stays a column, not the whole screen")
         XCTAssertGreaterThan(field.width, 300, "The page keeps real width")
+        XCTAssertLessThan(side.midX, field.midX, "Right to left: the page holds the start edge, the sidebar stands at its left")
+        // A rotation must not rebuild the page or replay a request: today's line is still there and no keyboard jumped up.
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(app.staticTexts["السطر الثاني في اليوم نفسه"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "No focus replayed after the rotation")
+        XCUIDevice.shared.orientation = .landscapeLeft
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "pad-diary-root"; shot.lifetime = .keepAlways; add(shot)
     }
 }

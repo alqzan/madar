@@ -102,7 +102,7 @@ struct DiaryDayPhotos: View {
             load()
         }
         .onChange(of: scenePhase) { _, phase in if phase == .active { load() } }
-        .onChange(of: app.diaryPhotoEpoch) { _, _ in linked.formUnion(DiaryPhotoLibrary.linkedIDs(app)) }
+        .onChange(of: app.diaryPhotoEpoch) { _, _ in linked = DiaryPhotoLibrary.linkedIDs(app) }
     }
     private var visible: [PHAsset] { assets.filter { !linked.contains($0.localIdentifier) } }
     private func load() {

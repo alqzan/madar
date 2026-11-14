@@ -32,6 +32,7 @@ import XCTest
         XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
         // The page strip and the grown composer both offer the day's photo (the same single asset); the next day's photo must never appear.
         XCTAssertTrue((1...2).contains(photos.count), "Only the chosen day's asset is suggested: \(photos.count)")
+        XCTAssertEqual(Set(photos.allElementsBoundByIndex.map(\.label)).count, 1, "one label: the same single asset in every strip")
         capture(app, "M3-20-day-photos-before-L")
         // The grown composer's strip pins the photo (the page strip beneath it opens the viewer); it is the last in the tree.
         photos.allElementsBoundByIndex.max(by: { $0.frame.minY < $1.frame.minY })!.tap()

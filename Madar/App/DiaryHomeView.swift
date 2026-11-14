@@ -94,19 +94,20 @@ struct DiaryHomeView: View {
         VStack(spacing: 0) {
             if rootToday, let snapshot {
                 // 14 Nov owner (T10): the room opens on today's page itself; nothing is pushed over a home.
-                if wide {
-                    // 14 Nov owner (iPad): today's page keeps the room's centre; the years and the recent days stand beside it, always in view.
-                    HStack(spacing: 0) {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 14) { homeBlocks(snapshot) }.padding(.horizontal, 14).padding(.vertical, 12)
-                        }.frame(width: 380).accessibilityIdentifier("diary-pad-sidebar")
-                        Divider()
-                        rootDayView(snapshot)
-                    }
-                } else {
-                    // «في مثل هذا اليوم» hidden in «خصّص المذكرات» removes the strip: the setting has a visible effect on the root page.
-                    if !typeSize.isAccessibilitySize, !hidden("memory"), let past = yearStripPage(snapshot) { yearStrip(past, snapshot: snapshot) }
+                // One fixed position for today's page, so a rotation or a folded sidebar never rebuilds it (and never replays an old request).
+                if !wide, !typeSize.isAccessibilitySize, !hidden("memory"), let past = yearStripPage(snapshot) { yearStrip(past, snapshot: snapshot) }
+                HStack(spacing: 0) {
                     rootDayView(snapshot)
+                    if wide {
+                        // 14 Nov owner (iPad): the page keeps the room's start edge; the years, the recent days and the questions stand beside it.
+                        Divider()
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 14) {
+                                homeBlocks(snapshot)
+                                DiaryQuestionsCard(app: app) { question in writeToday(snapshot.today, prompt: question) }
+                            }.padding(.horizontal, 14).padding(.vertical, 12)
+                        }.frame(width: 380).accessibilityIdentifier("diary-pad-sidebar")
+                    }
                 }
             } else if rootEnabled && snapshot == nil && failure == nil {
                 ProgressView("تُفتح صفحتك…").frame(maxWidth: .infinity, maxHeight: .infinity)
