@@ -39,6 +39,7 @@ struct DiaryTravelHeader: View {
     let day: GregorianDay
     let today: GregorianDay
     @Binding var selected: GregorianDay?
+    var onReturnToToday: (() -> Void)? = nil
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     var body: some View {
@@ -74,8 +75,10 @@ struct DiaryTravelHeader: View {
                 }
             }.padding(.horizontal, 18).padding(.vertical, 14)
             if day != today {
-                Button { selected = today } label: {
-                    Text("اليوم").font(DiaryType.label).frame(minHeight: 38).padding(.horizontal, 12)
+                Button {
+                    if let onReturnToToday { onReturnToToday() } else { selected = today }
+                } label: {
+                    Text("العودة إلى اليوم").font(DiaryType.label).frame(minHeight: 38).padding(.horizontal, 12)
                         .background(theme.surface, in: Capsule()).overlay { Capsule().stroke(theme.line) }
                         .contentShape(Capsule())
                 }.buttonStyle(.madarPlain).padding(.horizontal, 18).padding(.bottom, 10)

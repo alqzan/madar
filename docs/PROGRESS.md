@@ -4,7 +4,7 @@ Owner requests in force: a whole-app pass for ease, simplicity, flexibility and 
 
 ## Verified baseline and delivery
 
-- M0–M6 software is on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (49)** (`Madar/Artifacts/OWNER-TestFlight-49/upload.log`, uploaded 14 Nov 2026 21:05 Riyadh; Xcode reports upload succeeded and Apple began processing). The internal-only export was archived on Xcode 27.2; the archive app and widget signatures were valid and carried no iCloud/ubiquity entitlements. Owner-device installation and acceptance remain unverified. Build 27 (10 Nov) included Quran unreadable-draft recovery and the owner's exit-choice behavior. Xcode 27.2 archive and internal upload succeeded at 14:08 Riyadh on 10 Nov; App Store Connect reported that the package is processing. The exported IPA's app and widget signatures, versions, iOS target and entitlements were verified. Processing completion and installation on the owner's iPhone are not checked. Build 26 was the prior upload; build 24 added level-only voice recording and elapsed-time formatting. Older builds 14–20 are history (`docs/archive/PROGRESS-2026-11-08-codex-cleanup-batch.md` for 14–15).
+- M0–M6 software is on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (50)** (`Madar/Artifacts/OWNER-TestFlight-50/upload.log`, uploaded 14 Nov 2026 23:21 Riyadh; Xcode reports upload succeeded and Apple began processing). Xcode 27.2 archived the internal-only build; archive app and widget signatures verify, both versions are 0.1.0 (50), minimum OS is 27.0, and device families are 1 and 2. The app has no iCloud/ubiquity entitlement. Owner-device installation and acceptance remain unverified. Build 27 (10 Nov) included Quran unreadable-draft recovery and the owner's exit-choice behavior. Xcode 27.2 archive and internal upload succeeded at 14:08 Riyadh on 10 Nov; App Store Connect reported that the package is processing. The exported IPA's app and widget signatures, versions, iOS target and entitlements were verified. Processing completion and installation on the owner's iPhone are not checked. Build 26 was the prior upload; build 24 added level-only voice recording and elapsed-time formatting. Older builds 14–20 are history (`docs/archive/PROGRESS-2026-11-08-codex-cleanup-batch.md` for 14–15).
 - Simulators: `Madar 15 Pro Max` and `Madar iPad Pro 13`, both iOS 27.0, no others. Storage remains local-only (RA1); this request used synthetic stores only and did not open or migrate owner data. Owner-device installation and acceptance are separate.
 - Package baseline passes (rows 16–17). Current continuation: prayer history read failures propagate and remain retryable (42/42 prayer, 26/26 command/replay tests). Polar manual logging, habit delete/undo/relaunch and both year-calendar settings paths now pass on iOS 27.0; details in row 18. General no-trip FX rates still need an owner rule/data-model decision. The 9 handwritten-colour findings are resolved in row 19: static shipping-source scan passes (464 sources, 4 catalogs, 38 independently measured token pairs); its manual trace requirement remains separate.
 - Build 22 includes the changes after 21: lazy prayer/night reads and per-day prayer-time memoization, scoped habit undo reads, 1922 dead-code lines removed, stale-test cleanup, and the current continuation fixes. Signature verification passed; app/widget versions are both 0.1.0 (22), minimum OS 27.0, device families 1 and 2, and no iCloud/ubiquity entitlements. No owner-device performance measurement is implied.
@@ -280,7 +280,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 الورد: «أتممته كاملًا» يفتح سؤال تقدير واحدًا ثم quran.commitSession؛ إجراء الإشعار .foreground فقط.
 لم يُنفَّذ شيء من T10 بعد؛ الخطوتان ٢ و٤ كانتا منفّذتين أصلًا.
 
-## العمل الجاري بعد النسخة 48 — تحديث 14 نوفمبر 2026
+## العمل الجاري بعد النسخة 50 — تحديث 14 نوفمبر 2026
 
 1. **صور المذكرات المزروعة:** اتضح أن سبب فشل الاختبار كان افتراضه تاريخًا ثابتًا للصورة المزروعة. صار الاختبار يقرأ يوم العينة ويثبت أن يومين مختلفين يعرض كل منهما صورته وحدها. OWNER-notes-accessibility-photos-20261114.xcresult: ٩/٩؛ بلا فشل، مع تحذيرين وقت تشغيل عن أبعاد إطار غير صالحة.
 2. **إخفاقات واجهة المحبرة التسعة:** صُنّفت في OWNER-mihbara-nine-20261114.xcresult: ٧ إخفاقات و٢ نجاح. العيب الإنتاجي كان سباق عرض «حوّله» بعد استيراد PDF بسبب قراءة رف قديمة قبل اكتمال القراءة الجديدة؛ صار عرض التحويل ينتظر القراءة الناجحة ويحمل هوية الكتاب الفعلية، حتى عند استعادة كتاب موجود. نجحت الاختبارات الثلاثة للتحويل/الإلغاء في التشغيل اللاحق. باقي التوقعات كانت تمريرًا تحت الشريط السفلي أو نص حوار قديمًا أو تحديد WebKit متغيرًا أو توقع تراجع للاستيراد يخالف قرار ٥ نوفمبر. اختبارات الحالات السبع التي كانت تفشل نجحت في OWNER-final-focused-20261114.xcresult.
@@ -291,6 +291,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 7. **iPad:** أُخفي شريط السنة حتى يكتمل قياس العرض، وقُوّي اختبار غياب لوحة المفاتيح بعد التدوير. OWNER-notes-ipad-full-20261114.xcresult: ٣/٣ على Madar iPad Pro 13 iOS 27.0. قبول شكل الجهاز الحقيقي ما زال عند المالك.
 8. **رسالة البنك «صحيح»:** حُسم بقرار المالك ١٤ نوفمبر: لا إشعار مستقل عند وصول الرسالة؛ تبقى مراجعتها داخل غرفة المال فقط.
 9. **قبول جهاز المالك:** ما زالت تجربة شريط السنة، إجراء «أتممته» في إشعار الورد، بديل رموز التعرف على الصوت 1101/203، وشكل iPad بيد المالك فقط. قبول سول يغطي الشيفرة والاختبارات، ولا يحل محل قبول الجهاز الحقيقي.
+10. **استعراض الذكريات بعد مراجعة سول:** صار تاريخ اليوم بالتقويمين أول ما يظهر في صفحة المذكرات، وبعده شريط ذكريات مختصر ومدخل واحد «كل الذكريات». داخل الأرشيف تبويبات واضحة «الأيام / السنوات / الرسائل»، وقائمة واحدة لطريقة عرض الأيام (الأيام/التقويم/الصور)؛ مطابقة الذكرى للتاريخ الميلادي أو الهجري صارت قائمة مسماة بدل أزرار مبهمة. بطاقة السنة تفتح تقويمها، وفيه «كل السنوات» للرجوع إلى فهرس السنوات. اليوم التاريخي يحمل التاريخين وزر «العودة إلى اليوم». أزيل تكرار «اليوم/أمس/قبل سنة» ومداخل الأرشيف. استُلهمت بساطة بطاقات `My-dream` فقط دون نسخ بيانات أو واجهات. لا تغيير في النموذج أو قواعد التاريخ.
 
 ## تسليم 2026-11-14 (هـ) — استعراض الأيام وتحسينات المذكرات وإصلاحات التسع
 
@@ -364,3 +365,32 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - **حالة build 48 عند تسليمه:** لا إشعار بنكي مستقل حسب قرار المالك؛ قائمة «٣٦» لم تكن موثقة. في متابعة 14 نوفمبر تقاعدت الـ١٢ المؤكدة فقط مع إبقاء البيانات؛ #15 صار لديه اختبار تراجع وإعادة تنفيذ ناجح في التسليم الأحدث.
 - **لم يُتحقق منه:** اختبار الصور المزروعة testDayPhotosLinkOnce ما زال يفشل عند زرع الصور (الشريطان؛ الاختبار الافتراضي يتخطاه)؛ 9 اختبارات واجهة قديمة للمحبرة تفشل بلا علاقة بهذا العمل (ثُبت بإعادة التشغيل دون التعديل)؛ بقايا ميتة صغيرة: manuallyOpen/tableBook/motivationCues في MihbaraHomeView؛ AccessibilitySizeUITests يثبت عدم الانهيار وظهور زر، لا صلاحية الغرفة كاملة.
 - **Model/effort:** claude-sonnet-5-5 / غير معروض. **Usage:** not exposed.
+
+## تسليم 2026-11-14 (ز) — ذكريات السنوات وترتيب أرشيف المذكرات، النسخة 50
+
+### Works now
+- تاريخ اليوم بالتقويمين صار أول ما يظهر في صفحة المذكرات، يليه شريط ذكريات مختصر ومدخل واحد «كل الذكريات». مدخل السنوات مستقل وواضح داخل الأرشيف بجانب الأيام والرسائل؛ بطاقة السنة تفتح تقويمها و«كل السنوات» يعيد لفهرس السنوات.
+- طريقة عرض سجل الأيام (الأيام/التقويم/الصور) ومطابقة الذكرى (ميلادي/هجري) صارتا اختيارين مسميين داخل قائمتين واضحتين. أزيل تكرار «اليوم/أمس/قبل سنة» ومداخل الأرشيف.
+- اليوم التاريخي يعرض التاريخين وزر «العودة إلى اليوم». في قارئ الأرشيف يوضح زر الإغلاق أنه يعود إلى «الذكريات»، وإغلاق الأرشيف يعود إلى «المذكرات». إذا اختفى شريط الذكريات أو كبر حجم الوصول يبقى مدخل أرشيف واحد.
+
+### Verified
+- Xcode 27.2: بناء Debug نجح على `Madar 15 Pro Max`, iOS 27.0 (`Madar/Artifacts/owner-diary-years-navigation-20261114/debug-build.log`). أرشيف Release نجح في `Madar/Artifacts/OWNER-TestFlight-50/archive.log`; إصدار التطبيق والودجت 0.1.0 (50)، الهدف 27.0، العائلات 1 و2، وتوقيعهما صالحان. لم يظهر entitlement لـ iCloud/ubiquity. الرفع الداخلي نجح عند 23:21 في `Madar/Artifacts/OWNER-TestFlight-50/upload.log`، وXcode يقول إن Apple بدأت المعالجة. إعداد الرفع مباشر ولا يُنشئ IPA محليًا.
+- لقطة Light وDark من محاكي iPhone، ببيانات اختبار اصطناعية فقط: `Madar/Artifacts/owner-diary-years-navigation-20261114/OWNER-notes-home-years-L.png` و`OWNER-notes-home-years-D.png`؛ اختفت صفوف الأزرار المكررة. مقارنة المرجع أنشئت في `Madar/Artifacts/compare/N1-Nafidha.html`، والفروق في الترتيب مقصودة.
+- مراجعة سول `gpt-6.1-sol`, high، شملت تجربة الاستخدام: أوصى بتقديم تاريخ اليوم، جمع الأرشيف تحت «الأيام/السنوات/الرسائل»، تسمية اختيارات المطابقة والعرض، وإظهار الرجوع من تقويم السنة. نُفذت التوصيات وصُحح زر الإغلاق الذي كان يصف الوجهة خطأ؛ أكد سول القبول النهائي. لا موانع Critical/High، ولم يعدل المراجع ملفات أو يشغّل build/tests.
+- لم تُشغّل اختبارات في هذه الجولة. `git diff --check` نظيف عند التسليم.
+
+### Differences left
+- لقطة الجذر مُعاينة بصريًا. لم تُفتح واجهة Simulator رسوميًا للتنقل باللمس بين بطاقة سنة وصفحة الأرشيف والعودة؛ تقييم سول كان للمصدر فقط.
+- مستودع My-dream ألهم طريقة عرض البطاقة فقط. لا ادعاء بمطابقة الشاشة المرجعية أو باعتماد المالك للتصميم.
+
+### Not verified
+- قبول المالك على iPhone حقيقي أو iPad غير متحقق. معالجة Apple وتوفر TestFlight لا يُنتظران بعد الرفع.
+
+### Next
+- بعد اكتمال معالجة Apple وتوفر النسخة 50 في TestFlight، يثبتها المالك ويجرّب «كل الذكريات»، تبويب «السنوات»، فتح سنة، والعودة إلى اليوم. معالجة Apple لم يُنتظر اكتمالها.
+
+### Model/effort
+- الوكيل الرئيسي: model/effort not exposed. مستشار القبول: `gpt-6.1-sol`, high.
+
+### Usage
+- عند التسليم: خمس ساعات ٦٢٪ مستخدمة، والأسبوع ١٧٪ مستخدم؛ لم تُستخدم أرصدة إعادة الضبط.

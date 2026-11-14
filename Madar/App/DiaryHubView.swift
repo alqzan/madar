@@ -8,15 +8,18 @@ struct DiaryHubView: View {
     var initialTab: String? = nil
     var initialLetterID: UUID? = nil
     var initialLetterRequestID: UUID? = nil
+    var onReturnToToday: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var archive: DiaryArchiveSnapshot?
     @State private var contentPosition = ScrollPosition(edge: .top)
     @State private var year: Int?
     @State private var month: Int?
-    @State private var tab = "calendar"
+    @State private var tab = "timeline"
     @State private var reader: GregorianDay?
+    @State private var returnToRoomAfterReaderDismiss = false
     @State private var travelDays: Set<GregorianDay> = []
     @State private var searchOpen = false
     @State private var exportOpen = false
@@ -41,25 +44,24 @@ struct DiaryHubView: View {
             GregorianDay.containing(.now, in: app.activePlace.timeZone)
         ).year ?? Calendar.current.component(.year, from: .now)
     }
-    private static let mainTabs = [("calendar", "التقويم"), ("letters", "الرسائل"), ("index", "الفهرس")]
-    private static let calendarViews: Set<String> = ["calendar", "photos", "timeline"]
+    private static let mainTabs = [("timeline", "الأيام"), ("index", "السنوات"), ("letters", "الرسائل")]
+    private static let dayViews: Set<String> = ["timeline", "calendar", "photos"]
+    private static let dayViewOptions = [("timeline", "الأيام"), ("calendar", "التقويم"), ("photos", "الصور")]
     private let tabs = [
-        ("calendar", "التقويم"), ("timeline", "السجل"), ("letters", "الرسائل"), ("photos", "الصور"),
-        // Owner, 11 Nov 2026: projects are gone from the app for good; stored project rows stay in the store untouched.
-        // 12 Nov: «الذكريات» repeated the home's «هذا اليوم عبر السنين» and is gone; letters moved up and also have a toolbar button.
-        ("index", "الفهرس"),
+        ("timeline", "الأيام"), ("calendar", "التقويم"), ("letters", "الرسائل"), ("photos", "الصور"),
+        ("index", "السنوات"),
     ]
+    private var dayViewTitle: String { Self.dayViewOptions.first { $0.0 == tab }?.1 ?? "الأيام" }
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("أيامك").font(DiaryType.title);
+                    Text("ذكرياتك").font(DiaryType.title);
                 }.padding(.horizontal, 18).padding(.bottom, 12)
                 ScrollView(.horizontal) {
                     HStack(spacing: 16) {
-                        // 14 Nov owner (T10): three tabs; photos and the record are two views of the calendar.
                         ForEach(Self.mainTabs, id: \.0) { id, title in
-                            let selected = id == "calendar" ? Self.calendarViews.contains(tab) : tab == id
+                            let selected = id == "timeline" ? Self.dayViews.contains(tab) : tab == id
                             Button {
                                 tab = id
                             } label: {
@@ -72,17 +74,22 @@ struct DiaryHubView: View {
                         }
                     }
                 }.scrollIndicators(.hidden).padding(.horizontal, 18)
-                if Self.calendarViews.contains(tab) {
-                    HStack(spacing: 8) {
-                        ForEach([("calendar", "تقويم"), ("photos", "صور"), ("timeline", "سجل")], id: \.0) { id, title in
-                            Button { tab = id } label: {
-                                Text(title).font(MadarTypography.fine()).padding(.horizontal, 14).frame(minHeight: 44)
-                                    .foregroundStyle(tab == id ? theme.ink : theme.color("ink3Text"))
-                                    .background(tab == id ? theme.line.opacity(0.5) : Color.clear, in: Capsule()).contentShape(Capsule())
-                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-hub-view-" + id)
-                        }
+                if Self.dayViews.contains(tab) {
+                    HStack {
+                        Menu {
+                            ForEach(Self.dayViewOptions, id: \.0) { id, title in
+                                Button { tab = id } label: {
+                                    if tab == id { Label(title, systemImage: "checkmark") } else { Text(title) }
+                                }.accessibilityIdentifier("diary-hub-view-" + id)
+                            }
+                        } label: {
+                            Label("طريقة العرض: " + dayViewTitle, systemImage: "square.grid.2x2")
+                                .font(DiaryType.label).foregroundStyle(theme.ink)
+                                .padding(.horizontal, 12).frame(minHeight: 40)
+                                .background(theme.surface, in: Capsule()).overlay { Capsule().stroke(theme.line) }
+                        }.accessibilityIdentifier("diary-hub-view-menu")
                         Spacer()
-                    }.padding(.horizontal, 18)
+                    }.padding(.horizontal, 18).padding(.vertical, 4)
                 }
                 Divider().overlay(theme.line)
                 ScrollView {
@@ -96,7 +103,8 @@ struct DiaryHubView: View {
                                 DiaryLettersPanel(
                                     app: app, initialLetterID: initialLetterID,
                                     initialLetterRequestID: initialLetterRequestID, handledRouteID: $handledLetterRoute)
-                            default: timeline(archive.days)
+                            case "timeline": timeline(archive.days.filter { $0.day < archive.today }, empty: "لا توجد أيام سابقة محفوظة بعد.")
+                            default: EmptyView()
                             }
                         } else if let failure {
                             VStack(spacing: 12) {
@@ -140,10 +148,6 @@ struct DiaryHubView: View {
                         }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button { tab = "letters" } label: { Image(systemName: "envelope") }
-                            .accessibilityLabel("رسائلك إلى المستقبل").accessibilityIdentifier("diary-hub-letters-open")
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             searchOpen = true
                         } label: {
@@ -166,9 +170,17 @@ struct DiaryHubView: View {
                 .onChange(of: canReadDiary) { _, canRead in
                     if !canRead { aiComposerOpen = false; aiAvailability = .checking }
                 }
-                .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) {
+                .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } }), onDismiss: {
+                    guard returnToRoomAfterReaderDismiss else { return }
+                    returnToRoomAfterReaderDismiss = false
+                    onReturnToToday?()
+                    dismiss()
+                }) {
                     if let reader {
-                        DiaryDayView(app: app, day: reader, showsNavigationTools: false).environment(\.roomTheme, theme).madarSheetErrorAlert(app)
+                        DiaryDayView(app: app, day: reader, onReturnToToday: {
+                            returnToRoomAfterReaderDismiss = true
+                            self.reader = nil
+                        }, showsNavigationTools: false).environment(\.roomTheme, theme).madarSheetErrorAlert(app)
                     }
                 }
                 .onChange(of: initialTab) { _, target in
@@ -242,6 +254,16 @@ struct DiaryHubView: View {
                 }
                 .padding(2)
                 .glassEffect(.regular.interactive(), in: .capsule)
+                if year != nil {
+                    Button {
+                        tab = "index"
+                        year = nil
+                        month = nil
+                    } label: {
+                        Text("كل السنوات").font(DiaryType.label).foregroundStyle(theme.accent)
+                            .frame(minHeight: 40).contentShape(Rectangle())
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-calendar-all-years")
+                }
             }.buttonStyle(.madarPlain)
             if let month {
                 monthPage(archive, month: month)
@@ -468,22 +490,71 @@ struct DiaryHubView: View {
         }
     }
     private func index(_ archive: DiaryArchiveSnapshot) -> some View {
-        let years = Set(archive.days.map { grid.parts($0.day).year ?? $0.day.year }).sorted(by: >)
+        let savedDays = archive.days.filter { $0.day <= archive.today && ($0.writings > 0 || !$0.photoIDs.isEmpty) }
+        let daysByYear = Dictionary(grouping: savedDays) { grid.parts($0.day).year ?? $0.day.year }
+        let years = daysByYear.keys.sorted(by: >)
+        let columns = isPadWide(sizeClass) && !typeSize.isAccessibilitySize
+            ? [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+            : [GridItem(.flexible())]
         return VStack(alignment: .leading, spacing: 12) {
-            Text("فهرس الأيام").font(DiaryType.heading)
-            if years.isEmpty { Text("يبدأ فهرسك من أول صفحة تكتبها.").font(DiaryType.writing) }
-            ForEach(years, id: \.self) { year in
-                let labels = indexYearLabels(year)
-                DisclosureGroup {
-                    timeline(archive.days.filter { grid.parts($0.day).year == year })
-                } label: {
-                    MadarDateLabel(labels, primaryFont: DiaryType.heading, secondaryFont: MadarTypography.fine())
+            Text("ذكرياتك عبر السنين").font(DiaryType.heading)
+            Text("اختر سنة لتصل إلى أيامها وشهورها.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+            if years.isEmpty {
+                Text("ستظهر السنوات هنا بعد تدوين أول يوم.").font(DiaryType.writing).padding(.vertical, 20)
+            } else {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+                    ForEach(years, id: \.self) { year in
+                        let days = (daysByYear[year] ?? []).sorted { $0.day > $1.day }
+                        yearCard(year, days: days)
+                    }
                 }
-                .font(DiaryType.heading).padding(12).background(theme.surface, in: .rect(cornerRadius: 16))
-                .accessibilityElement(children: .combine).accessibilityLabel(labels.combined)
-                .accessibilityIdentifier("diary-hub-index-year-" + String(year))
             }
         }
+    }
+    private func yearCard(_ year: Int, days: [DiaryDaySummary]) -> some View {
+        let labels = indexYearLabels(year)
+        let latest = days.first
+        let photoID = days.first(where: { !$0.photoIDs.isEmpty })?.photoIDs.first
+        return Button {
+            self.year = year
+            month = nil
+            tab = "calendar"
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                MadarDateLabel(labels, primaryFont: DiaryType.title, secondaryFont: DiaryType.label)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(savedDaysLabel(days.count)).font(DiaryType.label).foregroundStyle(theme.accent)
+                HStack(alignment: .top, spacing: 10) {
+                    Text(latest?.excerpt ?? "").font(DiaryType.writing).lineLimit(2).multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let photoID, !typeSize.isAccessibilitySize {
+                        DiaryArchiveThumbnail(service: service, id: photoID, maxPixel: 128, placeholderHeight: 56) { image in
+                            image.resizable().scaledToFill().frame(width: 56, height: 56).clipShape(.rect(cornerRadius: 10))
+                                .accessibilityHidden(true)
+                        }.frame(width: 56, height: 56).accessibilityHidden(true)
+                    }
+                }
+                HStack {
+                    Text("افتح السنة").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    Spacer()
+                    Image(systemName: "chevron.backward").font(.caption).foregroundStyle(theme.accent)
+                }.padding(.top, 2)
+            }
+            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            .background(theme.surface, in: .rect(cornerRadius: 20))
+            .overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.line) }
+            .contentShape(.rect(cornerRadius: 20))
+        }.buttonStyle(.madarPlain)
+            .accessibilityLabel(labels.combined + "، " + savedDaysLabel(days.count) + (latest.map { "، " + $0.excerpt } ?? ""))
+            .accessibilityIdentifier("diary-hub-index-year-" + String(year))
+    }
+    private func savedDaysLabel(_ count: Int) -> String {
+        if count == 1 { return "يوم واحد محفوظ" }
+        if count == 2 { return "يومان محفوظان" }
+        let remainder = count % 100
+        if (3...10).contains(remainder) { return service.digits.string(count) + " أيام محفوظة" }
+        if count >= 100 && remainder == 0 { return service.digits.string(count) + " يوم محفوظ" }
+        return service.digits.string(count) + " يومًا محفوظًا"
     }
     private func indexYearLabels(_ year: Int) -> MadarDateLabels {
         let primary = service.digits.string(year) + (grid.first == .gregorian ? " م" : " هـ")

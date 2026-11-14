@@ -2,23 +2,27 @@ import SwiftUI
 import MadarCore
 import MadarDesign
 
-/// The day page's heading: both dates (the chosen calendar larger), the three day tabs and, on Fridays, the chosen ornament.
+/// The day page's heading: both dates, a visible today marker, a direct return on past days and, on Fridays, the chosen ornament.
 /// It owns no state of its own: the page hands it the day and a binding for the tab choice.
 struct DiaryDayHeader: View {
     @Bindable var app: AppSession
     let theme: RoomTheme
     let shownDay: GregorianDay
     let today: GregorianDay
-    let yearAgo: GregorianDay
     let appearance: DiaryDayAppearance?
     let friday: Bool
     @Binding var selected: GregorianDay?
+    var onReturnToToday: (() -> Void)? = nil
     private var service: AppDiaryService { AppDiaryService(app: app) }
     private var first: FirstCalendar { app.diaryFirstCalendar }
     private var fridayStyle: DiaryFridayStyle { DiaryFridayStyle(app) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
+            if shownDay == today {
+                Text("اليوم").font(DiaryType.label).foregroundStyle(theme.accent)
+                    .accessibilityIdentifier("diary-day-today-label")
+            }
             Text(
                 service.weekday(shownDay) + "، "
                     + (first == .gregorian && appearance?.night == true ? "ليلة " : "")
@@ -39,12 +43,19 @@ struct DiaryDayHeader: View {
             if friday {
                 VStack(spacing: 4) {
                     title
-                    if shownDay != today { dateChoice("اليوم", id: "today", value: today) }
+                    if shownDay != today { dateChoice("العودة إلى اليوم", id: "today", value: today) }
                 }
             } else {
                 ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .bottom, spacing: 8) { title; Spacer(minLength: 4); tabs }
-                    VStack(alignment: .leading, spacing: 4) { title; tabs }
+                    HStack(alignment: .bottom, spacing: 8) {
+                        title
+                        Spacer(minLength: 4)
+                        if shownDay != today { dateChoice("العودة إلى اليوم", id: "today", value: today) }
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        title
+                        if shownDay != today { dateChoice("العودة إلى اليوم", id: "today", value: today) }
+                    }
                 }
             }
         }.padding(.horizontal, 18).padding(.vertical, 4).frame(
@@ -71,18 +82,13 @@ struct DiaryDayHeader: View {
                 .accessibilityIdentifier("diary-friday-medallion")
         }
     }
-    private var tabs: some View {
-        HStack(spacing: 4) {
-            dateChoice("اليوم", id: "today", value: today)
-            dateChoice("أمس", id: "yesterday", value: today.adding(days: -1))
-            dateChoice("قبل سنة", id: "year", value: yearAgo)
-        }.fixedSize()
-    }
     private func dateChoice(_ title: String, id: String, value: GregorianDay) -> some View {
-        Button {
-            selected = value
+        let label = id == "today" && shownDay != today ? "العودة إلى اليوم" : title
+        return Button {
+            if id == "today", shownDay != today, let onReturnToToday { onReturnToToday() }
+            else { selected = value }
         } label: {
-            Text(title).font(DiaryType.label).frame(minHeight: 38).padding(.horizontal, 10).background(
+            Text(label).font(DiaryType.label).frame(minHeight: 38).padding(.horizontal, 10).background(
                 shownDay == value ? theme.surface : .clear, in: .rect(topLeadingRadius: 10, topTrailingRadius: 10)
             ).overlay {
                 UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10).stroke(

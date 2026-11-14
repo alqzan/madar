@@ -14,6 +14,12 @@ struct DiaryDayView: View {
     var prompt: String? = nil
     /// madar://notes/write opens today's page with the composer already grown.
     var expandComposerOnOpen = false
+    /// Closes the archive and returns to the room's actual today page when this day is nested inside the archive.
+    var onReturnToToday: (() -> Void)? = nil
+    /// The root's memory preview follows the date header so the current page is identified first.
+    var memoryRail: AnyView? = nil
+    /// Today's root already has one clear «كل الذكريات» entry above the page; older day pages keep a single archive shortcut.
+    var showsArchiveShortcuts = true
     /// A day opened from the archive, search or a week is already inside that screen: it does not offer the same screens again on top of themselves.
     var showsNavigationTools = true
     /// The room root offers its customize screen from the menu (the home that used to carry that button is gone).
@@ -59,6 +65,8 @@ struct DiaryDayView: View {
     @State private var returnDay: GregorianDay?
     @State private var returnDismissed = false
     @State private var archiveOpen = false
+    @State private var archiveInitialTab = "calendar"
+    @State private var returnToTodayAfterArchiveDismiss = false
     @State private var weekOpen = false
     @State private var searchOpen = false
     @State private var displayNow = Date()
@@ -126,6 +134,18 @@ struct DiaryDayView: View {
     }
     private var first: FirstCalendar { app.diaryFirstCalendar }
     private var eveningPrimary: Bool { shownDay == today && !intentions.isEmpty && service.intentionEvening(shownDay) }
+    private func openArchive(tab: String) {
+        archiveInitialTab = tab
+        archiveOpen = true
+    }
+    private func archiveButton(_ title: String, icon: String, tab: String, id: String) -> some View {
+        Button { openArchive(tab: tab) } label: {
+            Label(title, systemImage: icon).font(DiaryType.label).foregroundStyle(theme.ink)
+                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Capsule())
+                .background(theme.surface, in: Capsule())
+                .overlay { Capsule().stroke(theme.line) }
+        }.buttonStyle(.madarPlain).accessibilityIdentifier(id)
+    }
     private var secondInk: Color {
         switch app.string("notes.secondInk") {
         case "green": theme.color("ghad");
@@ -154,20 +174,15 @@ struct DiaryDayView: View {
                     DiaryTravelHeader(
                         page: travel, subtitle: service.bothDates(shownDay, calendar: first),
                         distance: service.kilometres(travel.kilometres), digits: service.digits,
-                        day: shownDay, today: today, selected: $selected)
+                        day: shownDay, today: today, selected: $selected, onReturnToToday: onReturnToToday)
                 } else {
-                    DiaryDayHeader(app: app, theme: theme, shownDay: shownDay, today: today, yearAgo: aYearAgo, appearance: appearance, friday: friday, selected: $selected)
+                    DiaryDayHeader(app: app, theme: theme, shownDay: shownDay, today: today, appearance: appearance, friday: friday, selected: $selected, onReturnToToday: onReturnToToday)
                 }
-                if showsNavigationTools {
+                if let memoryRail { memoryRail }
+                if showsNavigationTools && showsArchiveShortcuts {
                     HStack {
-                        Button { archiveOpen = true } label: {
-                            Label("أيامك", systemImage: "calendar")
-                                .font(DiaryType.label).foregroundStyle(theme.ink)
-                                .padding(.horizontal, 14).frame(minHeight: 42)
-                                .background(theme.surface, in: Capsule())
-                                .overlay { Capsule().stroke(theme.line) }
-                        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-archive")
-                        Spacer(minLength: 0)
+                        Spacer()
+                        archiveButton("كل الذكريات", icon: "clock.arrow.circlepath", tab: "timeline", id: "diary-day-archive")
                     }.padding(.horizontal, 18).padding(.top, 4).padding(.bottom, 4)
                 }
                 if !composerExpanded {
@@ -175,22 +190,18 @@ struct DiaryDayView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("آخر صفحة كتبتها: " + service.bothDates(returnDay, calendar: first)).font(DiaryType.label)
                         Text("لا تحتاج إلى تعويض شيء.").font(MadarTypography.body())
-                        HStack(spacing: 8) {
-                            if showsNavigationTools { Button {
-                                archiveOpen = true
-                            } label: {
-                                Text("افتح يومًا سابقًا").frame(maxWidth: .infinity, minHeight: 44).overlay {
-                                    Capsule().stroke(theme.line)
-                                }
-                            }.accessibilityIdentifier("diary-return-days") }
-                            Button {
-                                returnDismissed = true; composerExpanded = true
-                            } label: {
-                                Text("ابدأ من اليوم").frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(
-                                    theme.background
-                                ).background(theme.ink, in: .capsule)
-                            }.accessibilityIdentifier("diary-return-write")
-                        }.font(DiaryType.label).buttonStyle(.madarPlain)
+                        if shownDay != today && onReturnToToday == nil {
+                            HStack(spacing: 8) {
+                                Button {
+                                    returnDismissed = true
+                                    if let onReturnToToday { onReturnToToday() } else { selected = nil }
+                                } label: {
+                                    Text("ابدأ من اليوم").frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(
+                                        theme.background
+                                    ).background(theme.ink, in: .capsule)
+                                }.accessibilityIdentifier("diary-return-write")
+                            }.font(DiaryType.label).buttonStyle(.madarPlain)
+                        }
                     }.padding(16).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 1) }
                         .accessibilityElement(children: .contain).accessibilityIdentifier("diary-return")
                 }
@@ -418,7 +429,7 @@ struct DiaryDayView: View {
                         Button {
                             dismiss()
                         } label: {
-                            Label("المذكرات", systemImage: "chevron.backward")
+                            Label(onReturnToToday == nil ? "المذكرات" : "الذكريات", systemImage: "chevron.backward")
                         }.accessibilityIdentifier("diary-day-close")
                     }
                 }
@@ -437,8 +448,15 @@ struct DiaryDayView: View {
             .fullScreenCover(item: $photoViewer, onDismiss: { photoStripToken += 1 }) { start in
                 DiaryPhotoViewer(app: app, day: shownDay, load: { await refreshLines(); return viewerItems() }, selection: start.id).environment(\.roomTheme, theme)
             }
-            .fullScreenCover(isPresented: $archiveOpen) {
-                DiaryHubView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app)
+            .fullScreenCover(isPresented: $archiveOpen, onDismiss: {
+                guard returnToTodayAfterArchiveDismiss else { return }
+                returnToTodayAfterArchiveDismiss = false
+                if let onReturnToToday { onReturnToToday() } else { selected = nil }
+            }) {
+                DiaryHubView(app: app, initialTab: archiveInitialTab, onReturnToToday: {
+                    returnToTodayAfterArchiveDismiss = true
+                })
+                    .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
             }
             .sheet(item: $openingLetter, onDismiss: { retry += 1 }) { letter in
                 DiaryLetterMoment(app: app, letter: letter).environment(\.roomTheme, theme)
