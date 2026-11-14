@@ -207,7 +207,7 @@ struct DiaryDayView: View {
                                     if travel == nil { dayPhotoStrip }
                                     let flow = page.lines.filter { $0.kind != "intention" }
                                     let mediaByEntry = Dictionary(grouping: page.media, by: \.entryID)
-                                    let runs = autoRuns(flow)
+                                    let runs = autoRuns(flow, mediaByEntry: mediaByEntry)
                                     ForEach(Array(flow.enumerated()), id: \.element.id) { index, line in
                                         let attached = mediaByEntry[line.id] ?? []
                                         let hasAudio = attached.contains { $0.kind == "audio" }
@@ -218,7 +218,7 @@ struct DiaryDayView: View {
                                             if run.first { autoRunSummary(run).id("diary-entry-" + line.id) }
                                         } else if !hasAudio {
                                             lineRow(line, page: page).id("diary-entry-" + line.id)
-                                            if let run = runs[line.id], run.first, run.texts.count >= 2 { collapseRunButton(run) }
+                                            if let run = runs[line.id], run.texts.count >= 2, run.last == line.id { collapseRunButton(run) }
                                         }
                                         ForEach(attached.filter { $0.kind != "missing" }) { media in
                                             DiaryMediaCard(app: app, media: media, transcript: line.text, openPhoto: { photoViewer = .init(id: $0.id.uuidString) })
@@ -763,21 +763,21 @@ struct DiaryDayView: View {
         if inlineWriting { insertAt = nil; anchorLabel = nil; inlineEdit = .init(id: line.id, text: line.text) }
         else { editing = .init(id: line.id, text: line.text) }
     }
-    private struct AutoRun { let id: String; let first: Bool; let texts: [String] }
+    private struct AutoRun { let id: String; let first: Bool; let last: String; let texts: [String] }
     private static let autoKinds: Set<String> = ["salah", "quran", "mihbara", "mal", "habits"]
     /// Consecutive lines written by Madar inside one prayer chapter. A chapter heading or a line of yours ends the run.
-    private func autoRuns(_ flow: [DiaryDisplayLine]) -> [String: AutoRun] {
+    private func autoRuns(_ flow: [DiaryDisplayLine], mediaByEntry: [String: [DiaryDisplayMedia]]) -> [String: AutoRun] {
         var result: [String: AutoRun] = [:]
         var members: [DiaryDisplayLine] = []
         func close() {
             if let head = members.first {
                 let texts = members.map(\.text).filter { !$0.isEmpty }
-                for line in members { result[line.id] = AutoRun(id: head.id, first: line.id == head.id, texts: texts) }
+                for line in members { result[line.id] = AutoRun(id: head.id, first: line.id == head.id, last: members.last?.id ?? head.id, texts: texts) }
             }
             members = []
         }
         for line in flow {
-            if Self.autoKinds.contains(line.kind) {
+            if Self.autoKinds.contains(line.kind), (mediaByEntry[line.id] ?? []).isEmpty {
                 if periodLabels[line.id] != nil { close() }
                 members.append(line)
             } else { close() }
@@ -802,7 +802,7 @@ struct DiaryDayView: View {
         Button {
             withAnimation(reduceMotion ? nil : .snappy) { _ = expandedRuns.remove(run.id) }
         } label: {
-            Text("اطوِ").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).frame(maxWidth: .infinity, minHeight: 30)
+            Text("اطوِ").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).frame(maxWidth: .infinity, minHeight: 44)
         }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-auto-run-collapse")
     }
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
@@ -885,8 +885,14 @@ struct DiaryDayView: View {
         highlightGeneration += 1
         let generation = highlightGeneration
         highlightedEntryID = initialEntryID
-        proxy.scrollTo("diary-entry-" + initialEntryID.uuidString, anchor: .center)
+        // A deep link may name a line inside a collapsed chapter run: open that run first so the scroll target exists.
+        if let page, let run = autoRuns(page.lines.filter { $0.kind != "intention" }, mediaByEntry: Dictionary(grouping: page.media, by: \.entryID))[initialEntryID.uuidString] {
+            expandedRuns.insert(run.id)
+        }
+        let target = "diary-entry-" + initialEntryID.uuidString
         Task { @MainActor in
+            await Task.yield()
+            proxy.scrollTo(target, anchor: .center)
             do { try await Task.sleep(for: .seconds(2)) } catch { return }
             if highlightGeneration == generation, highlightedEntryID == initialEntryID { highlightedEntryID = nil }
         }

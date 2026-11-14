@@ -469,7 +469,7 @@ struct QuranHomeView: View {
                 Button("ابدأ") { run { active = try await service.start(kind: step.kind, stepID: step.id, range: step.range, rakaat: nil, spotID: nil) } }.disabled(busy)
                     .font(bodyFont(14, bold: true)).foregroundStyle(theme.onAccent).padding(.horizontal, 20).frame(minHeight: 44)
                     .background(theme.color("accent"), in: Capsule()).contentShape(Capsule()).contentShape(.capsule).disabled(busy).accessibilityIdentifier("quran-begin")
-                if step.kind == .hifz, step.range != nil {
+                if step.kind == .hifz, step.range != nil, !step.completed, state?.draft == nil {
                     // 14 Nov owner: finish a wird you already know in one tap; the grade is asked every time.
                     Button("أتممته كاملًا") { wholeStep = step }.disabled(busy).font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
                         .frame(minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("quran-finish-whole")
@@ -660,12 +660,8 @@ struct QuranHomeView: View {
     private func finishWhole(_ step: QuranUIStep, grade: QuranUIGrade) {
         wholeStep = nil
         guard let range = step.range else { return }
-        run(refresh: true) {
-            let started = try await service.start(kind: step.kind, stepID: step.id, range: range, rakaat: nil, spotID: nil)
-            for page in range.fromPage...range.toPage {
-                _ = try await service.session(draftID: started.id, action: .grade(page: page, grade: grade))
-            }
-            _ = try await service.session(draftID: started.id, action: .commit)
+        run {
+            _ = try await service.finishWhole(stepID: step.id, range: range, grade: grade)
             try await refresh()
         }
     }

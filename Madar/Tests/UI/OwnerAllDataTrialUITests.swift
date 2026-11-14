@@ -166,7 +166,7 @@ import XCTest
         app.buttons["diary-days"].tap()
         if app.buttons["diary-calendar-scale-year"].waitForExistence(timeout: 30) {
             shot(app, "TRIAL-diary-hub-L")
-            for tab in ["diary-hub-timeline", "diary-hub-photos", "diary-hub-letters"] where app.buttons[tab].exists { app.buttons[tab].tap(); Thread.sleep(forTimeInterval: 1.5); shot(app, "TRIAL-" + tab + "-L") }
+            for tab in ["diary-hub-view-timeline", "diary-hub-view-photos", "diary-hub-letters"] where app.buttons[tab].exists { app.buttons[tab].tap(); Thread.sleep(forTimeInterval: 1.5); shot(app, "TRIAL-" + tab + "-L") }
             if app.buttons["diary-hub-close"].exists { app.buttons["diary-hub-close"].tap() } else { app.swipeDown(velocity: .fast) }
         }
         let search = app.buttons["diary-search"]

@@ -41,6 +41,8 @@ struct DiaryHubView: View {
             GregorianDay.containing(.now, in: app.activePlace.timeZone)
         ).year ?? Calendar.current.component(.year, from: .now)
     }
+    private static let mainTabs = [("calendar", "التقويم"), ("letters", "الرسائل"), ("index", "الفهرس")]
+    private static let calendarViews: Set<String> = ["calendar", "photos", "timeline"]
     private let tabs = [
         ("calendar", "التقويم"), ("timeline", "السجل"), ("letters", "الرسائل"), ("photos", "الصور"),
         // Owner, 11 Nov 2026: projects are gone from the app for good; stored project rows stay in the store untouched.
@@ -55,19 +57,33 @@ struct DiaryHubView: View {
                 }.padding(.horizontal, 18).padding(.bottom, 12)
                 ScrollView(.horizontal) {
                     HStack(spacing: 16) {
-                        ForEach(tabs, id: \.0) { id, title in
+                        // 14 Nov owner (T10): three tabs; photos and the record are two views of the calendar.
+                        ForEach(Self.mainTabs, id: \.0) { id, title in
+                            let selected = id == "calendar" ? Self.calendarViews.contains(tab) : tab == id
                             Button {
                                 tab = id
                             } label: {
                                 Text(title).font(MadarTypography.caption()).frame(minHeight: 44).foregroundStyle(
-                                    tab == id ? theme.ink : theme.color("ink3Text")
+                                    selected ? theme.ink : theme.color("ink3Text")
                                 ).overlay(alignment: .bottom) {
-                                    if tab == id { Rectangle().fill(theme.accent).frame(height: 2) }
+                                    if selected { Rectangle().fill(theme.accent).frame(height: 2) }
                                 }
                             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-hub-" + id)
                         }
                     }
                 }.scrollIndicators(.hidden).padding(.horizontal, 18)
+                if Self.calendarViews.contains(tab) {
+                    HStack(spacing: 8) {
+                        ForEach([("calendar", "تقويم"), ("photos", "صور"), ("timeline", "سجل")], id: \.0) { id, title in
+                            Button { tab = id } label: {
+                                Text(title).font(MadarTypography.fine()).padding(.horizontal, 14).frame(minHeight: 44)
+                                    .foregroundStyle(tab == id ? theme.ink : theme.color("ink3Text"))
+                                    .background(tab == id ? theme.line.opacity(0.5) : Color.clear, in: Capsule()).contentShape(Capsule())
+                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-hub-view-" + id)
+                        }
+                        Spacer()
+                    }.padding(.horizontal, 18)
+                }
                 Divider().overlay(theme.line)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {

@@ -243,6 +243,28 @@ extension AppQuranService {
         value.draft = draft; try await save(value)
         return .active(try await sessionState(value))
     }
+    /// «أتممته كاملًا»: the learner already knows the wird. Every planned ayah counts as recited blind and every page of the
+    /// draft's own portions takes the grade the learner just chose. A failure discards the draft so «ابدأ» is never blocked.
+    func finishWhole(stepID: String?, range: QuranUIRange?, grade: QuranUIGrade) async throws -> QuranUISessionResult {
+        let started = try await start(kind: .hifz, stepID: stepID, range: range, rakaat: nil, spotID: nil)
+        do {
+            var value = try savedDraft(started.id)
+            let catalog = try QuranResources.catalog()
+            guard let rating = QuranReviewRating(storedRaw: grade.rawValue) else { throw QuranPlanError.invalidPages }
+            let planned = Set(value.draft.portions.flatMap { Array($0.first...$0.last) })
+            let pages = try value.draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }
+            value.draft.blindPassedAyahs.formUnion(planned)
+            for page in Set(pages).sorted() where !value.draft.grades.contains(where: { $0.page == page }) {
+                value.draft.grades.append(QuranDraftGrade(page: page, rating: rating))
+            }
+            value.draft.coachStage = .rating
+            try await save(value)
+            return try await session(draftID: started.id, action: .commit)
+        } catch {
+            _ = try? await session(draftID: started.id, action: .discard)
+            throw error
+        }
+    }
     func sessionState(_ value: QuranDraftPayload) async throws -> QuranUISessionState {
         let draft = value.draft, catalog = try QuranResources.catalog()
         let ids = Set(draft.portions.flatMap { Array($0.first...$0.last) })

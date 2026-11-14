@@ -16,8 +16,8 @@ import XCTest
         capture(app, "M3-V07-year-october-L")
         october.tap(); let day = app.buttons["diary-calendar-day-2026-10-15"]; XCTAssertTrue(day.waitForExistence(timeout: 5)); capture(app,"M3-V07-month-L"); day.tap()
         XCTAssertTrue(app.buttons["diary-day-write"].waitForExistence(timeout: 10)); app.closeDiaryDay()
-        app.buttons["diary-hub-timeline"].tap(); XCTAssertTrue(app.buttons["diary-hub-day-2026-10-15"].waitForExistence(timeout: 10)); capture(app,"M3-V07-timeline-L")
-        app.buttons["diary-hub-photos"].tap(); XCTAssertTrue(app.images.count > 0); capture(app,"M3-V07-photos-L")
+        app.buttons["diary-hub-view-timeline"].tap(); XCTAssertTrue(app.buttons["diary-hub-day-2026-10-15"].waitForExistence(timeout: 10)); capture(app,"M3-V07-timeline-L")
+        app.buttons["diary-hub-view-photos"].tap(); XCTAssertTrue(app.images.count > 0); capture(app,"M3-V07-photos-L")
         app.buttons["diary-hub-calendar"].tap(); yearScale.tap()
         let hijri = app.buttons["diary-calendar-hijri"]; for _ in 0..<4 where !hijri.isHittable { app.swipeUp() }; hijri.tap()
         XCTAssertTrue(app.staticTexts["diary-hub-year"].waitForExistence(timeout: 10)); XCTAssertEqual(app.staticTexts["diary-hub-year"].label,"١٤٤٨")
@@ -72,8 +72,8 @@ import XCTest
         let opened = Date(); app.buttons["diary-days"].tap()
         XCTAssertTrue(app.buttons["diary-calendar-scale-year"].waitForExistence(timeout: 30)); capture(app, "TRIAL-diary-hub-L")
         add(XCTAttachment(string: "hub opened in \(Date().timeIntervalSince(opened)) s"))
-        app.buttons["diary-hub-timeline"].tap(); _ = app.buttons.firstMatch.waitForExistence(timeout: 10); capture(app, "TRIAL-diary-timeline-L")
-        app.buttons["diary-hub-photos"].tap(); capture(app, "TRIAL-diary-photos-L")
+        app.buttons["diary-hub-view-timeline"].tap(); _ = app.buttons.firstMatch.waitForExistence(timeout: 10); capture(app, "TRIAL-diary-timeline-L")
+        app.buttons["diary-hub-view-photos"].tap(); capture(app, "TRIAL-diary-photos-L")
     }
     private func capture(_ app: XCUIApplication,_ name:String) { let shot = XCTAttachment(screenshot:app.screenshot()); shot.name=name; shot.lifetime = .keepAlways; add(shot) }
     private func selectHubTab(_ name: String, _ app: XCUIApplication) {
