@@ -4,7 +4,7 @@ Owner requests in force: a whole-app pass for ease, simplicity, flexibility and 
 
 ## Verified baseline and delivery
 
-- M0–M6 software is on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build before this settings follow-up: **0.1.0 (48)** (`Madar/Artifacts/OWNER-TestFlight-48/upload.log`, uploaded 14 Nov 2026 17:33 Riyadh; Apple reported processing). This request prepares build 49. Owner-device installation and acceptance remain unverified. Build 27 (10 Nov) included Quran unreadable-draft recovery and the owner's exit-choice behavior. Xcode 27.2 archive and internal upload succeeded at 14:08 Riyadh on 10 Nov; App Store Connect reported that the package is processing. The exported IPA's app and widget signatures, versions, iOS target and entitlements were verified. Processing completion and installation on the owner's iPhone are not checked. Build 26 was the prior upload; build 24 added level-only voice recording and elapsed-time formatting. Older builds 14–20 are history (`docs/archive/PROGRESS-2026-11-08-codex-cleanup-batch.md` for 14–15).
+- M0–M6 software is on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (49)** (`Madar/Artifacts/OWNER-TestFlight-49/upload.log`, uploaded 14 Nov 2026 21:05 Riyadh; Xcode reports upload succeeded and Apple began processing). The internal-only export was archived on Xcode 27.2; the archive app and widget signatures were valid and carried no iCloud/ubiquity entitlements. Owner-device installation and acceptance remain unverified. Build 27 (10 Nov) included Quran unreadable-draft recovery and the owner's exit-choice behavior. Xcode 27.2 archive and internal upload succeeded at 14:08 Riyadh on 10 Nov; App Store Connect reported that the package is processing. The exported IPA's app and widget signatures, versions, iOS target and entitlements were verified. Processing completion and installation on the owner's iPhone are not checked. Build 26 was the prior upload; build 24 added level-only voice recording and elapsed-time formatting. Older builds 14–20 are history (`docs/archive/PROGRESS-2026-11-08-codex-cleanup-batch.md` for 14–15).
 - Simulators: `Madar 15 Pro Max` and `Madar iPad Pro 13`, both iOS 27.0, no others. Storage remains local-only (RA1); this request used synthetic stores only and did not open or migrate owner data. Owner-device installation and acceptance are separate.
 - Package baseline passes (rows 16–17). Current continuation: prayer history read failures propagate and remain retryable (42/42 prayer, 26/26 command/replay tests). Polar manual logging, habit delete/undo/relaunch and both year-calendar settings paths now pass on iOS 27.0; details in row 18. General no-trip FX rates still need an owner rule/data-model decision. The 9 handwritten-colour findings are resolved in row 19: static shipping-source scan passes (464 sources, 4 catalogs, 38 independently measured token pairs); its manual trace requirement remains separate.
 - Build 22 includes the changes after 21: lazy prayer/night reads and per-day prayer-time memoization, scoped habit undo reads, 1922 dead-code lines removed, stale-test cleanup, and the current continuation fixes. Signature verification passed; app/widget versions are both 0.1.0 (22), minimum OS 27.0, device families 1 and 2, and no iCloud/ubiquity entitlements. No owner-device performance measurement is implied.
@@ -327,10 +327,10 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 ### Usage
 - عند التسليم: الخمس ساعات ١١٪ مستخدمة، والأسبوع ٩٪ مستخدم. لم تُستخدم أرصدة إعادة الضبط.
 
-## تسليم 2026-11-14 (و) — تقاعد الإعدادات الآمن وتجهيز نسخة 49
+## تسليم 2026-11-14 (و) — تقاعد الإعدادات الآمن ورفع نسخة 49
 
 ### Works now
-- تقاعدت 12 تعريفات إعداد لم تعد لها قراءة حية. تختفي من الإعدادات والبحث المركزي، وتبقى بياناتها المخزنة كما هي.
+- تقاعدت 12 تعريفًا لإعدادات لم تعد لها قراءة حية. تختفي من الإعدادات والبحث المركزي، وتبقى بياناتها المخزنة كما هي.
 - النمط القديم والتراجع القديم يتجاهلان المفاتيح المتقاعدة المعروفة فقط؛ أي مفتاح غير معروف يظل مرفوضًا مع rollback.
 - استعراض الأيام والرجوع إلى اليوم، وتحسينات المذكرات السابقة، مشمولة في النسخة الجديدة مع هذا التنظيف.
 - قرار البنك مستمر: لا إشعار محلي مستقل؛ المراجعة داخل غرفة المال فقط.
@@ -340,7 +340,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - `swift test --filter DataTests.settingsDefaultsPersistenceAndInvalidRejection` — 1/1؛ `swift test --filter ReplayTests.legacyPresetAndUndoSkipRetiredSettingsButRejectUnknownKeys` — 1/1.
 - محاكي iOS 27.0 `Madar 15 Pro Max`: `OWNER-retired-settings-20261114.xcresult` — اختبار التكامل 1/1، مفاتيح التقاعد غير موجودة في شاشة/بحث الإعدادات.
 - سول `gpt-6.1-sol`, high: قبول مراجعة التغيير؛ لا High/Critical. النسخ الثلاث من schema متطابقة، 138 إعدادًا، 62 منها تدخل في الأنماط؛ مفاتيح RA8 باقية.
-- أرشفة/رفع TestFlight وتوقيع النسخة 49: يضاف الدليل بعد الإجراء؛ رقم البناء زيد مرة واحدة لهذا الطلب.
+- أُرشفت نسخة 0.1.0 (49) على Xcode 27.2 ورُفعت داخليًا بنجاح في 14 نوفمبر 2026، 21:05 بتوقيت الرياض (`Madar/Artifacts/OWNER-TestFlight-49/upload.log`). أفاد Xcode أن الحزمة بدأت معالجة Apple؛ لم ننتظر اكتمالها.
 
 ### Differences left
 - القيم القديمة للـ12 لا تظهر ولا تؤثر في السلوك، لكن صفوفها تظل في المخزن والنسخ الاحتياطية بلا تعديل.
@@ -350,13 +350,13 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - اكتمال معالجة Apple وتوفر البناء في TestFlight، ثم قبول المالك على جهازه.
 
 ### Next
-- بعد نجاح الرفع، يدفع `main` إلى `origin`؛ يثبت المالك التطبيق ويقبل مظهر المذكرات وعودة اليوم والإعدادات.
+- بعد إتاحة البناء في TestFlight، يثبته المالك ويقبل مظهر المذكرات وعودة اليوم والإعدادات.
 
 ### Model/effort
 - الوكيل الرئيسي: model/effort not exposed. مستشار القبول: `gpt-6.1-sol`, high.
 
 ### Usage
-- يثبت الاستخدام الفعلي في آخر تحديث لهذا التسليم؛ لم تُستخدم أرصدة إعادة ضبط.
+- خمس ساعات: ٢٤٪ مستخدمة؛ الأسبوع: ١١٪ مستخدم. لم تُستخدم أرصدة إعادة ضبط.
 
 ## تسليم 2026-11-14 (د) — كل ما أمكن، النسخة 48
 - **يعمل:** المذكرات على iPad العريض صفحة اليوم وبجانبها عمود (ذكريات، أيام، أسئلة) بدل الرئيسية القديمة، ومكانها ثابت فلا تُبنى من جديد عند التدوير؛ «خصّص المذكرات» يخفي شريط السنة؛ شريطا صور اليوم يُسقطان الصورة المربوطة معًا (من الحقل ومن العارض)؛ قاعدة «لم يدخل وقتها» في LogPrayerIntent صارت دالة نقية في MadarCore بسلوك مطابق؛ حُذف الميت: QuranRoom.swift، مكتب المحبرة القديم، motivationCues.
