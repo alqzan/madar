@@ -6,6 +6,13 @@ import MadarData
 import MadarPrayer
 @testable import MadarCommands
 
+private struct LegacySettingsInverseFixture: Codable {
+    let settings: [String: MadarData.JSONValue]
+    let afterSettings: [String: MadarData.JSONValue]
+    let layouts: [String: Data?]
+    let afterLayouts: [String: Data]
+}
+
 @Suite(.serialized) @MainActor struct ReplayTests {
     private func fixture(at now: Date = Date()) throws -> (ModelContainer, CommandBus, URL) {
         let directory = FileManager.default.temporaryDirectory.appending(path: "MadarCommandFixture-\(UUID())")
@@ -259,5 +266,60 @@ import MadarPrayer
         #expect(try context.fetch(FetchDescriptor<QadaItem>()).isEmpty)
         let retiredMakeUp = CommandEnvelope(name: "prayer.makeUp", payload: .object(["dayKey": .string("2026-10-12"), "prayer": .string("fajr")]), issuedAt: now.addingTimeInterval(3))
         #expect(try await bus.execute(retiredMakeUp, now: now.addingTimeInterval(3)).status == .rejected)
+    }
+    @Test func legacyPresetAndUndoSkipRetiredSettingsButRejectUnknownKeys() async throws {
+        let now = date("2026-10-15T12:00:00+03:00")
+        let (container, bus, directory) = try fixture(at: now)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storedContext = ModelContext(container), retired = Setting()
+        let retiredBytes = Data("\"legacy-layout\"".utf8), retiredUpdatedAt = now.addingTimeInterval(-100)
+        retired.key = "mal.logView"; retired.valueJSON = retiredBytes; retired.updatedAt = retiredUpdatedAt; retired.writerID = "old-build"
+        storedContext.insert(retired); try storedContext.save()
+
+        let presetID = UUID()
+        let legacyPreset = CommandEnvelope(commandID: presetID, name: "settings.applyPreset", payload: .object(["settings": .object([
+            "core.numerals": .string("western"), "mal.logView": .string("monthArches")
+        ])]), issuedAt: now)
+        #expect(try await bus.execute(legacyPreset, now: now).status == .applied)
+        let store = try SettingsStore(context: ModelContext(container))
+        #expect(try store.value(for: "core.numerals") == .string("western"))
+        #expect(try ModelContext(container).fetch(FetchDescriptor<Setting>()).first { $0.key == "mal.logView" }?.valueJSON == retiredBytes)
+        #expect(try await bus.execute(.init(name: "system.undo", payload: .object(["undoToken": .string(presetID.uuidString)]), issuedAt: now.addingTimeInterval(1)), now: now.addingTimeInterval(1)).status == .applied)
+        #expect(try store.value(for: "core.numerals") == .string("arabicIndic"))
+        #expect(try ModelContext(container).fetch(FetchDescriptor<Setting>()).first { $0.key == "mal.logView" }?.updatedAt == retiredUpdatedAt)
+
+        let legacyUndoID = UUID()
+        _ = try await bus.execute(.init(commandID: legacyUndoID, name: "settings.applyPreset", payload: .object(["settings": .object(["core.numerals": .string("western")])]), issuedAt: now.addingTimeInterval(2)), now: now.addingTimeInterval(2))
+        let receiptContext = ModelContext(container)
+        let receipt = try #require(receiptContext.fetch(FetchDescriptor<MadarData.CommandReceipt>()).first { $0.commandID == legacyUndoID })
+        receipt.undoJSON = try JSONEncoder().encode(LegacySettingsInverseFixture(
+            settings: ["core.numerals": .string("arabicIndic"), "mal.logView": .string("arches")],
+            afterSettings: ["core.numerals": .string("western"), "mal.logView": .string("monthArches")],
+            layouts: [:], afterLayouts: [:]
+        ))
+        try receiptContext.save()
+        #expect(try await bus.execute(.init(name: "system.undo", payload: .object(["undoToken": .string(legacyUndoID.uuidString)]), issuedAt: now.addingTimeInterval(3)), now: now.addingTimeInterval(3)).status == .applied)
+        #expect(try store.value(for: "core.numerals") == .string("arabicIndic"))
+        #expect(try ModelContext(container).fetch(FetchDescriptor<Setting>()).first { $0.key == "mal.logView" }?.valueJSON == retiredBytes)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<Setting>()).first { $0.key == "mal.logView" }?.updatedAt == retiredUpdatedAt)
+
+        let unknownUndoID = UUID()
+        _ = try await bus.execute(.init(commandID: unknownUndoID, name: "settings.applyPreset", payload: .object(["settings": .object(["core.numerals": .string("western")])]), issuedAt: now.addingTimeInterval(4)), now: now.addingTimeInterval(4))
+        let unknownContext = ModelContext(container)
+        let unknownReceipt = try #require(unknownContext.fetch(FetchDescriptor<MadarData.CommandReceipt>()).first { $0.commandID == unknownUndoID })
+        unknownReceipt.undoJSON = try JSONEncoder().encode(LegacySettingsInverseFixture(
+            settings: ["core.numerals": .string("arabicIndic"), "future.setting": .bool(false)],
+            afterSettings: ["core.numerals": .string("western"), "future.setting": .bool(false)],
+            layouts: [:], afterLayouts: [:]
+        ))
+        try unknownContext.save()
+        do {
+            _ = try await bus.execute(.init(name: "system.undo", payload: .object(["undoToken": .string(unknownUndoID.uuidString)]), issuedAt: now.addingTimeInterval(5)), now: now.addingTimeInterval(5))
+            Issue.record("An undo containing an unknown setting must fail closed.")
+        } catch { }
+        #expect(try store.value(for: "core.numerals") == .string("western"))
+        let stillPending = try ModelContext(container).fetch(FetchDescriptor<MadarData.CommandReceipt>()).first { $0.commandID == unknownUndoID }
+        #expect(stillPending?.undoJSON != nil)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<Setting>()).first { $0.key == "mal.logView" }?.valueJSON == retiredBytes)
     }
 }

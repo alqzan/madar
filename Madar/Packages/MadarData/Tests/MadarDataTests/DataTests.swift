@@ -3,7 +3,33 @@ import SwiftData
 import Testing
 @testable import MadarData
 
+private struct LegacySettingsUndoChange: Codable {
+    let key: String
+    let before: JSONValue
+    let after: JSONValue
+}
+private struct RetiredSettingRowSnapshot: Equatable {
+    let id: UUID
+    let createdAt: Date
+    let updatedAt: Date
+    let deletedAt: Date?
+    let writerID: String
+    let mergedInto: UUID?
+    let deletionBarrierAt: Date?
+    let restoredAt: Date?
+    let key: String
+    let valueJSON: Data
+    init(_ row: Setting) {
+        id = row.id; createdAt = row.createdAt; updatedAt = row.updatedAt; deletedAt = row.deletedAt
+        writerID = row.writerID; mergedInto = row.mergedInto; deletionBarrierAt = row.deletionBarrierAt
+        restoredAt = row.restoredAt; key = row.key; valueJSON = row.valueJSON
+    }
+}
+
 @Suite(.serialized) @MainActor struct DataTests {
+    private func retiredSettingSnapshots(in context: ModelContext, keys: Set<String>) throws -> [RetiredSettingRowSnapshot] {
+        try context.fetch(FetchDescriptor<Setting>()).filter { keys.contains($0.key) }.map(RetiredSettingRowSnapshot.init).sorted { $0.key < $1.key }
+    }
     /// B1-7: liveness read from the stored properties must agree with the encoded record for every combination.
     @Test func liveRowFlagMatchesTheEncodedRecord() throws {
         let container = try MadarContainerFactory.makeInMemory(), context = container.mainContext
@@ -207,9 +233,79 @@ import Testing
         #expect(try c.mainContext.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key == "core.faceIDLock" }.count == 2)
         #expect(throws: DataError.invalidValue("unknown setting core.faceIDLock")) { try store.set(.string("app"), for: "core.faceIDLock") }
     }
+    @Test func retiredSettingsStayStoredAndLegacyPresetAndUndoSkipOnlyRetiredKeys() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MadarRetiredSettings-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let retired = [
+            "quran.hifzMethod", "quran.reviewMethod", "quran.similarAlert",
+            "mal.firstNumber", "mal.curveRange", "mal.logView", "mal.utilizationWarn",
+            "notes.suggestLine", "notes.marginAlsoToday",
+            "mihbara.hadithCollection", "mihbara.hadithView", "mihbara.readingReminder"
+        ]
+        let baseline: [String: JSONValue]
+        let retiredSet = Set(retired)
+        var savedRows: [RetiredSettingRowSnapshot] = []
+        do {
+            let container = try MadarContainerFactory.makeLocal(at: root)
+            let context = ModelContext(container), store = try SettingsStore(context: context)
+            baseline = try store.allValues()
+            #expect(store.schema.settings.count == 138)
+            #expect(store.schema.settings.filter(\.preset).count == 62)
+            #expect(retired.allSatisfy(store.schema.removedKeys.contains))
+            let now = Date(timeIntervalSince1970: 100_000)
+            for (index, key) in retired.enumerated() {
+                let row = Setting(); row.key = key
+                row.valueJSON = try JSONEncoder().encode(JSONValue.string("legacy-\(index)"))
+                row.updatedAt = now.addingTimeInterval(Double(index)); row.writerID = "legacy-writer"
+                context.insert(row)
+            }
+            try context.save()
+            savedRows = try retiredSettingSnapshots(in: context, keys: retiredSet)
+            #expect(try store.allValues() == baseline)
+
+            let token = try store.applyPreset(settings: ["core.numerals": .string("western"), "mal.logView": .string("monthArches")], now: now)
+            var expected = baseline; expected["core.numerals"] = .string("western")
+            #expect(try store.allValues() == expected)
+            #expect(try retiredSettingSnapshots(in: context, keys: retiredSet) == savedRows)
+            try store.undo(token, now: now.addingTimeInterval(1))
+            #expect(try store.allValues() == baseline)
+            #expect(try retiredSettingSnapshots(in: context, keys: retiredSet) == savedRows)
+
+            _ = try store.stage(["core.numerals": .string("western")], now: now.addingTimeInterval(2))
+            let oldReceipt = CommandReceipt(); oldReceipt.writerID = "legacy-writer"
+            oldReceipt.commandID = UUID(); oldReceipt.name = "ApplyPreset"; oldReceipt.status = "applied"
+            oldReceipt.createdAt = now; oldReceipt.updatedAt = now; oldReceipt.issuedAt = now
+            oldReceipt.undoExpiresAt = now.addingTimeInterval(60); oldReceipt.expiresAt = now.addingTimeInterval(7 * 86400)
+            oldReceipt.undoJSON = try JSONEncoder().encode([
+                LegacySettingsUndoChange(key: "mal.logView", before: .string("arches"), after: .string("monthArches")),
+                LegacySettingsUndoChange(key: "core.numerals", before: .string("arabicIndic"), after: .string("western"))
+            ])
+            context.insert(oldReceipt); try context.save()
+            try store.undo(.init(id: oldReceipt.commandID!, expiresAt: now.addingTimeInterval(60)), now: now.addingTimeInterval(3))
+            #expect(try store.allValues() == baseline)
+            #expect(try retiredSettingSnapshots(in: context, keys: retiredSet) == savedRows)
+
+            let archive = try BackupCodec.export(records: RecordBridge.all(context), passphrase: "retired settings fixture password")
+            let backup = try BackupCodec.validate(archive, passphrase: "retired settings fixture password")
+            let restored = try MadarContainerFactory.makeInMemory()
+            _ = try BackupRestore.merge(backup, into: restored.mainContext)
+            #expect(try retiredSettingSnapshots(in: restored.mainContext, keys: retiredSet) == savedRows)
+        }
+        let reopened = try MadarContainerFactory.makeLocal(at: root)
+        let reopenedContext = ModelContext(reopened), reopenedStore = try SettingsStore(context: reopenedContext)
+        #expect(try reopenedStore.allValues() == baseline)
+        #expect(try retiredSettingSnapshots(in: reopenedContext, keys: retiredSet) == savedRows)
+        #expect(throws: DataError.invalidValue("unknown setting future.setting")) {
+            try reopenedStore.applyPreset(settings: ["core.numerals": .string("western"), "future.setting": .bool(true)])
+        }
+        #expect(try reopenedStore.allValues() == baseline)
+    }
     @Test func settingsDefaultsPersistenceAndInvalidRejection() throws {
         let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext)
-        #expect(store.schema.settings.count == 150); // settings-schema.json: core.essentials added (owner 10 Nov, Batch 3); 151 on 4 Nov, salah.qadaReminder removed (owner 6 Nov, FB-41), core.faceIDLock removed (owner 10 Nov)
+        #expect(store.schema.settings.count == 138); // 150 before the 12 unused settings were retired (owner + Sol review, 14 Nov)
+        let ra8 = Set(["core.fontScale", "core.motion", "tabbar.style", "tabbar.labels", "tabbar.openOn", "tabbar.minimizeOnScroll", "bahw.habitsView", "bahw.yearView", "bahw.upcomingView", "bahw.widgetIdentity", "bahw.iphoneWidgetFamily", "salah.balanceView", "quran.toolsOrder", "notes.echoDistances", "mihbara.shape", "mihbara.sunnahPlace", "mihbara.pageStyle", "mihbara.motivateStyle", "mihbara.notebookStyle"])
+        #expect(ra8.isSubset(of: Set(store.schema.settings.map(\.key))))
+        #expect(store.schema.settings.contains { $0.key == "mihbara.layout" })
          #expect(try store.value(for:"core.firstCalendar") == .string("gregorian")) // owner, 22 Oct 2026
         #expect(throws:DataError.invalidValue("core.hijriOffset")) { try store.set(.number(9),for:"core.hijriOffset") }
         let undo = try store.set(.number(1),for:"core.hijriOffset"); #expect(try store.value(for:"core.hijriOffset") == .number(1)); try store.undo(undo); #expect(try store.value(for:"core.hijriOffset") == .number(0))

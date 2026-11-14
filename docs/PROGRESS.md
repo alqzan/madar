@@ -1,15 +1,15 @@
-# Current work — 11 November 2026
+# Current work — 14 November 2026
 
 Owner requests in force: a whole-app pass for ease, simplicity, flexibility and speed without making the app heavier (row 12), an iPad layout of its own (row 13), and consistent rules/board (9 Nov tidy). Internal TestFlight uploads need no further approval.
 
 ## Verified baseline and delivery
 
-- M0–M6 software is on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build: **0.1.0 (36)** (evidence: `Madar/Artifacts/OWNER-TestFlight-36/upload.log` and the newest handover; build 35 before it). Build 27 (10 Nov) included Quran unreadable-draft recovery and the owner's exit-choice behavior. Xcode 27.2 archive and internal upload succeeded at 14:08 Riyadh on 10 Nov; App Store Connect reported that the package is processing. The exported IPA's app and widget signatures, versions, iOS target and entitlements were verified. Processing completion and installation on the owner's iPhone are not checked. Build 26 was the prior upload; build 24 added level-only voice recording and elapsed-time formatting. Older builds 14–20 are history (`docs/archive/PROGRESS-2026-11-08-codex-cleanup-batch.md` for 14–15).
-- Simulators: `Madar 15 Pro Max` and `Madar iPad Pro 13`, both iOS 27.0, no others. Storage local-only (RA1); no owner store access, migration or device run is authorized.
+- M0–M6 software is on `main`; M7 owner-device/system acceptance remains open. Latest uploaded build before this settings follow-up: **0.1.0 (48)** (`Madar/Artifacts/OWNER-TestFlight-48/upload.log`, uploaded 14 Nov 2026 17:33 Riyadh; Apple reported processing). This request prepares build 49. Owner-device installation and acceptance remain unverified. Build 27 (10 Nov) included Quran unreadable-draft recovery and the owner's exit-choice behavior. Xcode 27.2 archive and internal upload succeeded at 14:08 Riyadh on 10 Nov; App Store Connect reported that the package is processing. The exported IPA's app and widget signatures, versions, iOS target and entitlements were verified. Processing completion and installation on the owner's iPhone are not checked. Build 26 was the prior upload; build 24 added level-only voice recording and elapsed-time formatting. Older builds 14–20 are history (`docs/archive/PROGRESS-2026-11-08-codex-cleanup-batch.md` for 14–15).
+- Simulators: `Madar 15 Pro Max` and `Madar iPad Pro 13`, both iOS 27.0, no others. Storage remains local-only (RA1); this request used synthetic stores only and did not open or migrate owner data. Owner-device installation and acceptance are separate.
 - Package baseline passes (rows 16–17). Current continuation: prayer history read failures propagate and remain retryable (42/42 prayer, 26/26 command/replay tests). Polar manual logging, habit delete/undo/relaunch and both year-calendar settings paths now pass on iOS 27.0; details in row 18. General no-trip FX rates still need an owner rule/data-model decision. The 9 handwritten-colour findings are resolved in row 19: static shipping-source scan passes (464 sources, 4 catalogs, 38 independently measured token pairs); its manual trace requirement remains separate.
 - Build 22 includes the changes after 21: lazy prayer/night reads and per-day prayer-time memoization, scoped habit undo reads, 1922 dead-code lines removed, stale-test cleanup, and the current continuation fixes. Signature verification passed; app/widget versions are both 0.1.0 (22), minimum OS 27.0, device families 1 and 2, and no iCloud/ubiquity entitlements. No owner-device performance measurement is implied.
 
-## Current focused reliability repair — startup alert and Quran loading
+## Earlier reliability delivery — startup alert and Quran loading
 
 - The 9 Nov screenshot matches the local notification-budget read path: after inbox/store maintenance, reminder refresh decodes the device-only `NotificationBudget/budget.json`; unreadable JSON made each refresh fail and left the same bad file to fail again on later opens. The owner's device/store were not inspected, so the file-level cause is inferred from the exact alert route, not confirmed from device data.
 - Fix: a fresh budget publish preserves unreadable bytes under a recovery filename and reconstructs operational state from the new policy plus live notification-ledger seeds. Prayer records and other SwiftData owner data are untouched. `NotificationBudgetTests` passed 10/10, including the damaged-file preservation/rebuild scenario. Build 25 archived and signed successfully on Xcode 27.2; export and internal TestFlight upload succeeded at 22:17 Riyadh; Apple reports processing started. The archive reports unrelated pre-existing Swift warnings in `AppDiarySearchService` and `MihbaraPDFReaderView`.
@@ -285,7 +285,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 1. **صور المذكرات المزروعة:** اتضح أن سبب فشل الاختبار كان افتراضه تاريخًا ثابتًا للصورة المزروعة. صار الاختبار يقرأ يوم العينة ويثبت أن يومين مختلفين يعرض كل منهما صورته وحدها. OWNER-notes-accessibility-photos-20261114.xcresult: ٩/٩؛ بلا فشل، مع تحذيرين وقت تشغيل عن أبعاد إطار غير صالحة.
 2. **إخفاقات واجهة المحبرة التسعة:** صُنّفت في OWNER-mihbara-nine-20261114.xcresult: ٧ إخفاقات و٢ نجاح. العيب الإنتاجي كان سباق عرض «حوّله» بعد استيراد PDF بسبب قراءة رف قديمة قبل اكتمال القراءة الجديدة؛ صار عرض التحويل ينتظر القراءة الناجحة ويحمل هوية الكتاب الفعلية، حتى عند استعادة كتاب موجود. نجحت الاختبارات الثلاثة للتحويل/الإلغاء في التشغيل اللاحق. باقي التوقعات كانت تمريرًا تحت الشريط السفلي أو نص حوار قديمًا أو تحديد WebKit متغيرًا أو توقع تراجع للاستيراد يخالف قرار ٥ نوفمبر. اختبارات الحالات السبع التي كانت تفشل نجحت في OWNER-final-focused-20261114.xcresult.
 3. **تنظيف T12:** أزيلت واجهة التحفيز وبياناتها والرموز الميتة من المحبرة، وأزيل استثناء QuranRoom.swift من فاحص الشحن. بقي setStand لأنه يُستخدم عند اختيار كتاب للطاولة. فحص الشحن: نجاح ثابت لـ٤٩٤ ملف Swift و٤ كتالوجات و٣٨ زوج ألوان M0؛ ظهرت ٩٥ ملاحظة حركة/نصف قطر وطلب الفحص تتبعًا يدويًا، فلا تُعدّ نتيجة تحقق يدوي كامل.
-4. **مفاتيح الإعدادات:** الصيغة القديمة «احذف ٣٦» مرفوضة: RA8 يطلب إبقاء مفاتيح v2 في المخطط، والعدد التاريخي بلا قائمة. مسح سول للمفاتيح الـ٣٣ التي لا تظهر كسلاسل حرفية كاملة في Swift الإنتاج صنّف ١٩ منها v2 يجب إبقاؤها، واستبعد mihbara.layout لاستخدامه الديناميكي. المرشحة لموافقة المالك هي ١٢ تعريفًا بلا قراءة مباشرة: quran.hifzMethod، quran.reviewMethod، quran.similarAlert؛ mal.firstNumber، mal.curveRange، mal.logView، mal.utilizationWarn؛ notes.suggestLine، notes.marginAlsoToday؛ mihbara.hadithCollection، mihbara.hadithView، mihbara.readingReminder. quran.tapForTafsir منفصل لارتباطه ببوابة ترخيص M2. كما أن notes.homeShape تقرأه معاينة، وtabbar.items/searchTab مستخدمان في التحقق المتبادل. الخطة المقترحة بعد موافقة المالك: حذف الـ١٢ فقط من النسخ الثلاث، توثيقها في removedKeys بلا حذف أو تعديل أي صف قديم، وإضافة توافق للأنماط وإيصالات التراجع القديمة مع استمرار رفض المفاتيح المجهولة. اختبار مخزن اصطناعي يثبت بقاء الصفوف وقيمها، وتطبيق نمط قديم، والتراجع، ورفض مفتاح مجهول. لم يتغير المخطط بعد.
+4. **تقاعد ١٢ مفتاح إعداد خامد:** فوّض المالك القرار في 14 نوفمبر، وأوصى سول `gpt-6.1-sol` بجهد high بتقاعدها؛ لم يجد مستهلكًا حيًا. أُزيلت التعريفات الاثنا عشر فقط من المخطط: `quran.hifzMethod`, `quran.reviewMethod`, `quran.similarAlert`, `mal.firstNumber`, `mal.curveRange`, `mal.logView`, `mal.utilizationWarn`, `notes.suggestLine`, `notes.marginAlsoToday`, `mihbara.hadithCollection`, `mihbara.hadithView`, `mihbara.readingReminder`. صار العدد 138 بدل 150 والأنماط 62 بدل 68. لم تُحذف أو تُكتب صفوف `Setting` أو `DeviceSetting` أو `Preset` أو إيصالات التراجع؛ النسخ القديمة تتجاوز `removedKeys` المعروفة في الذاكرة فقط، وتبقى المفاتيح المجهولة مرفوضة. مفاتيح RA8 و`mihbara.layout` و`notes.homeShape` و`tabbar.items/searchTab` باقية؛ `quran.tapForTafsir` مؤجل لبوابة ترخيص M2. التحقق: DataTests/ReplayTests 1/1 لكل اختبار مركّز؛ `OWNER-retired-settings-20261114.xcresult` 1/1. اختبار البيانات يقارن كامل حقول الصفوف بعد الإغلاق وإعادة الفتح والنسخ الاحتياطي/الاستعادة. سول قبل التغيير وبعده لم يجد مانع High/Critical.
 5. **T14 #15:** أضيف حقن فشل خاص بمثيل الاختبار بعد إدخال أول Allocation في تقسيم مصروف. swift test --package-path Madar/Packages/MadarCommands --filter MoneyPersistenceTests: ٦٠ اختبارًا في suite واحدة، كلها نجحت. الاختبار الجديد يفتح مخزنًا معزولًا من جديد بعد الفشل، يتحقق من rollback ثم يعيد الأمر نفسه بنجاح بلا تكرار.
 6. **AccessibilitySizeUITests:** اختبارات AX5 أصبحت تتحقق من معرّف خاص بكل غرفة. أخفق تشغيل وسيط في عنصر اليوم المكرر واختبار البهو، ثم اجتاز التشغيل اللاحق OWNER-notes-accessibility-photos-20261114.xcresult الاختبارات السبعة لكل الغرف مع اختبارَي الصور: ٩/٩.
 7. **iPad:** أُخفي شريط السنة حتى يكتمل قياس العرض، وقُوّي اختبار غياب لوحة المفاتيح بعد التدوير. OWNER-notes-ipad-full-20261114.xcresult: ٣/٣ على Madar iPad Pro 13 iOS 27.0. قبول شكل الجهاز الحقيقي ما زال عند المالك.
@@ -310,15 +310,15 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Differences left
 - الأرشيف وعودة اليوم تغييرات مقصودة فوق حالة «اليوم فقط» السابقة؛ لا ادعاء بمطابقة بكسلية للمرجع القديم. اللقطات المرجعية للمقارنة: قبل Madar/Artifacts/owner-notes-navigation-shots-20261114/T10-root-today-L.png؛ بعد Madar/Artifacts/owner-notes-navigation-shots-20261114/OWNER-notes-days-entry-L.png وMadar/Artifacts/owner-notes-navigation-shots-20261114/OWNER-notes-historical-friday-return-after-L.png وMadar/Artifacts/owner-notes-navigation-shots-20261114/OWNER-notes-historical-travel-return-after-L.png. مقارنة canonical: Madar/Artifacts/compare/today.html؛ الفروق مقصودة.
-- مفاتيح الإعدادات لم تُعدّل؛ المطلوب قرار المالك على ١٢ مرشحًا وفق الخطة أعلاه، مع إبقاء مفاتيح v2 وتأجيل المفتاح المرتبط ببوابة الترخيص.
+- عند هذا التسليم لم تكن مفاتيح الإعدادات قد تقاعدت بعد؛ فوّض المالك القرار لاحقًا، ونُفّذ في تسليم الإعدادات التالي. أبقيت مفاتيح v2 والمفتاح المرتبط ببوابة الترخيص المؤجل كما هما.
 - إشعار البنك غير مضاف عمدًا بقرار المالك: تبقى المراجعة داخل غرفة المال.
 
 ### Not verified
-- قبول على iPhone المالك أو جهاز iPad حقيقي، واكتمال معالجة Apple. لا أرشيف Release أو رفع TestFlight لهذه الدفعة؛ لا نرفع بناءً قبل حسم بقية نطاق الطلب والتحقق النهائي.
+- قبول iPhone المالك أو iPad حقيقي غير متحقق. البناء 48 يمثل لقطة سابقة؛ إعدادات هذا التسليم مضمّنة في بناء 49 بعد تحققها.
 - تجربة الرموز 1101/203 و«أتممته» والسحب على الجهاز الحقيقي.
 
 ### Next
-- لا تغيير في الإعدادات قبل إثبات أن المرشحات الـ١٢ تظهر كخيارات ميتة فعلًا؛ يظل المخطط كما هو حتى يحسم المالك هذه النظافة الاختيارية. بعد اكتمال بقية الطلب، أرشفة ورفع بناء واحد فقط ثم الدفع إلى origin/main.
+- قرار تقاعد المفاتيح نُفّذ واختُبر في تسليم 14 نوفمبر التالي؛ لا ترحيل ولا حذف لبيانات الإعدادات القديمة. التثبيت والقبول على جهاز المالك بعد اكتمال معالجة Apple.
 - يبقى قبول الجهاز الحقيقي للمالك.
 
 ### Model/effort
@@ -327,15 +327,40 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 ### Usage
 - عند التسليم: الخمس ساعات ١١٪ مستخدمة، والأسبوع ٩٪ مستخدم. لم تُستخدم أرصدة إعادة الضبط.
 
+## تسليم 2026-11-14 (و) — تقاعد الإعدادات الآمن وتجهيز نسخة 49
+
+### Works now
+- تقاعدت 12 تعريفات إعداد لم تعد لها قراءة حية. تختفي من الإعدادات والبحث المركزي، وتبقى بياناتها المخزنة كما هي.
+- النمط القديم والتراجع القديم يتجاهلان المفاتيح المتقاعدة المعروفة فقط؛ أي مفتاح غير معروف يظل مرفوضًا مع rollback.
+- استعراض الأيام والرجوع إلى اليوم، وتحسينات المذكرات السابقة، مشمولة في النسخة الجديدة مع هذا التنظيف.
+- قرار البنك مستمر: لا إشعار محلي مستقل؛ المراجعة داخل غرفة المال فقط.
+
+### Verified
+- `swift test --filter DataTests.retiredSettingsStayStoredAndLegacyPresetAndUndoSkipOnlyRetiredKeys` — 1/1، ويتحقق من كل حقول الصفوف الاثني عشر بعد reopen ونسخ احتياطي/استعادة اصطناعيين.
+- `swift test --filter DataTests.settingsDefaultsPersistenceAndInvalidRejection` — 1/1؛ `swift test --filter ReplayTests.legacyPresetAndUndoSkipRetiredSettingsButRejectUnknownKeys` — 1/1.
+- محاكي iOS 27.0 `Madar 15 Pro Max`: `OWNER-retired-settings-20261114.xcresult` — اختبار التكامل 1/1، مفاتيح التقاعد غير موجودة في شاشة/بحث الإعدادات.
+- سول `gpt-6.1-sol`, high: قبول مراجعة التغيير؛ لا High/Critical. النسخ الثلاث من schema متطابقة، 138 إعدادًا، 62 منها تدخل في الأنماط؛ مفاتيح RA8 باقية.
+- أرشفة/رفع TestFlight وتوقيع النسخة 49: يضاف الدليل بعد الإجراء؛ رقم البناء زيد مرة واحدة لهذا الطلب.
+
+### Differences left
+- القيم القديمة للـ12 لا تظهر ولا تؤثر في السلوك، لكن صفوفها تظل في المخزن والنسخ الاحتياطية بلا تعديل.
+- القبول على iPhone المالك يظل مطلوبًا بعد أن تعلن Apple توفر النسخة؛ لم يُفتح مخزنه ولم تُشغّل نسخته الحقيقية.
+
+### Not verified
+- اكتمال معالجة Apple وتوفر البناء في TestFlight، ثم قبول المالك على جهازه.
+
+### Next
+- بعد نجاح الرفع، يدفع `main` إلى `origin`؛ يثبت المالك التطبيق ويقبل مظهر المذكرات وعودة اليوم والإعدادات.
+
+### Model/effort
+- الوكيل الرئيسي: model/effort not exposed. مستشار القبول: `gpt-6.1-sol`, high.
+
+### Usage
+- يثبت الاستخدام الفعلي في آخر تحديث لهذا التسليم؛ لم تُستخدم أرصدة إعادة ضبط.
+
 ## تسليم 2026-11-14 (د) — كل ما أمكن، النسخة 48
 - **يعمل:** المذكرات على iPad العريض صفحة اليوم وبجانبها عمود (ذكريات، أيام، أسئلة) بدل الرئيسية القديمة، ومكانها ثابت فلا تُبنى من جديد عند التدوير؛ «خصّص المذكرات» يخفي شريط السنة؛ شريطا صور اليوم يُسقطان الصورة المربوطة معًا (من الحقل ومن العارض)؛ قاعدة «لم يدخل وقتها» في LogPrayerIntent صارت دالة نقية في MadarCore بسلوك مطابق؛ حُذف الميت: QuranRoom.swift، مكتب المحبرة القديم، motivationCues.
 - **اختبارات جديدة (T14):** حدود رمضان (٧ شعبان/١ رمضان/٢٩ رمضان/١ شوال)، لندن يوم تغيير الساعة، أوسلو، السلسلة بعد حذف سجل، سقف ٥١٢ م.ب، الرصيد لا يظهر نصًّا في اللقطة المخفية، AX5 لكل غرفة، iPad بتأكيدات (جهة العمود والتدوير). MadarCore 239 و MadarData 136 نجحتا.
-- **لم يُنفَّذ بقرار:** رسالة البنك «صحيح» (لا إشعار بنكي أصلًا؛ ميزة جديدة)؛ مفاتيح الإعدادات الـ36 غير المقروءة (تحتاج removedKeys وثلاثة ملفات schema — خطر على مخازن قديمة)؛ #15 حقن فشل في أمر مالي.
+- **حالة build 48 عند تسليمه:** لا إشعار بنكي مستقل حسب قرار المالك؛ قائمة «٣٦» لم تكن موثقة. في متابعة 14 نوفمبر تقاعدت الـ١٢ المؤكدة فقط مع إبقاء البيانات؛ #15 صار لديه اختبار تراجع وإعادة تنفيذ ناجح في التسليم الأحدث.
 - **لم يُتحقق منه:** اختبار الصور المزروعة testDayPhotosLinkOnce ما زال يفشل عند زرع الصور (الشريطان؛ الاختبار الافتراضي يتخطاه)؛ 9 اختبارات واجهة قديمة للمحبرة تفشل بلا علاقة بهذا العمل (ثُبت بإعادة التشغيل دون التعديل)؛ بقايا ميتة صغيرة: manuallyOpen/tableBook/motivationCues في MihbaraHomeView؛ AccessibilitySizeUITests يثبت عدم الانهيار وظهور زر، لا صلاحية الغرفة كاملة.
-- **Model/effort:** claude-sonnet-5-5 / غير معروض. **Usage:** not exposed.
-
-## تسليم 2026-11-14 (ج) — بقية المشاكل، النسخة 47
-- **يعمل:** محرران على مسودة واحدة صارا يعيدان القراءة عند إغلاق الورقة؛ «أمس» لمرة واحدة في كل المسارات؛ إشعار ورد قديم يفتح الغرفة فقط؛ سطر الرسالة المختومة يظهر (كان ForEach على العدد لا يتحدّث داخل القائمة الكسولة، فاختبار testLettersAndMailbox صار أخضر)؛ جامع الصوت يحفظ كل النتائج النهائية ومقطع صامت لا يُسقط ما قبله (DiaryVoiceController راجعه Opus وأُدخل).
-- **تم التحقق:** مجموعة المذكرات 64 اختبارًا (5 متخطاة)/0 فشل ثم 46/0 بعد آخر الإصلاحات؛ بناء Release ناجح؛ اختبار مسار finish-whole في MadarCore؛ ثلاث جولات مراجعة Opus.
-- **لم يُتحقق منه:** التعرّف على الصوت على جهاز (الرموز 1101/203 احتياط)، السحب وزر الإشعار على جهاز، «أمس» مرتبط بمؤقت خمس ثوانٍ.
 - **Model/effort:** claude-sonnet-5-5 / غير معروض. **Usage:** not exposed.

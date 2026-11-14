@@ -324,6 +324,17 @@ import CoreSpotlight
         let root = FileManager.default.temporaryDirectory.appending(path: "RoomSettingsSearch-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
         let definitions = app.schema.settings, supported = Set(AppSession.supportedKeys), known = Set(definitions.map(\.key))
+        let retired = [
+            "quran.hifzMethod", "quran.reviewMethod", "quran.similarAlert",
+            "mal.firstNumber", "mal.curveRange", "mal.logView", "mal.utilizationWarn",
+            "notes.suggestLine", "notes.marginAlsoToday",
+            "mihbara.hadithCollection", "mihbara.hadithView", "mihbara.readingReminder"
+        ]
+        XCTAssertTrue(retired.allSatisfy(app.schema.removedKeys.contains))
+        for key in retired {
+            XCTAssertFalse(known.contains(key), "\(key) must not appear as an active settings row")
+            XCTAssertFalse(RoomSettingsIndex.allKeys.contains(key), "\(key) must not appear in room-settings search")
+        }
         for key in RoomSettingsIndex.allKeys {
             XCTAssertTrue(known.contains(key), "\(key) is not in the settings schema")
             XCTAssertFalse(supported.contains(key), "\(key) is already on the central page")

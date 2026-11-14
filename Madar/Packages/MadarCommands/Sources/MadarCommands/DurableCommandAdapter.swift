@@ -343,7 +343,9 @@ private struct ReceiptWire: Codable {
                 } else { moneyPolicy = nil }
                 inverse = SettingsInverse(settings: try store.stage(typed, now: now), afterSettings: typed, layouts: [:], afterLayouts: [:], moneyMutation: moneyPolicy)
             case .applyPreset(let values, let layouts):
-                let typed = try convert(values)
+                // Older saved presets can still carry settings that this schema has retired. Keep their
+                // stored payload intact and ignore only keys explicitly listed as retired here.
+                let typed = store.schema.excludingRetiredKeys(try convert(values))
                 // Validate all layouts before touching any setting.
                 var dataLayouts: [String: Data] = [:]
                 for (room, value) in layouts {
@@ -373,6 +375,8 @@ private struct ReceiptWire: Codable {
                     return .init(status: .rejected, reason: "undoExpired")
                 }
                 let state = try JSONDecoder().decode(SettingsInverse.self, from: data)
+                let activeSettings = store.schema.excludingRetiredKeys(state.settings)
+                let activeAfterSettings = store.schema.excludingRetiredKeys(state.afterSettings)
                 if let mutation = state.bookMutation {
                     try BookMutationHandler.undo(mutation, context: context, now: now, writer: writer)
                 } else if let mutation = state.moneyMutation {
@@ -395,16 +399,16 @@ private struct ReceiptWire: Codable {
                     }
                     current.writerID = writer
                 }
-                for (key, after) in state.afterSettings where try store.value(for: key) != after {
+                for (key, after) in activeAfterSettings where try store.value(for: key) != after {
                     throw DataError.invalidValue("undo superseded: \(key)")
                 }
                 for (room, after) in state.afterLayouts {
                     let current = try store.value(for: room + ".layout").canonicalData()
                     guard current == after else { throw DataError.invalidValue("undo superseded: \(room).layout") }
                 }
-                try HabitContextProvenance.recordSettingChange(state.settings, store: store, context: context, now: now, writer: writer)
-                try HabitWeekHistory.record(state.settings, store: store, context: context, now: now, writer: writer)
-                _ = try store.stage(state.settings, now: now)
+                try HabitContextProvenance.recordSettingChange(activeSettings, store: store, context: context, now: now, writer: writer)
+                try HabitWeekHistory.record(activeSettings, store: store, context: context, now: now, writer: writer)
+                _ = try store.stage(activeSettings, now: now)
                 for (room, old) in state.layouts {
                     let rows = try context.fetch(FetchDescriptor<LayoutState>()).filter { $0.room == room && $0.deletedAt == nil && $0.mergedInto == nil }
                     if let old {

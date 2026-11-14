@@ -11,8 +11,16 @@ public struct SettingDefinition: Decodable, Sendable {
         key = try c.decode(String.self, forKey: .key); title = try c.decode(String.self, forKey: .title); type = try c.decode(String.self, forKey: .type); scope = try c.decode(String.self, forKey: .scope); owner = try c.decode(String.self, forKey: .owner); preset = try c.decode(Bool.self, forKey: .preset); defaultValue = try c.decode(JSONValue.self, forKey: .defaultValue); options = try c.decodeIfPresent([SettingOption].self, forKey: .options) ?? []; range = try c.decodeIfPresent([Double].self, forKey: .range); contract = try c.decodeIfPresent([String:JSONValue].self, forKey: .contract)
     }
 }
+private struct RemovedSettingDefinition: Decodable, Sendable { public let key: String }
 public struct SettingsSchema: Decodable, Sendable {
     public let settings: [SettingDefinition]
+    public let removedKeys: Set<String>
+    private enum CodingKeys: String, CodingKey { case settings, removedKeys }
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        settings = try container.decode([SettingDefinition].self, forKey: .settings)
+        removedKeys = Set(try container.decodeIfPresent([RemovedSettingDefinition].self, forKey: .removedKeys)?.map(\.key) ?? [])
+    }
     /// Decoded once: every repository opens a settings store, and decoding this file each time was a large part of opening a room.
     private static let bundledResult: Result<SettingsSchema, Error> = Result {
         guard let url = Bundle.module.url(forResource: "settings-schema", withExtension: "json") else { throw DataError.invalidValue("settings schema") }
@@ -20,6 +28,7 @@ public struct SettingsSchema: Decodable, Sendable {
     }
     public static func bundled() throws -> SettingsSchema { try bundledResult.get() }
     public func definition(for key: String) throws -> SettingDefinition { guard let d = settings.first(where: { $0.key == key }) else { throw DataError.invalidValue("unknown setting \(key)") }; return d }
+    public func excludingRetiredKeys(_ values: [String: JSONValue]) -> [String: JSONValue] { values.filter { !removedKeys.contains($0.key) } }
     public func validate(_ value: JSONValue, for key: String) throws {
         let d = try definition(for: key)
         func reject() throws -> Never { throw DataError.invalidValue(key) }
@@ -218,8 +227,9 @@ public final class SettingsStore {
     @discardableResult public func set(_ value: JSONValue, for key: String, now: Date = Date()) throws -> SettingsUndoToken { try perform(changes:[key:value],name:"SetSetting",window:600,now:now) }
     @discardableResult public func reset(_ key: String, now: Date = Date()) throws -> SettingsUndoToken { try set(schema.definition(for:key).defaultValue,for:key,now:now) }
     @discardableResult public func applyPreset(settings: [String:JSONValue], layouts: [String:JSONValue] = [:], now: Date = Date()) throws -> SettingsUndoToken {
-        var changes = settings
-        for key in settings.keys where try !schema.definition(for:key).preset { throw DataError.invalidValue("non-preset \(key)") }
+        let activeSettings = schema.excludingRetiredKeys(settings)
+        var changes = activeSettings
+        for key in activeSettings.keys where try !schema.definition(for:key).preset { throw DataError.invalidValue("non-preset \(key)") }
         for (room,layout) in layouts { let key = room + ".layout"; try schema.validate(layout,for:key); changes[key] = layout }
         return try perform(changes:changes,name:"ApplyPreset",window:60,now:now)
     }
@@ -235,7 +245,8 @@ public final class SettingsStore {
     public func undo(_ token: SettingsUndoToken, now: Date = Date()) throws {
         guard now < token.expiresAt, let receipt = try context.fetch(FetchDescriptor<CommandReceipt>()).first(where: { $0.commandID == token.id && $0.status == "applied" }), let deadline = receipt.undoExpiresAt, now < deadline, let data = receipt.undoJSON else { throw DataError.undoExpired }
         let changes = try JSONDecoder().decode([UndoChange].self,from:data)
-        guard try changes.allSatisfy({ try value(for:$0.key) == $0.after }) else { throw DataError.invalidValue("undo superseded by later edit") }
-        do { _ = try stage(Dictionary(uniqueKeysWithValues:changes.map { ($0.key,$0.before) }),now:now); receipt.status = "undone"; receipt.writerID = try writerIDForWrite(now:now); receipt.updatedAt = StableIdentity.monotonic(now:now,previous:receipt.updatedAt); receipt.undoJSON = nil; try context.save() } catch { context.rollback(); throw error }
+        let activeChanges = changes.filter { !schema.removedKeys.contains($0.key) }
+        guard try activeChanges.allSatisfy({ try value(for:$0.key) == $0.after }) else { throw DataError.invalidValue("undo superseded by later edit") }
+        do { _ = try stage(Dictionary(uniqueKeysWithValues:activeChanges.map { ($0.key,$0.before) }),now:now); receipt.status = "undone"; receipt.writerID = try writerIDForWrite(now:now); receipt.updatedAt = StableIdentity.monotonic(now:now,previous:receipt.updatedAt); receipt.undoJSON = nil; try context.save() } catch { context.rollback(); throw error }
     }
 }

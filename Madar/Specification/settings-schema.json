@@ -1,7 +1,7 @@
 {
  "version": 5,
- "date": "2026-11-02",
- "note": "default = المتفق عليه. scope sync = يُزامَن (Setting)، device = لهذا الجهاز (DeviceSetting في تكوين deviceOnly). preset = يدخل في الأنماط المحفوظة (§٦). layout entries are {blocks, pinned, hidden, sizes}; pinned blocks cannot be hidden. availability v2 = hidden in v1. Money values are Int minor units (halalas).",
+ "date": "2026-11-14",
+ "note": "default = المتفق عليه. scope sync = يُزامَن (Setting)، device = لهذا الجهاز (DeviceSetting في تكوين deviceOnly). preset = يدخل في الأنماط المحفوظة (§٦). layout entries are {blocks, pinned, hidden, sizes}; pinned blocks cannot be hidden. availability v2 = hidden in v1. Money values are Int minor units (halalas). removedKeys = مفاتيح متقاعدة تُتجاهل في الأنماط والتراجع القديمة، وتبقى صفوفها المخزنة كما هي.",
  "constants": {
   "sanctityMinutes": {
    "default": 30,
@@ -66,6 +66,66 @@
    "key": "core.faceIDLock",
    "movedTo": "removed — the app lock was deleted (owner, 10 Nov 2026); a value stored by an older build is ignored and left untouched",
    "finding": "owner 10 Nov 2026"
+  },
+  {
+   "key": "mal.curveRange",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
+  },
+  {
+   "key": "mal.firstNumber",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
+  },
+  {
+   "key": "mal.logView",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
+  },
+  {
+   "key": "mal.utilizationWarn",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
+  },
+  {
+   "key": "mihbara.hadithCollection",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
+  },
+  {
+   "key": "mihbara.hadithView",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
+  },
+  {
+   "key": "mihbara.readingReminder",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
+  },
+  {
+   "key": "notes.marginAlsoToday",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
+  },
+  {
+   "key": "notes.suggestLine",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
+  },
+  {
+   "key": "quran.hifzMethod",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
+  },
+  {
+   "key": "quran.reviewMethod",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
+  },
+  {
+   "key": "quran.similarAlert",
+   "movedTo": "Retired after review found no active consumer; existing rows remain untouched, and legacy presets and undo receipts ignore this known key.",
+   "finding": "owner authorization and Sol 6.1 review, 14 Nov 2026"
   }
  ],
  "settings": [
@@ -1671,62 +1731,6 @@
    "preset": false
   },
   {
-   "key": "quran.hifzMethod",
-   "owner": "quran",
-   "section": "الجلسة",
-   "title": "طريقة الحفظ",
-   "type": "choice",
-   "default": "coach",
-   "scope": "sync",
-   "options": [
-    {
-     "value": "coach",
-     "label": "المدرّب"
-    },
-    {
-     "value": "completeAyah",
-     "label": "أكمل الآية"
-    },
-    {
-     "value": "gradual",
-     "label": "تدريجي"
-    },
-    {
-     "value": "next",
-     "label": "ما بعدها؟"
-    },
-    {
-     "value": "link",
-     "label": "وصل الصفحات"
-    }
-   ],
-   "storage": "Setting (synced)",
-   "preset": false
-  },
-  {
-   "key": "quran.reviewMethod",
-   "owner": "quran",
-   "section": "الجلسة",
-   "title": "طريقة المراجعة",
-   "type": "choice",
-   "default": "continuous",
-   "scope": "sync",
-   "options": [
-    {
-     "value": "continuous",
-     "label": "سرد متصل"
-    },
-    {
-     "value": "voice",
-     "label": "بالصوت",
-     "availability": "v2"
-    }
-   ],
-   "note": "«بالصوت» v2: مخفي في الإصدار الأول",
-   "storage": "Setting (synced)",
-   "preset": false
-  },
-  {
    "key": "quran.reviewSchedule",
    "owner": "quran",
    "section": "الجلسة",
@@ -1751,17 +1755,6 @@
    "note": "المتباعدة هي الافتراضية؛ الدورة الثابتة: جزء يوميًا أو منزل يوميًا ضمن سبعة منازل أسبوعيًا",
    "storage": "Setting (synced)",
    "preset": false
-  },
-  {
-   "key": "quran.similarAlert",
-   "owner": "quran",
-   "section": "الجلسة",
-   "title": "تنبيه المتشابهات",
-   "type": "bool",
-   "default": true,
-   "scope": "sync",
-   "storage": "Setting (synced)",
-   "preset": true
   },
   {
    "key": "quran.tapForTafsir",
@@ -1903,48 +1896,6 @@
     "sizes": [],
     "unknownIds": "dropped on read"
    }
-  },
-  {
-   "key": "mal.firstNumber",
-   "owner": "mal",
-   "section": "الأرقام",
-   "title": "الرقم الأول",
-   "type": "choice",
-   "default": "availableNow",
-   "scope": "sync",
-   "options": [
-    {
-     "value": "availableNow",
-     "label": "لك الآن"
-    },
-    {
-     "value": "netBasis",
-     "label": "صافي رصيدك"
-    }
-   ],
-   "storage": "Setting (synced)",
-   "preset": true
-  },
-  {
-   "key": "mal.curveRange",
-   "owner": "mal",
-   "section": "الأرقام",
-   "title": "مدى المنحنى",
-   "type": "choice",
-   "default": "cycle",
-   "scope": "sync",
-   "options": [
-    {
-     "value": "cycle",
-     "label": "الدورة"
-    },
-    {
-     "value": "week",
-     "label": "٧ أيام"
-    }
-   ],
-   "storage": "Setting (synced)",
-   "preset": true
   },
   {
    "key": "mal.dailyAllowance",
@@ -2120,27 +2071,6 @@
    "preset": false
   },
   {
-   "key": "mal.logView",
-   "owner": "mal",
-   "section": "السجلّ والتحليل",
-   "title": "شكل السجلّ",
-   "type": "choice",
-   "default": "arches",
-   "scope": "sync",
-   "options": [
-    {
-     "value": "arches",
-     "label": "رواق الأقواس"
-    },
-    {
-     "value": "monthArches",
-     "label": "الشهر أقواسًا"
-    }
-   ],
-   "storage": "Setting (synced)",
-   "preset": true
-  },
-  {
    "key": "mal.hawlStyle",
    "owner": "mal",
    "section": "الغرفة",
@@ -2285,21 +2215,6 @@
    "type": "bool",
    "default": true,
    "scope": "sync",
-   "storage": "Setting (synced)",
-   "preset": false
-  },
-  {
-   "key": "mal.utilizationWarn",
-   "owner": "mal",
-   "section": "التنبيهات",
-   "title": "تنبيه استخدام الحد فوق",
-   "type": "int",
-   "default": 30,
-   "scope": "sync",
-   "range": [
-    10,
-    90
-   ],
    "storage": "Setting (synced)",
    "preset": false
   },
@@ -2687,29 +2602,6 @@
    "preset": true
   },
   {
-   "key": "notes.suggestLine",
-   "owner": "notes",
-   "section": "الكتابة",
-   "title": "اقترح عليّ سطرًا",
-   "type": "bool",
-   "default": true,
-   "scope": "sync",
-   "note": "لا يُكتب إلا باختيارك",
-   "storage": "Setting (synced)",
-   "preset": true
-  },
-  {
-   "key": "notes.marginAlsoToday",
-   "owner": "notes",
-   "section": "الكتابة",
-   "title": "الهامش يُكتب في صفحة اليوم",
-   "type": "bool",
-   "default": true,
-   "scope": "sync",
-   "storage": "Setting (synced)",
-   "preset": false
-  },
-  {
    "key": "notes.autoLines",
    "owner": "notes",
    "section": "اليوم يكتب نفسه",
@@ -3037,61 +2929,6 @@
    "preset": false
   },
   {
-   "key": "mihbara.hadithCollection",
-   "owner": "mihbara",
-   "section": "السنّة",
-   "title": "المتن الحالي",
-   "type": "choice",
-   "default": "nawawi40",
-   "scope": "sync",
-   "options": [
-    {
-     "value": "nawawi40",
-     "label": "الأربعون النووية"
-    },
-    {
-     "value": "umdah",
-     "label": "عمدة الأحكام"
-    },
-    {
-     "value": "riyad",
-     "label": "رياض الصالحين"
-    },
-    {
-     "value": "bulugh",
-     "label": "بلوغ المرام"
-    }
-   ],
-   "note": "المجموعات المتاحة فعلًا تتبع قرار المالك في المصدر والطبعة",
-   "storage": "Setting (synced)",
-   "preset": false
-  },
-  {
-   "key": "mihbara.hadithView",
-   "owner": "mihbara",
-   "section": "السنّة",
-   "title": "عرض الحديث",
-   "type": "choice",
-   "default": "layers",
-   "scope": "sync",
-   "options": [
-    {
-     "value": "layers",
-     "label": "طبقات"
-    },
-    {
-     "value": "hashiya",
-     "label": "حاشية"
-    },
-    {
-     "value": "cards",
-     "label": "بطاقات"
-    }
-   ],
-   "storage": "Setting (synced)",
-   "preset": true
-  },
-  {
    "key": "mihbara.readerAr",
    "owner": "mihbara",
    "section": "القارئ",
@@ -3179,31 +3016,6 @@
     }
    },
    "reviewFix": "RMI1"
-  },
-  {
-   "key": "mihbara.readingReminder",
-   "owner": "mihbara",
-   "section": "التذكير",
-   "title": "تذكير القراءة",
-   "type": "choice",
-   "default": "off",
-   "scope": "sync",
-   "options": [
-    {
-     "value": "off",
-     "label": "بلا"
-    },
-    {
-     "value": "afterAsr",
-     "label": "بعد العصر"
-    },
-    {
-     "value": "afterIsha",
-     "label": "بعد العشاء"
-    }
-   ],
-   "storage": "Setting (synced)",
-   "preset": false
   },
   {
    "owner": "mal",
