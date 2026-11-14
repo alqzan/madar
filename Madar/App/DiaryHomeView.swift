@@ -168,6 +168,7 @@ struct DiaryHomeView: View {
             DiaryDayView(app: app, day: day, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID, embeddedInNavigationStack: true, focusComposerOnOpen: focusReaderComposer, prompt: readerPrompt, expandComposerOnOpen: readerExpandComposer, writeDayPreset: readerPreset)
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app).toolbarVisibility(.visible, for: .navigationBar)
                 .hidesRoomAccessory(app, id: "diary-day-destination")
+                .task { if readerPreset != nil { guard (try? await Task.sleep(for: .seconds(5))) != nil else { return }; readerPreset = nil } }
         }
         .onChange(of: rootToday) { _, on in
             if on {

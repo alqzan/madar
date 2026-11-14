@@ -356,7 +356,10 @@ final class PrayerNotificationCoordinator {
                 guard let dayKey = info["dayKey"] as? String, let habit = (info["habit"] as? String).flatMap(UUID.init(uuidString:)) else { return }
                 try await session.completeHabitFromNotification(habitID: habit, dayKey: dayKey, requestID: response.notification.request.identifier)
             } else if response.actionIdentifier == Self.wirdDoneActionID {
-                session.open(URL(string: "madar://quran/finish-whole")!)
+                // A reminder left in the centre from an earlier day never finishes today's wird: it only opens the room.
+                let sent = response.notification.request.content.userInfo["dayKey"] as? String
+                let today = try? AppDiaryService(app: session).currentDay().description
+                session.open(URL(string: sent != nil && sent == today ? "madar://quran/finish-whole" : "madar://quran/session/wird")!)
             } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
                 let request = response.notification.request
                 if RoomNotificationContent.isRoomRequest(request.identifier) { RoomNotificationContent.open(request.identifier, userInfo: request.content.userInfo, session: session) }

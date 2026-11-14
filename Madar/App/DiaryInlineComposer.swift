@@ -163,7 +163,18 @@ struct DiaryInlineComposer: View {
         .task(id: app.diaryBoundaryUITestClockOverride) { currentDay = try? service.currentDay() }
 #endif
         .onAppear { visible = true }
-        .onDisappear { visible = false; if loaded, edit == nil, !trimmedText.isEmpty { DiaryDraftFlush.run { await keepDraft() } } }
+        .onDisappear {
+            visible = false
+            guard loaded, edit == nil else { return }
+            let wrote = !trimmedText.isEmpty
+            DiaryDraftFlush.run { if wrote { await keepDraft() }; app.diaryComposerEpoch += 1 }
+        }
+        // A sheet that also wrote today's draft has closed: this field, still on screen beneath it, takes the shared draft again (never over typing).
+        .onChange(of: app.diaryComposerEpoch) { _, _ in
+            guard visible, loaded, edit == nil, !touchedSinceLoad, !focused, !saving else { return }
+            let before = text
+            Task { await loadDraft(typedSince: before) }
+        }
         .onChange(of: cameraOpen) { _, open in if !open { holdCommit = false } }
         // 14 Nov owner (T10): leaving the app is a boundary. What was written becomes the line; no idle timer ever commits (one paragraph stays one line).
         .onChange(of: scenePhase) { _, phase in

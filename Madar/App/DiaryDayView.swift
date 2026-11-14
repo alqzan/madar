@@ -78,6 +78,18 @@ struct DiaryDayView: View {
     /// Travel days wear the air-mail paper everywhere on the page and in its sheets (§7.3).
     private var theme: RoomTheme { travel == nil ? roomTheme : RoomTheme(room: "notes.travel", dark: roomTheme.dark) }
     /// Writing happens in the one inline composer of the root page; a day opened in a sheet (search, hub, week, import) reads, and its pencil opens the full page.
+    /// One blurred line for the sealed letters written on this day (a ForEach over the count did not refresh inside the lazy list); its words are never readable.
+    @ViewBuilder private var sealedLetterRows: some View {
+        if sealedHere > 0 {
+            HStack(alignment: .center, spacing: 12) {
+                DiaryEnvelope(sealed: true).frame(width: DiaryDayMetrics.timeColumn, height: 26)
+                Text("رسالة مختومة تُفتح في وقتها، ولا تُقرأ قبله").font(DiaryType.writing)
+                    .redacted(reason: .placeholder).blur(radius: 2.2).accessibilityHidden(true)
+            }.padding(.leading, 6).padding(.trailing, 18).padding(.vertical, 10)
+                .accessibilityElement(children: .ignore).accessibilityLabel(sealedHere > 1 ? "رسائل مختومة" : "رسالة مختومة")
+                .accessibilityIdentifier("diary-sealed-letter-line")
+        }
+    }
     private var inlineWriting: Bool { shownDay == today }
     private var friday: Bool { appearance?.friday == true && travel == nil }
     private var shownDay: GregorianDay { selected ?? day }
@@ -239,16 +251,7 @@ struct DiaryDayView: View {
                                                 missingCount: attached.filter { $0.kind == "missing" }.count)
                                         }
                                     }
-                                    ForEach(0..<sealedHere, id: \.self) { _ in
-                                        HStack(alignment: .center, spacing: 12) {
-                                            DiaryEnvelope(sealed: true).frame(width: DiaryDayMetrics.timeColumn, height: 26)
-                                            Text("رسالة مختومة تُفتح في وقتها، ولا تُقرأ قبله").font(DiaryType.writing)
-                                                .redacted(reason: .placeholder).blur(radius: 2.2).accessibilityHidden(
-                                                    true)
-                                        }.padding(.leading, 6).padding(.trailing, 18).padding(.vertical, 10)
-                                            .accessibilityElement(children: .ignore).accessibilityLabel("رسالة مختومة")
-                                            .accessibilityIdentifier("diary-sealed-letter-line")
-                                    }
+                                    sealedLetterRows
                                     if !page.media.contains(where: { $0.id == page.photoID }), let data = page.photo {
                                         DiaryDataThumbnail(data: data, maxPixel: 900) { image in image.resizable().scaledToFill() }
                                             .frame(maxWidth: .infinity).aspectRatio(4 / 3, contentMode: .fit)
