@@ -102,6 +102,7 @@ struct DiaryDayPhotos: View {
             load()
         }
         .onChange(of: scenePhase) { _, phase in if phase == .active { load() } }
+        .onChange(of: app.diaryPhotoEpoch) { _, _ in linked.formUnion(DiaryPhotoLibrary.linkedIDs(app)) }
     }
     private var visible: [PHAsset] { assets.filter { !linked.contains($0.localIdentifier) } }
     private func load() {
@@ -111,7 +112,7 @@ struct DiaryDayPhotos: View {
     private func pick(_ asset: PHAsset) {
         guard busy == nil else { return }; busy = asset.localIdentifier
         Task {
-            if await link(asset) { linked.insert(asset.localIdentifier) }
+            if await link(asset) { linked.insert(asset.localIdentifier); app.diaryPhotoEpoch += 1 }
             busy = nil
         }
     }

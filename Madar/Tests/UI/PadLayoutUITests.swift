@@ -86,4 +86,20 @@ final class PadLayoutUITests: XCTestCase {
         sleep(2)
         try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-pdf.png"))
     }
+    /// 14 Nov owner (iPad): the diary opens on today's page, with the years and recent days in a column beside it; real assertions.
+    func testDiaryRootOnPadHasASidebarBesideTodaysPage() throws {
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "entryRoute", "MADAR_UI_DIARY_ROOT": "1",
+                                 "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_START_TAB": "notes"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["diary-pad-sidebar"].waitForExistence(timeout: 25), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["السطر الثاني في اليوم نفسه"].waitForExistence(timeout: 10), "Today's page stands beside the sidebar")
+        XCTAssertTrue(app.textFields["diary-inline-field"].exists)
+        let side = app.descendants(matching: .any)["diary-pad-sidebar"].frame, field = app.textFields["diary-inline-field"].frame
+        XCTAssertLessThan(side.width, 420, "The sidebar stays a column, not the whole screen")
+        XCTAssertGreaterThan(field.width, 300, "The page keeps real width")
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "pad-diary-root"; shot.lifetime = .keepAlways; add(shot)
+    }
 }

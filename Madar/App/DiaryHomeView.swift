@@ -44,7 +44,7 @@ struct DiaryHomeView: View {
     @State private var todayCardVisible = true
     @State private var todayIntention: String?
     private var wide: Bool { isPadWide(sizeClass) && roomWidth >= 960 }
-    private var rootToday: Bool { rootEnabled && !wide && snapshot != nil && failure == nil }
+    private var rootToday: Bool { rootEnabled && snapshot != nil && failure == nil }
     /// Shipping behaviour: the room opens on today's page. The legacy home-first suites run with the flag off; the root has its own suite (`MADAR_UI_DIARY_ROOT=1`).
     private var rootEnabled: Bool {
 #if DEBUG
@@ -83,17 +83,32 @@ struct DiaryHomeView: View {
 #endif
     @State private var refreshGeneration = 0
     private var service: AppDiaryService { AppDiaryService(app: app) }
+    private func rootDayView(_ snapshot: DiaryHomeSnapshot) -> some View {
+        DiaryDayView(app: app, day: snapshot.today, initialEntryID: rootParams.entryID, initialEntryRouteID: rootParams.routeID,
+                     embeddedInNavigationStack: true, focusComposerOnOpen: rootParams.focus, prompt: rootParams.prompt,
+                     expandComposerOnOpen: rootParams.expand, onCustomize: { customizing = true }, writeDayPreset: rootParams.preset)
+            .task(id: rootParams.token) { if rootParams.preset != nil { guard (try? await Task.sleep(for: .seconds(5))) != nil else { return }; rootParams.preset = nil } }
+            .id(rootParams.token).environment(\.roomTheme, theme)
+    }
     var body: some View {
         VStack(spacing: 0) {
             if rootToday, let snapshot {
                 // 14 Nov owner (T10): the room opens on today's page itself; nothing is pushed over a home.
-                if !typeSize.isAccessibilitySize, let past = yearStripPage(snapshot) { yearStrip(past, snapshot: snapshot) }
-                DiaryDayView(app: app, day: snapshot.today, initialEntryID: rootParams.entryID, initialEntryRouteID: rootParams.routeID,
-                             embeddedInNavigationStack: true, focusComposerOnOpen: rootParams.focus, prompt: rootParams.prompt,
-                             expandComposerOnOpen: rootParams.expand, onCustomize: { customizing = true }, writeDayPreset: rootParams.preset)
-                             .task(id: rootParams.token) { if rootParams.preset != nil { guard (try? await Task.sleep(for: .seconds(5))) != nil else { return }; rootParams.preset = nil } }
-                    .id(rootParams.token).environment(\.roomTheme, theme)
-            } else if rootEnabled && !wide && snapshot == nil && failure == nil {
+                if wide {
+                    // 14 Nov owner (iPad): today's page keeps the room's centre; the years and the recent days stand beside it, always in view.
+                    HStack(spacing: 0) {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 14) { homeBlocks(snapshot) }.padding(.horizontal, 14).padding(.vertical, 12)
+                        }.frame(width: 380).accessibilityIdentifier("diary-pad-sidebar")
+                        Divider()
+                        rootDayView(snapshot)
+                    }
+                } else {
+                    // «في مثل هذا اليوم» hidden in «خصّص المذكرات» removes the strip: the setting has a visible effect on the root page.
+                    if !typeSize.isAccessibilitySize, !hidden("memory"), let past = yearStripPage(snapshot) { yearStrip(past, snapshot: snapshot) }
+                    rootDayView(snapshot)
+                }
+            } else if rootEnabled && snapshot == nil && failure == nil {
                 ProgressView("تُفتح صفحتك…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
             header.padding(.horizontal, 14).padding(.top, 8)

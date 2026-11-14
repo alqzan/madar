@@ -30,13 +30,15 @@ import XCTest
         }
         let photos = app.buttons.matching(identifier: "diary-day-photo")
         XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
-        XCTAssertEqual(photos.count, 1, "Only the chosen day's asset is suggested")
+        // The page strip and the grown composer both offer the day's photo (the same single asset); the next day's photo must never appear.
+        XCTAssertTrue((1...2).contains(photos.count), "Only the chosen day's asset is suggested: \(photos.count)")
         capture(app, "M3-20-day-photos-before-L")
-        photos.firstMatch.tap()
+        // The grown composer's strip pins the photo (the page strip beneath it opens the viewer); it is the last in the tree.
+        photos.allElementsBoundByIndex.max(by: { $0.frame.minY < $1.frame.minY })!.tap()
         XCTAssertTrue(photos.firstMatch.waitForNonExistence(timeout: 15), app.debugDescription)
         capture(app, "M3-20-day-photos-linked-L")
         // The photo is saved the moment it is linked; the page has nothing else to save, so «تمّ» closes it.
-        app.buttons["diary-editor-cancel"].tap()
+        app.buttons["diary-editor-save"].tap()
         if app.buttons["diary-today"].waitForExistence(timeout: 5) { app.buttons["diary-today"].tap() }
         XCTAssertTrue(app.buttons["افتح الصورة"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == %@", "افتح الصورة")).count, 1)
@@ -66,7 +68,7 @@ import XCTest
         app.openDiaryEditorFromHome()
         let photos = app.buttons.matching(identifier: "diary-day-photo")
         XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 15), "Today (18 April) shows its own photo")
-        app.buttons["diary-editor-cancel"].tap()
+        app.buttons["diary-editor-save"].tap()
         let yesterday = app.buttons["diary-day-yesterday"]
         XCTAssertTrue(yesterday.waitForExistence(timeout: 10), app.debugDescription)
         yesterday.tap()

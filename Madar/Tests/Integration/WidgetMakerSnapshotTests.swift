@@ -60,6 +60,8 @@ import MadarSnapshots
         XCTAssertEqual(rows.first { $0.id == "moneyNow" }?.value, "•••")
         let json = String(decoding: try JSONEncoder().encode(hidden), as: UTF8.self)
         XCTAssertFalse(json.contains("VISIBLE-ONLY")); XCTAssertFalse(json.contains("SECRET-SEALED"))
+        // T14 item 17: the seeded balance (500037 minor units = 5000.37) appears nowhere in the hidden snapshot, in any digit form.
+        for needle in ["500037", "5000", "٥٠٠٠", "5,000", "٥٬٠٠٠", "5000.37", "٥٠٠٠٫٣٧"] { XCTAssertFalse(json.contains(needle), "hidden snapshot leaks the balance as \(needle)") }
         XCTAssertNil(app.snapshotStore.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: app.prayerNow().addingTimeInterval(4000)))
         XCTAssertNotNil(app.snapshotStore.read(WidgetCatalogSnapshot.name, as: WidgetCatalogSnapshot.self, now: app.prayerNow().addingTimeInterval(4000)), "The system picker may still name a saved preset after its facts expire.")
         try await app.applySettingsAndWait(["notes.widgetContent": .bool(true)])

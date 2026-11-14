@@ -40,3 +40,13 @@ public enum PrayerLobbyAsk {
         }?.prayer
     }
 }
+
+/// The Siri/Shortcuts «سجّل صلاة» rule (T07), pure so it is tested: a prayer whose adhan has not come yet cannot be logged,
+/// whichever day is named. A day after today never has; today's has not until its adhan has passed.
+public enum PrayerLogTiming {
+    public static func hasNotOccurred(dayKey: String, todayKey: String, adhanToday: Date?, now: Date) -> Bool {
+        if dayKey > todayKey { return true }
+        guard dayKey == todayKey, let adhanToday else { return false }
+        return adhanToday > now
+    }
+}

@@ -78,4 +78,12 @@ struct PrayerLobbyAskTests {
         #expect(PrayerLobbyAsk.choose(list, now: at(0)) == .fajr)
         #expect(PrayerLobbyAsk.choose([entry(.fajr, -600, pending: false)], now: at(0)) == nil)
     }
+    /// Review T14 item 12 (the intent rule, T07): the named day decides. Tomorrow never; today only after its adhan; an earlier day always.
+    @Test func prayerLogTimingRefusesPrayersWhoseTimeHasNotCome() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        #expect(PrayerLogTiming.hasNotOccurred(dayKey: "2026-10-16", todayKey: "2026-10-15", adhanToday: now.addingTimeInterval(-3600), now: now))
+        #expect(PrayerLogTiming.hasNotOccurred(dayKey: "2026-10-15", todayKey: "2026-10-15", adhanToday: now.addingTimeInterval(60), now: now))
+        #expect(!PrayerLogTiming.hasNotOccurred(dayKey: "2026-10-15", todayKey: "2026-10-15", adhanToday: now, now: now))
+        #expect(!PrayerLogTiming.hasNotOccurred(dayKey: "2026-10-14", todayKey: "2026-10-15", adhanToday: now.addingTimeInterval(3600), now: now))
+    }
 }

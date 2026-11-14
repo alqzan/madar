@@ -148,4 +148,13 @@ struct HabitEngineTests {
         #expect(HabitEngine.isNow(current,today:day("2026-10-01"),instant:night.start,window:night,pauses:[]))
         #expect(!HabitEngine.isNow(current,today:day("2026-10-01"),instant:night.end,window:night,pauses:[]))
     }
+    /// Review T14 item 14: the streak is derived, so deleting an old record changes it at once. Daily from 1 Oct, done 1–5 Oct, today 6 Oct:
+    /// streak 5 (worked by hand). Removing the records of 2 and 3 Oct leaves two missed days in a row, which break it: only 4 and 5 Oct count, streak 2.
+    @Test func deletingOldRecordsRecomputesTheStreak() throws {
+        let r = rule("2026-10-01")
+        let all = ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"].map { fact($0) }
+        #expect(try HabitEngine.evaluate(rules: [r], facts: all, today: day("2026-10-06"), days: days).streak == 5)
+        let kept = all.filter { ![day("2026-10-02"), day("2026-10-03")].contains($0.day) }
+        #expect(try HabitEngine.evaluate(rules: [r], facts: kept, today: day("2026-10-06"), days: days).streak == 2)
+    }
 }

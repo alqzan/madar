@@ -83,6 +83,8 @@ final class AppSession {
 #endif
     /// Bumped each time a diary composer has left and saved its draft: another composer still on screen under it re-reads the shared draft.
     var diaryComposerEpoch = 0
+    /// Bumped when a library photo is linked to a page: every day-photo strip on screen (page and grown composer) drops it at once.
+    var diaryPhotoEpoch = 0
     @ObservationIgnored weak var prayerNotifications: PrayerNotificationCoordinator?
     @ObservationIgnored private var widgetHabitRefreshPending = false
     let schema: SettingsSchema

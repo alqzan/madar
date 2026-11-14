@@ -80,9 +80,8 @@ struct LogPrayerIntent: AppIntent {
             var civil = Calendar(identifier: .gregorian); civil.timeZone = timeZone
             let parts = civil.dateComponents([.year, .month, .day], from: now)
             let today = String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
-            if dayKey > today { throw LogPrayerIntentError.prayerNotOccurred }
-            if let item = snapshot.payload.items.first(where: { $0.prayer == prayer.rawValue }), item.at > now,
-               civil.isDate(item.at, inSameDayAs: now), dayKey == today { throw LogPrayerIntentError.prayerNotOccurred }
+            let todayAdhan = snapshot.payload.items.first(where: { $0.prayer == prayer.rawValue }).flatMap { civil.isDate($0.at, inSameDayAs: now) ? $0.at : nil }
+            if PrayerLogTiming.hasNotOccurred(dayKey: dayKey, todayKey: today, adhanToday: todayAdhan, now: now) { throw LogPrayerIntentError.prayerNotOccurred }
             day = dayKey
         }
         else {

@@ -231,52 +231,6 @@ struct MihbaraMotivationCue: Identifiable {
                            isbn13: row.isbn13, tocJSON: row.tocJSON, turathID: row.turathID, language: row.language)
     }
 
-    /// RMI3: a book line comes only from the user's own page-linked note. When none exists,
-    /// the home offers a short reading step and real progress instead of inventing a quotation.
-    func motivationCues(for reading: MihbaraHomeReading, book: MihbaraBook?) throws -> [MihbaraMotivationCue] {
-        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
-        var cues: [MihbaraMotivationCue] = []
-        if let book {
-            let context = ModelContext(app.container)
-            let notes = try context.fetch(FetchDescriptor<NotebookNote>())
-                .filter { $0.targetID == book.id && $0.link == "page" && $0.deletedAt == nil && $0.mergedInto == nil && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-                .sorted { $0.updatedAt == $1.updatedAt ? $0.id.uuidString < $1.id.uuidString : $0.updatedAt > $1.updatedAt }
-            if let note = notes.first {
-                let text = note.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                let clipped = text.count <= 220 ? text : String(text.prefix(219)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
-                let position = note.page.map { "صفحة " + digits.string($0) } ?? "من دفتر كتابك"
-            let attribution = MadarInlineText.joined([book.title, book.author])
-                cues.append(.init(
-                    id: "note-\(note.id.uuidString)", title: "من هامشك", message: clipped,
-                source: MadarInlineText.joined([attribution, position]), actionTitle: "افتح الكتاب", bookID: book.id
-                ))
-            }
-
-            if let total = book.pages, total > 0, let current = book.page, current >= 0, current < total {
-                let remaining = total - current
-                cues.append(.init(
-                    id: "progress-\(book.id.uuidString)", title: "أنت أقرب مما تظن",
-                    message: MihbaraCopy.pagesLeft(remaining, digits) + " لتكمل «" + book.title + "»",
-                    source: "موضعك: صفحة " + digits.string(current) + " من " + digits.string(total),
-                    actionTitle: "واصل القراءة", bookID: book.id
-                ))
-            }
-
-            let remainingPages = book.pages.flatMap { total in book.page.map { max(0, total - $0) } }
-            let stepPages = remainingPages.map { min(5, max(1, $0)) } ?? 5
-            let minutes = max(1, Int((Double(stepPages) * 1.4).rounded()))
-            cues.append(.init(
-                id: "step-\(book.id.uuidString)", title: "خطوة صغيرة تكفي",
-                message: arabicCount(stepPages, ["صفحة واحدة", "صفحتان", "صفحات", "صفحة"], digits) + " فقط",
-                source: "وقت تقريبي: " + PrayerCopy.minutes(minutes, digits: digits) + "، من موضعك المحفوظ",
-                actionTitle: book.isReadableEPUB || book.isReadablePDF ? "ابدأ القراءة" : "افتح موضعك", bookID: book.id
-            ))
-        }
-
-        // FB-34 (owner, 5 Nov): the Forty Nawawi left the Mihbara, so its «ورد السنّة» cue no longer appears.
-        return cues
-    }
-
     /// M6-V08: the book's live paragraph highlights, oldest first so a later one draws on top.
     func highlights(for bookID: UUID) throws -> [MihbaraHighlight] {
         guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }

@@ -44,8 +44,6 @@ targets:
     platform: iOS
     sources:
       - path: App
-        excludes:
-          - QuranRoom.swift
       - Intents
       - Widgets/NextPrayerWidget.swift
     dependencies:
