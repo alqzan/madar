@@ -461,10 +461,13 @@ extension DiaryVoiceController: AVAudioRecorderDelegate {
 }
 
 /// A single native recognition request; cancellation resumes its waiter exactly once.
+/// Owner 12 Nov (a five-minute take came back as two lines): the recognizer ends a result at every pause, so one file gives
+/// several final results. All of them are kept, in order, and the request answers only when the recognizer says it finished.
 @MainActor private final class DiaryRecognitionRequest {
     private var continuation: CheckedContinuation<String, Error>?
     private var task: SFSpeechRecognitionTask?
     private var recognizer: SFSpeechRecognizer?
+    private var collector: Collector?
     func run(url: URL, language: String, onDevice: Bool) async throws -> String {
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -472,19 +475,38 @@ extension DiaryVoiceController: AVAudioRecorderDelegate {
                 guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: language)), recognizer.isAvailable else { finish(.failure(CocoaError(.featureUnsupported))); return }
                 self.recognizer = recognizer
                 let request = SFSpeechURLRecognitionRequest(url: url); request.requiresOnDeviceRecognition = onDevice; request.shouldReportPartialResults = false
-                task = recognizer.recognitionTask(with: request) { [weak self] result, error in
-                    let text = result?.isFinal == true ? result?.bestTranscription.formattedString : nil
-                    let failure = error?.localizedDescription
-                    Task { @MainActor in
-                        if let text { self?.finish(.success(text)) }
-                        else if let failure { self?.finish(.failure(NSError(domain: "DiarySpeech", code: 1, userInfo: [NSLocalizedDescriptionKey: failure]))) }
-                    }
-                }
+                let collector = Collector { [weak self] result in Task { @MainActor in self?.finish(result) } }
+                self.collector = collector
+                task = recognizer.recognitionTask(with: request, delegate: collector)
             }
         } onCancel: { Task { @MainActor [weak self] in self?.cancel() } }
     }
     func cancel() { task?.cancel(); task = nil; finish(.failure(CancellationError())) }
-    private func finish(_ result: Result<String, Error>) { let waiter = continuation; continuation = nil; task = nil; recognizer = nil; waiter?.resume(with: result) }
+    private func finish(_ result: Result<String, Error>) { let waiter = continuation; continuation = nil; task = nil; recognizer = nil; collector = nil; waiter?.resume(with: result) }
+
+    /// Speech calls its delegate on its own queue; the pieces are guarded and handed back once.
+    private final class Collector: NSObject, SFSpeechRecognitionTaskDelegate, @unchecked Sendable {
+        private let lock = NSLock()
+        private var text = ""
+        private var done = false
+        private let completion: @Sendable (Result<String, Error>) -> Void
+        init(completion: @escaping @Sendable (Result<String, Error>) -> Void) { self.completion = completion }
+        func speechRecognitionTask(_ task: SFSpeechRecognitionTask, didFinishRecognition result: SFSpeechRecognitionResult) {
+            lock.withLock { DiaryTranscriptJoin.append(result.bestTranscription.formattedString, to: &text) }
+        }
+        func speechRecognitionTask(_ task: SFSpeechRecognitionTask, didFinishSuccessfully successfully: Bool) {
+            let outcome: Result<String, Error>? = lock.withLock {
+                guard !done else { return nil }; done = true
+                // Silence (a quiet chunk, or quiet at the end of a take) is not a failure: the chunk answers with what it heard, possibly nothing,
+                // so one quiet piece never throws away the pieces before it. Any other error with words kept is a cut-off take and fails.
+                let error = task.error as NSError?
+                let noSpeech = error?.domain == "kAFAssistantErrorDomain" && error?.code == 1110
+                if successfully || noSpeech || error == nil { return .success(text) }
+                return .failure(error ?? NSError(domain: "DiarySpeech", code: 1, userInfo: [NSLocalizedDescriptionKey: "لم يُسمع كلام"]))
+            }
+            if let outcome { completion(outcome) }
+        }
+    }
 }
 
 /// What an audio-session notification means for a take in progress. Pure, so it is tested without a microphone.

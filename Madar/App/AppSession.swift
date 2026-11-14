@@ -80,9 +80,9 @@ final class AppSession {
     var notificationTestResult = ""
     var bankCorpusImportedInputCount = 0
     var diaryBoundaryUITestClockOverride: Date?
+#endif
     /// Bumped each time a diary composer has left and saved its draft: another composer still on screen under it re-reads the shared draft.
     var diaryComposerEpoch = 0
-#endif
     @ObservationIgnored weak var prayerNotifications: PrayerNotificationCoordinator?
     @ObservationIgnored private var widgetHabitRefreshPending = false
     let schema: SettingsSchema

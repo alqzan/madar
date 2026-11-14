@@ -171,7 +171,8 @@ struct DiaryInlineComposer: View {
         }
         // A sheet that also wrote today's draft has closed: this field, still on screen beneath it, takes the shared draft again (never over typing).
         .onChange(of: app.diaryComposerEpoch) { _, _ in
-            guard visible, loaded, edit == nil, !touchedSinceLoad, !focused, !saving else { return }
+            // Nothing unsaved here: the field matches its last save, or it is empty with no draft record (a line was just sent).
+            guard visible, loaded, edit == nil, !focused, !saving, !expanded, !voiceBusy, text == lastSaved || (!hasDraftRecord && trimmedText.isEmpty) else { return }
             let before = text
             Task { await loadDraft(typedSince: before) }
         }
