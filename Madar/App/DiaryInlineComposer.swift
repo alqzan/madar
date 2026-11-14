@@ -82,6 +82,9 @@ struct DiaryInlineComposer: View {
     @State private var richBaseline = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var focused: Bool
+    @Environment(\.scenePhase) private var scenePhase
+    /// True while the field is being folded out or the keyboard bar is used: losing focus then is not a boundary.
+    @State private var holdCommit = false
 
     private var voice: DiaryVoiceController { app.diaryVoice }
     private var voiceBusy: Bool { voice.recording || voice.savingAudio }
@@ -152,6 +155,34 @@ struct DiaryInlineComposer: View {
         .task(id: app.diaryBoundaryUITestClockOverride) { currentDay = try? service.currentDay() }
 #endif
         .onDisappear { if loaded, edit == nil, !trimmedText.isEmpty { DiaryDraftFlush.run { await keepDraft() } } }
+        // 14 Nov owner (T10): leaving the app is a boundary. What was written becomes the line; no idle timer ever commits (one paragraph stays one line).
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .background, loaded, edit == nil, canSend, !expanded, !voiceBusy else { return }
+            Task { await send() }
+        }
+        .onChange(of: focused) { old, new in
+            // Leaving the field (a tap on the page, another room) is a boundary; folding out or the keyboard bar are not.
+            guard old, !new, !holdCommit, loaded, edit == nil, canSend, !expanded, !voiceBusy, !cameraOpen, !choosingFile else { return }
+            Task { await send() }
+        }
+        .toolbar {
+            // One bar above the keyboard, only while this composer's field has the cursor.
+            ToolbarItemGroup(placement: .keyboard) {
+                if focused, edit == nil, !expanded {
+                    PhotosPicker(selection: $photo, matching: .images) { Image(systemName: "photo") }.accessibilityLabel("أضف صورة").accessibilityIdentifier("diary-keyboard-photo")
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        Button { holdCommit = true; focused = false; cameraOpen = true } label: { Image(systemName: "camera") }
+                            .accessibilityLabel("التقط صورة").accessibilityIdentifier("diary-keyboard-camera")
+                    }
+                    if trimmed.isEmpty {
+                        Button { holdCommit = true; Task { await startRecording(); holdCommit = false } } label: { Image(systemName: "mic") }
+                            .accessibilityLabel("سجّل صوتًا").accessibilityIdentifier("diary-keyboard-record")
+                    }
+                    Spacer()
+                    Button("تمّ") { focused = false }.accessibilityIdentifier("diary-keyboard-done")
+                }
+            }
+        }
         .onChange(of: text) { _, _ in if edit == nil { failure = nil; notice = nil; scheduleDraft() } }
         .onChange(of: editText) { _, _ in failure = nil }
         .onChange(of: edit) { _, value in
@@ -180,7 +211,7 @@ struct DiaryInlineComposer: View {
             if markdown != field.wrappedValue { field.wrappedValue = markdown }
         }
         .fullScreenCover(isPresented: $cameraOpen) {
-            DiaryCameraCapture(captured: cameraCaptured, cancelled: { cameraOpen = false }).ignoresSafeArea()
+            DiaryCameraCapture(captured: cameraCaptured, cancelled: { cameraOpen = false; holdCommit = false }).ignoresSafeArea()
         }
         .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.data]) { result in Task { await addFile(result) } }
         .modifier(InlineVoiceEvents(voice: voice, saved: saved, notice: $notice))
@@ -208,17 +239,25 @@ struct DiaryInlineComposer: View {
 
     private var expandedHeader: some View {
         HStack(spacing: 10) {
-            Button { toggle(false) } label: { Text("تمّ").font(DiaryType.label).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
-                .buttonStyle(.madarPlain).foregroundStyle(theme.accent).accessibilityIdentifier("diary-editor-cancel")
+            // 14 Nov owner (T10): no send button for new words. Autosave keeps the draft; «تمّ» (or leaving the field or the app) makes it the line.
+            if edit != nil {
+                Button { toggle(false) } label: { Text("إلغاء").font(DiaryType.label).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
+                    .buttonStyle(.madarPlain).foregroundStyle(theme.accent).accessibilityIdentifier("diary-editor-cancel")
+            }
             Text(MadarInlineText.joined([wordCount(words), draftStatus].filter { !$0.isEmpty })).font(MadarTypography.fine())
                 .foregroundStyle(theme.color("ink3Text")).lineLimit(1).accessibilityIdentifier("diary-draft-status")
             Spacer(minLength: 4)
-            Button { Task { await send() } } label: {
-                Text(saving ? "يُحفظ…" : edit != nil ? "احفظ التعديل" : "احفظ الصفحة").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline))
-                    .padding(.horizontal, 16).frame(minHeight: 40).foregroundStyle(theme.background)
-                    .background(theme.dark ? theme.accent : theme.ink, in: .capsule).opacity(canSend ? 1 : 0.4)
-            }.buttonStyle(.madarPlain).disabled(!canSend).accessibilityIdentifier("diary-editor-save")
+            Button { finish() } label: {
+                Text(saving ? "يُحفظ…" : edit != nil ? "احفظ التعديل" : "تمّ").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline))
+                    .padding(.horizontal, 16).frame(minHeight: 44).foregroundStyle(theme.background)
+                    .background(theme.dark ? theme.accent : theme.ink, in: .capsule).opacity(edit != nil && !canSend ? 0.4 : 1)
+            }.buttonStyle(.madarPlain).disabled(saving || (edit != nil && !canSend)).accessibilityIdentifier("diary-editor-save")
         }
+    }
+    /// «تمّ»: what was written becomes the line (nothing to commit: the surface just folds).
+    private func finish() {
+        if edit == nil, !canSend { toggle(false); return }
+        Task { await send() }
     }
 
     /// While the field covers the page: the latest line already there and what is attached, in one quiet line each.
@@ -330,7 +369,7 @@ struct DiaryInlineComposer: View {
             .overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 0.7) }
             if edit == nil {
                 // The full surface stays one tap away (camera, files, formatting, a longer text); the identifiers keep their old meaning.
-                Button { Task { await keepDraft(); toggle(true) } } label: {
+                Button { holdCommit = true; Task { await keepDraft(); toggle(true); holdCommit = false } } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 15)).frame(width: 44, height: 44).contentShape(Rectangle())
                 }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text"))
                     .accessibilityLabel("كبّر الحقل: كاميرا وملفات وتنسيق").accessibilityIdentifier(trimmed.isEmpty ? "diary-day-write" : "diary-inline-expand")
@@ -340,13 +379,13 @@ struct DiaryInlineComposer: View {
                     Image(systemName: "mic").font(.system(size: 19)).frame(width: 44, height: 44).contentShape(Circle())
                 }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text"))
                     .accessibilityLabel("سجّل صوتًا").accessibilityIdentifier("diary-inline-record")
-            } else {
+            } else if edit != nil {
                 Button { Task { await send() } } label: {
                     Image(systemName: "arrow.up").font(.system(size: 17, weight: .bold)).frame(width: 44, height: 44)
                         .foregroundStyle(theme.background).background(theme.dark ? theme.accent : theme.ink, in: .circle)
                         .contentShape(Circle())
                 }.buttonStyle(.madarPlain).disabled(!canSend)
-                    .accessibilityLabel(edit != nil ? "احفظ التعديل" : "أضف إلى الصفحة").accessibilityIdentifier("diary-inline-send")
+                    .accessibilityLabel("احفظ التعديل").accessibilityIdentifier("diary-inline-send")
             }
         }
     }
@@ -589,7 +628,7 @@ struct DiaryInlineComposer: View {
         } catch { failure = madarUserMessage(error) }
     }
     private func cameraCaptured(_ image: UIImage) {
-        cameraOpen = false
+        cameraOpen = false; holdCommit = false
         guard let original = image.jpegData(compressionQuality: 0.82), let data = DiaryPhotoLibrary.cameraCopy(of: original) else {
             failure = "تعذّر تجهيز الصورة. التقطها مرة أخرى."; return
         }

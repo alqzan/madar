@@ -16,6 +16,8 @@ struct DiaryDayView: View {
     var expandComposerOnOpen = false
     /// A day opened from the archive, search or a week is already inside that screen: it does not offer the same screens again on top of themselves.
     var showsNavigationTools = true
+    /// The room root offers its customize screen from the menu (the home that used to carry that button is gone).
+    var onCustomize: (() -> Void)? = nil
     @Environment(\.roomTheme) private var roomTheme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -368,6 +370,7 @@ struct DiaryDayView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button { readingOpen = true } label: { Label("اقرأ", systemImage: "book") }.accessibilityIdentifier("diary-day-read")
+                        if let onCustomize { Button { onCustomize() } label: { Label("خصّص المذكرات", systemImage: "slider.horizontal.3") }.accessibilityIdentifier("diary-customize") }
                         if shownDay == today, travel == nil {
                             Button { reviewOpen = true } label: { Label("محاسبة اليوم", systemImage: "moon.stars") }.accessibilityIdentifier("diary-day-review")
                         }

@@ -39,7 +39,10 @@ import XCTest
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"letters","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00"];app.launch()
         XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout:25));app.buttons["diary-today"].tap()
         XCTAssertTrue(app.buttons["diary-letter-waiting"].waitForExistence(timeout:10))
-        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-sealed-letter-line").firstMatch.exists)
+        let sealedLine=app.descendants(matching:.any).matching(identifier:"diary-sealed-letter-line").firstMatch
+        // The page is a lazy list: the sealed line sits at its foot and exists once scrolled to.
+        for _ in 0..<4 where !sealedLine.waitForExistence(timeout:2) { app.swipeUp() }
+        XCTAssertTrue(sealedLine.exists,app.debugDescription)
         XCTAssertFalse(app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@","لا تُقرأ قبل وقتها")).firstMatch.exists)
         capture(app,"F01-today-letters-L")
         app.buttons["diary-letter-waiting"].tap();XCTAssertTrue(app.buttons["diary-letter-open"].waitForExistence(timeout:10));capture(app,"F01-letter-sealed-L")

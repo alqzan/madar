@@ -46,7 +46,7 @@ import XCTest
 
     // MARK: Composer that grows
 
-    func testExpandTypeCollapseKeepsTheText() throws {
+    func testExpandTypeDoneWritesTheLine() throws {
         continueAfterFailure = false
         let app = launch("entryRoute")
         XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); app.buttons["diary-write"].tap()
@@ -56,9 +56,9 @@ import XCTest
         XCTAssertFalse(field.exists, "Grown, the quiet field gives way to the writing surface")
         editor.tap(); editor.typeText("نص يبقى بعد الطيّ")
         capture(app, "B-composer-expanded-L")
-        app.buttons["diary-editor-cancel"].tap()
+        app.buttons["diary-editor-save"].tap()   // 14 Nov: «تمّ» folds the surface and the words become the line
+        XCTAssertTrue(app.staticTexts["نص يبقى بعد الطيّ"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(((field.value as? String) ?? "").contains("نص يبقى بعد الطيّ"), "Folding keeps the same words: \(String(describing: field.value))")
         XCTAssertFalse(app.textViews["diary-editor-text"].exists)
     }
     func testExpandSendCommitsLikeTheQuietField() throws {

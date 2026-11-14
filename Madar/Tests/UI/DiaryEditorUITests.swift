@@ -84,7 +84,7 @@ import XCTest
         if hideKeyboard.waitForExistence(timeout: 5) { hideKeyboard.tap() }
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), app.debugDescription)
         capture(app, "M3-V06-empty-before-L")
-        app.buttons["diary-editor-cancel"].tap()
+        app.buttons["diary-editor-save"].tap()   // 14 Nov: «تمّ» folds an empty surface and writes nothing
         // Closing the page returns to today's page, where the writing began; one more step is home.
         app.closeDiaryDay()
         XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 10), app.debugDescription)
@@ -96,7 +96,7 @@ import XCTest
         XCTAssertFalse(app.staticTexts["مسودة مستعادة"].exists, app.debugDescription)
         XCTAssertTrue(app.staticTexts["اكتب ما تيسّر…"].exists, app.debugDescription)
         capture(app, "M3-V06-empty-after-reopen-L")
-        app.buttons["diary-editor-cancel"].tap()
+        app.buttons["diary-editor-save"].tap()
     }
     func testDraftRelaunchAndPickerCancelKeepContent() throws {
         continueAfterFailure = false
@@ -120,10 +120,10 @@ import XCTest
         XCTAssertTrue(context.waitForExistence(timeout: 10), app.debugDescription)
         let media = app.descendants(matching: .any).matching(identifier: "diary-editor-saved-media").firstMatch
         XCTAssertTrue(media.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertEqual(app.buttons["diary-editor-cancel"].label, "تمّ")
-        XCTAssertEqual(app.buttons["diary-editor-save"].label, "احفظ الصفحة")
+        XCTAssertEqual(app.buttons["diary-editor-save"].label, "تمّ")
+        XCTAssertFalse(app.buttons["diary-editor-cancel"].exists, "No separate cancel for new words: autosave keeps the draft")
         capture(app, "OWNER-writing-context-media-L")
-        app.buttons["diary-editor-cancel"].tap()
+        app.buttons["diary-editor-save"].tap()
         app.closeDiaryDay()
         XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 10), app.debugDescription)
     }
@@ -147,7 +147,9 @@ import XCTest
         XCTAssertTrue(app.buttons["diary-inline-chip-clear"].exists, app.debugDescription)
         field.tap(); field.typeText("سطر بين سطرين")
         capture(app, "FLOW-inline-composer-L")
-        app.buttons["diary-inline-send"].tap()
+        // 14 Nov: no send button for new words; «تمّ» above the keyboard ends the field and writes the line.
+        XCTAssertFalse(app.buttons["diary-inline-send"].exists)
+        app.buttons["diary-keyboard-done"].tap()
         XCTAssertTrue(app.staticTexts["سطر بين سطرين"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.buttons["diary-inline-chip-clear"].exists)
         // Quick win 5: a tap writes after the line; changing it is in the long-press menu («عدّل السطر»), same field, no sheet.

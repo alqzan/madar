@@ -323,7 +323,9 @@ import XCTest
         XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         app.textViews["diary-editor-text"].typeText("لن يحفظ")
-        app.buttons["diary-editor-cancel"].tap()
+        // 14 Nov: «تمّ» writes what is there; emptying the draft first is how a writer discards it.
+        app.textViews["diary-editor-text"].typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 7))
+        app.buttons["diary-editor-save"].tap()
         app.closeDiaryDay()
         // An empty day offers one «اكتب» action and no page to read; the closed draft wrote nothing visible.
         XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 10))

@@ -50,6 +50,17 @@ struct DiaryHomeView: View {
     @State private var todayCardVisible = true
     @State private var todayIntention: String?
     private var wide: Bool { isPadWide(sizeClass) && roomWidth >= 960 }
+    private var rootToday: Bool { rootEnabled && !wide && snapshot != nil && failure == nil }
+    /// Shipping behaviour: the room opens on today's page. The legacy home-first suites run with the flag off; the root has its own suite (`MADAR_UI_DIARY_ROOT=1`).
+    private var rootEnabled: Bool {
+#if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        if environment["MADAR_UI_STORE_ID"] != nil { return environment["MADAR_UI_DIARY_ROOT"] == "1" }
+#endif
+        return true
+    }
+    private struct RootParams { var entryID: UUID?; var routeID: UUID?; var focus = false; var prompt: String?; var expand = false; var token = UUID() }
+    @State private var rootParams = RootParams()
     @State private var snapshot: DiaryHomeSnapshot?
     @State private var customizing = false
     @State private var archiveOpen = false
@@ -78,6 +89,14 @@ struct DiaryHomeView: View {
     private var service: AppDiaryService { AppDiaryService(app: app) }
     var body: some View {
         VStack(spacing: 0) {
+            if rootToday, let snapshot {
+                // 14 Nov owner (T10): the room opens on today's page itself; nothing is pushed over a home.
+                if !typeSize.isAccessibilitySize, let past = yearStripPage(snapshot) { yearStrip(past, snapshot: snapshot) }
+                DiaryDayView(app: app, day: snapshot.today, initialEntryID: rootParams.entryID, initialEntryRouteID: rootParams.routeID,
+                             embeddedInNavigationStack: true, focusComposerOnOpen: rootParams.focus, prompt: rootParams.prompt,
+                             expandComposerOnOpen: rootParams.expand, onCustomize: { customizing = true })
+                    .id(rootParams.token).environment(\.roomTheme, theme)
+            } else {
             header.padding(.horizontal, 14).padding(.top, 8)
             ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -104,18 +123,19 @@ struct DiaryHomeView: View {
             }.padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 12)
             .frame(maxWidth: !isPadWide(sizeClass) ? .infinity : wide ? 1100 : 720).frame(maxWidth: .infinity)
             }
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
+            }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
         .background(theme.background).foregroundStyle(theme.ink)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // The write control lives in today's card; the bar only stands in for it once the card has scrolled away (never two on screen).
-            if let snapshot, !todayCardVisible, !wide {
+            if let snapshot, !todayCardVisible, !wide, !rootToday {
                 todayBar(snapshot.todayPage).ignoresSafeArea(.keyboard, edges: .bottom).transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .madarAnimation(.quick, value: todayCardVisible)
         .scrollDismissesKeyboard(.interactively)
-        .toolbarVisibility(.hidden, for: .navigationBar)
+        .toolbarVisibility(rootToday ? .visible : .hidden, for: .navigationBar)
         .task(id: [isFrontRoom ? app.prayerRevision : -1, roomVisit]) {
             guard isFrontRoom else { return }
             await refresh()
@@ -157,6 +177,12 @@ struct DiaryHomeView: View {
         }
         .onChange(of: editor) { old, new in if old != nil, new == nil { editorDidDismiss() } }
         .onChange(of: reader) { old, new in
+            if rootToday, let new, new == snapshot?.today {
+                // Today is the root page: the same request (entry, prompt, cursor) is handed to it instead of pushing a second copy.
+                rootParams = RootParams(entryID: readerEntryID, routeID: readerEntryRouteID, focus: focusReaderComposer, prompt: readerPrompt, expand: readerExpandComposer)
+                reader = nil
+                return
+            }
             if old != nil, new == nil {
                 readerEntryID = nil; readerEntryRouteID = nil; focusReaderComposer = false; readerPrompt = nil; readerExpandComposer = false
                 applyPendingDiaryRootIfReady()
@@ -346,6 +372,29 @@ struct DiaryHomeView: View {
                 }.scrollIndicators(.hidden).accessibilityIdentifier("diary-years")
             }
         }
+    }
+    /// The page a year (or the nearest match) ago that has something written or a photo; the strip over today's page shows it.
+    private func yearStripPage(_ snapshot: DiaryHomeSnapshot) -> DiaryDisplayDay? {
+        snapshot.selection.days.compactMap { day in snapshot.days.first { $0.day == day } }
+            .first { page in page.photo != nil || page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
+    }
+    /// 96 pt: the photo dimmed, one line over it; a tap or a pull down opens that page (the window).
+    private func yearStrip(_ page: DiaryDisplayDay, snapshot: DiaryHomeSnapshot) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            if let data = page.photo {
+                DiaryDataThumbnail(data: data, maxPixel: 600) { image in
+                    image.resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: 96).clipped().overlay(theme.background.opacity(0.55))
+                }.id(page.photoID?.uuidString ?? page.id)
+            } else { Rectangle().fill(theme.surface) }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(service.distance(page.day, snapshot.today) + ": " + page.excerpt).font(.custom("thmanyahseriftext-Regular", size: 16, relativeTo: .body)).lineLimit(1)
+                MadarDateLabel(app.dateLabels(page.day)).foregroundStyle(theme.color("ink3Text"))
+            }.padding(.horizontal, 16).padding(.bottom, 8).frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: 96).frame(maxWidth: .infinity).clipped().contentShape(Rectangle())
+        .onTapGesture { reader = page.day }
+        .gesture(DragGesture(minimumDistance: 20).onEnded { value in if value.translation.height > 40 { reader = page.day } })
+        .accessibilityElement(children: .combine).accessibilityAddTraits(.isButton).accessibilityIdentifier("diary-year-strip")
     }
     private func calendarButton(_ calendar: FirstCalendar, _ title: String) -> some View {
         Button { app.set(.string(calendar.rawValue), key: "notes.match") { Task { await refresh() } } } label: {
