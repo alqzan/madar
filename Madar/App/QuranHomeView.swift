@@ -19,6 +19,7 @@ struct QuranHomeView: View {
     @State private var detail: HomeDetail?
     @State private var active: QuranUISessionState?
     @State private var busy = false
+    @State private var wholeStep: QuranUIStep?
     /// A refresh asked for while another operation runs is replayed once it ends, so the home never stays stale.
     @State private var refreshPending = false
     @State private var refreshGeneration = UUID()
@@ -187,6 +188,12 @@ struct QuranHomeView: View {
         // Back from the lock screen or past midnight, «مسار اليوم» and a missed day reflect the day it is now.
         .onChange(of: scenePhase) { _, phase in if phase == .active, active == nil, isFrontRoom { run(refresh: true) { try await refresh() } } }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in if active == nil { run(refresh: true) { try await refresh() } } }
+        .confirmationDialog("كيف كان الورد؟", isPresented: Binding(get: { wholeStep != nil }, set: { if !$0 { wholeStep = nil } }), titleVisibility: .visible) {
+            ForEach(QuranUIGrade.allCases) { grade in
+                Button(grade.title) { if let step = wholeStep { finishWhole(step, grade: grade) } }
+            }
+            Button("إلغاء", role: .cancel) { wholeStep = nil }
+        } message: { Text("يُسجَّل التقدير نفسه لكل وجه من الورد.") }
         .refreshesAtMadarDay(service.app) { if active == nil { run(refresh: true) { try await refresh() } } }
         .onChange(of: service.app.quranRoute, initial: true) { _, route in
             guard let route else { return }
@@ -462,6 +469,11 @@ struct QuranHomeView: View {
                 Button("ابدأ") { run { active = try await service.start(kind: step.kind, stepID: step.id, range: step.range, rakaat: nil, spotID: nil) } }.disabled(busy)
                     .font(bodyFont(14, bold: true)).foregroundStyle(theme.onAccent).padding(.horizontal, 20).frame(minHeight: 44)
                     .background(theme.color("accent"), in: Capsule()).contentShape(Capsule()).contentShape(.capsule).disabled(busy).accessibilityIdentifier("quran-begin")
+                if step.kind == .hifz, step.range != nil {
+                    // 14 Nov owner: finish a wird you already know in one tap; the grade is asked every time.
+                    Button("أتممته كاملًا") { wholeStep = step }.disabled(busy).font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
+                        .frame(minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("quran-finish-whole")
+                }
             }
             if step.kind == .hifz, let ayahRange = step.ayahRange {
                 // FB-33: the wird's tafsir opens on the page itself, its first ayah lit and explained.
@@ -643,6 +655,18 @@ struct QuranHomeView: View {
             if route.path.last == "qiyam" { return }
             else if let draft = state?.draft { active = try await service.resume(draftID: draft.id) }
             else if let kind = QuranUIKind(rawValue: route.path.last == "wird" ? "hifz" : route.path.last ?? "") { active = try await service.start(kind: kind, stepID: nil, range: nil, rakaat: nil, spotID: nil) }
+        }
+    }
+    private func finishWhole(_ step: QuranUIStep, grade: QuranUIGrade) {
+        wholeStep = nil
+        guard let range = step.range else { return }
+        run(refresh: true) {
+            let started = try await service.start(kind: step.kind, stepID: step.id, range: range, rakaat: nil, spotID: nil)
+            for page in range.fromPage...range.toPage {
+                _ = try await service.session(draftID: started.id, action: .grade(page: page, grade: grade))
+            }
+            _ = try await service.session(draftID: started.id, action: .commit)
+            try await refresh()
         }
     }
     private func run(refresh isRefresh: Bool = false, _ operation: @escaping @MainActor () async throws -> Void) {

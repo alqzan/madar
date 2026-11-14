@@ -64,6 +64,8 @@ struct DiaryDayView: View {
     @State private var openingLetter: DiaryLetterCard?
     @State private var sealedHere = 0
     @State private var periodLabels: [String: DiaryPeriodLabel] = [:]
+    @State private var expandedRuns: Set<String> = []
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var readingOpen = false
     @State private var reviewOpen = false
     @State private var afterIsha = false
@@ -205,12 +207,19 @@ struct DiaryDayView: View {
                                     if travel == nil { dayPhotoStrip }
                                     let flow = page.lines.filter { $0.kind != "intention" }
                                     let mediaByEntry = Dictionary(grouping: page.media, by: \.entryID)
+                                    let runs = autoRuns(flow)
                                     ForEach(Array(flow.enumerated()), id: \.element.id) { index, line in
                                         let attached = mediaByEntry[line.id] ?? []
                                         let hasAudio = attached.contains { $0.kind == "audio" }
                                         // A recording's text is its transcript: the card below shows it whole and editable, so the line itself is not repeated.
                                         if let label = periodLabels[line.id] { DiaryPeriodHeadingRow(label: label) }
-                                        if !hasAudio { lineRow(line, page: page).id("diary-entry-" + line.id) }
+                                        if let run = runs[line.id], run.texts.count >= 2, !expandedRuns.contains(run.id) {
+                                            // 14 Nov owner (T10): what Madar wrote for a chapter is one faint line; a tap opens it.
+                                            if run.first { autoRunSummary(run).id("diary-entry-" + line.id) }
+                                        } else if !hasAudio {
+                                            lineRow(line, page: page).id("diary-entry-" + line.id)
+                                            if let run = runs[line.id], run.first, run.texts.count >= 2 { collapseRunButton(run) }
+                                        }
                                         ForEach(attached.filter { $0.kind != "missing" }) { media in
                                             DiaryMediaCard(app: app, media: media, transcript: line.text, openPhoto: { photoViewer = .init(id: $0.id.uuidString) })
                                                 .overlay(alignment: .topLeading) {
@@ -753,6 +762,48 @@ struct DiaryDayView: View {
     private func editLine(_ line: DiaryDisplayLine) {
         if inlineWriting { insertAt = nil; anchorLabel = nil; inlineEdit = .init(id: line.id, text: line.text) }
         else { editing = .init(id: line.id, text: line.text) }
+    }
+    private struct AutoRun { let id: String; let first: Bool; let texts: [String] }
+    private static let autoKinds: Set<String> = ["salah", "quran", "mihbara", "mal", "habits"]
+    /// Consecutive lines written by Madar inside one prayer chapter. A chapter heading or a line of yours ends the run.
+    private func autoRuns(_ flow: [DiaryDisplayLine]) -> [String: AutoRun] {
+        var result: [String: AutoRun] = [:]
+        var members: [DiaryDisplayLine] = []
+        func close() {
+            if let head = members.first {
+                let texts = members.map(\.text).filter { !$0.isEmpty }
+                for line in members { result[line.id] = AutoRun(id: head.id, first: line.id == head.id, texts: texts) }
+            }
+            members = []
+        }
+        for line in flow {
+            if Self.autoKinds.contains(line.kind) {
+                if periodLabels[line.id] != nil { close() }
+                members.append(line)
+            } else { close() }
+        }
+        close()
+        return result
+    }
+    private func autoRunSummary(_ run: AutoRun) -> some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .snappy) { _ = expandedRuns.insert(run.id) }
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Color.clear.frame(width: DiaryDayMetrics.timeColumn, height: 1)
+                Text(run.texts.joined(separator: "، ")).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).italic()
+                    .foregroundStyle(theme.color("autoInkText")).multilineTextAlignment(.leading).lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.down").font(.caption).foregroundStyle(theme.color("ink3Text"))
+            }.padding(.leading, 6).padding(.trailing, 18).padding(.vertical, 10).frame(minHeight: 44).contentShape(Rectangle())
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-auto-run")
+    }
+    private func collapseRunButton(_ run: AutoRun) -> some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .snappy) { _ = expandedRuns.remove(run.id) }
+        } label: {
+            Text("اطوِ").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).frame(maxWidth: .infinity, minHeight: 30)
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-auto-run-collapse")
     }
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
         let auto = ["salah", "quran", "mihbara", "mal", "habits"].contains(line.kind)
