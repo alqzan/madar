@@ -91,6 +91,7 @@ struct DiaryHomeView: View {
                 DiaryDayView(app: app, day: snapshot.today, initialEntryID: rootParams.entryID, initialEntryRouteID: rootParams.routeID,
                              embeddedInNavigationStack: true, focusComposerOnOpen: rootParams.focus, prompt: rootParams.prompt,
                              expandComposerOnOpen: rootParams.expand, onCustomize: { customizing = true }, writeDayPreset: rootParams.preset)
+                             .task(id: rootParams.token) { if rootParams.preset != nil { try? await Task.sleep(for: .seconds(5)); rootParams.preset = nil } }
                     .id(rootParams.token).environment(\.roomTheme, theme)
             } else if rootEnabled && !wide && snapshot == nil && failure == nil {
                 ProgressView("تُفتح صفحتك…").frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -378,6 +379,7 @@ struct DiaryHomeView: View {
             }.padding(.horizontal, 16).padding(.bottom, 8).frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(height: height).frame(maxWidth: .infinity).clipped().contentShape(Rectangle())
+        .onDisappear { stripPull = 0 }
         .onTapGesture { reader = page.day }
         .gesture(DragGesture(minimumDistance: 8)
             .onChanged { value in

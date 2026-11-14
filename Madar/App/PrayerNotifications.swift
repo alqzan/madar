@@ -536,7 +536,7 @@ final class PrayerNotificationCoordinator {
                 try updateLedger(requestID: candidate.id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "dropped", reason: error == .full ? "budget" : "disabled")
                 continue
             }
-            if !current.contains(where: { $0.identifier == candidate.id && Self.matches($0, dueAt: candidate.dueAt) && $0.content.title == content.title && $0.content.body == content.body }) {
+            if !current.contains(where: { $0.identifier == candidate.id && Self.matches($0, dueAt: candidate.dueAt) && $0.content.title == content.title && $0.content.body == content.body && $0.content.categoryIdentifier == content.categoryIdentifier }) {
                 do { try await center.add(UNNotificationRequest(identifier: candidate.id, content: content, trigger: UNCalendarNotificationTrigger(dateMatching: date, repeats: false))) }
                 catch {
                     try session.notificationBudget.cancel(id: candidate.id, now: now, requestFailed: true)

@@ -134,7 +134,7 @@ struct DiaryInlineComposer: View {
             if expanded {
                 savedContext
                 richField
-                if edit == nil, let day = try? service.currentDay() {
+                if edit == nil, margin == nil, let day = try? service.currentDay() {
                     DiaryDayPhotos(app: app, day: day) { asset in await linkLibraryPhoto(asset) }
                 }
                 if voiceBusy { voiceRow } else { toolsRow }
@@ -293,7 +293,7 @@ struct DiaryInlineComposer: View {
     @State private var currentDay: GregorianDay?
     /// A draft begun on an earlier day (the day turned at Fajr while it was open) keeps that day's page; the writer is told.
     private var staleDayNote: String? {
-        guard edit == nil, let writing = draftWritingDay, let today = currentDay,
+        guard edit == nil, margin == nil, let writing = draftWritingDay, let today = currentDay,
               (draftDay == "today" && writing < today) || (draftDay == "yesterday" && writing < today.adding(days: -1)) else { return nil }
         return MadarInlineText.joined(["مسودة عن " + service.diaryDates(writing), "تُحفظ في صفحتها الأصلية"])
     }
