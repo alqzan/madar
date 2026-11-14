@@ -85,6 +85,9 @@ struct DiaryInlineComposer: View {
     @Environment(\.scenePhase) private var scenePhase
     /// True while the field is being folded out or the keyboard bar is used: losing focus then is not a boundary.
     @State private var holdCommit = false
+    /// Only words typed in this view since the draft loaded are committed at a boundary; an untouched restored draft or a hidden composer never is.
+    @State private var visible = false
+    @State private var touchedSinceLoad = false
 
     private var voice: DiaryVoiceController { app.diaryVoice }
     private var voiceBusy: Bool { voice.recording || voice.savingAudio }
@@ -154,15 +157,18 @@ struct DiaryInlineComposer: View {
 #if DEBUG
         .task(id: app.diaryBoundaryUITestClockOverride) { currentDay = try? service.currentDay() }
 #endif
-        .onDisappear { if loaded, edit == nil, !trimmedText.isEmpty { DiaryDraftFlush.run { await keepDraft() } } }
+        .onAppear { visible = true }
+        .onDisappear { visible = false; if loaded, edit == nil, !trimmedText.isEmpty { DiaryDraftFlush.run { await keepDraft() } } }
+        .onChange(of: cameraOpen) { _, open in if !open { holdCommit = false } }
         // 14 Nov owner (T10): leaving the app is a boundary. What was written becomes the line; no idle timer ever commits (one paragraph stays one line).
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .background, loaded, edit == nil, canSend, !expanded, !voiceBusy else { return }
+            guard phase == .background, visible, touchedSinceLoad, loaded, edit == nil, canSend, !expanded, !voiceBusy else { return }
             Task { await send() }
         }
         .onChange(of: focused) { old, new in
             // Leaving the field (a tap on the page, another room) is a boundary; folding out or the keyboard bar are not.
-            guard old, !new, !holdCommit, loaded, edit == nil, canSend, !expanded, !voiceBusy, !cameraOpen, !choosingFile else { return }
+            if new { holdCommit = false }
+            guard old, !new, !holdCommit, visible, touchedSinceLoad, loaded, edit == nil, canSend, !expanded, !voiceBusy, !cameraOpen, !choosingFile else { return }
             Task { await send() }
         }
         .toolbar {
@@ -170,6 +176,7 @@ struct DiaryInlineComposer: View {
             ToolbarItemGroup(placement: .keyboard) {
                 if focused, edit == nil, !expanded {
                     PhotosPicker(selection: $photo, matching: .images) { Image(systemName: "photo") }.accessibilityLabel("أضف صورة").accessibilityIdentifier("diary-keyboard-photo")
+                        .simultaneousGesture(TapGesture().onEnded { holdCommit = true })
                     if UIImagePickerController.isSourceTypeAvailable(.camera) {
                         Button { holdCommit = true; focused = false; cameraOpen = true } label: { Image(systemName: "camera") }
                             .accessibilityLabel("التقط صورة").accessibilityIdentifier("diary-keyboard-camera")
@@ -183,7 +190,7 @@ struct DiaryInlineComposer: View {
                 }
             }
         }
-        .onChange(of: text) { _, _ in if edit == nil { failure = nil; notice = nil; scheduleDraft() } }
+        .onChange(of: text) { _, _ in if edit == nil { failure = nil; notice = nil; if loaded { touchedSinceLoad = true }; scheduleDraft() } }
         .onChange(of: editText) { _, _ in failure = nil }
         .onChange(of: edit) { _, value in
             if let value {
@@ -241,7 +248,7 @@ struct DiaryInlineComposer: View {
         HStack(spacing: 10) {
             // 14 Nov owner (T10): no send button for new words. Autosave keeps the draft; «تمّ» (or leaving the field or the app) makes it the line.
             if edit != nil {
-                Button { toggle(false) } label: { Text("إلغاء").font(DiaryType.label).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
+                Button { edit = nil; editText = ""; toggle(false) } label: { Text("إلغاء").font(DiaryType.label).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
                     .buttonStyle(.madarPlain).foregroundStyle(theme.accent).accessibilityIdentifier("diary-editor-cancel")
             }
             Text(MadarInlineText.joined([wordCount(words), draftStatus].filter { !$0.isEmpty })).font(MadarTypography.fine())
@@ -593,7 +600,7 @@ struct DiaryInlineComposer: View {
         } catch { failure = madarUserMessage(error) }
     }
     private func addPhoto(_ item: PhotosPickerItem) async {
-        defer { photo = nil }
+        defer { photo = nil; holdCommit = false }
         do {
             guard let data = try await item.loadTransferable(type: Data.self),
                   let copy = await Task.detached(priority: .userInitiated, operation: { DiaryPhotoLibrary.smallCopy(of: data) }).value else {

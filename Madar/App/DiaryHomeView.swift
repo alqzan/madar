@@ -96,6 +96,8 @@ struct DiaryHomeView: View {
                              embeddedInNavigationStack: true, focusComposerOnOpen: rootParams.focus, prompt: rootParams.prompt,
                              expandComposerOnOpen: rootParams.expand, onCustomize: { customizing = true })
                     .id(rootParams.token).environment(\.roomTheme, theme)
+            } else if rootEnabled && !wide && snapshot == nil && failure == nil {
+                ProgressView("تُفتح صفحتك…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
             header.padding(.horizontal, 14).padding(.top, 8)
             ScrollView {
@@ -176,6 +178,18 @@ struct DiaryHomeView: View {
                 .hidesRoomAccessory(app, id: "diary-day-destination")
         }
         .onChange(of: editor) { old, new in if old != nil, new == nil { editorDidDismiss() } }
+        .onChange(of: rootToday) { _, on in
+            if on {
+                // A route that arrived before the first load pushed nothing yet to show: hand it to the root instead of a second copy of today.
+                if let r = reader, r == snapshot?.today {
+                    rootParams = RootParams(entryID: readerEntryID, routeID: readerEntryRouteID, focus: focusReaderComposer, prompt: readerPrompt, expand: readerExpandComposer)
+                    reader = nil
+                }
+            } else {
+                // A recreated root page must not replay an old request.
+                rootParams.focus = false; rootParams.prompt = nil; rootParams.entryID = nil; rootParams.routeID = nil; rootParams.expand = false
+            }
+        }
         .onChange(of: reader) { old, new in
             if rootToday, let new, new == snapshot?.today {
                 // Today is the root page: the same request (entry, prompt, cursor) is handed to it instead of pushing a second copy.

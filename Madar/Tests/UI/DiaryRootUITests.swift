@@ -50,4 +50,25 @@ import XCTest
         strip.tap()
         XCTAssertTrue(app.staticTexts["diary-day-title"].waitForExistence(timeout: 10), app.debugDescription)
     }
+    func testLeavingTheAppWritesWhatWasTypedAsOneLine() throws {
+        continueAfterFailure = false
+        let app = launch("entryRoute")
+        let field = app.textFields["diary-inline-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 25), app.debugDescription)
+        field.tap(); field.typeText("كتبته ثم غادرت")
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(app.staticTexts["كتبته ثم غادرت"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(app.staticTexts.matching(identifier: "كتبته ثم غادرت").count, 1, "One paragraph, one line")
+    }
+    func testScrollingThePageDoesNotCommitHalfAParagraph() throws {
+        continueAfterFailure = false
+        let app = launch("entryRoute")
+        let field = app.textFields["diary-inline-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 25), app.debugDescription)
+        field.tap(); field.typeText("نصف فقرة")
+        app.swipeDown()
+        XCTAssertFalse(app.staticTexts["نصف فقرة"].exists, "Dragging the page is not a boundary: the words stay in the field")
+        XCTAssertTrue(app.keyboards.firstMatch.exists, "The keyboard stays up while writing on the page")
+    }
 }

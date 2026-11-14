@@ -351,7 +351,7 @@ struct DiaryDayView: View {
             }
             // iPad: the page is a column of paper in the middle, not lines stretched across the screen.
             .frame(maxWidth: 680).frame(maxWidth: .infinity)
-            .background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme, theme).scrollDismissesKeyboard(.interactively)
+            .background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme, theme).scrollDismissesKeyboard(inlineWriting ? .never : .interactively)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if showsNavigationTools {
