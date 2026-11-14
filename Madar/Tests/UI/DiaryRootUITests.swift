@@ -71,4 +71,28 @@ import XCTest
         XCTAssertFalse(app.staticTexts["نصف فقرة"].exists, "Dragging the page is not a boundary: the words stay in the field")
         XCTAssertTrue(app.keyboards.firstMatch.exists, "The keyboard stays up while writing on the page")
     }
+    func testRestoredDraftIsNotCommittedWhenTheAppLeavesUntouched() throws {
+        continueAfterFailure = false
+        let store = UUID().uuidString
+        func start() -> XCUIApplication {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": store, "MADAR_UI_DIARY_FIXTURE": "entryRoute", "MADAR_UI_DIARY_ROOT": "1",
+                                     "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+            app.launch(); return app
+        }
+        var app = start()
+        var field = app.textFields["diary-inline-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 25), app.debugDescription)
+        field.tap(); field.typeText("مسودة لم ألمسها")
+        Thread.sleep(forTimeInterval: 2)   // autosave runs 600 ms after the last key
+        app.terminate()
+        app = start()
+        field = app.textFields["diary-inline-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 25), app.debugDescription)
+        XCTAssertTrue(((field.value as? String) ?? "").contains("مسودة لم ألمسها"), "The draft is restored into the field")
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(field.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["مسودة لم ألمسها"].exists, "An untouched restored draft is never committed at a boundary")
+    }
 }

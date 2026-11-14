@@ -88,6 +88,7 @@ struct DiaryInlineComposer: View {
     /// Only words typed in this view since the draft loaded are committed at a boundary; an untouched restored draft or a hidden composer never is.
     @State private var visible = false
     @State private var touchedSinceLoad = false
+    @State private var loadedText = ""
 
     private var voice: DiaryVoiceController { app.diaryVoice }
     private var voiceBusy: Bool { voice.recording || voice.savingAudio }
@@ -190,7 +191,7 @@ struct DiaryInlineComposer: View {
                 }
             }
         }
-        .onChange(of: text) { _, _ in if edit == nil { failure = nil; notice = nil; if loaded { touchedSinceLoad = true }; scheduleDraft() } }
+        .onChange(of: text) { _, _ in if edit == nil { failure = nil; notice = nil; if loaded, text != loadedText { touchedSinceLoad = true }; scheduleDraft() } }
         .onChange(of: editText) { _, _ in failure = nil }
         .onChange(of: edit) { _, value in
             if let value {
@@ -530,6 +531,7 @@ struct DiaryInlineComposer: View {
                 text = typed ?? ""
             }
         } catch { failure = madarUserMessage(error) }
+        loadedText = text; touchedSinceLoad = typed != nil
         loaded = true
         // Typed words that arrived before the draft was read are written like any other edit.
         if typed != nil { scheduleDraft() }
