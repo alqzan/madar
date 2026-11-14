@@ -136,6 +136,8 @@ struct DiaryInlineComposer: View {
                 richField
                 if edit == nil, margin == nil, let day = try? service.currentDay() {
                     DiaryDayPhotos(app: app, day: day) { asset in await linkLibraryPhoto(asset) }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("diary-composer-photo-strip")
                 }
                 if voiceBusy { voiceRow } else { toolsRow }
             } else if voiceBusy {

@@ -27,6 +27,23 @@ import XCTest
         XCTAssertEqual(localTime.label, "١٢:٣٠ ص", "London's midnight entry must not fall back to Riyadh time")
         capture(app, "M3-V15-trip-clock-L")
     }
+    func testHistoricalTravelDayCanReturnToToday() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "travel", "MADAR_UI_DIARY_ROOT": "1",
+                                "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-01T16:40:00+03:00"]
+        app.launch()
+        XCTAssertTrue(app.buttons["diary-day-more"].waitForExistence(timeout: 25), app.debugDescription)
+        app.open(URL(string: "madar://notes/day/2026-09-30")!)
+        XCTAssertTrue(app.descendants(matching: .any)["diary-travel"].waitForExistence(timeout: 10), app.debugDescription)
+        let today = app.buttons["diary-day-today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 10), app.debugDescription)
+        capture(app, "OWNER-notes-historical-travel-return-before-L")
+        today.tap()
+        XCTAssertEqual(app.staticTexts["diary-travel-title"].waitForExistence(timeout: 10) ? app.staticTexts["diary-travel-title"].label : "", "اليوم الثاني", app.debugDescription)
+        XCTAssertFalse(today.exists, "The return action disappears once the current day is open")
+        capture(app, "OWNER-notes-historical-travel-return-after-L")
+    }
     // §7.3 «تقويم السفر · الإطار البريدي» and the return moment: the Cairo trip (10–14 September) is framed, and its return day folds into an envelope.
     func testTravelCalendarFramesAndReturnEnvelope() throws {
         continueAfterFailure=false
@@ -43,5 +60,13 @@ import XCTest
         capture(app,"M3-V15-return-envelope-L")
         envelope.tap();XCTAssertTrue(app.buttons["diary-stamps-done"].waitForExistence(timeout:10))
     }
-    private func capture(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
+    private func capture(_ app: XCUIApplication, _ name: String) {
+        let image = app.screenshot(), attachment = XCTAttachment(screenshot: image)
+        attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+        if let directory = ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] {
+            let url = URL(fileURLWithPath: directory, isDirectory: true)
+            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            try? image.pngRepresentation.write(to: url.appendingPathComponent(name + ".png"))
+        }
+    }
 }

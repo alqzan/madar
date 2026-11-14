@@ -92,6 +92,11 @@ public enum MoneyDefaultCategories {
 }
 
 struct MoneyStagedResult { var inverse: Data?; var duplicate: Bool }
+enum MoneyWriteCheckpoint: Equatable {
+    case expenseInserted
+    case transferInserted
+    case allocationInserted(Int)
+}
 private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var after: [DataRecord]; var reserveGoalID: UUID? = nil }
 
 /// Stages only, under DurableCommandAdapter's lease. The receipt, movement, allocations and
@@ -113,7 +118,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         return decision == .discard || decision == .discardWithoutText
     }
     static func stage(name: String, payload p: [String: MadarCore.JSONValue], id: UUID, issuedAt: Date,
-                      source: CommandSource, context: ModelContext, now: Date, writer: String) throws -> MoneyStagedResult {
+                      source: CommandSource, context: ModelContext, now: Date, writer: String,
+                      checkpoint: (@MainActor (MoneyWriteCheckpoint) throws -> Void)? = nil) throws -> MoneyStagedResult {
         if name == "money.markVisit" {
             // «منذ آخر زيارة»: a per-device marker, never synced and never undone.
             let key = "sys.moneyLastVisit", value = Data(("\"" + ISO8601DateFormatter().string(from: now) + "\"").utf8)
@@ -336,10 +342,12 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             row.showInDiary = p["showInDiary"] != .bool(false)
             try stampDay(row, at: MoneyCommandPayload.date(p["eventAt"]) ?? issuedAt, context: context, now: now)
             row.reviewState = "needsLook"; row.createdAt = now; context.insert(row)
+            try checkpoint?(.expenseInserted)
             if source == .app {
                 try resolvePayment(row, context: context)
                 // M5-V17: the sheet's split (envelope first, «يومك» last) must add up to the charge, as in a confirmation.
-                try confirm(row, payload: p["allocations"].map { ["allocations": $0] } ?? [:], commandID: id, context: context, now: now, writer: writer)
+                try confirm(row, payload: p["allocations"].map { ["allocations": $0] } ?? [:], commandID: id, context: context, now: now, writer: writer,
+                            checkpoint: checkpoint)
             } else {
                 // A draft from outside the app waits for review; a split is only decided in the app.
                 guard p["allocations"] == nil else { throw MoneyCommandError.invalidSplit }
@@ -365,7 +373,9 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             row.showInDiary = false
             try stampDay(row, at: MoneyCommandPayload.date(p["eventAt"]) ?? issuedAt, context: context, now: now)
             row.reviewState = "needsLook"; row.createdAt = now; context.insert(row)
-            try confirm(row, payload: p["allocations"].map { ["allocations": $0] } ?? [:], commandID: id, context: context, now: now, writer: writer)
+            try checkpoint?(.transferInserted)
+            try confirm(row, payload: p["allocations"].map { ["allocations": $0] } ?? [:], commandID: id, context: context, now: now, writer: writer,
+                        checkpoint: checkpoint)
         case "money.moveEnvelope":
             // FB-39 (owner, 6 Nov): one pair of allocations, out of one balance and into the other; the total never changes.
             // The reserve and the surplus are read as repayEnvelopeNow reads them. Only money that is there can move.
@@ -1123,7 +1133,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             return (try? confirm(row, payload: [:], commandID: UUID(), context: context, now: now, writer: "dryRun")) != nil
         })
     }
-    private static func confirm(_ row: MoneyTransaction, payload p: [String: MadarCore.JSONValue], commandID: UUID, context: ModelContext, now: Date, writer: String) throws {
+    private static func confirm(_ row: MoneyTransaction, payload p: [String: MadarCore.JSONValue], commandID: UUID, context: ModelContext, now: Date, writer: String,
+                                checkpoint: (@MainActor (MoneyWriteCheckpoint) throws -> Void)? = nil) throws {
         guard row.kind != "salary" else { throw MoneyCommandError.salaryNeedsCycleConfirmation }
         for (key, setter) in [
             ("fromAccountID", { row.fromAccountID = $0 }), ("toAccountID", { row.toAccountID = $0 }),
@@ -1208,7 +1219,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                     kind: .fund, idempotencyKey: key)]
             }
         }
-        try writeAllocations(allocations, context: context, now: now, writer: writer)
+        try writeAllocations(allocations, context: context, now: now, writer: writer, checkpoint: checkpoint)
         if row.kind == "repayment" {
             guard let itemID = row.installmentID, let item = try context.fetch(FetchDescriptor<InstallmentItem>()).first(where: { $0.id == itemID && live($0) }),
                   item.obligationID == row.obligationID else { throw MoneyCommandError.invalidReference }
@@ -1357,13 +1368,14 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             return (target, amount)
         }
     }
-    static func writeAllocations(_ rows: [AllocationRow], context: ModelContext, now: Date, writer: String) throws {
+    static func writeAllocations(_ rows: [AllocationRow], context: ModelContext, now: Date, writer: String,
+                                 checkpoint: (@MainActor (MoneyWriteCheckpoint) throws -> Void)? = nil) throws {
         guard !rows.isEmpty else { return }
         // B1-7: only the rows that could collide are read (a store keeps one allocation per expense, so the whole table grows without limit).
         // The lookup runs once before the loop, as the full read did: a key repeated inside this batch is still not a collision.
         let keys = rows.map(\.idempotencyKey)
         let stored = Set(try context.fetch(FetchDescriptor<Allocation>(predicate: #Predicate { keys.contains($0.idempotencyKey) })).map(\.idempotencyKey))
-        for value in rows {
+        for (index, value) in rows.enumerated() {
             guard !stored.contains(value.idempotencyKey) else { throw MoneyCommandError.invalidReference }
             let row = Allocation(); row.id = StableIdentity.uuid(for: "Allocation:\(value.idempotencyKey)")
             row.transactionID = value.transactionID.flatMap(UUID.init(uuidString:)); row.groupID = value.groupID.map { StableIdentity.uuid(for: $0) }
@@ -1377,6 +1389,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             case .goal(let id): row.target = "goal"; row.targetID = UUID(uuidString: id)
             }
             row.createdAt = now; context.insert(row); try touch(row, now, writer)
+            try checkpoint?(.allocationInserted(index))
         }
     }
 

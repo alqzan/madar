@@ -60,15 +60,6 @@ struct MihbaraHomeReading {
     /// Any book the room knows, the originals included (reader routes and «الأصل»).
     func book(_ id: UUID) -> MihbaraBook? { books.first { $0.id == id } ?? originals.first { $0.id == id } }
 }
-struct MihbaraMotivationCue: Identifiable {
-    let id: String
-    let title: String
-    let message: String
-    let source: String
-    let actionTitle: String
-    var bookID: UUID? = nil
-    var hadithNumber: Int? = nil
-}
 @MainActor struct AppMihbaraService {
     unowned let app: AppSession
     var digits: MadarNumberFormatter { .init(style: app.string("core.numerals") == "western" ? .western : .hindi) }

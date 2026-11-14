@@ -18,26 +18,30 @@ import MadarDesign
         } catch { PDFBookFiles.discard(id: id, root: root); throw error }
     }
 
-    func confirmPDF(_ inspection: PDFBookInspection, bookID: UUID, commandID: UUID, title: String, author: String, language: String) async throws {
+    func confirmPDF(_ inspection: PDFBookInspection, bookID: UUID, commandID: UUID, title: String, author: String, language: String) async throws -> UUID {
         let service = AppMihbaraService(app: app)
+        let importedBookID: UUID
         if let existing = try service.bookRestorableFromFile(sha256: inspection.sha256, sizeBytes: inspection.sizeBytes, formats: ["pdf", "pdfScanned"]) {
             try await app.executeBookCommand("book.restoreFile", payload: [
                 "id": .string(existing.id.uuidString), "fileID": .string(inspection.id.uuidString), "sha256": .string(inspection.sha256)
             ], id: commandID, undoMessage: "أُعيد ملف الكتاب")
+            importedBookID = existing.id
         } else {
             try await app.executeBookCommand("book.importPDF", payload: [
                 "id": .string(bookID.uuidString), "fileID": .string(inspection.id.uuidString),
                 "sha256": .string(inspection.sha256), "title": .string(title), "author": .string(author), "language": .string(language)
             ], id: commandID)
+            importedBookID = bookID
         }
         PDFBookFiles.discard(id: inspection.id, root: app.bookStagingDirectory)
+        return importedBookID
     }
 }
 
 struct MihbaraPDFImportView: View {
     let app: AppSession
     let source: URL
-    let onImported: () -> Void
+    let onImported: (UUID) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var fileID = UUID()
@@ -180,8 +184,8 @@ struct MihbaraPDFImportView: View {
         saving = true; error = nil
         Task { @MainActor in
             do {
-                try await service.confirmPDF(inspection, bookID: bookID, commandID: commandID, title: metadata[0], author: metadata[1], language: metadata[2])
-                finished = true; saving = false; onImported()
+                let importedBookID = try await service.confirmPDF(inspection, bookID: bookID, commandID: commandID, title: metadata[0], author: metadata[1], language: metadata[2])
+                finished = true; saving = false; onImported(importedBookID)
             } catch {
                 if case DataError.invalidValue(let message) = error {
                     // AU-95: a rejected title or author was never written; free the fields so it can be corrected,

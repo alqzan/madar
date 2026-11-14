@@ -375,6 +375,7 @@ import UIKit
 
         XCTAssertTrue(search.waitForNonExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(library.waitForExistence(timeout: 10), app.debugDescription)
+        reach(app, library)
         XCTAssertTrue(library.isHittable, app.debugDescription)
         app.terminate()
     }
@@ -976,7 +977,7 @@ import UIKit
         XCTAssertTrue(remove.waitForExistence(timeout: 5), app.debugDescription); remove.tap()
         let confirm = app.buttons["احذف ملف الكتاب"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لا يمكن التراجع")).firstMatch.exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لا تراجع")).firstMatch.exists, app.debugDescription)
         confirm.tap()
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-book-file-unavailable"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-book-file-restore-detail"].exists, app.debugDescription)
@@ -2257,18 +2258,23 @@ import UIKit
         let word = app.staticTexts["mihbara-word-title"]
         XCTAssertTrue(word.exists)
         XCTAssertEqual(word.label.split(whereSeparator: \.isWhitespace).count, 1, app.debugDescription)
+        let savedWord = word.label
         XCTAssertTrue(app.buttons["mihbara-word-save"].waitForExistence(timeout: 5), app.debugDescription)
         // The device dictionary is offered only when it has the word; otherwise the card says nothing negative.
         XCTAssertFalse(app.staticTexts["لا يوجد تعريف لهذه الكلمة في قاموس الجهاز"].exists, app.debugDescription)
         shot(app, "M6-V14-word-L")
         app.buttons["mihbara-word-save"].tap()
         XCTAssertTrue(card.waitForNonExistence(timeout: 8), app.debugDescription)
-        // A single tap ends the last selection gesture; without it WebKit grows the next long press into a phrase.
-        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).tap()
-        sleep(2)
-        if card.exists { app.buttons["mihbara-word-close"].tap(); _ = card.waitForNonExistence(timeout: 5) }
-        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).press(forDuration: 0.8)
+        app.terminate()
+        app.launch()
+        open(app)
+        let continueBook = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(continueBook.waitForExistence(timeout: 10), app.debugDescription); reach(app, continueBook); continueBook.tap()
+        let reopenedParagraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "This is original synthetic fixture text")).firstMatch
+        XCTAssertTrue(reopenedParagraph.waitForExistence(timeout: 20), app.debugDescription)
+        reopenedParagraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).press(forDuration: 0.8)
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(word.label, savedWord, "Reopen the same selected word after app relaunch")
         XCTAssertTrue(app.staticTexts["mihbara-word-saved"].waitForExistence(timeout: 5), app.debugDescription)
 
         let translate = app.buttons["mihbara-word-translate"]

@@ -20,6 +20,12 @@ struct DiaryDayView: View {
     var onCustomize: (() -> Void)? = nil
     /// «أمس» from madar://notes/write?day=yesterday: the composer starts on that day when it has no draft yet.
     var writeDayPreset: String? = nil
+    /// Updated only after a root request has waited for open diary drafts to settle.
+    var rootReturnToTodayToken: UUID? = nil
+    /// The week/month follow-up belongs on the current page now that it is the room root.
+    var intentionFollowUp: DiaryIntentionFollowUp? = nil
+    var onIntentionFollowUpSaved: ((DiaryIntentionFollowUp?) -> Void)? = nil
+    var showsQuestionsAction = true
     @Environment(\.roomTheme) private var roomTheme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -32,6 +38,8 @@ struct DiaryDayView: View {
     @State private var failure: String?
     @State private var composerExpanded = false
     @State private var promptDismissed = false
+    @State private var selectedPrompt: String?
+    @State private var questionsOpen = false
     @State private var insertAt: Date?
     @State private var anchorLabel: String?
     @State private var inlineEdit: DiaryLineEdit?
@@ -91,6 +99,7 @@ struct DiaryDayView: View {
         }
     }
     private var inlineWriting: Bool { shownDay == today }
+    private var visiblePrompt: String? { selectedPrompt ?? prompt }
     private var friday: Bool { appearance?.friday == true && travel == nil }
     private var shownDay: GregorianDay { selected ?? day }
     private var fridayStyle: DiaryFridayStyle { DiaryFridayStyle(app) }
@@ -144,9 +153,22 @@ struct DiaryDayView: View {
                 if let travel {
                     DiaryTravelHeader(
                         page: travel, subtitle: service.bothDates(shownDay, calendar: first),
-                        distance: service.kilometres(travel.kilometres), digits: service.digits)
+                        distance: service.kilometres(travel.kilometres), digits: service.digits,
+                        day: shownDay, today: today, selected: $selected)
                 } else {
                     DiaryDayHeader(app: app, theme: theme, shownDay: shownDay, today: today, yearAgo: aYearAgo, appearance: appearance, friday: friday, selected: $selected)
+                }
+                if showsNavigationTools {
+                    HStack {
+                        Button { archiveOpen = true } label: {
+                            Label("أيامك", systemImage: "calendar")
+                                .font(DiaryType.label).foregroundStyle(theme.ink)
+                                .padding(.horizontal, 14).frame(minHeight: 42)
+                                .background(theme.surface, in: Capsule())
+                                .overlay { Capsule().stroke(theme.line) }
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-archive")
+                        Spacer(minLength: 0)
+                    }.padding(.horizontal, 18).padding(.top, 4).padding(.bottom, 4)
                 }
                 if !composerExpanded {
                 if let returnDay, !returnDismissed {
@@ -217,6 +239,11 @@ struct DiaryDayView: View {
                     ScrollViewReader { proxy in
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 0) {
+                                if inlineWriting, let intentionFollowUp {
+                                    IntentionReviewCard(app: app, item: intentionFollowUp, saved: { onIntentionFollowUpSaved?($0) })
+                                        .id("\(intentionFollowUp.id)-\(intentionFollowUp.period)")
+                                        .padding(.horizontal, 18).padding(.bottom, 12)
+                                }
                                 if let page {
                                     // 10 Nov owner design: the day is one flow — the day's library photos on top, then every line, recording and attachment in the order it happened.
                                     if travel == nil { dayPhotoStrip }
@@ -364,11 +391,6 @@ struct DiaryDayView: View {
                         } label: {
                             Image(systemName: "magnifyingglass")
                         }.accessibilityLabel("ابحث في مذكراتك")
-                        Button {
-                            archiveOpen = true
-                        } label: {
-                            Image(systemName: "calendar")
-                        }.accessibilityLabel("أيامك").accessibilityIdentifier("diary-day-archive")
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -377,6 +399,10 @@ struct DiaryDayView: View {
                         if let onCustomize { Button { onCustomize() } label: { Label("خصّص المذكرات", systemImage: "slider.horizontal.3") }.accessibilityIdentifier("diary-customize") }
                         if shownDay == today, travel == nil {
                             Button { reviewOpen = true } label: { Label("محاسبة اليوم", systemImage: "moon.stars") }.accessibilityIdentifier("diary-day-review")
+                        }
+                        if inlineWriting, showsQuestionsAction {
+                            Button { questionsOpen = true } label: { Label("أسئلة الكتابة", systemImage: "questionmark.bubble") }
+                                .accessibilityIdentifier("diary-day-questions")
                         }
                     } label: { Image(systemName: "ellipsis.circle") }.accessibilityLabel("المزيد").accessibilityIdentifier("diary-day-more")
                 }
@@ -437,6 +463,26 @@ struct DiaryDayView: View {
             }
             .sheet(isPresented: $stampsOpen) { DiaryStampsView(app: app).environment(\.roomTheme, theme) }
             .sheet(isPresented: $weekOpen) { DiaryWeekView(app: app, day: shownDay).environment(\.roomTheme, theme) }
+            .sheet(isPresented: $questionsOpen) {
+                NavigationStack {
+                    ScrollView {
+                        DiaryQuestionsCard(app: app) { question in
+                            selectedPrompt = question
+                            promptDismissed = false
+                            questionsOpen = false
+                            composerExpanded = true
+                            focusTick += 1
+                        }.padding(18)
+                    }
+                    .navigationTitle("أسئلة الكتابة")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("تمّ") { questionsOpen = false }
+                        }
+                    }
+                }.presentationSizing(.page).environment(\.roomTheme, theme)
+            }
             // N04: letters are checked when the diary is open and the app comes to the foreground.
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { followToday(); aiAvailability = .checking; retry += 1 }
@@ -446,6 +492,10 @@ struct DiaryDayView: View {
             .onChange(of: shownDay) { _, _ in
                 // A line being edited or a «write after» chip belongs to the page it began on.
                 inlineEdit = nil; insertAt = nil; anchorLabel = nil; composerExpanded = false
+            }
+            .onChange(of: rootReturnToTodayToken) { _, token in
+                guard embeddedInNavigationStack, token != nil else { return }
+                selected = nil
             }
             .onChange(of: canReadDiary) { _, canRead in
                 if canRead {
@@ -488,7 +538,7 @@ struct DiaryDayView: View {
                         UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
                             .accessibilityIdentifier("diary-day-undo")
                     }
-                    if inlineWriting, let prompt, !promptDismissed {
+                    if inlineWriting, let prompt = visiblePrompt, !promptDismissed {
                         HStack(alignment: .top, spacing: 8) {
                             Text(prompt).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).foregroundStyle(theme.color("ink3Text"))
                                 .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("diary-day-prompt")

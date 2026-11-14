@@ -2,7 +2,16 @@ import XCTest
 
 /// iPad layout captures: each wide room in landscape, saved under MADAR_PAD_SHOTS (host path) for review.
 /// Skips on iPhone and when no output folder is given, so the regular suite is unaffected.
-final class PadLayoutUITests: XCTestCase {
+@MainActor final class PadLayoutUITests: XCTestCase {
+    private func waitForWindow(_ app: XCUIApplication, landscape: Bool, timeout: TimeInterval = 10) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let frame = app.windows.firstMatch.frame
+            if landscape ? frame.width > frame.height : frame.height > frame.width { return true }
+            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.1))
+        } while Date() < deadline
+        return false
+    }
     /// B2-19: the sidebar folds away and comes back; the choice is kept on the device.
     func testSidebarFoldsAndReturns() throws {
         let out = ProcessInfo.processInfo.environment["MADAR_PAD_SHOTS"] ?? ""
@@ -28,20 +37,22 @@ final class PadLayoutUITests: XCTestCase {
         let out = ProcessInfo.processInfo.environment["MADAR_PAD_SHOTS"] ?? ""
         try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad || out.isEmpty)
         XCUIDevice.shared.orientation = .landscapeLeft
-        let rooms: [(String, [String: String])] = [
-            ("prayer", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_NOW": "2026-10-08T16:20:00+03:00"]),
-            ("notes", ["MADAR_UI_DIARY_FIXTURE": "home", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]),
-            ("foundation", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]),
-            ("mihbara", ["MADAR_UI_MIHBARA_FIXTURE": "home", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]),
-            ("customize", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]),
-            ("money", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]),
-            ("quran", ["MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]),
+        let rooms: [(String, [String: String], String)] = [
+            ("prayer", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_NOW": "2026-10-08T16:20:00+03:00"], "prayer-today-summary"),
+            ("notes", ["MADAR_UI_DIARY_FIXTURE": "entryRoute", "MADAR_UI_DIARY_ROOT": "1", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"], "diary-day-more"),
+            ("foundation", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"], "bahw-habits-open"),
+            ("mihbara", ["MADAR_UI_MIHBARA_FIXTURE": "home", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"], "mihbara-library"),
+            ("customize", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"], "settings-search"),
+            ("money", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"], "money-title"),
+            ("quran", ["MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"], "quran-home"),
         ]
-        for (tab, env) in rooms {
+        for (tab, env, contentIdentifier) in rooms {
             let app = XCUIApplication()
             app.launchEnvironment = env.merging(["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_START_TAB": tab]) { $1 }
             app.launch()
-            sleep(5)
+            XCTAssertTrue(app.descendants(matching: .any)[contentIdentifier].waitForExistence(timeout: 30),
+                          "The iPad \(tab) room must show room content: " + app.debugDescription)
+            sleep(1)
             try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-\(tab).png"))
             app.terminate()
         }
@@ -95,17 +106,22 @@ final class PadLayoutUITests: XCTestCase {
                                  "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_START_TAB": "notes"]
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["diary-pad-sidebar"].waitForExistence(timeout: 25), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["diary-year-strip"].exists, "The inline year strip must not flash into the measured iPad landscape root")
         XCTAssertTrue(app.staticTexts["السطر الثاني في اليوم نفسه"].waitForExistence(timeout: 10), "Today's page stands beside the sidebar")
         XCTAssertTrue(app.textFields["diary-inline-field"].exists)
         let side = app.descendants(matching: .any)["diary-pad-sidebar"].frame, field = app.textFields["diary-inline-field"].frame
         XCTAssertLessThan(side.width, 420, "The sidebar stays a column, not the whole screen")
         XCTAssertGreaterThan(field.width, 300, "The page keeps real width")
         XCTAssertLessThan(side.midX, field.midX, "Right to left: the page holds the start edge, the sidebar stands at its left")
-        // A rotation must not rebuild the page or replay a request: today's line is still there and no keyboard jumped up.
+        // A rotation must not rebuild the page or replay a request: today's line is still there and an unfocused field stays keyboard-free.
         XCUIDevice.shared.orientation = .portrait
         XCTAssertTrue(app.staticTexts["السطر الثاني في اليوم نفسه"].waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForWindow(app, landscape: false), "Wait for the iPad to finish laying out in portrait")
         XCTAssertFalse(app.keyboards.firstMatch.exists, "No focus replayed after the rotation")
         XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(waitForWindow(app, landscape: true), "Wait for the iPad to finish laying out in landscape")
+        XCTAssertTrue(app.descendants(matching: .any)["diary-pad-sidebar"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.keyboards.firstMatch.exists)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "pad-diary-root"; shot.lifetime = .keepAlways; add(shot)
     }
 }

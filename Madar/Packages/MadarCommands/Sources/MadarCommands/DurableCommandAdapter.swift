@@ -45,15 +45,24 @@ private struct ReceiptWire: Codable {
     let lockDirectory: URL
     private let transactionClock: @Sendable (Date) -> Date
     private let generationProvider: @MainActor () throws -> UUID?
+    private let moneyWriteCheckpoint: (@MainActor (MoneyWriteCheckpoint) throws -> Void)?
     /// Production refreshes time after waiting for the lock and before writing the receipt.
     /// Tests using a virtual timeline may inject `{ $0 }`.
     public init(container: ModelContainer, lockDirectory: URL, transactionClock: @escaping @Sendable (Date) -> Date = { _ in Date() }, generationProvider: @escaping @MainActor () throws -> UUID? = { nil }) {
         self.containerProvider = { container }; self.lockDirectory = lockDirectory; self.transactionClock = transactionClock; self.generationProvider = generationProvider
+        self.moneyWriteCheckpoint = nil
+    }
+    init(container: ModelContainer, lockDirectory: URL, transactionClock: @escaping @Sendable (Date) -> Date = { _ in Date() },
+         generationProvider: @escaping @MainActor () throws -> UUID? = { nil },
+         moneyWriteCheckpoint: @escaping @MainActor (MoneyWriteCheckpoint) throws -> Void) {
+        self.containerProvider = { container }; self.lockDirectory = lockDirectory; self.transactionClock = transactionClock; self.generationProvider = generationProvider
+        self.moneyWriteCheckpoint = moneyWriteCheckpoint
     }
     /// Resolve the active generation only after acquiring the shared transaction lease.
     /// Long maintenance fails immediately; ordinary command contention waits cooperatively.
     public init(containerProvider: @escaping @MainActor () throws -> ModelContainer, lockDirectory: URL, transactionClock: @escaping @Sendable (Date) -> Date = { _ in Date() }, generationProvider: @escaping @MainActor () throws -> UUID? = { nil }) {
         self.containerProvider = containerProvider; self.lockDirectory = lockDirectory; self.transactionClock = transactionClock; self.generationProvider = generationProvider
+        self.moneyWriteCheckpoint = nil
     }
     public var diaryStagingDirectory: URL { lockDirectory.appending(path: "DiaryStaging", directoryHint: .isDirectory) }
     public var bookStagingDirectory: URL { lockDirectory.appending(path: "BookStaging", directoryHint: .isDirectory) }
@@ -194,7 +203,8 @@ private struct ReceiptWire: Codable {
             case .money(let name, let payload):
                 do {
                     let staged = try MoneyMutationHandler.stage(name: name, payload: payload, id: request.envelope.commandID,
-                        issuedAt: request.envelope.issuedAt, source: request.envelope.source, context: context, now: now, writer: writer)
+                        issuedAt: request.envelope.issuedAt, source: request.envelope.source, context: context, now: now, writer: writer,
+                        checkpoint: moneyWriteCheckpoint)
                     if staged.duplicate {
                         let outcome = CommandOutcome(status: .duplicate)
                         try saveReceipt(request, outcome: outcome, inverseJSON: nil, writer: writer, generationID: generationID, at: now, context: context)

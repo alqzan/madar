@@ -37,7 +37,10 @@ struct DiaryDayHeader: View {
                 .custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .largeTitle)
             ).lineLimit(1).minimumScaleFactor(0.7).accessibilityIdentifier("diary-day-title")
             if friday {
-                title
+                VStack(spacing: 4) {
+                    title
+                    if shownDay != today { dateChoice("اليوم", id: "today", value: today) }
+                }
             } else {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .bottom, spacing: 8) { title; Spacer(minLength: 4); tabs }

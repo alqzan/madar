@@ -40,7 +40,67 @@ import MadarInbox
     func basis() throws -> Basis { try MoneyRepository(context: ModelContext(container)).basis(at: now) }
 }
 
+@MainActor private final class MoneyWriteFailureProbe {
+    struct InjectedFailure: Error {}
+    private(set) var reached: [MoneyWriteCheckpoint] = []
+    func check(_ checkpoint: MoneyWriteCheckpoint) throws {
+        reached.append(checkpoint)
+        if checkpoint == .allocationInserted(0) { throw InjectedFailure() }
+    }
+}
+
 @MainActor struct MoneyPersistenceTests {
+    @Test func failedExpenseSplitAfterFirstAllocationRollsBackAndCanReplay() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let setup = ModelContext(f.container), envelope = Envelope()
+        envelope.name = "سفر"; setup.insert(envelope); try setup.save()
+        let before = try f.basis()
+        let originalTransactions = try setup.fetchCount(FetchDescriptor<MoneyTransaction>())
+        let originalAllocations = try setup.fetchCount(FetchDescriptor<Allocation>())
+        let originalReceipts = try setup.fetchCount(FetchDescriptor<MadarData.CommandReceipt>())
+        let originalScopes = try setup.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key.hasPrefix("sys.commandReceiptScope:") }.count
+        let probe = MoneyWriteFailureProbe()
+        let failingBus = CommandBus(adapter: DurableCommandAdapter(container: f.container, lockDirectory: f.root,
+            transactionClock: { $0 }, moneyWriteCheckpoint: { try probe.check($0) }))
+        let commandID = UUID()
+        let split: [MadarCore.JSONValue] = [
+            .object(["target": .string("envelope"), "targetID": .string(envelope.id.uuidString), "amountMinor": .string("600")]),
+            .object(["target": .string("daily"), "amountMinor": .string("400")])
+        ]
+        let payload: [String: MadarCore.JSONValue] = [
+            "amountMinor": .string("1000"), "currency": .string("SAR"), "method": .string("card"),
+            "cardID": .string(f.debit.uuidString), "allocations": .array(split)
+        ]
+        let request = CommandEnvelope(commandID: commandID, name: "money.logExpense", payload: .object(payload), source: .app, issuedAt: f.now)
+        do {
+            _ = try await failingBus.execute(request, now: f.now)
+            Issue.record("The injected failure after the first split row must escape the command")
+        } catch is MoneyWriteFailureProbe.InjectedFailure {
+            // Expected: the first allocation was inserted into the staged context, then the adapter rolled back.
+        }
+        #expect(probe.reached == [.expenseInserted, .allocationInserted(0)])
+
+        let reopened = try MadarContainerFactory.makeLocal(at: f.root)
+        let persisted = ModelContext(reopened)
+        #expect(try persisted.fetchCount(FetchDescriptor<MoneyTransaction>()) == originalTransactions)
+        #expect(try persisted.fetchCount(FetchDescriptor<Allocation>()) == originalAllocations)
+        #expect(try persisted.fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == originalReceipts)
+        #expect(try persisted.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key.hasPrefix("sys.commandReceiptScope:") }.count == originalScopes)
+        #expect(try persisted.fetch(FetchDescriptor<MoneyTransaction>()).allSatisfy { $0.id != commandID })
+        #expect(try MoneyRepository(context: persisted).basis(at: f.now).inAccountMinor == before.inAccountMinor)
+
+        let retryBus = CommandBus(adapter: DurableCommandAdapter(container: reopened, lockDirectory: f.root, transactionClock: { $0 }))
+        #expect(try await retryBus.execute(request, now: f.now).status == .applied)
+        #expect(try await retryBus.execute(request, now: f.now).status == .applied, "The recovered command replays without duplicating writes")
+        let recovered = ModelContext(reopened)
+        let transaction = try #require(try recovered.fetch(FetchDescriptor<MoneyTransaction>()).first { $0.id == commandID && $0.deletedAt == nil })
+        let allocations = try MoneyRepository(context: recovered).allocationRows(transactionID: commandID)
+        #expect(transaction.homeAmountMinor == 1000)
+        #expect(allocations.count == 2)
+        #expect(try MoneyRepository(context: recovered).basis(at: f.now).inAccountMinor == before.inAccountMinor - 1000)
+        #expect(try recovered.fetch(FetchDescriptor<MadarData.CommandReceipt>()).filter { $0.commandID == commandID }.count == 1)
+    }
+
     @Test func effectContextIndexesKeepTheFirstFetchedReference() async throws {
         let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
         let context = ModelContext(f.container)

@@ -44,6 +44,7 @@ struct DiaryHomeView: View {
     @State private var todayCardVisible = true
     @State private var todayIntention: String?
     private var wide: Bool { isPadWide(sizeClass) && roomWidth >= 960 }
+    private var roomWidthReady: Bool { !isPadWide(sizeClass) || roomWidth > 0 }
     private var rootToday: Bool { rootEnabled && snapshot != nil && failure == nil }
     /// Shipping behaviour: the room opens on today's page. The legacy home-first suites run with the flag off; the root has its own suite (`MADAR_UI_DIARY_ROOT=1`).
     private var rootEnabled: Bool {
@@ -53,7 +54,7 @@ struct DiaryHomeView: View {
 #endif
         return true
     }
-    private struct RootParams { var entryID: UUID?; var routeID: UUID?; var focus = false; var prompt: String?; var expand = false; var preset: String?; var token = UUID() }
+    private struct RootParams { var entryID: UUID?; var routeID: UUID?; var focus = false; var prompt: String?; var expand = false; var preset: String?; var token = UUID(); var returnToTodayToken = UUID() }
     @State private var rootParams = RootParams()
     @State private var stripPull: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -86,7 +87,9 @@ struct DiaryHomeView: View {
     private func rootDayView(_ snapshot: DiaryHomeSnapshot) -> some View {
         DiaryDayView(app: app, day: snapshot.today, initialEntryID: rootParams.entryID, initialEntryRouteID: rootParams.routeID,
                      embeddedInNavigationStack: true, focusComposerOnOpen: rootParams.focus, prompt: rootParams.prompt,
-                     expandComposerOnOpen: rootParams.expand, onCustomize: { customizing = true }, writeDayPreset: rootParams.preset)
+                     expandComposerOnOpen: rootParams.expand, onCustomize: { customizing = true }, writeDayPreset: rootParams.preset,
+                     rootReturnToTodayToken: rootParams.returnToTodayToken, intentionFollowUp: intentionFollowUp,
+                     onIntentionFollowUpSaved: { intentionFollowUp = $0 }, showsQuestionsAction: !wide)
             .task(id: rootParams.token) { if rootParams.preset != nil { guard (try? await Task.sleep(for: .seconds(5))) != nil else { return }; rootParams.preset = nil } }
             .id(rootParams.token).environment(\.roomTheme, theme)
     }
@@ -95,7 +98,7 @@ struct DiaryHomeView: View {
             if rootToday, let snapshot {
                 // 14 Nov owner (T10): the room opens on today's page itself; nothing is pushed over a home.
                 // One fixed position for today's page, so a rotation or a folded sidebar never rebuilds it (and never replays an old request).
-                if !wide, !typeSize.isAccessibilitySize, !hidden("memory"), let past = yearStripPage(snapshot) { yearStrip(past, snapshot: snapshot) }
+                if roomWidthReady, !wide, !typeSize.isAccessibilitySize, !hidden("memory"), let past = yearStripPage(snapshot) { yearStrip(past, snapshot: snapshot) }
                 HStack(spacing: 0) {
                     rootDayView(snapshot)
                     if wide {
@@ -280,6 +283,7 @@ struct DiaryHomeView: View {
         readerEntryID = nil
         readerEntryRouteID = nil
         clearHubRoute()
+        rootParams.returnToTodayToken = UUID()
     }
     private var header: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -590,7 +594,7 @@ struct DiaryHomeView: View {
 }
 
 /// The follow-up of an intention (week or month): the original words, one question and a field for the answer.
-private struct IntentionReviewCard: View {
+struct IntentionReviewCard: View {
     @Bindable var app: AppSession
     let item: DiaryIntentionFollowUp
     let saved: (DiaryIntentionFollowUp?) -> Void

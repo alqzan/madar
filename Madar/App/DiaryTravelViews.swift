@@ -36,6 +36,9 @@ struct DiaryTravelHeader: View {
     let subtitle: String
     let distance: String
     let digits: MadarNumberFormatter
+    let day: GregorianDay
+    let today: GregorianDay
+    @Binding var selected: GregorianDay?
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     var body: some View {
@@ -70,6 +73,15 @@ struct DiaryTravelHeader: View {
                     DiaryTravelRoute(page: page).frame(height: 150).padding(.top, 8)
                 }
             }.padding(.horizontal, 18).padding(.vertical, 14)
+            if day != today {
+                Button { selected = today } label: {
+                    Text("اليوم").font(DiaryType.label).frame(minHeight: 38).padding(.horizontal, 12)
+                        .background(theme.surface, in: Capsule()).overlay { Capsule().stroke(theme.line) }
+                        .contentShape(Capsule())
+                }.buttonStyle(.madarPlain).padding(.horizontal, 18).padding(.bottom, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("diary-day-today")
+            }
             DiaryAirmailStripe()
         }.accessibilityElement(children: .contain).accessibilityIdentifier("diary-travel")
     }

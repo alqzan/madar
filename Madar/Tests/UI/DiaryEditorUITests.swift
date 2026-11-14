@@ -6,10 +6,11 @@ import XCTest
     func testDayPhotosLinkOnce() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["MADAR_TEST_PHOTOS_SEEDED"] == "1", "Requires the explicit synthetic simulator Photos fixture")
         continueAfterFailure = false
+        let fixtureDay = syntheticPhotoDay()
         let app = XCUIApplication()
         app.resetAuthorizationStatus(for: .photos)
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty",
-            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2001-04-17T15:00:00+03:00"]
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "\(fixtureDay)T15:00:00+03:00"]
         app.launch()
         XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25), app.debugDescription)
         app.openDiaryEditorFromHome()
@@ -28,14 +29,15 @@ import XCTest
             XCTAssertFalse(allow.exists, system.debugDescription)
             app.activate()
         }
-        let photos = app.buttons.matching(identifier: "diary-day-photo")
+        let composerStrip = app.descendants(matching: .any)["diary-composer-photo-strip"]
+        XCTAssertTrue(composerStrip.waitForExistence(timeout: 10), app.debugDescription)
+        let photos = composerStrip.buttons.matching(identifier: "diary-day-photo")
         XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
-        // The page strip and the grown composer both offer the day's photo (the same single asset); the next day's photo must never appear.
-        XCTAssertTrue((1...2).contains(photos.count), "Only the chosen day's asset is suggested: \(photos.count)")
-        XCTAssertEqual(Set(photos.allElementsBoundByIndex.map(\.label)).count, 1, "one label: the same single asset in every strip")
+        XCTAssertEqual(photos.count, 1,
+                       "The expanded composer should show only \(fixtureDay), not the following day's photo: \(photos.debugDescription)")
+        XCTAssertEqual(photos.firstMatch.label, "أضف هذه الصورة إلى صفحة اليوم")
         capture(app, "M3-20-day-photos-before-L")
-        // The grown composer's strip pins the photo (the page strip beneath it opens the viewer); it is the last in the tree.
-        photos.allElementsBoundByIndex.max(by: { $0.frame.minY < $1.frame.minY })!.tap()
+        photos.firstMatch.tap()
         XCTAssertTrue(photos.firstMatch.waitForNonExistence(timeout: 15), app.debugDescription)
         capture(app, "M3-20-day-photos-linked-L")
         // The photo is saved the moment it is linked; the page has nothing else to save, so «تمّ» closes it.
@@ -61,19 +63,22 @@ import XCTest
     func testPastDayShowsItsLibraryPhotosAutomatically() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["MADAR_TEST_PHOTOS_SEEDED"] == "1", "Requires the explicit synthetic simulator Photos fixture")
         continueAfterFailure = false
+        let fixtureDay = syntheticPhotoDay()
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty",
-            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2001-04-18T15:00:00+03:00"]
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "\(syntheticPhotoDay(offset: 1))T15:00:00+03:00"]
         app.launch()
         XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25), app.debugDescription)
         app.openDiaryEditorFromHome()
         let photos = app.buttons.matching(identifier: "diary-day-photo")
-        XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 15), "Today (18 April) shows its own photo")
+        XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 15), "Today (\(syntheticPhotoDay(offset: 1))) shows its own photo")
+        XCTAssertEqual(photos.count, 1, "The later day should show exactly its own synthetic photo")
         app.buttons["diary-editor-save"].tap()
         let yesterday = app.buttons["diary-day-yesterday"]
         XCTAssertTrue(yesterday.waitForExistence(timeout: 10), app.debugDescription)
         yesterday.tap()
         XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 10), "A past day shows its photo too: " + app.debugDescription)
+        XCTAssertEqual(photos.count, 1, "The earlier day should show exactly its own synthetic photo (\(fixtureDay))")
     }
     func testClosingBlankEditorDoesNotRestoreAnEmptyDraft() throws {
         continueAfterFailure = false
@@ -252,5 +257,20 @@ import XCTest
     private func capture(_ app: XCUIApplication, _ name: String) {
         let image = app.screenshot(), shot = XCTAttachment(screenshot: image); shot.name = name; shot.lifetime = .keepAlways; add(shot)
         if let dir = ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? image.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png")) }
+    }
+
+    private func syntheticPhotoDay(offset: Int = 0) -> String {
+        let base = ProcessInfo.processInfo.environment["MADAR_TEST_PHOTO_DAY"] ?? "2001-04-17"
+        let parser = ISO8601DateFormatter()
+        guard let date = parser.date(from: base + "T12:00:00+03:00") else { return base }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let day = calendar.date(byAdding: .day, value: offset, to: date) ?? date
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: day)
     }
 }

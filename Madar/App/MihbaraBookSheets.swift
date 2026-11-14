@@ -58,7 +58,7 @@ struct MihbaraAddBookView: View {
     let app: AppSession
     let readingBooks: [MihbaraBook]
     let onPaperBookSaved: () -> Void
-    let onPDFImported: () -> Void
+    let onPDFImported: (UUID) -> Void
     let onEPUBImported: () -> Void
     let onGoodreadsImported: () -> Void
     @Binding var pendingBookFile: URL?
@@ -232,10 +232,10 @@ struct MihbaraAddBookView: View {
         .statusBarHidden(true)
         .navigationDestination(isPresented: $previewingPDF) {
             if let pendingBookFile {
-                MihbaraPDFImportView(app: app, source: pendingBookFile) {
+                MihbaraPDFImportView(app: app, source: pendingBookFile) { bookID in
                     self.pendingBookFile = nil
                     previewingPDF = false
-                    onPDFImported()
+                    onPDFImported(bookID)
                 }
             }
         }

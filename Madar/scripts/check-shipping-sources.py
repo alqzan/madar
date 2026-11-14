@@ -502,7 +502,7 @@ def run(root):
                 supportedKeys=supported, literalSettingKeys=sorted(source_keys),
                 tokenPairsMeasured=measured, catalogs=catalogs, findings=failures,
                 manualTrace=manual, reachability=reachability,
-                exclusions=['test/probe executable targets', 'excluded QuranRoom.swift',
+                exclusions=['test/probe executable targets',
                             'external Adhan dependency source', 'pinned Readium package source'],
                 limits=['regex does not prove all rendered strings, computed settings or control reachability',
                         'UI inventory requires manual colour/background/font/action and count-phrase tracing',

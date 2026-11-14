@@ -17,7 +17,6 @@ struct MihbaraHomeView: View {
     @State private var roomWidth: CGFloat = 0
     @State private var shapes: [UUID: MihbaraBookShape] = [:]
     @State private var shelfWidth: CGFloat = 360
-    @State private var motivationCues: [MihbaraMotivationCue] = []
     @State private var scrollTarget: String?
     @State private var tableID: UUID?
     @State private var sheet: MihbaraSheet?
@@ -28,13 +27,12 @@ struct MihbaraHomeView: View {
     @State private var pendingRemoval: MihbaraRemovalConfirmation?
     @State private var renameTitle = ""
     @State private var renameAuthor = ""
-    @State private var manuallyOpen = false
     @State private var libraryQuery = ""
     @State private var libraryShelf = "all"
     @State private var pendingBookFile: URL?
+    @State private var pendingPDFConversionBookID: UUID?
     @State private var pendingGoodreadsFile: URL?
     @State private var pendingGoodreadsStage: GoodreadsCSVStage?
-    @State private var pendingMotivationBook: UUID?
     @State private var slotBook: MihbaraBook?
     @State private var pendingSlotBook: MihbaraBook?
     @State private var pendingLibraryAction: MihbaraLibraryAction?
@@ -55,7 +53,6 @@ struct MihbaraHomeView: View {
     #endif
     private var theme: RoomTheme { .init(room: "mihbara", dark: colorScheme == .dark) }
     private var service: AppMihbaraService { .init(app: app) }
-    private var tableBook: MihbaraBook? { reading.flatMap { MihbaraStand.pick(from: $0.books, preferred: tableID) } }
     private func setStand(_ id: UUID) { tableID = id; MihbaraStand.save(id); try? app.publishSnapshot() }
     private var shelfReadFailurePanel: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -100,7 +97,7 @@ struct MihbaraHomeView: View {
             if empty, let route = app.mihbaraRoute { openRoute(route) }
         }
         .onChange(of: app.undoToken?.id) { load() }
-        .onChange(of: app.prayerRevision) { load() }.onChange(of: reading?.day) { manuallyOpen = false }
+        .onChange(of: app.prayerRevision) { load() }
         .modifier(MihbaraHomeConfirmations(
             slotBook: $slotBook, pendingRemoval: $pendingRemoval,
             replacementBooks: { replacementBooks(for: $0) },
@@ -130,8 +127,11 @@ struct MihbaraHomeView: View {
                         app: app,
                         readingBooks: reading.books.filter { $0.shelf == "reading" },
                         onPaperBookSaved: { showingAddBook = false; load() },
-                        onPDFImported: {
-                            pendingBookFile = nil; showingAddBook = false; load(); offerNewestPDF()
+                        onPDFImported: { bookID in
+                            pendingBookFile = nil
+                            showingAddBook = false
+                            pendingPDFConversionBookID = bookID
+                            load()
                         },
                         onEPUBImported: { pendingBookFile = nil; showingAddBook = false; load() },
                         onGoodreadsImported: { showingAddBook = false; load() },
@@ -177,15 +177,13 @@ struct MihbaraHomeView: View {
                     MihbaraRahlOpeningView(app: app).presentationDetents([.large])
                 case .notebook:
                     MihbaraNotebookContent(app: app, initialNoteID: notebookRouteID)
-                case .motivation:
-                    MihbaraMotivationCard(cues: motivationCues, action: performMotivation)
                 }
             }
         }
         .environment(\.roomTheme, theme)
         .presentationDragIndicator(.visible)
         // iPad: the library, a book, a hadith and the notebook open as a full page; the small cards stay small.
-        .modifier(PadPageSheet(on: { if case .opening = target { return false }; if case .motivation = target { return false }; return true }()))
+        .modifier(PadPageSheet(on: { if case .opening = target { return false }; return true }()))
         .madarSheetErrorAlert(app)
     }
     /// FB-34 (owner, 5 Nov: «الاحصائيات حقت الكتب شف لها طريقه»): what the stand used to tell, for every book in hand.
@@ -275,9 +273,10 @@ struct MihbaraHomeView: View {
         pendingGoodreadsFile = nil
     }
     /// The PDF just added is offered for conversion (owner's choice, never automatic).
-    private func offerNewestPDF() {
-        let pdfs = (reading?.books ?? []).filter { $0.isReadablePDF && MihbaraConversions.shared.job(for: $0.id) == nil }
-        offerConversion = pdfs.max { $0.updated < $1.updated }
+    private func offerPDFForConversion(_ id: UUID, in books: [MihbaraBook]) {
+        guard let book = books.first(where: { $0.id == id && $0.isReadablePDF }),
+              MihbaraConversions.shared.job(for: id) == nil else { return }
+        offerConversion = book
     }
     private func originalPDFID(_ hash: String) -> UUID? {
         let all: [MihbaraBook] = (reading?.originals ?? []) + (reading?.books ?? [])
@@ -302,6 +301,10 @@ struct MihbaraHomeView: View {
                 let loaded = try await service.loadOffMain()
                 guard !Task.isCancelled, shelfReadRequestID == requestID else { return }
                 reading = loaded
+                if let importedPDFID = pendingPDFConversionBookID {
+                    pendingPDFConversionBookID = nil
+                    offerPDFForConversion(importedPDFID, in: loaded.books)
+                }
                 // A failed read keeps the last card; a nil card would offer to create a habit that may already exist.
                 do { readingGoal = try service.readingGoal(today: loaded.day, book: MihbaraStand.pick(from: loaded.books, preferred: tableID)) } catch { app.errorMessage = madarUserMessage(error) }
                 shelfReadFailed = false
@@ -455,10 +458,6 @@ struct MihbaraHomeView: View {
         }
         if case .opened = openBook(book) { app.mihbaraBookToOpen = nil }
     }
-    private func performMotivation(_ cue: MihbaraMotivationCue) {
-        if let number = cue.hadithNumber { sheet = .hadith(number); return }
-        if let id = cue.bookID { pendingMotivationBook = id; sheet = nil }
-    }
     private func sheetDismissed() {
         if let action = pendingLibraryAction {
             pendingLibraryAction = nil
@@ -469,7 +468,6 @@ struct MihbaraHomeView: View {
             restoreFileAfterSheet = false
             showingAddBook = true
         }
-        openPendingMotivationBook()
         if let book = pendingSlotBook { pendingSlotBook = nil; slotBook = book }
         notebookRouteID = nil
         if let route = app.mihbaraRoute { openRoute(route) }
@@ -620,12 +618,6 @@ struct MihbaraHomeView: View {
                 load()
             } catch { app.errorMessage = madarUserMessage(error) }
         }
-    }
-    private func openPendingMotivationBook() {
-        guard let id = pendingMotivationBook else { return }
-        pendingMotivationBook = nil
-        guard let book = reading?.books.first(where: { $0.id == id }) else { return }
-        openBook(book)
     }
     /// Owner, 22 Oct 2026 («٢»): one bookcase on the wall, its shelves named — what you read, what waits, what you
     /// finished — with no tabs; the book you are reading stands open on the stand in front of it.
@@ -1022,7 +1014,7 @@ struct MihbaraHomeView: View {
 
 }
 private enum MihbaraRemovalConfirmation { case book(MihbaraBook), file(MihbaraBook) }
-private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook, motivation; var id: String { String(describing: self) } }
+private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook; var id: String { String(describing: self) } }
 private enum MihbaraLibraryAction { case rename(MihbaraBook), remove(MihbaraRemovalConfirmation), open(MihbaraBook, volume: Int?, locatorJSON: String?) }
 private enum MihbaraBookOpenResult { case opened, deferred, failed }
 private struct MihbaraGoalEditor: Identifiable { let reading: HabitReading?; var id: UUID { reading?.id ?? fresh }; private let fresh = UUID()
@@ -1143,63 +1135,6 @@ enum MihbaraPDFLocator {
               case .number(let number)? = object["pdfPageIndex"], number.isFinite,
               number >= 0, number < Double(Int.max), number.rounded(.down) == number else { return nil }
         return Int(number)
-    }
-}
-
-private struct MihbaraMotivationCard: View {
-    let cues: [MihbaraMotivationCue]
-    let action: (MihbaraMotivationCue) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.roomTheme) private var theme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var index = 0
-    private var cue: MihbaraMotivationCue? { cues.indices.contains(index) ? cues[index] : nil }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                if let cue {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text(cue.title).font(MadarTypography.cardTitle()).accessibilityIdentifier("mihbara-motivate-title")
-                        Text(cue.message).font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("mihbara-motivate-message")
-                        Text(cue.source).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                            .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("mihbara-motivate-source")
-                    }
-                    .padding(20).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(theme.surface, in: .rect(cornerRadius: 20))
-                    .overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.line.opacity(0.7), lineWidth: 1) }
-                    .shadow(color: theme.ink.opacity(0.08), radius: 12, y: 5)
-
-                    Button { action(cue) } label: {
-                        Text(cue.actionTitle).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 52)
-                    }
-                    .buttonStyle(MadarPrimaryButton())
-                    .accessibilityIdentifier("mihbara-motivate-action")
-
-                    if cues.count > 1 {
-                        Button {
-                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) { index = (index + 1) % cues.count }
-                        } label: {
-                            Text("اقتراح آخر").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 46)
-                        }
-                        .buttonStyle(.madarPlain).glassEffect(.regular.interactive(), in: Capsule())
-                        .accessibilityIdentifier("mihbara-motivate-next")
-                    }
-                } else {
-                    Text("أتممت ورد اليوم. عد إلى كتابك حين يحين وقتك.")
-                        .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                        .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
-                }
-            }
-            .padding(20).frame(maxWidth: 560).frame(maxWidth: .infinity)
-        }
-        .background(theme.background).foregroundStyle(theme.ink)
-        .presentationDetents([.medium, .large])
-        .toolbar {
-            ToolbarItem(placement: .principal) { Text("حمّسني").font(MadarTypography.section()) }
-            ToolbarItem(placement: .topBarTrailing) { Button("تمّ") { dismiss() }.accessibilityIdentifier("mihbara-motivate-close") }
-        }
     }
 }
 

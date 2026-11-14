@@ -50,7 +50,7 @@ import XCTest
         XCTAssertTrue(text.label.hasPrefix("أرجو أن تكون"));capture(app,"F01-letter-open-L")
         app.buttons["diary-letter-done"].tap()
         XCTAssertTrue(app.buttons["diary-letter-waiting"].waitForNonExistence(timeout:10))
-        app.buttons.matching(identifier:"أيامك").firstMatch.tap();XCTAssertTrue(app.buttons["diary-hub-letters"].waitForExistence(timeout:10));app.buttons["diary-hub-letters"].tap()
+        app.buttons["diary-day-archive"].tap();XCTAssertTrue(app.buttons["diary-hub-letters"].waitForExistence(timeout:10));app.buttons["diary-hub-letters"].tap()
         XCTAssertTrue(app.buttons["diary-letter-opened"].waitForExistence(timeout:10));XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-letter-sealed").firstMatch.exists)
         capture(app,"F01-mailbox-L")
     }
