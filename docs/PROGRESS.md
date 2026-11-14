@@ -280,6 +280,18 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 الورد: «أتممته كاملًا» يفتح سؤال تقدير واحدًا ثم quran.commitSession؛ إجراء الإشعار .foreground فقط.
 لم يُنفَّذ شيء من T10 بعد؛ الخطوتان ٢ و٤ كانتا منفّذتين أصلًا.
 
+## للوكيل التالي (Codex) — ما بقي بعد النسخة 48 (owner 14 Nov)
+اقرأ التسليم (د) أولًا. كل بند هنا جاهز للتنفيذ دون سؤال المالك إلا حيث كُتب. اعتمد البروتوكول: نسخة واحدة في النهاية، ثم الدفع.
+1. **اختبار الصور المزروعة يفشل:** `Tests/UI/DiaryEditorUITests.swift` `testDayPhotosLinkOnce` (زرع بـ `swift scripts/seed-diary-photos.swift 390840AD-4FF0-476F-8E1D-E0C521A58E45 Artifacts/photo-seed`، وشغّله بـ `TEST_RUNNER_MADAR_TEST_PHOTOS_SEEDED=1`). بعد لمس صورة في شريط الحقل الممدود تبقى الصورة في شريط الحقل (الشريط الآخر في الصفحة يُسقطها). اعثر على السبب (`DiaryDayPhotos.pick` و`linkLibraryPhoto` في `DiaryInlineComposer.swift` و`diaryPhotoEpoch` في `AppSession`) وأصلح التطبيق أو الاختبار.
+2. **تسع اختبارات واجهة للمحبرة تفشل قبل عملنا:** `MihbaraHomeUITests` (testMihbaraRootRouteClosesLibraryAndReturnsToShelf، testRemovingPDFKeepsTheBookButClearsUndo، testEnglishWordCardSavesItsContextAndOnlyOfferTranslation…) و`MihbaraImportUITests` (٦ اختبارات استيراد). شخّص كل واحد: خلل في التطبيق أم اختبار قديم؟ لا تلمس شيئًا من قيود Turath (انظر الذاكرة: ٤ إصلاحات فقط).
+3. **تنظيف T12 المتبقي (آمن):** في `MihbaraHomeView.swift` حذف `manuallyOpen` و`tableBook` و`setStand` و`motivationCues` و`.motivation` الميتة؛ حذف سطر `excluded QuranRoom.swift` من `scripts/check-shipping-sources.py:505`.
+4. **مفاتيح الإعدادات غير المقروءة (36):** حذفها من `settings-schema.json` (النسخ الثلاث) وإضافتها إلى `removedKeys` حتى لا تفشل قراءة مخزن قديم؛ اختبار على مخزن يحمل المفتاح القديم. هذا يمس مخطط البيانات فاعرض خطتك على المالك قبل التنفيذ.
+5. **T14 #15:** اختبار حقن فشل بعد أول كتابة في أمر مالي (تحويل/تقسيم) يثبت أن لا شيء يُحفظ (`Packages/MadarCommands`، انظر `MoneyPersistenceTests`).
+6. **AccessibilitySizeUITests:** اجعل كل غرفة تتحقق من معرّف يخصها (لا أزرار شريط التبويب فقط) عند AX5.
+7. **iPad:** وميض شريط السنة في أول إطار قبل قياس `roomWidth` (`DiaryHomeView`)، وقوّ تأكيد غياب لوحة المفاتيح بعد التدوير؛ ثم جرّب الغرف الأخرى على `Madar iPad Pro 13`.
+8. **رسالة البنك «صحيح»:** لا إشعار بنكي أصلًا؛ ميزة جديدة تحتاج قرار المالك (هل يُرسل إشعار لرسالة بنكية؟) قبل أي بناء.
+9. **على جهاز المالك (ليس للوكيل):** سحب شريط السنة، زر «أتممته» في إشعار الورد، التعرّف على الصوت (رموز 1101/203 احتياط)، شكل iPad.
+
 ## تسليم 2026-11-14 (د) — كل ما أمكن، النسخة 48
 - **يعمل:** المذكرات على iPad العريض صفحة اليوم وبجانبها عمود (ذكريات، أيام، أسئلة) بدل الرئيسية القديمة، ومكانها ثابت فلا تُبنى من جديد عند التدوير؛ «خصّص المذكرات» يخفي شريط السنة؛ شريطا صور اليوم يُسقطان الصورة المربوطة معًا (من الحقل ومن العارض)؛ قاعدة «لم يدخل وقتها» في LogPrayerIntent صارت دالة نقية في MadarCore بسلوك مطابق؛ حُذف الميت: QuranRoom.swift، مكتب المحبرة القديم، motivationCues.
 - **اختبارات جديدة (T14):** حدود رمضان (٧ شعبان/١ رمضان/٢٩ رمضان/١ شوال)، لندن يوم تغيير الساعة، أوسلو، السلسلة بعد حذف سجل، سقف ٥١٢ م.ب، الرصيد لا يظهر نصًّا في اللقطة المخفية، AX5 لكل غرفة، iPad بتأكيدات (جهة العمود والتدوير). MadarCore 239 و MadarData 136 نجحتا.
