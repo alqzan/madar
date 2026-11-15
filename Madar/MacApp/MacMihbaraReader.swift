@@ -33,6 +33,17 @@ struct MihbaraReaderView: View {
     @State private var sessionStartChapter = 0
     @State private var sessionStartProgression = 0.0
     @State private var positions = ReadingPositionProgress()
+    @State private var highlights: [MihbaraHighlight] = []
+    @State private var paragraph: MacEPUBParagraph?
+
+    private var marks: [MacEPUBMark] {
+        guard let publication else { return [] }
+        return highlights.compactMap { h in
+            guard let m = publication.mark(fromLocatorJSON: h.locatorJSON), m.chapter == chapter else { return nil }
+            return MacEPUBMark(id: h.id, selector: m.selector, color: h.color)
+        }
+    }
+    private var paragraphMark: MacEPUBMark? { paragraph.flatMap { p in marks.last { $0.selector == p.selector } } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,6 +52,16 @@ struct MihbaraReaderView: View {
                 Spacer()
                 Text(book.title).font(MadarTypography.section()).lineLimit(1)
                 Spacer()
+                if paragraph != nil {
+                    // Click a paragraph, then colour it here; the same paragraph highlight as on iPhone (one tap of its colour clears it).
+                    Menu {
+                        ForEach([("yellow", "أصفر"), ("green", "أخضر"), ("rose", "وردي")], id: \.0) { color, name in
+                            Button(paragraphMark?.color == color ? "\(name) ✓" : name) { Task { await highlight(color) } }
+                        }
+                        if paragraphMark != nil { Divider(); Button("أزل التظليل", role: .destructive) { Task { await removeHighlight() } } }
+                    } label: { Label("ظلّل الفقرة", systemImage: "highlighter") }
+                    .fixedSize()
+                }
                 if let publication, !publication.contents.isEmpty {
                     Menu {
                         ForEach(Array(publication.contents.enumerated()), id: \.offset) { _, entry in
@@ -59,7 +80,7 @@ struct MihbaraReaderView: View {
             Group {
                 if let publication {
                     MacEPUBWebView(publication: publication, chapter: chapter, startProgression: startProgression,
-                                   fontScale: fontScale, paper: theme.surface, ink: theme.ink, page: page)
+                                   fontScale: fontScale, paper: theme.surface, ink: theme.ink, page: page, marks: marks)
                 } else if let failure {
                     VStack(spacing: 14) {
                         Text(failure).font(MadarTypography.body()).multilineTextAlignment(.center)
@@ -105,6 +126,8 @@ struct MihbaraReaderView: View {
             }
             publication = opened
             page.onChange = { [self] progression in observe(progression) }
+            page.onParagraph = { [self] tapped in paragraph = tapped }
+            reloadHighlights()
             beginSession(at: Date())
         } catch {
             failure = "تعذّر فتح الكتاب على الماك. \(madarUserMessage(error))"
@@ -114,15 +137,41 @@ struct MihbaraReaderView: View {
     private func move(by delta: Int) {
         guard let publication else { return }
         save()
+        paragraph = nil
         chapter = min(max(chapter + delta, 0), publication.spine.count - 1)
         startProgression = delta < 0 ? 1 : 0
         page.progression = startProgression
         observe(startProgression, jump: true)
     }
 
+    private func reloadHighlights() { highlights = (try? AppMihbaraService(app: app).highlights(for: book.id)) ?? [] }
+
+    private func highlight(_ color: String) async {
+        guard let publication, let paragraph else { return }
+        if paragraphMark?.color == color { await removeHighlight(); return }
+        guard let locator = publication.locatorJSON(chapter: chapter, progression: page.progression,
+                                                    selector: paragraph.selector, text: paragraph.text) else { return }
+        do {
+            try await app.executeBookCommand("highlight.save", payload: [
+                "id": .string((paragraphMark?.id ?? UUID()).uuidString), "bookID": .string(book.id.uuidString),
+                "locator": .string(locator), "color": .string(color)
+            ], undoMessage: "ظُلّلت الفقرة")
+            reloadHighlights()
+        } catch { app.errorMessage = madarUserMessage(error) }
+    }
+
+    private func removeHighlight() async {
+        guard let id = paragraphMark?.id else { return }
+        do {
+            try await app.executeBookCommand("highlight.delete", payload: ["id": .string(id.uuidString)], undoMessage: "أُزيل التظليل")
+            reloadHighlights()
+        } catch { app.errorMessage = madarUserMessage(error) }
+    }
+
     private func jump(to target: Int) {
         guard let publication, publication.spine.indices.contains(target) else { return }
         save()
+        paragraph = nil
         chapter = target
         startProgression = 0
         page.progression = 0
@@ -182,6 +231,7 @@ struct MihbaraReaderView: View {
 @MainActor final class MacEPUBPage {
     var progression = 0.0
     var onChange: ((Double) -> Void)?
+    var onParagraph: ((MacEPUBParagraph) -> Void)?
     func report(_ value: Double) { progression = value; onChange?(value) }
 }
 
@@ -270,6 +320,14 @@ struct MacEPUB: Sendable {
         return text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces)
     }
 
+    /// The chapter and paragraph selector of a saved highlight's locator, when it lands on this book's spine.
+    func mark(fromLocatorJSON data: Data) -> (chapter: Int, selector: String)? {
+        guard let json = String(data: data, encoding: .utf8), let place = place(fromLocatorJSON: json),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let selector = (object["locations"] as? [String: Any])?["cssSelector"] as? String, !selector.isEmpty else { return nil }
+        return (place.chapter, selector)
+    }
+
     func place(fromLocatorJSON json: String) -> (chapter: Int, progression: Double)? {
         guard let object = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any],
               var href = object["href"] as? String else { return nil }
@@ -292,13 +350,28 @@ struct MacEPUB: Sendable {
         return (before + Int(min(max(progression, 0), 1) * Double(sizes[chapter]))) / 1024 + 1
     }
 
-    func locatorJSON(chapter: Int, progression: Double) -> String? {
+    func locatorJSON(chapter: Int, progression: Double, selector: String? = nil, text: String? = nil) -> String? {
         let p = min(max(progression, 0), 1)
         let total = totalProgression(chapter: chapter, progression: p)
-        let object: [String: Any] = ["href": spine[chapter], "type": "application/xhtml+xml",
-                                     "locations": ["progression": p, "totalProgression": total]]
+        var locations: [String: Any] = ["progression": p, "totalProgression": total]
+        if let selector { locations["cssSelector"] = selector }
+        var object: [String: Any] = ["href": spine[chapter], "type": "application/xhtml+xml", "locations": locations]
+        if let text, !text.isEmpty { object["text"] = ["highlight": text] }
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .withoutEscapingSlashes]) else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+}
+
+/// The paragraph the reader last clicked: its CSS selector (the same kind Readium stores) and its text.
+struct MacEPUBParagraph: Equatable { let selector: String; let text: String }
+
+/// A saved paragraph highlight on the open chapter, with its tint as CSS.
+struct MacEPUBMark: Equatable {
+    let id: UUID
+    let selector: String
+    let color: String
+    var tint: String {
+        switch color { case "green": "rgba(120,190,130,0.35)"; case "rose": "rgba(235,140,155,0.35)"; default: "rgba(245,205,80,0.40)" }
     }
 }
 
@@ -359,12 +432,14 @@ private struct MacEPUBWebView: NSViewRepresentable {
     let paper: Color
     let ink: Color
     let page: MacEPUBPage
+    var marks: [MacEPUBMark] = []
 
     func makeCoordinator() -> Coordinator { Coordinator(page: page) }
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(context.coordinator, name: "place")
+        configuration.userContentController.add(context.coordinator, name: "paragraph")
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.navigationDelegate = context.coordinator
         view.setValue(false, forKey: "drawsBackground")
@@ -375,16 +450,19 @@ private struct MacEPUBWebView: NSViewRepresentable {
         let coordinator = context.coordinator
         coordinator.style = style
         coordinator.startProgression = startProgression
+        let marksChanged = coordinator.marks != marks
+        coordinator.marks = marks
         if coordinator.loadedChapter != chapter {
             coordinator.loadedChapter = chapter
             view.loadFileURL(publication.url(chapter: chapter), allowingReadAccessTo: publication.root)
         } else {
-            view.evaluateJavaScript(coordinator.styleScript)
+            view.evaluateJavaScript(coordinator.styleScript + (marksChanged ? coordinator.marksScript : ""))
         }
     }
 
     static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) {
         view.configuration.userContentController.removeScriptMessageHandler(forName: "place")
+        view.configuration.userContentController.removeScriptMessageHandler(forName: "paragraph")
     }
 
     private var style: String {
@@ -405,7 +483,20 @@ private struct MacEPUBWebView: NSViewRepresentable {
         var loadedChapter = -1
         var style = ""
         var startProgression = 0.0
+        var marks: [MacEPUBMark] = []
         init(page: MacEPUBPage) { self.page = page }
+
+        /// Paints each saved paragraph highlight (iPhone or Mac) by its CSS selector, after clearing the previous paint.
+        var marksScript: String {
+            let items = marks.map { mark -> String in
+                let selector = mark.selector.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+                return "['\(selector)','\(mark.tint)']"
+            }.joined(separator: ",")
+            return """
+            (function(){document.querySelectorAll('[data-madar-mark]').forEach(function(e){e.style.backgroundColor='';e.removeAttribute('data-madar-mark');});
+            [\(items)].forEach(function(m){try{var e=document.querySelector(m[0]);if(e){e.style.backgroundColor=m[1];e.style.borderRadius='4px';e.setAttribute('data-madar-mark','1');}}catch(x){}});})();
+            """
+        }
 
         var styleScript: String {
             let escaped = style.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "`", with: "\\`")
@@ -419,12 +510,20 @@ private struct MacEPUBWebView: NSViewRepresentable {
             webView.evaluateJavaScript(styleScript + """
             (function(){var e=document.scrollingElement;var max=Math.max(e.scrollHeight-innerHeight,0);e.scrollTop=max*\(start);
             var t;addEventListener('scroll',function(){clearTimeout(t);t=setTimeout(function(){var m=Math.max(e.scrollHeight-innerHeight,1);
-            window.webkit.messageHandlers.place.postMessage(e.scrollTop/m);},250);});})();
-            """)
+            window.webkit.messageHandlers.place.postMessage(e.scrollTop/m);},250);});
+            function sel(el){var parts=[];while(el&&el!==document.documentElement){var i=1,s=el;while((s=s.previousElementSibling))i++;parts.unshift(':nth-child('+i+')');el=el.parentElement;}return ':root > '+parts.join(' > ');}
+            addEventListener('click',function(ev){var el=ev.target.closest('p,li,blockquote,h1,h2,h3,h4,h5,h6,dd,dt,figcaption');if(!el)return;
+            window.webkit.messageHandlers.paragraph.postMessage({selector:sel(el),text:(el.innerText||'').trim().slice(0,600)});});})();
+            """ + marksScript)
             page.progression = start
         }
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "paragraph", let body = message.body as? [String: Any], let selector = body["selector"] as? String {
+                let text = body["text"] as? String ?? ""
+                MainActor.assumeIsolated { page.onParagraph?(MacEPUBParagraph(selector: selector, text: text)) }
+                return
+            }
             if let value = message.body as? Double { MainActor.assumeIsolated { page.report(min(max(value, 0), 1)) } }
         }
 
