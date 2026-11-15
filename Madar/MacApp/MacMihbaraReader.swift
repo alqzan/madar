@@ -35,6 +35,7 @@ struct MihbaraReaderView: View {
     @State private var positions = ReadingPositionProgress()
     @State private var highlights: [MihbaraHighlight] = []
     @State private var paragraph: MacEPUBParagraph?
+    @State private var noteDraft: String?
 
     private var marks: [MacEPUBMark] {
         guard let publication else { return [] }
@@ -59,7 +60,9 @@ struct MihbaraReaderView: View {
                             Button(paragraphMark?.color == color ? "\(name) ✓" : name) { Task { await highlight(color) } }
                         }
                         if paragraphMark != nil { Divider(); Button("أزل التظليل", role: .destructive) { Task { await removeHighlight() } } }
-                    } label: { Label("ظلّل الفقرة", systemImage: "highlighter") }
+                        Divider()
+                        Button("دوّن حاشية على الفقرة…") { noteDraft = "" }
+                    } label: { Label("الفقرة", systemImage: "highlighter") }
                     .fixedSize()
                 }
                 if let publication, !publication.contents.isEmpty {
@@ -108,6 +111,23 @@ struct MihbaraReaderView: View {
         .background(theme.surface)
         .environment(\.layoutDirection, .rightToLeft)
         .task { await open() }
+        .sheet(isPresented: Binding(get: { noteDraft != nil }, set: { if !$0 { noteDraft = nil } })) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("حاشية على الفقرة").font(MadarTypography.section())
+                if let paragraph { Text(paragraph.text).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).lineLimit(3) }
+                TextEditor(text: Binding(get: { noteDraft ?? "" }, set: { noteDraft = $0 }))
+                    .font(MadarTypography.body()).frame(minHeight: 140).scrollContentBackground(.hidden)
+                    .padding(8).background(theme.surface, in: .rect(cornerRadius: 10))
+                HStack {
+                    Button("إلغاء") { noteDraft = nil }.keyboardShortcut(.cancelAction)
+                    Spacer()
+                    Button("احفظ في دفتر الكتاب") { Task { await savePageNote() } }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled((noteDraft ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(24).frame(width: 460).environment(\.layoutDirection, .rightToLeft)
+        }
         .onDisappear { save(); endSession(at: Date()); publication?.discard() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { beginSession(at: Date()) } else { save(); endSession(at: Date()) }
@@ -157,6 +177,19 @@ struct MihbaraReaderView: View {
                 "locator": .string(locator), "color": .string(color)
             ], undoMessage: "ظُلّلت الفقرة")
             reloadHighlights()
+        } catch { app.errorMessage = madarUserMessage(error) }
+    }
+
+    /// The same «حاشية الكتاب» record as the iPhone's word card: the note text with the paragraph's locator.
+    private func savePageNote() async {
+        guard let publication, let paragraph, let text = noteDraft?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty,
+              let locator = publication.locatorJSON(chapter: chapter, progression: page.progression,
+                                                    selector: paragraph.selector, text: paragraph.text) else { return }
+        do {
+            try await app.executeBookCommand("notebook.savePage", payload: [
+                "id": .string(UUID().uuidString), "bookID": .string(book.id.uuidString), "text": .string(text), "locator": .string(locator)
+            ], undoMessage: "دُوّنت في حاشية الكتاب")
+            noteDraft = nil
         } catch { app.errorMessage = madarUserMessage(error) }
     }
 
