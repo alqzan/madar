@@ -529,8 +529,10 @@ struct QuranHomeView: View {
                     tool("مراجعة حرة", icon: "arrow.left.arrow.right", id: "free") { showFree = true }
                     tool("منسوب الحفظ", icon: "chart.bar", id: "strength") { showStrength = true }
                 }
+                if MadarPlatform.hasNotifications || MadarPlatform.hasHomeScreenWidgets {
                 Divider().overlay(theme.line)
                 Button { showOutside = true } label: { Label("التذكير والودجات", systemImage: "bell").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-outside")
+                }
             }
         }
     }

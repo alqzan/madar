@@ -117,7 +117,7 @@ struct PrayerCustomizeView: View {
                 previewCard
                 searchField
                 if query.isEmpty || normalized("ترتيب الرئيسية").contains(normalized(query)) { layoutCard }
-                ForEach(groups) { group in
+                ForEach(groups.filter { $0.id != "remind" || MadarPlatform.hasNotifications }) { group in
                     let items = definitions(group)
                     if !items.isEmpty || (group.id == "log" && showsTrackingStart) { groupCard(group, items) }
                 }

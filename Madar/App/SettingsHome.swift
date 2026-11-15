@@ -33,8 +33,10 @@ struct SettingsHome: View {
                 link("أقسامك والبهو", "أضف قسمًا أو أخفِه، ورتّب البهو وأحجامه", "square.grid.2x2") {
                     SettingsPage(title: "أقسامك والبهو") {
                         BahwBlocksSection(session: session)
-                        action("ودجات الشاشة الرئيسية", "square.grid.2x2", openGallery)
-                        action("اصنع ودجة", "square.stack.3d.up", openMaker)
+                        if MadarPlatform.hasHomeScreenWidgets {
+                            action("ودجات الشاشة الرئيسية", "square.grid.2x2", openGallery)
+                            action("اصنع ودجة", "square.stack.3d.up", openMaker)
+                        }
                     }
                 }
             }
@@ -55,7 +57,9 @@ struct SettingsHome: View {
             group("عام") {
                 link("اليوم والتقويم", "بداية اليوم والتقويم الأول", "moon") { sectionsPage("اليوم والتقويم", ["اليوم والتقويم", "مدينتك"]) }
                 link("المظهر", "الوضع والألوان والأرقام", "paintpalette") { sectionsPage("المظهر", ["المظهر"]) }
-                link("الإشعارات", "تذكيرات الغرف وأوقات الصمت", "bell.badge") { sectionsPage("الإشعارات", ["الإشعارات"]) }
+                if MadarPlatform.hasNotifications {
+                    link("الإشعارات", "تذكيرات الغرف وأوقات الصمت", "bell.badge") { sectionsPage("الإشعارات", ["الإشعارات"]) }
+                }
                 link("صحة مدار", "النسخة الاحتياطية والطلبات المعلّقة والإشعارات", "heart.text.square") { MadarHealthView(session: session) }
                 link("الخصوصية والبحث", "فهرسة Spotlight وإخفاء الأرقام", "lock") { sectionsPage("الخصوصية والبحث", ["البحث"]) }
                 if let backup = session.backupService {

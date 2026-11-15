@@ -1,6 +1,10 @@
 import Foundation
 import Observation
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MadarCore
 import MadarData
 import MadarCommands
@@ -81,7 +85,9 @@ private struct PDFConversionLoadedCheckpoint {
     private(set) var jobs: [Job] = []
     private var tasks: [UUID: Task<Void, Never>] = [:]
     /// Leaving the app mid-conversion asks iOS for the time it allows, instead of stopping at once.
+    #if os(iOS)
     private var background: [UUID: UIBackgroundTaskIdentifier] = [:]
+    #endif
     /// Called after a converted book joins the library, so an open room reloads.
     var onFinished: (() -> Void)?
 
@@ -91,9 +97,11 @@ private struct PDFConversionLoadedCheckpoint {
         guard job(for: book.id)?.state.isActive != true else { return }
         jobs.removeAll { $0.id == book.id }
         jobs.append(Job(id: book.id, title: book.title))
+        #if os(iOS)
         background[book.id] = UIApplication.shared.beginBackgroundTask(withName: "pdf-conversion") { [weak self] in
             MainActor.assumeIsolated { self?.endBackground(book.id) }
         }
+        #endif
         Self.setPending(book.id, true, app: app)
         tasks[book.id] = Task { [weak self] in await self?.run(book, app: app) }
     }
@@ -125,8 +133,10 @@ private struct PDFConversionLoadedCheckpoint {
     func dismiss(_ bookID: UUID) { if job(for: bookID)?.state.isActive != true { jobs.removeAll { $0.id == bookID } } }
 
     private func endBackground(_ id: UUID) {
+        #if os(iOS)
         guard let task = background.removeValue(forKey: id), task != .invalid else { return }
         UIApplication.shared.endBackgroundTask(task)
+        #endif
     }
 
     private func update(_ id: UUID, _ change: (inout Job) -> Void) {

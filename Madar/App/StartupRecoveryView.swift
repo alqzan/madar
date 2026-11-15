@@ -62,7 +62,7 @@ struct StartupRecoveryView: View {
     private var details: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
-        return "Madar \(version) (\(build)) · iOS \(UIDevice.current.systemVersion)\n\(error)"
+        return "Madar \(version) (\(build)) · \(MadarPlatform.systemDescription)\n\(error)"
     }
     private func title(_ item: StartupRecovery.Candidate) -> String {
         switch item.source {

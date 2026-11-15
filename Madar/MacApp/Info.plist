@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ar</string>
+	<key>CFBundleDisplayName</key>
+	<string>مدار</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.alqzan.madar2</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>madar</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.lifestyle</string>
+	<key>NSLocationUsageDescription</key>
+	<string>يقرأ مدار موقعك مرة واحدة ليعرف مدينتك ويحسب مواقيت الصلاة بدقة. يحفظ المدينة وإحداثياتها على جهازك فقط.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>سجّل صوتك واحفظه في صفحة يومك على هذا الجهاز.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>يعرض مدار صور يومك من تطبيق الصور لتضيف منها ما تشاء، ويحفظ نسخة صغيرة منها فقط.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>حوّل التسجيل الذي تختاره إلى نص. لا يُرسل الصوت إلى Apple دون موافقتك داخل مدار.</string>
+</dict>
+</plist>

@@ -70,11 +70,11 @@ struct CustomizeMadar: View {
                     .buttonStyle(.madarPlain).accessibilityIdentifier("quran-tafsir-library-open")
                 }
                 if query.isEmpty || normalized("الودجات وأحجامها البهو الكتل").contains(normalized(query)) { BahwBlocksSection(session: session) }
-                if query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query)) {
+                if MadarPlatform.hasHomeScreenWidgets, query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query)) {
                     Button { widgetMaker = true } label: { Label("اصنع ودجة", systemImage: "square.stack.3d.up").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).background(theme.surface, in: .rect(cornerRadius: 20)) }
                         .buttonStyle(.madarPlain).accessibilityIdentifier("widget-maker-open")
                 }
-                if query.isEmpty || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) {
+                if MadarPlatform.hasHomeScreenWidgets, query.isEmpty || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) {
                     Button {widgetGallery=true} label:{Label("ودجات الشاشة الرئيسية",systemImage:"square.grid.2x2").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:50).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widgets-gallery")
                 }
                 if showsRoomLayouts { RoomHomeLayoutSection(session: session, searching: !query.isEmpty) }
@@ -115,11 +115,13 @@ struct CustomizeMadar: View {
         .navigationDestination(isPresented: $session.moneyOpen) { MoneyRoomView(app: session) }
         .navigationDestination(isPresented: $quranTafsirLibrary) { QuranTafsirLibraryView(app: session) }
         .navigationDestination(isPresented: $diarySettings) { DiaryCustomizeView(app: session) }
+        #if os(iOS)
         .sheet(isPresented: $widgetMaker, onDismiss: { session.widgetMakerRoute = nil; session.widgetMakerRouteID = nil }) {
             WidgetMakerView(session: session)
                 .presentationDetents([.large]).madarSheetErrorAlert(session)
         }
         .sheet(isPresented:$widgetGallery){NavigationStack{RoomWidgetsGallery(session:session)}.madarSheetErrorAlert(session)}
+        #endif
         .toolbarVisibility(.hidden, for: .navigationBar)
         .onChange(of: session.widgetMakerRouteID, initial: true) { _, requestID in if requestID != nil { widgetMaker = true } }
         .confirmationDialog("أعِد الإعدادات المتفق عليها؟", isPresented: $confirmReset, titleVisibility: .visible) {
@@ -214,7 +216,7 @@ struct CustomizeMadar: View {
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "الذكاء", "اليوم والتقويم", "المظهر", "مدينتك", "البحث", "الإشعارات", "الصلاة", "المواقيت", "متقدم"].filter { section in !(section == "متقدم" && query.isEmpty && session.bool("core.essentials")) && filtered.contains { sectionFor($0.key) == section } } }
+    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "الذكاء", "اليوم والتقويم", "المظهر", "مدينتك", "البحث", "الإشعارات", "الصلاة", "المواقيت", "متقدم"].filter { section in (section != "الإشعارات" || MadarPlatform.hasNotifications) && !(section == "متقدم" && query.isEmpty && session.bool("core.essentials")) && filtered.contains { sectionFor($0.key) == section } } }
     private let symbols = ["متقدم": "gearshape.2", "الذكاء": "sparkles", "العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "البحث": "magnifyingglass", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"] + RoomHomeLayout.rooms.map { $0.0 + ".layout" }).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
@@ -481,7 +483,7 @@ extension AppSession {
 struct NotificationPermissionCard: View {
     @Bindable var session: AppSession
     var body: some View {
-        if (session.bool("salah.askReminder") || session.bool("salah.beforeReminder") || session.bool("notif.thisDeviceReminders")) && !session.notificationsAuthorized {
+        if MadarPlatform.hasNotifications, (session.bool("salah.askReminder") || session.bool("salah.beforeReminder") || session.bool("notif.thisDeviceReminders")) && !session.notificationsAuthorized {
             MadarCard {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(session.notificationPermissionTitle).font(MadarTypography.body())

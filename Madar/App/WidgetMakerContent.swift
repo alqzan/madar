@@ -18,7 +18,7 @@ struct WidgetMakerContent: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.widgetRenderingMode) private var renderingMode
     private var style: WidgetMakerStyle { config.flatMap { try? JSONDecoder().decode(WidgetMakerStyle.self, from: $0.styleJSON) } ?? .init() }
-    private var accessory: Bool { [.accessoryCircular, .accessoryRectangular, .accessoryInline].contains(family) }
+    private var accessory: Bool { family.isMadarAccessory }
     private var capacity: Int {
         if family == .systemExtraLargePortrait { return WidgetMakerStyle.capacity(for: "extraLargePortrait") }
         switch family { case .systemSmall: return WidgetMakerStyle.capacity(for: "small"); case .systemMedium: return WidgetMakerStyle.capacity(for: "medium"); case .systemLarge: return WidgetMakerStyle.capacity(for: "large"); case .accessoryRectangular: return WidgetMakerStyle.capacity(for: "accessoryRectangular"); default: return 1 }
@@ -37,7 +37,7 @@ struct WidgetMakerContent: View {
             else if rows.isEmpty {
                 if style.hideWhenEmpty { Color.clear }
                 else { VStack(spacing: 8) { Image(systemName: "sparkles"); Text(emptyPrompt ?? (config == nil ? "اصنع ودجتك في مدار" : "لا شيء ينتظر هنا الآن")).font(.caption).multilineTextAlignment(.center) } }
-            } else if family == .accessoryInline {
+            } else if family.isMadarAccessoryInline {
                 if let row = rows.first { Text(row.title + " " + value(row)).font(.caption).lineLimit(1) }
             } else if accessory {
                 VStack(spacing: 4) { ForEach(rows) { row in Link(destination: URL(string: row.route) ?? URL(string: "madar://bahw")!) { HStack(spacing: 4) { if style.showArt { MadarGlyph(row.glyph, size: 15) }; Text(row.title + " " + value(row)).font(.system(size: 12)).lineLimit(2) } } } }
@@ -92,9 +92,11 @@ struct WidgetMakerContent: View {
                     if style.showArt, let share = row.share { ProgressView(value: max(0, min(1, share))).tint(accent).widgetAccentable().accessibilityHidden(true) }
                 }.frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
             }.buttonStyle(.plain)
+            #if os(iOS)
             if permitsActions && style.interactive, let id = row.habitID {
                 Button(intent: WidgetCompleteHabitIntent(habitID: id)) { Label("سجّل", systemImage: "checkmark").font(textFont(11, bold: true)) }.buttonStyle(.plain)
             }
+            #endif
         }
         .padding(style.density == "compact" ? 5 : 8).frame(maxWidth: .infinity, maxHeight: family == .systemMedium ? .infinity : nil, alignment: .topLeading)
         .background {

@@ -2,7 +2,9 @@ import Foundation
 import Observation
 import AVFoundation
 import Speech
+#if canImport(UIKit)
 import UIKit
+#endif
 import MadarCore
 
 /// Owns UI-bound microphone, permission and recognition state. Audio is committed before recognition starts.
@@ -103,8 +105,10 @@ import MadarCore
         do {
             try AppDiaryService(app: app).authorizeRead()
             app.diaryPlayback.stop()
+            #if os(iOS)
             try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try AVAudioSession.sharedInstance().setActive(true)
+            #endif
             sessionActive = true
             recordingDay = writingDay; microphoneDenied = false; message = "الحبر يسمعك · اضغط للإيقاف"
         elapsedSeconds = 0; meterLevels = []; recordedAudioLevels = []
@@ -188,12 +192,18 @@ import MadarCore
         pendingAudioCount = files.filter { $0.pathExtension == "json" && Self.stagedAudio(for: $0) != nil }.count
     }
     /// Every way a take ends hands the audio session back, so other apps' audio can resume.
-    private func endAudioSession() { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
+    private func endAudioSession() {
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
+    }
     func stop() async {
         guard let recorder else { return }; recording = false
         // A call or the lock screen sends the app to the background right as the take ends; this asks the system for the time to finish saving it.
+        #if os(iOS)
         let background = UIApplication.shared.beginBackgroundTask(withName: "diary-take-save")
         defer { if background != .invalid { UIApplication.shared.endBackgroundTask(background) } }
+        #endif
         stopMetering(); stopObservingAudioSession(); elapsedSeconds = Int(recorder.currentTime.rounded(.down))
         let url = recorder.url; recorder.stop(); self.recorder = nil
         // Other apps' audio resumes at once, not after the file is exported.
@@ -204,6 +214,7 @@ import MadarCore
     // MARK: Interruptions (B1-11): a call, an alarm or a lost microphone ends the take cleanly with what was recorded.
     private func observeAudioSession() {
         audioEventTask?.cancel()
+        #if os(iOS)
         audioEventTask = Task { [weak self] in
             let center = NotificationCenter.default, session = AVAudioSession.sharedInstance()
             await withTaskGroup(of: Void.self) { group in
@@ -218,6 +229,7 @@ import MadarCore
                 }
             }
         }
+        #endif
     }
     private func stopObservingAudioSession() { audioEventTask?.cancel(); audioEventTask = nil }
     func handleAudioEvent(_ event: DiaryVoiceInterruption.Event) async {
@@ -519,6 +531,7 @@ enum DiaryVoiceInterruption {
     enum Action: Equatable { case ignore, stopAndSave }
     static func action(recording: Bool, event: Event) -> Action { recording ? .stopAndSave : .ignore }
     static func event(from note: Notification) -> Event? {
+        #if os(iOS)
         guard let info = note.userInfo else { return nil }
         if note.name == AVAudioSession.interruptionNotification {
             guard let raw = info[AVAudioSessionInterruptionTypeKey] as? UInt, AVAudioSession.InterruptionType(rawValue: raw) == .began else { return nil }
@@ -531,6 +544,7 @@ enum DiaryVoiceInterruption {
                   !previous.inputs.isEmpty, AVAudioSession.sharedInstance().currentRoute.inputs.isEmpty else { return nil }
             return .inputLost
         }
+        #endif
         return nil
     }
 }

@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.alqzan.madar2
   deploymentTarget:
     iOS: '27.0'
+    macOS: '27.0'
   developmentLanguage: ar
   createIntermediateGroups: true
 settings:
@@ -124,6 +125,43 @@ targets:
           - IBMPlexSerif-Bold.ttf
     # App/Madar.entitlements (App Group + HealthKit) is kept as a file; CODE_SIGN_ENTITLEMENTS picks it or, in the
     # paid iCloud build, App/Madar-CloudKit.entitlements through MADAR_APP_ENTITLEMENTS.
+  MadarMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: MacApp
+      - path: App
+        excludes: [MadarApp.swift, TabShell.swift, Info.plist, "*.entitlements", PrayerNotifications.swift, AppBackupBackgroundTasks.swift, MihbaraContentsSheet.swift, MihbaraEPUBLoader.swift, MihbaraPDFInk.swift, MihbaraPaperCapture.swift, MihbaraPaperIndexEditor.swift, MihbaraReaderView.swift, MihbaraLibrarySearch.swift, PrayerActivityAttributes.swift, MihbaraHomeView.swift, MihbaraPDFReaderView.swift, MihbaraFootnoteCard.swift, MihbaraPageNoteSheet.swift, MihbaraQuoteCardArtwork.swift, MihbaraQuoteCardSheet.swift, MihbaraReaderSettingsSheet.swift, MihbaraTranslationSheet.swift, MihbaraWordCard.swift, LockWidgetGallery.swift, WidgetMakerView.swift, RoomWidgetsGallery.swift]
+    dependencies:
+      - package: MadarCore
+      - package: MadarData
+      - package: MadarDesign
+      - package: MadarSnapshots
+      - package: MadarCommands
+      - package: MadarMoney
+      - package: MadarPrayer
+      - package: MadarQuran
+      - package: MadarInbox
+      - package: MadarSync
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alqzan.madar2
+        PRODUCT_NAME: Madar
+        TARGETED_DEVICE_FAMILY: ''
+    info:
+      path: MacApp/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: ar
+        CFBundleDisplayName: مدار
+        LSApplicationCategoryType: public.app-category.lifestyle
+        CFBundleURLTypes:
+          - CFBundleURLName: com.alqzan.madar2
+            CFBundleURLSchemes: [madar]
+        ITSAppUsesNonExemptEncryption: false
+        NSLocationUsageDescription: يقرأ مدار موقعك مرة واحدة ليعرف مدينتك ويحسب مواقيت الصلاة بدقة. يحفظ المدينة وإحداثياتها على جهازك فقط.
+        NSMicrophoneUsageDescription: سجّل صوتك واحفظه في صفحة يومك على هذا الجهاز.
+        NSSpeechRecognitionUsageDescription: حوّل التسجيل الذي تختاره إلى نص. لا يُرسل الصوت إلى Apple دون موافقتك داخل مدار.
+        NSPhotoLibraryUsageDescription: يعرض مدار صور يومك من تطبيق الصور لتضيف منها ما تشاء، ويحفظ نسخة صغيرة منها فقط.
   MadarWidgets:
     type: app-extension
     platform: iOS

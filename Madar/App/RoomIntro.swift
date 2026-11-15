@@ -144,7 +144,7 @@ struct RoomIntroSheet: View {
                         }
                     }
                 }
-                if let reminder = block.reminderLine, session.canRequestNotificationPermission {
+                if MadarPlatform.hasNotifications, let reminder = block.reminderLine, session.canRequestNotificationPermission {
                     Text(reminder).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     Button { session.requestPrayerNotificationPermission() } label: {
                         Label("اسمح بالتذكيرات", systemImage: "bell").font(MadarTypography.body().bold()).foregroundStyle(theme.accent)

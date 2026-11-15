@@ -1,6 +1,10 @@
 #if DEBUG
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import AVFoundation
 import SwiftData
 import MadarCore
@@ -178,6 +182,9 @@ extension AppSession {
         return try Data(contentsOf: url)
     }
     private static func diaryFixturePhoto(variant: Int) -> Data? {
+        #if os(macOS)
+        return nil
+        #else
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 720, height: 800))
         return renderer.jpegData(withCompressionQuality: 0.8) { surface in
             let c = surface.cgContext, notes = RoomTheme(room: "notes"), colors = [
@@ -192,6 +199,7 @@ extension AppSession {
                 c.drawRadialGradient(glow, startCenter: .init(x: x, y: y), startRadius: 0, endCenter: .init(x: x, y: y), endRadius: r + Double(variant)*3, options: [])
             }
         }
+        #endif
     }
 }
 private extension TimeZone { static let riyadh = TimeZone(identifier: "Asia/Riyadh")! }

@@ -38,7 +38,7 @@ struct FirstRunView: View {
                     if let message = locator.message, step == 1 {
                         Text(message).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         if locator.needsSettings {
-                            Button { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } } label: { Text("افتح إعدادات الآيفون")
+                            Button { MadarPlatform.openAppSettings() } label: { Text("افتح إعدادات الآيفون")
                                 .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("first-run-open-settings")
                         }
                     }

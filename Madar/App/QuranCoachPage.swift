@@ -1,5 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import CoreText
 import MadarDesign
 import MadarQuran
@@ -123,6 +127,7 @@ private struct QuranPageNumberOval: View {
     }
 }
 
+#if os(iOS)
 private struct QuranCoachTextCanvas: UIViewRepresentable {
     let page: QuranUIPage
     let coach: QuranUICoach
@@ -478,3 +483,4 @@ private enum QuranSurahArtwork {
         }
     }
 }
+#endif

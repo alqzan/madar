@@ -215,6 +215,7 @@ struct DiaryMediaCard: View {
         } catch { self.error = "تعذّر فتح المرفق. يمكنك إعادة المحاولة." }
     }
 }
+#if os(iOS)
 struct DiaryQuickLook: UIViewControllerRepresentable {
     let url: URL
     @Environment(\.dismiss) private var dismiss
@@ -234,6 +235,7 @@ struct DiaryQuickLook: UIViewControllerRepresentable {
         func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> any QLPreviewItem { url as NSURL }
     }
 }
+#endif
 private struct DiaryTranscriptEditor: View {
     @Bindable var app: AppSession
     let media: DiaryDisplayMedia
@@ -278,7 +280,10 @@ private struct DiaryTranscriptEditor: View {
     func toggle(id: UUID, data: Data) throws {
         if activeID != id { stop(); player = try AVAudioPlayer(data: data); activeID = id }
         if playing { player?.pause(); playing = false; ticker?.cancel(); return }
-        try AVAudioSession.sharedInstance().setCategory(.playback); playing = player?.play() == true
+        #if os(iOS)
+        try AVAudioSession.sharedInstance().setCategory(.playback)
+        #endif
+        playing = player?.play() == true
         ticker = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self, let player = self.player else { break }

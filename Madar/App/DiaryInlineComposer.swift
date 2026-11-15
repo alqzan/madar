@@ -3,7 +3,11 @@ import MadarDesign
 import Photos
 import PhotosUI
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import UniformTypeIdentifiers
 
 /// A draft write begun as a page closes or the day tab changes. The next composer or the full page waits for it before it reads the draft,

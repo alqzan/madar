@@ -12,7 +12,13 @@ struct MoneyWidgetContent: View {
     @Environment(\.widgetRenderingMode) private var rendering
     private var extraLargePortrait: Bool { family == .systemExtraLargePortrait }
     private var largeHome: Bool { family == .systemLarge || extraLargePortrait }
-    private var accessory: Bool { [.accessoryInline, .accessoryCircular, .accessoryRectangular].contains(family) }
+    private var accessory: Bool {
+        #if os(iOS)
+        [.accessoryInline, .accessoryCircular, .accessoryRectangular].contains(family)
+        #else
+        false
+        #endif
+    }
     private func color(_ key: String) -> Color { if rendering != .fullColor { return .primary }; return MadarToken.colors["widgetIdentity.room.mal.\(scheme == .dark ? "dark" : "light").\(key)"] ?? .primary }
     private var hidden: Bool { snapshot?.rows.first?.value == "•••" }
     private var rows: [RoomWidgetSnapshot.Row] {
@@ -34,8 +40,8 @@ struct MoneyWidgetContent: View {
         Group {
             if accessory {
                 // Lock-screen content never reads the amount-bearing rows, even when outside hiding is off.
-                if family == .accessoryInline { Text("المال، افتح مدار").font(.caption) }
-                else { VStack(spacing: 4) { Image(systemName: "banknote"); Text("المال").font(.caption); if family == .accessoryRectangular { Text("افتح مدار").font(.caption2) } }.frame(maxWidth: .infinity, maxHeight: .infinity) }
+                if family.isMadarAccessoryInline { Text("المال، افتح مدار").font(.caption) }
+                else { VStack(spacing: 4) { Image(systemName: "banknote"); Text("المال").font(.caption); if family.isMadarAccessoryRectangular { Text("افتح مدار").font(.caption2) } }.frame(maxWidth: .infinity, maxHeight: .infinity) }
             } else {
                 VStack(alignment: .leading, spacing: largeHome ? 4 : 6) {
                     Label("المال", systemImage: "banknote").font(MadarTypography.fine()).foregroundStyle(color("accent")).widgetAccentable()
@@ -117,4 +123,37 @@ private func figureText(_ value: String, mark: (Character) -> Text, run make: (S
         flush(); text = Text("\(text)\(mark(character))")
     }
     flush(); return text.accessibilityLabel(Text(verbatim: value))
+}
+
+extension WidgetFamily {
+    /// The lobby's smallest tile draws like the round Lock Screen widget on iPhone; the Mac has no Lock Screen family, so it uses the small one.
+    static var madarIcon: WidgetFamily {
+        #if os(iOS)
+        .accessoryCircular
+        #else
+        .systemSmall
+        #endif
+    }
+    var isMadarAccessoryInline: Bool {
+        #if os(iOS)
+        self == .accessoryInline
+        #else
+        false
+        #endif
+    }
+    var isMadarAccessoryCircular: Bool {
+        #if os(iOS)
+        self == .accessoryCircular
+        #else
+        false
+        #endif
+    }
+    var isMadarAccessory: Bool { isMadarAccessoryInline || isMadarAccessoryCircular || isMadarAccessoryRectangular }
+    var isMadarAccessoryRectangular: Bool {
+        #if os(iOS)
+        self == .accessoryRectangular
+        #else
+        false
+        #endif
+    }
 }

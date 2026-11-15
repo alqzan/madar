@@ -106,7 +106,7 @@ struct DiaryVoiceFeedback: View {
                 }
             }
             if controller.pendingAudioCount > 0 { Button { Task { await controller.recoverRecordings() } } label: { Text("أعد حفظ التسجيل في الصفحة").frame(minHeight: 44).contentShape(Rectangle()) }.disabled(controller.savingAudio || controller.recording) }
-            if controller.microphoneDenied { Button { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } } label: { Text("افتح إعدادات الميكروفون").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } }
+            if controller.microphoneDenied { Button { MadarPlatform.openAppSettings() } label: { Text("افتح إعدادات الميكروفون").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } }
         }
     }
     private var digits: MadarNumberFormatter { AppDiaryService(app: controller.app).digits }

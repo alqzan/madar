@@ -33,7 +33,7 @@ struct BahwBlockView: View {
     private var room: RoomTheme {
         switch block { case .salah: RoomTheme(room: "salah", dark: dark); case .quran: RoomTheme(room: "quran", dark: dark); case .notes: RoomTheme(room: "notes", dark: dark); case .mihbara: RoomTheme(room: "mihbara", dark: dark); default: lobby }
     }
-    private var widgetFamily: WidgetFamily { switch size { case .icon: .accessoryCircular; case .small: .systemSmall; case .wide: .systemMedium; case .large: .systemLarge } }
+    private var widgetFamily: WidgetFamily { switch size { case .icon: .madarIcon; case .small: .systemSmall; case .wide: .systemMedium; case .large: .systemLarge } }
     private var mayReadMihbara: Bool { service.session.protectedDataAuthorized }
     var body: some View {
         content
@@ -91,7 +91,7 @@ struct BahwBlockView: View {
         if size == .icon {
             let payload = service.session.cachedMoneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now)
             VStack(spacing: 2) { Text("لك الآن").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)); displayFigure(payload.rows.first?.value ?? "افتح", "thmanyahserifdisplay-Bold", size: 22, relativeTo: .largeTitle).lineLimit(1).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, maxHeight: .infinity).foregroundStyle(MadarToken.colors["widgetIdentity.room.mal.\(dark ? "dark" : "light").ink"] ?? lobby.ink)
-        } else { MoneyWidgetContent(snapshot: service.session.cachedMoneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now), family: size == .icon ? .accessoryCircular : size == .small ? .systemSmall : size == .wide ? .systemMedium : .systemLarge, template: size == .wide ? "basis" : "now") }
+        } else { MoneyWidgetContent(snapshot: service.session.cachedMoneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now), family: size == .icon ? .madarIcon : size == .small ? .systemSmall : size == .wide ? .systemMedium : .systemLarge, template: size == .wide ? "basis" : "now") }
     }
 
     private func periodRing(_ f: HabitFrequency, rows: [HabitReading], selected: Bool) -> some View {

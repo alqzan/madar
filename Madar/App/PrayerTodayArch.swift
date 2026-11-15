@@ -29,8 +29,8 @@ private extension EnvironmentValues {
 
 struct PrayerTodayArch: View {
     /// On iPad the arches stand taller and wider: the riwaq is the room's centrepiece and the screen has the room for it.
-    static var archHeight: CGFloat { UIDevice.current.userInterfaceIdiom == .pad ? 138 : 92 }
-    private static var archMaxWidth: CGFloat { UIDevice.current.userInterfaceIdiom == .pad ? 86 : 58 }
+    static var archHeight: CGFloat { MadarPlatform.usesPadMetrics ? 138 : 92 }
+    private static var archMaxWidth: CGFloat { MadarPlatform.usesPadMetrics ? 86 : 58 }
     let cell: PrayerCell
     let isNext: Bool
     let title: String

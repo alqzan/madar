@@ -1,6 +1,10 @@
 import Foundation
 import SwiftData
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import CoreText
 import CryptoKit
 import UniformTypeIdentifiers

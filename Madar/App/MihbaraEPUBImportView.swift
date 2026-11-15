@@ -1,6 +1,10 @@
 import SwiftUI
 import SwiftData
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import ImageIO
 import MadarCore
 import MadarData
@@ -40,6 +44,7 @@ import MadarDesign
     }
 }
 
+#if os(iOS)
 struct MihbaraEPUBImportView: View {
     let app: AppSession
     let source: URL
@@ -463,3 +468,14 @@ struct MihbaraEPUBImportView: View {
         return UIImage(cgImage: image)
     }
 }
+#else
+/// EPUB import reads books with Readium, which the Mac app does not include yet; it is reached only from inside the Mihbara room,
+/// which has no entry point on the Mac, so this is never shown.
+struct MihbaraEPUBImportView: View {
+    let app: AppSession
+    let source: URL
+    var turathID: Int? = nil
+    let onImported: () -> Void
+    var body: some View { EmptyView() }
+}
+#endif

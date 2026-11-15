@@ -1,7 +1,11 @@
 #if DEBUG
 import Foundation
 import CryptoKit
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import SwiftData
 import MadarCore
 import MadarData
@@ -11,6 +15,9 @@ import MadarDesign
 extension AppSession {
     /// A drawn jacket for UI shots: deep indigo with a gold eight-point star lattice and a cream title label.
     static func fixtureCoverJPEG() -> Data? {
+        #if os(macOS)
+        return nil
+        #else
         let size = CGSize(width: 600, height: 860)
         let image = UIGraphicsImageRenderer(size: size).image { ctx in
             let g = ctx.cgContext
@@ -36,6 +43,7 @@ extension AppSession {
             ("من مكتبتك" as NSString).draw(in: CGRect(x: 100, y: 460, width: 400, height: 50), withAttributes: [.font: UIFont.systemFont(ofSize: 30, weight: .medium), .foregroundColor: ink, .paragraphStyle: style])
         }
         return image.jpegData(compressionQuality: 0.85)
+        #endif
     }
 
     func prepareMihbaraFixture(group: URL) throws {

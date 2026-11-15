@@ -29,7 +29,7 @@ struct RoomWidgetContent:View {
         let values=room == .upcoming && template == "nearest" ? Array(snapshot.rows.prefix(1)) : snapshot.rows
         return Array(values.prefix(capacity))
     }
-    private var accessory:Bool{[WidgetFamily.accessoryInline,.accessoryCircular,.accessoryRectangular].contains(family)}
+    private var accessory:Bool{family.isMadarAccessory}
     var body:some View {Group{if room == .mihbara{MihbaraRoomWidgetContent(snapshot:mihbaraSnapshot,locked:mihbaraLocked,family:family,numerals:numerals)}else if room == .money { MoneyWidgetContent(snapshot: snapshot, family: family, template: template) } else if accessory{accessoryContent}else{home}}}
     private var home:some View {
         VStack(alignment:.leading,spacing:8) {
@@ -97,9 +97,9 @@ struct RoomWidgetContent:View {
         return room == .upcoming ? row.title+" "+row.value : row.value
     }
     @ViewBuilder private var accessoryContent:some View {
-        if family == .accessoryInline {
+        if family.isMadarAccessoryInline {
             Text(room.title+"، "+accessoryValue).font(.caption).lineLimit(1).privacySensitive(room == .habits || room == .upcoming)
-        } else if family == .accessoryCircular {
+        } else if family.isMadarAccessoryCircular {
             ZStack {
                 Circle().trim(from: 0.08, to: 0.92).stroke(.primary.opacity(0.25), style: .init(lineWidth: 3, lineCap: .round)).rotationEffect(.degrees(-90))
                 if snapshot?.locked != true && !(room == .habits && template == "coming") {
@@ -207,10 +207,10 @@ private struct MihbaraRoomWidgetContent:View {
     }
     var body:some View {
         Group {
-            if [WidgetFamily.accessoryInline,.accessoryCircular,.accessoryRectangular].contains(family) { accessory }
+            if family.isMadarAccessory { accessory }
             else { home }
         }
-        .foregroundStyle(family == .accessoryInline || family == .accessoryCircular || family == .accessoryRectangular ? Color.primary : theme.ink)
+        .foregroundStyle(family.isMadarAccessory ? Color.primary : theme.ink)
         .environment(\.layoutDirection,.rightToLeft)
         .privacySensitive()
     }
@@ -256,9 +256,9 @@ private struct MihbaraRoomWidgetContent:View {
         }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
     }
     @ViewBuilder private var accessory:some View {
-        if family == .accessoryInline {
+        if family.isMadarAccessoryInline {
             Text("المحبرة، "+(locked ? "افتح مدار" : fallbackTitle ?? "رفّك ينتظرك")).font(.caption).lineLimit(1)
-        } else if family == .accessoryCircular {
+        } else if family.isMadarAccessoryCircular {
             ZStack {
                 Circle().stroke(.primary.opacity(0.25),lineWidth:3)
                 if !locked,let page=snapshot?.currentBook?.currentPage {

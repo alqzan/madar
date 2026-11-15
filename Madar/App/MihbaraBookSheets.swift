@@ -1,6 +1,10 @@
 import SwiftUI
 import SwiftData
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import UniformTypeIdentifiers
 import MadarCore
 import MadarDesign
@@ -573,7 +577,7 @@ struct MihbaraBookCard: View {
         }
         .task { page = digits.string(book.page ?? 0).filter { $0.wholeNumberValue != nil } }
         .confirmationDialog("رف «أقرأها» ممتلئ: اختر كتابًا يرجع إلى «أبي أقرأها»", isPresented: $choosingSlot, titleVisibility: .visible) { ForEach(books.filter { $0.shelf == "reading" && $0.id != book.id }) { old in Button(old.title) { move("reading", replacing: old.id) } } }
-        .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } } }
+        .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { MadarPlatform.endEditing() } } }
         .presentationDetents(book.kind == "paper" ? [.height(book.shelf == "reading" ? 520 : 360)] : [.large])
     }
     private var paperBookContent: some View {
@@ -746,6 +750,7 @@ struct MihbaraHadithView: View {
 }
 private func mihbaraInteger(_ value: String) -> Int? { let clean = value.trimmingCharacters(in: .whitespacesAndNewlines); guard !clean.isEmpty, clean.allSatisfy({ $0.wholeNumberValue != nil }) else { return nil }; return Int(clean.compactMap { $0.wholeNumberValue.map(String.init) }.joined()) }
 
+#if os(iOS)
 /// R01: the bundled Sunnah text uses native TextKit 2, without custom pagination.
 private struct MihbaraHadithText: UIViewRepresentable {
     var text: String
@@ -768,3 +773,15 @@ private struct MihbaraHadithText: UIViewRepresentable {
         return .init(width: width, height: uiView.sizeThatFits(.init(width: width, height: .greatestFiniteMagnitude)).height)
     }
 }
+#else
+/// The Mac draws the bundled Sunnah text with SwiftUI: the same Amiri face, right to left, selectable.
+private struct MihbaraHadithText: View {
+    var text: String
+    var ink: Color
+    var body: some View {
+        Text(text).font(.custom("Amiri-Regular", size: 26, relativeTo: .title2)).foregroundStyle(ink).lineSpacing(8)
+            .multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
+            .accessibilityIdentifier("mihbara-hadith-text")
+    }
+}
+#endif

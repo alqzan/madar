@@ -1,7 +1,11 @@
 import SwiftUI
 import Photos
 import ImageIO
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import UniformTypeIdentifiers
 import SwiftData
 import MadarCore
@@ -134,6 +138,7 @@ private struct DiaryDayPhotoThumb: View {
     }
 }
 
+#if os(iOS)
 /// Opens the system camera directly from the diary. Captures are handed back as
 /// images and reduced to Madar's existing small local attachment copy.
 struct DiaryCameraCapture: UIViewControllerRepresentable {
@@ -162,3 +167,4 @@ struct DiaryCameraCapture: UIViewControllerRepresentable {
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { cancelled() }
     }
 }
+#endif

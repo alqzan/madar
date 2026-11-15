@@ -10,7 +10,6 @@ import MadarCommands
 import MadarInbox
 import MadarMoney
 import MadarPrayer
-import UIKit
 
 typealias JSONValue = MadarData.JSONValue
 struct AppUndoToken { let id: UUID; let expiresAt: Date }
@@ -200,10 +199,10 @@ final class AppSession {
         try (self.syncService as? AppSyncService)?.processLocalHistory()
         WidgetCenter.shared.reloadAllTimelines()
     }, shouldPause: { [weak self] in
-        self?.maintenanceInProgress != false || !UIApplication.shared.isProtectedDataAvailable
+        self?.maintenanceInProgress != false || !MadarPlatform.isProtectedDataAvailable
     }, authorization: { [weak self] command in
         guard let self else { return .init(status: .needsApp) }
-        guard UIApplication.shared.isProtectedDataAvailable else { return .init(status: .needsUnlock) }
+        guard MadarPlatform.isProtectedDataAvailable else { return .init(status: .needsUnlock) }
         // §16 authorize: prayer.log and habit.complete are blindWrite even with whole-app Face ID protection.
         // App-only settings never enter via transport, even if it claims source: app.
         if CommandBus.transportBlindWriteNames.contains(command.name) { return nil }
@@ -1420,8 +1419,7 @@ final class AppSession {
     }
 #endif
     func openPrayerNotificationSettings() {
-        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-        UIApplication.shared.open(url)
+        MadarPlatform.openNotificationSettings()
     }
     func updateNotificationAuthorization(_ state: String) { notificationAuthorization = state }
     var notificationsAuthorized: Bool { ["authorized", "provisional", "ephemeral"].contains(notificationAuthorization) }
@@ -1499,7 +1497,7 @@ final class AppSession {
         // app may be suspended at any moment, so the files are written now. `.inactive` is NOT background: it is the state of a cold
         // launch and of every return to the app, exactly when the first screen must appear (owner 7 Nov: «أول ما أفتح التطبيق يعلق»);
         // leaving the app still writes at once through `flushPendingSnapshot`.
-        if Self.publishesSnapshotsImmediately || UIApplication.shared.applicationState == .background {
+        if Self.publishesSnapshotsImmediately || MadarPlatform.isInBackground {
             snapshotTask?.cancel(); snapshotTask = nil; try publishSnapshotNow(); return
         }
         snapshotTask?.cancel()
