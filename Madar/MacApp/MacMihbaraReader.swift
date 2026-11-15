@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 import MadarCore
+import MadarData
 import MadarDesign
 
 /// The Mihbara EPUB reader on the Mac (owner, 15 Nov 2026: «ابي المحبره»). Readium is iOS-only (its shared module imports UIKit),
@@ -18,6 +19,7 @@ struct MihbaraReaderView: View {
     let close: () -> Void
 
     @Environment(\.roomTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @State private var publication: MacEPUB?
     @State private var failure: String?
     @State private var chapter = 0
@@ -44,6 +46,31 @@ struct MihbaraReaderView: View {
             guard let m = publication.mark(fromLocatorJSON: h.locatorJSON), m.chapter == chapter else { return nil }
             return MacEPUBMark(id: h.id, selector: m.selector, color: h.color)
         }
+    }
+    /// The reader theme shared with iPhone and iPad (`mihbara.readerAr` / `mihbara.readerEn` → `theme`); «تلقائي» is paper by
+    /// day and night after dark, the same colours as the iPhone reader.
+    private var settingsKey: String { book.language == "en" ? "mihbara.readerEn" : "mihbara.readerAr" }
+    private var readerSettings: [String: MadarData.JSONValue] {
+        var merged = app.schema.settings.first(where: { $0.key == settingsKey })?.defaultValue.object ?? [:]
+        if case .object(let stored)? = app.values[settingsKey] { merged.merge(stored) { _, new in new } }
+        return merged
+    }
+    private var readerTheme: String { readerSettings["theme"]?.string ?? "auto" }
+    private var readerColors: (paper: Color, ink: Color) {
+        let name = readerTheme == "auto" ? (colorScheme == .dark ? "night" : "paper") : readerTheme
+        let hex: (String, String) = switch name {
+        case "warm": ("#F3E7CF", "#2E2216")
+        case "calm": ("#E5E4DF", "#1F1E1B")
+        case "night": ("#1F1C17", "#E9E1D2")
+        case "black": ("#000000", "#D9D3C7")
+        default: ("#FAF6EA", "#2A2118")
+        }
+        return (Color(macReaderHex: hex.0), Color(macReaderHex: hex.1))
+    }
+    private func setReaderTheme(_ value: String) {
+        var settings = readerSettings
+        settings["theme"] = .string(value)
+        app.set(.object(settings), key: settingsKey)
     }
     private var paragraphMark: MacEPUBMark? { paragraph.flatMap { p in marks.last { $0.selector == p.selector } } }
 
@@ -74,6 +101,12 @@ struct MihbaraReaderView: View {
                     } label: { Image(systemName: "list.bullet") }
                     .menuIndicator(.hidden).fixedSize().accessibilityLabel("الفهرس")
                 }
+                Menu {
+                    ForEach([("auto", "تلقائي"), ("paper", "ورق"), ("warm", "دافئ"), ("calm", "هادئ"), ("night", "ليل"), ("black", "أسود")], id: \.0) { value, title in
+                        Button(readerTheme == value ? "\(title) ✓" : title) { setReaderTheme(value) }
+                    }
+                } label: { Image(systemName: "circle.lefthalf.filled") }
+                .menuIndicator(.hidden).fixedSize().accessibilityLabel("لون الصفحة")
                 Button { fontScale = max(0.8, fontScale - 0.1) } label: { Image(systemName: "textformat.size.smaller") }
                     .keyboardShortcut("-", modifiers: .command).accessibilityLabel("تصغير الخط")
                 Button { fontScale = min(1.8, fontScale + 0.1) } label: { Image(systemName: "textformat.size.larger") }
@@ -84,7 +117,7 @@ struct MihbaraReaderView: View {
             Group {
                 if let publication {
                     MacEPUBWebView(publication: publication, chapter: chapter, startProgression: startProgression,
-                                   fontScale: fontScale, paper: theme.surface, ink: theme.ink, page: page, marks: marks)
+                                   fontScale: fontScale, paper: readerColors.paper, ink: readerColors.ink, page: page, marks: marks)
                 } else if let failure {
                     VStack(spacing: 14) {
                         Text(failure).font(MadarTypography.body()).multilineTextAlignment(.center)
@@ -101,7 +134,7 @@ struct MihbaraReaderView: View {
                         .disabled(chapter == 0).keyboardShortcut(.leftArrow, modifiers: .command)
                     Spacer()
                     Text("الفصل \((chapter + 1).formatted()) من \(publication.spine.count.formatted())")
-                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        .font(MadarTypography.caption()).foregroundStyle(readerColors.ink)
                     Spacer()
                     Button { move(by: 1) } label: { Label("الفصل التالي", systemImage: "chevron.left") }
                         .disabled(chapter >= publication.spine.count - 1).keyboardShortcut(.rightArrow, modifiers: .command)
@@ -109,7 +142,8 @@ struct MihbaraReaderView: View {
                 .buttonStyle(.borderless).padding(.horizontal, 20).padding(.vertical, 10)
             }
         }
-        .background(theme.surface)
+        .background(readerColors.paper)
+        .foregroundStyle(readerColors.ink)
         .environment(\.layoutDirection, .rightToLeft)
         .task { await open() }
         .sheet(isPresented: Binding(get: { footnote != nil }, set: { if !$0 { footnote = nil } })) {
@@ -624,5 +658,12 @@ private struct MacEPUBWebView: NSViewRepresentable {
             }
             return .cancel
         }
+    }
+}
+
+private extension Color {
+    init(macReaderHex hex: String) {
+        let value = UInt32(hex.dropFirst(), radix: 16) ?? 0
+        self.init(red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255, blue: Double(value & 0xFF) / 255)
     }
 }
