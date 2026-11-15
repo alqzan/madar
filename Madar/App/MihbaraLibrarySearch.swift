@@ -1,7 +1,9 @@
 import Foundation
 import PDFKit
 import SwiftUI
+#if os(iOS)
 import ReadiumShared
+#endif
 import MadarCore
 import MadarDesign
 
@@ -34,6 +36,7 @@ struct MihbaraTextHit: Identifiable {
         return Array(hits.prefix(total))
     }
 
+    #if os(iOS)
     private static func epub(_ needle: String, _ book: MihbaraBook, _ service: AppMihbaraService) async -> [MihbaraTextHit] {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("MadarSearch-" + UUID().uuidString).appendingPathExtension("epub")
         defer { try? FileManager.default.removeItem(at: file) }
@@ -52,6 +55,43 @@ struct MihbaraTextHit: Identifiable {
         }
         return hits
     }
+
+    #else
+    /// The Mac has no Readium: the book is unpacked by the Mac reader's own EPUB loader and each chapter's text searched with
+    /// the same rules (case and diacritics ignored). A hit opens the reader at that chapter and its place in it.
+    private static func epub(_ needle: String, _ book: MihbaraBook, _ service: AppMihbaraService) async -> [MihbaraTextHit] {
+        guard let data = await service.readableBookData(for: book) else { return [] }
+        let found = await macMatches(needle, in: data, limit: perBook)
+        return found.map { MihbaraTextHit(bookID: book.id, title: book.title, before: tail($0.before), match: $0.match,
+                                         after: head($0.after), locatorJSON: $0.locator) }
+    }
+
+    private struct MacMatch: Sendable { let before: String, match: String, after: String, locator: String? }
+
+    @concurrent private static func macMatches(_ needle: String, in data: Data, limit: Int) async -> [MacMatch] {
+        guard let publication = try? MacEPUB(data: data) else { return [] }
+        defer { publication.discard() }
+        var matches: [MacMatch] = []
+        for chapter in publication.spine.indices where matches.count < limit && !Task.isCancelled {
+            guard let html = try? String(contentsOf: publication.url(chapter: chapter), encoding: .utf8) else { continue }
+            let text = MacEPUB.plainText(html)
+            let length = Double(max(text.count, 1))
+            var searchRange: Range<String.Index> = text.startIndex..<text.endIndex
+            while matches.count < limit,
+                  let hit = text.range(of: needle, options: [.caseInsensitive, .diacriticInsensitive], range: searchRange) {
+                let offset = Double(text.distance(from: text.startIndex, to: hit.lowerBound))
+                let beforeStart = text.index(hit.lowerBound, offsetBy: -60, limitedBy: text.startIndex) ?? text.startIndex
+                let afterEnd = text.index(hit.upperBound, offsetBy: 60, limitedBy: text.endIndex) ?? text.endIndex
+                matches.append(MacMatch(before: String(text[beforeStart..<hit.lowerBound]), match: String(text[hit]),
+                                        after: String(text[hit.upperBound..<afterEnd]),
+                                        locator: publication.locatorJSON(chapter: chapter, progression: offset / length)))
+                searchRange = hit.upperBound..<text.endIndex
+            }
+        }
+        return matches
+    }
+
+    #endif
 
     private static func writeBook(_ book: MihbaraBook, to file: URL, _ service: AppMihbaraService) async -> Bool {
         guard let data = await service.readableBookData(for: book) else { return false }
@@ -75,10 +115,10 @@ struct MihbaraTextHit: Identifiable {
         return found.map { .init(bookID: book.id, title: book.title, before: tail($0.before), match: $0.match, after: head($0.after), pdfPage: $0.page) }  // 0-based, as the reader's `startPage` is
     }
 
-    private static func clean(_ text: String?) -> String { (text ?? "").replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression) }
+    nonisolated private static func clean(_ text: String?) -> String { (text ?? "").replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression) }
     // The side touching the match keeps its space, so «الكتاب نافذة هادئة» never reads as one word.
-    private static func tail(_ text: String?) -> String { let t = clean(text); return t.count > 50 ? "…" + String(String(t.suffix(50)).drop { $0 == " " }) : t }
-    private static func head(_ text: String?) -> String { let t = clean(text); return t.count > 50 ? String(String(t.prefix(50)).reversed().drop { $0 == " " }.reversed()) + "…" : t }
+    nonisolated private static func tail(_ text: String?) -> String { let t = clean(text); return t.count > 50 ? "…" + String(String(t.suffix(50)).drop { $0 == " " }) : t }
+    nonisolated private static func head(_ text: String?) -> String { let t = clean(text); return t.count > 50 ? String(String(t.prefix(50)).reversed().drop { $0 == " " }.reversed()) + "…" : t }
 }
 
 /// Inside «مكتبتي»: an offer to look inside the books for the typed words, then the matches grouped by book.

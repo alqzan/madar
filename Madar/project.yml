@@ -131,7 +131,7 @@ targets:
     sources:
       - path: MacApp
       - path: App
-        excludes: [MadarApp.swift, TabShell.swift, Info.plist, "*.entitlements", PrayerNotifications.swift, AppBackupBackgroundTasks.swift, MihbaraContentsSheet.swift, MihbaraEPUBLoader.swift, MihbaraPDFInk.swift, MihbaraPaperCapture.swift, MihbaraPaperIndexEditor.swift, MihbaraReaderView.swift, MihbaraLibrarySearch.swift, PrayerActivityAttributes.swift, MihbaraFootnoteCard.swift, MihbaraPageNoteSheet.swift, MihbaraQuoteCardArtwork.swift, MihbaraQuoteCardSheet.swift, MihbaraReaderSettingsSheet.swift, MihbaraTranslationSheet.swift, MihbaraWordCard.swift, LockWidgetGallery.swift, WidgetMakerView.swift, RoomWidgetsGallery.swift]
+        excludes: [MadarApp.swift, TabShell.swift, Info.plist, "*.entitlements", PrayerNotifications.swift, AppBackupBackgroundTasks.swift, MihbaraContentsSheet.swift, MihbaraEPUBLoader.swift, MihbaraPDFInk.swift, MihbaraPaperCapture.swift, MihbaraPaperIndexEditor.swift, MihbaraReaderView.swift, PrayerActivityAttributes.swift, MihbaraFootnoteCard.swift, MihbaraPageNoteSheet.swift, MihbaraQuoteCardArtwork.swift, MihbaraQuoteCardSheet.swift, MihbaraReaderSettingsSheet.swift, MihbaraTranslationSheet.swift, MihbaraWordCard.swift, LockWidgetGallery.swift, WidgetMakerView.swift, RoomWidgetsGallery.swift]
     dependencies:
       - package: MadarCore
       - package: MadarData

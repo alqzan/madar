@@ -24,6 +24,15 @@ struct MihbaraReaderView: View {
     @State private var startProgression = 0.0
     @State private var fontScale = 1.0
     @State private var page = MacEPUBPage()
+    @Environment(\.scenePhase) private var scenePhase
+    // Reading time, counted the same way as the iPhone reader: active seconds (idle pauses after five minutes), sessions of a
+    // minute or more, forward positions of about 1024 characters each (Readium's position size) for the reading wird.
+    @State private var clock: ActiveReadingClock?
+    @State private var sessionID = UUID()
+    @State private var sessionStart: Date?
+    @State private var sessionStartChapter = 0
+    @State private var sessionStartProgression = 0.0
+    @State private var positions = ReadingPositionProgress()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -70,7 +79,10 @@ struct MihbaraReaderView: View {
         .background(theme.surface)
         .environment(\.layoutDirection, .rightToLeft)
         .task { await open() }
-        .onDisappear { save(); publication?.discard() }
+        .onDisappear { save(); endSession(at: Date()); publication?.discard() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { beginSession(at: Date()) } else { save(); endSession(at: Date()) }
+        }
     }
 
     private func open() async {
@@ -84,6 +96,8 @@ struct MihbaraReaderView: View {
                 chapter = min(opened.spine.count - 1, Int((Double(volume) / Double(max(volume + 1, 1))) * Double(opened.spine.count)))
             }
             publication = opened
+            page.onChange = { [self] progression in observe(progression) }
+            beginSession(at: Date())
         } catch {
             failure = "تعذّر فتح الكتاب على الماك. \(madarUserMessage(error))"
         }
@@ -95,6 +109,48 @@ struct MihbaraReaderView: View {
         chapter = min(max(chapter + delta, 0), publication.spine.count - 1)
         startProgression = delta < 0 ? 1 : 0
         page.progression = startProgression
+        observe(startProgression, jump: true)
+    }
+
+    private func beginSession(at now: Date) {
+        guard let publication, clock == nil, scenePhase == .active else { return }
+        clock = ActiveReadingClock(startedAt: now)
+        sessionID = UUID()
+        sessionStart = now
+        sessionStartChapter = chapter
+        sessionStartProgression = page.progression
+        positions = ReadingPositionProgress(startingAt: publication.position(chapter: chapter, progression: page.progression), at: now)
+    }
+
+    private func observe(_ progression: Double, jump: Bool = false) {
+        guard let publication, var clock else { return }
+        let now = Date()
+        clock.advance(to: now)
+        clock.interaction(at: now)
+        self.clock = clock
+        positions.observe(position: publication.position(chapter: chapter, progression: progression), at: now, explicitJump: jump)
+    }
+
+    private func endSession(at now: Date) {
+        guard let publication, var clock, let sessionStart else { return }
+        clock.advance(to: now)
+        self.clock = nil
+        let active = min(86_400, clock.activeSeconds)
+        guard active >= 60,
+              let first = publication.locatorJSON(chapter: sessionStartChapter, progression: sessionStartProgression),
+              let last = publication.locatorJSON(chapter: chapter, progression: page.progression) else { return }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let startTotal = publication.totalProgression(chapter: sessionStartChapter, progression: sessionStartProgression)
+        let endTotal = max(startTotal, publication.totalProgression(chapter: chapter, progression: page.progression))
+        MihbaraReadingSaveCoordinator.forSession(app).enqueue(sessionID: sessionID, payload: [
+            "id": .string(sessionID.uuidString), "bookID": .string(book.id.uuidString),
+            "start": .string(formatter.string(from: sessionStart)), "end": .string(formatter.string(from: now)),
+            "activeSeconds": .number(Double(active)), "fromPage": .number(0), "toPage": .number(0),
+            "startLocator": .string(first), "endLocator": .string(last),
+            "startProgression": .number(startTotal), "endProgression": .number(endTotal),
+            "pagesCounted": .number(Double(positions.pagesCounted))
+        ])
     }
 
     private func save() {
@@ -106,12 +162,18 @@ struct MihbaraReaderView: View {
 }
 
 /// The scroll position the web view reports, kept outside SwiftUI state so a scroll does not redraw the reader.
-final class MacEPUBPage { var progression = 0.0 }
+@MainActor final class MacEPUBPage {
+    var progression = 0.0
+    var onChange: ((Double) -> Void)?
+    func report(_ value: Double) { progression = value; onChange?(value) }
+}
 
 /// An unpacked EPUB: the folder it lives in and its reading order (paths relative to the publication root, as Readium writes them).
 struct MacEPUB: Sendable {
     let root: URL
     let spine: [String]
+    /// Each spine file's size in bytes, used to weigh progress across chapters and to count positions as Readium does.
+    let sizes: [Int]
 
     init(data: Data) throws {
         let zip = try ZIPReader(data: data)
@@ -136,6 +198,9 @@ struct MacEPUB: Sendable {
         guard !spine.isEmpty else { throw MacEPUBError.unreadable }
         self.root = root
         self.spine = spine
+        self.sizes = spine.map { path in
+            ((try? FileManager.default.attributesOfItem(atPath: root.appendingPathComponent(path).path)[.size]) as? Int).map { max($0, 1) } ?? 1
+        }
     }
 
     func url(chapter: Int) -> URL { root.appendingPathComponent(spine[chapter]) }
@@ -148,6 +213,16 @@ struct MacEPUB: Sendable {
 
     func discard() { try? FileManager.default.removeItem(at: root) }
 
+    /// A chapter's readable text: markup, scripts and styles removed, entities for spaces and brackets decoded, spaces collapsed.
+    static func plainText(_ html: String) -> String {
+        var text = html.replacingOccurrences(of: "<(head|script|style)[^>]*>[\\s\\S]*?</\\1>", with: " ", options: .regularExpression)
+        text = text.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+        for (entity, value) in [("&nbsp;", " "), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&#39;", "'"), ("&amp;", "&")] {
+            text = text.replacingOccurrences(of: entity, with: value)
+        }
+        return text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces)
+    }
+
     func place(fromLocatorJSON json: String) -> (chapter: Int, progression: Double)? {
         guard let object = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any],
               var href = object["href"] as? String else { return nil }
@@ -159,12 +234,23 @@ struct MacEPUB: Sendable {
         return (index, min(max((locations?["progression"] as? Double) ?? 0, 0), 1))
     }
 
+    func totalProgression(chapter: Int, progression: Double) -> Double {
+        let all = Double(sizes.reduce(0, +))
+        let before = Double(sizes.prefix(chapter).reduce(0, +))
+        return min(max((before + min(max(progression, 0), 1) * Double(sizes[chapter])) / max(all, 1), 0), 1)
+    }
+
+    func position(chapter: Int, progression: Double) -> Int {
+        let before = sizes.prefix(chapter).reduce(0, +)
+        return (before + Int(min(max(progression, 0), 1) * Double(sizes[chapter]))) / 1024 + 1
+    }
+
     func locatorJSON(chapter: Int, progression: Double) -> String? {
         let p = min(max(progression, 0), 1)
-        let total = (Double(chapter) + p) / Double(max(spine.count, 1))
+        let total = totalProgression(chapter: chapter, progression: p)
         let object: [String: Any] = ["href": spine[chapter], "type": "application/xhtml+xml",
                                      "locations": ["progression": p, "totalProgression": total]]
-        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else { return nil }
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .withoutEscapingSlashes]) else { return nil }
         return String(data: data, encoding: .utf8)
     }
 }
@@ -281,7 +367,7 @@ private struct MacEPUBWebView: NSViewRepresentable {
         }
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-            if let value = message.body as? Double { page.progression = min(max(value, 0), 1) }
+            if let value = message.body as? Double { MainActor.assumeIsolated { page.report(min(max(value, 0), 1)) } }
         }
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
@@ -289,24 +375,4 @@ private struct MacEPUBWebView: NSViewRepresentable {
             action.request.url?.isFileURL == true ? .allow : .cancel
         }
     }
-}
-
-/// Full-text search across EPUB books uses Readium's search service, which is iOS-only. On the Mac the library search finds books
-/// by title and author (the shared list below the field); the in-text hits section stays empty.
-struct MihbaraTextSearchSection: View {
-    let query: String
-    let books: [MihbaraBook]
-    let service: AppMihbaraService
-    let open: (MihbaraTextHit) -> Void
-    var body: some View { EmptyView() }
-}
-
-/// The same hit record as the iOS library search, so the shared library sheet compiles unchanged.
-struct MihbaraTextHit: Identifiable {
-    let id = UUID()
-    let bookID: UUID
-    let title: String
-    let before: String, match: String, after: String
-    var locatorJSON: String? = nil
-    var pdfPage: Int? = nil
 }
