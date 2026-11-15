@@ -17,12 +17,12 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.alqzan.madar2</string>
+			<string>com.alqzan.madar2.mac</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>madar</string>
@@ -30,11 +30,13 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.lifestyle</string>
+	<key>MadarCloudKitContainer</key>
+	<string>$(MADAR_CLOUDKIT_CONTAINER)</string>
 	<key>NSLocationUsageDescription</key>
 	<string>يقرأ مدار موقعك مرة واحدة ليعرف مدينتك ويحسب مواقيت الصلاة بدقة. يحفظ المدينة وإحداثياتها على جهازك فقط.</string>
 	<key>NSMicrophoneUsageDescription</key>

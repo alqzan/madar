@@ -1542,13 +1542,47 @@ final class AppSession {
         }
         let snapshot = SnapshotEnvelope(name: "foundation", generatedAt: instant, validUntil: instant.addingTimeInterval(3600), dayKey: key.dayKey, tzID: place.timeZoneID, privacy: SnapshotPrivacy(), payload: FoundationSnapshot(firstCalendar: string("core.firstCalendar"), numerals: string("core.numerals")))
         try snapshotStore.write(snapshot)
-        try publishRoomWidgetSnapshots(at:instant,readHabitReadings:sharedHabitReadings)
+        let watchDayEnd = try publishRoomWidgetSnapshots(at:instant,readHabitReadings:sharedHabitReadings)
         publishPrayerNextSnapshot(at: instant, tzID: place.timeZoneID, dayKey: key.dayKey)
         let quran = AppQuranService(session: self, clock: { instant })
         do { try snapshotStore.write(quran.widgetSnapshot()); WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran") }
         catch { try? redactQuranWidgetSnapshot() }
         try publishWidgetCatalog(at: instant, readHabitReadings: sharedHabitReadings)
+#if os(iOS)
+        publishWatchDashboard(at: instant, dayKey: key.dayKey, timeZoneID: place.timeZoneID, dayEnd: watchDayEnd)
+#endif
     }
+#if os(iOS)
+    private func publishWatchDashboard(at instant: Date, dayKey: String, timeZoneID: String, dayEnd: Date) {
+        let prayerSchedule = snapshotStore.read("prayerNext", as: PrayerNextSnapshot.self, now: instant)?.payload.items
+            .filter { $0.at > instant }
+            .map { WatchDashboardSnapshot.NextPrayer(name: $0.name, at: $0.at) } ?? []
+        let quran = snapshotStore.read("quran", as: QuranWidgetSnapshot.self, now: instant)?.payload
+        let habits = snapshotStore.read(BuiltRoomWidget.habits.rawValue, as: RoomWidgetSnapshot.self, now: instant)
+        let foundation = snapshotStore.read("foundation", as: FoundationSnapshot.self, now: instant)?.payload
+        let today = AppBahwService(session: self, evaluationDate: instant).today
+        let dates = dateLabels(today)
+        let habitProgress: WatchDashboardSnapshot.Progress?
+        if let completed = habits?.payload.habitCompletedToday, let total = habits?.payload.habitDueToday {
+            habitProgress = .init(completed: completed, total: total)
+        } else {
+            habitProgress = nil
+        }
+        let payload = WatchDashboardSnapshot(
+            datePrimary: dates.primary,
+            dateSecondary: dates.secondary,
+            numerals: foundation?.numerals ?? string("core.numerals"),
+            prayers: prayerSchedule,
+            quran: quran.map { .init(completed: $0.done, total: $0.total) },
+            habits: habitProgress
+        )
+        let envelope = SnapshotEnvelope(name: "watchDashboard", generatedAt: instant,
+                                        validUntil: min(instant.addingTimeInterval(8 * 3600), max(instant.addingTimeInterval(60), dayEnd)),
+                                        dayKey: dayKey, tzID: timeZoneID,
+                                        privacy: SnapshotPrivacy(), payload: payload)
+        try? MadarWatchSnapshotPublisher.shared.publish(envelope)
+    }
+#endif
     /// The next-prayer widget reads this file only; it holds times, never counts or streaks (RP9, RU2).
     private func publishPrayerNextSnapshot(at instant: Date, tzID: String, dayKey: String) {
         let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]

@@ -40,8 +40,12 @@ test-ios: generate
 	xcodebuild -project Madar.xcodeproj -scheme Madar -destination 'platform=iOS Simulator,id=$(SIMULATOR)' -derivedDataPath DerivedData -resultBundlePath Artifacts/M0-tests-$$(date +%s).xcresult CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES test
 test-links: generate
 	SIMULATOR=$(SIMULATOR) python3 scripts/deep-link-test.py
-# Deferred under RA1. Retained command is guarded against accidental activation.
+# Owner authorized development-environment testing with synthetic stores on 15 Nov; keep the guard to prevent accidental use later.
 cloud-device:
 	@test "$(CLOUDKIT_OWNER_AUTHORIZED)" = "YES" || (echo "CloudKit is deferred under RA1; explicit owner authorization required."; exit 1)
 	$(MAKE) generate
 	xcodebuild -project Madar.xcodeproj -scheme Madar -destination 'generic/platform=iOS' -derivedDataPath DerivedData -allowProvisioningUpdates DEVELOPMENT_TEAM=$(TEAM) MADAR_CLOUDKIT_CONTAINER=iCloud.com.alqzan.madar2 MADAR_APP_ENTITLEMENTS=App/Madar-CloudKit.entitlements build
+cloud-mac:
+	@test "$(CLOUDKIT_OWNER_AUTHORIZED)" = "YES" || (echo "CloudKit is deferred under RA1; explicit owner authorization required."; exit 1)
+	$(MAKE) generate
+	xcodebuild -project Madar.xcodeproj -scheme MadarMac -destination 'generic/platform=macOS' -derivedDataPath DerivedData -allowProvisioningUpdates DEVELOPMENT_TEAM=$(TEAM) MADAR_CLOUDKIT_CONTAINER=iCloud.com.alqzan.madar2 MADAR_MAC_ENTITLEMENTS=MacApp/MadarMac-CloudKit.entitlements build

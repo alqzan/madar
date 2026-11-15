@@ -246,18 +246,18 @@ struct MihbaraPDFReaderView: View {
             }
             #endif
             async let bytesTask = service.pdfDataOffMain(for: book)
-            #if os(iOS)
+            #if os(iOS) || os(macOS)
             async let inkTask = try? service.pageInkOffMain(bookID: book.id)
             #endif
             let bytes = try await bytesTask
-            #if os(iOS)
+            #if os(iOS) || os(macOS)
             let savedInk = await inkTask
             #endif
             try Task.checkCancellation()
             guard document == nil, let opened = PDFDocument(data: bytes), !opened.isLocked, opened.pageCount > 0,
                   opened.page(at: 0) != nil else { throw PDFReaderError.unreadable }
             document = opened
-            #if os(iOS)
+            #if os(iOS) || os(macOS)
             inkLayer = savedInk.map { makeInkLayer(saved: $0) }
             #endif
             pageIndex = startPage.map { min(max($0, 0), opened.pageCount - 1) } ?? restoredIndex(count: opened.pageCount)
@@ -390,7 +390,7 @@ struct MihbaraPDFReaderView: View {
         readingClock = nil
     }
 
-    #if os(iOS)
+    #if os(iOS) || os(macOS)
     /// A failed saved-drawing read leaves the reader open without the pen rather than risk overwriting them.
     @MainActor private func makeInkLayer(saved: [Int: Data]) -> MihbaraInkOverlay {
         let bookID = book.id

@@ -30,8 +30,11 @@ public struct RoomWidgetSnapshot:Codable,Sendable,Equatable {
     public var periods:[Row]
     /// Optional upcoming recurring habit dates; absent in snapshots written by older app versions.
     public var upcomingHabits:[Row]? = nil
+    /// Habit totals for the current day, present only for the habits room and only after a successful read.
+    public var habitCompletedToday:Int? = nil
+    public var habitDueToday:Int? = nil
     public var locked:Bool
-    public init(datePrimary:String,dateSecondary:String,heading:String,emptyTitle:String,rows:[Row]=[],periods:[Row]=[],upcomingHabits:[Row]?=nil,locked:Bool=false){self.datePrimary=datePrimary;self.dateSecondary=dateSecondary;self.heading=heading;self.emptyTitle=emptyTitle;self.rows=rows;self.periods=periods;self.upcomingHabits=upcomingHabits;self.locked=locked}
+    public init(datePrimary:String,dateSecondary:String,heading:String,emptyTitle:String,rows:[Row]=[],periods:[Row]=[],upcomingHabits:[Row]?=nil,habitCompletedToday:Int?=nil,habitDueToday:Int?=nil,locked:Bool=false){self.datePrimary=datePrimary;self.dateSecondary=dateSecondary;self.heading=heading;self.emptyTitle=emptyTitle;self.rows=rows;self.periods=periods;self.upcomingHabits=upcomingHabits;self.habitCompletedToday=habitCompletedToday;self.habitDueToday=habitDueToday;self.locked=locked}
     public func hasVisibleRows(for room:BuiltRoomWidget, template:String) -> Bool {
         if room == .habits && template == "periods" { return !periods.isEmpty }
         if room == .habits && template == "coming" { return !(upcomingHabits ?? []).isEmpty }

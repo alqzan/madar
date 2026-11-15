@@ -63,8 +63,16 @@ private struct UnprovisionedAccountProvider: CloudAccountProviding {
         // CKContainer traps for an identifier the build is not entitled to: only a provisioned build asks iCloud.
         let accounts: any CloudAccountProviding = containerID.map { AppleCloudAccountProvider(containerIdentifier: $0) } ?? UnprovisionedAccountProvider()
         coordinator = SyncCoordinator(adapter: adapter, accountProvider: accounts,
-            provisioning: SyncProvisioning(appGroupAvailable: true, verifiedEntitlements: containerID != nil, cloudKitContainerIdentifier: containerID))
+            provisioning: SyncProvisioning(appGroupAvailable: true, verifiedEntitlements: containerID != nil, cloudKitContainerIdentifier: containerID),
+            onCloudImportSuccess: { [weak session] in
+                guard let session else { return }
+                do { try session.reload(); try session.publishSnapshot() }
+                catch { session.errorMessage = "وصل تحديث iCloud، لكن تعذّر تحديث واجهة مدار. \(madarUserMessage(error))" }
+            })
         coordinator.startObserving()
+        if containerID != nil {
+            Task { await coordinator.refreshAccount() }
+        }
     }
     func status() async throws -> SyncUIStatus {
         await coordinator.refreshAccount()

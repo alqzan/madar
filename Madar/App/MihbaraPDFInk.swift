@@ -80,45 +80,6 @@ enum MihbaraInkTool: String, CaseIterable, Identifiable {
     }
 }
 
-extension AppMihbaraService {
-    /// The saved drawings of a PDF book, by 0-based page index.
-    func pageInk(bookID: UUID) throws -> [Int: Data] {
-        try Self.pageInk(container: app.container, bookID: bookID)
-    }
-
-    /// Fetch a book's drawings away from the UI executor; each worker owns its own context.
-    func pageInkOffMain(bookID: UUID) async throws -> [Int: Data] {
-        let container = app.container
-        let worker = Task.detached(priority: .userInitiated) {
-            try Self.pageInk(container: container, bookID: bookID)
-        }
-        let result = try await withTaskCancellationHandler {
-            try await worker.value
-        } onCancel: {
-            worker.cancel()
-        }
-        try Task.checkCancellation()
-        return result
-    }
-
-    nonisolated private static func pageInk(container: ModelContainer, bookID: UUID) throws -> [Int: Data] {
-        let prefix = "pdf-ink:\(bookID.uuidString):"
-        var descriptor = FetchDescriptor<Media>(predicate: #Predicate {
-            $0.kind == "drawing" && $0.deletedAt == nil && $0.mergedInto == nil && $0.sourceID?.starts(with: prefix) == true
-        })
-        descriptor.propertiesToFetch = [\.sourceID, \.updatedAt, \.data]
-        let context = ModelContext(container)
-        let rows = try context.fetch(descriptor)
-        var result: [Int: (Date, Data)] = [:]
-        for (index, row) in rows.enumerated() {
-            if index.isMultiple(of: 128) { try Task.checkCancellation() }
-            guard let key = row.sourceID, key.hasPrefix(prefix), let page = Int(key.dropFirst(prefix.count)), let data = row.data, !data.isEmpty else { continue }
-            if (result[page]?.0 ?? .distantPast) < row.updatedAt { result[page] = (row.updatedAt, data) }
-        }
-        return result.mapValues(\.1)
-    }
-}
-
 /// A canvas that holds its page's drawing in page points and shows it scaled to its own size.
 final class MihbaraInkCanvas: PKCanvasView {
     let pageIndex: Int

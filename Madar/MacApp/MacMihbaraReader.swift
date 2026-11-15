@@ -1,6 +1,8 @@
 import SwiftUI
+import AppKit
 import WebKit
 import SwiftData
+import Translation
 import MadarCore
 import MadarPrayer
 import MadarCommands
@@ -24,6 +26,7 @@ struct MihbaraReaderView: View {
     @Environment(\.roomTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @State private var publication: MacEPUB?
+    @State private var contentRuleList: WKContentRuleList?
     @State private var failure: String?
     @State private var chapter = 0
     @State private var startProgression = 0.0
@@ -44,6 +47,11 @@ struct MihbaraReaderView: View {
     @State private var noteDraft: String?
     @State private var footnote: String?
     @State private var scrollRequest = 0
+    @State private var selection: MacEPUBSelection?
+    @State private var wordCard: MacEPUBSelection?
+    @State private var wordCardDestination: MacWordCardDestination?
+    @State private var quoteCard: MihbaraQuoteCardContent?
+    @State private var settingsOpen = false
 
     private var marks: [MacEPUBMark] {
         guard let publication else { return [] }
@@ -78,13 +86,47 @@ struct MihbaraReaderView: View {
         return min(7, max(1, Int(value)))
     }
     private var fontScale: Double { Double(95 + (readerSize - 1) * 10) / 100 }
+    private var readerFontFamily: String {
+        let name = readerSettings["font"]?.string ?? (book.language == "en" ? "literata" : "amiri")
+        if book.language == "en" {
+            return switch name {
+            case "sourceSerif": "Source Serif 4"
+            case "atkinsonHyperlegible": "Atkinson Hyperlegible"
+            case "ibmPlexSerif": "IBM Plex Serif"
+            default: "Literata"
+            }
+        }
+        return switch name {
+        case "thmanyahSerif": "Thmanyah Serif Text"
+        case "thmanyahSans": "Thmanyah Sans"
+        default: "Amiri"
+        }
+    }
+    private var lineHeight: Double {
+        let value = (readerSettings["lineSpacing"]?.number ?? 2).rounded()
+        return 1.5 + min(max(value, 1), 4) * 0.2
+    }
+    private var pageMargin: Double {
+        let value = (readerSettings["margins"]?.number ?? 2).rounded()
+        return 1.0 + min(max(value, 1), 4) * 0.4
+    }
+    private var readerHeavier: Bool {
+        guard case .bool(let value)? = readerSettings["heavier"] else { return false }
+        return value
+    }
+    private var readerJustifies: Bool {
+        guard case .bool(let value)? = readerSettings["justify"] else { return true }
+        return value
+    }
     private func setReaderTheme(_ value: String) { setReader("theme", .string(value)) }
     private func setReader(_ key: String, _ value: MadarData.JSONValue) {
         var settings = readerSettings
         settings[key] = value
         app.set(.object(settings), key: settingsKey)
     }
-    private var paragraphMark: MacEPUBMark? { paragraph.flatMap { p in marks.last { $0.selector == p.selector } } }
+    private var paragraphMark: MacEPUBMark? {
+        paragraph.flatMap { p in p.chapter == chapter ? marks.last { $0.selector == p.selector } : nil }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -108,7 +150,7 @@ struct MihbaraReaderView: View {
                 if let publication, !publication.contents.isEmpty {
                     Menu {
                         ForEach(Array(publication.contents.enumerated()), id: \.offset) { _, entry in
-                            Button(entry.title) { jump(to: entry.chapter) }
+                            Button(entry.title) { jump(to: entry.chapter, fragment: entry.fragment) }
                         }
                     } label: { Image(systemName: "list.bullet") }
                     .menuIndicator(.hidden).fixedSize().accessibilityLabel("الفهرس")
@@ -123,13 +165,24 @@ struct MihbaraReaderView: View {
                     .keyboardShortcut("-", modifiers: .command).accessibilityLabel("تصغير الخط")
                 Button { setReader("size", .number(Double(min(7, readerSize + 1)))) } label: { Image(systemName: "textformat.size.larger") }
                     .keyboardShortcut("=", modifiers: .command).accessibilityLabel("تكبير الخط")
+                Button { settingsOpen = true } label: { Image(systemName: "textformat") }
+                    .fixedSize().accessibilityLabel("إعدادات عرض الصفحة")
             }
             .buttonStyle(.borderless).padding(.horizontal, 20).padding(.vertical, 12)
             Divider()
             Group {
                 if let publication {
-                    MacEPUBWebView(publication: publication, chapter: chapter, startProgression: startProgression,
-                                   fontScale: fontScale, paper: readerColors.paper, ink: readerColors.ink, page: page, marks: marks, scrollRequest: scrollRequest)
+                    if let contentRuleList {
+                        MacEPUBWebView(publication: publication, chapter: chapter, startProgression: startProgression,
+                                       fontScale: fontScale, pageMargin: pageMargin, lineHeight: lineHeight,
+                                       readerFontFamily: readerFontFamily, heavier: readerHeavier,
+                                       justify: readerJustifies,
+                                       writingDirection: book.language == "en" ? "ltr" : "rtl",
+                                       paper: readerColors.paper, ink: readerColors.ink, page: page,
+                                       contentRuleList: contentRuleList, marks: marks, scrollRequest: scrollRequest)
+                    } else {
+                        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 } else if let failure {
                     VStack(spacing: 14) {
                         Text(failure).font(MadarTypography.body()).multilineTextAlignment(.center)
@@ -184,6 +237,32 @@ struct MihbaraReaderView: View {
             }
             .padding(24).frame(width: 460).environment(\.layoutDirection, .rightToLeft)
         }
+        .sheet(isPresented: $settingsOpen) {
+            MacMihbaraReaderSettingsSheet(bookIsEnglish: book.language == "en", settings: readerSettings,
+                                           set: setReader, reset: { app.reset([settingsKey]) })
+                .frame(minWidth: 420, minHeight: 310)
+        }
+        .sheet(item: $wordCard, onDismiss: presentWordCardDestination) { selected in
+            MacMihbaraWordCardSheet(app: app, book: book, selection: selected,
+                                    locatorJSON: locator(for: selected),
+                                    onQuote: { if let card = makeQuoteCard(from: selected) { wordCardDestination = .quote(card) } },
+                                    onNote: { wordCardDestination = .note(selected) })
+                .frame(minWidth: 460, minHeight: 460)
+        }
+        .sheet(item: $quoteCard) { card in MacMihbaraQuoteCardSheet(card: card) }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let selection {
+                HStack(spacing: 12) {
+                    Text(selection.selectedText).font(MadarTypography.caption()).lineLimit(1)
+                    Spacer(minLength: 8)
+                    Button("بطاقة الكلمة") { wordCard = selection }
+                    Button("بطاقة اقتباس") { quoteCard = makeQuoteCard(from: selection) }
+                }
+                .buttonStyle(.borderless).padding(.horizontal, 18).padding(.vertical, 10)
+                .background(readerColors.paper.opacity(0.96))
+                .overlay(alignment: .top) { Divider() }
+            }
+        }
         .onDisappear { save(); endSession(at: Date()); publication?.discard() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { beginSession(at: Date()) } else { save(); endSession(at: Date()) }
@@ -192,19 +271,24 @@ struct MihbaraReaderView: View {
 
     private func open() async {
         do {
+            contentRuleList = try await MacEPUBWebPolicy.blockRemoteContent()
             let data = try await AppMihbaraService(app: app).epubDataOffMain(for: book)
             let opened = try await Task.detached { try MacEPUB(data: data) }.value
             let saved = initialLocatorJSON ?? book.locatorJSON.flatMap { String(data: $0, encoding: .utf8) }
             if let saved, let place = opened.place(fromLocatorJSON: saved) {
-                chapter = place.chapter; startProgression = place.progression
+                chapter = place.chapter; startProgression = place.progression; page.fragment = place.fragment
             } else if let volume, volume > 0, opened.spine.count > 1 {
                 chapter = min(opened.spine.count - 1, Int((Double(volume) / Double(max(volume + 1, 1))) * Double(opened.spine.count)))
             }
+            // The session may close or the window may resign before WebKit finishes its first layout.
+            // Seed the restored location before the clock can observe or save it.
+            page.progression = startProgression
             publication = opened
             page.onChange = { [self] progression in observe(progression) }
-            page.onParagraph = { [self] tapped in paragraph = tapped }
+            page.onParagraph = { [self] tapped in if tapped.chapter == chapter { paragraph = tapped } }
+            page.onSelection = { [self] tapped in if tapped.chapter == chapter { selection = tapped } }
             page.onNote = { [self] text in footnote = text }
-            page.onLink = { [self] index in jump(to: index) }
+            page.onLink = { [self] index, fragment in jump(to: index, fragment: fragment) }
             reloadHighlights()
             beginSession(at: Date())
         } catch {
@@ -216,8 +300,11 @@ struct MihbaraReaderView: View {
         guard let publication else { return }
         save()
         paragraph = nil
+        selection = nil
+        wordCard = nil
         chapter = min(max(chapter + delta, 0), publication.spine.count - 1)
         startProgression = delta < 0 ? 1 : 0
+        page.fragment = nil
         page.progression = startProgression
         observe(startProgression, jump: true)
     }
@@ -227,7 +314,7 @@ struct MihbaraReaderView: View {
     private func highlight(_ color: String) async {
         guard let publication, let paragraph else { return }
         if paragraphMark?.color == color { await removeHighlight(); return }
-        guard let locator = publication.locatorJSON(chapter: chapter, progression: page.progression,
+        guard let locator = publication.locatorJSON(chapter: paragraph.chapter, progression: page.progression,
                                                     selector: paragraph.selector, text: paragraph.text) else { return }
         do {
             try await app.executeBookCommand("highlight.save", payload: [
@@ -241,7 +328,7 @@ struct MihbaraReaderView: View {
     /// The same «حاشية الكتاب» record as the iPhone's word card: the note text with the paragraph's locator.
     private func savePageNote() async {
         guard let publication, let paragraph, let text = noteDraft?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty,
-              let locator = publication.locatorJSON(chapter: chapter, progression: page.progression,
+              let locator = publication.locatorJSON(chapter: paragraph.chapter, progression: page.progression,
                                                     selector: paragraph.selector, text: paragraph.text) else { return }
         do {
             try await app.executeBookCommand("notebook.savePage", payload: [
@@ -259,12 +346,15 @@ struct MihbaraReaderView: View {
         } catch { app.errorMessage = madarUserMessage(error) }
     }
 
-    private func jump(to target: Int) {
+    private func jump(to target: Int, fragment: String? = nil) {
         guard let publication, publication.spine.indices.contains(target) else { return }
         save()
         paragraph = nil
+        selection = nil
+        wordCard = nil
         chapter = target
         startProgression = 0
+        page.fragment = fragment
         scrollRequest += 1
         page.progression = 0
         observe(0, jump: true)
@@ -318,7 +408,7 @@ struct MihbaraReaderView: View {
         let active = min(86_400, clock.activeSeconds)
         guard active >= 60,
               let first = publication.locatorJSON(chapter: sessionStartChapter, progression: sessionStartProgression),
-              let last = publication.locatorJSON(chapter: chapter, progression: page.progression) else { return }
+              let last = publication.locatorJSON(chapter: chapter, progression: page.progression, fragment: page.fragment) else { return }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let startTotal = publication.totalProgression(chapter: sessionStartChapter, progression: sessionStartProgression)
@@ -334,8 +424,32 @@ struct MihbaraReaderView: View {
     }
 
     private func save() {
-        guard let publication, let json = publication.locatorJSON(chapter: chapter, progression: page.progression) else { return }
+        guard let publication, let json = publication.locatorJSON(chapter: chapter, progression: page.progression, fragment: page.fragment) else { return }
         MihbaraReadingSaveCoordinator.forSession(app).enqueueLocatorJSON(json, bookID: book.id)
+    }
+
+    private func locator(for selected: MacEPUBSelection) -> String? {
+        publication?.locatorJSON(chapter: selected.chapter, progression: page.progression,
+                                 selector: selected.selector, text: selected.paragraphText)
+    }
+
+    private func presentWordCardDestination() {
+        guard let destination = wordCardDestination else { return }
+        wordCardDestination = nil
+        switch destination {
+        case .quote(let card): quoteCard = card
+        case .note(let selected):
+            paragraph = .init(chapter: selected.chapter, selector: selected.selector, text: selected.paragraphText)
+            noteDraft = ""
+        }
+    }
+
+    private func makeQuoteCard(from selected: MacEPUBSelection) -> MihbaraQuoteCardContent? {
+        let quote = selected.paragraphText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !quote.isEmpty else { return nil }
+        return MihbaraQuoteCardContent(quote: quote, bookTitle: book.title, author: book.author,
+                                       pageLabel: nil, turathID: book.turathID,
+                                       digits: AppMihbaraService(app: app).digits)
     }
 
     private func finish() { save(); close() }
@@ -344,11 +458,26 @@ struct MihbaraReaderView: View {
 /// The scroll position the web view reports, kept outside SwiftUI state so a scroll does not redraw the reader.
 @MainActor final class MacEPUBPage {
     var progression = 0.0
+    var fragment: String?
     var onChange: ((Double) -> Void)?
     var onParagraph: ((MacEPUBParagraph) -> Void)?
+    var onSelection: ((MacEPUBSelection) -> Void)?
     var onNote: ((String) -> Void)?
-    var onLink: ((Int) -> Void)?
-    func report(_ value: Double) { progression = value; onChange?(value) }
+    var onLink: ((Int, String?) -> Void)?
+    func report(_ value: Double) { progression = value; fragment = nil; onChange?(value) }
+}
+
+private enum MacWordCardDestination {
+    case quote(MihbaraQuoteCardContent)
+    case note(MacEPUBSelection)
+}
+
+struct MacEPUBSelection: Identifiable, Equatable {
+    let id = UUID()
+    let chapter: Int
+    let selectedText: String
+    let selector: String
+    let paragraphText: String
 }
 
 /// An unpacked EPUB: the folder it lives in and its reading order (paths relative to the publication root, as Readium writes them).
@@ -364,38 +493,69 @@ struct MacEPUB: Sendable {
         let zip = try ZIPReader(data: data)
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("mihbara-mac-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        var completed = false
+        defer { if !completed { try? FileManager.default.removeItem(at: root) } }
+        var writtenPaths = Set<String>()
         for member in zip.members where !member.isDirectory && !member.isSymbolicLink && !member.isEncrypted {
-            let parts = member.path.split(separator: "/").map(String.init)
-            guard !parts.isEmpty, !parts.contains(".."), !member.path.hasPrefix("/") else { continue }
-            let target = parts.reduce(root) { $0.appendingPathComponent($1) }
+            guard let path = Self.safePath(member.path), !path.isEmpty,
+                  writtenPaths.insert(path).inserted else { continue }
+            let target = root.appending(path: path, directoryHint: .notDirectory)
             try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
             try zip.read(member).write(to: target, options: .atomic)
         }
         let container = try Data(contentsOf: root.appendingPathComponent("META-INF/container.xml"))
-        guard let opfPath = MacEPUBXML.attribute("full-path", ofFirst: "rootfile", in: container) else { throw MacEPUBError.unreadable }
-        let opf = try Data(contentsOf: root.appendingPathComponent(opfPath))
-        let base = (opfPath as NSString).deletingLastPathComponent
+        guard let rawOPFPath = MacEPUBXML.attribute("full-path", ofFirst: "rootfile", in: container),
+              let opfPath = Self.safePath(rawOPFPath) else { throw MacEPUBError.unreadable }
+        let opf = try Data(contentsOf: root.appending(path: opfPath, directoryHint: .notDirectory))
         let parsed = MacEPUBXML.spine(in: opf)
         let spine = parsed.order.compactMap { idref -> String? in
-            guard let href = parsed.manifest[idref]?.removingPercentEncoding ?? parsed.manifest[idref] else { return nil }
-            return base.isEmpty ? href : base + "/" + href
+            guard let href = parsed.manifest[idref] else { return nil }
+            return Self.resolveReference(href, relativeTo: opfPath)?.path
         }
         guard !spine.isEmpty else { throw MacEPUBError.unreadable }
         self.root = root
         self.spine = spine
         var navPath: String?
-        if let nav = parsed.nav { navPath = base.isEmpty ? nav : base + "/" + nav }
-        else if let ncx = parsed.ncx { navPath = base.isEmpty ? ncx : base + "/" + ncx }
+        if let nav = parsed.nav { navPath = Self.resolveReference(nav, relativeTo: opfPath)?.path }
+        else if let ncx = parsed.ncx { navPath = Self.resolveReference(ncx, relativeTo: opfPath)?.path }
         self.contents = navPath.flatMap { path in
-            (try? String(contentsOf: root.appendingPathComponent(path.removingPercentEncoding ?? path), encoding: .utf8))
+            (try? String(contentsOf: root.appending(path: path, directoryHint: .notDirectory), encoding: .utf8))
                 .map { MacEPUB.contents(in: $0, at: path, spine: spine) }
         } ?? []
         self.sizes = spine.map { path in
-            ((try? FileManager.default.attributesOfItem(atPath: root.appendingPathComponent(path).path)[.size]) as? Int).map { max($0, 1) } ?? 1
+            ((try? FileManager.default.attributesOfItem(atPath: root.appending(path: path, directoryHint: .notDirectory).path)[.size]) as? Int).map { max($0, 1) } ?? 1
         }
+        completed = true
     }
 
-    func url(chapter: Int) -> URL { root.appendingPathComponent(spine[chapter]) }
+    func url(chapter: Int) -> URL { root.appending(path: spine[chapter], directoryHint: .notDirectory) }
+
+    /// Resolves an EPUB reference inside the extracted root. Percent decoding happens before
+    /// normalization so encoded dot segments cannot bypass the root boundary.
+    static func safePath(_ rawPath: String, relativeTo base: String = "") -> String? {
+        let decoded = rawPath.removingPercentEncoding ?? rawPath
+        guard !decoded.hasPrefix("/"), !decoded.contains("\\"), !decoded.contains("\0") else { return nil }
+        var parts = base.split(separator: "/").map(String.init)
+        for component in decoded.split(separator: "/", omittingEmptySubsequences: false).map(String.init) {
+            switch component {
+            case "", ".": continue
+            case "..":
+                guard !parts.isEmpty else { return nil }
+                parts.removeLast()
+            default: parts.append(component)
+            }
+        }
+        return parts.joined(separator: "/")
+    }
+
+    /// Resolves a link relative to a publication file while retaining its in-document fragment.
+    static func resolveReference(_ rawReference: String, relativeTo baseFile: String) -> (path: String, fragment: String?)? {
+        guard let components = URLComponents(string: rawReference), components.scheme == nil, components.host == nil else { return nil }
+        let folder = (baseFile as NSString).deletingLastPathComponent
+        let referencePath = components.percentEncodedPath.isEmpty ? (baseFile as NSString).lastPathComponent : components.percentEncodedPath
+        guard let path = safePath(referencePath, relativeTo: folder == "." ? "" : folder), !path.isEmpty else { return nil }
+        return (path, components.percentEncodedFragment?.removingPercentEncoding)
+    }
 
     /// Opens a staged EPUB the way the reader will, then removes the unpacked copy.
     @concurrent static func validate(_ file: URL) async throws {
@@ -408,7 +568,6 @@ struct MacEPUB: Sendable {
     /// Reads the entries of a nav (`<a href>`) or NCX (`<navLabel><text>` + `<content src>`) file and keeps those that land
     /// on a spine chapter, in book order of appearance.
     static func contents(in source: String, at path: String, spine: [String]) -> [MacEPUBContentsEntry] {
-        let folder = (path as NSString).deletingLastPathComponent
         let pattern = path.hasSuffix(".ncx")
             ? "<text>([\\s\\S]*?)</text>[\\s\\S]*?<content[^>]*src=\"([^\"]+)\""
             : "<a[^>]*href=\"([^\"]+)\"[^>]*>([\\s\\S]*?)</a>"
@@ -417,12 +576,10 @@ struct MacEPUB: Sendable {
         return regex.matches(in: source, range: NSRange(location: 0, length: ns.length)).compactMap { match in
             let first = ns.substring(with: match.range(at: 1)), second = ns.substring(with: match.range(at: 2))
             let (href, label) = path.hasSuffix(".ncx") ? (second, first) : (first, second)
-            let file = String(href.split(separator: "#").first ?? "")
-            let joined = ((folder.isEmpty ? file : folder + "/" + file) as NSString).standardizingPath
-            let resolved = joined.removingPercentEncoding ?? joined
-            guard let chapter = spine.firstIndex(of: resolved) else { return nil }
+            guard let reference = resolveReference(href, relativeTo: path),
+                  let chapter = spine.firstIndex(of: reference.path) else { return nil }
             let title = plainText(label)
-            return title.isEmpty ? nil : MacEPUBContentsEntry(title: title, chapter: chapter)
+            return title.isEmpty ? nil : MacEPUBContentsEntry(title: title, chapter: chapter, fragment: reference.fragment)
         }
     }
 
@@ -444,15 +601,16 @@ struct MacEPUB: Sendable {
         return (place.chapter, selector)
     }
 
-    func place(fromLocatorJSON json: String) -> (chapter: Int, progression: Double)? {
+    func place(fromLocatorJSON json: String) -> (chapter: Int, progression: Double, fragment: String?)? {
         guard let object = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any],
-              var href = object["href"] as? String else { return nil }
-        href = href.split(separator: "#").first.map(String.init) ?? href
-        if href.hasPrefix("/") { href.removeFirst() }
-        href = href.removingPercentEncoding ?? href
-        guard let index = spine.firstIndex(of: href) ?? spine.firstIndex(where: { $0.hasSuffix("/" + href) || href.hasSuffix("/" + $0) }) else { return nil }
+              let href = object["href"] as? String else { return nil }
+        guard let components = URLComponents(string: href) else { return nil }
+        var locatorPath = components.percentEncodedPath
+        if locatorPath.hasPrefix("/") { locatorPath.removeFirst() }
+        guard let safe = Self.safePath(locatorPath),
+              let index = spine.firstIndex(of: safe) ?? spine.firstIndex(where: { $0.hasSuffix("/" + safe) || safe.hasSuffix("/" + $0) }) else { return nil }
         let locations = object["locations"] as? [String: Any]
-        return (index, min(max((locations?["progression"] as? Double) ?? 0, 0), 1))
+        return (index, min(max((locations?["progression"] as? Double) ?? 0, 0), 1), components.percentEncodedFragment?.removingPercentEncoding)
     }
 
     func totalProgression(chapter: Int, progression: Double) -> Double {
@@ -466,12 +624,14 @@ struct MacEPUB: Sendable {
         return (before + Int(min(max(progression, 0), 1) * Double(sizes[chapter]))) / 1024 + 1
     }
 
-    func locatorJSON(chapter: Int, progression: Double, selector: String? = nil, text: String? = nil) -> String? {
+    func locatorJSON(chapter: Int, progression: Double, fragment: String? = nil, selector: String? = nil, text: String? = nil) -> String? {
         let p = min(max(progression, 0), 1)
         let total = totalProgression(chapter: chapter, progression: p)
         var locations: [String: Any] = ["progression": p, "totalProgression": total]
         if let selector { locations["cssSelector"] = selector }
-        var object: [String: Any] = ["href": spine[chapter], "type": "application/xhtml+xml", "locations": locations]
+        let encodedFragment = fragment?.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed)
+        let href = spine[chapter] + (encodedFragment.map { "#" + $0 } ?? "")
+        var object: [String: Any] = ["href": href, "type": "application/xhtml+xml", "locations": locations]
         if let text, !text.isEmpty { object["text"] = ["highlight": text] }
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .withoutEscapingSlashes]) else { return nil }
         return String(data: data, encoding: .utf8)
@@ -479,7 +639,7 @@ struct MacEPUB: Sendable {
 }
 
 /// The paragraph the reader last clicked: its CSS selector (the same kind Readium stores) and its text.
-struct MacEPUBParagraph: Equatable { let selector: String; let text: String }
+struct MacEPUBParagraph: Equatable { let chapter: Int; let selector: String; let text: String }
 
 /// A saved paragraph highlight on the open chapter, with its tint as CSS.
 struct MacEPUBMark: Equatable {
@@ -494,11 +654,33 @@ struct MacEPUBMark: Equatable {
 struct MacEPUBContentsEntry: Hashable, Sendable {
     let title: String
     let chapter: Int
+    let fragment: String?
 }
 
 enum MacEPUBError: LocalizedError {
     case unreadable
-    var errorDescription: String? { "ملف الكتاب لا يحوي ترتيب قراءة صالحًا." }
+    case webContentPolicyUnavailable
+    var errorDescription: String? {
+        switch self {
+        case .unreadable: "ملف الكتاب لا يحوي ترتيب قراءة صالحًا."
+        case .webContentPolicyUnavailable: "تعذّر تأمين محتوى الكتاب على الماك."
+        }
+    }
+}
+
+@MainActor private enum MacEPUBWebPolicy {
+    private static var cachedRules: WKContentRuleList?
+
+    static func blockRemoteContent() async throws -> WKContentRuleList {
+        if let cachedRules { return cachedRules }
+        guard let store = WKContentRuleListStore.default() else { throw MacEPUBError.webContentPolicyUnavailable }
+        let json = #"[{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}}]"#
+        guard let rules = try await store.compileContentRuleList(forIdentifier: "madar-epub-no-network", encodedContentRuleList: json) else {
+            throw MacEPUBError.webContentPolicyUnavailable
+        }
+        cachedRules = rules
+        return rules
+    }
 }
 
 /// A small OPF/container reader: the rootfile path, the manifest (id → href) and the spine order.
@@ -545,9 +727,16 @@ private struct MacEPUBWebView: NSViewRepresentable {
     let chapter: Int
     let startProgression: Double
     let fontScale: Double
+    let pageMargin: Double
+    let lineHeight: Double
+    let readerFontFamily: String
+    let heavier: Bool
+    let justify: Bool
+    let writingDirection: String
     let paper: Color
     let ink: Color
     let page: MacEPUBPage
+    let contentRuleList: WKContentRuleList
     var marks: [MacEPUBMark] = []
     var scrollRequest = 0
 
@@ -555,8 +744,11 @@ private struct MacEPUBWebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
+        configuration.userContentController.add(contentRuleList)
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
         configuration.userContentController.add(context.coordinator, name: "place")
         configuration.userContentController.add(context.coordinator, name: "paragraph")
+        configuration.userContentController.add(context.coordinator, name: "selection")
         configuration.userContentController.add(context.coordinator, name: "note")
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.navigationDelegate = context.coordinator
@@ -569,15 +761,18 @@ private struct MacEPUBWebView: NSViewRepresentable {
         coordinator.style = style
         coordinator.publication = publication
         coordinator.startProgression = startProgression
+        coordinator.startFragment = page.fragment
         let scrollChanged = coordinator.scrollRequest != scrollRequest
+        let fragmentChanged = coordinator.fragment != page.fragment
         coordinator.scrollRequest = scrollRequest
+        coordinator.fragment = page.fragment
         let marksChanged = coordinator.marks != marks
         coordinator.marks = marks
         if coordinator.loadedChapter != chapter {
             coordinator.loadedChapter = chapter
             view.loadFileURL(publication.url(chapter: chapter), allowingReadAccessTo: publication.root)
         } else {
-            let scroll = scrollChanged ? "document.scrollingElement.scrollTop=Math.max(document.scrollingElement.scrollHeight-innerHeight,0)*\(min(max(startProgression, 0), 1));" : ""
+            let scroll = scrollChanged || fragmentChanged ? Self.scrollScript(progression: startProgression, fragment: page.fragment) : ""
             view.evaluateJavaScript(coordinator.styleScript + (marksChanged ? coordinator.marksScript : "") + scroll)
         }
     }
@@ -585,14 +780,24 @@ private struct MacEPUBWebView: NSViewRepresentable {
     static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) {
         view.configuration.userContentController.removeScriptMessageHandler(forName: "place")
         view.configuration.userContentController.removeScriptMessageHandler(forName: "paragraph")
+        view.configuration.userContentController.removeScriptMessageHandler(forName: "selection")
         view.configuration.userContentController.removeScriptMessageHandler(forName: "note")
     }
 
     private var style: String {
         """
-        html,body{direction:rtl;background:\(Self.css(paper))!important;color:\(Self.css(ink))!important}
-        body{max-width:44em;margin:0 auto!important;padding:2.5em 2em 4em!important;font-size:\(Int(fontScale * 120))%!important;line-height:1.9!important}
+        html:not([dir]){direction:\(writingDirection)}
+        html,body{background:\(Self.css(paper))!important;color:\(Self.css(ink))!important}
+        body{max-width:44em;margin:0 auto!important;padding:\(pageMargin)em!important;font-size:\(Int(fontScale * 120))%!important;line-height:\(lineHeight)!important;font-family:'\(readerFontFamily)',serif!important;font-weight:\(heavier ? 600 : 400)!important;text-align:\(justify ? "justify" : "start")!important}
         img{max-width:100%;height:auto}
+        """
+    }
+
+    private static func scrollScript(progression: Double, fragment: String?) -> String {
+        let encoded = fragment.flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) } ?? "null"
+        return """
+        (function(){var target=\(encoded);var node=target?document.getElementById(target):null;
+        if(node){node.scrollIntoView();}else{var e=document.scrollingElement;e.scrollTop=Math.max(e.scrollHeight-innerHeight,0)*\(min(max(progression,0),1));}})();
         """
     }
 
@@ -606,6 +811,8 @@ private struct MacEPUBWebView: NSViewRepresentable {
         var loadedChapter = -1
         var style = ""
         var startProgression = 0.0
+        var startFragment: String?
+        var fragment: String?
         var marks: [MacEPUBMark] = []
         var scrollRequest = 0
         var publication: MacEPUB?
@@ -616,15 +823,16 @@ private struct MacEPUBWebView: NSViewRepresentable {
             guard let publication, url.isFileURL else { return nil }
             let root = publication.root.standardizedFileURL.path
             let full = url.standardizedFileURL.path
-            guard full.hasPrefix(root) else { return nil }
-            return (String(full.dropFirst(root.count + 1)), url.fragment)
+            let prefix = root.hasSuffix("/") ? root : root + "/"
+            guard full.hasPrefix(prefix), let path = MacEPUB.safePath(String(full.dropFirst(prefix.count))) else { return nil }
+            return (path, url.fragment)
         }
 
         /// A footnote in another file of the book: the text of the element with that id.
         func noteText(_ href: String) -> String? {
             guard let publication, loadedChapter >= 0,
-                  let url = URL(string: href, relativeTo: publication.url(chapter: loadedChapter)), let fragment = url.fragment,
-                  let html = try? String(contentsOf: URL(fileURLWithPath: url.absoluteURL.path), encoding: .utf8),
+                  let reference = MacEPUB.resolveReference(href, relativeTo: publication.spine[loadedChapter]), let fragment = reference.fragment,
+                  let html = try? String(contentsOf: publication.root.appending(path: reference.path, directoryHint: .notDirectory), encoding: .utf8),
                   let regex = try? NSRegularExpression(pattern: "<(\\w+)[^>]*id=\"\(NSRegularExpression.escapedPattern(for: fragment))\"[^>]*>([\\s\\S]*?)</\\1>")
             else { return nil }
             let ns = html as NSString
@@ -654,8 +862,8 @@ private struct MacEPUBWebView: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             let start = min(max(startProgression, 0), 1)
-            webView.evaluateJavaScript(styleScript + """
-            (function(){var e=document.scrollingElement;var max=Math.max(e.scrollHeight-innerHeight,0);e.scrollTop=max*\(start);
+            webView.evaluateJavaScript("window.__madarChapter=\(loadedChapter);" + styleScript + MacEPUBWebView.scrollScript(progression: start, fragment: startFragment) + """
+            (function(){var e=document.scrollingElement;
             var t;addEventListener('scroll',function(){clearTimeout(t);t=setTimeout(function(){var m=Math.max(e.scrollHeight-innerHeight,1);
             window.webkit.messageHandlers.place.postMessage(e.scrollTop/m);},250);});
             function sel(el){var parts=[];while(el&&el!==document.documentElement){var i=1,s=el;while((s=s.previousElementSibling))i++;parts.unshift(':nth-child('+i+')');el=el.parentElement;}return ':root > '+parts.join(' > ');}
@@ -666,7 +874,12 @@ private struct MacEPUBWebView: NSViewRepresentable {
             if(!isNote)return;ev.preventDefault();ev.stopPropagation();
             window.webkit.messageHandlers.note.postMessage(target?{text:(target.innerText||'').trim()}:{href:h});},true);
             addEventListener('click',function(ev){var el=ev.target.closest('p,li,blockquote,h1,h2,h3,h4,h5,h6,dd,dt,figcaption');if(!el)return;
-            window.webkit.messageHandlers.paragraph.postMessage({selector:sel(el),text:(el.innerText||'').trim().slice(0,600)});});})();
+            window.webkit.messageHandlers.paragraph.postMessage({chapter:window.__madarChapter,selector:sel(el),text:(el.innerText||'').trim().slice(0,4000)});});
+            function selected(){var selection=window.getSelection();if(!selection||selection.isCollapsed)return;var text=selection.toString().trim();if(!text)return;
+            var node=selection.getRangeAt(0).commonAncestorContainer;if(node.nodeType!==1)node=node.parentElement;var el=node&&node.closest('p,li,blockquote,h1,h2,h3,h4,h5,h6,dd,dt,figcaption,div');
+            if(!el||el===document.body||el===document.documentElement)return;
+            window.webkit.messageHandlers.selection.postMessage({chapter:window.__madarChapter,selectedText:text.slice(0,300),selector:sel(el),text:(el.innerText||'').trim().slice(0,4000)});}
+            addEventListener('mouseup',function(){setTimeout(selected,40);});addEventListener('keyup',function(){setTimeout(selected,40);});})();
             """ + marksScript)
             page.progression = start
         }
@@ -679,7 +892,15 @@ private struct MacEPUBWebView: NSViewRepresentable {
             }
             if message.name == "paragraph", let body = message.body as? [String: Any], let selector = body["selector"] as? String {
                 let text = body["text"] as? String ?? ""
-                MainActor.assumeIsolated { page.onParagraph?(MacEPUBParagraph(selector: selector, text: text)) }
+                let chapter = body["chapter"] as? Int ?? loadedChapter
+                MainActor.assumeIsolated { page.onParagraph?(MacEPUBParagraph(chapter: chapter, selector: selector, text: text)) }
+                return
+            }
+            if message.name == "selection", let body = message.body as? [String: Any],
+               let selectedText = body["selectedText"] as? String, let selector = body["selector"] as? String {
+                let text = body["text"] as? String ?? selectedText
+                let chapter = body["chapter"] as? Int ?? loadedChapter
+                MainActor.assumeIsolated { page.onSelection?(MacEPUBSelection(chapter: chapter, selectedText: selectedText, selector: selector, paragraphText: text)) }
                 return
             }
             if let value = message.body as? Double { MainActor.assumeIsolated { page.report(min(max(value, 0), 1)) } }
@@ -694,7 +915,7 @@ private struct MacEPUBWebView: NSViewRepresentable {
             let currentPath = loadedChapter >= 0 ? publication.spine[loadedChapter] : ""
             if target.path == currentPath { return .allow }
             if let index = publication.spine.firstIndex(of: target.path) {
-                await MainActor.run { page.onLink?(index) }
+                await MainActor.run { page.onLink?(index, target.fragment) }
             }
             return .cancel
         }

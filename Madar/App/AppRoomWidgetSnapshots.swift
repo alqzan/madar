@@ -39,7 +39,7 @@ extension AppSession {
         }
         let upcomingHabits = habitReadFailed || locked ? [] : habitComingWidgetRows(readings, today: today, days: service.calendarDays, now: now)
         let dueToday=eligible.filter{!$0.paused && ($0.summary.current?.target ?? 0)>0}
-        payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:habitReadFailed ? "تعذّر تحديث العادات" : WidgetCopy.habitsHeading(met:dueToday.filter{$0.summary.current?.met==true}.count,total:dueToday.count,digits:digits),emptyTitle:habitReadFailed ? "افتح مدار لإعادة المحاولة" : readings.isEmpty ? "أضف أول عادة" : "لا عادات مستحقة اليوم",rows:habitReadFailed ? [] : rows,periods:habitReadFailed ? [] : periods,upcomingHabits:upcomingHabits,locked:locked)
+        payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:habitReadFailed ? "تعذّر تحديث العادات" : WidgetCopy.habitsHeading(met:dueToday.filter{$0.summary.current?.met==true}.count,total:dueToday.count,digits:digits),emptyTitle:habitReadFailed ? "افتح مدار لإعادة المحاولة" : readings.isEmpty ? "أضف أول عادة" : "لا عادات مستحقة اليوم",rows:habitReadFailed ? [] : rows,periods:habitReadFailed ? [] : periods,upcomingHabits:upcomingHabits,habitCompletedToday:habitReadFailed ? nil : dueToday.filter{$0.summary.current?.met==true}.count,habitDueToday:habitReadFailed ? nil : dueToday.count,locked:locked)
         let year=service.year()
         var yearRows:[RoomWidgetSnapshot.Row]=[
             .init(id:"hijri",title:digits.string(year.hijriYear)+" هـ",value:digits.string(year.hijri.basisPoints/100)+"٪\u{061C}",detail:"بقي "+service.daysPhrase(year.hijri.remaining),share:Double(year.hijri.basisPoints)/10000,route:BuiltRoomWidget.year.route),
@@ -69,7 +69,7 @@ extension AppSession {
             return .init(currentBook:book,shelfCount:reading.books.count)
         } catch { return .init() }
     }
-    func publishRoomWidgetSnapshots(at now:Date, readHabitReadings:(() throws -> [HabitReading])? = nil) throws {
+    func publishRoomWidgetSnapshots(at now:Date, readHabitReadings:(() throws -> [HabitReading])? = nil) throws -> Date {
         let service=AppBahwService(session:self,evaluationDate:now),prayers=try PrayerRepository(context:ModelContext(container))
         let next=service.today.adding(days:1),place=prayers.place(at:now),options=prayers.calculationOptions(at:now)
         let end:Date?
@@ -91,6 +91,7 @@ extension AppSession {
         // Names outlive the day so Siri can still find a habit; its period is only trusted until the day ends.
         let periodsEnd=end ?? now.addingTimeInterval(900)
         try snapshotStore.write(SnapshotEnvelope(name:HabitShortcutSnapshot.name,generatedAt:now,validUntil:now.addingTimeInterval(30*86400),dayKey:service.today.description,tzID:place.timeZoneID,privacy:SnapshotPrivacy(notesLocked:locked),payload:habitShortcutPayload(locked:locked,at:now,periodsValidUntil:periodsEnd,readHabitReadings:readHabitReadings)))
+        return end ?? now.addingTimeInterval(900)
     }
     /// Same step as the lobby and habit card buttons, so «أتممت» from Siri means what a tap means.
     func habitShortcutPayload(locked:Bool,at now:Date,periodsValidUntil:Date,readHabitReadings:(() throws -> [HabitReading])? = nil)->HabitShortcutSnapshot {

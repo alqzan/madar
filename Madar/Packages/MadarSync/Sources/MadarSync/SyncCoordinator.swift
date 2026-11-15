@@ -1,8 +1,15 @@
 import Foundation
 import Observation
 import CloudKit
+import CoreData
 import SwiftData
 import MadarData
+
+private struct PendingCloudImport: Equatable {
+    let storeIdentifier: String
+    let generationID: UUID
+    let date: Date
+}
 
 @MainActor @Observable public final class SyncCoordinator {
     public private(set) var health = SyncHealth(phase: .idle, message: "لا معلومات عن آخر مزامنة")
@@ -17,20 +24,52 @@ import MadarData
     private let history: HistoryProcessor
     private var busy = false
     private var observer: (any NSObjectProtocol)?
+    private var mirroringObserver: (any NSObjectProtocol)?
     private var knownAccount: CloudAccount = .temporarilyUnavailable
     private var lastImport: Date?
     private var lastExport: Date?
+    private var pendingImports: [PendingCloudImport] = []
+    private var importRetryTask: Task<Void, Never>?
     private var pendingPreference: Bool?
-    public init(adapter: any SyncLifecycleAdapter, accountProvider: any CloudAccountProviding, provisioning: SyncProvisioning, history: HistoryProcessor = .init()) {
-        self.adapter = adapter; self.accountProvider = accountProvider; self.provisioning = provisioning; self.history = history
+    private let onCloudImportSuccess: (@MainActor () -> Void)?
+    public init(adapter: any SyncLifecycleAdapter, accountProvider: any CloudAccountProviding, provisioning: SyncProvisioning,
+                history: HistoryProcessor = .init(), onCloudImportSuccess: (@MainActor () -> Void)? = nil) {
+        self.adapter = adapter; self.accountProvider = accountProvider; self.provisioning = provisioning
+        self.history = history; self.onCloudImportSuccess = onCloudImportSuccess
     }
     public func startObserving() {
-        guard observer == nil else { return }
-        observer = NotificationCenter.default.addObserver(forName: .CKAccountChanged, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in await self?.refreshAccount() }
+        if observer == nil {
+            observer = NotificationCenter.default.addObserver(forName: .CKAccountChanged, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in await self?.refreshAccount() }
+            }
+        }
+        guard mirroringObserver == nil else { return }
+        mirroringObserver = NotificationCenter.default.addObserver(
+            forName: NSPersistentCloudKitContainer.eventChangedNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let event = note.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
+                    as? NSPersistentCloudKitContainer.Event,
+                  event.endDate != nil else { return }
+            let isImport = event.type == .import
+            let isExport = event.type == .export
+            let succeeded = event.succeeded
+            let date = event.endDate ?? Date()
+            let error = event.error as NSError?
+            let errorDomain = error?.domain ?? ""
+            let errorCode = error?.code ?? 0
+            let storeIdentifier = event.storeIdentifier
+            guard isImport || isExport else { return }
+            Task { @MainActor [weak self] in
+                self?.finishMirroringEvent(storeIdentifier: storeIdentifier, isImport: isImport, isExport: isExport, succeeded: succeeded,
+                                           date: date, errorDomain: errorDomain, errorCode: errorCode)
+            }
         }
     }
-    public func stopObserving() { if let observer { NotificationCenter.default.removeObserver(observer) }; observer = nil }
+    public func stopObserving() {
+        if let observer { NotificationCenter.default.removeObserver(observer) }
+        if let mirroringObserver { NotificationCenter.default.removeObserver(mirroringObserver) }
+        observer = nil; mirroringObserver = nil
+    }
     public func refreshAccount() async {
         guard !busy else { return }; busy = true; defer { busy = false }
         guard provisioning.appGroupAvailable else { set(.failed, "حاوية مدار غير متاحة — لم تُفتح المزامنة"); return }
@@ -44,10 +83,11 @@ import MadarData
             case .available(let hash):
                 guard !hash.isEmpty else { throw SyncFailure.unknownAccount }
                 if binding.accountHash == nil {
-                    // First account this store has met: nothing to choose between. Bind it while still
-                    // local; mirroring starts only when the person turns sync on.
-                    try await adapter.activate(.init(accountHash: hash, cloudEnabled: false, dataChoice: .keepDevice, checkpoint: nil, generationBefore: binding.generationID, requestedDevicePreference: preference))
-                    set(.localOnly, "المزامنة مطفأة — بياناتك محفوظة على هذا الجهاز")
+                    // The preference is false on a new install. If the person explicitly enabled it
+                    // earlier on this device, attach only after the app adapter checkpoints first.
+                    let mirror = preference && provisioning.mayOpenCloudMirror
+                    try await adapter.activate(.init(accountHash: hash, cloudEnabled: mirror, dataChoice: .keepDevice, checkpoint: nil, generationBefore: binding.generationID, requestedDevicePreference: preference))
+                    set(mirror ? .cloudConfigured : .localOnly, mirror ? "يجهّز مدار المزامنة" : "المزامنة مطفأة — بياناتك محفوظة على هذا الجهاز")
                 } else if binding.accountHash != hash {
                     if checkpoint == nil {
                         set(.transitioning, "يحفظ مدار نسخة قبل تغيير الحساب")
@@ -108,12 +148,35 @@ import MadarData
     }
     @discardableResult public func processHistory() throws -> HistoryDrainReport {
         guard !busy, pendingAccountHash == nil else { throw SyncFailure.transitionInProgress }
-        let generation = adapter.binding.generationID
-        let report = try adapter.withExclusiveStoreAccess { container, binding in
-            guard binding.generationID == generation else { throw SyncFailure.generationChanged }
-            return try history.drain(container: container, generationID: generation) { models in try adapter.publishSnapshots(changedModels: models) }
+        let expectedGeneration = adapter.binding.generationID
+        let result = try adapter.withExclusiveStoreAccess { container, binding -> (HistoryDrainReport, String?) in
+            guard binding.generationID == expectedGeneration else { throw SyncFailure.generationChanged }
+            let report = try history.drain(container: container, generationID: binding.generationID) { models in
+                try adapter.publishSnapshots(changedModels: models)
+            }
+            return (report, container.storeIdentifier(forConfigurationNamed: "synced"))
         }
-        lastHistoryReport = report; return report
+        let report = result.0
+        lastHistoryReport = report
+        let activeGeneration = adapter.binding.generationID
+        let matchingImports = pendingImports.filter {
+            $0.generationID == activeGeneration && $0.storeIdentifier == result.1
+        }
+        if let latestImport = matchingImports.map(\.date).max(), adapter.binding.cloudEnabled {
+            // HistoryProcessor already reconciles imported rows and refreshes snapshots when it
+            // sees transactions. An empty drain still gets one reload before the event is consumed.
+            if report.transactions == 0 { onCloudImportSuccess?() }
+            pendingImports.removeAll()
+            lastImport = latestImport
+            set(health.phase, health.message)
+        } else {
+            // A different generation/store became active while an import was queued. Discard those
+            // stale events so they can never be reported as imports into the new store.
+            pendingImports.removeAll {
+                !adapter.binding.cloudEnabled || $0.generationID != activeGeneration || $0.storeIdentifier != result.1
+            }
+        }
+        return report
     }
     /// Only call for an actual observed mirror event, never infer from local saves/history.
     public func observeCloudImportSuccess(at date: Date) { lastImport = date; set(health.phase, health.message) }
@@ -123,6 +186,71 @@ import MadarData
         case .quotaExceeded: set(adapter.binding.cloudEnabled ? .cloudConfigured : .localOnly, "مساحة iCloud ممتلئة — الكتابة على الجهاز مستمرة")
         case .notAuthenticated: set(.localOnly, "iCloud غير متاح — بياناتك على هذا الجهاز فقط")
         default: set(adapter.binding.cloudEnabled ? .cloudConfigured : .localOnly, "لم تكتمل المزامنة — الكتابة على الجهاز مستمرة")
+        }
+    }
+    private func finishMirroringEvent(storeIdentifier: String, isImport: Bool, isExport: Bool, succeeded: Bool, date: Date,
+                                      errorDomain: String, errorCode: Int) {
+        guard isImport || isExport, adapter.binding.cloudEnabled else { return }
+        let eventGeneration = adapter.binding.generationID
+        if isImport, succeeded {
+            let pending = PendingCloudImport(storeIdentifier: storeIdentifier, generationID: eventGeneration, date: date)
+            if let index = pendingImports.firstIndex(where: {
+                $0.storeIdentifier == pending.storeIdentifier && $0.generationID == pending.generationID
+            }) {
+                if pendingImports[index].date < date { pendingImports[index] = pending }
+            } else {
+                pendingImports.append(pending)
+            }
+        }
+        guard let identity = activeCloudStoreIdentity() else {
+            if isImport, succeeded { scheduleImportRetry() }
+            return
+        }
+        guard identity.storeIdentifier == storeIdentifier, identity.generationID == eventGeneration else {
+            if isImport { pendingImports.removeAll { $0.storeIdentifier == storeIdentifier && $0.generationID == eventGeneration } }
+            return
+        }
+        guard succeeded else {
+            if errorDomain == CKErrorDomain, errorCode == CKError.Code.quotaExceeded.rawValue {
+                set(adapter.binding.cloudEnabled ? .cloudConfigured : .localOnly, "مساحة iCloud ممتلئة — الكتابة على الجهاز مستمرة")
+            } else if errorDomain == CKErrorDomain, errorCode == CKError.Code.notAuthenticated.rawValue {
+                set(.localOnly, "iCloud غير متاح — بياناتك على هذا الجهاز فقط")
+            } else {
+                set(adapter.binding.cloudEnabled ? .cloudConfigured : .localOnly, "لم تكتمل المزامنة — الكتابة على الجهاز مستمرة")
+            }
+            return
+        }
+        if isImport {
+            do { _ = try processHistory() }
+            catch { scheduleImportRetry() }
+        }
+        if isExport { observeCloudExportSuccess(at: date) }
+    }
+
+    private func activeCloudStoreIdentity() -> (storeIdentifier: String, generationID: UUID)? {
+        guard adapter.binding.cloudEnabled else { return nil }
+        let expectedGeneration = adapter.binding.generationID
+        do {
+            return try adapter.withExclusiveStoreAccess { container, binding in
+                guard binding.cloudEnabled, binding.generationID == expectedGeneration,
+                      let identifier = container.storeIdentifier(forConfigurationNamed: "synced") else { return nil }
+                return (identifier, binding.generationID)
+            }
+        } catch { return nil }
+    }
+
+    /// A busy transition must not consume a successful import event. Retry briefly, then leave it
+    /// pending for the next ordinary history drain if a transition still holds the store.
+    private func scheduleImportRetry() {
+        guard importRetryTask == nil, !pendingImports.isEmpty else { return }
+        importRetryTask = Task { @MainActor [weak self] in
+            for delay in [250, 750, 1_500] {
+                try? await Task.sleep(for: .milliseconds(delay))
+                guard let self, !self.pendingImports.isEmpty, !Task.isCancelled else { break }
+                do { _ = try self.processHistory() } catch { continue }
+                if self.pendingImports.isEmpty { break }
+            }
+            self?.importRetryTask = nil
         }
     }
     private func set(_ phase: SyncHealth.Phase, _ message: String) { health = .init(phase: phase, message: message, lastObservedImportAt: lastImport, lastObservedExportAt: lastExport) }
