@@ -24,7 +24,6 @@ struct MihbaraReaderView: View {
     @State private var failure: String?
     @State private var chapter = 0
     @State private var startProgression = 0.0
-    @State private var fontScale = 1.0
     @State private var page = MacEPUBPage()
     @Environment(\.scenePhase) private var scenePhase
     // Reading time, counted the same way as the iPhone reader: active seconds (idle pauses after five minutes), sessions of a
@@ -67,9 +66,16 @@ struct MihbaraReaderView: View {
         }
         return (Color(macReaderHex: hex.0), Color(macReaderHex: hex.1))
     }
-    private func setReaderTheme(_ value: String) {
+    /// The shared text size (1…7, the iPhone's 95%…155%), shown a fifth larger on the Mac's reading distance.
+    private var readerSize: Int {
+        guard case .number(let value)? = readerSettings["size"], value.isFinite else { return 4 }
+        return min(7, max(1, Int(value)))
+    }
+    private var fontScale: Double { Double(95 + (readerSize - 1) * 10) / 100 }
+    private func setReaderTheme(_ value: String) { setReader("theme", .string(value)) }
+    private func setReader(_ key: String, _ value: MadarData.JSONValue) {
         var settings = readerSettings
-        settings["theme"] = .string(value)
+        settings[key] = value
         app.set(.object(settings), key: settingsKey)
     }
     private var paragraphMark: MacEPUBMark? { paragraph.flatMap { p in marks.last { $0.selector == p.selector } } }
@@ -107,9 +113,9 @@ struct MihbaraReaderView: View {
                     }
                 } label: { Image(systemName: "circle.lefthalf.filled") }
                 .menuIndicator(.hidden).fixedSize().accessibilityLabel("لون الصفحة")
-                Button { fontScale = max(0.8, fontScale - 0.1) } label: { Image(systemName: "textformat.size.smaller") }
+                Button { setReader("size", .number(Double(max(1, readerSize - 1)))) } label: { Image(systemName: "textformat.size.smaller") }
                     .keyboardShortcut("-", modifiers: .command).accessibilityLabel("تصغير الخط")
-                Button { fontScale = min(1.8, fontScale + 0.1) } label: { Image(systemName: "textformat.size.larger") }
+                Button { setReader("size", .number(Double(min(7, readerSize + 1)))) } label: { Image(systemName: "textformat.size.larger") }
                     .keyboardShortcut("=", modifiers: .command).accessibilityLabel("تكبير الخط")
             }
             .buttonStyle(.borderless).padding(.horizontal, 20).padding(.vertical, 12)
