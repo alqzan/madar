@@ -298,9 +298,14 @@ struct DiaryDayView: View {
                                     }
                                     if page.lines.isEmpty && page.photo == nil {
                                         Text(shownDay == today ? "صفحة تنتظر سطرك." : "لم تُكتب سطور في هذا اليوم.")
-                                            .font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(
-                                                .vertical, 40
-                                            ).padding(.horizontal, 54)
+                                            .font(DiaryType.writing)
+                                            .foregroundStyle(theme.color("ink3Text"))
+                                            .multilineTextAlignment(.leading)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .padding(.leading, DiaryDayMetrics.contentLeading)
+                                            .padding(.trailing, 18)
+                                            .padding(.vertical, 40)
+                                            .accessibilityIdentifier("diary-day-empty-invitation")
                                         if shownDay == today, let echo { echoBlock(echo) }
                                     }
                                 } else if failure == nil {

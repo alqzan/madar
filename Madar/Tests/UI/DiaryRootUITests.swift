@@ -33,6 +33,21 @@ import XCTest
         XCTAssertFalse(app.staticTexts["diary-home-title"].exists)
         capture(app, "T10-root-today-L")
     }
+    func testEmptyPageInvitationClearsTheWritingRule() throws {
+        continueAfterFailure = false
+        let app = launch("empty")
+        let invitation = app.staticTexts["diary-day-empty-invitation"]
+        XCTAssertTrue(invitation.waitForExistence(timeout: 25), app.debugDescription)
+        let page = app.scrollViews.firstMatch
+        XCTAssertTrue(page.waitForExistence(timeout: 5), app.debugDescription)
+        let clearance = page.frame.maxX - invitation.frame.maxX
+        XCTAssertGreaterThanOrEqual(
+            clearance,
+            58,
+            "The Arabic invitation must begin to the left of the vertical writing rule; clearance was \(clearance) pt."
+        )
+        capture(app, "OWNER-diary-empty-invitation-L")
+    }
     func testWritingNeedsNoSendButtonAndKeyboardDoneWritesTheLine() throws {
         continueAfterFailure = false
         let app = launch("entryRoute")
