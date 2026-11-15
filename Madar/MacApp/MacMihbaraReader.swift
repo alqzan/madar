@@ -41,6 +41,14 @@ struct MihbaraReaderView: View {
                 Spacer()
                 Text(book.title).font(MadarTypography.section()).lineLimit(1)
                 Spacer()
+                if let publication, !publication.contents.isEmpty {
+                    Menu {
+                        ForEach(Array(publication.contents.enumerated()), id: \.offset) { _, entry in
+                            Button(entry.title) { jump(to: entry.chapter) }
+                        }
+                    } label: { Image(systemName: "list.bullet") }
+                    .menuIndicator(.hidden).fixedSize().accessibilityLabel("الفهرس")
+                }
                 Button { fontScale = max(0.8, fontScale - 0.1) } label: { Image(systemName: "textformat.size.smaller") }
                     .keyboardShortcut("-", modifiers: .command).accessibilityLabel("تصغير الخط")
                 Button { fontScale = min(1.8, fontScale + 0.1) } label: { Image(systemName: "textformat.size.larger") }
@@ -112,6 +120,15 @@ struct MihbaraReaderView: View {
         observe(startProgression, jump: true)
     }
 
+    private func jump(to target: Int) {
+        guard let publication, publication.spine.indices.contains(target) else { return }
+        save()
+        chapter = target
+        startProgression = 0
+        page.progression = 0
+        observe(0, jump: true)
+    }
+
     private func beginSession(at now: Date) {
         guard let publication, clock == nil, scenePhase == .active else { return }
         clock = ActiveReadingClock(startedAt: now)
@@ -174,6 +191,8 @@ struct MacEPUB: Sendable {
     let spine: [String]
     /// Each spine file's size in bytes, used to weigh progress across chapters and to count positions as Readium does.
     let sizes: [Int]
+    /// The book's own table of contents (EPUB 3 nav, else the EPUB 2 NCX), each entry pointing at a spine chapter.
+    let contents: [MacEPUBContentsEntry]
 
     init(data: Data) throws {
         let zip = try ZIPReader(data: data)
@@ -198,6 +217,13 @@ struct MacEPUB: Sendable {
         guard !spine.isEmpty else { throw MacEPUBError.unreadable }
         self.root = root
         self.spine = spine
+        var navPath: String?
+        if let nav = parsed.nav { navPath = base.isEmpty ? nav : base + "/" + nav }
+        else if let ncx = parsed.ncx { navPath = base.isEmpty ? ncx : base + "/" + ncx }
+        self.contents = navPath.flatMap { path in
+            (try? String(contentsOf: root.appendingPathComponent(path.removingPercentEncoding ?? path), encoding: .utf8))
+                .map { MacEPUB.contents(in: $0, at: path, spine: spine) }
+        } ?? []
         self.sizes = spine.map { path in
             ((try? FileManager.default.attributesOfItem(atPath: root.appendingPathComponent(path).path)[.size]) as? Int).map { max($0, 1) } ?? 1
         }
@@ -212,6 +238,27 @@ struct MacEPUB: Sendable {
     }
 
     func discard() { try? FileManager.default.removeItem(at: root) }
+
+    /// Reads the entries of a nav (`<a href>`) or NCX (`<navLabel><text>` + `<content src>`) file and keeps those that land
+    /// on a spine chapter, in book order of appearance.
+    static func contents(in source: String, at path: String, spine: [String]) -> [MacEPUBContentsEntry] {
+        let folder = (path as NSString).deletingLastPathComponent
+        let pattern = path.hasSuffix(".ncx")
+            ? "<text>([\\s\\S]*?)</text>[\\s\\S]*?<content[^>]*src=\"([^\"]+)\""
+            : "<a[^>]*href=\"([^\"]+)\"[^>]*>([\\s\\S]*?)</a>"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let ns = source as NSString
+        return regex.matches(in: source, range: NSRange(location: 0, length: ns.length)).compactMap { match in
+            let first = ns.substring(with: match.range(at: 1)), second = ns.substring(with: match.range(at: 2))
+            let (href, label) = path.hasSuffix(".ncx") ? (second, first) : (first, second)
+            let file = String(href.split(separator: "#").first ?? "")
+            let joined = ((folder.isEmpty ? file : folder + "/" + file) as NSString).standardizingPath
+            let resolved = joined.removingPercentEncoding ?? joined
+            guard let chapter = spine.firstIndex(of: resolved) else { return nil }
+            let title = plainText(label)
+            return title.isEmpty ? nil : MacEPUBContentsEntry(title: title, chapter: chapter)
+        }
+    }
 
     /// A chapter's readable text: markup, scripts and styles removed, entities for spaces and brackets decoded, spaces collapsed.
     static func plainText(_ html: String) -> String {
@@ -255,6 +302,11 @@ struct MacEPUB: Sendable {
     }
 }
 
+struct MacEPUBContentsEntry: Hashable, Sendable {
+    let title: String
+    let chapter: Int
+}
+
 enum MacEPUBError: LocalizedError {
     case unreadable
     var errorDescription: String? { "ملف الكتاب لا يحوي ترتيب قراءة صالحًا." }
@@ -266,6 +318,8 @@ private final class MacEPUBXML: NSObject, XMLParserDelegate {
     private var attributeName = ""
     private var found: String?
     private(set) var manifest: [String: String] = [:]
+    private(set) var nav: String?
+    private(set) var ncx: String?
     private var order: [String] = []
 
     static func attribute(_ name: String, ofFirst element: String, in data: Data) -> String? {
@@ -274,10 +328,10 @@ private final class MacEPUBXML: NSObject, XMLParserDelegate {
         return reader.found
     }
 
-    static func spine(in data: Data) -> (order: [String], manifest: [String: String]) {
+    static func spine(in data: Data) -> (order: [String], manifest: [String: String], nav: String?, ncx: String?) {
         let reader = MacEPUBXML()
         let parser = XMLParser(data: data); parser.delegate = reader; parser.parse()
-        return (reader.order, reader.manifest)
+        return (reader.order, reader.manifest, reader.nav, reader.ncx)
     }
 
     func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName: String?,
@@ -287,7 +341,11 @@ private final class MacEPUBXML: NSObject, XMLParserDelegate {
             if local == wanted, found == nil { found = attributes[attributeName] }
             return
         }
-        if local == "item", let id = attributes["id"], let href = attributes["href"] { manifest[id] = href }
+        if local == "item", let id = attributes["id"], let href = attributes["href"] {
+            manifest[id] = href
+            if attributes["properties"]?.split(separator: " ").contains("nav") == true { nav = href }
+            if attributes["media-type"] == "application/x-dtbncx+xml" { ncx = href }
+        }
         if local == "itemref", let idref = attributes["idref"], attributes["linear"] != "no" { order.append(idref) }
     }
 }
