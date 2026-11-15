@@ -82,9 +82,9 @@ struct MadarMacCommands: Commands {
     }
 }
 
-/// The rooms the Mac app opens, in sidebar order. The Mihbara is not here: its reader is not on the Mac yet (no entry point).
+/// The rooms the Mac app opens, in sidebar order. The Mihbara reads EPUBs with the Mac reader and PDFs with PDFKit.
 @MainActor enum MacRooms {
-    static let macTabs: Set<String> = ["prayer", "quran", "notes", "money"]
+    static let macTabs: Set<String> = ["prayer", "quran", "notes", "money", "mihbara"]
     static var tabs: [FoundationTab] {
         [FoundationTab(id: "foundation", title: "البهو", symbol: "MadarOrbit")]
             + AppSession.roomTabs.map(\.tab).filter(macTabs.contains).compactMap { AppSession.tabInfo[$0] }

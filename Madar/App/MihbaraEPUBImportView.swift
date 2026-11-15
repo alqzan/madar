@@ -44,7 +44,6 @@ import MadarDesign
     }
 }
 
-#if os(iOS)
 struct MihbaraEPUBImportView: View {
     let app: AppSession
     let source: URL
@@ -416,8 +415,13 @@ struct MihbaraEPUBImportView: View {
             recoveryBook = try service.bookRestorableFromFile(sha256: value.sha256, sizeBytes: value.sizeBytes, formats: ["epub"])
             try Task.checkCancellation()
             guard !departed else { return }
+            #if os(iOS)
             let publication = try await MihbaraEPUBLoader.open(at: EPUBBookFiles.stagedURL(id: fileID, root: app.bookStagingDirectory))
             defer { publication.close() }
+            #else
+            // The Mac reader has no Readium: the staged file must open in the Mac EPUB reader (container, OPF and a reading order).
+            try await MacEPUB.validate(EPUBBookFiles.stagedURL(id: fileID, root: app.bookStagingDirectory))
+            #endif
             try Task.checkCancellation()
             guard !departed else { return }
             inspection = value
@@ -425,9 +429,14 @@ struct MihbaraEPUBImportView: View {
             if let recoveryBook {
                 title = recoveryBook.title; author = recoveryBook.author; language = recoveryBook.language
             } else {
+                #if os(iOS)
                 if let readiumTitle = publication.metadata.title?.trimmingCharacters(in: .whitespacesAndNewlines), !readiumTitle.isEmpty { title = readiumTitle }
                 else { title = value.title }
                 author = value.author.isEmpty ? publication.metadata.authors.map(\.name).joined(separator: "، ") : value.author
+                #else
+                title = value.title
+                author = value.author
+                #endif
                 language = value.appLanguage ?? "ar"
             }
             cover = Self.thumbnail(value.coverData)
@@ -468,14 +477,3 @@ struct MihbaraEPUBImportView: View {
         return UIImage(cgImage: image)
     }
 }
-#else
-/// EPUB import reads books with Readium, which the Mac app does not include yet; it is reached only from inside the Mihbara room,
-/// which has no entry point on the Mac, so this is never shown.
-struct MihbaraEPUBImportView: View {
-    let app: AppSession
-    let source: URL
-    var turathID: Int? = nil
-    let onImported: () -> Void
-    var body: some View { EmptyView() }
-}
-#endif

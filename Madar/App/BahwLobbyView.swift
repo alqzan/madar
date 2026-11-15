@@ -8,12 +8,7 @@ import MadarPrayer
 /// A room enters the lobby after its milestone builds its block; RL9 still excludes deferred options.
 enum BahwBlock: String, CaseIterable {
     case habits, salah, quran, mal, year, upcoming, notes, mihbara
-    #if os(iOS)
     static let built: Set<BahwBlock> = [.habits, .salah, .quran, .mal, .year, .upcoming, .notes, .mihbara]
-    #else
-    /// The Mac app's first slice: every room but the Mihbara, whose reader (Readium, PencilKit, VisionKit) is not on the Mac yet.
-    static let built: Set<BahwBlock> = [.habits, .salah, .quran, .mal, .year, .upcoming, .notes]
-    #endif
     var title: String {
         switch self { case .habits: "عاداتك"; case .salah: "الصلاة"; case .quran: "القرآن"; case .mal: "المال"; case .year: "السنة"; case .upcoming: "الأيام القادمة"; case .notes: "المذكرات"; case .mihbara: "المحبرة" }
     }

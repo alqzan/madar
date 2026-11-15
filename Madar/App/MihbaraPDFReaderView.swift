@@ -246,14 +246,20 @@ struct MihbaraPDFReaderView: View {
             }
             #endif
             async let bytesTask = service.pdfDataOffMain(for: book)
+            #if os(iOS)
             async let inkTask = try? service.pageInkOffMain(bookID: book.id)
+            #endif
             let bytes = try await bytesTask
+            #if os(iOS)
             let savedInk = await inkTask
+            #endif
             try Task.checkCancellation()
             guard document == nil, let opened = PDFDocument(data: bytes), !opened.isLocked, opened.pageCount > 0,
                   opened.page(at: 0) != nil else { throw PDFReaderError.unreadable }
             document = opened
+            #if os(iOS)
             inkLayer = savedInk.map { makeInkLayer(saved: $0) }
+            #endif
             pageIndex = startPage.map { min(max($0, 0), opened.pageCount - 1) } ?? restoredIndex(count: opened.pageCount)
             let now = Date()
             beginSegment(at: now)
@@ -384,6 +390,7 @@ struct MihbaraPDFReaderView: View {
         readingClock = nil
     }
 
+    #if os(iOS)
     /// A failed saved-drawing read leaves the reader open without the pen rather than risk overwriting them.
     @MainActor private func makeInkLayer(saved: [Int: Data]) -> MihbaraInkOverlay {
         let bookID = book.id
@@ -395,6 +402,7 @@ struct MihbaraPDFReaderView: View {
         layer.onChange = { DispatchQueue.main.async { inkRevision += 1 } }
         return layer
     }
+    #endif
 
     @MainActor private func setInking(_ on: Bool) {
         if !on { inkLayer?.flushAll() }
@@ -512,6 +520,7 @@ private enum PDFReaderError: LocalizedError {
     var errorDescription: String? { "تعذر فتح PDF المحلي. قد يكون الملف تالفًا أو محميًا بكلمة مرور." }
 }
 
+#if os(iOS)
 private struct MihbaraPDFPage: UIViewRepresentable {
     let document: PDFDocument
     let pageIndex: Int
@@ -600,3 +609,4 @@ final class RestoringPDFView: PDFView {
         DispatchQueue.main.async { [weak self] in self?.reportsPageChanges = true }
     }
 }
+#endif

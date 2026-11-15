@@ -20,15 +20,6 @@ import MadarData
     #endif
 }
 
-/// The Mihbara reader (Readium) is not part of the Mac app yet, so there is never a pending reading write to retry here.
-@MainActor final class MihbaraReadingSaveCoordinator {
-    private static let shared = MihbaraReadingSaveCoordinator()
-    static func forSession(_ app: AppSession) -> MihbaraReadingSaveCoordinator { shared }
-    static func storeMaintenanceEnded(for app: AppSession) {}
-    var canRetryPendingWriteErrorNow: Bool { false }
-    func retryPendingWritesNow() {}
-    func dismissPendingWriteError() {}
-}
 
 /// iOS wakes the app for the automatic backup through BackgroundTasks. The Mac has no such scheduler for a sandboxed app, so the
 /// automatic backup runs when the window opens and when it comes back to the front (the root view already asks for it then).

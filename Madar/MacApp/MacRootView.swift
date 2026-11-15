@@ -45,8 +45,8 @@ struct MacRootView: View {
             if session.introNeeded(block) { session.pendingIntro = block }
         }
         .onChange(of: session.mihbaraOpen) { _, open in
-            // The Mihbara is not on the Mac yet; a shared screen that asks for it lands nowhere.
-            if open { session.mihbaraOpen = false }
+            // The Mihbara is a sidebar room on the Mac: a shared screen that asks for it selects that room.
+            if open { session.mihbaraOpen = false; session.selectedTab = "mihbara" }
         }
         .font(MadarTypography.body())
         .environment(\.roomTheme, theme)
@@ -100,6 +100,7 @@ private struct MacRoomRoot: View {
                 case "quran": QuranHomeView(service: AppQuranService(session: session))
                 case "notes": DiaryRoomView(app: session)
                 case "money": MoneyRoomView(app: session, isTabRoot: true)
+                case "mihbara": MihbaraHomeView(app: session, isTabRoot: true)
                 default: BahwLobbyView(session: session)
                 }
             }
