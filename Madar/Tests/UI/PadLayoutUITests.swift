@@ -143,6 +143,12 @@ import XCTest
         XCTAssertFalse(app.descendants(matching: .any)["diary-year-strip"].exists, "The inline year strip must not flash into the measured iPad landscape root")
         XCTAssertTrue(app.staticTexts["السطر الثاني في اليوم نفسه"].waitForExistence(timeout: 10), "Today's page stands beside the sidebar")
         XCTAssertTrue(app.textFields["diary-inline-field"].exists)
+        let dayTitle = app.staticTexts["diary-day-title"]
+        let secondaryDate = app.staticTexts["diary-day-secondary-date"]
+        XCTAssertTrue(dayTitle.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(secondaryDate.exists, app.debugDescription)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.exists, app.debugDescription)
         let side = app.descendants(matching: .any)["diary-pad-sidebar"].frame, field = app.textFields["diary-inline-field"].frame
         XCTAssertLessThan(side.width, 420, "The sidebar stays a column, not the whole screen")
         XCTAssertGreaterThan(field.width, 300, "The page keeps real width")
@@ -156,6 +162,15 @@ import XCTest
         XCTAssertTrue(waitForWindow(app, landscape: true), "Wait for the iPad to finish laying out in landscape")
         XCTAssertTrue(app.descendants(matching: .any)["diary-pad-sidebar"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.keyboards.firstMatch.exists)
-        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "pad-diary-root"; shot.lifetime = .keepAlways; add(shot)
+        let bounds = window.frame
+        for (name, element) in [("day title", dayTitle), ("secondary date", secondaryDate), ("writing field", app.textFields["diary-inline-field"])] {
+            let frame = element.frame
+            XCTAssertTrue([frame.minX, frame.minY, frame.width, frame.height].allSatisfy { $0.isFinite }, "The \(name) must have finite geometry")
+            XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1, "The \(name) must remain inside the app window")
+            XCTAssertGreaterThanOrEqual(frame.minY, bounds.minY - 1, "The \(name) must remain inside the app window")
+            XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX + 1, "The \(name) must remain inside the app window")
+            XCTAssertLessThanOrEqual(frame.maxY, bounds.maxY + 1, "The \(name) must remain inside the app window")
+        }
+        let shot = XCTAttachment(screenshot: window.screenshot()); shot.name = "pad-diary-root-window"; shot.lifetime = .keepAlways; add(shot)
     }
 }

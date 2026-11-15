@@ -97,7 +97,23 @@ import XCTest
         let field = app.textFields["money-limit-field"]
         for _ in 0..<8 where !field.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        XCTAssertTrue(field.isHittable, app.debugDescription)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.exists, app.debugDescription)
+        let assertVisibleGeometry: (XCUIElement, String) -> Void = { element, name in
+            let frame = element.frame
+            let bounds = window.frame
+            XCTAssertTrue([frame.minX, frame.minY, frame.maxX, frame.maxY, frame.width, frame.height].allSatisfy { $0.isFinite }, "Non-finite \(name) geometry: \(frame)")
+            XCTAssertGreaterThan(frame.width, 0, "The \(name) needs visible width")
+            XCTAssertGreaterThan(frame.height, 0, "The \(name) needs visible height")
+            XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1, "The \(name) must stay inside the app window")
+            XCTAssertGreaterThanOrEqual(frame.minY, bounds.minY - 1, "The \(name) must stay inside the app window")
+            XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX + 1, "The \(name) must stay inside the app window")
+            XCTAssertLessThanOrEqual(frame.maxY, bounds.maxY + 1, "The \(name) must stay inside the app window")
+        }
+        assertVisibleGeometry(field, "money input")
+        field.tap()
+        assertVisibleGeometry(field, "focused money input")
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 32) + "1.234")
         let invalid = app.staticTexts["money-limit-invalid-input"]
         XCTAssertTrue(invalid.waitForExistence(timeout: 5), app.debugDescription)
@@ -109,14 +125,14 @@ import XCTest
         Thread.sleep(forTimeInterval: 0.8)
         shot(app, "OWNER-money-limit-invalid-L")
 
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.tap()
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 32) + "90071992547410")
         XCTAssertEqual(invalid.label, "هذا المبلغ أكبر من الحد الذي يمكن حفظه بدقة.")
         XCTAssertEqual(app.staticTexts["money-limit-value"].label, "—", "An over-limit input must not leave the previous limit looking active.")
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "money-limit-percent-summary").firstMatch.exists)
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "money-limit-left").firstMatch.exists)
         XCTAssertFalse(app.buttons["money-limit-save"].isEnabled)
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.tap()
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 32) + "90071992547409")
         XCTAssertFalse(invalid.exists, app.debugDescription)
         let done = app.buttons["money-limit-keyboard-done"]
@@ -127,9 +143,12 @@ import XCTest
         for _ in 0..<8 where !percent.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(percent.isHittable, app.debugDescription)
         XCTAssertTrue(percent.isEnabled, app.debugDescription)
+        assertVisibleGeometry(percent, "percentage mode button before switching")
         percent.tap()
         let value = app.staticTexts["money-limit-value"]
         XCTAssertTrue(value.waitForExistence(timeout: 5), app.debugDescription)
+        assertVisibleGeometry(percent, "percentage mode button after switching")
+        assertVisibleGeometry(value, "percentage limit value")
         XCTAssertEqual(value.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: ""), "١٠٠٪")
         app.terminate()
     }
@@ -152,7 +171,8 @@ import XCTest
         let field = app.textFields["money-limit-field"]
         for _ in 0..<8 where !field.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        XCTAssertTrue(field.isHittable, app.debugDescription)
+        field.tap()
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 32) + "90071992547409")
         XCTAssertFalse(app.staticTexts["money-limit-invalid-input"].exists, app.debugDescription)
         let done = app.buttons["money-limit-keyboard-done"]
