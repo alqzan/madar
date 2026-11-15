@@ -30,31 +30,62 @@ struct DiaryPhotoViewer: View {
     @State private var items: [DiaryViewerItem] = []
     @State private var editing = false
     @State private var draft = ""
+    @State private var commentDrafts: [String: String] = [:]
     @State private var saving = false
     @State private var error: String?
+    @State private var confirmDiscard = false
+    @State private var rootBlockerID = UUID()
     @FocusState private var focused: Bool
     private var service: AppDiaryService { AppDiaryService(app: app, clock: { app.prayerNow() }) }
     private var current: DiaryViewerItem? { items.first { $0.id == selection } }
+    private var hasUnsavedComment: Bool {
+        if let item = current, editing, draft != item.comment { return true }
+        return commentDrafts.contains { pair in items.first { $0.id == pair.key }?.comment != pair.value }
+    }
+    private var commentBinding: Binding<String> {
+        Binding(get: { draft }, set: { value in
+            draft = value
+            if let item = current { rememberDraft(value, for: item) }
+        })
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             topBar
             TabView(selection: $selection) {
                 ForEach(items) { item in DiaryZoomablePhoto(item: item).tag(item.id) }
-            }.tabViewStyle(.page(indexDisplayMode: .never))
+            }.tabViewStyle(.page(indexDisplayMode: .never)).disabled(saving)
             commentPanel
         }
         .background(theme.background.ignoresSafeArea())
         .task { items = await load() }
-        .onChange(of: selection) { _, _ in editing = false; error = nil; focused = false }
+        .onChange(of: selection) { old, new in
+            if editing, let previous = items.first(where: { $0.id == old }) { rememberDraft(draft, for: previous) }
+            error = nil; focused = false
+            if let next = items.first(where: { $0.id == new }) {
+                draft = commentDrafts[next.id] ?? next.comment
+                editing = commentDrafts[next.id] != nil
+            } else { draft = ""; editing = false }
+        }
+        .onChange(of: hasUnsavedComment, initial: true) { _, blocked in
+            app.setDiaryRootDraftBlocker(rootBlockerID, active: blocked)
+        }
+        .onDisappear { app.setDiaryRootDraftBlocker(rootBlockerID, active: false) }
+        .interactiveDismissDisabled(hasUnsavedComment || saving)
+        .confirmationDialog("تعليقك لم يُحفظ", isPresented: $confirmDiscard, titleVisibility: .visible) {
+            Button("أغلق دون حفظ", role: .destructive) {
+                commentDrafts.removeAll(); editing = false; dismiss()
+            }.accessibilityIdentifier("diary-photo-comment-discard-close")
+            Button("أكمل التحرير", role: .cancel) { }
+        } message: { Text("تعليقك على الصورة سيبقى هنا حتى تحفظه.") }
         .accessibilityElement(children: .contain).accessibilityIdentifier("diary-photo-viewer")
     }
 
     private var topBar: some View {
         HStack {
-            Button { dismiss() } label: {
+            Button { requestClose() } label: {
                 Image(systemName: "xmark").font(.system(size: 17, weight: .semibold)).frame(width: 44, height: 44).contentShape(Rectangle())
-            }.buttonStyle(.madarPlain).foregroundStyle(theme.ink).accessibilityLabel("أغلق الصور").accessibilityIdentifier("diary-photo-viewer-close")
+            }.buttonStyle(.madarPlain).disabled(saving).foregroundStyle(theme.ink).accessibilityLabel("أغلق الصور").accessibilityIdentifier("diary-photo-viewer-close")
             Spacer()
             if let index = items.firstIndex(where: { $0.id == selection }), items.count > 1 {
                 Text(service.digits.string(index + 1) + " من " + service.digits.string(items.count))
@@ -67,19 +98,20 @@ struct DiaryPhotoViewer: View {
         if let item = current {
             VStack(alignment: .leading, spacing: 10) {
                 if editing {
-                    TextField(item.lineID == nil ? "اكتب تعليقًا؛ تُثبَّت الصورة في الصفحة معه" : "تعليقك على هذه الصورة", text: $draft, axis: .vertical)
+                    TextField(item.lineID == nil ? "اكتب تعليقًا؛ تُثبَّت الصورة في الصفحة معه" : "تعليقك على هذه الصورة", text: commentBinding, axis: .vertical)
                         .font(DiaryType.writing).lineLimit(1...6).focused($focused).padding(10)
                         .background(theme.surface, in: .rect(cornerRadius: 12)).overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.line) }
+                        .disabled(saving)
                         .accessibilityIdentifier("diary-photo-comment-field")
                     HStack(spacing: 12) {
-                        Button("إلغاء") { editing = false; focused = false }.font(DiaryType.label).frame(minHeight: 44)
+                        Button("إلغاء") { cancelEditing(item) }.font(DiaryType.label).frame(minHeight: 44).disabled(saving)
                             .accessibilityIdentifier("diary-photo-comment-cancel")
                         Spacer()
                         Button { Task { await save(item) } } label: {
                             HStack(spacing: 6) { if saving { ProgressView() }; Text("احفظ التعليق") }
                                 .font(DiaryType.label).padding(.horizontal, 18).frame(minHeight: 44)
                                 .foregroundStyle(theme.onAccent).background(theme.accent, in: .capsule)
-                        }.buttonStyle(.madarPlain).disabled(saving || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }.buttonStyle(.madarPlain).disabled(saving || (item.lineID == nil && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
                             .accessibilityIdentifier("diary-photo-comment-save")
                     }
                 } else {
@@ -110,14 +142,34 @@ struct DiaryPhotoViewer: View {
         }
     }
 
+    private func rememberDraft(_ value: String, for item: DiaryViewerItem) {
+        if value == item.comment { commentDrafts.removeValue(forKey: item.id) }
+        else { commentDrafts[item.id] = value }
+    }
+    private func cancelEditing(_ item: DiaryViewerItem) {
+        commentDrafts.removeValue(forKey: item.id)
+        draft = item.comment; editing = false; focused = false
+    }
+    private func requestClose() {
+        guard !saving else { return }
+        focused = false
+        if hasUnsavedComment { confirmDiscard = true } else { dismiss() }
+    }
+
     private func save(_ item: DiaryViewerItem) async {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !saving else { return }
-        if item.lineID == nil { await pin(item, comment: text); return }
+        guard !saving else { return }
+        if item.lineID == nil {
+            guard !text.isEmpty else { return }
+            focused = false
+            await pin(item, comment: text); return
+        }
         guard let line = item.lineID else { return }
+        focused = false
         saving = true; defer { saving = false }
         do {
             try await service.edit(line, text: text)
+            commentDrafts.removeValue(forKey: item.id)
             editing = false; focused = false
             await reload(keeping: item)
         } catch { self.error = madarUserMessage(error) }
@@ -129,6 +181,7 @@ struct DiaryPhotoViewer: View {
         do {
             try await service.appendMedia(data: copy, kind: "photo", contentType: "image/jpeg", caption: comment, day: "today", writingDay: day, assetID: id)
             app.diaryPhotoEpoch += 1
+            commentDrafts.removeValue(forKey: item.id)
             editing = false; focused = false
             await reload(keeping: item)
         } catch { self.error = madarUserMessage(error) }

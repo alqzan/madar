@@ -77,6 +77,109 @@ import XCTest
         app.terminate()
     }
 
+    func testInvalidLimitIsBlockedAndLargeLimitCanSwitchToPercent() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        app.launch()
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let open = app.buttons["money-categories-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !open.isHittable { app.swipeUp(velocity: .slow) }
+        for _ in 0..<4 where open.frame.maxY > app.frame.maxY - 140 { app.swipeUp(velocity: .slow) }
+        open.tap()
+
+        let grocery = app.buttons["money-shelf-بقالة"]
+        XCTAssertTrue(grocery.waitForExistence(timeout: 10), app.debugDescription)
+        grocery.tap()
+
+        let field = app.textFields["money-limit-field"]
+        for _ in 0..<8 where !field.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 32) + "1.234")
+        let invalid = app.staticTexts["money-limit-invalid-input"]
+        XCTAssertTrue(invalid.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(invalid.isHittable, "The warning must remain visible above the amount keypad: \(app.debugDescription)")
+        XCTAssertFalse(app.buttons["money-limit-save"].isEnabled)
+        XCTAssertEqual(app.staticTexts["money-limit-value"].label, "—", "An invalid input must not leave the previous limit looking active.")
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "money-limit-percent-summary").firstMatch.exists, "The percentage summary must not reuse the previous amount.")
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "money-limit-left").firstMatch.exists, "The remaining amount must not reuse the previous limit.")
+        Thread.sleep(forTimeInterval: 0.8)
+        shot(app, "OWNER-money-limit-invalid-L")
+
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 32) + "90071992547410")
+        XCTAssertEqual(invalid.label, "هذا المبلغ أكبر من الحد الذي يمكن حفظه بدقة.")
+        XCTAssertEqual(app.staticTexts["money-limit-value"].label, "—", "An over-limit input must not leave the previous limit looking active.")
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "money-limit-percent-summary").firstMatch.exists)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "money-limit-left").firstMatch.exists)
+        XCTAssertFalse(app.buttons["money-limit-save"].isEnabled)
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 32) + "90071992547409")
+        XCTAssertFalse(invalid.exists, app.debugDescription)
+        let done = app.buttons["money-limit-keyboard-done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5), app.debugDescription)
+        done.tap()
+        let percent = app.buttons["money-limit-mode-percent"]
+        XCTAssertTrue(percent.waitForExistence(timeout: 5), app.debugDescription)
+        for _ in 0..<8 where !percent.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(percent.isHittable, app.debugDescription)
+        XCTAssertTrue(percent.isEnabled, app.debugDescription)
+        percent.tap()
+        let value = app.staticTexts["money-limit-value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(value.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: ""), "١٠٠٪")
+        app.terminate()
+    }
+
+    func testLargeFixedLimitSurvivesSavingAndReopening() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        app.launch()
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let open = app.buttons["money-categories-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !open.isHittable { app.swipeUp(velocity: .slow) }
+        for _ in 0..<4 where open.frame.maxY > app.frame.maxY - 140 { app.swipeUp(velocity: .slow) }
+        open.tap()
+
+        let grocery = app.buttons["money-shelf-بقالة"]
+        XCTAssertTrue(grocery.waitForExistence(timeout: 10), app.debugDescription); grocery.tap()
+        let field = app.textFields["money-limit-field"]
+        for _ in 0..<8 where !field.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 32) + "90071992547409")
+        XCTAssertFalse(app.staticTexts["money-limit-invalid-input"].exists, app.debugDescription)
+        let done = app.buttons["money-limit-keyboard-done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5), app.debugDescription); done.tap()
+
+        let save = app.buttons["money-limit-save"]
+        for _ in 0..<8 where !save.isHittable { app.swipeUp(velocity: .slow) }
+        let updatedRow = app.buttons["money-shelf-بقالة"]
+        XCTAssertTrue(updatedRow.waitForExistence(timeout: 5), app.debugDescription)
+        let initialRowLabel = updatedRow.label
+        XCTAssertTrue(save.isHittable && save.isEnabled, app.debugDescription); save.tap()
+        let saved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", initialRowLabel), object: updatedRow)
+        XCTAssertEqual(XCTWaiter.wait(for: [saved], timeout: 15), .completed, app.debugDescription)
+        let close = app.buttons["money-categories-close"]
+        close.tap()
+
+        let reopen = app.buttons["money-categories-open"]
+        XCTAssertTrue(reopen.waitForExistence(timeout: 10), app.debugDescription); reopen.tap()
+        let reopenedGrocery = app.buttons["money-shelf-بقالة"]
+        XCTAssertTrue(reopenedGrocery.waitForExistence(timeout: 10), app.debugDescription); reopenedGrocery.tap()
+        let reloadedField = app.textFields["money-limit-field"]
+        XCTAssertTrue(reloadedField.waitForExistence(timeout: 10), app.debugDescription)
+        let reloadedDigits = ((reloadedField.value as? String) ?? "").compactMap(\.wholeNumberValue).map { String($0) }.joined()
+        XCTAssertTrue(reloadedDigits.hasPrefix("90071992547409"), "The saved limit must reload in full: \(reloadedField.value ?? "nil")")
+        app.terminate()
+    }
+
     func testLimit80AlertIsDeliveredWithPrivacySafeCopy() throws {
         continueAfterFailure = false
         let storeID = UUID().uuidString

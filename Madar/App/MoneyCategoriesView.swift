@@ -12,12 +12,15 @@ struct MoneyCategoriesView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @FocusState private var amountLimitFocused: Bool
     @State private var reading: MoneyCategoriesReading?
     @State private var failure: String?
     @State private var selected: UUID?
     @State private var percentMode = false
     @State private var draftMinor = 0
     @State private var typedLimit = ""
+    @State private var typedLimitIsValid = true
+    @State private var typedLimitError: String?
     @State private var draftBp = 0
     @State private var draftBase = "income"
     @State private var saving = false
@@ -28,6 +31,47 @@ struct MoneyCategoriesView: View {
     private var homeCurrencyName: String { app.string("core.currency") == "SAR" ? "ريال" : service.currencyName(app.string("core.currency")) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
     private func amount(_ minor: Int) -> String { visible ? service.amount(minor) : "•••" }
+    private var currencyExponent: Int { CurrencyExponents.specified.exponent(app.string("core.currency")) ?? 2 }
+    private func editableAmount(_ minor: Int) -> String {
+        service.digits.amount(minorUnits: Int64(minor), fractionDigits: currencyExponent, signed: false)
+            .replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "")
+    }
+    private func setDraftMinor(_ value: Int) {
+        draftMinor = value
+        typedLimit = editableAmount(value)
+        typedLimitIsValid = MoneyCommandPayload.integer(.string(String(value))) != nil
+        typedLimitError = typedLimitIsValid ? nil : "هذا المبلغ أكبر من الحد الذي يمكن حفظه بدقة."
+    }
+    private func updateTypedLimit(_ raw: String) {
+        guard let minor = MoneyAmountInput.minor(raw, exponent: currencyExponent) else {
+            typedLimitIsValid = false
+            typedLimitError = "اكتب مبلغًا صحيحًا قبل الحفظ."
+            return
+        }
+        draftMinor = minor
+        typedLimitIsValid = MoneyCommandPayload.integer(.string(String(minor))) != nil
+        typedLimitError = typedLimitIsValid ? nil : "هذا المبلغ أكبر من الحد الذي يمكن حفظه بدقة."
+    }
+    private var limitValue: Text {
+        guard typedLimitIsValid || percentMode else { return Text("—") }
+        return Text(figure: percentMode ? percentLabel(draftBp) : amount(draftMinor))
+    }
+    /// Split the multiplication around 10,000 so even Int.max-sized source values stay exact and cannot overflow.
+    private func amountForBasisPoints(base: Int, basisPoints: Int) -> Int {
+        let base = max(0, base), points = min(10_000, max(0, basisPoints))
+        return (base / 10_000) * points + (base % 10_000) * points / 10_000
+    }
+    private func basisPoints(amount: Int, of base: Int) -> Int {
+        guard amount > 0, base > 0 else { return 0 }
+        guard amount < base else { return 10_000 }
+        let scaled = Decimal(Int64(amount)) * Decimal(10_000) / Decimal(Int64(base))
+        return min(10_000, max(0, NSDecimalNumber(decimal: scaled).intValue))
+    }
+    private func isAtLeastEightyPercent(spent: Int, limit: Int) -> Bool {
+        guard limit > 0 else { return false }
+        let threshold = (limit / 5) * 4 + ((limit % 5) * 4 + 4) / 5
+        return max(0, spent) >= threshold
+    }
     /// The shelf plank: dark wood under every category.
     private var wood: Color { theme.color("reserveText").mix(with: theme.ink, by: 0.45) }
     /// Each shelf's books take their own binding colour, in category order (the canonical's brown, green, blue, purple, grey).
@@ -35,36 +79,53 @@ struct MoneyCategoriesView: View {
 
     var body: some View { screen.hidesMoneyInBackground($revealed) }
     @ViewBuilder private var screen: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).glassEffect(.regular.interactive(), in: .circle)
-                    }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-categories-close")
+                    }.buttonStyle(.madarPlain).disabled(saving).accessibilityLabel("إغلاق").accessibilityIdentifier("money-categories-close")
                     Text("التصنيفات والحدود").font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer()
                 }.padding(.top, 8)
                 if let reading {
-                    header(reading)
-                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } }
-                    if reading.shelves.isEmpty {
-                        Text("لا تصنيفات بعد. تُنشأ حين تصنّف أول حركة في رسائل البنك.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                    if !amountLimitFocused {
+                        header(reading)
+                        if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } }
+                        if reading.shelves.isEmpty {
+                            Text("لا تصنيفات بعد. تُنشأ حين تصنّف أول حركة في رسائل البنك.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                        }
+                        ForEach(Array(reading.shelves.enumerated()), id: \.element.id) { shelf($0.element, tint: binding($0.offset)) }
+                        if !reading.shelves.isEmpty {
+                            HStack(spacing: 14) {
+                                HStack(spacing: 4) { Rectangle().fill(wood).frame(width: 18, height: 4); Text("الرف حدّك") }
+                                HStack(spacing: 4) { DashLine().stroke(theme.color("accent"), style: .init(lineWidth: 2, dash: [3, 2])).frame(width: 2, height: 14); Text("المفروض حتى اليوم") }
+                            }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity)
+                        }
                     }
-                    ForEach(Array(reading.shelves.enumerated()), id: \.element.id) { shelf($0.element, tint: binding($0.offset)) }
-                    if !reading.shelves.isEmpty {
-                        HStack(spacing: 14) {
-                            HStack(spacing: 4) { Rectangle().fill(wood).frame(width: 18, height: 4); Text("الرف حدّك") }
-                            HStack(spacing: 4) { DashLine().stroke(theme.color("accent"), style: .init(lineWidth: 2, dash: [3, 2])).frame(width: 2, height: 14); Text("المفروض حتى اليوم") }
-                        }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity)
+                    if let shelf = reading.shelves.first(where: { $0.id == selected }) ?? reading.shelves.first {
+                        editor(shelf, reading).id("money-limit-editor")
                     }
-                    if let shelf = reading.shelves.first(where: { $0.id == selected }) ?? reading.shelves.first { editor(shelf, reading) }
                 } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("تمّ") { amountLimitFocused = false }.accessibilityIdentifier("money-limit-keyboard-done")
+                }
+            }
             .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .onChange(of: amountLimitFocused) { _, focused in
+                guard focused else { return }
+                withAnimation(MadarMotion.quick.animation) { proxy.scrollTo("money-limit-editor", anchor: .bottom) }
+            }
             .accessibilityIdentifier("money-categories")
+            .interactiveDismissDisabled(saving)
+        }
     }
 
     private func header(_ r: MoneyCategoriesReading) -> some View {
@@ -132,8 +193,10 @@ struct MoneyCategoriesView: View {
     // MARK: The limit editor
 
     private func editor(_ s: MoneyCategoryShelf, _ r: MoneyCategoriesReading) -> some View {
-        let limit = percentMode ? ((draftBase == "allowance" ? r.allowanceMinor : r.incomeMinor) * draftBp) / 10_000 : draftMinor
-        let left = limit - s.spentMinor
+        let limit = percentMode
+            ? amountForBasisPoints(base: draftBase == "allowance" ? r.allowanceMinor : r.incomeMinor, basisPoints: draftBp)
+            : draftMinor
+        let left = limit - max(0, s.spentMinor)
         return VStack(spacing: 12) {
             HStack(spacing: 6) {
                 Rectangle().fill(theme.color("reserve")).frame(height: 1); Image(systemName: "sparkle").foregroundStyle(theme.color("reserve")); Rectangle().fill(theme.color("reserve")).frame(height: 1)
@@ -142,43 +205,61 @@ struct MoneyCategoriesView: View {
                 Text("حدّ " + s.name).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
                 Spacer()
                 HStack(spacing: 0) {
-                    modeButton(homeCurrencyName, !percentMode, id: "amount") { percentMode = false; draftMinor = limit }
-                    if r.incomeMinor > 0 { modeButton("٪ راتب", percentMode, id: "percent") { percentMode = true; draftBase = "income"; draftBp = r.incomeMinor > 0 ? min(10_000, max(1, (draftMinor * 10_000) / r.incomeMinor)) : 0 } }
+                    modeButton(homeCurrencyName, !percentMode, id: "amount") { percentMode = false; setDraftMinor(limit) }
+                    if r.incomeMinor > 0 {
+                        modeButton("٪ راتب", percentMode, id: "percent") {
+                            percentMode = true; draftBase = "income"
+                            draftBp = max(1, basisPoints(amount: draftMinor, of: r.incomeMinor))
+                        }.disabled(!typedLimitIsValid)
+                    }
                 }.glassEffect(.regular.interactive(), in: .capsule).clipShape(Capsule())
             }
             HStack {
-                step("minus") { if percentMode { draftBp = max(100, draftBp - 100) } else { draftMinor = max(0, draftMinor - 10_000) } }
+                step("minus") {
+                    if percentMode { draftBp = max(100, draftBp - 100) }
+                    else { setDraftMinor(max(0, draftMinor - 10_000)) }
+                }
                 Spacer()
-                Text(figure: percentMode ? percentLabel(draftBp) : amount(draftMinor)).font(.custom("thmanyahserifdisplay-Black", size: 52, relativeTo: .largeTitle))
+                limitValue.font(.custom("thmanyahserifdisplay-Black", size: 52, relativeTo: .largeTitle))
                     .lineLimit(1).minimumScaleFactor(0.5).accessibilityIdentifier("money-limit-value")
                 Spacer()
-                step("plus") { if percentMode { draftBp = min(10_000, draftBp + 100) } else { draftMinor += 10_000 } }
+                step("plus") {
+                    if percentMode { draftBp = min(10_000, draftBp + 100) }
+                    else {
+                        let (next, overflow) = draftMinor.addingReportingOverflow(10_000)
+                        setDraftMinor(overflow ? Int.max : next)
+                    }
+                }
             }.environment(\.layoutDirection, .leftToRight)
             if !percentMode && visible {
                 // Quick win 25: type the limit instead of tapping the step many times.
                 TextField("اكتب المبلغ", text: $typedLimit)
-                    .keyboardType(.decimalPad).multilineTextAlignment(.center).frame(minHeight: 44)
-                    .onChange(of: typedLimit) { _, raw in
-                        let exponent = CurrencyExponents.specified.exponent(app.string("core.currency")) ?? 2
-                        if let minor = MoneyAmountInput.minor(raw, exponent: exponent) { draftMinor = minor }
-                    }
+                    .keyboardType(.decimalPad).multilineTextAlignment(.center).frame(minHeight: 44).focused($amountLimitFocused)
+                    .onChange(of: typedLimit) { _, raw in updateTypedLimit(raw) }
                     .accessibilityIdentifier("money-limit-field")
+                if !typedLimitIsValid {
+                    Text(typedLimitError ?? "اكتب مبلغًا صحيحًا قبل الحفظ.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
+                        .accessibilityIdentifier("money-limit-invalid-input")
+                }
             }
-            Text(figure: percentMode ? "= " + amount(limit) + " هذه الدورة" : r.incomeMinor > 0 && visible ? "= " + service.percent(draftMinor, of: r.incomeMinor) + " من راتبك" : "")
-                .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-            Text(figure: left >= 0 ? "باقي " + amount(left) + "، يكفيك " + amount(left / max(1, r.daysLeft)) + " في اليوم" : "تجاوزت الحد بـ" + amount(-left))
-                .font(MadarTypography.caption()).foregroundStyle(left >= 0 && limit > 0 && s.spentMinor * 100 / max(1, limit) < 80 ? theme.color("surplusText") : theme.color("dueText"))
-                .accessibilityIdentifier("money-limit-left")
+            if typedLimitIsValid {
+                Text(figure: percentMode ? "= " + amount(limit) + " هذه الدورة" : r.incomeMinor > 0 && visible ? "= " + service.percent(draftMinor, of: r.incomeMinor) + " من راتبك" : "")
+                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-limit-percent-summary")
+                Text(figure: left >= 0 ? "باقي " + amount(left) + "، يكفيك " + amount(left / max(1, r.daysLeft)) + " في اليوم" : "تجاوزت الحد بـ" + amount(-left))
+                    .font(MadarTypography.caption()).foregroundStyle(left >= 0 && !isAtLeastEightyPercent(spent: s.spentMinor, limit: limit) ? theme.color("surplusText") : theme.color("dueText"))
+                    .accessibilityIdentifier("money-limit-left")
+            }
             HStack(spacing: 10) {
                 if s.limitMinor != nil {
                     Button { save(s, none: true) } label: {
                         Text("بلا حد").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 54).glassEffect(.regular.interactive(), in: .capsule)
-                    }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-limit-none")
+                }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-limit-none")
                 }
                 Button { save(s, none: false) } label: {
                     Text("احفظ الحد").font(.custom("thmanyahsans-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.background)
                         .frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: Capsule())
-                }.buttonStyle(.madarPlain).disabled(saving || (!percentMode && draftMinor <= 0)).accessibilityIdentifier("money-limit-save").layoutPriority(1)
+                }.buttonStyle(.madarPlain).disabled(saving || !typedLimitIsValid || (!percentMode && draftMinor <= 0))
+                    .accessibilityIdentifier("money-limit-save").layoutPriority(1)
             }
             if let saveFailure { Text(saveFailure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-limit-failure") }
         }.padding(.top, 6)
@@ -196,7 +277,8 @@ struct MoneyCategoriesView: View {
     private func step(_ symbol: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol).font(.title3).frame(width: 64, height: 64).background(theme.surface, in: Circle()).glassEffect(.regular.interactive(), in: .circle)
-        }.buttonStyle(.madarPlain).accessibilityLabel(symbol == "plus" ? "زد الحد" : "أنقص الحد").accessibilityIdentifier("money-limit-" + symbol)
+        }.buttonStyle(.madarPlain).disabled(!typedLimitIsValid)
+            .accessibilityLabel(symbol == "plus" ? "زد الحد" : "أنقص الحد").accessibilityIdentifier("money-limit-" + symbol)
     }
 
     // MARK: Actions
@@ -206,7 +288,7 @@ struct MoneyCategoriesView: View {
         percentMode = s.mode == "percent" && (reading?.incomeMinor ?? 0) > 0
         draftBp = s.percentBp ?? 0
         draftBase = s.mode == "percent" ? s.base : "income"
-        draftMinor = s.limitMinor ?? 0
+        setDraftMinor(s.limitMinor ?? 0)
     }
     private func load() {
         do {

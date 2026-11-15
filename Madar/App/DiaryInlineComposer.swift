@@ -95,8 +95,8 @@ struct DiaryInlineComposer: View {
     @State private var loadedText = ""
 
     private var voice: DiaryVoiceController { app.diaryVoice }
-    private var voiceBusy: Bool { voice.recording || voice.savingAudio }
-    private var voiceShown: Bool { voice.recording || voice.savingAudio || voice.converting || voice.needsConsent || voice.microphoneDenied }
+    private var voiceBusy: Bool { voice.recording || voice.savingAudio || voice.converting }
+    private var voiceShown: Bool { voice.recording || voice.savingAudio || voice.converting || voice.needsConsent || voice.microphoneDenied || voice.pendingAudioCount > 0 }
     private var service: AppDiaryService { AppDiaryService(app: app, clock: { app.prayerNow() }) }
     private var field: Binding<String> { edit == nil ? $text : $editText }
     private var trimmed: String { field.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -367,13 +367,17 @@ struct DiaryInlineComposer: View {
     private var voiceRow: some View {
         // One tap records and one tap stops, right here on the page; nothing opens, nothing moves.
         HStack(spacing: 12) {
-            Text(voice.recording ? "يُسجَّل صوتك…" : "يُحفظ التسجيل…").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+            Text(voice.recording ? "يُسجَّل صوتك…" : voice.converting ? "يُفرّغ التسجيل…" : "يُحفظ التسجيل…").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
             Spacer(minLength: 4)
-            Button { Task { await voice.stop() } } label: {
-                Image(systemName: "stop.fill").font(.system(size: 18)).frame(width: 44, height: 44)
-                    .foregroundStyle(theme.background).background(theme.color("late"), in: .circle).contentShape(Circle())
-            }.buttonStyle(.madarPlain).disabled(voice.savingAudio)
-                .accessibilityLabel("أوقف التسجيل واحفظه").accessibilityIdentifier("diary-inline-stop")
+            if voice.recording {
+                Button { Task { await voice.stop() } } label: {
+                    Image(systemName: "stop.fill").font(.system(size: 18)).frame(width: 44, height: 44)
+                        .foregroundStyle(theme.background).background(theme.color("late"), in: .circle).contentShape(Circle())
+                }.buttonStyle(.madarPlain).disabled(voice.savingAudio)
+                    .accessibilityLabel("أوقف التسجيل واحفظه").accessibilityIdentifier("diary-inline-stop")
+            } else if voice.converting {
+                ProgressView().frame(width: 44, height: 44).accessibilityLabel("يُفرّغ التسجيل")
+            }
         }.padding(.horizontal, 8).frame(minHeight: 44)
     }
 
@@ -397,6 +401,7 @@ struct DiaryInlineComposer: View {
             .padding(.horizontal, 14).padding(.vertical, 10).frame(minHeight: 44)
             .background(theme.surface, in: .rect(cornerRadius: 22))
             .overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 0.7) }
+            .disabled(saving)
             if edit == nil {
                 // The full surface stays one tap away (camera, files, formatting, a longer text); the identifiers keep their old meaning.
                 Button { holdCommit = true; Task { await keepDraft(); toggle(true); holdCommit = false } } label: {

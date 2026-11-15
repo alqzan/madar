@@ -93,7 +93,7 @@ import MadarCore
     }
     private var starting = false
     func start(writingDay: GregorianDay) async {
-        guard !recording, !savingAudio, !starting else { return }
+        guard !recording, !savingAudio, !converting, !starting else { return }
         starting = true; defer { starting = false }
         lastMedia = nil; transcriptMedia = nil; transcriptText = ""; savedTranscript = ""; transcriptIsDirty = false; interrupted = false
         generatedTitle = nil; insightStatus = ""
@@ -224,7 +224,9 @@ import MadarCore
         guard DiaryVoiceInterruption.action(recording: recording, event: event) == .stopAndSave else { return }
         await stop()
         interrupted = true
-        message = "توقف التسجيل لأن النظام قاطعه؛ حُفظ ما سُجّل"
+        message = pendingAudioCount > 0
+            ? "توقف التسجيل؛ ملفه محفوظ لإعادة إدخاله في الصفحة."
+            : "توقف التسجيل لأن النظام قاطعه؛ حُفظ ما سُجّل"
     }
     private func startMetering() {
         meterTask?.cancel()

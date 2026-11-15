@@ -125,7 +125,6 @@ extension AppMoneyService {
 
     /// A share of the salary as a whole percent («٩٪»), rounded half up in integers.
     func percent(_ part: Int, of whole: Int) -> String {
-        guard whole > 0 else { return digits.string(0) + "٪" }
-        return digits.string((part * 100 + whole / 2) / whole) + "٪"
+        digits.string(MoneySafeArithmetic.percent(part, of: whole)) + "٪"
     }
 }

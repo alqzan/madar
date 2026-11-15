@@ -8,6 +8,7 @@ struct DiaryDaySummary: Identifiable, Sendable {
     let day: GregorianDay
     let excerpt: String
     let writings: Int
+    let hasSavedContent: Bool
     let photoIDs: [UUID]
     let places: Set<String>
     let projectIDs: Set<UUID>
@@ -84,21 +85,48 @@ extension AppDiaryService {
         let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)])))
         let pages = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
         let margins = try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
-        var descriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.kind == "photo" && $0.state != "missing" && $0.deletedAt == nil && $0.mergedInto == nil }); descriptor.propertiesToFetch = [\.id]
-        let photos = Set(try context.fetch(descriptor).map(\.id))
+        var descriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.state != "missing" && $0.deletedAt == nil && $0.mergedInto == nil })
+        descriptor.propertiesToFetch = [\.id, \.kind]
+        let media = try context.fetch(descriptor)
+        let activeMediaIDs = Set(media.map(\.id))
+        let photos = Set(media.filter { $0.kind == "photo" }.map(\.id))
+        let mediaKinds = Dictionary(uniqueKeysWithValues: media.map { ($0.id, $0.kind) })
         let niyyas=try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil}))
-        let grouped = Dictionary(grouping: entries, by: \.dayKey), keys = Set(entries.map(\.dayKey) + pages.filter { $0.photoMediaID != nil || $0.questionAnswer != nil }.map(\.dayKey) + margins.map(\.writtenDayKey)+niyyas.map(\.dayKey))
+        let entriesByDay = Dictionary(grouping: entries, by: \.dayKey)
+        let pagesByDay = Dictionary(grouping: pages, by: \.dayKey)
+        let marginsByDay = Dictionary(grouping: margins, by: \.writtenDayKey)
+        let intentionsByDay = Dictionary(grouping: niyyas, by: \.dayKey)
+        let pagesWithContent = pages.filter {
+            $0.photoMediaID != nil || !($0.questionAnswer ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        let keys = Set(entries.map(\.dayKey) + pagesWithContent.map(\.dayKey) + margins.map(\.writtenDayKey) + niyyas.map(\.dayKey))
         let days = keys.compactMap { key -> DiaryDaySummary? in
             guard let day = try? GregorianDay(key) else { return nil }
-            let rows = grouped[key] ?? [], written = rows.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            let ids = Set(rows.flatMap(\.attachmentMediaIDs) + pages.filter { $0.dayKey == key }.compactMap(\.photoMediaID)).intersection(photos)
-            let notes = margins.filter { $0.writtenDayKey == key }
-            let intentions=niyyas.filter{$0.dayKey==key}
-            let fallback=ids.isEmpty ? "صفحة من يومك" : "صورة من هذا اليوم"
+            let rows = entriesByDay[key] ?? []
+            let pageRows = pagesByDay[key] ?? []
+            let written = rows.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            let linkedMediaIDs = Set(rows.compactMap(\.mediaID) + rows.flatMap(\.attachmentMediaIDs) + pageRows.compactMap(\.photoMediaID))
+                .intersection(activeMediaIDs)
+            let photoIDs = linkedMediaIDs.intersection(photos)
+            let notes = marginsByDay[key] ?? []
+            let intentions = intentionsByDay[key] ?? []
+            let answerExists = pageRows.contains {
+                !($0.questionAnswer ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            let writings = written.count + notes.count + intentions.count
+            let hasSavedContent = writings > 0 || !linkedMediaIDs.isEmpty || answerExists
+            let fallback: String
+            if !photoIDs.isEmpty { fallback = "صورة من هذا اليوم" }
+            else if linkedMediaIDs.contains(where: { mediaKinds[$0] == "audio" }) { fallback = "تسجيل صوتي محفوظ من هذا اليوم" }
+            else if !linkedMediaIDs.isEmpty { fallback = "مرفق محفوظ من هذا اليوم" }
+            else if answerExists { fallback = "إجابة محفوظة من هذا اليوم" }
+            else { fallback = "صفحة من يومك" }
             // The newest line written (by when it was written, not by the moment it describes: a line added «بعد» an earlier one sits in the middle of the day); the user's own lines come before the app's.
             let newest=(written.filter{["normal","late","ghad"].contains($0.ink)}.max{$0.createdAt<$1.createdAt}) ?? written.max{$0.createdAt<$1.createdAt}
             let excerpt:String=newest.map{ $0.textFormat == "markdown" ? DayOneMarkdown.plain($0.text) : $0.text } ?? intentions.last?.text ?? notes.last?.text ?? fallback
-            return DiaryDaySummary(day:day,excerpt:excerpt,writings:written.count+notes.count+intentions.count,photoIDs:ids.sorted{$0.uuidString<$1.uuidString},places:Set(rows.compactMap(\.place)),projectIDs:Set(rows.compactMap(\.projectID)))
+            return DiaryDaySummary(day: day, excerpt: excerpt, writings: writings, hasSavedContent: hasSavedContent,
+                photoIDs: photoIDs.sorted { $0.uuidString < $1.uuidString }, places: Set(rows.compactMap(\.place)),
+                projectIDs: Set(rows.compactMap(\.projectID)))
         }.sorted { $0.day > $1.day }
         return days
     }

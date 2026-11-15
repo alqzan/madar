@@ -35,6 +35,23 @@ import XCTest
         XCTAssertTrue(app.buttons["افتح الصورة"].exists, "Editing the comment keeps the photo on the page")
     }
 
+    func testPhotoCommentAsksBeforeClosingWithUnsavedText() throws {
+        continueAfterFailure = false
+        let app = openEditorDay()
+        app.buttons["افتح الصورة"].tap()
+        app.buttons["diary-photo-comment-open"].tap()
+        let field = app.descendants(matching: .any)["diary-photo-comment-field"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5), app.debugDescription)
+        field.tap(); field.typeText(" تعليق لم أحفظه")
+        app.buttons["diary-photo-viewer-close"].tap()
+        let warning = app.buttons["diary-photo-comment-discard-close"]
+        XCTAssertTrue(warning.waitForExistence(timeout: 5), app.debugDescription)
+        let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "OWNER-photo-comment-unsaved-L"; screenshot.lifetime = .keepAlways; add(screenshot)
+        warning.firstMatch.tap()
+        XCTAssertTrue(app.buttons["افتح الصورة"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["صورة احتفظت بها اليوم. تعليق لم أحفظه"].exists)
+    }
+
     func testRecordingTitleIsAlwaysAboveItAndEditable() throws {
         continueAfterFailure = false
         let app = openEditorDay()

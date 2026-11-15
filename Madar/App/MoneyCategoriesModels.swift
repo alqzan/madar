@@ -5,6 +5,37 @@ import MadarData
 import MadarMoney
 import MadarCommands
 
+enum MoneySafeArithmetic {
+    static func percent(_ part: Int, of whole: Int, rounded: Bool = true) -> Int {
+        guard whole > 0 else { return 0 }
+        return ratio(part, multiplier: 100, over: whole, rounding: rounded ? .plain : .down)
+    }
+
+    static func ratio(_ value: Int, multiplier: Int, over denominator: Int) -> Int {
+        ratio(value, multiplier: multiplier, over: denominator, rounding: .down)
+    }
+
+    static func sum(_ values: [Int]) -> Int {
+        let total = values.reduce(Decimal(0)) { $0 + Decimal(Int64($1)) }
+        return boundedInteger(total, rounding: .down)
+    }
+
+    private static func ratio(_ value: Int, multiplier: Int, over denominator: Int, rounding: NSDecimalNumber.RoundingMode) -> Int {
+        guard denominator > 0 else { return 0 }
+        let exact = Decimal(Int64(value)) * Decimal(Int64(multiplier)) / Decimal(Int64(denominator))
+        return boundedInteger(exact, rounding: rounding)
+    }
+
+    private static func boundedInteger(_ value: Decimal, rounding: NSDecimalNumber.RoundingMode) -> Int {
+        var rounded = Decimal()
+        var source = value
+        NSDecimalRound(&rounded, &source, 0, rounding)
+        if rounded >= Decimal(Int64.max) { return Int.max }
+        if rounded <= Decimal(Int64.min) { return Int.min }
+        return NSDecimalNumber(decimal: rounded).intValue
+    }
+}
+
 /// One book on a category's shelf: a merchant's spending this cycle.
 struct MoneyShelfBook: Identifiable, Equatable {
     var id: String
@@ -24,7 +55,7 @@ struct MoneyCategoryShelf: Identifiable, Equatable {
     var books: [MoneyShelfBook]
     /// «المفروض اليوم»: the limit spread evenly over the cycle, through today.
     var expectedTodayMinor: Int?
-    var percentUsed: Int? { limitMinor.flatMap { $0 > 0 ? max(0, spentMinor) * 100 / $0 : nil } }
+    var percentUsed: Int? { limitMinor.flatMap { $0 > 0 ? MoneySafeArithmetic.percent(max(0, spentMinor), of: $0, rounded: false) : nil } }
 }
 
 struct MoneyCategoriesReading: Equatable {
@@ -72,7 +103,9 @@ extension AppMoneyService {
             }
             let effective = mode.flatMap { LimitEngine.effectiveLimit($0, cycleIncomeMinor: income, cycleAllowanceMinor: allowance) }
             return .init(id: category.id, name: category.name, spentMinor: spent, limitMinor: effective, mode: limit?.mode ?? "none", percentBp: limit?.percentBp,
-                         base: limit?.base ?? "income", books: books, expectedTodayMinor: effective.map { $0 * elapsed / length })
+                         base: limit?.base ?? "income", books: books, expectedTodayMinor: effective.map {
+                             MoneySafeArithmetic.ratio($0, multiplier: elapsed, over: length)
+                         })
         }
         // «تصنّفت وحدها»: confirmed movements this cycle that carry their merchant rule's category.
         let auto = movements.filter { row in
@@ -80,7 +113,7 @@ extension AppMoneyService {
             let key = BankDedupe.normalize(merchant)
             return rules.contains { $0.pattern == key && $0.categoryID == category && !$0.ignore }
         }.count
-        return .init(cycleID: cycle?.id, shelves: shelves, totalLimitsMinor: shelves.compactMap(\.limitMinor).reduce(0, +), incomeMinor: income, allowanceMinor: allowance,
+        return .init(cycleID: cycle?.id, shelves: shelves, totalLimitsMinor: MoneySafeArithmetic.sum(shelves.compactMap(\.limitMinor)), incomeMinor: income, allowanceMinor: allowance,
                      autoCategorized: auto, daysLeft: max(1, length - elapsed + 1))
     }
 }

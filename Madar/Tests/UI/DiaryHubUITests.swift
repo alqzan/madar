@@ -45,6 +45,32 @@ import XCTest
         XCTAssertTrue(hijriYear.label.contains(" هـ") && hijriYear.label.contains(" م"), hijriYear.label)
         capture(app, "M3-V07-index-hijri-L")
     }
+
+    func testAudioOnlyDayAppearsInYearsAndCalendar() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "audioOnlyYear",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+        app.launch()
+        XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25), app.debugDescription)
+        app.buttons["diary-days"].tap()
+        selectHubTab("index", app)
+
+        let year = app.buttons["diary-hub-index-year-2025"]
+        XCTAssertTrue(year.waitForExistence(timeout: 10), "An audio-only day must still create a year card: \(app.debugDescription)")
+        XCTAssertTrue(year.label.contains("تسجيل صوتي محفوظ من هذا اليوم"), year.label)
+        capture(app, "OWNER-diary-audio-only-year-L")
+        year.tap()
+
+        let monthScale = app.buttons["diary-calendar-scale"]
+        XCTAssertTrue(monthScale.waitForExistence(timeout: 10), app.debugDescription)
+        monthScale.tap()
+        let audioDay = app.buttons["diary-calendar-day-2025-06-15"]
+        XCTAssertTrue(audioDay.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(audioDay.value as? String, "فيه ذكرى محفوظة")
+        capture(app, "OWNER-diary-audio-only-calendar-L")
+    }
+
     /// Owner trial, 22 Oct 2026. Runs only when TEST_RUNNER_MADAR_TRIAL_ZIP names the converted old-Madar diary; it
     /// imports into a fresh UI-test store through the shipped Day One importer and captures the rooms at real volume.
     func testOwnerLegacyDiaryTrial() throws {

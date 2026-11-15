@@ -157,7 +157,7 @@ struct DiaryMediaCard: View {
             }
             .onChange(of: transcript) { _, value in voice?.loadExistingTranscript(media, text: value) }
             .sheet(item: $preview) { item in DiaryQuickLook(url: item.url).onDisappear { try? FileManager.default.removeItem(at: item.url.deletingLastPathComponent()) } }
-            .onDisappear { if playback.activeID == media.id { playback.stop() }; voice?.cancelConversion(); voice?.cancelDownload() }
+            .onDisappear { if playback.activeID == media.id { playback.stop() } }
     }
     private func seconds(_ n: Int) -> String {
         DiaryDurationFormat.elapsed(n, digits: AppDiaryService(app: app).digits)

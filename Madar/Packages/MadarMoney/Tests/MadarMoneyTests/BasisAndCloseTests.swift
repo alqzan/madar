@@ -113,6 +113,13 @@ import Testing
         #expect(!LimitEngine.shouldAlert80(spentMinor: 10_000, limitMinor: nil, alreadyFiredThisCycle: false))
     }
 
+    @Test func l05MaximumLimitKeepsTheEightyPercentThresholdRepresentable() {
+        // ceil(Int.max × 0.8), calculated from the ratio in the product spec.
+        let threshold = 7_378_697_629_483_820_646
+        #expect(LimitEngine.shouldAlert80(spentMinor: threshold, limitMinor: Int.max, alreadyFiredThisCycle: false))
+        #expect(!LimitEngine.shouldAlert80(spentMinor: threshold - 1, limitMinor: Int.max, alreadyFiredThisCycle: false))
+    }
+
     @Test func percentLimitFollowsEachCyclesBaseAndAlertsOncePerCycle() {
         // 30% of income: 1500000 → 450000; next cycle 1200000 → 360000.
         let mode = CategoryLimitMode.percent(basisPoints: 3_000, base: .income)

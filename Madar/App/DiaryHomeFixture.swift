@@ -10,7 +10,7 @@ import MadarDesign
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "restored", "today", "editor", "entryRoute", "return", "travel", "travelClock", "letters", "lettersRoutes", "intentionReview", "periods"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "restored", "today", "editor", "entryRoute", "return", "travel", "travelClock", "letters", "lettersRoutes", "intentionReview", "periods", "audioOnlyYear"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -98,6 +98,14 @@ extension AppSession {
                 let day = today.adding(days: -age), row = Entry(); row.dayKey = day.description; row.text = text
                 row.eventAt = day.date(in: .riyadh).addingTimeInterval(10 * 3600); row.tzID = "Asia/Riyadh"; row.dayPolicy = "midnight@1"; row.source = "native"; context.insert(row)
             }
+            try context.save(); return
+        }
+        if variant == "audioOnlyYear" {
+            let day = try GregorianDay(year: 2025, month: 6, day: 15)
+            let media = Media(); media.kind = "audio"; media.contentType = "audio/mp4"; media.data = Data([0]); media.sizeBytes = 1
+            context.insert(media)
+            let entry = Entry(); entry.dayKey = day.description; entry.eventAt = day.date(in: .riyadh).addingTimeInterval(12 * 3600)
+            entry.dayPolicy = "midnight@1"; entry.tzID = "Asia/Riyadh"; entry.mediaID = media.id; context.insert(entry)
             try context.save(); return
         }
         if variant == "intentionReview" {

@@ -7,6 +7,13 @@ import MadarMoney
 
 /// Expected values are worked by hand from the store below (M5-V14 DECISIONS), never read back from the loader.
 @MainActor final class MoneyAnalysisIntegrationTests: XCTestCase {
+    func testSafeCategoryMathKeepsExtremeMinorUnitsRepresentable() {
+        XCTAssertEqual(MoneySafeArithmetic.ratio(Int.max, multiplier: 16, over: 30), 4_919_131_752_989_213_763)
+        XCTAssertEqual(MoneySafeArithmetic.sum([Int.max, 1]), Int.max)
+        XCTAssertEqual(MoneySafeArithmetic.percent(Int.max, of: 1), Int.max)
+        XCTAssertEqual(MoneySafeArithmetic.percent(Int.max, of: Int.max, rounded: false), 100)
+    }
+
     func testAnalysisReadsTheLogLedgerAndTheShelfDefinition() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MoneyAnalysis-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -82,5 +89,15 @@ import MadarMoney
         XCTAssertEqual(earlier.spentMinor, 25_000); XCTAssertEqual(earlier.allowanceMinor, 300_000)
         XCTAssertFalse(earlier.running); XCTAssertNil(earlier.comparison); XCTAssertFalse(earlier.canGoBack); XCTAssertNil(earlier.pace?.projectedLeftMinor)
         XCTAssertEqual(try ModelContext(container).fetch(FetchDescriptor<Allocation>()).count, 7, "Reading writes nothing")
+
+        limit.limitMinor = Int.max
+        let secondCategory = MadarData.Category(); secondCategory.name = "بقالة"; secondCategory.order = 1; c.insert(secondCategory)
+        let secondLimit = CategoryLimit(); secondLimit.categoryID = secondCategory.id; secondLimit.mode = "fixed"; secondLimit.limitMinor = 1; c.insert(secondLimit)
+        try c.save()
+        let extreme = try service.loadCategories()
+        XCTAssertEqual(extreme.totalLimitsMinor, Int.max, "The aggregate clamps at Int.max instead of overflowing")
+        let extremeShelf = try XCTUnwrap(extreme.shelves.first { $0.id == food.id })
+        XCTAssertEqual(extremeShelf.limitMinor, Int.max)
+        XCTAssertGreaterThanOrEqual(extremeShelf.expectedTodayMinor ?? -1, 0)
     }
 }

@@ -75,6 +75,9 @@ struct TabShell<Content: View>: View {
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             remember(tab)
         }
+        .onChange(of: hasProtectedDraft) { _, protected in
+            if !protected { trimAliveRooms(keeping: selection) }
+        }
     }
 
     /// B2-19: the sidebar folds away so a room can use the whole wide screen (reading, the Mushaf, a long diary page).
@@ -155,8 +158,18 @@ struct TabShell<Content: View>: View {
         visits[tab, default: 0] += 1
         alive.removeAll { $0 == tab }
         alive.append(tab)
-        // The lobby is home and stays; the oldest other room is released when a fifth would be kept.
-        while alive.count > 4, let oldest = alive.first(where: { $0 != "foundation" && $0 != tab }) { alive.removeAll { $0 == oldest } }
+        trimAliveRooms(keeping: tab)
+    }
+
+    private func trimAliveRooms(keeping tab: String) {
+        // Keep draft-bearing rooms alive until their own save/discard flow releases the blocker.
+        while alive.count > 4, !hasProtectedDraft,
+              let oldest = alive.first(where: { $0 != "foundation" && $0 != tab }) { alive.removeAll { $0 == oldest } }
+    }
+
+    private var hasProtectedDraft: Bool {
+        !session.diaryRootDraftBlockers.isEmpty || !session.moneyRootDraftBlockers.isEmpty
+            || !session.mihbaraRootDraftBlockers.isEmpty || !session.prayerRootDraftBlockers.isEmpty
     }
 
     private var barShown: Bool { session.accessoryHiders.isEmpty }
@@ -524,7 +537,6 @@ private struct MadarSidebar: View {
         .padding(.horizontal, 12).padding(.bottom, 12)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(theme.background.ignoresSafeArea())
-        .accessibilityIdentifier("fixed-tab-bar")
     }
     private func row(_ tab: FoundationTab) -> some View {
         let on = tab.id == selection

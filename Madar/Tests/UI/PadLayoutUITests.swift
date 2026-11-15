@@ -33,6 +33,40 @@ import XCTest
         show.tap()
         XCTAssertTrue(app.buttons["الصلاة"].waitForExistence(timeout: 5), app.debugDescription)
     }
+
+    func testSidebarRoomChangesKeepAnUnsavedExpenseOpen() throws {
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString,
+            "MADAR_UI_MONEY_FIXTURE": "expense",
+            "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00",
+            "MADAR_UI_START_TAB": "money",
+        ]
+        app.launch()
+
+        let open = app.buttons["money-expense-open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 25), app.debugDescription)
+        open.tap()
+        let amount = app.staticTexts["money-expense-amount"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["money-expense-key-4"].tap()
+        app.buttons["money-expense-key-2"].tap()
+        XCTAssertTrue(amount.label.contains("٤٢"), amount.label)
+
+        for room in ["prayer", "quran", "notes", "mihbara"] {
+            let destination = app.buttons["tab-" + room]
+            XCTAssertTrue(destination.waitForExistence(timeout: 5), "Missing iPad room destination: \(room)")
+            destination.tap()
+        }
+        app.buttons["tab-money"].tap()
+
+        XCTAssertTrue(app.buttons["money-expense-close"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(amount.label.contains("٤٢"), "Room retention must preserve the unsaved amount: \(amount.label)")
+        XCTAssertTrue(app.buttons["money-expense-save"].isEnabled)
+    }
+
     func testWideRoomsInLandscape() throws {
         let out = ProcessInfo.processInfo.environment["MADAR_PAD_SHOTS"] ?? ""
         try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad || out.isEmpty)

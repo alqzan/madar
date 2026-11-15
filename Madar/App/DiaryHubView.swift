@@ -201,8 +201,8 @@ struct DiaryHubView: View {
                             }
                         #endif
                         let loaded = try await service.archiveOffMain()
-                        dayCounts = Dictionary(loaded.days.map { ($0.day, $0.writings) }, uniquingKeysWith: { first, _ in first })
-                        writtenDays = Set(loaded.days.filter { $0.writings > 0 || !$0.photoIDs.isEmpty }.map(\.day))
+                        dayCounts = Dictionary(loaded.days.map { ($0.day, max($0.writings, $0.hasSavedContent ? 1 : 0)) }, uniquingKeysWith: { first, _ in first })
+                        writtenDays = Set(loaded.days.filter(\.hasSavedContent).map(\.day))
                         photoByDay = Dictionary(loaded.days.compactMap { d in d.photoIDs.first.map { (d.day, $0) } }, uniquingKeysWith: { first, _ in first })
                         archive = loaded
                         travelDays = (try? service.travelDays()) ?? []
@@ -249,7 +249,18 @@ struct DiaryHubView: View {
                         title: "الشهر", accessibilityLabel: "ورقة الشهر", selected: month != nil,
                         identifier: "diary-calendar-scale"
                     ) {
-                        if month == nil { month = grid.parts(archive.today).month }
+                        if month == nil {
+                            let todayParts = grid.parts(archive.today)
+                            if selectedYear == (todayParts.year ?? archive.today.year) {
+                                month = todayParts.month
+                            } else if let latestSavedDay = archive.days.first(where: {
+                                grid.parts($0.day).year == selectedYear && $0.hasSavedContent
+                            }) {
+                                month = grid.parts(latestSavedDay.day).month
+                            } else {
+                                month = 1
+                            }
+                        }
                     }
                 }
                 .padding(2)
@@ -396,7 +407,9 @@ struct DiaryHubView: View {
                             }
                     }.buttonStyle(.madarPlain).disabled(day > archive.today).accessibilityLabel(
                         service.bothDates(day, calendar: grid.first) + (travelDays.contains(day) ? "، يوم سفر" : "")
-                    ).accessibilityValue(photoByDay[day] != nil ? "فيه صورة" : "").accessibilityIdentifier("diary-calendar-day-" + day.description)
+                    ).accessibilityValue(
+                        photoByDay[day] != nil ? "فيه صورة" : (written.contains(day) ? "فيه ذكرى محفوظة" : "")
+                    ).accessibilityIdentifier("diary-calendar-day-" + day.description)
                 }
             }
             timeline(
@@ -490,7 +503,7 @@ struct DiaryHubView: View {
         }
     }
     private func index(_ archive: DiaryArchiveSnapshot) -> some View {
-        let savedDays = archive.days.filter { $0.day <= archive.today && ($0.writings > 0 || !$0.photoIDs.isEmpty) }
+        let savedDays = archive.days.filter { $0.day <= archive.today && $0.hasSavedContent }
         let daysByYear = Dictionary(grouping: savedDays) { grid.parts($0.day).year ?? $0.day.year }
         let years = daysByYear.keys.sorted(by: >)
         let columns = isPadWide(sizeClass) && !typeSize.isAccessibilitySize

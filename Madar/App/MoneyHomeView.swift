@@ -208,8 +208,8 @@ struct MoneyHomeView: View {
         .onChange(of: app.selectedTab) { revealed = false }
         .onChange(of: scenePhase) { if scenePhase != .active { revealed = false; cancelReadingLoad() } else if isFrontRoom { load() } }
         .onChange(of: isFrontRoom) { _, front in if !front { cancelReadingLoad() } }
-        // Left open past midnight, «اليوم» and the cycle day follow the day it is now.
-        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in if isFrontRoom { load() } }
+        // The cycle follows core.dayStart (often Fajr), which can be hours after civil midnight.
+        .refreshesAtMadarDay(app) { if isFrontRoom { load() } }
         .accessibilityIdentifier("money-home")
     }
     private var homeContent: some View {

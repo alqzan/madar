@@ -21,8 +21,10 @@ public enum LimitEngine {
 
     /// The 80% alert fires once per (category, cycle), when spending reaches 80% of the limit; a fixed 0 alerts on any spend.
     public static func shouldAlert80(spentMinor: Int, limitMinor: Int?, alreadyFiredThisCycle: Bool) -> Bool {
-        guard let limit = limitMinor, !alreadyFiredThisCycle, spentMinor > 0 else { return false }
-        return spentMinor * 10 >= limit * 8
+        guard let limit = limitMinor, limit >= 0, !alreadyFiredThisCycle, spentMinor > 0 else { return false }
+        // ceil(80% × limit), split by five so Int.max stays representable.
+        let threshold = (limit / 5) * 4 + ((limit % 5) * 4 + 4) / 5
+        return spentMinor >= threshold
     }
 }
 
