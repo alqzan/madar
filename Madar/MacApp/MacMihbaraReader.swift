@@ -1,6 +1,9 @@
 import SwiftUI
 import WebKit
+import SwiftData
 import MadarCore
+import MadarPrayer
+import MadarCommands
 import MadarData
 import MadarDesign
 
@@ -34,6 +37,8 @@ struct MihbaraReaderView: View {
     @State private var sessionStartChapter = 0
     @State private var sessionStartProgression = 0.0
     @State private var positions = ReadingPositionProgress()
+    @State private var sessionDayStamp: String?
+    @State private var lastSample: Date?
     @State private var highlights: [MihbaraHighlight] = []
     @State private var paragraph: MacEPUBParagraph?
     @State private var noteDraft: String?
@@ -271,11 +276,32 @@ struct MihbaraReaderView: View {
         sessionStartChapter = chapter
         sessionStartProgression = page.progression
         positions = ReadingPositionProgress(startingAt: publication.position(chapter: chapter, progression: page.progression), at: now)
+        sessionDayStamp = dayStamp(at: now)
+        lastSample = now
+    }
+
+    /// The reading day a moment belongs to (`core.dayStart`, place and time zone), as the iPhone readers stamp it; a session that
+    /// crosses into a new day is saved in two parts so each day's wird counts only its own minutes.
+    private func dayStamp(at date: Date) -> String? {
+        let context = ModelContext(app.container)
+        guard let day = try? DiaryLineRenderer.today(context: context, now: date),
+              let prayers = try? PrayerRepository(context: context) else { return nil }
+        return day.description + "|" + prayers.place(at: date).timeZoneID + "|" + app.string("core.dayStart")
+    }
+
+    private func splitAtDayBoundary(_ now: Date) {
+        defer { lastSample = now }
+        guard clock != nil, let previous = sessionDayStamp, let last = lastSample, let stamp = dayStamp(at: now), stamp != previous,
+              let boundary = ReadingSessionBoundaryFinder.firstTransition(from: previous, after: last, through: now, stampAt: { dayStamp(at: $0) })
+        else { return }
+        endSession(at: boundary.endsPreviousAt)
+        beginSession(at: boundary.startsNextAt)
     }
 
     private func observe(_ progression: Double, jump: Bool = false) {
-        guard let publication, var clock else { return }
         let now = Date()
+        splitAtDayBoundary(now)
+        guard let publication, var clock else { return }
         clock.advance(to: now)
         clock.interaction(at: now)
         self.clock = clock
@@ -283,6 +309,7 @@ struct MihbaraReaderView: View {
     }
 
     private func endSession(at now: Date) {
+        if now.timeIntervalSince(lastSample ?? now) > 0 { splitAtDayBoundary(now) }
         guard let publication, var clock, let sessionStart else { return }
         clock.advance(to: now)
         self.clock = nil
