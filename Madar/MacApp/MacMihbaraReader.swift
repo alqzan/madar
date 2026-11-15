@@ -36,6 +36,7 @@ struct MihbaraReaderView: View {
     @State private var highlights: [MihbaraHighlight] = []
     @State private var paragraph: MacEPUBParagraph?
     @State private var noteDraft: String?
+    @State private var footnote: String?
 
     private var marks: [MacEPUBMark] {
         guard let publication else { return [] }
@@ -111,6 +112,15 @@ struct MihbaraReaderView: View {
         .background(theme.surface)
         .environment(\.layoutDirection, .rightToLeft)
         .task { await open() }
+        .sheet(isPresented: Binding(get: { footnote != nil }, set: { if !$0 { footnote = nil } })) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("الحاشية").font(MadarTypography.section())
+                ScrollView { Text(footnote ?? "").font(MadarTypography.body()).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled) }
+                    .frame(maxHeight: 320)
+                HStack { Spacer(); Button("تمّ") { footnote = nil }.keyboardShortcut(.defaultAction) }
+            }
+            .padding(24).frame(width: 460).environment(\.layoutDirection, .rightToLeft)
+        }
         .sheet(isPresented: Binding(get: { noteDraft != nil }, set: { if !$0 { noteDraft = nil } })) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("حاشية على الفقرة").font(MadarTypography.section())
@@ -147,6 +157,8 @@ struct MihbaraReaderView: View {
             publication = opened
             page.onChange = { [self] progression in observe(progression) }
             page.onParagraph = { [self] tapped in paragraph = tapped }
+            page.onNote = { [self] text in footnote = text }
+            page.onLink = { [self] index in jump(to: index) }
             reloadHighlights()
             beginSession(at: Date())
         } catch {
@@ -265,6 +277,8 @@ struct MihbaraReaderView: View {
     var progression = 0.0
     var onChange: ((Double) -> Void)?
     var onParagraph: ((MacEPUBParagraph) -> Void)?
+    var onNote: ((String) -> Void)?
+    var onLink: ((Int) -> Void)?
     func report(_ value: Double) { progression = value; onChange?(value) }
 }
 
@@ -473,6 +487,7 @@ private struct MacEPUBWebView: NSViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(context.coordinator, name: "place")
         configuration.userContentController.add(context.coordinator, name: "paragraph")
+        configuration.userContentController.add(context.coordinator, name: "note")
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.navigationDelegate = context.coordinator
         view.setValue(false, forKey: "drawsBackground")
@@ -482,6 +497,7 @@ private struct MacEPUBWebView: NSViewRepresentable {
     func updateNSView(_ view: WKWebView, context: Context) {
         let coordinator = context.coordinator
         coordinator.style = style
+        coordinator.publication = publication
         coordinator.startProgression = startProgression
         let marksChanged = coordinator.marks != marks
         coordinator.marks = marks
@@ -496,6 +512,7 @@ private struct MacEPUBWebView: NSViewRepresentable {
     static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) {
         view.configuration.userContentController.removeScriptMessageHandler(forName: "place")
         view.configuration.userContentController.removeScriptMessageHandler(forName: "paragraph")
+        view.configuration.userContentController.removeScriptMessageHandler(forName: "note")
     }
 
     private var style: String {
@@ -517,7 +534,30 @@ private struct MacEPUBWebView: NSViewRepresentable {
         var style = ""
         var startProgression = 0.0
         var marks: [MacEPUBMark] = []
+        var publication: MacEPUB?
         init(page: MacEPUBPage) { self.page = page }
+
+        /// The spine path a link inside the open chapter points to, and its fragment.
+        func resolve(_ url: URL) -> (path: String, fragment: String?)? {
+            guard let publication, url.isFileURL else { return nil }
+            let root = publication.root.standardizedFileURL.path
+            let full = url.standardizedFileURL.path
+            guard full.hasPrefix(root) else { return nil }
+            return (String(full.dropFirst(root.count + 1)), url.fragment)
+        }
+
+        /// A footnote in another file of the book: the text of the element with that id.
+        func noteText(_ href: String) -> String? {
+            guard let publication, loadedChapter >= 0,
+                  let url = URL(string: href, relativeTo: publication.url(chapter: loadedChapter)), let fragment = url.fragment,
+                  let html = try? String(contentsOf: URL(fileURLWithPath: url.absoluteURL.path), encoding: .utf8),
+                  let regex = try? NSRegularExpression(pattern: "<(\\w+)[^>]*id=\"\(NSRegularExpression.escapedPattern(for: fragment))\"[^>]*>([\\s\\S]*?)</\\1>")
+            else { return nil }
+            let ns = html as NSString
+            guard let match = regex.firstMatch(in: html, range: NSRange(location: 0, length: ns.length)) else { return nil }
+            let text = MacEPUB.plainText(ns.substring(with: match.range(at: 2)))
+            return text.isEmpty ? nil : text
+        }
 
         /// Paints each saved paragraph highlight (iPhone or Mac) by its CSS selector, after clearing the previous paint.
         var marksScript: String {
@@ -545,6 +585,12 @@ private struct MacEPUBWebView: NSViewRepresentable {
             var t;addEventListener('scroll',function(){clearTimeout(t);t=setTimeout(function(){var m=Math.max(e.scrollHeight-innerHeight,1);
             window.webkit.messageHandlers.place.postMessage(e.scrollTop/m);},250);});
             function sel(el){var parts=[];while(el&&el!==document.documentElement){var i=1,s=el;while((s=s.previousElementSibling))i++;parts.unshift(':nth-child('+i+')');el=el.parentElement;}return ':root > '+parts.join(' > ');}
+            addEventListener('click',function(ev){var a=ev.target.closest('a[href]');if(!a)return;var h=a.getAttribute('href')||'';
+            var type=(a.getAttribute('epub:type')||a.getAttributeNS('http://www.idpf.org/2007/ops','type')||'')+' '+(a.getAttribute('role')||'');
+            var hash=h.indexOf('#')>=0?decodeURIComponent(h.split('#')[1]):'';var local=h.charAt(0)==='#';var target=local&&hash?document.getElementById(hash):null;
+            var isNote=/noteref|doc-noteref/.test(type)||(target&&/aside|footnote|endnote|note/i.test((target.tagName||'')+' '+(target.getAttribute('epub:type')||'')+' '+(target.className||'')));
+            if(!isNote)return;ev.preventDefault();ev.stopPropagation();
+            window.webkit.messageHandlers.note.postMessage(target?{text:(target.innerText||'').trim()}:{href:h});},true);
             addEventListener('click',function(ev){var el=ev.target.closest('p,li,blockquote,h1,h2,h3,h4,h5,h6,dd,dt,figcaption');if(!el)return;
             window.webkit.messageHandlers.paragraph.postMessage({selector:sel(el),text:(el.innerText||'').trim().slice(0,600)});});})();
             """ + marksScript)
@@ -552,6 +598,11 @@ private struct MacEPUBWebView: NSViewRepresentable {
         }
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "note", let body = message.body as? [String: Any] {
+                let text = body["text"] as? String ?? (body["href"] as? String).flatMap(noteText) ?? ""
+                MainActor.assumeIsolated { if !text.isEmpty { page.onNote?(text) } }
+                return
+            }
             if message.name == "paragraph", let body = message.body as? [String: Any], let selector = body["selector"] as? String {
                 let text = body["text"] as? String ?? ""
                 MainActor.assumeIsolated { page.onParagraph?(MacEPUBParagraph(selector: selector, text: text)) }
@@ -561,8 +612,17 @@ private struct MacEPUBWebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
-            // Only the book's own files open inside the reader; outside links are not followed.
-            action.request.url?.isFileURL == true ? .allow : .cancel
+            // Only the book's own files open inside the reader; outside links are not followed. A link to another chapter moves
+            // the reader there (so the saved place and reading time follow), a link inside this chapter scrolls in place.
+            guard let url = action.request.url, url.isFileURL else { return .cancel }
+            guard action.navigationType == .linkActivated else { return .allow }
+            guard let target = resolve(url), let publication else { return .cancel }
+            let currentPath = loadedChapter >= 0 ? publication.spine[loadedChapter] : ""
+            if target.path == currentPath { return .allow }
+            if let index = publication.spine.firstIndex(of: target.path) {
+                await MainActor.run { page.onLink?(index) }
+            }
+            return .cancel
         }
     }
 }
