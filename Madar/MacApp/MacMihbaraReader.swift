@@ -43,6 +43,7 @@ struct MihbaraReaderView: View {
     @State private var paragraph: MacEPUBParagraph?
     @State private var noteDraft: String?
     @State private var footnote: String?
+    @State private var scrollRequest = 0
 
     private var marks: [MacEPUBMark] {
         guard let publication else { return [] }
@@ -128,7 +129,7 @@ struct MihbaraReaderView: View {
             Group {
                 if let publication {
                     MacEPUBWebView(publication: publication, chapter: chapter, startProgression: startProgression,
-                                   fontScale: fontScale, paper: readerColors.paper, ink: readerColors.ink, page: page, marks: marks)
+                                   fontScale: fontScale, paper: readerColors.paper, ink: readerColors.ink, page: page, marks: marks, scrollRequest: scrollRequest)
                 } else if let failure {
                     VStack(spacing: 14) {
                         Text(failure).font(MadarTypography.body()).multilineTextAlignment(.center)
@@ -264,6 +265,7 @@ struct MihbaraReaderView: View {
         paragraph = nil
         chapter = target
         startProgression = 0
+        scrollRequest += 1
         page.progression = 0
         observe(0, jump: true)
     }
@@ -547,6 +549,7 @@ private struct MacEPUBWebView: NSViewRepresentable {
     let ink: Color
     let page: MacEPUBPage
     var marks: [MacEPUBMark] = []
+    var scrollRequest = 0
 
     func makeCoordinator() -> Coordinator { Coordinator(page: page) }
 
@@ -566,13 +569,16 @@ private struct MacEPUBWebView: NSViewRepresentable {
         coordinator.style = style
         coordinator.publication = publication
         coordinator.startProgression = startProgression
+        let scrollChanged = coordinator.scrollRequest != scrollRequest
+        coordinator.scrollRequest = scrollRequest
         let marksChanged = coordinator.marks != marks
         coordinator.marks = marks
         if coordinator.loadedChapter != chapter {
             coordinator.loadedChapter = chapter
             view.loadFileURL(publication.url(chapter: chapter), allowingReadAccessTo: publication.root)
         } else {
-            view.evaluateJavaScript(coordinator.styleScript + (marksChanged ? coordinator.marksScript : ""))
+            let scroll = scrollChanged ? "document.scrollingElement.scrollTop=Math.max(document.scrollingElement.scrollHeight-innerHeight,0)*\(min(max(startProgression, 0), 1));" : ""
+            view.evaluateJavaScript(coordinator.styleScript + (marksChanged ? coordinator.marksScript : "") + scroll)
         }
     }
 
@@ -601,6 +607,7 @@ private struct MacEPUBWebView: NSViewRepresentable {
         var style = ""
         var startProgression = 0.0
         var marks: [MacEPUBMark] = []
+        var scrollRequest = 0
         var publication: MacEPUB?
         init(page: MacEPUBPage) { self.page = page }
 
