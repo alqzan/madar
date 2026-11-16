@@ -27,6 +27,18 @@ Returning to the original account, or signing out during a pending choice,
 requests a lifecycle activation that releases the pending suspension. The old
 generation and checkpoint remain intact if activation fails.
 
+## First account and first cloud attach
+
+The first iCloud account observed for a local store is bound locally, even if the
+saved device preference is already on; it does not start mirroring or ask the
+person to choose between accounts. A later enable/refresh may attach that same
+account to CloudKit. Before the first mirror bind, `AppSyncService` requires a
+configured backup key and completes an automatic verified backup. The backup
+must finish before `bindCloudMirror`; a missing key or failed export leaves the
+mirror unattached. Reopening a store already bound to the same mirror does not
+make a redundant backup. `MadarSync` tests verify the first bind stays local;
+they do not emulate a signed CloudKit upload.
+
 processHistory() holds the shared lease, refreshes the manager's current binding,
 then drains actual SwiftData transactions from fresh contexts. Cursor JSON lives in
 a device-only DeviceSetting, scoped by generation and physical storeIdentifier.
@@ -71,10 +83,14 @@ errors expose a clear state and allow local writes.
   rendering and PencilKit ink persistence after close/reopen were manually verified.
   This does not verify cross-device restore, WatchConnectivity delivery or CloudKit
   development sync between synthetic stores.
-- CloudKit signing failed: no matching Apple Development identity for team
-  V8YZL4R65K and no profile for com.alqzan.madar2.mac; Xcode reports there are
-  no registered team devices from which to generate the profile. App Store Connect
-  container/platform state was not verified. No development sync or production
+- CloudKit signing failed at the time of this run: no matching Apple Development
+  identity for team V8YZL4R65K and no profile for the then-current Mac ID
+  `com.alqzan.madar2.mac`; Xcode reported no registered team devices from which
+  to generate the profile. The owner later unified the Mac target to
+  `com.alqzan.madar2` (see `../../docs/PROGRESS.md`). At the time of this run,
+  App Store Connect container/platform state was not verified; macOS was later
+  added to record `6830247088`, while the iCloud container remains unverified.
+  No development sync or production
   schema deployment occurred; no owner data was opened.
 - SwiftData CloudKit compatibility was reviewed at source level: no unique
   constraints or relationships, optional/defaulted fields, optional UUID links,

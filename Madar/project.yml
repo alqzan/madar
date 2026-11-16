@@ -149,7 +149,7 @@ targets:
       - package: MadarSync
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.alqzan.madar2.mac
+        PRODUCT_BUNDLE_IDENTIFIER: com.alqzan.madar2
         PRODUCT_NAME: Madar
         TARGETED_DEVICE_FAMILY: ''
         MADAR_CLOUDKIT_CONTAINER: ''
@@ -164,7 +164,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.lifestyle
         CFBundleURLTypes:
-          - CFBundleURLName: com.alqzan.madar2.mac
+          - CFBundleURLName: com.alqzan.madar2
             CFBundleURLSchemes: [madar]
         ITSAppUsesNonExemptEncryption: false
         NSLocationUsageDescription: يقرأ مدار موقعك مرة واحدة ليعرف مدينتك ويحسب مواقيت الصلاة بدقة. يحفظ المدينة وإحداثياتها على جهازك فقط.

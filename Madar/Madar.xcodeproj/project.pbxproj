@@ -3311,7 +3311,7 @@
 				);
 				MADAR_CLOUDKIT_CONTAINER = "";
 				MADAR_MAC_ENTITLEMENTS = MacApp/MadarMac.entitlements;
-				PRODUCT_BUNDLE_IDENTIFIER = com.alqzan.madar2.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alqzan.madar2;
 				PRODUCT_NAME = Madar;
 				SDKROOT = macosx;
 				TARGETED_DEVICE_FAMILY = "";
@@ -3541,7 +3541,7 @@
 				);
 				MADAR_CLOUDKIT_CONTAINER = "";
 				MADAR_MAC_ENTITLEMENTS = MacApp/MadarMac.entitlements;
-				PRODUCT_BUNDLE_IDENTIFIER = com.alqzan.madar2.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alqzan.madar2;
 				PRODUCT_NAME = Madar;
 				SDKROOT = macosx;
 				TARGETED_DEVICE_FAMILY = "";
