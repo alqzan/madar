@@ -590,6 +590,7 @@
 		B77777701B5C254F46AF360A /* MadarRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27B800BADE6E4CAC71DD6DA0 /* MadarRuntime.swift */; };
 		B7BE8AF91FC5BF168BBF356C /* MadarWatchApp.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 18DEDA7F672E912E5AC1997B /* MadarWatchApp.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B7FA778ED0749618554BF1FE /* MoneyZakatUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6640B9C0CA04FCD70A0907D5 /* MoneyZakatUITests.swift */; };
+		B82D6072AB1C44D2ADEABA0A /* HabitsRedesignPreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AFCF7B67502960F9EB2F8E /* HabitsRedesignPreviewTests.swift */; };
 		B841BF9C583DC210AD062255 /* MoneyBasisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C821A790FA49E1A68E6FC28 /* MoneyBasisView.swift */; };
 		B87D7B42173E6AB1C9C0A6A2 /* MoneyBasisUnknownBalanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0347B20F5460FD1EF28BB5BC /* MoneyBasisUnknownBalanceTests.swift */; };
 		BA161EEACE65443924885A48 /* FoundationHome.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C4E870846C8F0F11086BEB /* FoundationHome.swift */; };
@@ -1293,6 +1294,7 @@
 		C7DEC0048B04AF62E8D5EDE5 /* DiaryPeriodHeadings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryPeriodHeadings.swift; sourceTree = "<group>"; };
 		C81D478CA21DD0A67BD6386E /* MoneyHomeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyHomeUITests.swift; sourceTree = "<group>"; };
 		C83F53C2034722DE17B40FDF /* QuranDayCloseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranDayCloseView.swift; sourceTree = "<group>"; };
+		C8AFCF7B67502960F9EB2F8E /* HabitsRedesignPreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsRedesignPreviewTests.swift; sourceTree = "<group>"; };
 		C8DFFB9BE72D3D9FD7BBBB92 /* MadarTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MadarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C91FC7B3A193DE8DAE5BE3E5 /* MadarAIMoneySnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadarAIMoneySnapshotTests.swift; sourceTree = "<group>"; };
 		C9EF607AD5CD72DFE5DAA998 /* QuranWirdReferenceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranWirdReferenceIntegrationTests.swift; sourceTree = "<group>"; };
@@ -2046,6 +2048,7 @@
 				D469796404360B49B02BC5E1 /* DiaryYearbookIntegrationTests.swift */,
 				1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */,
 				41D68577D1E6FA5223FD92FE /* HabitRhythmTests.swift */,
+				C8AFCF7B67502960F9EB2F8E /* HabitsRedesignPreviewTests.swift */,
 				5BB241AD7E579D99264DA8ED /* LaunchAppearanceTests.swift */,
 				07E5B58AA5B0B1DDDE4BDE66 /* LegacyHabitTrialTests.swift */,
 				472B1CBA95C9D6F4CB205E81 /* LegacyMoveNativeWinsTests.swift */,
@@ -2526,6 +2529,7 @@
 				ACF8D45E7B47DF98E40E506D /* DiaryYearbookIntegrationTests.swift in Sources */,
 				16A45A0199AD6A2B5E9EC744 /* ExportPrivacyTests.swift in Sources */,
 				A0561536CAB91FAF9E90D622 /* HabitRhythmTests.swift in Sources */,
+				B82D6072AB1C44D2ADEABA0A /* HabitsRedesignPreviewTests.swift in Sources */,
 				C2838D05BF9653A2F162C231 /* LaunchAppearanceTests.swift in Sources */,
 				52430EB75D09E6A03E8C2296 /* LegacyHabitTrialTests.swift in Sources */,
 				D4427180CF7E563DD2809A57 /* LegacyMoveNativeWinsTests.swift in Sources */,
