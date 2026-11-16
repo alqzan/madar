@@ -1,155 +1,152 @@
 import XCTest
 import SwiftUI
-import MadarCore
 import MadarDesign
 @testable import Madar
 
-// Design preview only (owner 16 Nov). Round 5. Owner: «تصميم هادئ ذكي جميل واضح» and
-// «ابيها طريقة تستطيع أي عادة تكون فِت معها»: nothing is drawn for a particular habit.
-// Every row comes from one rule over the engine's own fields (measure, frequency, value, target, unit),
-// so any habit the user creates fits. Synthetic data; not wired into the app.
+// Design preview only (owner 16 Nov). Round 6, after the owner explained the flow:
+// habits are logged OUTSIDE the room: a question at the time the user sets for each habit, one last call if still open,
+// and the lobby for anything missed. The room is opened rarely: add a habit, read long-range statistics and smart notes.
+// Synthetic data; generic for every habit kind. Not wired into the app.
 
-private struct AnyHabit: Identifiable {
-    let id = UUID()
-    let name: String
-    let measure: HabitMeasure
-    let frequency: HabitFrequency
-    let value: Double
-    let target: Double
-    var unit: String? = nil
-    var left = ""              // time left in the period, from the period's end date
-    var share: Double { min(1, value / max(1, target)) }
-    var done: Bool { value >= target }
-}
-
-private func ar(_ v: Double) -> String {
-    let f = NumberFormatter(); f.locale = Locale(identifier: "ar_SA"); f.maximumFractionDigits = 1
-    return f.string(from: NSNumber(value: v)) ?? "\(v)"
-}
-
-/// The one rule: what a row says, how its line is drawn and what its button does, from the habit's kind alone.
-private enum HabitLine {
-    static func amount(_ h: AnyHabit) -> String {
-        if h.done { return "تمّت" }
-        switch h.measure {
-        case .once: return "لم تتمّ بعد"
-        case .count: return "\(ar(h.value)) من \(ar(h.target)) \(h.unit ?? "مرات")"
-        case .duration: return "\(ar(h.value)) من \(ar(h.target)) \(h.unit ?? "دقيقة")"
-        case .health: return "\(ar(h.value)) من \(ar(h.target)) \(h.unit ?? "")"
-        }
-    }
-    /// Discrete targets of ten or fewer show their steps; amounts and durations show one continuous line.
-    static func steps(_ h: AnyHabit) -> Int? {
-        switch h.measure { case .once: 1; case .count: h.target <= 10 ? Int(h.target) : nil; default: nil }
-    }
-    static func action(_ h: AnyHabit) -> String {
-        switch h.measure {
-        case .once: "تمّت"
-        case .count: "+١"
-        case .duration: "+١٠ دقائق"
-        case .health: "سجّل"
-        }
-    }
-}
-
-private struct StepLine: View {
-    let h: AnyHabit
-    @Environment(\.roomTheme) private var theme
-    var body: some View {
-        let fill = theme.accent.opacity(0.75), empty = theme.line.opacity(0.7)
-        if let n = HabitLine.steps(h) {
-            HStack(spacing: 4) { ForEach(0..<n, id: \.self) { i in Capsule().fill(Double(i) < h.value ? fill : empty).frame(height: 3) } }
-        } else {
-            GeometryReader { g in
-                HStack(spacing: 0) { Capsule().fill(fill).frame(width: g.size.width * h.share); Capsule().fill(empty) }
-            }.frame(height: 3)
-        }
-    }
-}
-
-private struct Row: View {
-    let h: AnyHabit
-    @Environment(\.roomTheme) private var theme
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(h.name).font(PrayerHomeType.strong).foregroundStyle(h.done ? theme.secondaryInk : theme.ink)
-                    if !h.left.isEmpty && !h.done { Text(h.left).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk) }
-                }
-                Spacer()
-                Text(HabitLine.amount(h)).font(PrayerHomeType.body).foregroundStyle(h.done ? theme.accent : theme.secondaryInk)
-                if !h.done {
-                    Text(HabitLine.action(h)).font(PrayerHomeType.smallBold).foregroundStyle(theme.accent)
-                        .padding(.horizontal, 12).frame(minHeight: 34).overlay { Capsule().stroke(theme.line) }
-                }
-            }
-            StepLine(h: h)
-        }
-    }
-}
-
-private struct Group: View {
+private struct Notice: View {
     let title: String
-    let rows: [AnyHabit]
+    let message: String
+    let actions: [String]
     @Environment(\.roomTheme) private var theme
+    var body: some View {
+        VStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    RoundedRectangle(cornerRadius: 6).fill(theme.accent).frame(width: 22, height: 22)
+                        .overlay { PrayerStar().fill(theme.background).frame(width: 12, height: 12) }
+                    Text("مدار").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                    Spacer()
+                    Text("الآن").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                }
+                Text(title).font(PrayerHomeType.strong)
+                Text(message).font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+            }
+            .padding(14).background(theme.surface, in: .rect(cornerRadius: 20))
+            ForEach(actions, id: \.self) { a in
+                Text(a).font(PrayerHomeType.strong).frame(maxWidth: .infinity, minHeight: 44)
+                    .background(theme.surface.opacity(0.8), in: .rect(cornerRadius: 14))
+            }
+        }
+    }
+}
+
+private struct Caption: View {
+    let text: String
+    @Environment(\.roomTheme) private var theme
+    var body: some View { Text(text).font(PrayerHomeType.smallBold).foregroundStyle(theme.accent) }
+}
+
+/// Outside the room: the question at the habit's own time, the last call, and the lobby block.
+private struct OutsideFlow: View {
+    let theme: RoomTheme
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Text(title).font(PrayerHomeType.cardHead)
-                Spacer()
-                Text("\(ar(Double(rows.filter(\.done).count))) من \(ar(Double(rows.count)))").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+            Text("خارج القسم").font(PrayerHomeType.hero)
+            Caption(text: "١. في الوقت الذي تحدده للعادة (عادة بمقدار، ٦:٠٠ م)")
+            Notice(title: "مشيت اليوم؟", message: "عادتك ٥ كم. آخر ثلاث مرات مشيت ٥ كم.", actions: ["مشيت ٥ كم كالمعتاد", "سجّل مقدارًا آخر", "ليس الآن"])
+            Caption(text: "٢. تذكير أخير واحد إن بقيت مفتوحة (١٠:٠٠ م)")
+            Notice(title: "آخر سؤال اليوم", message: "لم تسجّل المشي بعد. هل مشيت؟", actions: ["نعم، ٥ كم", "لم أمشِ اليوم"])
+            Caption(text: "عادة مرة واحدة: زرّان فقط، وعادة بالعدد: «+١»")
+            Notice(title: "قبل النوم", message: "هل أتممت عادة آخر اليوم؟", actions: ["تمّت", "ليس اليوم"])
+            Caption(text: "٣. في البهو: ما فاتك فقط، ويُسجَّل بلمسة")
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("بقي من عاداتك اليوم").font(PrayerHomeType.cardHead)
+                    Spacer()
+                    Text("٢").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                }
+                lobbyRow("عادة بالعدد", "٢ من ٣", "+١")
+                lobbyRow("عادة بالمدة", "لم تُسجَّل", "٣٠ دقيقة")
             }
-            ForEach(rows) { Row(h: $0) }
+            .padding(16).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 22))
+            Text("الأوراد والقراءة المرتبطة بغرفها تُسجَّل تلقائيًا ولا يُسأل عنها. ولا يصل أي سؤال وقت حرمة الأذان؛ يتأخر إلى ما بعدها.")
+                .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(24).foregroundStyle(theme.ink).background(theme.background).environment(\.roomTheme, theme)
+    }
+    private func lobbyRow(_ name: String, _ state: String, _ action: String) -> some View {
+        HStack {
+            Text(name).font(PrayerHomeType.strong)
+            Text(state).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+            Spacer()
+            Text(action).font(PrayerHomeType.smallBold).foregroundStyle(theme.accent)
+                .padding(.horizontal, 12).frame(minHeight: 36).overlay { Capsule().stroke(theme.line) }
         }
     }
 }
 
-private struct UniversalHome: View {
+/// Inside the room: statistics and smart notes first; adding a habit is one clear action.
+private struct RoomStats: View {
     let theme: RoomTheme
-    // Every measure and every frequency the engine knows, named by kind, so the preview proves the rule, not a sample.
-    private let all: [AnyHabit] = [
-        .init(name: "عادة مرة في اليوم", measure: .once, frequency: .daily, value: 1, target: 1),
-        .init(name: "عادة بالعدد", measure: .count, frequency: .daily, value: 2, target: 3, unit: "مرات"),
-        .init(name: "عادة بالمدة", measure: .duration, frequency: .daily, value: 20, target: 30, unit: "دقيقة"),
-        .init(name: "عادة بمقدار ووحدة", measure: .health, frequency: .daily, value: 3.5, target: 5, unit: "كم"),
-        .init(name: "عادة أسبوعية", measure: .count, frequency: .weekly, value: 1, target: 3, unit: "مرات", left: "بقي ٤ أيام"),
-        .init(name: "عادة شهرية", measure: .once, frequency: .monthly, value: 0, target: 1, left: "حتى ٣٠ نوفمبر"),
-        .init(name: "عادة كل ٣ أيام", measure: .once, frequency: .interval, value: 0, target: 1, left: "موعدها غدًا"),
-        .init(name: "عادة سنوية", measure: .count, frequency: .yearly, value: 4, target: 6, unit: "أيام", left: "حتى ٣١ ديسمبر"),
+    private let habits: [(String, String, [Double])] = [
+        ("عادة يومية بمقدار", "٨٧٪ هذا العام", [0.6, 0.7, 0.8, 0.9, 0.85, 0.9, 0.95, 0.8, 0.9, 1, 0.92, 0]),
+        ("عادة يومية مرة", "٧٤٪ هذا العام", [0.4, 0.5, 0.7, 0.8, 0.6, 0.7, 0.9, 0.85, 0.8, 0.75, 0.8, 0]),
+        ("عادة أسبوعية", "٣٨ من ٤٦ أسبوعًا", [1, 0.75, 1, 1, 0.5, 1, 0.75, 1, 1, 0.75, 1, 0]),
+        ("عادة شهرية", "١٠ من ١١ شهرًا", [1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0]),
     ]
+    private let months = ["ي", "ف", "م", "أ", "م", "ي", "ي", "أ", "س", "أ", "ن", "د"]
     var body: some View {
-        let daily = all.filter { $0.frequency == .daily }
-        // The card picks, by rule, the due habit closest to done. No habit is special.
-        let next = daily.filter { !$0.done }.max { $0.share < $1.share }!
-        VStack(alignment: .leading, spacing: 26) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("الاثنين ١٦ نوفمبر").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
-                Text("٢٥ جمادى الأولى ١٤٤٨").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk.opacity(0.8))
+        VStack(alignment: .leading, spacing: 24) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("العادات").font(PrayerHomeType.hero)
+                Spacer()
+                Text("+ عادة جديدة").font(PrayerHomeType.strong).foregroundStyle(theme.background)
+                    .padding(.horizontal, 16).frame(minHeight: 44).background(theme.accent, in: .capsule)
             }
-            VStack(alignment: .leading, spacing: 14) {
-                Text("أتممت \(ar(Double(daily.filter(\.done).count))) من \(ar(Double(daily.count))) اليوم.")
-                    .font(.custom("thmanyahserifdisplay-Bold", size: 30))
-                HStack(spacing: 6) { ForEach(daily) { h in Capsule().fill(h.done ? theme.accent.opacity(0.75) : theme.line.opacity(0.7)).frame(height: 4) } }
-            }
+            // Smart notes, from the habits' own logs: patterns the user would not see alone.
             VStack(alignment: .leading, spacing: 12) {
-                Text("الأقرب للتمام").font(PrayerHomeType.smallBold).foregroundStyle(theme.accent)
-                HStack(alignment: .firstTextBaseline) {
-                    Text(next.name).font(PrayerHomeType.cardHead)
-                    Spacer()
-                    Text("بقي \(ar(next.target - next.value)) \(next.unit ?? "")").font(PrayerHomeType.strong).foregroundStyle(theme.accent)
-                }
-                StepLine(h: next)
-                Text(HabitLine.action(next)).font(PrayerHomeType.strong).frame(maxWidth: .infinity, minHeight: 46)
-                    .background(theme.accent, in: .capsule).foregroundStyle(theme.background)
+                Caption(text: "ما لاحظه مدار")
+                note("أثبت أيامك الأحد والاثنين، وأضعفها الجمعة.")
+                note("العادة اليومية مرة تتعثّر حين تُسأل بعد ١١ م؛ جرّب وقتًا أبكر.")
+                note("العادة الشهرية بقي لها ١٤ يومًا هذا الشهر.")
             }
-            .padding(18).background(theme.surface, in: .rect(cornerRadius: 22))
-            Group(title: "اليوم", rows: daily)
-            Rectangle().fill(theme.line).frame(height: 1)
-            Group(title: "مواعيد أبعد", rows: all.filter { $0.frequency != .daily })
+            .padding(16).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 22))
+            // The year: one quiet strip of twelve months per habit, whatever its kind.
+            VStack(alignment: .leading, spacing: 18) {
+                Text("سنتك ٢٠٢٦").font(PrayerHomeType.cardHead)
+                ForEach(habits, id: \.0) { name, summary, values in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(name).font(PrayerHomeType.strong)
+                            Spacer()
+                            Text(summary).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                        }
+                        HStack(alignment: .bottom, spacing: 5) {
+                            ForEach(Array(values.enumerated()), id: \.offset) { i, v in
+                                VStack(spacing: 4) {
+                                    RoundedRectangle(cornerRadius: 3).fill(i == 10 ? theme.accent : theme.accent.opacity(0.25 + 0.5 * v))
+                                        .frame(height: max(3, 34 * v))
+                                    Text(months[i]).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk.opacity(0.7))
+                                }.frame(maxWidth: .infinity)
+                            }
+                        }.frame(height: 56, alignment: .bottom)
+                    }
+                }
+            }
+            HStack(spacing: 10) {
+                stat("٢١ يومًا", "أطول سلسلة")
+                stat("٨١٪", "التزام نوفمبر")
+                stat("٣ عادات", "تحسّنت عن أكتوبر")
+            }
         }
-        .padding(.horizontal, 24).padding(.vertical, 28)
-        .foregroundStyle(theme.ink).background(theme.background).environment(\.roomTheme, theme)
+        .padding(24).foregroundStyle(theme.ink).background(theme.background).environment(\.roomTheme, theme)
+    }
+    private func note(_ t: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            PrayerStar().fill(theme.accent.opacity(0.6)).frame(width: 9, height: 9)
+            Text(t).font(PrayerHomeType.body).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+    private func stat(_ v: String, _ t: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(v).font(PrayerHomeType.strong)
+            Text(t).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+        }.padding(12).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 16))
     }
 }
 
@@ -159,11 +156,12 @@ final class HabitsRedesignPreviewTests: XCTestCase {
         let out = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Artifacts/habits-redesign-preview")
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
-        for dark in [false, true] {
-            let renderer = ImageRenderer(content: UniversalHome(theme: RoomTheme(room: "salah", dark: dark)).frame(width: 430).environment(\.layoutDirection, .rightToLeft))
+        let theme = RoomTheme(room: "salah", dark: false)
+        for (name, view) in [("H-outside", AnyView(OutsideFlow(theme: theme))), ("H-room", AnyView(RoomStats(theme: theme)))] {
+            let renderer = ImageRenderer(content: view.frame(width: 430).environment(\.layoutDirection, .rightToLeft))
             renderer.scale = 2
             let image = try XCTUnwrap(renderer.uiImage)
-            try XCTUnwrap(image.pngData()).write(to: out.appendingPathComponent("habits-G-universal-\(dark ? "D" : "L").png"))
+            try XCTUnwrap(image.pngData()).write(to: out.appendingPathComponent("habits-\(name)-L.png"))
         }
     }
 }
