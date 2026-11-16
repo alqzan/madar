@@ -194,7 +194,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         WKCompanionAppBundleIdentifier: com.alqzan.madar2
-        WKWatchKitApp: true
+        WKApplication: true
         WKRunsIndependentlyOfCompanionApp: false
   MadarWidgets:
     type: app-extension

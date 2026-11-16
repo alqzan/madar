@@ -253,6 +253,11 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - بعد توفير هوية وملف تطوير صالحين للفريق، تحقق من تفعيل حاوية iCloud لمنصتي iOS وMac، ثم ابنِ بتوقيع CloudKit وجرّب مخزنين اصطناعيين وراجع الاستيراد والتعارض والحذف. لا بيانات مالك ولا مخطط إنتاج قبل هذه البوابة.
 - آخر رفع داخلي هو 0.1.0 (52)؛ لا أرشيف/رفع جديد في هذه المتابعة. عند اكتمال الطلب والتحقق، يكون رقم الرفع التالي 53. قبول المالك على أجهزته منفصل.
 
+### Review by Claude — 2026-11-16
+- `SyncCoordinator`: the first-account bind started iCloud mirroring when the saved preference was on, with `checkpoint: nil` (the comment said a checkpoint is taken first). `firstAccountBindsLocallyWithoutChoiceOrCheckpoint` failed (2 issues). Restored the local first bind; the existing-binding path still writes a verified checkpoint before attaching iCloud. `swift test` in MadarSync: 10 tests passed.
+- Watch: the single-target SwiftUI watch app declared `WKWatchKitApp` (the old two-part WatchKit app key, which needs an extension) — replaced with `WKApplication` in `project.yml` and `WatchApp/Info.plist` so App Store validation accepts the embedded watch app. MadarSnapshots: 20 tests passed. iOS (with the watch app) and Mac: BUILD SUCCEEDED (unsigned).
+- Note: the Mac bundle ID is now `com.alqzan.madar2.mac`, so the Mac app is its own App Store Connect record (no universal purchase with the iPhone app).
+
 ### Model/effort
 - Codex: غير معروض. Sol: غير معروض.
 

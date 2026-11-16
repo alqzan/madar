@@ -24,7 +24,7 @@
 	<string>com.alqzan.madar2</string>
 	<key>WKRunsIndependentlyOfCompanionApp</key>
 	<false/>
-	<key>WKWatchKitApp</key>
+	<key>WKApplication</key>
 	<true/>
 </dict>
 </plist>

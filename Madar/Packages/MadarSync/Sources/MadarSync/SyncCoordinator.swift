@@ -83,11 +83,11 @@ private struct PendingCloudImport: Equatable {
             case .available(let hash):
                 guard !hash.isEmpty else { throw SyncFailure.unknownAccount }
                 if binding.accountHash == nil {
-                    // The preference is false on a new install. If the person explicitly enabled it
-                    // earlier on this device, attach only after the app adapter checkpoints first.
-                    let mirror = preference && provisioning.mayOpenCloudMirror
-                    try await adapter.activate(.init(accountHash: hash, cloudEnabled: mirror, dataChoice: .keepDevice, checkpoint: nil, generationBefore: binding.generationID, requestedDevicePreference: preference))
-                    set(mirror ? .cloudConfigured : .localOnly, mirror ? "يجهّز مدار المزامنة" : "المزامنة مطفأة — بياناتك محفوظة على هذا الجهاز")
+                    // First account this store has met: nothing to choose between. Bind it while still
+                    // local, even when the saved preference is on; mirroring starts only through the
+                    // existing-binding path, which writes a verified checkpoint before attaching iCloud.
+                    try await adapter.activate(.init(accountHash: hash, cloudEnabled: false, dataChoice: .keepDevice, checkpoint: nil, generationBefore: binding.generationID, requestedDevicePreference: preference))
+                    set(.localOnly, "المزامنة مطفأة — بياناتك محفوظة على هذا الجهاز")
                 } else if binding.accountHash != hash {
                     if checkpoint == nil {
                         set(.transitioning, "يحفظ مدار نسخة قبل تغيير الحساب")
