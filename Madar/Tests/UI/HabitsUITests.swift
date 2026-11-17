@@ -213,6 +213,29 @@ import UIKit
         if !row.waitForExistence(timeout:5), app.buttons["habits-today-empty"].exists { app.buttons["habits-today-empty"].tap() }
         XCTAssertTrue(row.waitForExistence(timeout:10),app.debugDescription);shot(app,"FB39-habit-interval-room-L")
     }
+    func testQuitHabitIsCreatedAndOnlyAnExplicitSlipLogsIt() throws {
+        continueAfterFailure=false;let app=app("empty");open(app)
+        app.buttons["habit-first"].tap()
+        let name=app.textFields["habit-name"];XCTAssertTrue(name.waitForExistence(timeout:5));name.tap();name.typeText("التدخين")
+        let measure=app.buttons["habit-measure"];XCTAssertTrue(measure.waitForExistence(timeout:5));measure.tap()
+        let quit=app.buttons["عادة تركتها"];XCTAssertTrue(quit.waitForExistence(timeout:5));quit.tap()
+        XCTAssertTrue(app.staticTexts["habit-abstain-hint"].waitForExistence(timeout:5))
+        app.buttons["habit-save"].tap();XCTAssertTrue(name.waitForNonExistence(timeout:10))
+        let row=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","habit-row-")).firstMatch
+        if !row.waitForExistence(timeout:5), app.buttons["habits-today-empty"].exists { app.buttons["habits-today-empty"].tap() }
+        XCTAssertTrue(row.waitForExistence(timeout:10),app.debugDescription)
+        // No ring or plus logs a quit habit: the row has no quick-log control.
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","habit-quick-")).firstMatch.exists)
+        row.tap()
+        let slip=app.buttons["habit-slip"];XCTAssertTrue(slip.waitForExistence(timeout:10),app.debugDescription)
+        XCTAssertTrue(app.staticTexts["habit-quit-days"].exists)
+        slip.tap()
+        let confirm=app.buttons["habit-slip-confirm"].firstMatch;XCTAssertTrue(confirm.waitForExistence(timeout:5));confirm.tap()
+        // The sheet closes and the row says the count started again today.
+        XCTAssertTrue(slip.waitForNonExistence(timeout:10))
+        let again=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label CONTAINS %@","habit-row-","بدأت من جديد")).firstMatch
+        XCTAssertTrue(again.waitForExistence(timeout:10),app.debugDescription)
+    }
     func testEmptyAddCompleteFreezeRestoreAndRelaunch() throws {
         continueAfterFailure=false;let app=app("empty");open(app)
         XCTAssertTrue(app.buttons["habit-first"].exists);shot(app,"M4-V02-empty-L");app.buttons["habit-first"].tap()

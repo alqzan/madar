@@ -281,8 +281,24 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
   - Screenshots `Madar/Artifacts/verify/habits-showcase.png` and `habits-atRisk.png`.
 - Untracked `.codex/` and `.agents/skills/verify/` appeared from an outside copy of the verify setup (not from this session) and were left uncommitted.
 
+### Second follow-up (build 55): «كملها كلها»
+- Built by Sonnet and reviewed by Claude. No schema change.
+- Idea 10, a habit you quit (`HabitMeasure.abstain`):
+  - The streak is clean days since the last slip. Only an explicit «زلّة» with confirmation logs.
+  - Excluded from reminders, the lobby, widgets, intents and the orbit.
+- Idea 8, a goal that grows («يكبر تدريجيًا»): `HabitSchedule.plan` writes future-dated policy steps in the same `habit.save`.
+- Ramadan times for any windowed habit: policies dated 1 Ramadan and 1 Shawwal, from the Hijri calendar.
+- Review fix by Claude: a later save had tombstoned all future steps, even on a rename. Now an edit that leaves the rule unchanged re-sends the planned steps; only a change to the goal or time replaces them, and the editor copy says so.
+- Data safety: future steps are tombstoned with `deletedAt` and `deletionBarrierAt`, restored rows get `restoredAt`, and undo goes through the inverse change list.
+- Verified by Claude:
+  - MadarCore 258/258 and MadarCommands 330/330.
+  - App integration 53/53 and HabitsUITests 26/26 (`Artifacts/review3-1794932729.xcresult`).
+  - `verify-smoke.sh` passed on its first real run.
+  - The editor's Ramadan controls were checked on the simulator.
+  - Not visually checked: the quit-habit hero and the next-step line.
+
 ### Model/effort
-- claude-opus-5-5, effort not exposed. Helper: Sonnet (owner's order) for the follow-up build.
+- claude-opus-5-5, effort not exposed. Helper: Sonnet (owner's order) for both follow-ups.
 
 ### Usage
 - Five-hour window 63% used at commit time (37% left); weekly 10% used.

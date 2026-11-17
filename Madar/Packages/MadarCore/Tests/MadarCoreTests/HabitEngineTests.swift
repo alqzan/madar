@@ -247,4 +247,53 @@ struct HabitEngineTests {
         #expect(before.end == prayer.fajr && before.duration == 90 * 60)
         #expect(HabitPresets.named("preset.fast", from: day("2026-03-01"))?.name == HabitPresets.mondayThursdayFastName && HabitPresets.named("custom", from: day("2026-03-01")) == nil)
     }
+    /// Idea 10 (owner, 17 Nov 2026): a habit you quit. A day is complete while no slip is logged and missed once one is;
+    /// a single slip ends the streak, so the streak is the clean days since the last slip. Worked by hand from 1 Oct 2026.
+    @Test func aQuitHabitCountsCleanDaysSinceTheLastSlip() throws {
+        var r = rule("2026-10-01"); r.measure = .abstain
+        try r.validate()
+        func slip(_ d: String) -> HabitFact { .init(id: UUID(), day: day(d), periodKey: d, delta: 1) }
+        // No slip: every day is complete, today included; the streak is the days so far (1–6 Oct).
+        let clean = try HabitEngine.evaluate(rules: [r], facts: [], today: day("2026-10-06"), days: days)
+        #expect(clean.streak == 6 && clean.periods.allSatisfy { $0.outcome == .complete })
+        // A slip on 4 Oct: 1–3 complete, 4 missed (streak 0), then 5 and 6 clean → 2 = days since the slip (6 − 4).
+        let slipped = try HabitEngine.evaluate(rules: [r], facts: [slip("2026-10-04")], today: day("2026-10-06"), days: days)
+        #expect(slipped.periods.map(\.outcome) == [.complete, .complete, .complete, .missed, .complete, .complete])
+        #expect(slipped.streak == 2 && slipped.consecutiveMisses == 0 && !slipped.atRisk)
+        #expect(slipped.streak == MadarCalendarDays.distance(from: day("2026-10-04"), to: day("2026-10-06")))
+        // A slip today ends the streak at once; undoing it (an inverse event) restores the day.
+        let today = try HabitEngine.evaluate(rules: [r], facts: [slip("2026-10-06")], today: day("2026-10-06"), days: days)
+        #expect(today.streak == 0 && today.current?.outcome == .missed)
+        let undone = try HabitEngine.evaluate(rules: [r], facts: [slip("2026-10-06"), .init(id: UUID(), day: day("2026-10-06"), periodKey: "2026-10-06", delta: -1)], today: day("2026-10-06"), days: days)
+        #expect(undone.current?.outcome == .complete && undone.streak == 6)
+        // The rule only makes sense daily, with a target of one and no reminder window or minimum.
+        var weekly = r; weekly.frequency = .weekly; #expect(throws: CoreError.invalidCommand) { try weekly.validate() }
+        var two = r; two.target = 2; #expect(throws: CoreError.invalidCommand) { try two.validate() }
+        var windowed = r; windowed.windowStart = 60; windowed.windowEnd = 120; windowed.windowAnchor = .isha; #expect(throws: CoreError.invalidCommand) { try windowed.validate() }
+        // Earned rest days never apply to it.
+        let long = try HabitEngine.evaluate(rules: [r], facts: [slip("2026-10-31")], today: day("2026-11-02"), days: days, earnedRestEvery: 30)
+        #expect(long.streak == 2)
+    }
+    @Test func steppedSaveAndSlipCommandsParseWithTheirRules() throws {
+        let id = JSONValue.string(UUID().uuidString)
+        func json(_ r: HabitRule) throws -> JSONValue { try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(r)) }
+        var base = rule("2026-10-01"); base.measure = .count; base.unit = "pages"; base.target = 5
+        var step = base; step.effectiveFrom = day("2026-10-08"); step.target = 6
+        let payload: [String: JSONValue] = ["id": id, "name": .string("القراءة"), "rule": try json(base), "steps": .array([try json(step)])]
+        guard case .save(_, _, _, _, _, _, let steps)? = HabitCommand.parse("habit.save", payload) else { Issue.record("steps should parse"); return }
+        #expect(steps.map(\.target) == [6])
+        // A step that changes the frequency or is not later than today's version is refused.
+        var weekly = step; weekly.frequency = .weekly
+        #expect(HabitCommand.parse("habit.save", payload.merging(["steps": .array([try json(weekly)])]) { $1 }) == nil)
+        var same = step; same.effectiveFrom = base.effectiveFrom
+        #expect(HabitCommand.parse("habit.save", payload.merging(["steps": .array([try json(same)])]) { $1 }) == nil)
+        // A quit habit must be custom, with no reminder.
+        var quit = rule("2026-10-01"); quit.measure = .abstain
+        let quitPayload: [String: JSONValue] = ["id": id, "name": .string("بلا تدخين"), "rule": try json(quit), "reminder": .string("none")]
+        #expect(HabitCommand.parse("habit.save", quitPayload) != nil)
+        #expect(HabitCommand.parse("habit.save", quitPayload.merging(["reminder": .string("push")]) { $1 }) == nil)
+        #expect(HabitCommand.parse("habit.save", quitPayload.merging(["reminder": .string("dot")]) { $1 }) == nil)
+        guard case .complete(_, _, _, _, _, let slip)? = HabitCommand.parse("habit.complete", ["id": id, "slip": .bool(true)]) else { Issue.record("slip should parse"); return }
+        #expect(slip)
+    }
 }

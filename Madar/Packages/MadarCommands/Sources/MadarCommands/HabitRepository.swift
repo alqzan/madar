@@ -25,6 +25,10 @@ public struct HabitReading: Identifiable, Sendable {
     public var latestRule: HabitRule? = nil
     /// When the newest logged times happened (up to 14, newest first); a push habit with no window is reminded at their median.
     public var eventTimes: [Date] = []
+    /// The saved versions of the rule dated after today, oldest first: the steps of a growing goal or a Ramadan window.
+    public var upcomingRules: [HabitRule] = []
+    /// A habit you quit (owner, 17 Nov 2026, idea 10): never «open», never asked, logged only by an explicit slip.
+    public var quitting: Bool { (summary.current?.rule ?? latestRule)?.measure == .abstain }
     public func refreshed(in readings: [HabitReading]) -> HabitReading? {
         readings.first { $0.id == id }
     }
@@ -72,9 +76,14 @@ public struct HabitRepository {
         return HabitBreak(from: from, until: until)
     }
     public func reading(id: UUID, at now: Date) throws -> HabitReading? {
-        try readings(at: now, onlyHabitID: id).first
+        try readings(at: now, includeQuitting: true, onlyHabitID: id).first
     }
-    public func readings(at now: Date, includeArchived: Bool = false, liveHealth: [UUID:Int] = [:], onlyHabitID: UUID? = nil) throws -> [HabitReading] {
+    public func readings(at now: Date, includeArchived: Bool = false, liveHealth: [UUID:Int] = [:], includeQuitting: Bool = false, onlyHabitID: UUID? = nil) throws -> [HabitReading] {
+        // A habit left behind (idea 10) is never a due item: lobby lists, notifications, widgets and intents read without it; only the room and its detail ask for it.
+        let all = try allReadings(at: now, includeArchived: includeArchived, liveHealth: liveHealth, onlyHabitID: onlyHabitID)
+        return includeQuitting ? all : all.filter { !$0.quitting }
+    }
+    private func allReadings(at now: Date, includeArchived: Bool, liveHealth: [UUID:Int], onlyHabitID: UUID?) throws -> [HabitReading] {
         let settings = try SettingsStore(context: context), prayers = try PrayerRepository(context: context), place = prayers.place(at: now)
         let today = try DiaryLineRenderer.today(context: context, now: now)
         let boundary = DayBoundary(rawValue: try settings.value(for: "core.dayStart").string ?? "fajr") ?? .fajr
@@ -231,7 +240,8 @@ public struct HabitRepository {
             let times = net.filter { $0.value > 0 && $0.key <= today }.keys.sorted(by: >).map { HabitTime(day: $0, entryID: links[$0.description]) }
             result.append(.init(id: habit.id, name: habit.name, source: habit.linkedSource, archived: habit.archivedAt != nil, homeOnly: habit.homeOnly, reminder: habit.reminder, summary: summary, firstEffectiveFrom: firstDay, paused: breaks.contains { $0.contains(today) }, isNow: summary.current.map { HabitEngine.isNow($0, today: today, instant: now, window: window, pauses: breaks) } ?? false, times: times, breaks: breaks,
                                  latestRule: rules.max { $0.effectiveFrom < $1.effectiveFrom },
-                                 eventTimes: habitEvents.filter { $0.delta > 0 }.map(\.eventAt).sorted(by: >).prefix(RoomReminders.learnedTimeSample).map { $0 }))
+                                 eventTimes: habitEvents.filter { $0.delta > 0 }.map(\.eventAt).sorted(by: >).prefix(RoomReminders.learnedTimeSample).map { $0 },
+                                 upcomingRules: rules.filter { $0.effectiveFrom > today }.sorted { $0.effectiveFrom < $1.effectiveFrom }))
         }
         return result
     }

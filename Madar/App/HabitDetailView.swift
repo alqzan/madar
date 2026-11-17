@@ -25,6 +25,7 @@ struct HabitDetailView:View {
     @State private var pastDay=false
     /// Read once when the page opens; it was rebuilt from every prayer log on each redraw of the «جمّد» menu.
     @State private var onTrip=false
+    @State private var slipping=false
     /// A month or a year apart, the habit is kept by «آخر مرة» (item 26 «ج»): that leads the page.
     private var keptBySince:Bool { reading.source == nil && [.monthly,.yearly].contains(reading.summary.current?.rule.frequency) }
     private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
@@ -37,9 +38,11 @@ struct HabitDetailView:View {
             VStack(alignment:.leading,spacing:18) {
                 HStack { Text(reading.name).font(HabitType.title());Spacer();Button{dismiss()}label:{Text("تمّ").padding(.horizontal,16).frame(minHeight:44).glassEffect(.regular.interactive(), in: .capsule)}.buttonStyle(.madarPlain) }
                 if keptBySince { HabitSinceSection(session:session,reading:reading) }
-                if let current=reading.summary.current { hero(current) }
+                if reading.quitting { quitHero }
+                else if let current=reading.summary.current { hero(current) }
+                if !reading.quitting { nextStep }
                 actions
-                if let current=reading.summary.current { history(current) }
+                if !reading.quitting, let current=reading.summary.current { history(current) }
                 Text("الحذف يحفظ سجلك؛ تستعيد العادة من «عادات محذوفة».").font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
             }.padding(22)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.roomTheme,theme)
@@ -64,6 +67,42 @@ struct HabitDetailView:View {
         }
         .padding(18).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:24))
     }
+    /// Idea 10 (owner, 17 Nov 2026): a habit you quit counts the clean days since its last slip; «زلّة» is the only thing that logs,
+    /// and it asks first, because it starts the count again. Undo brings the day back.
+    private var quitHero:some View {
+        VStack(alignment:.leading,spacing:14) {
+            VStack(alignment:.leading,spacing:6) {
+                Text(habitPeriodCount(reading.summary.streak,.daily,digits)).font(HabitType.title()).accessibilityIdentifier("habit-quit-days")
+                if let last=reading.lastTime {
+                    Text("منذ آخر زلّة").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
+                    MadarDateLabel(session.dateLabels(last.day,weekday:true))
+                } else {
+                    Text("منذ بدأتها").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
+                    MadarDateLabel(session.dateLabels(reading.firstEffectiveFrom,weekday:true))
+                }
+            }
+            if !reading.paused {
+                Button { slipping = true } label: { outline(Label("زلّة",systemImage:"arrow.counterclockwise")) }.buttonStyle(.madarPlain).disabled(busy).accessibilityIdentifier("habit-slip")
+                    .confirmationDialog("تسجيل زلّة اليوم يبدأ العدّ من جديد، وسجلّك السابق يبقى.",isPresented:$slipping,titleVisibility:.visible) {
+                        Button("سجّل زلّة اليوم",role:.destructive) { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(1),"slip":.bool(true)]) }.accessibilityIdentifier("habit-slip-confirm")
+                        Button("تراجع",role:.cancel) {}
+                    }
+            }
+            Text("مدار لا يسألك عنها ولا يذكّرك؛ العدّ يمضي ما لم تسجّل زلّة.").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
+        }
+        .padding(18).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:24))
+    }
+    /// Ideas 8 and 16: the next saved version of the rule, with its date on both calendars.
+    @ViewBuilder private var nextStep:some View {
+        if let step=reading.upcomingRules.first, let now=reading.summary.current?.rule {
+            VStack(alignment:.leading,spacing:4) {
+                Text(step.target != now.target ? "الخطوة القادمة: "+habitUnitCount(step.target,step.unit,digits) : "يتغيّر وقتها في الخطوة القادمة").font(HabitType.section())
+                HStack(spacing:6) { Text("من").font(HabitType.caption()); MadarDateLabel(session.dateLabels(step.effectiveFrom,weekday:true)) }.foregroundStyle(theme.secondaryInk)
+            }
+            .padding(14).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:18))
+            .accessibilityElement(children:.combine).accessibilityIdentifier("habit-next-step")
+        }
+    }
     private func stateLine(_ p:HabitPeriodResult)->String? {
         if reading.paused || reading.summary.atRisk || p.met || p.target == 0 { return reading.statusTitle }
         if reading.isNow { return "وقتها الآن" }
@@ -84,7 +123,7 @@ struct HabitDetailView:View {
                 }
                 dismiss()
             } label: { filled("افتح "+(reading.sourceTitle ?? "غرفتها")) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-owner")
-        } else if !reading.paused && current.target > 0 {
+        } else if !reading.paused && current.target > 0 && !reading.quitting {
             let doneOnce = current.met && current.rule.measure == .once
             // A once-a-period habit done in its period needs no greyed «تمّت»: the ring and the state line already say it (AU-35).
             if !doneOnce { Button { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(current.rule.measure == .duration ? 15 : 1)]) } label: {

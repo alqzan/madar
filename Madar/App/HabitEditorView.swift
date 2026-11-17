@@ -13,6 +13,8 @@ private struct HabitEditorSnapshot: Equatable {
     let windowOn: Bool
     let homeOnly: Bool
     let reminder: String
+    var rampOn = false
+    var ramadanOn = false
 }
 
 struct HabitEditorView:View {
@@ -49,6 +51,17 @@ struct HabitEditorView:View {
     @State private var windowOn=false
     @State private var homeOnly=false
     @State private var reminder="dot"
+    /// Idea 8 (owner, 17 Nov 2026): a goal that grows by `rampStep` every `rampEvery` days or weeks up to `rampCap`; the later steps are saved as dated versions.
+    @State private var rampOn=false
+    @State private var rampStep=1
+    @State private var rampEvery=1
+    @State private var rampWeeks=true
+    @State private var rampCap=10
+    /// Idea 16: the window this habit keeps during Ramadan, saved as a version dated 1 Ramadan and another on 1 Shawwal that restores the usual one.
+    @State private var ramadanOn=false
+    @State private var ramadanAnchor:Prayer = .isha
+    @State private var ramadanStart=90
+    @State private var ramadanEnd=360
     /// B2-9: name, repeat and amount are the quick part; time, reminder, travel and days off fold under «متقدم» unless already set.
     @State private var advancedOpen=false
     @State private var busy=false
@@ -83,7 +96,7 @@ struct HabitEditorView:View {
                         else if let title=reading?.sourceTitle { Text("تُقرأ من "+title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     }
                     section("التكرار") {
-                        Picker("تكرار العادة",selection:Binding(get:{rule.frequency},set:{rule.frequency=$0;rule.intervalDays = $0 == .interval ? (rule.intervalDays ?? 3) : nil})) { Text("يومية").tag(HabitFrequency.daily);Text("كل عدد من الأيام").tag(HabitFrequency.interval);Text("أسبوعية").tag(HabitFrequency.weekly);Text("شهرية").tag(HabitFrequency.monthly);Text("سنوية").tag(HabitFrequency.yearly) }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-frequency")
+                        if rule.measure != .abstain { Picker("تكرار العادة",selection:Binding(get:{rule.frequency},set:{rule.frequency=$0;rule.intervalDays = $0 == .interval ? (rule.intervalDays ?? 3) : nil})) { Text("يومية").tag(HabitFrequency.daily);Text("كل عدد من الأيام").tag(HabitFrequency.interval);Text("أسبوعية").tag(HabitFrequency.weekly);Text("شهرية").tag(HabitFrequency.monthly);Text("سنوية").tag(HabitFrequency.yearly) }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-frequency") }
                         if reading != nil { Text("تغيير التكرار يبدأ سلسلة جديدة، وسجلّك يبقى.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                         // FB-39 (owner, 6 Nov): «كل ٣ أيام»، «كل ٤٠ يومًا» — any day inside each block counts.
                         if rule.frequency == .interval {
@@ -114,7 +127,8 @@ struct HabitEditorView:View {
                     }
                     section("قدر يسهل أن تدوم عليه") {
                         if source == "custom" {
-                            Picker("الحساب",selection:$rule.measure){Text("مرة").tag(HabitMeasure.once);Text("بالعدد").tag(HabitMeasure.count);Text("بالوقت").tag(HabitMeasure.duration)}.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-measure")
+                            Picker("الحساب",selection:$rule.measure){Text("مرة").tag(HabitMeasure.once);Text("بالعدد").tag(HabitMeasure.count);Text("بالوقت").tag(HabitMeasure.duration);Text("عادة تركتها").tag(HabitMeasure.abstain)}.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-measure")
+                            if rule.measure == .abstain { Text("تعدّ مدار الأيام منذ آخر زلّة. تسجّل الزلّة من صفحة العادة، ولا يسألك مدار عنها ولا يذكّرك.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("habit-abstain-hint") }
                             if rule.measure == .count { TextField("الوحدة، مثل كوب أو صفحة",text:Binding(get:{rule.unit ?? ""},set:{rule.unit=$0})).frame(minHeight:44).accessibilityIdentifier("habit-unit") }
                         }
                         if source == "reading" {
@@ -129,7 +143,7 @@ struct HabitEditorView:View {
                             Picker("وحدة الصحة",selection:Binding(get:{rule.unit ?? "steps"},set:{unitTargets[rule.unit ?? "steps"]=rule.target;rule.unit=$0;rule.target=unitTargets[$0] ?? ["steps":6000,"sleepMinutes":420,"workouts":1][$0] ?? 30})) {Text("خطوات").tag("steps");Text("دقائق حركة").tag("exerciseMinutes");Text("دقائق النوم").tag("sleepMinutes");Text("تمارين").tag("workouts")}.pickerStyle(.menu)
                             Text("دقائق الحركة تشمل كل تمرين، والنوم هو ما انتهى في صباح اليوم، والتمارين عدد ما سجّلته ساعتك. مدار يقرأ من الصحة ولا يكتب فيها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
-                        if rule.measure != .once {
+                        if rule.measure != .once && rule.measure != .abstain {
                             // FB-39: a step of one up to 100000 meant 2000 taps to move a walking goal from 6000 to 8000 steps; type it, or step by a sensible amount.
                             let daysPicked = (!rule.weekdays.isEmpty && rule.frequency == .weekly) || (!monthDays.isEmpty && rule.frequency == .monthly)
                             if daysPicked { Text("في الأيام التي اخترتها").font(MadarTypography.caption()).frame(minHeight:44) }
@@ -144,6 +158,19 @@ struct HabitEditorView:View {
                             if !rule.weekdays.isEmpty && rule.frequency == .weekly || !monthDays.isEmpty && rule.frequency == .monthly { Text("عدد الأيام هو هدف الفترة، وما زاد فضل.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             Toggle("أقلّ القليل يحفظ السلسلة",isOn:$minimumOn).frame(minHeight:44).accessibilityIdentifier("habit-minimum-toggle")
                             if minimumOn { Stepper("أقلّ القليل: "+habitUnitCount(min(rule.target,rule.minimum ?? 1),rule.unit,digits),value:Binding(get:{min(rule.target,rule.minimum ?? 1)},set:{rule.minimum=$0}),in:1...max(1,rule.target)).frame(minHeight:44) }
+                        }
+                        if [.count,.duration].contains(rule.measure) && !((!rule.weekdays.isEmpty && rule.frequency == .weekly) || (!monthDays.isEmpty && rule.frequency == .monthly)) {
+                            Toggle("يكبر تدريجيًا",isOn:$rampOn).frame(minHeight:44).accessibilityIdentifier("habit-ramp-toggle")
+                            if rampOn {
+                                Stepper("يزيد: "+habitUnitCount(rampStep,rule.unit,digits),value:$rampStep,in:1...max(1,targetLimit/10)).frame(minHeight:44).accessibilityIdentifier("habit-ramp-step")
+                                Stepper("كل "+(rampWeeks ? WidgetCopy.agree(rampEvery,digits,one:"أسبوع",two:"أسبوعين",few:"أسابيع",many:"أسبوعًا") : WidgetCopy.agree(rampEvery,digits,one:"يوم",two:"يومين",few:"أيام",many:"يومًا")),value:$rampEvery,in:1...52).frame(minHeight:44).accessibilityIdentifier("habit-ramp-every")
+                                Picker("المدة",selection:$rampWeeks){Text("أسابيع").tag(true);Text("أيام").tag(false)}.pickerStyle(.segmented)
+                                Stepper("حتى: "+habitUnitCount(max(rampCap,rule.target+1),rule.unit,digits),value:$rampCap,in:(rule.target+1)...targetLimit,step:targetStep).frame(minHeight:44).accessibilityIdentifier("habit-ramp-cap")
+                                Text("تبدأ بـ "+habitUnitCount(rule.target,rule.unit,digits)+" وتصل إلى "+habitUnitCount(max(rampCap,rule.target+1),rule.unit,digits)+". تُحفظ الخطوات القادمة معها، وأي تعديل لاحق على العادة يلغيها فتفعّلها من جديد إن شئت.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            }
+                        }
+                        if let reading, !reading.upcomingRules.isEmpty {
+                            Text("للعادة خطوات قادمة محفوظة. تغيير الاسم أو التذكير يبقيها، وتغيير الهدف أو الوقت يلغيها فأعد تفعيلها هنا إن أردتها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("habit-upcoming-warning")
                         }
                     }
                     section("متقدم") {
@@ -163,12 +190,19 @@ struct HabitEditorView:View {
                                 Stepper("النهاية: "+digits.string(rule.windowEnd ?? 90)+" دقيقة من الأذان",value:Binding(get:{rule.windowEnd ?? 90},set:{rule.windowEnd=$0}),in:15...1440,step:15)
                             }
                             Text("الوقت يتبع مدينتك النشطة؛ ونافذة الليل تتبع يوم مدار الذي بدأت فيه.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            Toggle("وقتها في رمضان",isOn:$ramadanOn).frame(minHeight:44).accessibilityIdentifier("habit-ramadan-toggle")
+                            if ramadanOn {
+                                Picker("في رمضان تبدأ من",selection:$ramadanAnchor) { ForEach(Prayer.allCases,id:\.self){p in Text(prayerName(p)).tag(p)} }.pickerStyle(.menu)
+                                Stepper("البداية: "+(ramadanStart < 0 ? digits.string(-ramadanStart)+" دقيقة قبل الأذان" : digits.string(ramadanStart)+" دقيقة من الأذان"),value:$ramadanStart,in:-720...720,step:15)
+                                Stepper("النهاية: "+digits.string(ramadanEnd)+" دقيقة من الأذان",value:$ramadanEnd,in:-705...1440,step:15)
+                                Text("يتغيّر وقتها من أول رمضان، ويعود وقتها المعتاد في أول شوال، في رمضانين قادمين. أي تعديل لاحق يلغي هذه الخطوات.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            }
                         }
-                        Picker("التذكير",selection:$reminder){
+                        if rule.measure != .abstain { Picker("التذكير",selection:$reminder){
                             Text("نقطة في البهو").tag("dot")
                             if source == "custom" || (reading != nil && reminder == "push") { Text("إشعار لطيف").tag("push") }
                             Text("بلا تذكير").tag("none")
-                        }.pickerStyle(.menu).accessibilityIdentifier("habit-reminder")
+                        }.pickerStyle(.menu).accessibilityIdentifier("habit-reminder") }
                         if reminder == "push" {
                             Text(source == "custom" ? (windowOn ? "يصلك الإشعار في بداية وقت العادة." : "بلا وقت محدد يتعلّم مدار وقتك من آخر تسجيلاتك، ويبدأ بعد ٣ مرات.") : "الإشعار غير متاح للعادة المرتبطة؛ يمكنك اختيار نقطة البهو.")
                                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
@@ -226,6 +260,12 @@ struct HabitEditorView:View {
     }
     /// Switching back from minutes to a count drops the «minutes» unit, so a count habit never reads as time.
     private func measureChanged(from old:HabitMeasure,to value:HabitMeasure) {
+        if value == .abstain {
+            // A habit you quit: daily, one «day» a unit, nothing to ask — and never a window, reminder, minimum or growth.
+            rule.frequency = .daily;rule.intervalDays=nil;rule.target=1;rule.unit=nil;rule.minimum=nil;rule.weekdays=[];rule.restWeekdays=[];rule.windowStart=nil;rule.windowEnd=nil;rule.windowAnchor=nil
+            minimumOn=false;windowOn=false;ramadanOn=false;rampOn=false;reminder="none";return
+        }
+        if old == .abstain, reminder == "none" { reminder="dot" }
         if source == "reading" { return } // the minutes/pages picker sets measure, unit and target together
         if value == .duration {rule.unit="minutes";rule.target=15}
         else if value == .once {rule.target=1;rule.minimum=nil;minimumOn=false}
@@ -233,7 +273,7 @@ struct HabitEditorView:View {
     }
     private var hasUnsavedChanges: Bool {
         guard let initialSnapshot else { return false }
-        return initialSnapshot != .init(name:name,source:source,rule:rule,monthDays:monthDays,minimumOn:minimumOn,windowOn:windowOn,homeOnly:homeOnly,reminder:reminder)
+        return initialSnapshot != .init(name:name,source:source,rule:rule,monthDays:monthDays,minimumOn:minimumOn,windowOn:windowOn,homeOnly:homeOnly,reminder:reminder,rampOn:rampOn,ramadanOn:ramadanOn)
     }
     private func dayButtons(_ selection:Binding<[Int]>)->some View { HStack(spacing:3) { ForEach(Array(["ح","ن","ث","ر","خ","ج","س"].enumerated()),id:\.offset){i,label in Button {let day=i+1;if selection.wrappedValue.contains(day){selection.wrappedValue.removeAll{$0==day}}else{selection.wrappedValue.append(day)}}label:{Text(label).font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:44).background(selection.wrappedValue.contains(i+1) ? theme.accentFill : theme.background,in:.capsule).foregroundStyle(selection.wrappedValue.contains(i+1) ? theme.onAccent : theme.ink)}.buttonStyle(.madarPlain).accessibilityLabel(["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"][i]).accessibilityAddTraits(selection.wrappedValue.contains(i+1) ? .isSelected : []) } } }
     private func section<Content:View>(_ title:String,@ViewBuilder content:()->Content)->some View { VStack(alignment:.leading,spacing:12){Text(title).font(MadarTypography.section());content()}.padding(16).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:22)) }
@@ -282,8 +322,25 @@ struct HabitEditorView:View {
             // FB-39: a «إشعار لطيف» without a time never fires (RoomReminders.habit needs the window), so it is not saved silently.
 
             try saved.validate()
+            // Ideas 8 and 16: the later versions of the rule (a growing goal, a Ramadan window) travel with this save.
+            var steps:[HabitRule]=[]
+            if saved.measure != .abstain,rampOn || (ramadanOn && windowOn) {
+                if rampOn,rampCap <= saved.target {issue="اجعل الحدّ الأعلى أكبر من بداية الهدف.";busy=false;return}
+                let calendar=MadarCalendarDays(zone:session.activePlace.timeZone,source:HijriSource(rawValue:session.string("core.hijriSource")) ?? .ummAlQura,offset:Int(session.number("core.hijriOffset")))
+                let plan=HabitSchedule.plan(base:saved,ramp:rampOn ? HabitRamp(step:rampStep,everyDays:rampWeeks ? rampEvery*7 : rampEvery,cap:rampCap) : nil,
+                                            ramadan:ramadanOn && windowOn ? HabitRamadanWindow(anchor:ramadanAnchor,start:ramadanStart,end:ramadanEnd) : nil,today:AppBahwService(session:session).today,days:calendar)
+                saved=plan.rule;steps=plan.steps
+                for step in steps { try step.validate() }
+            }
+            // An edit that leaves the rule as it was (a new name, reminder or home-only) keeps the growing goal and the
+            // Ramadan times already planned; only a change to the rule itself replaces them.
+            if steps.isEmpty, !rampOn, !ramadanOn, let reading, !reading.upcomingRules.isEmpty, var initialRule=initialSnapshot?.rule {
+                initialRule.effectiveFrom=saved.effectiveFrom
+                if initialRule == saved { steps=reading.upcomingRules.filter{$0.effectiveFrom > saved.effectiveFrom} }
+            }
             let json=try JSONDecoder().decode(MadarCore.JSONValue.self,from:JSONEncoder().encode(saved))
-            var p:[String:MadarCore.JSONValue]=["id":.string(id.uuidString),"name":.string(name),"rule":json,"homeOnly":.bool(homeOnly),"reminder":.string(reminder)]
+            var p:[String:MadarCore.JSONValue]=["id":.string(id.uuidString),"name":.string(name),"rule":json,"homeOnly":.bool(homeOnly),"reminder":.string(saved.measure == .abstain ? "none" : reminder)]
+            if !steps.isEmpty { p["steps"] = .array(try steps.map{try JSONDecoder().decode(MadarCore.JSONValue.self,from:JSONEncoder().encode($0))}) }
             if source != "custom"{p["source"] = .string(source)}
             Task {do{if source == "walking" {try await HabitHealthStore.authorize(unit:saved.unit ?? "steps")};try await session.executeDiaryCommand("habit.save",payload:p);dismiss()}catch{issue="لم تُحفظ العادة: "+madarUserDetail(error)};busy=false}
         }catch{issue="راجع العادة: "+madarUserDetail(error);busy=false}

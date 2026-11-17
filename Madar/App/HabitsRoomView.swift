@@ -25,6 +25,7 @@ extension HabitReading {
     }
     var statusTitle: String {
         if paused { return "مجمّدة" }
+        if quitting { return summary.current?.outcome == .missed ? "زلّة اليوم" : "تركتها" }
         if summary.atRisk { return missedPhrase(MadarNumberFormatter(style: .hindi)) + "؛ الحالية تحفظها" }
         switch summary.current?.outcome { case .complete: return "تمّت"; case .minimum: return "أقلّ القليل"; case .excluded: return "إجازتها اليوم"; case .missed: return "فترة بلا تسجيل"; default: return isNow ? "وقتها الآن" : "تنتظر" }
     }
@@ -216,7 +217,7 @@ struct HabitsRoomView: View {
         return fixed && !p.dueDays.contains(today)
     }
     private func dueToday(_ r:HabitReading)->Bool {
-        guard !r.paused, let p=r.summary.current, p.target > 0 else { return false }
+        guard !r.paused, !r.quitting, let p=r.summary.current, p.target > 0 else { return false }
         if p.rule.frequency == .daily { return true }
         if p.met { return false }
         if p.rule.frequency == .yearly || (p.rule.frequency == .monthly && !p.rule.monthDays.isEmpty) {
@@ -447,7 +448,7 @@ struct HabitsRoomView: View {
                 }.padding(.leading,10).padding(.vertical,13).frame(minHeight:70).contentShape(.rect)
             }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-row-"+row.id.uuidString).accessibilityLabel(row.name+"، "+progress(row)+"، "+row.statusTitle)
             // A day forgotten is one long-press away (item 26), without opening the habit.
-            .contextMenu { if row.source == nil, !row.archived, let p = row.summary.current, p.rule.measure != .health, (row.summary.periods.first?.start).map({ $0 < today }) == true { Button("فعلتها في يوم سابق",systemImage:"calendar.badge.clock") { pastDay = row } } }
+            .contextMenu { if row.source == nil, !row.archived, let p = row.summary.current, p.rule.measure != .health, p.rule.measure != .abstain, (row.summary.periods.first?.start).map({ $0 < today }) == true { Button("فعلتها في يوم سابق",systemImage:"calendar.badge.clock") { pastDay = row } } }
             trailing(row).padding(.trailing,10)
         }
     }
@@ -468,7 +469,7 @@ struct HabitsRoomView: View {
     }
     /// Count and duration habits log from a «+»; a once-habit logs from its ring.
     @ViewBuilder private func trailing(_ row:HabitReading)->some View {
-        if row.source == nil, !row.paused, let p=row.summary.current, p.target > 0, p.rule.measure != .once {
+        if row.source == nil, !row.paused, let p=row.summary.current, p.target > 0, p.rule.measure != .once, p.rule.measure != .abstain {
             Button { complete(row, delta: p.rule.measure == .duration ? 15 : 1) } label: {
                 Image(systemName:"plus").font(.system(size:16,weight:.semibold)).foregroundStyle(p.met ? theme.accent : theme.onAccent).frame(width:38,height:38).background(p.met ? theme.accentFill.opacity(0.14) : theme.accentFill,in:.circle)
                     .frame(width:44,height:44).contentShape(.circle)
@@ -484,7 +485,7 @@ struct HabitsRoomView: View {
         default: return "أضف واحدًا إلى " + name
         }
     }
-    private func progress(_ row:HabitReading)->String { guard let p=row.summary.current else{return "لا فترة بعد"}; return p.target == 0 ? "سجلك محفوظ" : p.rule.measure == .once && p.target == 1 ? (p.value >= 1 ? "تمّت" : "") : habitProgressText(p.value,p.target,p.rule.unit,digits) }
+    private func progress(_ row:HabitReading)->String { guard let p=row.summary.current else{return "لا فترة بعد"}; if p.rule.measure == .abstain { return row.summary.streak > 0 ? habitPeriodCount(row.summary.streak,.daily,digits)+" بلا زلّة" : "بدأت من جديد اليوم" }; return p.target == 0 ? "سجلك محفوظ" : p.rule.measure == .once && p.target == 1 ? (p.value >= 1 ? "تمّت" : "") : habitProgressText(p.value,p.target,p.rule.unit,digits) }
     /// Owner, 5 Nov 2026 («اضغط العاده يعلق التطبيق»): every table of every habit is read on a background context, and only the
     /// latest request lands, so a tap, a Health refresh and a prayer write in a row never stack reads on the main thread.
     private func reload() {
@@ -492,7 +493,7 @@ struct HabitsRoomView: View {
         let container = session.container, now = session.prayerNow(), health = liveHealth
         reloadTask = Task {
             let result = await Task.detached(priority: .userInitiated) {
-                Result { try HabitRepository(context: ModelContext(container)).readings(at: now, includeArchived: true, liveHealth: health) }
+                Result { try HabitRepository(context: ModelContext(container)).readings(at: now, includeArchived: true, liveHealth: health, includeQuitting: true) }
             }.value
             guard !Task.isCancelled else { return }
             apply(result)

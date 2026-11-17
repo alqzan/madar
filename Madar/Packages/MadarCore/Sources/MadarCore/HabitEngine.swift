@@ -3,7 +3,9 @@ import Foundation
 /// `interval` (FB-39, owner 6 Nov: «كل ٣ أيام»، «كل ٤٠ يومًا»): each period is `intervalDays` consecutive days
 /// counted from the habit's first date; any day inside the period counts.
 public enum HabitFrequency: String, Codable, Sendable { case daily, weekly, monthly, yearly, interval }
-public enum HabitMeasure: String, Codable, Sendable { case once, count, duration, health }
+/// `abstain` (owner, 17 Nov 2026, idea 10 «عادة تركتها»): a daily habit of NOT doing something. A day is complete while no slip is logged
+/// and missed once one is; a slip ends the streak at once, so the streak is the clean days since the last slip.
+public enum HabitMeasure: String, Codable, Sendable { case once, count, duration, health, abstain }
 /// Rules are versioned; identity, archived state and owning-room facts are deliberately outside this pure engine.
 public struct HabitRule: Codable, Equatable, Sendable {
     public var effectiveFrom: GregorianDay
@@ -38,6 +40,7 @@ public struct HabitRule: Codable, Equatable, Sendable {
                   windowAnchor != nil || ((0..<1440).contains(start) && (0..<1440).contains(end)) else { throw CoreError.invalidCommand }
         }
         if measure == .duration && unit != "minutes" { throw CoreError.invalidCommand }
+        if measure == .abstain, frequency != .daily || target != 1 || minimum != nil || unit != nil || windowStart != nil || !restWeekdays.isEmpty { throw CoreError.invalidCommand }
         if measure == .health && !Self.healthUnits.contains(unit ?? "") { throw CoreError.invalidCommand }
     }
 }
@@ -202,16 +205,17 @@ public enum HabitEngine {
             var sum = 0
             for (_, fact) in periodFacts where fact.unit == nil || fact.unit == rule.unit { let added = sum.addingReportingOverflow(fact.delta); guard !added.overflow else { throw CoreError.invalidCommand }; sum = added.partialValue }
             let value = max(0, sum)
-            let outcome: HabitOutcome = target == 0 ? .excluded : value >= target ? .complete : (rule.minimum.map { value >= min($0, target) } ?? false) ? .minimum : end <= today ? .missed : .waiting
+            let outcome: HabitOutcome = rule.measure == .abstain ? (target == 0 ? .excluded : value > 0 ? .missed : .complete) : target == 0 ? .excluded : value >= target ? .complete : (rule.minimum.map { value >= min($0, target) } ?? false) ? .minimum : end <= today ? .missed : .waiting
             let result = HabitPeriodResult(key: key, start: cursor, end: end, rule: rule, dueDays: due, target: target, value: value, outcome: outcome)
             results.append(result)
-            let earning = rule.frequency == .daily ? earnedRestEvery.flatMap { $0 > 0 ? $0 : nil } : nil
+            let earning = rule.frequency == .daily && rule.measure != .abstain ? earnedRestEvery.flatMap { $0 > 0 ? $0 : nil } : nil
             if result.met {
                 streak += 1; misses = 0
                 if let earning { sinceCredit += 1; if sinceCredit >= earning { credits += 1; sinceCredit = 0 } }
             }
             else if outcome == .missed {
-                if earning != nil, credits > 0 { credits -= 1 }
+                if rule.measure == .abstain { streak = 0; misses = 0 }
+                else if earning != nil, credits > 0 { credits -= 1 }
                 else { misses += 1; sinceCredit = 0; if misses >= breakAfter { streak = 0; credits = 0 } }
             }
             cursor = end

@@ -18,7 +18,7 @@ private struct HabitUndo: Codable {
         }
         var inverse = HabitUndo()
         switch command {
-        case .save(let identity, let name, let source, let rule, let homeOnly, let reminder):
+        case .save(let identity, let name, let source, let rule, let homeOnly, let reminder, let steps):
             let existing = try context.fetch(FetchDescriptor<Habit>(predicate: #Predicate { $0.id == identity })).first
             // FB-39 (owner, 6 Nov): a new habit may start on a free first date, back up to ten years (then its past days can be
             // logged) or ahead up to a year; an edit of an existing habit starts today, or on its own start date if that is still ahead.
@@ -43,16 +43,31 @@ private struct HabitUndo: Codable {
             row.id = identity; row.name = name; row.linkedSource = source; row.kind = source == nil ? "custom" : "linked"; row.homeOnly = homeOnly; row.reminder = reminder
             if existing == nil { row.startDate = now; row.createdAt = now; row.order = try context.fetchCount(FetchDescriptor<Habit>()); context.insert(row) }
             try touch(row); inverse.changes.append(.init(before: before, after: try row.record()))
-            let effectiveFrom = start.description
-            let oldPolicy = try context.fetch(FetchDescriptor<HabitPolicy>(predicate: #Predicate { $0.habitID == identity && $0.effectiveFrom == effectiveFrom && $0.deletedAt == nil && $0.mergedInto == nil })).first
-            let policy = oldPolicy ?? HabitPolicy(), old = try oldPolicy?.record()
-            if oldPolicy == nil { policy.id = StableIdentity.uuid(for: "habit-policy:\(identity):\(start)"); policy.habitID = identity; policy.createdAt = now; context.insert(policy) }
-            HabitRepository.apply(rule, to: policy); try touch(policy)
-            inverse.changes.append(.init(before: old, after: try policy.record()))
+            // Owner, 17 Nov 2026 (ideas 8 and 16): later dated versions of the rule (a goal that grows, a Ramadan window).
+            // An edit first tombstones every live version dated after the one being written (undo restores them), then writes the new set.
+            let stepDays = Set(steps.map { $0.effectiveFrom.description })
+            let later = try context.fetch(FetchDescriptor<HabitPolicy>(predicate: #Predicate { $0.habitID == identity && $0.deletedAt == nil && $0.mergedInto == nil }))
+                .filter { $0.effectiveFrom > start.description && !stepDays.contains($0.effectiveFrom) }
+            for row in later {
+                let before = try row.record(); var after = before
+                let stamp = StableIdentity.monotonic(now: now, previous: before.date("updatedAt") ?? .distantPast)
+                try after.set(stamp, for: "deletedAt"); try after.set(stamp, for: "deletionBarrierAt"); try after.set(stamp, for: "updatedAt"); try after.set(writer, for: "writerID")
+                try row.apply(after); inverse.changes.append(.init(before: before, after: after))
+            }
+            for version in [rule] + steps {
+                let effectiveFrom = version.effectiveFrom.description, policyID = StableIdentity.uuid(for: "habit-policy:\(identity):\(version.effectiveFrom)")
+                let sameDay = try context.fetch(FetchDescriptor<HabitPolicy>(predicate: #Predicate { $0.habitID == identity && $0.effectiveFrom == effectiveFrom && $0.deletedAt == nil && $0.mergedInto == nil })).first
+                let existingPolicy = try sameDay ?? context.fetch(FetchDescriptor<HabitPolicy>(predicate: #Predicate { $0.id == policyID })).first
+                let policy = existingPolicy ?? HabitPolicy(), old = try existingPolicy?.record()
+                if existingPolicy == nil { policy.id = policyID; policy.habitID = identity; policy.createdAt = now; context.insert(policy) }
+                else if policy.deletedAt != nil { policy.restoredAt = StableIdentity.monotonic(now: now, previous: policy.deletionBarrierAt ?? now); policy.deletedAt = nil }
+                HabitRepository.apply(version, to: policy); try touch(policy)
+                inverse.changes.append(.init(before: old, after: try policy.record()))
+            }
             if let origin=try HabitContextProvenance.ensureOrigin(habit:row,context:context,now:now,writer:writer),existing==nil {
                 inverse.changes.append(.init(before:nil,after:try origin.record()))
             }
-        case .complete(let identity, let delta, let periodKey, let day, let entryID):
+        case .complete(let identity, let delta, let periodKey, let day, let entryID, let slip):
             let row = try habit(identity); guard row.archivedAt == nil, row.kind == "custom" else { throw DataError.invalidValue("العادة المربوطة تُسجّل في غرفتها") }
             let reading = try HabitRepository(context: context).reading(id: identity, at: now)
             let prayers = try PrayerRepository(context: context), event = HabitEvent()
@@ -75,6 +90,8 @@ private struct HabitUndo: Codable {
             if target.rule.measure == .once && target.met {
                 guard logDay != today, reading?.times.contains(where: { $0.day == logDay }) == false else { return nil }
             }
+            // A habit you quit logs only an explicit slip («زلّة»); a row ring, widget, intent or reminder tap never does.
+            if target.rule.measure == .abstain { guard slip else { return nil } }
             let current = target
             event.id = id; event.habitID = identity; event.dayKey = logDay.description; event.periodKey = current.key; event.entryID = entryID
             event.tzID = prayers.place(at: now).timeZoneID

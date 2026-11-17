@@ -1,8 +1,8 @@
 import Foundation
 
 public enum HabitCommand: Codable, Equatable, Sendable {
-    case save(id: UUID, name: String, source: String?, rule: HabitRule, homeOnly: Bool, reminder: String)
-    case complete(id: UUID, delta: Int, periodKey: String?, day: GregorianDay? = nil, entryID: UUID? = nil)
+    case save(id: UUID, name: String, source: String?, rule: HabitRule, homeOnly: Bool, reminder: String, steps: [HabitRule] = [])
+    case complete(id: UUID, delta: Int, periodKey: String?, day: GregorianDay? = nil, entryID: UUID? = nil, slip: Bool = false)
     case pause(id: UUID, from: GregorianDay, until: GregorianDay?, trip: Bool)
     case health(id: UUID, unit: String, values: [String:Int])
     case resume(UUID)
@@ -13,7 +13,7 @@ public enum HabitCommand: Codable, Equatable, Sendable {
         guard let id = (value["id"] ?? value["habitID"])?.string.flatMap(UUID.init(uuidString:)) else { return nil }
         switch name {
         case "habit.save":
-            guard Set(value.keys).isSubset(of: ["id","name","source","rule","homeOnly","reminder"]), let text = value["name"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty, text.count <= 80,
+            guard Set(value.keys).isSubset(of: ["id","name","source","rule","homeOnly","reminder","steps"]), let text = value["name"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty, text.count <= 80,
                   let json = value["rule"], let data = try? json.canonicalData(), let rule = try? JSONDecoder().decode(HabitRule.self, from: data), (try? rule.validate()) != nil else { return nil }
             let source = value["source"]?.string
             guard value["source"] == nil || source.map({ ["jamaah","review","reading","diaryLine","walking","wird"].contains($0) }) == true else { return nil }
@@ -26,16 +26,31 @@ public enum HabitCommand: Codable, Equatable, Sendable {
             }
             let reminder = value["reminder"]?.string ?? "dot"
             guard ["dot","push","none"].contains(reminder), value["homeOnly"] == nil || value["homeOnly"]?.bool != nil else { return nil }
-            return .save(id: id, name: text, source: source, rule: rule, homeOnly: value["homeOnly"]?.bool ?? false, reminder: reminder)
+            // Owner, 17 Nov 2026 (ideas 8, 16): later steps of a growing goal or of a Ramadan window are full rules dated after today's.
+            var steps: [HabitRule] = []
+            if let raw = value["steps"] {
+                guard case .array(let items) = raw, items.count <= HabitSchedule.maximumSteps else { return nil }
+                for item in items {
+                    guard let data = try? item.canonicalData(), let step = try? JSONDecoder().decode(HabitRule.self, from: data), (try? step.validate()) != nil,
+                          step.effectiveFrom > rule.effectiveFrom, step.frequency == rule.frequency, step.measure == rule.measure, step.unit == rule.unit,
+                          step.weekdays == rule.weekdays, step.monthDays == rule.monthDays, step.hijri == rule.hijri, step.intervalDays == rule.intervalDays else { return nil }
+                    steps.append(step)
+                }
+                guard Set(steps.map(\.effectiveFrom)).count == steps.count else { return nil }
+            }
+            // A habit you quit (idea 10) is a custom daily habit with no reminder: «فاتتك» would otherwise tell the user to relapse.
+            if rule.measure == .abstain, source != nil || reminder != "none" || !steps.isEmpty { return nil }
+            return .save(id: id, name: text, source: source, rule: rule, homeOnly: value["homeOnly"]?.bool ?? false, reminder: reminder, steps: steps)
         case "habit.complete":
-            guard Set(value.keys).isSubset(of: ["id","habitID","delta","periodKey","day","entryID"]) else { return nil }
+            guard Set(value.keys).isSubset(of: ["id","habitID","delta","periodKey","day","entryID","slip"]) else { return nil }
             guard value["id"] == nil || value["habitID"] == nil, value["delta"] == nil || value["delta"]?.number != nil, value["periodKey"] == nil || value["periodKey"]?.string != nil else {return nil}
             let n = value["delta"]?.number ?? 1
             guard n > 0, n <= 100000, n.rounded() == n else { return nil }
             // «فعلتها في يوم سابق» names the day; a diary line of that day may be linked to the time (item 26).
             let day = value["day"]?.string.flatMap { try? GregorianDay($0) }, entry = value["entryID"]?.string.flatMap(UUID.init(uuidString:))
             guard value["day"] == nil || day != nil, value["entryID"] == nil || entry != nil, day == nil || value["periodKey"] == nil else { return nil }
-            return .complete(id: id, delta: Int(n), periodKey: value["periodKey"]?.string, day: day, entryID: entry)
+            guard value["slip"] == nil || value["slip"]?.bool != nil else { return nil }
+            return .complete(id: id, delta: Int(n), periodKey: value["periodKey"]?.string, day: day, entryID: entry, slip: value["slip"]?.bool ?? false)
         case "habit.pause":
             guard Set(value.keys).isSubset(of: ["id","from","until","trip"]), let from = value["from"]?.string.flatMap({ try? GregorianDay($0) }) else { return nil }
             let until = value["until"]?.string.flatMap { try? GregorianDay($0) }
