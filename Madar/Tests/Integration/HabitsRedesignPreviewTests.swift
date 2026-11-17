@@ -3,128 +3,169 @@ import SwiftUI
 import MadarDesign
 @testable import Madar
 
-// Design preview only (owner 16 Nov). Round 8, the owner: «أبي شي أنت تجيبه من ذكاءك».
-// Idea: «الوتيرة» (pace). Every habit, whatever its unit or frequency, has a plan to date (what you meant to do by today)
-// and an actual to date. The room shows one thing per habit: are you ahead of your own plan or behind, by how much,
-// and when you will catch up at your current pace. The gold line is what you did; the dashed line is your plan;
-// the space between them is gold when ahead and rose when behind, with the room's soft reflection under it.
-// Synthetic data; not wired into the app.
+// Design preview only (owner 17 Nov). Round 9, after «شف التطبيقات وأبي شي جميل وخورافي»; the owner kept the colours.
+// Lessons taken (not copied): Streaks — one big, bold token per habit you read at a glance; Apple Fitness — a month of
+// small rings; Gentler Streak — kind, never punishing. Madar's own twist: «سماء يومك», the day's real light from the
+// prayer-time engine (dawn to night) with each habit placed at the time it will ask you, and a sun at «now».
+// Generic: tokens depend only on measure × frequency. Synthetic data; not wired into the app.
 
 private func ar(_ v: Double) -> String {
     let f = NumberFormatter(); f.locale = Locale(identifier: "ar_SA"); f.maximumFractionDigits = 1
     return f.string(from: NSNumber(value: v)) ?? "\(v)"
 }
 
-private struct Pace {
-    let actual: [Double]   // cumulative, one value per step so far
-    let steps: Int         // steps in the whole period
-    let planTotal: Double
+private struct H: Identifiable {
+    let id = UUID()
+    let name: String
+    let symbol: String
+    let share: Double
+    let amount: String
+    let askAt: Double     // fraction of the day from Fajr (0) to Isha (1)
+    let askLabel: String
 }
 
-private struct PaceChart: View {
-    let pace: Pace
-    var height: CGFloat = 70
-    var reflection = false
+private let today: [H] = [
+    .init(name: "الأذكار", symbol: "sun.horizon", share: 1, amount: "تمّت", askAt: 0.08, askLabel: "٥:٣٠ ص"),
+    .init(name: "القراءة", symbol: "book", share: 1, amount: "٢٠ صفحة", askAt: 0.3, askLabel: "٩:٠٠ ص"),
+    .init(name: "الماء", symbol: "drop", share: 0.62, amount: "٥ من ٨ أكواب", askAt: 0.55, askLabel: "٢:٠٠ م"),
+    .init(name: "المشي", symbol: "figure.walk", share: 0.7, amount: "٣٫٥ من ٥ كم", askAt: 0.7, askLabel: "٦:٠٠ م"),
+    .init(name: "الرياضة", symbol: "dumbbell", share: 0.66, amount: "٢ من ٣ هذا الأسبوع", askAt: 0.83, askLabel: "٨:٠٠ م"),
+    .init(name: "النوم المبكر", symbol: "moon.stars", share: 0, amount: "قبل ١١ م", askAt: 0.95, askLabel: "١٠:٣٠ م"),
+]
+
+/// The day's sky: real light from Fajr (right) to Isha (left), a sun-path arc, habits at their ask times.
+private struct DaySky: View {
+    let now: Double
     @Environment(\.roomTheme) private var theme
     var body: some View {
         GeometryReader { g in
-            let w = g.size.width, h = height
-            let maxV = max(pace.planTotal, pace.actual.max() ?? 1)
-            let x = { (i: Int) in w * CGFloat(i) / CGFloat(pace.steps - 1) }
-            let y = { (v: Double) in h - h * CGFloat(v / maxV) }
-            let plan = { (i: Int) in pace.planTotal * Double(i) / Double(pace.steps - 1) }
-            let n = pace.actual.count
-            let ahead = (pace.actual.last ?? 0) >= plan(n - 1)
-            let gap = Path { p in
-                p.move(to: CGPoint(x: x(0), y: y(pace.actual[0])))
-                for i in 1..<n { p.addLine(to: CGPoint(x: x(i), y: y(pace.actual[i]))) }
-                for i in stride(from: n - 1, through: 0, by: -1) { p.addLine(to: CGPoint(x: x(i), y: y(plan(i)))) }
-                p.closeSubpath()
+            let w = g.size.width, h = g.size.height
+            let base = h - 48, radiusX = w / 2 - 34, radiusY = h - 96
+            let point = { (t: Double) -> CGPoint in
+                let a = Double.pi * t          // 0 at right (Fajr), π at left (Isha)
+                return CGPoint(x: w / 2 + cos(a) * radiusX, y: base - sin(a) * radiusY)
             }
-            let actualLine = Path { p in
-                p.move(to: CGPoint(x: x(0), y: y(pace.actual[0])))
-                for i in 1..<n { p.addLine(to: CGPoint(x: x(i), y: y(pace.actual[i]))) }
-            }
-            let planLine = Path { p in p.move(to: CGPoint(x: x(0), y: y(0))); p.addLine(to: CGPoint(x: x(pace.steps - 1), y: y(pace.planTotal))) }
-            ZStack(alignment: .topLeading) {
-                Rectangle().fill(theme.line).frame(height: 1).offset(y: h)
-                gap.fill((ahead ? theme.color("goldMid") : theme.color("missed")).opacity(0.28))
-                planLine.stroke(theme.secondaryInk.opacity(0.6), style: StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
-                actualLine.stroke(theme.accent, style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
-                Circle().fill(theme.accent).frame(width: 9, height: 9)
-                    .position(x: x(n - 1), y: y(pace.actual[n - 1]))
-                if reflection {
-                    ZStack(alignment: .topLeading) {
-                        gap.fill((ahead ? theme.color("goldMid") : theme.color("missed")).opacity(0.28))
-                        actualLine.stroke(theme.accent, lineWidth: 2)
+            ZStack {
+                LinearGradient(stops: [
+                    .init(color: Color(red: 0.96, green: 0.86, blue: 0.80), location: 0),
+                    .init(color: Color(red: 0.98, green: 0.93, blue: 0.82), location: 0.35),
+                    .init(color: Color(red: 0.93, green: 0.80, blue: 0.62), location: 0.75),
+                    .init(color: Color(red: 0.30, green: 0.22, blue: 0.17), location: 1),
+                ], startPoint: .trailing, endPoint: .leading)
+                // The arc the sun travels.
+                Path { p in
+                    p.move(to: point(0))
+                    for i in 1...60 { p.addLine(to: point(Double(i) / 60)) }
+                }.stroke(.white.opacity(0.7), style: StrokeStyle(lineWidth: 1.2, dash: [3, 4]))
+                // Horizon with a soft reflection.
+                Rectangle().fill(.white.opacity(0.55)).frame(height: 1).position(x: w / 2, y: base)
+                LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 34).position(x: w / 2, y: base + 17)
+                // Now: the sun.
+                let s = point(now)
+                Circle().fill(Color(red: 1, green: 0.85, blue: 0.5).opacity(0.55)).frame(width: 70, height: 70).blur(radius: 14).position(s)
+                Circle().fill(Color(red: 1, green: 0.88, blue: 0.6)).frame(width: 20, height: 20).position(s)
+                ForEach(today) { item in
+                    let p = point(item.askAt)
+                    ZStack {
+                        Circle().fill(item.share >= 1 ? theme.accent : theme.background.opacity(0.92))
+                        Circle().trim(from: 0, to: item.share).stroke(theme.accent, style: StrokeStyle(lineWidth: 2.5, lineCap: .round)).rotationEffect(.degrees(-90))
+                        Image(systemName: item.symbol).font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(item.share >= 1 ? theme.background : theme.accent)
                     }
-                    .scaleEffect(x: 1, y: -0.35, anchor: .top).offset(y: h * 2 + 2)
-                    .opacity(0.35)
-                    .mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).offset(y: h))
+                    .frame(width: 34, height: 34).position(p)
+                    Text(item.askLabel).font(PrayerHomeType.small).foregroundStyle(item.askAt > 0.88 ? .white.opacity(0.9) : theme.ink.opacity(0.7))
+                        .position(x: p.x, y: item.askAt > 0.65 ? p.y - 28 : p.y + 30)
                 }
+                HStack { Text("العشاء"); Spacer(); Text("الفجر") }
+                    .font(PrayerHomeType.smallBold).foregroundStyle(.white.opacity(0.9))
+                    .padding(.horizontal, 16).position(x: w / 2, y: h - 18)
+                    .environment(\.layoutDirection, .leftToRight)
             }
+            .environment(\.layoutDirection, .leftToRight)
         }
-        .frame(height: height * (reflection ? 1.4 : 1))
-        .environment(\.layoutDirection, .leftToRight)
-        .scaleEffect(x: -1, y: 1) // time runs right to left, like the page
+        .frame(height: 290)
+        .clipShape(.rect(cornerRadius: 28))
     }
 }
 
-private func ramp(_ perStep: [Double]) -> [Double] { perStep.reduce(into: [Double]()) { $0.append(($0.last ?? 0) + $1) } }
-
-private struct HabitPace: Identifiable {
-    let id = UUID()
-    let name: String
-    let rule: String
-    let verdict: String     // ahead / behind in the habit's unit
-    let detail: String      // the smart sentence
-    let ahead: Bool
-    let pace: Pace
+/// One bold token per habit: a ring that fills with the period's share, the symbol inside, the amount in its unit.
+private struct Token: View {
+    let h: H
+    var size: CGFloat = 104
+    @Environment(\.roomTheme) private var theme
+    var body: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                Circle().fill(h.share >= 1 ? theme.accent : theme.surface)
+                Circle().stroke(theme.line, lineWidth: 7).padding(5)
+                Circle().trim(from: 0, to: h.share).stroke(h.share >= 1 ? theme.background.opacity(0.35) : theme.accent, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .rotationEffect(.degrees(-90)).padding(5)
+                Image(systemName: h.symbol).font(.system(size: size * 0.28, weight: .medium))
+                    .foregroundStyle(h.share >= 1 ? theme.background : theme.accent)
+            }
+            .frame(width: size, height: size)
+            VStack(spacing: 2) {
+                Text(h.name).font(PrayerHomeType.strong)
+                Text(h.amount).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.8)
+            }
+        }
+    }
 }
 
-private let paces: [HabitPace] = [
-    .init(name: "المشي", rule: "٥ كم كل يوم", verdict: "متقدّم ١٨ كم", detail: "بهذه الوتيرة تختم نوفمبر عند ١٦٨ كم من ١٥٠.", ahead: true,
-          pace: Pace(actual: ramp([7, 6, 0, 8, 7, 6, 5, 7, 9, 6, 10, 0, 7, 6, 7, 7]), steps: 30, planTotal: 150)),
-    .init(name: "ورد الأذكار", rule: "مرة كل يوم", verdict: "متأخر يومين", detail: "فاتك الجمعتان؛ تلحق خطتك إن لم يفتك يوم حتى ٢٢ نوفمبر.", ahead: false,
-          pace: Pace(actual: ramp([1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1]), steps: 30, planTotal: 30)),
-    .init(name: "الرياضة", rule: "٣ مرات أسبوعيًا", verdict: "على خطتك تمامًا", detail: "٤٢ حصة من ٤٢ حتى هذا الأسبوع.", ahead: true,
-          pace: Pace(actual: ramp([3, 3, 2, 4, 3, 3, 3, 3, 2, 4, 3, 3, 3, 3]), steps: 52, planTotal: 156)),
-    .init(name: "القراءة", rule: "٢٠ صفحة كل يوم", verdict: "متقدّم ٧٠ صفحة", detail: "قرأت ٣٨٠ صفحة في نوفمبر، أي كتابًا ونصفًا تقريبًا.", ahead: true,
-          pace: Pace(actual: ramp([25, 20, 30, 15, 40, 20, 25, 30, 20, 35, 25, 20, 30, 25, 20, 0]), steps: 30, planTotal: 600)),
-]
+/// A month of small rings: each day's share of habits met.
+private struct MonthRings: View {
+    var dim: CGFloat = 26
+    let values: [Double?]
+    @Environment(\.roomTheme) private var theme
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 8) {
+            ForEach(["س", "ح", "ن", "ث", "ر", "خ", "ج"], id: \.self) { Text($0).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk) }
+            Color.clear.frame(width: dim, height: dim) // 1 Nov 2026 is a Sunday
+            ForEach(Array(values.enumerated()), id: \.offset) { i, v in
+                ZStack {
+                    Circle().stroke(theme.line, lineWidth: 3)
+                    if let v { Circle().trim(from: 0, to: v).stroke(theme.accent.opacity(v >= 1 ? 1 : 0.7), style: StrokeStyle(lineWidth: 3, lineCap: .round)).rotationEffect(.degrees(-90)) }
+                    if v == 1 { Circle().fill(theme.accent.opacity(0.18)).padding(4) }
+                }
+                .frame(width: dim, height: dim)
+                .overlay { if i == 15 { Circle().stroke(theme.accent, lineWidth: 1).padding(-4) } }
+            }
+        }
+    }
+}
+
+private let november: [Double?] = [1, 0.8, 1, 1, 0.5, 1, 0.8, 1, 1, 1, 0.66, 1, 0.4, 1, 1, 0.66] + Array(repeating: nil, count: 14)
 
 // MARK: Room home
 
-private struct PaceHome: View {
+private struct SkyHome: View {
     let theme: RoomTheme
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 22) {
             HStack(alignment: .firstTextBaseline) {
-                Text("العادات").font(PrayerHomeType.hero)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("العادات").font(PrayerHomeType.hero)
+                    Text("الاثنين ١٦ نوفمبر، ٢٥ جمادى الأولى").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                }
                 Spacer()
                 Image(systemName: "plus").font(.system(size: 18, weight: .semibold)).foregroundStyle(theme.background)
                     .frame(width: 44, height: 44).background(theme.accent, in: .circle)
             }
-            VStack(alignment: .leading, spacing: 6) {
-                Text("أنت متقدّم على خطتك في ٣ عادات من ٤.").font(.custom("thmanyahserifdisplay-Bold", size: 26))
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("الخط الذهبي ما فعلته، والمتقطع ما نويته حتى اليوم.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+            DaySky(now: 0.62)
+            Text("بقي سؤالان اليوم: المشي ٦:٠٠ م والنوم المبكر ١٠:٣٠ م.").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 22) {
+                ForEach(today) { Token(h: $0, size: 92) }
             }
-            ForEach(paces) { p in
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(p.name).font(PrayerHomeType.cardHead)
-                            Text(p.rule).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
-                        }
-                        Spacer()
-                        Text(p.verdict).font(PrayerHomeType.strong).foregroundStyle(p.ahead ? theme.accent : theme.color("missedTextOnSurface"))
-                    }
-                    PaceChart(pace: p.pace, height: 54)
-                    Text(p.detail).font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("نوفمبر").font(PrayerHomeType.cardHead)
+                    Spacer()
+                    Text("٨٧٪، أفضل من أكتوبر").font(PrayerHomeType.smallBold).foregroundStyle(theme.accent)
                 }
-                .padding(18).background(theme.surface, in: .rect(cornerRadius: 22))
+                MonthRings(values: november)
             }
+            .padding(18).background(theme.surface, in: .rect(cornerRadius: 24))
         }
         .padding(22).foregroundStyle(theme.ink).background(theme.background).environment(\.roomTheme, theme)
     }
@@ -132,42 +173,41 @@ private struct PaceHome: View {
 
 // MARK: Habit page
 
-private struct PaceHabit: View {
+private struct SkyHabit: View {
     let theme: RoomTheme
     var body: some View {
-        let p = paces[0]
+        let walk = today[3]
         VStack(alignment: .leading, spacing: 22) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(p.name).font(PrayerHomeType.hero)
-                Text("٥ كم كل يوم. يسألك ٦:٠٠ م، وآخر تذكير ١٠:٠٠ م.").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
-            }
-            HStack(spacing: 8) {
-                ForEach(["الأسبوع", "نوفمبر", "٢٠٢٦"], id: \.self) { t in
-                    Text(t).font(PrayerHomeType.smallBold).padding(.horizontal, 14).frame(minHeight: 36)
-                        .background(t == "نوفمبر" ? theme.accent : theme.surface, in: .capsule)
-                        .foregroundStyle(t == "نوفمبر" ? theme.background : theme.ink)
+            HStack(spacing: 18) {
+                Token(h: .init(name: "", symbol: walk.symbol, share: walk.share, amount: "", askAt: 0, askLabel: ""), size: 120)
+                    .frame(height: 130).padding(.top, 6)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(walk.name).font(PrayerHomeType.hero)
+                    Text("٣٫٥ من ٥ كم اليوم").font(PrayerHomeType.cardHead)
+                    Text("يسألك ٦:٠٠ م، وآخر تذكير ١٠:٠٠ م").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
                 }
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("متقدّم ١٨ كم").font(.custom("thmanyahserifdisplay-Bold", size: 40)).foregroundStyle(theme.accent)
-                Text("مشيت ٩٨ كم، وخطتك حتى اليوم ٨٠ كم.").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+            HStack(spacing: 10) {
+                stat("١٢ يومًا", "سلسلتك"); stat("٩٨ كم", "نوفمبر"); stat("٨٧٪", "التزامك")
             }
-            PaceChart(pace: p.pace, height: 150)
             VStack(alignment: .leading, spacing: 14) {
-                insight("بهذه الوتيرة", "تختم نوفمبر عند ١٦٨ كم من ١٥٠.")
-                insight("وقتك المعتاد", "بين ٥ و٦ م؛ سؤال ٦:٠٠ م في وقته.")
-                insight("يومك الأضعف", "الجمعة: مشيت فيها مرتين من خمس.")
-                insight("أطول سلسلة", "٢١ يومًا في سبتمبر، والحالية ١٢.")
+                Text("نوفمبر").font(PrayerHomeType.cardHead)
+                MonthRings(dim: 30, values: [1, 1, 0, 1, 1, 0.8, 0.4, 1, 1, 1, 1, 0, 1, 1, 1, 0.7] + Array(repeating: nil, count: 14))
             }
-            .padding(18).background(theme.surface, in: .rect(cornerRadius: 22))
+            .padding(18).background(theme.surface, in: .rect(cornerRadius: 24))
+            VStack(alignment: .leading, spacing: 12) {
+                Text("ما لاحظه مدار").font(PrayerHomeType.smallBold).foregroundStyle(theme.accent)
+                Text("تمشي غالبًا بين ٥ و٦ م، فسؤال ٦:٠٠ م في وقته.").font(PrayerHomeType.body)
+                Text("الجمعة أضعف أيامك: مشيت فيها مرتين من خمس.").font(PrayerHomeType.body)
+                Text("بهذه الوتيرة تختم نوفمبر عند ١٦٨ كم من ١٥٠.").font(PrayerHomeType.body)
+            }
+            .padding(18).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 24))
         }
         .padding(22).foregroundStyle(theme.ink).background(theme.background).environment(\.roomTheme, theme)
     }
-    private func insight(_ title: String, _ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).frame(width: 96, alignment: .leading)
-            Text(text).font(PrayerHomeType.body).fixedSize(horizontal: false, vertical: true)
-        }
+    private func stat(_ v: String, _ t: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) { Text(v).font(PrayerHomeType.cardHead); Text(t).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk) }
+            .padding(12).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 16))
     }
 }
 
@@ -178,7 +218,7 @@ final class HabitsRedesignPreviewTests: XCTestCase {
             .appendingPathComponent("Artifacts/habits-redesign-preview")
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         let theme = RoomTheme(room: "salah", dark: false)
-        for (name, view) in [("J1-pace-home", AnyView(PaceHome(theme: theme))), ("J2-pace-habit", AnyView(PaceHabit(theme: theme)))] {
+        for (name, view) in [("K1-sky-home", AnyView(SkyHome(theme: theme))), ("K2-sky-habit", AnyView(SkyHabit(theme: theme)))] {
             let renderer = ImageRenderer(content: view.frame(width: 430).environment(\.layoutDirection, .rightToLeft))
             renderer.scale = 2
             let image = try XCTUnwrap(renderer.uiImage)
