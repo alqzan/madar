@@ -24,6 +24,8 @@ public struct HabitRule: Codable, Equatable, Sendable {
     public var windowEnd: Int? = nil
     public var intervalDays: Int? = nil
     public init(effectiveFrom: GregorianDay) { self.effectiveFrom = effectiveFrom }
+    /// What Apple Health can supply (read only). Owner, 17 Nov 2026 (idea 14): last night's sleep in minutes and the number of workouts.
+    public static let healthUnits = ["steps", "exerciseMinutes", "sleepMinutes", "workouts"]
     public func validate() throws {
         guard target > 0, minimum.map({ $0 > 0 && $0 <= target }) ?? true,
               weekdays.allSatisfy({ (1...7).contains($0) }), restWeekdays.allSatisfy({ (1...7).contains($0) }),
@@ -36,7 +38,7 @@ public struct HabitRule: Codable, Equatable, Sendable {
                   windowAnchor != nil || ((0..<1440).contains(start) && (0..<1440).contains(end)) else { throw CoreError.invalidCommand }
         }
         if measure == .duration && unit != "minutes" { throw CoreError.invalidCommand }
-        if measure == .health && unit != "steps" && unit != "exerciseMinutes" { throw CoreError.invalidCommand }
+        if measure == .health && !Self.healthUnits.contains(unit ?? "") { throw CoreError.invalidCommand }
     }
 }
 public struct HabitFact: Sendable {
@@ -129,7 +131,7 @@ public enum HabitEngine {
     /// Linked habits supply owner facts and `ownerStreak`; they never create HabitEvent rows.
     public static func evaluate(rules: [HabitRule], facts: [HabitFact], pauses: [HabitBreak] = [], today: GregorianDay,
                                 days: MadarCalendarDays, weekStart initialWeek: MadarWeekStart = .saturday,
-                                weekChanges: [HabitWeekChange] = [], calendarChanges: [HabitCalendarChange] = [], breakAfter: Int = 2, ownerStreak: Int? = nil) throws -> HabitSummary {
+                                weekChanges: [HabitWeekChange] = [], calendarChanges: [HabitCalendarChange] = [], breakAfter: Int = 2, ownerStreak: Int? = nil, earnedRestEvery: Int? = nil) throws -> HabitSummary {
         let rules = rules.sorted { $0.effectiveFrom < $1.effectiveFrom }
         let orderedWeeks=weekChanges.enumerated().sorted { a,b in a.element.day == b.element.day ? a.offset < b.offset : a.element.day < b.element.day }.map(\.element)
         let orderedCalendars=calendarChanges.enumerated().sorted { a,b in a.element.day == b.element.day ? a.offset < b.offset : a.element.day < b.element.day }.map(\.element)
@@ -150,6 +152,9 @@ public enum HabitEngine {
         let creationDays=days
         var cursor = naturalStart(first.effectiveFrom, first, creationDays, initialWeek), week = initialWeek
         var results: [HabitPeriodResult] = [], streak = 0, misses = 0, lastFrequency = first.frequency
+        // Owner, 17 Nov 2026 (idea 12): every `earnedRestEvery` consecutive met days of a daily habit earn one rest day; a missed day
+        // spends it (counted as neither met nor missed) so the streak stays. Credits never carry past a frequency change.
+        var sinceCredit = 0, credits = 0
         while cursor <= today {
             // A closed period keeps the calendar in force at its start, as it keeps its policy.
             let periodDays=calendar(at:cursor)
@@ -160,7 +165,7 @@ public enum HabitEngine {
             if let changed = rules.first(where: { $0.effectiveFrom > cursor && $0.effectiveFrom < end && $0.frequency != atStart.frequency }) { end = changed.effectiveFrom }
             // A goal/unit/window edit affects its current period, never an earlier closed period.
             let rule = rules.last(where: { $0.effectiveFrom < end && $0.effectiveFrom <= today && $0.frequency == atStart.frequency }) ?? atStart
-            if rule.frequency != lastFrequency { streak = 0; misses = 0; lastFrequency = rule.frequency }
+            if rule.frequency != lastFrequency { streak = 0; misses = 0; lastFrequency = rule.frequency; sinceCredit = 0; credits = 0 }
             var due: [GregorianDay] = [], scheduled = 0, eligible = 0, day = cursor
             var periodFacts: [(Int, HabitFact)] = []
             func isScheduled(_ day: GregorianDay) -> Bool {
@@ -200,11 +205,28 @@ public enum HabitEngine {
             let outcome: HabitOutcome = target == 0 ? .excluded : value >= target ? .complete : (rule.minimum.map { value >= min($0, target) } ?? false) ? .minimum : end <= today ? .missed : .waiting
             let result = HabitPeriodResult(key: key, start: cursor, end: end, rule: rule, dueDays: due, target: target, value: value, outcome: outcome)
             results.append(result)
-            if result.met { streak += 1; misses = 0 }
-            else if outcome == .missed { misses += 1; if misses >= breakAfter { streak = 0 } }
+            let earning = rule.frequency == .daily ? earnedRestEvery.flatMap { $0 > 0 ? $0 : nil } : nil
+            if result.met {
+                streak += 1; misses = 0
+                if let earning { sinceCredit += 1; if sinceCredit >= earning { credits += 1; sinceCredit = 0 } }
+            }
+            else if outcome == .missed {
+                if earning != nil, credits > 0 { credits -= 1 }
+                else { misses += 1; sinceCredit = 0; if misses >= breakAfter { streak = 0; credits = 0 } }
+            }
             cursor = end
         }
         return .init(periods: results, streak: ownerStreak ?? streak, consecutiveMisses: misses)
+    }
+    /// Whether a daily or weekly rule schedules `day`, for the day after the current period (reminders the evening before).
+    /// Other frequencies answer false here: their due days come from the evaluated period.
+    public static func schedulesDay(_ rule: HabitRule, _ day: GregorianDay) -> Bool {
+        guard !rule.restWeekdays.contains(weekday(day)) else { return false }
+        switch rule.frequency {
+        case .daily: return true
+        case .weekly: return rule.weekdays.isEmpty || rule.weekdays.contains(weekday(day))
+        case .interval, .monthly, .yearly: return false
+        }
     }
     /// Window instants are supplied in the active place, and assigned by their START to a Madar day.
     public static func window(rule: HabitRule, civilDay: GregorianDay, place: ActivePlace, prayer: PrayerDay?) -> DateInterval? {

@@ -9,7 +9,8 @@ import UIKit
         if rootRouteHarness { environment["MADAR_UI_BAHW_ROOT_ROUTE_HARNESS"] = "1" }
         app.launchEnvironment=environment;app.launch();return app
     }
-    private func open(_ app:XCUIApplication){let block=app.descendants(matching:.any).matching(identifier:"bahw-block-habits").firstMatch;XCTAssertTrue(block.waitForExistence(timeout:20));let header=app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { block.tap() };XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
+    /// Owner, 17 Nov 2026: habits is a tab of its own, no longer a lobby sub-room.
+    private func open(_ app:XCUIApplication){let tab=app.buttons["tab-habits"].firstMatch;XCTAssertTrue(tab.waitForExistence(timeout:20));tab.tap();XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
     private func shot(_ app:XCUIApplication,_ name:String){guard ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] != nil else {return};let s=app.screenshot(),a=XCTAttachment(screenshot:s);a.name=name;a.lifetime = .keepAlways;add(a); if let dir=ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to:URL(fileURLWithPath:dir).appendingPathComponent(name+".png")) }}
     func testAutomaticThemeUsesResolvedAppearanceInLobbyAndHabitSheets() throws {
         continueAfterFailure = false
@@ -183,7 +184,7 @@ import UIKit
         for _ in 0..<3 where !(shelf.exists && shelf.isHittable) { app.swipeUp(velocity:.slow) }
         XCTAssertTrue(shelf.waitForExistence(timeout:8),app.debugDescription)
         let diary=app.buttons["habits-room-diaryLine"]
-        XCTAssertTrue(diary.exists && app.buttons["habits-room-wird"].exists && app.buttons["habits-room-review"].exists && app.buttons["habits-room-reading"].exists && app.buttons["habits-room-jamaah"].exists,app.debugDescription)
+        XCTAssertTrue(diary.exists && app.buttons["habits-room-wird"].exists && app.buttons["habits-room-review"].exists && app.buttons["habits-room-reading"].exists && app.buttons["habits-room-preset.jamaah"].exists,app.debugDescription)
         shot(app,"FB35-room-habits-L")
         diary.tap()
         let name=app.textFields["habit-name"];XCTAssertTrue(name.waitForExistence(timeout:5))
@@ -224,13 +225,13 @@ import UIKit
         XCTAssertTrue(quick.waitForExistence(timeout:5),app.debugDescription);shot(app,"GD-habits-quick-L");quick.tap();XCTAssertTrue(quick.waitForNonExistence(timeout:5))
         row().tap();XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["habit-progress"].label.contains("١ من ١"));app.buttons["habit-freeze"].tap();app.buttons["جمّد حتى أفكّه"].tap();XCTAssertTrue(app.buttons["habit-freeze"].waitForNonExistence(timeout:5))
         row().tap();XCTAssertTrue(app.buttons["habit-resume"].waitForExistence(timeout:5));shot(app,"M4-V02-frozen-L");app.buttons["habit-resume"].tap();XCTAssertTrue(app.buttons["habit-resume"].waitForNonExistence(timeout:5))
-        row().tap();app.buttons["habit-delete"].tap();app.buttons["habit-delete-confirm"].tap();XCTAssertTrue(app.buttons["habit-first"].waitForExistence(timeout:5));app.buttons["habit-archived"].tap();app.buttons["استعدها"].tap();XCTAssertTrue(row().waitForExistence(timeout:5))
+        row().tap();app.buttons["habit-delete"].tap();app.buttons["habit-delete-confirm"].firstMatch.tap();XCTAssertTrue(app.buttons["habit-first"].waitForExistence(timeout:5));app.buttons["habit-archived"].tap();app.buttons["استعدها"].tap();XCTAssertTrue(row().waitForExistence(timeout:5))
         app.terminate();app.launch();open(app);XCTAssertTrue(row().waitForExistence(timeout:10));shot(app,"M4-V02-accessory-after-L");XCTAssertTrue(row().isHittable)
         let accessory=app.tabBars["fixed-tab-bar"] // FB-31: the native glass bar is a UITabBar.
         XCTAssertTrue(accessory.waitForExistence(timeout:10))
         XCTAssertLessThanOrEqual(row().frame.maxY,accessory.frame.minY,"The first habit row should finish above the glass tab bar.")
         row().tap();XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["habit-progress"].label.contains("١ من ١"))
-        app.buttons["تمّ"].tap();row().tap();app.buttons["habit-delete"].tap();app.buttons["habit-delete-confirm"].tap()
+        app.buttons["تمّ"].tap();row().tap();app.buttons["habit-delete"].tap();app.buttons["habit-delete-confirm"].firstMatch.tap()
         XCTAssertTrue(app.buttons["habit-archived"].waitForExistence(timeout:5));app.buttons["habit-archived"].tap()
         let finalDelete=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","حذف نهائي")).firstMatch
         XCTAssertTrue(finalDelete.waitForExistence(timeout:5));finalDelete.tap()
@@ -356,8 +357,9 @@ import UIKit
     func testAtRiskFixedHabitsStayHiddenBeforeTheirDates() {
         continueAfterFailure = false
         let app = app("scheduledRisk", now: "2026-12-25T20:00:00+03:00"); open(app)
-        let monthly = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "صدقة شهرية محددة")).firstMatch
-        let yearly = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "موعد سنوي محدد")).firstMatch
+        // The today-list row only: the orbit's beads carry the same names.
+        let monthly = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "صدقة شهرية محددة")).firstMatch
+        let yearly = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "موعد سنوي محدد")).firstMatch
         shot(app, "M4-V02-scheduled-risk-early-L")
         XCTAssertFalse(monthly.exists, app.debugDescription)
         XCTAssertFalse(yearly.exists, app.debugDescription)
@@ -486,7 +488,7 @@ import UIKit
         XCTAssertEqual(name.value as? String, "عادة قيد الحفظ", "A lobby-root link must not remove the unsaved habit editor.")
         app.buttons["إلغاء"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["bahw-greeting"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertFalse(app.staticTexts["habits-title"].exists)
+        // Habits is a tab now: it stays in the tab bar after a lobby-root route.
 
         app.open(URL(string: "madar://bahw/year")!)
         XCTAssertTrue(app.descendants(matching: .any)["bahw-year-hero"].waitForExistence(timeout: 10), app.debugDescription)
@@ -532,7 +534,7 @@ import UIKit
         XCTAssertTrue(app.staticTexts["مشيت مع أخي بعد العصر."].exists, "The selected historical day must remain active.")
         app.buttons["إلغاء"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["bahw-greeting"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertFalse(app.staticTexts["habits-title"].exists)
+        // Habits is a tab now: it stays in the tab bar after a lobby-root route.
     }
 
     func testHabitEditorSwipeKeepsUnsavedDraftOpen() throws {

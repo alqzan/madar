@@ -126,8 +126,8 @@ struct HabitEditorView:View {
                             Text("تُحسب من قراءتك في المحبرة: الوقت الفعلي والصفحات الجديدة.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         if source == "walking" {
-                            Picker("وحدة الصحة",selection:Binding(get:{rule.unit ?? "steps"},set:{unitTargets[rule.unit ?? "steps"]=rule.target;rule.unit=$0;rule.target=unitTargets[$0] ?? ($0 == "steps" ? 6000 : 30)})) {Text("خطوات").tag("steps");Text("دقائق حركة").tag("exerciseMinutes")}.pickerStyle(.menu)
-                            Text("دقائق الحركة تشمل كل تمرين. مدار يقرأ من الصحة ولا يكتب فيها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            Picker("وحدة الصحة",selection:Binding(get:{rule.unit ?? "steps"},set:{unitTargets[rule.unit ?? "steps"]=rule.target;rule.unit=$0;rule.target=unitTargets[$0] ?? ["steps":6000,"sleepMinutes":420,"workouts":1][$0] ?? 30})) {Text("خطوات").tag("steps");Text("دقائق حركة").tag("exerciseMinutes");Text("دقائق النوم").tag("sleepMinutes");Text("تمارين").tag("workouts")}.pickerStyle(.menu)
+                            Text("دقائق الحركة تشمل كل تمرين، والنوم هو ما انتهى في صباح اليوم، والتمارين عدد ما سجّلته ساعتك. مدار يقرأ من الصحة ولا يكتب فيها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         if rule.measure != .once {
                             // FB-39: a step of one up to 100000 meant 2000 taps to move a walking goal from 6000 to 8000 steps; type it, or step by a sensible amount.
@@ -159,7 +159,7 @@ struct HabitEditorView:View {
                                 DatePicker("من",selection:timeBinding(start:true),displayedComponents:.hourAndMinute)
                                 DatePicker("إلى",selection:timeBinding(start:false),displayedComponents:.hourAndMinute)
                             } else {
-                                Stepper("البداية: "+digits.string(rule.windowStart ?? 0)+" دقيقة من الأذان",value:Binding(get:{rule.windowStart ?? 0},set:{rule.windowStart=$0}),in:0...720,step:15)
+                                Stepper("البداية: "+((rule.windowStart ?? 0) < 0 ? digits.string(-(rule.windowStart ?? 0))+" دقيقة قبل الأذان" : digits.string(rule.windowStart ?? 0)+" دقيقة من الأذان"),value:Binding(get:{rule.windowStart ?? 0},set:{rule.windowStart=$0}),in:-720...720,step:15)
                                 Stepper("النهاية: "+digits.string(rule.windowEnd ?? 90)+" دقيقة من الأذان",value:Binding(get:{rule.windowEnd ?? 90},set:{rule.windowEnd=$0}),in:15...1440,step:15)
                             }
                             Text("الوقت يتبع مدينتك النشطة؛ ونافذة الليل تتبع يوم مدار الذي بدأت فيه.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
@@ -170,7 +170,7 @@ struct HabitEditorView:View {
                             Text("بلا تذكير").tag("none")
                         }.pickerStyle(.menu).accessibilityIdentifier("habit-reminder")
                         if reminder == "push" {
-                            Text(source == "custom" ? "يصلك الإشعار في بداية وقت العادة، فوقتها مطلوب." : "الإشعار غير متاح للعادة المرتبطة؛ يمكنك اختيار نقطة البهو.")
+                            Text(source == "custom" ? (windowOn ? "يصلك الإشعار في بداية وقت العادة." : "بلا وقت محدد يتعلّم مدار وقتك من آخر تسجيلاتك، ويبدأ بعد ٣ مرات.") : "الإشعار غير متاح للعادة المرتبطة؛ يمكنك اختيار نقطة البهو.")
                                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         Toggle("للبيت فقط، تتوقف في السفر",isOn:$homeOnly).frame(minHeight:44)
@@ -196,10 +196,11 @@ struct HabitEditorView:View {
             }
             // Owner, 17 Nov 2026: «صليت كل الصلوات بجماعة» is the user's own once-a-day habit, asked an hour after Isha.
             let jamaahPreset = reading == nil && self.initialSource == "preset.jamaah"
-            let initialName = jamaahPreset ? HabitJamaahConversion.name : reading?.name ?? HabitEditorView.linkedDefaults[self.initialSource]?.name ?? ""
-            let initialSource = jamaahPreset ? "custom" : reading?.source ?? self.initialSource
+            let namedPreset = reading == nil ? HabitPresets.named(self.initialSource, from:AppBahwService(session:session).today) : nil, fastPreset = namedPreset != nil
+            let initialName = jamaahPreset ? HabitJamaahConversion.name : namedPreset?.name ?? reading?.name ?? HabitEditorView.linkedDefaults[self.initialSource]?.name ?? ""
+            let initialSource = jamaahPreset || fastPreset ? "custom" : reading?.source ?? self.initialSource
             // D6: a habit that has not started shows its saved rule and keeps its own start date.
-            var initialRule = jamaahPreset ? HabitJamaahConversion.rule(from:AppBahwService(session:session).today) : reading?.summary.current?.rule ?? reading?.latestRule ?? HabitRule(effectiveFrom:AppBahwService(session:session).today)
+            var initialRule = jamaahPreset ? HabitJamaahConversion.rule(from:AppBahwService(session:session).today) : namedPreset?.rule ?? reading?.summary.current?.rule ?? reading?.latestRule ?? HabitRule(effectiveFrom:AppBahwService(session:session).today)
             if reading == nil, let linked = HabitEditorView.linkedDefaults[initialSource] { initialRule.measure = linked.measure;initialRule.unit=linked.unit;initialRule.target=linked.target }
             initialRule.effectiveFrom=editStart
             let initialMonthDays = initialRule.monthDays.map{digits.string($0)}.joined(separator:"، ")
@@ -207,7 +208,7 @@ struct HabitEditorView:View {
             let initialWindowOn = initialRule.windowStart != nil
             let initialHomeOnly = reading?.homeOnly ?? false
             let defaultReminder = session.string("bahw.reminder")
-            let initialReminder = jamaahPreset ? "push" : reading?.reminder ?? (["dot", "push", "none"].contains(defaultReminder) ? defaultReminder : "dot")
+            let initialReminder = jamaahPreset || fastPreset ? "push" : reading?.reminder ?? (["dot", "push", "none"].contains(defaultReminder) ? defaultReminder : "dot")
             advancedOpen = initialWindowOn || initialHomeOnly || initialReminder != "dot" || !initialRule.restWeekdays.isEmpty
             name=initialName;source=initialSource;rule=initialRule;monthDays=initialMonthDays;minimumOn=initialMinimumOn;windowOn=initialWindowOn;homeOnly=initialHomeOnly;reminder=initialReminder
             initialSnapshot = .init(name:initialName,source:initialSource,rule:initialRule,monthDays:initialMonthDays,minimumOn:initialMinimumOn,windowOn:initialWindowOn,homeOnly:initialHomeOnly,reminder:initialReminder)
@@ -260,7 +261,7 @@ struct HabitEditorView:View {
         return today
     }
     private var targetLimit:Int { source == "jamaah" ? 5 : 100000 }
-    private var targetStep:Int { switch rule.unit { case "steps": 500; case "minutes","exerciseMinutes": 5; default: 1 } }
+    private var targetStep:Int { switch rule.unit { case "steps": 500; case "minutes","exerciseMinutes": 5; case "sleepMinutes": 15; default: 1 } }
     private func save(){
         busy=true;issue=nil
         do{
@@ -279,7 +280,7 @@ struct HabitEditorView:View {
             if let low=saved.minimum, low <= 0 || low > saved.target {issue="الحد الأدنى بين ١ والهدف.";busy=false;return}
             if let a=saved.windowStart, let b=saved.windowEnd, a == b {issue="وقت البداية والنهاية يجب أن يختلفا.";busy=false;return}
             // FB-39: a «إشعار لطيف» without a time never fires (RoomReminders.habit needs the window), so it is not saved silently.
-            if reminder == "push" && source == "custom" && !windowOn {issue="الإشعار يحتاج وقتًا للعادة: فعّل «له وقت في اليوم».";busy=false;return}
+
             try saved.validate()
             let json=try JSONDecoder().decode(MadarCore.JSONValue.self,from:JSONEncoder().encode(saved))
             var p:[String:MadarCore.JSONValue]=["id":.string(id.uuidString),"name":.string(name),"rule":json,"homeOnly":.bool(homeOnly),"reminder":.string(reminder)]

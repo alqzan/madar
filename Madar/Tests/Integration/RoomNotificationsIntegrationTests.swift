@@ -259,6 +259,83 @@ import MadarCore
         XCTAssertEqual(calendar.component(.day, from: candidate.dueAt), 16)
     }
 
+    /// Rows for a custom push habit: daily or weekly, with an optional clock window or Fajr-anchored window.
+    private func addPushHabit(_ context: ModelContext, name: String, frequency: String = "daily", weekdays: [String]? = nil, clockStart: Int? = nil, anchor: (start: Int, end: Int)? = nil) -> Habit {
+        let habit = Habit(); habit.name = name; habit.reminder = "push"; habit.startDate = ISO8601DateFormatter().date(from: "2026-09-01T00:00:00Z")!; context.insert(habit)
+        let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = "2026-10-01"; policy.frequency = frequency; policy.weekdays = weekdays
+        policy.measure = "once"; policy.target = 1
+        if let clockStart { policy.windowStartMin = clockStart; policy.windowEndMin = clockStart + 120 }
+        if let anchor { policy.windowAnchor = "fajr"; policy.windowStartMin = anchor.start; policy.windowEndMin = anchor.end }
+        context.insert(policy)
+        return habit
+    }
+    private func addEvent(_ context: ModelContext, _ habit: Habit, day: String, at instant: Date) {
+        let event = HabitEvent(); event.habitID = habit.id; event.dayKey = day; event.periodKey = day; event.eventAt = instant; event.delta = 1; event.tzID = "Asia/Riyadh"; event.dayPolicy = "midnight@1"
+        context.insert(event)
+    }
+
+    /// Idea 4 (owner, 17 Nov 2026): reminders 15 minutes apart or less are one notification; a later one stays alone.
+    func testPushHabitRemindersWithinFifteenMinutesAreOneNotification() async throws {
+        let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight")])
+        let context = ModelContext(app.container)
+        let a = addPushHabit(context, name: "الماء", clockStart: 8 * 60), b = addPushHabit(context, name: "المشي", clockStart: 8 * 60 + 10), c = addPushHabit(context, name: "القراءة", clockStart: 11 * 60)
+        try context.save(); try app.reload()
+        let days = (0..<3).compactMap { PrayerTimesEngine.calculate(day: try! GregorianDay("2026-10-15").adding(days: $0), place: .riyadh) }
+        XCTAssertEqual(days.first?.day, day.day)
+        let candidates = try await RoomNotificationContent.candidates(session: app, prayerDays: days, now: now).filter { $0.id.hasPrefix("habits.") }
+        XCTAssertEqual(candidates.count, 2, "الماء والمشي معًا، والقراءة وحدها")
+        let group = try XCTUnwrap(candidates.first { RoomReminders.groupedHabitIDs($0.id) != nil })
+        XCTAssertEqual(Set(try XCTUnwrap(RoomReminders.groupedHabitIDs(group.id))), [a.id, b.id])
+        XCTAssertTrue(candidates.contains { $0.id == "habits.2026-10-15.\(c.id.uuidString)" })
+        var riyadh = Calendar(identifier: .gregorian); riyadh.timeZone = ActivePlace.riyadh.timeZone
+        XCTAssertEqual(riyadh.component(.hour, from: group.dueAt), 8); XCTAssertEqual(riyadh.component(.minute, from: group.dueAt), 10)
+        let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now, timeZone: day.place.timeZone, policy: .init(staleNudgeEnabled: false))
+        let content = RoomNotificationContent.content(for: group, plan: plan, session: app, habitNames: [a.id.uuidString: "الماء", b.id.uuidString: "المشي"])
+        XCTAssertEqual(content.title, "عاداتك تنتظرك")
+        XCTAssertTrue(content.body.contains("الماء") && content.body.contains("المشي") && !content.body.contains("القراءة"))
+        XCTAssertTrue(try RoomNotificationContent.stillRelevant(group.id, session: app, now: now))
+    }
+
+    /// Idea 9: a push habit with no window is asked at the median time of its logged times; fewer than three logs give nothing.
+    func testPushHabitWithoutAWindowLearnsTheMedianLoggingTime() async throws {
+        let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight")])
+        let context = ModelContext(app.container)
+        let learned = addPushHabit(context, name: "الأذكار"), young = addPushHabit(context, name: "جديدة")
+        func at(_ d: Int, _ h: Int, _ m: Int) -> Date { ISO8601DateFormatter().date(from: String(format: "2026-10-%02dT%02d:%02d:00+03:00", d, h, m))! }
+        // 19:50, 20:00, 20:10 on three days: median 20:00. The second habit has only two logs.
+        addEvent(context, learned, day: "2026-10-12", at: at(12, 20, 10)); addEvent(context, learned, day: "2026-10-13", at: at(13, 19, 50)); addEvent(context, learned, day: "2026-10-14", at: at(14, 20, 0))
+        addEvent(context, young, day: "2026-10-13", at: at(13, 8, 0)); addEvent(context, young, day: "2026-10-14", at: at(14, 9, 0))
+        try context.save(); try app.reload()
+        let days = (0..<3).compactMap { PrayerTimesEngine.calculate(day: try! GregorianDay("2026-10-15").adding(days: $0), place: .riyadh) }
+        XCTAssertEqual(days.first?.day, day.day)
+        let candidates = try await RoomNotificationContent.candidates(session: app, prayerDays: days, now: now).filter { $0.id.hasPrefix("habits.") }
+        XCTAssertEqual(candidates.map(\.id), ["habits.2026-10-15.\(learned.id.uuidString)"])
+        XCTAssertEqual(candidates.first?.dueAt, at(15, 20, 0))
+    }
+
+    /// Idea 17: the Monday/Thursday fast is asked the evening before, 8 hours ahead of Fajr, and not on other days.
+    func testMondayThursdayFastIsAskedTheEveningBefore() async throws {
+        let (app, _, _, _) = try fixture(["core.dayStart": .string("midnight")])
+        let context = ModelContext(app.container)
+        let fast = addPushHabit(context, name: "صيام الإثنين والخميس", frequency: "weekly", weekdays: ["mon", "thu"], anchor: (-480, 720))
+        try context.save(); try app.reload()
+        let place = ActivePlace.riyadh
+        let days = (0..<4).compactMap { PrayerTimesEngine.calculate(day: try! GregorianDay("2026-10-04").adding(days: $0), place: place) }
+        let sundayNoon = ISO8601DateFormatter().date(from: "2026-10-04T12:00:00+03:00")!
+        let sunday = try await RoomNotificationContent.candidates(session: app, prayerDays: days, now: sundayNoon).filter { $0.id.hasPrefix("habits.") }
+        let mondayFajr = try XCTUnwrap(days.first { $0.day == (try! GregorianDay("2026-10-05")) }).fajr
+        // The night-before ask only asks: its id marks it, and it carries no «تمّت» button that would log Sunday.
+        XCTAssertEqual(sunday.map(\.id), ["habits.2026-10-04.eve.\(fast.id.uuidString)"])
+        let eve = RoomNotificationContent.content(for: try XCTUnwrap(sunday.first), plan: NotificationArbiter.plan(candidates: [], prayerDays: days, now: sundayNoon, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false)), session: app, habitNames: [fast.id.uuidString: "صيام"])
+        XCTAssertEqual(eve.categoryIdentifier, "")
+        XCTAssertEqual(eve.body, "موعدها بكرة. نويت؟")
+        XCTAssertEqual(sunday.first?.dueAt, mondayFajr.addingTimeInterval(-480 * 60))
+        // Tuesday noon: Wednesday is not a fast day, so nothing is asked.
+        let tuesdayNoon = ISO8601DateFormatter().date(from: "2026-10-06T12:00:00+03:00")!
+        let tuesday = try await RoomNotificationContent.candidates(session: app, prayerDays: days, now: tuesdayNoon).filter { $0.id.hasPrefix("habits.") }
+        XCTAssertTrue(tuesday.isEmpty)
+    }
+
     func testQuranReminderCopyNamesTheWirdAndTheLateReview() throws {
         let (app, _, now, day) = try fixture([:])
         let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now,

@@ -399,7 +399,7 @@ struct SettingControl: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if definition.key == "bahw.reminder" {
-                Text("يُطبّق على العادات الجديدة. الإشعار يحتاج وقتًا محددًا للعادة.")
+                Text("يُطبّق على العادات الجديدة. الإشعار يأتي في وقت العادة، وإن لم يكن لها وقت ففي وقتك المعتاد.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }

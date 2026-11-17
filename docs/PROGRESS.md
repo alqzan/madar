@@ -258,8 +258,31 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - Remaining approved ideas: 2 (weekly behaviour suggestion, applied only on approval), 4 (one notification for habits done back to back), 8 (a goal that grows gradually), 9 (a reminder that learns the usual logging time), 10 (a habit you quit, counted as days since), 12 (an earned rest day every 30 days), 14 (Health sleep and workouts), 16 (Ramadan mode), 17 (Monday/Thursday fasting asked the night before: weekly weekdays [2,5] with a Fajr-anchored window starting about −480 min). 8, 12 and 16 touch the habit rule or engine, so they need engine tests from the spec.
 - Rewrite the 4 skipped tests on a habit command, and delete or rewrite the prayer UI tests.
 
+### Follow-up the same day (build 54) — Sonnet built, Claude reviewed
+- Built by Sonnet on the owner's order, reviewed and re-verified by Claude:
+  - Period cards redesigned (ring, title, «x من y»).
+  - 17: a «صيام الإثنين والخميس» preset, asked the night before. Claude made the night-before ask a plain question with no log button (`habits.<day>.eve.<id>`), so it can no longer log Sunday.
+  - 4: reminders within 15 minutes arrive as one notification.
+  - 9: a push habit with no window is reminded at the median of its last 14 logged times (needs 3 logs).
+  - 2: a Saturday lobby suggestion for a daily habit met fewer than 3 of 7 days. It opens the habit and changes nothing.
+  - 14: sleep and workout units from Health (HealthKit queries compile only, not verified on a device).
+  - 12: one earned rest day per 30 met days.
+  - 16: Ramadan presets (qiyam after Isha, wird before Suhoor), shown in Ramadan only.
+  - Prayer UI tests deleted.
+  - HabitsUITests repaired. Claude made `testAtRiskFixedHabitsStayHiddenBeforeTheirDates` match only `habit-row-` rows; it had matched the orbit beads.
+- Not built:
+  - 10 (a habit you quit). Needs a new `HabitMeasure.abstain` and many surfaces; no schema change.
+  - 8 as a user feature. The engine already handles dated rule versions; `habit.save` must write future-dated steps.
+  - 16 for existing habits shifting their times. Needs a per-policy Ramadan window field.
+- Verified by Claude:
+  - MadarCore 251/251 and MadarCommands 325/325.
+  - App integration slice 28 executed, then RoomNotificationsIntegrationTests 18/18 after the eve fix.
+  - MadarUITests/HabitsUITests 25/25 (`Artifacts/review-1794929621.xcresult`).
+  - Screenshots `Madar/Artifacts/verify/habits-showcase.png` and `habits-atRisk.png`.
+- Untracked `.codex/` and `.agents/skills/verify/` appeared from an outside copy of the verify setup (not from this session) and were left uncommitted.
+
 ### Model/effort
-- claude-opus-5-5, effort not exposed. Helpers: none in this stretch.
+- claude-opus-5-5, effort not exposed. Helper: Sonnet (owner's order) for the follow-up build.
 
 ### Usage
 - Five-hour window 63% used at commit time (37% left); weekly 10% used.

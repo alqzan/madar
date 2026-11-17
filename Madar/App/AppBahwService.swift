@@ -353,6 +353,12 @@ extension AppBahwService {
                 result.append(.init(id: "friday", title: "حصاد أسبوعك", detail: "أتممت " + digits.string(kept) + " من " + digits.string(week.count) + " من عاداتك اليومية في سبعة أيام", symbol: "MadarHabits", destination: .habits))
             }
         }
+        // Idea 2 (owner, 17 Nov 2026): on Saturday, the new week, the lobby names the daily habit that met fewer than three of the
+        // last seven days and offers to ease it. It opens the habit; nothing changes until the user edits and saves it there.
+        if session.roomEnabled(.habits), Calendar(identifier: .gregorian).component(.weekday, from: today.date(in: session.activePlace.timeZone).addingTimeInterval(43200)) == 7,
+           let (habit, week) = strugglingHabit(readings) {
+            result.append(.init(id: "habitHelp", title: "«" + habit.name + "» تتعثّر", detail: "أتممتها " + digits.string(week.met) + " من " + digits.string(week.total) + " أيام. خفّف هدفها أو غيّر وقتها", symbol: "MadarHabits", destination: .habit(habit.id)))
+        }
         // T13: a bill, instalment, subscription or card statement due within two days enters the order (never an amount).
         if session.roomEnabled(.mal), let reading = try? AppMoneyService(app: session).loadObligations() {
             let all = reading.cycle + reading.installments + reading.bills + reading.subscriptions + reading.statements
@@ -387,6 +393,16 @@ extension AppBahwService {
         let first = repository.prayerDay(at: now)
         let days = (-1...1).compactMap { PrayerTimesEngine.calculate(day: first.adding(days: $0), place: place, options: options) }
         return LobbyMomentPlan.moment(at: now, days: days)
+    }
+    /// The daily habit with the lowest share of the last seven days met, when that is under three of seven.
+    private func strugglingHabit(_ readings: [HabitReading]) -> (HabitReading, HabitInsights.WeekBehaviour)? {
+        var worst: (reading: HabitReading, week: HabitInsights.WeekBehaviour)?
+        for reading in readings where !reading.archived && !reading.paused && (reading.source == nil || reading.source == "walking") {
+            guard let week = HabitInsights.lastWeek(of: reading.summary, today: today), week.struggling else { continue }
+            let share = Double(week.met) / Double(week.total), worstShare = worst.map { Double($0.week.met) / Double($0.week.total) }
+            if worstShare == nil || share < worstShare! || (share == worstShare! && reading.name < worst!.reading.name) { worst = (reading, week) }
+        }
+        return worst.map { ($0.reading, $0.week) }
     }
     /// The amount itself («بقي ٥ أكواب»), never a generic «خطوة صغيرة».
     private func habitRemainingPhrase(_ habit: HabitReading) -> String {

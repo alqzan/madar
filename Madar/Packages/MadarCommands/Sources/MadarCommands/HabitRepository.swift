@@ -23,6 +23,8 @@ public struct HabitReading: Identifiable, Sendable {
     public var breaks: [HabitBreak] = []
     /// The newest saved rule, also before the habit starts (D6): the editor shows it instead of a default rule.
     public var latestRule: HabitRule? = nil
+    /// When the newest logged times happened (up to 14, newest first); a push habit with no window is reminded at their median.
+    public var eventTimes: [Date] = []
     public func refreshed(in readings: [HabitReading]) -> HabitReading? {
         readings.first { $0.id == id }
     }
@@ -211,7 +213,7 @@ public struct HabitRepository {
             let epochWeek=initialEpoch?.weekStart ?? initialWeek
             let summary = try HabitEngine.evaluate(rules: rules, facts: facts, pauses: breaks, today: today, days: epochCalendar,
                 weekStart: MadarWeekStart(rawValue: epochWeek) ?? .saturday, weekChanges: weekChanges, calendarChanges:calendarChanges,
-                breakAfter: Int((try settings.value(for: "bahw.streakBreakAfter")).number ?? 2), ownerStreak: ownerStreak)
+                breakAfter: Int((try settings.value(for: "bahw.streakBreakAfter")).number ?? 2), ownerStreak: ownerStreak, earnedRestEvery: 30)
             let civil = GregorianDay.containing(now, in: place.timeZone), options = prayers.activeTrip(at: now) == nil ? prayers.options : prayers.tripOptions
             let window = summary.current.flatMap { current in
                 [civil.adding(days: -1), civil].compactMap { day -> DateInterval? in
@@ -228,7 +230,8 @@ public struct HabitRepository {
             let net = Dictionary(facts.map { ($0.day, $0.delta) }, uniquingKeysWith: +)
             let times = net.filter { $0.value > 0 && $0.key <= today }.keys.sorted(by: >).map { HabitTime(day: $0, entryID: links[$0.description]) }
             result.append(.init(id: habit.id, name: habit.name, source: habit.linkedSource, archived: habit.archivedAt != nil, homeOnly: habit.homeOnly, reminder: habit.reminder, summary: summary, firstEffectiveFrom: firstDay, paused: breaks.contains { $0.contains(today) }, isNow: summary.current.map { HabitEngine.isNow($0, today: today, instant: now, window: window, pauses: breaks) } ?? false, times: times, breaks: breaks,
-                                 latestRule: rules.max { $0.effectiveFrom < $1.effectiveFrom }))
+                                 latestRule: rules.max { $0.effectiveFrom < $1.effectiveFrom },
+                                 eventTimes: habitEvents.filter { $0.delta > 0 }.map(\.eventAt).sorted(by: >).prefix(RoomReminders.learnedTimeSample).map { $0 }))
         }
         return result
     }

@@ -18,7 +18,7 @@ public enum HabitCommand: Codable, Equatable, Sendable {
             let source = value["source"]?.string
             guard value["source"] == nil || source.map({ ["jamaah","review","reading","diaryLine","walking","wird"].contains($0) }) == true else { return nil }
             if source == "jamaah", rule.target > 5 { return nil }
-            if source == "walking" { guard rule.measure == .health, ["steps","exerciseMinutes"].contains(rule.unit ?? "") else {return nil} }
+            if source == "walking" { guard rule.measure == .health, HabitRule.healthUnits.contains(rule.unit ?? "") else {return nil} }
             // §7.1 unit table: reading counts active minutes (default) or pages from the Mihbara's saved sessions.
             else if source == "reading" { guard rule.measure == .duration && rule.unit == "minutes" || rule.measure == .count && (rule.unit == "pages" || rule.unit == "chapters") else { return nil } }
             else if let source {
@@ -44,7 +44,7 @@ public enum HabitCommand: Codable, Equatable, Sendable {
             return .pause(id: id, from: from, until: until, trip: value["trip"]?.bool ?? false)
         case "habit.deleteArchived": return Set(value.keys) == ["id"] ? .deleteArchived(id) : nil
         case "habit.refreshHealth":
-            guard Set(value.keys) == ["id","unit","values"], let unit=value["unit"]?.string, ["steps","exerciseMinutes"].contains(unit), case .object(let raw)=value["values"], raw.count<=7 else{return nil}
+            guard Set(value.keys) == ["id","unit","values"], let unit=value["unit"]?.string, HabitRule.healthUnits.contains(unit), case .object(let raw)=value["values"], raw.count<=7 else{return nil}
             var values:[String:Int]=[:]
             for (day,number) in raw {guard (try? GregorianDay(day)) != nil, let n=number.number, n>=0,n<=1000000,n.rounded()==n else{return nil};values[day]=Int(n)}
             return .health(id:id,unit:unit,values:values)

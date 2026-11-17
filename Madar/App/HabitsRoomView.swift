@@ -151,11 +151,18 @@ struct HabitsRoomView: View {
         ("review", "المراجعة", "تُحسب من وجوه مراجعتك في القرآن", "MadarQuran", "quran"),
         ("reading", "القراءة", "تُحسب من دقائق قراءتك في المحبرة", "books.vertical", "mihbara"),
         ("preset.jamaah", "صليت كل الصلوات بجماعة", "يسألك مدار عنها بعد العشاء بساعة", "MadarPrayer", "salah"),
+        ("preset.ramadanQiyam", HabitPresets.ramadanQiyamName, "رمضان: يسألك مدار بعد التراويح", "moon.stars", "bahw"),
+        ("preset.ramadanSuhoor", HabitPresets.ramadanSuhoorName, "رمضان: يسألك مدار قبل الفجر", "sunrise", "bahw"),
+        ("preset.fast", HabitPresets.mondayThursdayFastName, "يسألك مدار مساء الليلة التي قبل كل يوم", "moon.stars", "bahw"),
         ("walking", "المشي", "تُحسب من خطواتك في تطبيق الصحة", "figure.walk", "bahw")]
     private var roomHabitsLeft: [(source: String, title: String, detail: String, symbol: String, room: String)] {
         var kept = Set(readings.filter { !$0.archived }.compactMap(\.source))
         if readings.contains(where: { !$0.archived && $0.name == HabitJamaahConversion.name }) { kept.insert("preset.jamaah") }
-        return Self.roomSources.filter { !kept.contains($0.source) && ($0.source != "walking" || HabitHealthStore.available) }
+        for (id, name) in [("preset.fast", HabitPresets.mondayThursdayFastName), ("preset.ramadanQiyam", HabitPresets.ramadanQiyamName), ("preset.ramadanSuhoor", HabitPresets.ramadanSuhoorName)]
+            where readings.contains(where: { !$0.archived && $0.name == name }) { kept.insert(id) }
+        // Ramadan mode: its presets appear only while the Hijri month is Ramadan.
+        let ramadan = HabitPresets.isRamadan(AppBahwService(session: session).today, days: MadarCalendarDays(zone: session.activePlace.timeZone, source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, offset: Int(session.number("core.hijriOffset"))))
+        return Self.roomSources.filter { !kept.contains($0.source) && ($0.source != "walking" || HabitHealthStore.available) && (ramadan || !$0.source.hasPrefix("preset.ramadan")) }
     }
     @ViewBuilder private var roomHabits: some View {
         let left = roomHabitsLeft
@@ -317,7 +324,7 @@ struct HabitsRoomView: View {
     /// A compact overview of the four frequencies. Choosing one opens its own grouped list;
     /// the Today/All switch remains available to return to either complete view.
     private var periodSummaries: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             ForEach([HabitFrequency.daily, .weekly, .monthly, .yearly], id: \.self) { frequency in
                 periodSummary(frequency)
             }
@@ -527,19 +534,17 @@ private struct HabitPeriodSummaryCard: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 4) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(HabitType.fine()).lineLimit(1)
-                    Text(count).font(.custom("thmanyahseriftext-Regular", size: 11, relativeTo: .caption2))
-                        .foregroundStyle(theme.secondaryInk).lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                if showsRing { HabitMiniRing(share: share, theme: theme).frame(width: 22, height: 22) }
+            // Canvas «Habits» (17 Nov): a ring over the period's name and «x من y», centred on a paper card.
+            VStack(spacing: 6) {
+                if showsRing { HabitMiniRing(share: share, theme: theme).frame(width: 34, height: 34) }
+                Text(title).font(HabitType.section()).foregroundStyle(theme.ink).lineLimit(1)
+                Text(count).font(.custom("thmanyahseriftext-Regular", size: 12, relativeTo: .caption2))
+                    .foregroundStyle(theme.secondaryInk).lineLimit(2).minimumScaleFactor(0.8).multilineTextAlignment(.center)
             }
-            .padding(.horizontal, 8).frame(maxWidth: .infinity, minHeight: 58)
-            .background(theme.surface, in: .rect(cornerRadius: 14))
-            .overlay { RoundedRectangle(cornerRadius: 14).stroke(selected ? theme.accentFill : theme.line, lineWidth: selected ? 1.5 : 1) }
-            .contentShape(.rect(cornerRadius: 14))
+            .padding(.horizontal, 6).padding(.vertical, 12).frame(maxWidth: .infinity, minHeight: 58)
+            .background(theme.surface, in: .rect(cornerRadius: 20))
+            .overlay { RoundedRectangle(cornerRadius: 20).stroke(selected ? theme.accentFill : theme.line, lineWidth: selected ? 1.5 : 1) }
+            .contentShape(.rect(cornerRadius: 20))
         }
         .buttonStyle(.madarPlain).disabled(!enabled)
         .accessibilityLabel(frequency.arabic + "، " + count)
@@ -622,7 +627,7 @@ func habitRoomColour(_ source:String?,dark:Bool)->Color {
 }
 struct HabitMiniRing:View {
     let share:Double; let theme:RoomTheme
-    var body:some View { ZStack { Circle().stroke(theme.line,lineWidth:4); Circle().trim(from:0,to:min(1,max(0,share))).stroke(theme.accentFill,style:.init(lineWidth:4,lineCap:.round)).rotationEffect(.degrees(-90)) }.accessibilityHidden(true) }
+    var body:some View { ZStack { Circle().stroke(theme.line,lineWidth:3.5); Circle().trim(from:0,to:min(1,max(0,share))).stroke(theme.accentFill,style:.init(lineWidth:3.5,lineCap:.round)).rotationEffect(.degrees(-90)) }.accessibilityHidden(true) }
 }
 /// «٣ من ٨ أكواب»; before anything is logged, the goal alone («الهدف: ٨ أكواب») rather than «٠ من ٨».
 func habitProgressText(_ value:Int,_ target:Int,_ unit:String?,_ digits:MadarNumberFormatter)->String {
@@ -637,7 +642,7 @@ func habitOneMore(_ unit:String?)->String {
     guard let unit, !unit.isEmpty else { return "مرة" }
     return ["كوب":"كوبًا","كأس":"كأسًا","pages":"صفحة","صفحة":"صفحة","ركعة":"ركعة","مرة":"مرة","فنجان":"فنجانًا"][unit] ?? "واحدًا"
 }
-func habitUnitName(_ unit:String)->String { ["minutes":"دقيقة","exerciseMinutes":"دقيقة حركة","steps":"خطوة","pages":"صفحة"][unit] ?? unit }
+func habitUnitName(_ unit:String)->String { ["minutes":"دقيقة","exerciseMinutes":"دقيقة حركة","sleepMinutes":"دقيقة نوم","workouts":"تمرين","steps":"خطوة","pages":"صفحة"][unit] ?? unit }
 /// A count with its unit in Arabic number agreement; the table lives in `WidgetCopy` so the widget says the same.
 func habitUnitCount(_ count:Int,_ unit:String?,_ digits:MadarNumberFormatter,genitive:Bool=false)->String {
     WidgetCopy.unitCount(count,unit,digits,genitive:genitive)
@@ -662,7 +667,8 @@ func habitBreakExplanation(_ periods:Int,_ frequency:HabitFrequency?=nil)->Strin
     case .yearly?: forms=["سنة واحدة","سنتين متتاليتين","ثلاث سنوات متتالية"]; frozen="السنوات"
     case nil: forms=["فترة واحدة","فترتين متتاليتين","ثلاث فترات متتالية"]; frozen="الفترات"
     }
-    return "تنكسر السلسلة بفوت "+forms[min(max(periods,1),3)-1]+". "+frozen+" المجمدة مستثناة."
+    // Owner, 17 Nov 2026 (idea 12): a daily habit earns one rest day for every 30 met days in a row.
+    return "تنكسر السلسلة بفوت "+forms[min(max(periods,1),3)-1]+". "+frozen+" المجمدة مستثناة."+(frequency == .daily ? " وكل ثلاثين يومًا متتالية تكسبك يوم راحة يحفظ سلسلتك من فوتة واحدة." : "")
 }
 
 /// FB-39: an «every N days» habit sits in the band nearest its length — up to a week with the weekly habits,

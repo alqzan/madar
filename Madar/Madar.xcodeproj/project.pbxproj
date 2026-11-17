@@ -463,7 +463,6 @@
 		8FE2463637B9421352B04668 /* PrayerLogControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = C465C55A47592A6081EE8186 /* PrayerLogControl.swift */; };
 		8FFF486523975BCDF3051D4B /* Prayer.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 0FBE1448D1219609C2020B02 /* Prayer.xcstrings */; };
 		9005C48F81C76338273892BA /* HabitDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F89AA4241E4160ECC76C8C67 /* HabitDetailView.swift */; };
-		904419E7B2CEAA3926042BDB /* PrayerCountdownUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5261ACBFBFDCD6155459C362 /* PrayerCountdownUITests.swift */; };
 		9047BA339A9AACC637EF3E6C /* MoneyRevealPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07C4770BA1AFF03006C83C6 /* MoneyRevealPrivacy.swift */; };
 		906C97C017BF20351AA91C62 /* AppQuranService+DayClose.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF4D218E30D4A52E0F9F14BD /* AppQuranService+DayClose.swift */; };
 		9089E86B1A78BF97B4CABEFF /* Prayer.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 0FBE1448D1219609C2020B02 /* Prayer.xcstrings */; };
@@ -505,7 +504,6 @@
 		9A1D9FE7352C4847821E9BCE /* MihbaraNotebookContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F690583B5608B024BDC56C39 /* MihbaraNotebookContent.swift */; };
 		9A432F7D5F30FAE626590A0A /* MacLocationBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA67CCFEF7D700E67525CBF3 /* MacLocationBridge.swift */; };
 		9A76282D6B195A47B757ACBE /* MoneyBigExpenseUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC2FFD247065928DD721EA29 /* MoneyBigExpenseUITests.swift */; };
-		9B1AF1C87BF0CD506517E957 /* PrayerFirstDayUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB5BB7EBFA282B3EB4AA780 /* PrayerFirstDayUITests.swift */; };
 		9B1F14E7A1B37F479C735FA6 /* PrayerActivityIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1B530A57CB78A0BD45F0ED /* PrayerActivityIntegrationTests.swift */; };
 		9B338C3B7422D3D5AEB9767E /* QuranYearView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5265ABF3C9DFCE44A071263 /* QuranYearView.swift */; };
 		9B5CB63080CFA401AA15F076 /* MihbaraReadingGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93AF4C5A3669C16B24D77DEC /* MihbaraReadingGoal.swift */; };
@@ -554,6 +552,7 @@
 		A94A80930BC7158AAB0BB4D1 /* MoneyBudgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B8E9177702E585B368740E /* MoneyBudgetView.swift */; };
 		A94ECEF5C8A2A8E880A8C5A0 /* MoneyZakatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00625CA27F7107AFB4D7DB59 /* MoneyZakatModels.swift */; };
 		A98930FF3FA0BF8BA1CB3A44 /* AppDiaryImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018FFAFD0D740954AD88C24C /* AppDiaryImportService.swift */; };
+		AB1AB4229324EDCBF72BF59E /* HabitSuggestionIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C85CD535A8F40BCB84A2D08 /* HabitSuggestionIntegrationTests.swift */; };
 		ABA4E775EB715884E4B87770 /* PrayerActivityBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC79AED1B314B7B8C603514A /* PrayerActivityBudget.swift */; };
 		ABD1FF8F73FB10488DB847D4 /* MoneyQuickExpense.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D8AA2CC8F87F5E866D814E7 /* MoneyQuickExpense.swift */; };
 		ABF497AC4D28430574F9E872 /* HabitSinceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43015F2877F12AC88306D1A6 /* HabitSinceView.swift */; };
@@ -1008,6 +1007,7 @@
 		3C1CAE15724598AC86613130 /* MoneyCardSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyCardSheet.swift; sourceTree = "<group>"; };
 		3C51B7F621FD8CA7685E7B45 /* MadarPrayerShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadarPrayerShortcuts.swift; sourceTree = "<group>"; };
 		3C5F681423C9EE494E433E64 /* AppDiarySearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiarySearchService.swift; sourceTree = "<group>"; };
+		3C85CD535A8F40BCB84A2D08 /* HabitSuggestionIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitSuggestionIntegrationTests.swift; sourceTree = "<group>"; };
 		3CBD6993AEFD01597EAFD5EB /* AppBackupBackgroundTasks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBackupBackgroundTasks.swift; sourceTree = "<group>"; };
 		3D4DA6A41BFC8B46816890E9 /* CitySearchUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitySearchUITests.swift; sourceTree = "<group>"; };
 		3E04A1C1AF0F23A0D17A3A20 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -1053,7 +1053,6 @@
 		51A896BAAC402D5481449DB5 /* MadarPrayer */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarPrayer; path = Packages/MadarPrayer; sourceTree = SOURCE_ROOT; };
 		52096FB2E7F5C96D70BD4B80 /* MadarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadarApp.swift; sourceTree = "<group>"; };
 		5219589675789A4DFFDA07ED /* DiaryPhotoLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryPhotoLibrary.swift; sourceTree = "<group>"; };
-		5261ACBFBFDCD6155459C362 /* PrayerCountdownUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerCountdownUITests.swift; sourceTree = "<group>"; };
 		52735133758CAE2D8945A464 /* AppQuranService+Drill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppQuranService+Drill.swift"; sourceTree = "<group>"; };
 		52980AFF9B623E80DAA76A99 /* MoneyLogUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyLogUITests.swift; sourceTree = "<group>"; };
 		52CA868B10189C0926274983 /* SourceSerif4-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SourceSerif4-Variable.ttf"; sourceTree = "<group>"; };
@@ -1087,7 +1086,6 @@
 		5D4987B5D450117231586F8F /* MoneyObligationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyObligationSheet.swift; sourceTree = "<group>"; };
 		5D8AA2CC8F87F5E866D814E7 /* MoneyQuickExpense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyQuickExpense.swift; sourceTree = "<group>"; };
 		5D97EA0A97206A62947BE14C /* QuranServiceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranServiceIntegrationTests.swift; sourceTree = "<group>"; };
-		5DB5BB7EBFA282B3EB4AA780 /* PrayerFirstDayUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerFirstDayUITests.swift; sourceTree = "<group>"; };
 		5DEA3BA58F06FAAC274081E2 /* BahwAttentionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BahwAttentionTests.swift; sourceTree = "<group>"; };
 		5DFE82C4D216FC9A003ED7A2 /* thmanyahsans-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahsans-Medium.otf"; sourceTree = "<group>"; };
 		5E6D8632065B521B685FADB6 /* thmanyahsans-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahsans-Bold.otf"; sourceTree = "<group>"; };
@@ -1909,8 +1907,6 @@
 				F1E26F2965534F90C55CB21B /* OwnerAllDataTrialUITests.swift */,
 				178528B11682EF3F688E3A27 /* PadLayoutUITests.swift */,
 				DC15B2505609E8765B103F49 /* PersonalOwnerTrialUITests.swift */,
-				5261ACBFBFDCD6155459C362 /* PrayerCountdownUITests.swift */,
-				5DB5BB7EBFA282B3EB4AA780 /* PrayerFirstDayUITests.swift */,
 				FB394D0AA548ADD478457293 /* QuranCoachUITests.swift */,
 				470CAB0116FBD521F5A3B143 /* QuranDayCloseUITests.swift */,
 				698F695ACB91C7284480267F /* QuranDrillUITests.swift */,
@@ -2049,6 +2045,7 @@
 				1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */,
 				41D68577D1E6FA5223FD92FE /* HabitRhythmTests.swift */,
 				C8AFCF7B67502960F9EB2F8E /* HabitsRedesignPreviewTests.swift */,
+				3C85CD535A8F40BCB84A2D08 /* HabitSuggestionIntegrationTests.swift */,
 				5BB241AD7E579D99264DA8ED /* LaunchAppearanceTests.swift */,
 				07E5B58AA5B0B1DDDE4BDE66 /* LegacyHabitTrialTests.swift */,
 				472B1CBA95C9D6F4CB205E81 /* LegacyMoveNativeWinsTests.swift */,
@@ -2529,6 +2526,7 @@
 				ACF8D45E7B47DF98E40E506D /* DiaryYearbookIntegrationTests.swift in Sources */,
 				16A45A0199AD6A2B5E9EC744 /* ExportPrivacyTests.swift in Sources */,
 				A0561536CAB91FAF9E90D622 /* HabitRhythmTests.swift in Sources */,
+				AB1AB4229324EDCBF72BF59E /* HabitSuggestionIntegrationTests.swift in Sources */,
 				B82D6072AB1C44D2ADEABA0A /* HabitsRedesignPreviewTests.swift in Sources */,
 				C2838D05BF9653A2F162C231 /* LaunchAppearanceTests.swift in Sources */,
 				52430EB75D09E6A03E8C2296 /* LegacyHabitTrialTests.swift in Sources */,
@@ -2641,8 +2639,6 @@
 				DD1C6B4F69365A85062C8862 /* OwnerAllDataTrialUITests.swift in Sources */,
 				BD9AC546463B5CE92B8D6006 /* PadLayoutUITests.swift in Sources */,
 				E92049B4E1213F5E6F6A3C60 /* PersonalOwnerTrialUITests.swift in Sources */,
-				904419E7B2CEAA3926042BDB /* PrayerCountdownUITests.swift in Sources */,
-				9B1AF1C87BF0CD506517E957 /* PrayerFirstDayUITests.swift in Sources */,
 				56D09B30E80044902F44350D /* QuranCoachUITests.swift in Sources */,
 				4CB10D8B89D0C260CFF4C2DE /* QuranDayCloseUITests.swift in Sources */,
 				E22DD3F7C11BF0CB7D575A9F /* QuranDrillUITests.swift in Sources */,
@@ -3370,7 +3366,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 53;
+				CURRENT_PROJECT_VERSION = 54;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = V8YZL4R65K;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -3478,7 +3474,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 53;
+				CURRENT_PROJECT_VERSION = 54;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = V8YZL4R65K;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

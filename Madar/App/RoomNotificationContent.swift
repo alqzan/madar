@@ -21,11 +21,21 @@ import MadarPrayer
         let civil = GregorianDay.containing(now, in: place.timeZone)
         for reading in try HabitRepository(context: ModelContext(session.container)).readings(at: now) {
             guard reading.reminder == "push", reading.source == nil, !reading.archived, !reading.paused,
-                  let current = reading.summary.current, current.target > 0, !current.met, current.dueDays.contains(today) else { continue }
-            let start = [civil, civil.adding(days: 1)].lazy.compactMap { day in
-                HabitEngine.window(rule: current.rule, civilDay: day, place: place, prayer: prayerDays.first { $0.day == day })?.start
-            }.first { $0 > now }
-            if let candidate = RoomReminders.habit(id: reading.id, windowStart: start, dayKey: today.description, prayerDays: prayerDays, now: now) {
+                  let current = reading.summary.current, current.target > 0, !current.met else { continue }
+            // Owner, 17 Nov 2026 (idea 9): a push habit with no window is asked at the median time of its last 14 logged times.
+            let learned = current.rule.windowStart == nil ? RoomReminders.learnedHabitMinute(eventTimes: reading.eventTimes, timeZone: place.timeZone) : nil
+            guard current.rule.windowStart != nil || learned != nil else { continue }
+            // Today's window, or tomorrow's when it opens the evening before (idea 17); each needs its own day to be due.
+            var eveningBefore = false
+            let start = (0...1).lazy.compactMap { offset -> (Date, Int)? in
+                let dueDay = today.adding(days: offset), civilDay = civil.adding(days: offset)
+                guard current.dueDays.contains(dueDay) || (offset == 1 && HabitEngine.schedulesDay(current.rule, dueDay)) else { return nil }
+                if let learned { return RoomReminders.habitLearnedStart(minute: learned, on: civilDay, timeZone: place.timeZone).map { ($0, offset) } }
+                return (HabitEngine.window(rule: current.rule, civilDay: civilDay, place: place, prayer: prayerDays.first { $0.day == civilDay })?.start).map { ($0, offset) }
+            }.first { $0.0 > now }.map { found -> Date in eveningBefore = found.1 == 1 && !current.dueDays.contains(today); return found.0 }
+            if var candidate = RoomReminders.habit(id: reading.id, windowStart: start, dayKey: today.description, prayerDays: prayerDays, now: now) {
+                // A reminder for tomorrow's day (the fast asked the night before) only asks; it never logs tonight.
+                if eveningBefore { candidate = .init(id: "habits.\(today).eve.\(reading.id.uuidString)", room: .habits, dueAt: candidate.dueAt, dayKey: candidate.dayKey) }
                 result.append(candidate)
             }
         }
@@ -39,6 +49,8 @@ import MadarPrayer
             guard due > now else { continue }
             result.append(.init(id: "habits.\(today).final.\(reading.id.uuidString)", room: .habits, dueAt: due, dayKey: today.description))
         }
+        // Idea 4: habit reminders within 15 minutes of each other arrive as one notification.
+        result = RoomReminders.groupHabitReminders(result)
         // Each family may read a whole room on the main thread: yield between them so a tap is never held behind all of them.
         result += try diaryCandidates(session: session, prayerDays: prayerDays, now: now); await Task.yield()
         result += limitCandidates(session: session, prayerDays: prayerDays, now: now); await Task.yield()
@@ -230,6 +242,12 @@ import MadarPrayer
             let members = plan.digestMembers[id] ?? [], kinds = RoomReminders.digestKinds(memberIDs: members)
             content.body = "لديك " + reminderCount(members.count, digits) + (kinds.isEmpty ? "" : ": " + kinds.joined(separator: "، "))
             content.userInfo = ["dayKey": candidate.dayKey, "room": "bahw"]
+        } else if id.hasPrefix("habits."), let members = RoomReminders.groupedHabitIDs(id) {
+            let names = members.compactMap { habitNames[$0.uuidString] }
+            content.title = "عاداتك تنتظرك"
+            let listed = names.count > 3 ? names.prefix(2).joined(separator: "، ") + " و" + arabicCount(names.count - 2, ["واحدة أخرى", "اثنتان أخريان", "عادات أخرى", "عادة أخرى"], digits) : names.joined(separator: "، ")
+            content.body = names.isEmpty ? "حان وقت " + arabicCount(members.count, ["عادة", "عادتين", "عادات", "عادة"], digits) : "حان وقت: " + listed
+            content.userInfo = ["dayKey": candidate.dayKey, "room": "habits"]
         } else if id.hasPrefix("habits.") {
             let habitID = String(id.split(separator: ".").last ?? "")
             content.title = habitNames[habitID] ?? "عادتك"
@@ -237,13 +255,16 @@ import MadarPrayer
             let reading = (try? HabitRepository(context: ModelContext(session.container)).readings(at: Date()))?.first { $0.id.uuidString == habitID }
             let streak = reading?.summary.streak ?? 0
             content.body = NudgeWording.body(streak > 0 ? .habitKeepStreak : .habitFirstStep, dayKey: candidate.dayKey)
+            if id.contains(".eve.") {
+                content.body = "موعدها بكرة. نويت؟"
+            }
             if id.contains(".final.") {
                 let frequency = reading?.summary.current?.rule.frequency ?? .daily
                 content.title = "سلسلة " + (habitNames[habitID] ?? "عادتك") + " " + habitPeriodCount(streak, frequency, digits) + " بتروح الليلة"
                 content.body = "فاتتك أمس. سوّها الحين وتبقى."
             }
             content.userInfo = ["dayKey": candidate.dayKey, "room": "habits", "habit": habitID]
-            if reading?.source == nil {
+            if reading?.source == nil, !id.contains(".eve.") {
                 let rule = reading?.summary.current?.rule
                 let amount = rule.map { ($0.measure == .count || $0.measure == .duration) && $0.target > 1 } ?? false
                 content.categoryIdentifier = amount ? PrayerNotificationCoordinator.habitAmountCategoryID(reading!.id) : PrayerNotificationCoordinator.habitCategoryID
@@ -319,6 +340,10 @@ import MadarPrayer
         }
         if id.hasPrefix("qada.") {
             return false
+        }
+        if id.hasPrefix("habits."), let members = RoomReminders.groupedHabitIDs(id) {
+            let readings = try HabitRepository(context: ModelContext(session.container)).readings(at: now)
+            return readings.contains { reading in members.contains(reading.id) && reading.reminder == "push" && !reading.paused && reading.summary.current?.met == false }
         }
         if id.hasPrefix("habits."), let habitID = UUID(uuidString: String(id.split(separator: ".").last ?? "")) {
             let reading = try HabitRepository(context: ModelContext(session.container)).readings(at: now).first { $0.id == habitID }

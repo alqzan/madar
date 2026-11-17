@@ -422,6 +422,18 @@ import MadarData
         await #expect(throws: (any Error).self) {try await run(["2026-10-14":.number(30)],unit:"exerciseMinutes")}
         #expect(try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).filter{$0.delta != 0}.count==0)
     }
+    /// Idea 14 (owner, 17 Nov 2026): sleep minutes and workout counts are stored per closed day like steps, in their own unit.
+    @Test(arguments: [("sleepMinutes",430),("workouts",2)]) func sleepAndWorkoutTotalsAreStoredAsClosedHealthDays(_ unit:String,_ total:Int) async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("HabitHealthNew-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
+        let container=try MadarContainerFactory.makeLocal(at:root),bus=CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))
+        let context=ModelContext(container),habit=Habit();habit.linkedSource="walking";habit.kind="linked";context.insert(habit)
+        let policy=HabitPolicy();policy.habitID=habit.id;policy.effectiveFrom="2026-10-01";policy.measure="health";policy.unit=unit;policy.target=1;context.insert(policy);try context.save()
+        func run(_ values:[String:MadarCore.JSONValue],unit:String) async throws -> CommandOutcome {try await bus.execute(.init(name:"habit.refreshHealth",payload:.object(["id":.string(habit.id.uuidString),"unit":.string(unit),"values":.object(values)]),issuedAt:now),now:now)}
+        _ = try await run(["2026-10-14":.number(Double(total))],unit:unit)
+        let saved=try ModelContext(container).fetch(FetchDescriptor<HabitLog>())
+        #expect(saved.count==1 && saved.first?.value==total)
+        await #expect(throws: (any Error).self) {try await run(["2026-10-14":.number(5)],unit:"steps")}
+    }
     @Test func weekSettingAndUndoPreserveWeekEpochs() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("HabitWeeks-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root),bus=CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))
