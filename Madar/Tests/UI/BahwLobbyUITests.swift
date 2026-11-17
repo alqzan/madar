@@ -15,11 +15,9 @@ import XCTest
         XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertEqual(element("bahw-greeting").label, "مساء الخير")
         XCTAssertFalse(element("bahw-date").label.contains("·"))
-        for block in ["habits", "salah", "quran", "mal", "year", "upcoming"] { XCTAssertTrue(element("bahw-block-" + block).exists, block) }
-        // Every shipped room, including Mihbara from M6, has a lobby destination.
-        let nextPrayer = element("bahw-salah-next")
-        XCTAssertTrue(nextPrayer.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(nextPrayer.label.contains("المغرب"), nextPrayer.label)
+        for block in ["habits", "quran", "mal", "year", "upcoming"] { XCTAssertTrue(element("bahw-block-" + block).exists, block) }
+        // Owner 17 Nov 2026: the prayer room is gone, so the lobby has no prayer block.
+        XCTAssertFalse(element("bahw-block-salah").exists)
         capture(app, "M4-V01-lobby-L")
         app.buttons["bahw-arrange-start"].tap()
         XCTAssertTrue(app.buttons["bahw-arrange"].waitForExistence(timeout: 5), app.debugDescription)
@@ -34,7 +32,7 @@ import XCTest
         app.swipeUp(); XCTAssertTrue(element("bahw-block-notes").waitForExistence(timeout: 5)); XCTAssertTrue(element("bahw-block-mihbara").exists); capture(app, "M4-V01-lobby-s1-L")
         app.swipeDown()
 
-        element("bahw-block-salah").press(forDuration: 0.7)
+        element("bahw-block-habits").press(forDuration: 0.7)
         let hide = app.buttons["bahw-hide-year"]; XCTAssertTrue(hide.waitForExistence(timeout: 5)); hide.tap()
         XCTAssertTrue(element("bahw-block-year").waitForNonExistence(timeout: 5))
         app.swipeUp(); app.buttons["bahw-drawer"].tap()
@@ -42,10 +40,10 @@ import XCTest
         XCTAssertTrue(element("bahw-block-year").waitForExistence(timeout: 5))
         app.swipeDown(); app.buttons["bahw-arrange"].tap()
 
-        element("bahw-block-salah").tap()
-        XCTAssertTrue(element("prayer-today-header").waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertFalse(app.buttons["bahw-open-prayer"].exists)
-        capture(app, "UX-02-direct-prayer-L")
+        // The habits block's rings log on tap (testHabitIconFitsAndOpensItsRoom covers opening it); Quran opens directly.
+        element("bahw-block-quran").tap()
+        XCTAssertTrue(element("quran-coverage-title").waitForExistence(timeout: 10), app.debugDescription)
+        capture(app, "UX-02-direct-quran-L")
     }
 
     func testThreeDayReturnPlanPersistsLocallyAndOpensItsRooms() throws {
@@ -97,29 +95,6 @@ import XCTest
         XCTAssertTrue(mihbara.waitForExistence(timeout: 8), app.debugDescription)
         mihbara.tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
-    }
-    /// B3-1: before an adhan the lobby leads with that prayer; inside the sanctity window it shows no step at all.
-    func testLobbyLeadsWithNextPrayerBeforeAdhanAndIsQuietInsideTheWindow() throws {
-        continueAfterFailure = false
-        // Riyadh, 9 Oct 2026: Maghrib's adhan is about 17:32; its window ends 20 minutes later.
-        for (stamp, quiet) in [("2026-10-09T17:10:00+03:00", false), ("2026-10-09T17:40:00+03:00", true)] {
-            let app = XCUIApplication()
-            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": stamp, "MADAR_UI_TRACKING_START": "2026-10-01"]
-            app.launch(); finishOnboarding(app)
-            app.buttons["tab-foundation"].tap()
-            let later = app.buttons["bahw-attention-primary"]
-            if later.waitForExistence(timeout: 3) { later.tap(); _ = later.waitForNonExistence(timeout: 5) }
-            let lead = app.buttons["bahw-suggestion-nextPrayer"]
-            if quiet {
-                XCTAssertTrue(app.buttons["tab-foundation"].isSelected)
-                XCTAssertFalse(lead.waitForExistence(timeout: 4), "no step inside the sanctity window")
-                XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "bahw-suggestions").firstMatch.exists, app.debugDescription)
-            } else {
-                XCTAssertTrue(lead.waitForExistence(timeout: 10), app.debugDescription)
-                XCTAssertTrue(lead.label.contains("المغرب"), lead.label)
-            }
-            app.terminate()
-        }
     }
     func testMoneySuggestionOpensBankMessages() throws {
         continueAfterFailure = false
@@ -285,19 +260,6 @@ import XCTest
         XCTAssertTrue(block.waitForExistence(timeout: 15))
         XCTAssertLessThan(block.frame.width / block.frame.height, 1.2, "Keep the owner's saved large size.")
     }
-    func testNextFajrAfterIsha() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T22:00:00+03:00"]
-        app.launch(); finishOnboarding(app)
-        let next = app.descendants(matching: .any).matching(identifier: "bahw-salah-next").firstMatch
-        XCTAssertTrue(next.waitForExistence(timeout: 15), app.debugDescription)
-        XCTAssertTrue(next.label.contains("الفجر"), next.label)
-        // After Isha the next Fajr is tomorrow's: it says so beside today's earlier Fajr arch.
-        XCTAssertTrue(next.label.contains("الفجر غدًا"), next.label)
-        XCTAssertTrue(next.label.contains("بعد"), next.label)
-        capture(app, "UX-03-next-fajr-L")
-    }
     func testYearSummaryAvoidsDuplicateSeasonsAndDate() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -325,8 +287,8 @@ import XCTest
         XCTAssertFalse(greeting.isHittable)
         capture(app, "UX-14-lobby-s1-L")
         app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
-        let prayer = app.descendants(matching: .any).matching(identifier: "bahw-block-salah").firstMatch
-        prayer.press(forDuration: 0.7)
+        let habits = app.descendants(matching: .any).matching(identifier: "bahw-block-habits").firstMatch
+        habits.press(forDuration: 0.7)
         XCTAssertTrue(app.buttons["bahw-arrange"].waitForExistence(timeout: 5))
         app.buttons["bahw-arrange"].tap()
         XCTAssertFalse(app.buttons["bahw-arrange"].exists)
@@ -378,10 +340,10 @@ import XCTest
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         writer.typeText("بداية هادئة من البهو")
         capture(app, "UX-07-writer-L")
-        app.buttons["diary-editor-cancel"].tap()
-        app.openDiaryEditorFromHome()
-        XCTAssertTrue(writer.waitForExistence(timeout: 5))
-        XCTAssertEqual(writer.value as? String, "بداية هادئة من البهو")
+        // 14 Nov owner (T10): no cancel for new words; «تمّ» makes the draft today's line.
+        XCTAssertFalse(app.buttons["diary-editor-cancel"].exists)
+        app.buttons["diary-editor-save"].tap()
+        XCTAssertTrue(app.staticTexts["بداية هادئة من البهو"].waitForExistence(timeout: 10), app.debugDescription)
     }
     func testNativeMinimizedBarAndVisibleTabsSwitchOnce() throws {
         continueAfterFailure = false
@@ -400,7 +362,7 @@ import XCTest
         capture(app, "UX-10-glass-shortcuts-expanded-L")
         // Owner, 3 Nov 2026: one fixed bar with every enabled room, no «المزيد» and no accessory; «خصّص» opens from the lobby.
         // Since FB-43 the bar is the system's own tab bar, so each room is checked by its tab identifier below.
-        for room in ["foundation", "prayer", "quran", "notes", "money", "mihbara"] {
+        for room in ["foundation", "quran", "notes", "money", "mihbara"] {
             let shortcut = app.buttons["tab-\(room)"]
             XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing room tab: \(room)\n\(app.debugDescription)")
             XCTAssertTrue(shortcut.isHittable, "Room tab is not tappable: \(room)")
@@ -413,7 +375,7 @@ import XCTest
         XCTAssertTrue(app.staticTexts["bahw-greeting"].waitForExistence(timeout: 10))
         app.swipeUp(velocity: .slow)
         capture(app, "UX-10-glass-shortcuts-inline-L")
-        for room in ["prayer", "quran", "notes", "money", "mihbara"] {
+        for room in ["quran", "notes", "money", "mihbara"] {
             let shortcut = app.buttons["tab-\(room)"]
             XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing one-tap room shortcut: \(room)\n\(app.debugDescription)")
             XCTAssertTrue(shortcut.isHittable, "Room shortcut is not tappable: \(room)")
@@ -422,11 +384,10 @@ import XCTest
         }
         for (room, destination) in [
             ("quran", "quran-coverage-title"),
-            ("prayer", "prayer-today-header"),
             ("notes", "diary-home-title"),
             ("money", "money-home"),
             ("mihbara", "mihbara-add-paper"),
-            ("foundation", "bahw-block-salah")
+            ("foundation", "bahw-greeting")
         ] {
             let shortcut = app.buttons["tab-\(room)"]
             XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing one-tap room shortcut: \(room)")

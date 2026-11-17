@@ -3,62 +3,85 @@ import MadarCore
 import MadarCommands
 import MadarDesign
 
-/// RL1: each visible bead has a visible name and a 44 pt target. Extra habits stay in the labelled list.
+/// The canvas «Habits» orbit (owner order, 17 Nov 2026): four rings (today, week, month, year) with every habit as a bead on its own
+/// ring, the chosen habit enlarged and named, the rest dimmed, a moving dot for «الآن» on each ring and the day's count in the middle.
+/// Progress runs against the clock as Arabic reads. From AX1 the drawing gives way to one line per ring.
 struct HabitOrbitView:View {
     let readings:[HabitReading]; let digits:MadarNumberFormatter; let theme:RoomTheme
     let nowPositions:[HabitFrequency:Double]
+    var selected:UUID? = nil
     let select:(HabitReading)->Void
+    /// What the centre says: «٣ من ٦» and its caption, or the chosen habit's own state.
+    var centre:(title:String,caption:String) = ("","")
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let frequencies:[HabitFrequency] = [.daily,.weekly,.monthly,.yearly]
-    /// A linked habit's bead takes its room's colour (prayer, Quran, diary, Mihbara), as W2 draws them.
+    private static let radii:[Double] = [78,112,144,162]
+    private static let single:[Double] = [0.5,0.28,0.72,0.4]
     private func beadColour(_ row:HabitReading)->Color { habitRoomColour(row.source,dark:theme.dark) }
-    private var centreCount:String {
-        let daily=readings.filter{$0.summary.current?.rule.frequency == .daily && ($0.summary.current?.target ?? 0)>0 && !$0.paused}
-        return daily.isEmpty ? "اليوم راحة" : digits.string(daily.filter{$0.summary.current?.met == true}.count)+" من "+digits.string(daily.count)
+    private func share(_ f:HabitFrequency)->(met:Int,due:Int) {
+        let due=readings.filter{$0.summary.current?.rule.band == f && !$0.paused && ($0.summary.current?.target ?? 0)>0}
+        return (due.filter{$0.summary.current?.met == true}.count,due.count)
     }
+    private func title(_ f:HabitFrequency)->String { f == .daily ? "اليوم" : f == .weekly ? "الأسبوع" : f == .monthly ? "الشهر" : "السنة" }
+    private func label(_ f:HabitFrequency)->String { let s=share(f); return title(f)+(s.due == 0 ? "" : " "+digits.percent(Int((Double(s.met)*100/Double(s.due)).rounded()))) }
     var body:some View {
-        GeometryReader { g in
-            let centre = CGPoint(x:g.size.width/2,y:175), base = min(g.size.width/2-14,164.0)
-            ZStack {
-                ForEach(Array(frequencies.enumerated()),id:\.element) { index,f in
-                    let radius=base-Double(3-index)*28, rows=readings.filter{$0.summary.current?.rule.band == f}, due=rows.filter{!$0.paused && ($0.summary.current?.target ?? 0)>0}, met=due.filter{$0.summary.current?.met == true}.count
-                    Circle().stroke(theme.line,lineWidth:1).frame(width:radius*2,height:radius*2).position(centre)
-                    Circle().trim(from:0,to:due.isEmpty ? 0 : Double(met)/Double(due.count)).stroke(theme.accentFill.opacity(0.6),style:.init(lineWidth:3.5,lineCap:.round)).rotationEffect(.degrees(-90)).frame(width:radius*2,height:radius*2).position(centre)
-                    let period = f == .daily ? "اليوم" : f == .weekly ? "الأسبوع" : f == .monthly ? "الشهر" : "السنة"
-                    let progress = due.isEmpty ? "" : " " + digits.percent(Int((Double(met) * 100 / Double(due.count)).rounded()))
-                    Text(period + progress).font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
-                        .padding(.horizontal,5).background(theme.surface).position(x:centre.x,y:centre.y-radius)
-                        .accessibilityIdentifier("habit-orbit-progress-" + f.rawValue)
-                        .accessibilityLabel(period + (due.isEmpty ? "، لا أهداف في هذه الفترة" : progress))
-                    ForEach(Array(rows.prefix(3).enumerated()),id:\.element.id) { offset,row in
-                        let angle=(Double(offset)*100+30+Double(index)*35)*Double.pi/180
-                        Button { select(row) } label: {
-                            VStack(spacing:2) {
-                                HabitBead(state:HabitBead.State(row),colour:beadColour(row),theme:theme).frame(width:17,height:17)
-                                Text(row.name).font(.custom("thmanyahseriftext-Regular",size:11,relativeTo:.caption2)).lineLimit(1).padding(.horizontal,3).background(theme.background.opacity(0.92),in:.capsule)
-                            }.frame(width:86,height:44)
-                        }.buttonStyle(.madarPlain).accessibilityLabel(row.name+"، "+row.statusTitle).accessibilityIdentifier("habit-orbit-"+row.id.uuidString).position(x:centre.x+cos(angle)*radius,y:centre.y+sin(angle)*radius)
-                    }
-                    // The ring draws three beads; the rest are in the list below, so say how many are not drawn here.
-                    if rows.count > 3 {
-                        let angle=(Double(3)*100+30+Double(index)*35)*Double.pi/180
-                        Text("+" + digits.string(rows.count - 3)).font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
-                            .padding(.horizontal,6).frame(minHeight:22).background(theme.background.opacity(0.92),in:.capsule)
-                            .position(x:centre.x+cos(angle)*radius,y:centre.y+sin(angle)*radius)
-                            .accessibilityLabel("وعادات أخرى في القائمة: " + digits.string(rows.count - 3))
-                    }
-                    if let phase = nowPositions[f] {
-                        let angle = (phase * 360 - 90) * Double.pi / 180
-                        Circle().fill(theme.ink).frame(width: 6, height: 6)
-                            .glassEffect(.regular.interactive(), in: .circle)
-                            .position(x: centre.x + cos(angle) * radius, y: centre.y + sin(angle) * radius)
-                            .accessibilityHidden(true)
-                    }
-                }
-                VStack(spacing:4) { Text(centreCount).font(HabitType.cardTitle()); Text("عادات اليوم").font(HabitType.fine()).foregroundStyle(theme.secondaryInk) }.frame(width:88,height:88).background(theme.surface,in:.circle).overlay{Circle().stroke(theme.line)}.position(centre)
-            }.environment(\.layoutDirection,.leftToRight)
-        }.frame(height:380)
-        .overlay(alignment:.bottom) { HStack(spacing:10) { ForEach([HabitBead.State.done,.waiting,.atRisk,.paused],id:\.self) { st in Label { Text(st.title) } icon: { HabitBead(state:st,colour:theme.accentFill,theme:theme).frame(width:11,height:11) } }; Label { Text("الآن") } icon: { Circle().fill(theme.ink).frame(width:6,height:6) } }.font(HabitType.fine()).foregroundStyle(theme.secondaryInk).padding(.bottom,8) }
-        .background(theme.surface.opacity(0.35),in:.rect(cornerRadius:26)).overlay{RoundedRectangle(cornerRadius:26).stroke(theme.line)}
+        VStack(spacing:14) {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment:.leading,spacing:6) { ForEach(frequencies,id:\.self) { f in Text(label(f)).font(HabitType.caption()) } }.frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,16)
+            } else {
+                GeometryReader { g in
+                    let size=min(g.size.width,358.0), k=size/358.0, c=size/2
+                    ZStack {
+                        ForEach(Array(frequencies.enumerated()),id:\.element) { index,f in
+                            let r=Self.radii[index]*k, s=share(f), fraction=s.due == 0 ? 0 : Double(s.met)/Double(s.due)
+                            Circle().stroke(theme.accentFill.opacity(0.22),lineWidth:1.5).frame(width:r*2,height:r*2).position(x:c,y:c)
+                            Circle().trim(from:0,to:fraction).stroke(theme.accentFill,style:.init(lineWidth:4,lineCap:.round)).rotationEffect(.degrees(-90)).scaleEffect(x:-1)
+                                .frame(width:r*2,height:r*2).position(x:c,y:c).opacity(selected == nil ? 0.85 : 0.3)
+                            Text(label(f)).font(HabitType.fine()).foregroundStyle(theme.ink.opacity(0.72)).padding(.horizontal,6).background(Rectangle().fill(theme.background).overlay(theme.accentFill.opacity(0.07)))
+                                .position(x:c,y:c-r).accessibilityIdentifier("habit-orbit-progress-"+f.rawValue).accessibilityLabel(title(f)+(s.due == 0 ? "، لا أهداف في هذه الفترة" : " "+digits.percent(Int((fraction*100).rounded()))))
+                            if let phase=nowPositions[f] {
+                                let a=phase*2*Double.pi
+                                Circle().fill(theme.ink).frame(width:7,height:7).position(x:c-r*sin(a),y:c-r*cos(a)).accessibilityHidden(true)
+                            }
+                        }
+                        ForEach(Array(frequencies.enumerated()),id:\.element) { index,f in
+                            let rows=readings.filter{$0.summary.current?.rule.band == f}
+                            ForEach(Array(rows.enumerated()),id:\.element.id) { offset,row in
+                                let on=row.id == selected, r=Self.radii[index]*k
+                                // One bead sits where the canvas puts it; several spread over the ring and keep clear of the label at the top.
+                                let fraction=rows.count == 1 ? Self.single[index] : 0.08+0.84*(Double(offset)+0.5)/Double(rows.count)
+                                let a=fraction*2*Double.pi
+                                let x=c-r*sin(a), y=c-r*cos(a)
+                                Button { select(row) } label: {
+                                    HabitBead(state:HabitBead.State(row),colour:beadColour(row),theme:theme).frame(width:on ? 26 : 18,height:on ? 26 : 18)
+                                        .shadow(color:on ? theme.accentFill.opacity(0.55) : .clear,radius:on ? 9 : 0)
+                                        .frame(width:44,height:44).contentShape(.circle)
+                                }.buttonStyle(.madarPlain).opacity(selected == nil || on ? 1 : 0.32)
+                                .accessibilityLabel(row.name+"، "+row.statusTitle).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("habit-orbit-"+row.id.uuidString)
+                                .position(x:x,y:y)
+                                if on {
+                                    Text(row.name).font(HabitType.fine()).foregroundStyle(.white).padding(.horizontal,8).padding(.vertical,2).background(theme.accent,in:.rect(cornerRadius:10))
+                                        .position(x:min(max(x,40),size-40),y:y+26).allowsHitTesting(false)
+                                }
+                            }
+                        }
+                        VStack(spacing:2) {
+                            Text(centre.title).font(HabitType.cardTitle()).lineLimit(1).minimumScaleFactor(0.6)
+                            Text(centre.caption).font(HabitType.fine()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
+                        }.padding(8).frame(width:100*k,height:100*k).background(theme.surface,in:.circle).position(x:c,y:c)
+                    }.frame(width:size,height:size).frame(maxWidth:.infinity)
+                }.aspectRatio(1,contentMode:.fit).frame(maxWidth:358).environment(\.layoutDirection,.leftToRight)
+            }
+            HStack(spacing:14) {
+                legend("تمّت",.done); legend("فاتتك مرة",.atRisk); legend("تنتظر",.waiting)
+                HStack(spacing:5) { Circle().fill(theme.ink).frame(width:7,height:7); Text("الآن").font(HabitType.fine()) }
+            }.foregroundStyle(theme.ink.opacity(0.72)).padding(.horizontal,12)
+        }
+        .padding(.vertical,16).frame(maxWidth:.infinity)
+        .background(theme.accentFill.opacity(0.07),in:.rect(cornerRadius:28)).overlay{RoundedRectangle(cornerRadius:28).stroke(theme.accentFill.opacity(0.24))}
+    }
+    private func legend(_ title:String,_ state:HabitBead.State)->some View {
+        HStack(spacing:5) { HabitBead(state:state,colour:theme.accent,theme:theme).frame(width:10,height:10); Text(title).font(HabitType.fine()) }
     }
 }
 

@@ -52,15 +52,14 @@ struct HabitsRoomView: View {
     @State private var showArchived = false
     @State private var deletingArchived: HabitReading?
     @State private var pendingEditor: HabitEditorIdentity?
-    @State private var showAll = false
-    @State private var selectedPeriod: HabitFrequency?
+    /// The habit whose story the room is telling (canvas `sel`); nil shows every habit.
+    @State private var selected: UUID?
     @State private var pastDay: HabitReading?
     /// AU-95: repeated quick taps submit one command while a habit completion is still saving.
     @State private var completionInFlight: Set<UUID> = []
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Namespace private var viewLens
     private var theme: RoomTheme { .init(room:"bahw",dark:colorScheme == .dark) }
     private var digits: MadarNumberFormatter { .init(style:session.string("core.numerals") == "western" ? .western : .hindi) }
     private var active: [HabitReading] { readings.filter { !$0.archived } }
@@ -75,31 +74,29 @@ struct HabitsRoomView: View {
                 Spacer()
                 Button { editor = .init(id:UUID()) } label: { Image(systemName:"plus").frame(width:44,height:44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("عادة جديدة").accessibilityIdentifier("habit-add")
             }.padding(.horizontal,14).padding(.vertical,8)
+            ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment:.leading,spacing:8) {
+                VStack(alignment:.leading,spacing:20) {
                     if !loaded { Color.clear.frame(height: 1) }
-                    else if active.isEmpty { empty; roomHabits }
+                    else if active.isEmpty { empty; roomHabits; archivedBlock }
                     else {
                         periodSummaries
-                        if active.count > 1 && !dynamicTypeSize.isAccessibilitySize {
-                            nextStep
-                            HabitOrbitView(readings: active.filter { !waitsForItsDate($0) }, digits: digits, theme: theme, nowPositions: AppBahwService(session: session).habitOrbitPositions()) { detail = $0 }
-                                .accessibilityElement(children: .contain).accessibilityIdentifier("habits-orbit")
-                        } else {
-                            hero
+                        VStack(alignment:.leading,spacing:8) { dailySection; longerSection; archivedBlock }
+                        if let chosen = selectedReading { story(chosen).id("habit-story") }
+                        orbit
+                        HabitRoomAnalysis(readings:active.filter { !$0.quitting },selected:selected,session:session,digits:digits,theme:theme)
+                        VStack(alignment:.leading,spacing:8) {
+                            Button { editor = .init(id:UUID()) } label: { Label("عادة صغيرة جديدة",systemImage:"plus").font(HabitType.caption()).frame(maxWidth:.infinity,minHeight:48).overlay { RoundedRectangle(cornerRadius:16).stroke(theme.line,style:.init(lineWidth:1,dash:[4,4])) }.contentShape(.rect) }
+                                .buttonStyle(.madarPlain).accessibilityIdentifier("habits-new")
+                            roomHabits
                         }
-                        viewSwitch
-                        if showAll { allList } else { todayList }
-                        Button { editor = .init(id:UUID()) } label: { Label("عادة صغيرة جديدة",systemImage:"plus").font(HabitType.caption()).frame(maxWidth:.infinity,minHeight:48).overlay { RoundedRectangle(cornerRadius:16).stroke(theme.line,style:.init(lineWidth:1,dash:[4,4])) }.contentShape(.rect) }
-                            .buttonStyle(.madarPlain).padding(.top,10).accessibilityIdentifier("habits-new")
-                        roomHabits
                     }
-                    if readings.contains(where: \.archived) {
-                        Button { showArchived.toggle() } label: { Text(showArchived ? "أخفِ العادات المحذوفة" : "عادات محذوفة").font(HabitType.caption()).frame(minHeight:44).contentShape(Rectangle()) }.accessibilityIdentifier("habit-archived")
-                        if showArchived { ForEach(readings.filter(\.archived)) { row in HStack(spacing:10) { Text(row.name); Spacer(); Button { deletingArchived=row } label: { Text("حذف نهائي").font(HabitType.caption()).foregroundStyle(theme.secondaryInk).frame(minHeight:44).contentShape(Rectangle()) }.accessibilityLabel("حذف نهائي "+row.name); Button("استعدها") { perform("habit.archive",["id":.string(row.id.uuidString),"archived":.bool(false)]) }.buttonStyle(.borderedProminent).frame(minHeight:44) }.padding(14).background(theme.surface,in:.rect(cornerRadius:18)) } }
-                    }
-                    VStack(spacing:5) { Text("«أحبّ الأعمال إلى الله أدومها وإن قلّ»").font(HabitType.body()); Text("متفق عليه، من حديث عائشة رضي الله عنها").font(HabitType.fine()).foregroundStyle(theme.secondaryInk) }.frame(maxWidth:.infinity).padding(.vertical,24)
+                    VStack(spacing:4) { Text("«أحبّ الأعمال إلى الله أدومها وإن قلّ»").font(HabitType.body()); Text("متفق عليه، من حديث عائشة رضي الله عنها").font(HabitType.fine()).foregroundStyle(theme.secondaryInk) }.frame(maxWidth:.infinity).padding(.vertical,24)
                 }.padding(.horizontal,14).padding(.vertical,8)
+            }.onChange(of:selected) { _,new in
+                guard new != nil else { return }
+                withAnimation(reduceMotion ? nil : .smooth(duration:0.5)) { proxy.scrollTo("habit-story",anchor:.top) }
+            }
             }.madarTopClipped()
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent)
@@ -205,6 +202,12 @@ struct HabitsRoomView: View {
         VStack(spacing:16) { HabitRingGlyph(share:0,done:false,symbol:nil,lineWidth:5).frame(width:60,height:60); Text("القليل الذي تدوم عليه").font(HabitType.title()); Text("اختر عادة صغيرة تبدأ بها، أو اربطها بما تسجّله في غرف مدار.").font(HabitType.body()).multilineTextAlignment(.center).foregroundStyle(theme.secondaryInk); Button { editor = .init(id:UUID()) } label: { Text("أضف أول عادة").font(HabitType.section()).padding(.horizontal,22).frame(minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-first") }.padding(28).frame(maxWidth:.infinity).background(theme.surface,in:.rect(cornerRadius:24)).padding(.top,25)
     }
 
+    @ViewBuilder private var archivedBlock: some View {
+        if readings.contains(where: \.archived) {
+                        Button { showArchived.toggle() } label: { Text(showArchived ? "أخفِ العادات المحذوفة" : "عادات محذوفة").font(HabitType.caption()).frame(minHeight:44).contentShape(Rectangle()) }.accessibilityIdentifier("habit-archived")
+                        if showArchived { ForEach(readings.filter(\.archived)) { row in HStack(spacing:10) { Text(row.name); Spacer(); Button { deletingArchived=row } label: { Text("حذف نهائي").font(HabitType.caption()).foregroundStyle(theme.secondaryInk).frame(minHeight:44).contentShape(Rectangle()) }.accessibilityLabel("حذف نهائي "+row.name); Button("استعدها") { perform("habit.archive",["id":.string(row.id.uuidString),"archived":.bool(false)]) }.buttonStyle(.borderedProminent).frame(minHeight:44) }.padding(14).background(theme.surface,in:.rect(cornerRadius:18)) } }
+                    }
+    }
     // MARK: What «اليوم» holds
 
     /// Due now: every daily habit and longer habits on their scheduled days, with the existing weekly and
@@ -242,230 +245,184 @@ struct HabitsRoomView: View {
     private var openToday: [HabitReading] { todayRows.filter { $0.summary.current?.met != true } }
     private func priority(_ r:HabitReading)->Int { (r.summary.current?.met == true ? 100 : 0) + (r.isNow ? 0 : 10) + (r.summary.atRisk ? 0 : 1) }
 
-    // MARK: Hero
+    // MARK: Lists
 
-    /// The next useful step, from what the room already knows: a streak at risk, a habit whose time is now, or the hour of the day.
-    private var headline: (title:String,detail:String?) {
-        let rows = todayRows, open = openToday
-        if rows.isEmpty { return ("لا شيء مستحقّ اليوم","عاداتك الأخرى لها وقتها في أسبوعها وشهرها") }
-        guard let next = open.first else { return ("يومك تمّ، دام القليل الجميل",nil) }
-        // Owner 24 Oct: few words. The ring already shows «٠ من ٣», so the title stands alone.
-        let left:String? = nil
-        if next.summary.atRisk { return (next.name+": القليل اليوم يحفظ سلسلتك",left) }
-        if next.isNow { return (next.name+": وقتها الآن",left) }
-        var calendar = Calendar(identifier:.gregorian); calendar.timeZone = session.activePlace.timeZone
-        let hour = calendar.component(.hour,from:session.prayerNow())
-        return (hour < 12 ? "صباحك بخطوة صغيرة" : hour < 17 ? "خطوة صغيرة تكفي" : "ما زال في يومك متّسع",left)
-    }
-    private func heroAction(_ r:HabitReading)->String {
-        guard r.source == nil, let p = r.summary.current else { return "تفاصيل "+r.name }
-        switch p.rule.measure {
-        case .once: return "أتممتُ "+r.name
-        case .duration: return r.name+": أضف "+digits.string(15)+" دقيقة"
-        default: return r.name+": سجّل "+habitOneMore(p.rule.unit)
-        }
-    }
-    /// W2's short invitation leaves the full orbit as the room's focal point.
-    private var nextStep: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "sparkle").foregroundStyle(theme.accent)
-            Text(headline.title).font(HabitType.caption())
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            if let next = openToday.first {
-                Button {
-                    if next.source == nil, let period = next.summary.current {
-                        complete(next, delta: period.rule.measure == .duration ? 15 : 1)
-                    } else { detail = next }
-                } label: {
-                    // FB-39: the button names the habit it logs; a bare «سجّل» logged a habit the card never showed.
-                    Text((next.source == nil ? "سجّل " : "افتح ") + next.name).font(HabitType.caption())
-                        .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 14).frame(minHeight: 44)
-                        .background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent)
-                }
-                .buttonStyle(.madarPlain).disabled(completionInFlight.contains(next.id))
-                .accessibilityLabel(heroAction(next)).accessibilityIdentifier("habits-next")
+    /// The four period cards. With a habit chosen they tell that habit's own day, week, month and year.
+    private var periodSummaries: some View {
+        let cards: [HabitCardModel] = selectedReading.map(selectedCards) ?? [HabitFrequency.daily, .weekly, .monthly, .yearly].map(allCard)
+        return HStack(spacing: 8) {
+            ForEach(cards, id: \.frequency) { card in
+                HabitPeriodSummaryCard(title: card.title, count: card.count, share: card.share, frequency: card.frequency, theme: theme, showsRing: !dynamicTypeSize.isAccessibilitySize)
             }
         }
-        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.surface, in: .rect(cornerRadius: 18))
-        .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line) }
     }
-
-    private var hero: some View {
-        let rows = todayRows, done = rows.count - openToday.count
-        let share = rows.isEmpty ? 0 : Double(done)/Double(rows.count), line = headline
-        return HStack(alignment:.center,spacing:16) {
-            VStack(alignment:.leading,spacing:6) {
-                Text(line.title).font(HabitType.cardTitle()).fixedSize(horizontal:false,vertical:true)
-                if let detail = line.detail { Text(detail).font(HabitType.caption()).foregroundStyle(theme.secondaryInk) }
-                if let next = openToday.first {
-                    // The next step is one tap from the top: it logs, as the row's own button does; a linked habit opens its sheet.
-                    Button {
-                        if next.source == nil, let p = next.summary.current { complete(next, delta: p.rule.measure == .duration ? 15 : 1) } else { detail = next }
-                    } label: { Text(heroAction(next)).font(HabitType.caption()).multilineTextAlignment(.center).fixedSize(horizontal:false,vertical:true).padding(.horizontal,14).frame(minHeight:44).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
-                        .buttonStyle(.madarPlain).disabled(completionInFlight.contains(next.id)).padding(.top,4).accessibilityIdentifier("habits-next")
-                }
+    private func allCard(_ frequency: HabitFrequency) -> HabitCardModel {
+        let group = active.filter { $0.summary.current?.rule.band == frequency }
+        let rows = group.filter { !$0.paused && !$0.quitting && ($0.summary.current?.target ?? 0) > 0 }
+        let done = rows.filter { $0.summary.current?.met == true }.count
+        let count = rows.isEmpty ? (group.isEmpty ? "لا عادات" : "لا شيء مستحق") : digits.string(done) + " من " + digits.string(rows.count)
+        return .init(title: periodTitle(frequency), count: count, share: rows.isEmpty ? 0 : Double(done) / Double(rows.count), frequency: frequency)
+    }
+    private func periodTitle(_ f: HabitFrequency) -> String { f == .daily ? "اليوم" : f == .weekly ? "الأسبوع" : f == .monthly ? "الشهر" : f == .yearly ? "السنة" : "المُدد" }
+    private var selectedReading: HabitReading? { selected.flatMap { id in active.first { $0.id == id } } }
+    private func rank(_ f: HabitFrequency) -> Int { switch f { case .daily: 0; case .interval, .weekly: 1; case .monthly: 2; case .yearly: 3 } }
+    /// The chosen habit across today, the week, the month and the year: its own period shows its progress, a shorter one says it
+    /// is not asked, a longer one counts the times it was done in it, and a daily habit counts its kept days.
+    private func selectedCards(_ r: HabitReading) -> [HabitCardModel] {
+        let service = AppBahwService(session: session), hijriFirst = session.string("core.firstCalendar") == "hijri", days = service.calendarDays
+        let starts: [HabitFrequency: GregorianDay] = [
+            .daily: today, .weekly: MadarYear.week(today, start: service.weekStart).start,
+            .monthly: (hijriFirst ? MadarYear.hijriMonth(today, days) : MadarYear.gregorianMonth(today)).start,
+            .yearly: (hijriFirst ? MadarYear.hijriYear(today, days) : MadarYear.gregorianYear(today)).start]
+        let band = r.summary.current?.rule.band ?? .daily
+        let rates = HabitRoomInsights.dayRates([HabitRoomSeries(id: r.id, periods: r.summary.periods, doneDays: r.times.map(\.day), loggedAt: [])], selected: r.id, today: today)
+        return [HabitFrequency.daily, .weekly, .monthly, .yearly].map { f in
+            let title = periodTitle(f), start = starts[f] ?? today
+            if f == band, let p = r.summary.current {
+                let share = p.target == 0 ? 0 : p.met ? 1 : min(1, Double(p.value) / Double(p.target))
+                return .init(title: title, count: p.target == 0 ? "إجازتها اليوم" : habitProgressText(p.rule.measure == .once ? min(p.value, p.target) : p.value, p.target, p.rule.unit, digits), share: share, frequency: f)
             }
-            Spacer(minLength:0)
-            if !dynamicTypeSize.isAccessibilitySize {
-                HabitHeroOrbit(share:share,done:!rows.isEmpty && done == rows.count,moving:!reduceMotion && !openToday.isEmpty,count:rows.isEmpty ? nil : digits.string(done)+" من "+digits.string(rows.count))
+            if band == .daily {
+                let counted = (0...max(0, MadarCalendarDays.distance(from: start, to: today))).compactMap { rates[start.adding(days: $0)] }
+                let met = counted.filter { $0 >= 1 }.count
+                let share = counted.isEmpty ? 0 : Double(met) / Double(counted.count)
+                return .init(title: title, count: counted.isEmpty ? "لا بيانات" : f == .yearly ? digits.percent(Int((share * 100).rounded())) + " من الأيام" : digits.string(met) + " من " + digits.string(counted.count), share: share, frequency: f)
             }
+            if rank(f) < rank(band) { return .init(title: title, count: "لا تُسأل " + (f == .daily ? "يوميًا" : f == .weekly ? "أسبوعيًا" : "شهريًا"), share: 0, frequency: f) }
+            let n = r.times.filter { $0.day >= start && $0.day <= today }.count
+            return .init(title: title, count: n == 0 ? "لم تُتمّها" : arabicCount(n, ["مرة واحدة", "مرتان", "مرات", "مرة"], digits) + (f == .weekly ? " هذا الأسبوع" : f == .monthly ? " هذا الشهر" : " هذه السنة"), share: n > 0 ? 1 : 0, frequency: f)
         }
-        .padding(.horizontal,18).padding(.vertical,14).frame(maxWidth:.infinity,alignment:.leading)
-        .background(theme.surface,in:.rect(cornerRadius:24))
-        .animation(reduceMotion ? nil : .smooth(duration:0.6),value:done)
-        .sensoryFeedback(.success,trigger:done) { old,new in new > old }
-        .accessibilityElement(children:.contain).accessibilityIdentifier("habits-hero")
     }
 
     // MARK: Lists
 
-    /// A compact overview of the four frequencies. Choosing one opens its own grouped list;
-    /// the Today/All switch remains available to return to either complete view.
-    private var periodSummaries: some View {
-        HStack(spacing: 8) {
-            ForEach([HabitFrequency.daily, .weekly, .monthly, .yearly], id: \.self) { frequency in
-                periodSummary(frequency)
+    private func choose(_ row: HabitReading) {
+        let next = selected == row.id ? nil : row.id
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.35)) { selected = next }
+    }
+    private var dailyRows: [HabitReading] {
+        active.enumerated().filter { ($0.element.summary.current?.rule.band ?? .daily) == .daily }
+            .sorted { (settled($0.element) ? 1 : 0, $0.offset) < (settled($1.element) ? 1 : 0, $1.offset) }.map(\.element)
+    }
+    private var longerRows: [HabitReading] {
+        active.enumerated().filter { ($0.element.summary.current?.rule.band ?? .daily) != .daily }
+            .sorted { (settled($0.element) ? 1 : 0, $0.offset) < (settled($1.element) ? 1 : 0, $1.offset) }.map(\.element)
+    }
+    /// Done habits sink to the bottom of their list; a frozen one rests there too.
+    private func settled(_ r: HabitReading) -> Bool { r.paused || r.summary.current?.met == true }
+    @ViewBuilder private var dailySection: some View {
+        let rows = dailyRows, due = rows.filter(dueToday), done = due.filter { $0.summary.current?.met == true }.count
+        if !rows.isEmpty {
+            HStack(alignment: .firstTextBaseline) {
+                Text("يومية").font(HabitType.cardTitle()).accessibilityAddTraits(.isHeader)
+                Spacer()
+                Text(due.isEmpty ? "لا شيء مستحقّ اليوم" : digits.string(done) + " من " + digits.string(due.count) + "، اضغط الحلقة إذا سويتها").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
+            }.padding(.horizontal, 4).accessibilityIdentifier("habits-daily-header")
+            rowsBlock(rows)
+        }
+    }
+    @ViewBuilder private var longerSection: some View {
+        let rows = longerRows
+        if !rows.isEmpty {
+            Text("أسبوعية وشهرية وسنوية").font(HabitType.cardTitle()).padding(.horizontal, 4).padding(.top, 10).accessibilityAddTraits(.isHeader).accessibilityIdentifier("habits-longer-header")
+            rowsBlock(rows)
+        }
+    }
+    private func rowsBlock(_ rows: [HabitReading]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                if index > 0 { Divider().overlay(theme.ink.opacity(0.07)) }
+                habitRow(row)
             }
-        }
+        }.background(theme.surface, in: .rect(cornerRadius: 24)).clipShape(.rect(cornerRadius: 24))
     }
+    // MARK: Story and orbit
 
-    private func periodSummary(_ frequency: HabitFrequency) -> some View {
-        let group = active.filter { $0.summary.current?.rule.band == frequency }
-        let rows = group.filter { !$0.paused && ($0.summary.current?.target ?? 0) > 0 }
-        let done = rows.filter { $0.summary.current?.met == true }.count
-        let count = rows.isEmpty ? (group.isEmpty ? "لا عادات" : "لا شيء مستحق") : digits.string(done) + " من " + digits.string(rows.count)
-        let title: String = switch frequency {
-        case .daily: "اليوم"
-        case .interval: "المُدد"
-        case .weekly: "الأسبوع"
-        case .monthly: "الشهر"
-        case .yearly: "السنة"
-        }
-        return HabitPeriodSummaryCard(title: title, count: count,
-                                      share: rows.isEmpty ? 0 : Double(done) / Double(rows.count),
-                                      selected: showAll && selectedPeriod == frequency, enabled: !group.isEmpty,
-                                      frequency: frequency, theme: theme, showsRing: !dynamicTypeSize.isAccessibilitySize) {
-            withAnimation(reduceMotion ? nil : .snappy) { showAll = true; selectedPeriod = frequency }
-        }
+    private func story(_ row: HabitReading) -> some View {
+        let service = AppBahwService(session: session)
+        let breakAfter = min(3, max(1, Int(session.number("bahw.streakBreakAfter")) == 0 ? 2 : Int(session.number("bahw.streakBreakAfter"))))
+        let longest = HabitRoomInsights.longestStreak(row.summary.periods, today: today, breakAfter: breakAfter)
+        return HabitStoryCard(reading: row, rule: ruleLine(row), digits: digits, started: session.dateLabels(row.firstEffectiveFrom), longestDate: longest.map { session.dateLabels($0.end) }, today: service.today, breakAfter: breakAfter,
+                              clear: { choose(row) }, details: { detail = row })
     }
-
-    private var viewSwitch: some View {
-        HStack(spacing:6) {
-            ForEach([false,true],id:\.self) { all in
-                let on = showAll == all && (!all || selectedPeriod == nil)
-                Button { withAnimation(reduceMotion ? nil : .snappy) { showAll = all; selectedPeriod = nil } } label: {
-                    Text(all ? "كل عاداتي" : "اليوم").font(HabitType.caption()).frame(maxWidth:.infinity,minHeight:40)
-                        .background { if on { Capsule().fill(theme.accentFill.opacity(0.14)).glassEffect(.regular.interactive(), in: .capsule).matchedGeometryEffect(id:"lens",in:viewLens) } }
-                        .foregroundStyle(on ? theme.ink : theme.secondaryInk).contentShape(.capsule)
-                }
-                .buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier(all ? "habits-view-all" : "habits-view-today")
-            }
-        }
-        // FB-35: one glass track with a lens that slides between «اليوم» and «كل عاداتي», like the tab bar.
-        .padding(4).background(theme.line.opacity(0.35),in:.capsule).padding(.top,6)
+    /// «٥ كم كل يوم»: what the rule asks, in the habit's own words.
+    private func ruleLine(_ row: HabitReading) -> String {
+        guard let rule = row.summary.current?.rule ?? row.latestRule else { return "" }
+        if rule.measure == .abstain { return "عادة تركتها؛ يُحسب كل يوم بلا زلّة" }
+        let every: String = switch rule.frequency { case .daily: "كل يوم"; case .weekly: "كل أسبوع"; case .monthly: "كل شهر"; case .yearly: "كل سنة"; case .interval: "كل " + habitPeriodCount(rule.intervalDays ?? 1, .daily, digits) }
+        if row.source != nil { return "تُقرأ من " + (row.sourceTitle ?? "غرفتها") }
+        let amount = rule.measure == .once || rule.target == 1 && rule.unit == nil ? "مرة" : rule.unit != nil ? habitUnitCount(rule.target, rule.unit, digits) : arabicCount(rule.target, ["مرة واحدة", "مرتان", "مرات", "مرة"], digits)
+        return amount + " " + every
     }
-    @ViewBuilder private var todayList: some View {
-        let rows = todayRows, open = rows.filter { $0.summary.current?.met != true }, done = rows.filter { $0.summary.current?.met == true }
-        let frozen = active.filter { $0.paused && $0.summary.current?.rule.frequency == .daily }
-        let laterRows = active.filter { r in !rows.contains { $0.id == r.id } && !frozen.contains { $0.id == r.id } }
-        let later = laterRows.count, laterOpen = laterRows.filter { $0.summary.current?.met != true && !$0.paused }.count
-        let laterPaused = laterRows.filter(\.paused).count
-        let settledLater = laterPaused == later ? "عاداتك الأخرى مجمّدة" : laterPaused > 0 ? "عادات مكتملة وأخرى مجمّدة" : "عاداتك الأخرى تمّت في فتراتها"
-        if rows.isEmpty && frozen.isEmpty {
-            Button { withAnimation(reduceMotion ? nil : .snappy) { showAll = true } } label: { Label("لا شيء مستحقّ اليوم؛ اعرض كل عاداتك",systemImage:"list.bullet").font(HabitType.caption()).frame(maxWidth:.infinity,minHeight:56) }
-                .buttonStyle(.madarPlain).background(theme.surface,in:.rect(cornerRadius:20)).accessibilityIdentifier("habits-today-empty")
+    private var orbit: some View {
+        let rows = active.filter { !waitsForItsDate($0) && !$0.quitting }
+        var centre = (title: "", caption: "عادات اليوم")
+        if let r = selectedReading, let p = r.summary.current {
+            centre.title = p.rule.measure == .once && p.target == 1 ? (p.met ? "تمّت" : "لم تتم") : digits.string(p.value)
+            centre.caption = p.target > 1 ? "من " + digits.string(p.target) + (p.rule.unit.map { " " + $0 } ?? "") : (p.rule.band == .daily ? "اليوم" : "في فترتها")
         } else {
-            ForEach([HabitFrequency.daily, .weekly, .monthly, .yearly], id: \.self) { frequency in
-                let group = open.filter { $0.summary.current?.rule.band == frequency }
-                if !group.isEmpty {
-                    Text(frequency.arabic).font(HabitType.section()).padding(.top, 4)
-                        .accessibilityIdentifier("habits-today-group-" + frequency.rawValue)
-                    rowsBlock(group)
-                }
-            }
-            if !done.isEmpty {
-                Text("تمّت اليوم").font(HabitType.fine()).foregroundStyle(theme.secondaryInk).padding(.top,open.isEmpty ? 0 : 10)
-                rowsBlock(done)
-            }
-            if !frozen.isEmpty {
-                Text("مجمّدة حتى تفكّها").font(HabitType.fine()).foregroundStyle(theme.secondaryInk).padding(.top,10)
-                rowsBlock(frozen)
-            }
+            let due = dailyRows.filter(dueToday)
+            centre.title = due.isEmpty ? "راحة" : digits.string(due.filter { $0.summary.current?.met == true }.count) + " من " + digits.string(due.count)
         }
-        if later > 0 {
-            Button { withAnimation(reduceMotion ? nil : .snappy) { showAll = true } } label: {
-                HStack { Text(laterOpen == 0 ? settledLater : laterOpen == 1 ? "عادة أخرى تنتظر في فترتها" : laterOpen == 2 ? "عادتان أخريان في فترتيهما" : arabicCount(laterOpen,["","","عادات","عادة"],digits)+" أخرى في فتراتها").font(HabitType.fine()); Image(systemName:"chevron.left").font(.caption) }
-                    .foregroundStyle(theme.accent).frame(minHeight:44)
-            }.buttonStyle(.madarPlain).accessibilityIdentifier("habits-later")
+        return VStack(alignment: .leading, spacing: 10) {
+            HabitOrbitView(readings: rows, digits: digits, theme: theme, nowPositions: AppBahwService(session: session).habitOrbitPositions(), selected: selected, select: choose, centre: centre)
+                .accessibilityElement(children: .contain).accessibilityIdentifier("habits-orbit")
         }
     }
-    @ViewBuilder private var allList: some View {
-        ForEach([HabitFrequency.daily,.weekly,.monthly,.yearly],id:\.self) { f in
-            let rows = active.filter { ($0.summary.current?.rule.band ?? .daily) == f }.sorted { priority($0) < priority($1) }
-            if !rows.isEmpty && (selectedPeriod == nil || selectedPeriod == f) {
-                HStack(alignment:.firstTextBaseline) {
-                    Text(f == .daily ? "كل يوم" : f == .weekly ? "كل أسبوع" : f == .monthly ? "كل شهر" : "كل سنة").font(HabitType.section())
-                    Spacer()
-                    if let left = windowLeft(f,rows) { Text(left).font(HabitType.fine()).foregroundStyle(theme.secondaryInk) }
-                }.padding(.top,10).accessibilityElement(children:.combine).accessibilityIdentifier("habits-group-"+f.rawValue)
-                if !dynamicTypeSize.isAccessibilitySize { HabitRhythmBand(frequency:f,rows:rows,today:today,digits:digits) }
-                rowsBlock(rows)
-            }
-        }
-    }
-    private func rowsBlock(_ rows:[HabitReading])->some View {
-        VStack(spacing:0) { ForEach(rows) { row in habitRow(row); if row.id != rows.last?.id { Divider().overlay(theme.line).padding(.leading,58) } } }
-            .background(theme.surface,in:.rect(cornerRadius:22))
-    }
-    /// What is left of the current window («بقي ٣ أيام»); a day's own window needs no countdown.
-    private func windowLeft(_ f:HabitFrequency,_ rows:[HabitReading]) -> String? {
-        guard f != .daily, let p = rows.compactMap({ $0.summary.current }).first else { return nil }
-        let left = daysLeft(p)
-        guard left > 0 else { return nil }
-        return left == 1 ? "آخر يوم فيها" : "بقي " + habitPeriodCount(left,.daily,digits)
-    }
+    /// A habit as the canvas draws it: its ring, its name with the room it is counted in, one line of state, and on the other side
+    /// the streak capsule over seven small beads. A tap chooses the habit (its story opens below); the ring and «+» keep logging.
     private func habitRow(_ row:HabitReading)->some View {
-        let p = row.summary.current, met = p?.met == true
+        let p = row.summary.current, met = p?.met == true, on = selected == row.id
+        let colour = habitRoomColour(row.source,dark:colorScheme == .dark)
         let share = Double(p?.value ?? 0)/Double(max(1,p?.target ?? 1))
-        return HStack(spacing:0) {
-            leading(row,share:share,met:met).padding(.leading,10)
-            Button { detail = row } label: {
-                HStack(spacing:12) {
-                    VStack(alignment:.leading,spacing:4) {
-                        HStack(spacing:6) { Text(row.name).font(HabitType.section()); if row.summary.streak > 1 || row.summary.atRisk { HabitFlame(count:row.summary.streak,frequency:p?.rule.frequency ?? .daily,digits:digits,met:met,atRisk:row.summary.atRisk && !met,tint:habitRoomColour(row.source,dark:colorScheme == .dark)) }; if let source=row.sourceTitle { let roomColour=habitRoomColour(row.source,dark:colorScheme == .dark); Text(source).font(.custom("thmanyahseriftext-Bold",size:11,relativeTo:.caption2)).foregroundStyle(roomColour).padding(.horizontal,7).padding(.vertical,2).background(roomColour.opacity(0.12),in:.capsule) } }
-                        if !progress(row).isEmpty { Text(progress(row)).font(HabitType.caption()).foregroundStyle(theme.secondaryInk) }
+        let risky = row.summary.atRisk && !met && !row.paused
+        return HStack(spacing:12) {
+            leading(row,share:share,met:met,colour:colour)
+            Button { choose(row) } label: {
+                HStack(spacing:10) {
+                    VStack(alignment:.leading,spacing:3) {
+                        HStack(spacing:8) {
+                            Text(row.name).font(HabitType.section()).fixedSize(horizontal:false,vertical:true)
+                            if let tag = row.sourceTitle { Text(tag).font(HabitType.fine()).foregroundStyle(colour).padding(.horizontal,8).padding(.vertical,1).background(colour.opacity(0.1),in:.rect(cornerRadius:8)) }
+                        }
+                        Text(rowLine(row)).font(HabitType.caption()).foregroundStyle(risky ? HabitFlame.riskColour : theme.secondaryInk).fixedSize(horizontal:false,vertical:true)
                         // Idea 6 (owner, 17 Nov 2026): a quiet milestone on the day a daily streak reaches 30, 100 or 365 — no sound, no pop-up.
                         if met, p?.rule.frequency == .daily, [30,100,365].contains(row.summary.streak) {
-                            Text(habitPeriodCount(row.summary.streak,.daily,digits)+" — «أحبّ الأعمال إلى الله أدومها وإن قلّ»").font(HabitType.fine()).foregroundStyle(habitRoomColour(row.source,dark:colorScheme == .dark))
+                            Text(habitPeriodCount(row.summary.streak,.daily,digits)+" — «أحبّ الأعمال إلى الله أدومها وإن قلّ»").font(HabitType.fine()).foregroundStyle(colour)
                                 .accessibilityIdentifier("habit-milestone-"+row.id.uuidString)
                         }
-                        if row.paused || row.isNow || row.summary.atRisk { Label(row.statusTitle,systemImage:row.paused ? "pause.circle" : "circle.lefthalf.filled").font(HabitType.fine()).foregroundStyle(theme.accent) }
                     }
                     Spacer(minLength:0)
-                }.padding(.leading,10).padding(.vertical,13).frame(minHeight:70).contentShape(.rect)
-            }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-row-"+row.id.uuidString).accessibilityLabel(row.name+"، "+progress(row)+"، "+row.statusTitle)
+                    VStack(alignment:.trailing,spacing:5) {
+                        if row.summary.streak > 0 || row.summary.atRisk { HabitFlame(count:row.summary.streak,frequency:p?.rule.frequency ?? .daily,digits:digits,met:met,atRisk:risky,tint:colour) }
+                        HabitRowDots(periods:row.summary.periods,colour:colour)
+                    }
+                }.frame(minHeight:46).contentShape(.rect)
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-row-"+row.id.uuidString).accessibilityLabel(row.name+"، "+rowLine(row)).accessibilityAddTraits(on ? .isSelected : [])
             // A day forgotten is one long-press away (item 26), without opening the habit.
             .contextMenu { if row.source == nil, !row.archived, let p = row.summary.current, p.rule.measure != .health, p.rule.measure != .abstain, (row.summary.periods.first?.start).map({ $0 < today }) == true { Button("فعلتها في يوم سابق",systemImage:"calendar.badge.clock") { pastDay = row } } }
-            trailing(row).padding(.trailing,10)
+            trailing(row)
         }
+        .padding(.horizontal,14).padding(.vertical,12).background(on ? theme.accentFill.opacity(0.16) : .clear)
+        .animation(reduceMotion ? nil : .smooth(duration:0.35),value:on)
     }
-    /// A once-habit's ring is its own checkbox: one circle per row, tapped to finish (tour 25 Oct: the ring
-    /// beside an empty tap circle read as two of the same). Count habits keep the ring as progress and a «+».
-    @ViewBuilder private func leading(_ row:HabitReading,share:Double,met:Bool)->some View {
+    /// «٣ من ٥ كم»; a frozen habit says so, a habit that lost a period says what saves it, a quit habit counts its clean days.
+    private func rowLine(_ row:HabitReading)->String {
+        if row.paused { return row.statusTitle }
+        if row.summary.atRisk && row.summary.current?.met != true { return row.statusTitle }
+        var line = progress(row)
+        if line.isEmpty { line = row.summary.current?.met == true ? "تمّت" : row.summary.current?.rule.band == .daily ? "لم تتمّها بعد" : "تنتظر في فترتها" }
+        if row.isNow { line += line.isEmpty ? "وقتها الآن" : "، وقتها الآن" }
+        return line
+    }
+    /// A once-habit's ring is its own checkbox: one circle per row, tapped to finish. Count habits keep the ring as progress and a «+».
+    @ViewBuilder private func leading(_ row:HabitReading,share:Double,met:Bool,colour:Color)->some View {
+        let ring = HabitRowRing(share:share,done:met,colour:colour,symbol:row.source == nil ? nil : row.symbol,glyph:row.source == nil ? row.nameGlyph : nil)
         if let p=row.summary.current, row.source == nil, !row.paused, p.target > 0, p.rule.measure == .once, !met {
-            Button {
-                complete(row, delta: 1)
-            } label: {
-                Circle().stroke(theme.accent,lineWidth:2).frame(width:32,height:32).frame(width:44,height:44).contentShape(.circle)
-            }.buttonStyle(.madarPlain).disabled(completionInFlight.contains(row.id))
-            .accessibilityLabel(quickLogLabel(row.name,.once))
-            .accessibilityIdentifier("habit-quick-"+row.id.uuidString)
-        } else if !dynamicTypeSize.isAccessibilitySize {
-            HabitRingGlyph(share:share,done:met,symbol:row.source == nil ? row.nameGlyph : row.symbol).frame(width:36,height:36).frame(width:44,height:44)
-        }
+            Button { complete(row, delta: 1) } label: { ring.contentShape(.circle) }
+                .buttonStyle(.madarPlain).disabled(completionInFlight.contains(row.id))
+                .accessibilityLabel(quickLogLabel(row.name,.once)).accessibilityIdentifier("habit-quick-"+row.id.uuidString)
+        } else if !dynamicTypeSize.isAccessibilitySize { ring }
     }
     /// Count and duration habits log from a «+»; a once-habit logs from its ring.
     @ViewBuilder private func trailing(_ row:HabitReading)->some View {
@@ -526,30 +483,23 @@ private struct HabitPeriodSummaryCard: View {
     let title: String
     let count: String
     let share: Double
-    let selected: Bool
-    let enabled: Bool
     let frequency: HabitFrequency
     let theme: RoomTheme
     let showsRing: Bool
-    let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            // Canvas «Habits» (17 Nov): a ring over the period's name and «x من y», centred on a paper card.
-            VStack(spacing: 6) {
-                if showsRing { HabitMiniRing(share: share, theme: theme).frame(width: 34, height: 34) }
-                Text(title).font(HabitType.section()).foregroundStyle(theme.ink).lineLimit(1)
-                Text(count).font(.custom("thmanyahseriftext-Regular", size: 12, relativeTo: .caption2))
-                    .foregroundStyle(theme.secondaryInk).lineLimit(2).minimumScaleFactor(0.8).multilineTextAlignment(.center)
-            }
-            .padding(.horizontal, 6).padding(.vertical, 12).frame(maxWidth: .infinity, minHeight: 58)
-            .background(theme.surface, in: .rect(cornerRadius: 20))
-            .overlay { RoundedRectangle(cornerRadius: 20).stroke(selected ? theme.accentFill : theme.line, lineWidth: selected ? 1.5 : 1) }
-            .contentShape(.rect(cornerRadius: 20))
+        // Canvas «Habits» (17 Nov): a ring over the period's name and «x من y», centred on a paper card.
+        VStack(spacing: 6) {
+            if showsRing { HabitMiniRing(share: share, theme: theme).frame(width: 34, height: 34) }
+            Text(title).font(HabitType.section()).foregroundStyle(theme.ink).lineLimit(1)
+            Text(count).font(.custom("thmanyahseriftext-Regular", size: 12, relativeTo: .caption2))
+                .foregroundStyle(theme.secondaryInk).lineLimit(2).minimumScaleFactor(0.8).multilineTextAlignment(.center)
         }
-        .buttonStyle(.madarPlain).disabled(!enabled)
+        .padding(.horizontal, 6).padding(.vertical, 12).frame(maxWidth: .infinity, minHeight: 58)
+        .background(theme.surface, in: .rect(cornerRadius: 20))
+        .overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.ink.opacity(0.08), lineWidth: 1) }
+        .accessibilityElement(children: .combine)
         .accessibilityLabel(frequency.arabic + "، " + count)
-        .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("habits-period-" + frequency.rawValue)
     }
 }
@@ -571,25 +521,6 @@ struct HabitRingGlyph:View {
         }.padding(lineWidth/2).accessibilityHidden(true)
     }
 }
-/// The day as a small «مدار»: today's ring closes as habits finish, two faint outer orbits stand for the
-/// week and the month, and one bead travels the outer orbit slowly while something is still open.
-private struct HabitHeroOrbit:View {
-    let share:Double; let done:Bool; let moving:Bool; var count:String?
-    @Environment(\.roomTheme) private var theme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    var body:some View {
-        ZStack {
-            Circle().stroke(theme.line.opacity(0.6),lineWidth:1)
-            Circle().stroke(theme.line,lineWidth:1).padding(9)
-            TimelineView(.animation(minimumInterval:1/12,paused:!moving || reduceMotion)) { context in
-                let angle = moving && !reduceMotion ? context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy:40)/40*360 : 210
-                Circle().fill(theme.accentFill).frame(width:7,height:7).offset(y:-44).rotationEffect(.degrees(angle))
-            }
-            HabitRingGlyph(share:share,done:done,symbol:nil,lineWidth:5).padding(19)
-            if let count, !done { Text(count).font(HabitType.fine()).foregroundStyle(theme.ink).lineLimit(1).minimumScaleFactor(0.7) }
-        }.frame(width:92,height:92).accessibilityHidden(true)
-    }
-}
 /// The streak as a flame and its count, no words (owner, 24 Oct: «شعلة وعندها الأيام وبس»).
 /// Owner, 17 Nov 2026 (shape «ب»): the streak is one light capsule — flame, number, unit.
 /// Done today: the habit's room colour with a lit flame. Waiting: grey with an empty flame.
@@ -600,7 +531,8 @@ struct HabitFlame:View {
     var atRisk:Bool = false
     var tint:Color? = nil
     @Environment(\.roomTheme) private var theme
-    private static let risk = Color(red:0.647,green:0.306,blue:0.204)
+    static let riskColour = Color(red:0.647,green:0.306,blue:0.204)
+    private static var risk:Color { riskColour }
     private var ink:Color { atRisk ? Self.risk : met ? (tint ?? theme.accent) : theme.secondaryInk }
     private var fill:Color { atRisk ? Self.risk.opacity(0.12) : met ? (tint ?? theme.accent).opacity(0.14) : theme.ink.opacity(0.06) }
     var body:some View {

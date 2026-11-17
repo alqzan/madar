@@ -10,6 +10,8 @@ import UIKit
         app.launchEnvironment=environment;app.launch();return app
     }
     /// Owner, 17 Nov 2026: habits is a tab of its own, no longer a lobby sub-room.
+    /// A row now chooses the habit and opens its story; «التفاصيل» on the story opens the sheet.
+    private func openDetail(_ app:XCUIApplication,_ row:XCUIElement){let d=app.buttons["habit-story-details"].firstMatch;if !d.exists{row.tap()};XCTAssertTrue(d.waitForExistence(timeout:5),app.debugDescription);d.tap()}
     private func open(_ app:XCUIApplication){let tab=app.buttons["tab-habits"].firstMatch;XCTAssertTrue(tab.waitForExistence(timeout:20));tab.tap();XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
     private func shot(_ app:XCUIApplication,_ name:String){guard ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] != nil else {return};let s=app.screenshot(),a=XCTAttachment(screenshot:s);a.name=name;a.lifetime = .keepAlways;add(a); if let dir=ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to:URL(fileURLWithPath:dir).appendingPathComponent(name+".png")) }}
     func testAutomaticThemeUsesResolvedAppearanceInLobbyAndHabitSheets() throws {
@@ -22,7 +24,7 @@ import UIKit
             open(app)
             shot(app, "M4-auto-\(appearance)-habits-L"); try assertPaper(app, dark: appearance == "dark")
             let water = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "الماء،")).firstMatch
-            XCTAssertTrue(water.waitForExistence(timeout: 5)); for _ in 0..<6 where !water.isHittable || water.frame.maxY > app.frame.maxY - 150 { app.swipeUp(velocity: .slow) }; water.tap()
+            XCTAssertTrue(water.waitForExistence(timeout: 5)); for _ in 0..<6 where !water.isHittable || water.frame.maxY > app.frame.maxY - 150 { app.swipeUp(velocity: .slow) }; openDetail(app,water)
             XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout: 5))
             shot(app, "M4-auto-\(appearance)-detail-L"); try assertPaper(app, dark: appearance == "dark")
             let past = app.buttons["habit-past-day"]
@@ -87,11 +89,7 @@ import UIKit
             XCTAssertTrue(weekly.waitForExistence(timeout: 5))
             XCTAssertEqual(weekly.label, "الأسبوع، لا أهداف في هذه الفترة")
             XCTAssertFalse(weekly.label.contains("٪"), "A paused-only period has no completion denominator.")
-            let later = app.buttons["habits-later"]
-            XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription)
-            shot(app, "M4-later-\(fixture)-L")
-            XCTAssertEqual(later.label, fixture == "pausedLater" ? "عاداتك الأخرى مجمّدة" : "عادات مكتملة وأخرى مجمّدة")
-            later.tap()
+            // Every habit is on the page now: the frozen one rests in the longer list, labelled as frozen.
             let paused = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "صلة الأرحام،")).firstMatch
             XCTAssertTrue(paused.waitForExistence(timeout: 5), app.debugDescription)
             XCTAssertTrue(paused.label.contains("مجمّدة"), paused.label)
@@ -110,7 +108,6 @@ import UIKit
     func testRapidCountHabitTapsDoNotDoubleLogWhileSaving() throws {
         continueAfterFailure = false
         let app = app("partialDuration", habitWriteHoldMS: 1200); open(app)
-        app.buttons["habits-view-all"].tap()
         let quick = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "habit-quick-")).firstMatch
         XCTAssertTrue(quick.waitForExistence(timeout: 5), app.debugDescription)
         quick.tap()
@@ -120,7 +117,7 @@ import UIKit
         let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: quick)
         XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 10), .completed)
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "habit-row-")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); openDetail(app,row)
         let progress = app.staticTexts["habit-progress"]
         XCTAssertTrue(progress.waitForExistence(timeout: 5))
         XCTAssertTrue(progress.label.contains("١٥ من ٣٠"), progress.label)
@@ -130,7 +127,7 @@ import UIKit
         XCTAssertFalse(quick.isEnabled, "A new intentional tap is accepted after the previous save.")
         let enabledAgain = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: quick)
         XCTAssertEqual(XCTWaiter.wait(for: [enabledAgain], timeout: 10), .completed)
-        row.tap()
+        openDetail(app,row)
         XCTAssertTrue(progress.waitForExistence(timeout: 5))
         XCTAssertTrue(progress.label.contains("٣٠ من ٣٠"), progress.label)
     }
@@ -162,9 +159,6 @@ import UIKit
     func testPartialDurationIsNotACompleteDayAndPastSaveNamesItsAmount() throws {
         continueAfterFailure = false
         let app = app("partialDuration"); open(app)
-        app.buttons["habits-view-all"].tap()
-        let band = app.descendants(matching: .any)["habits-band-daily"]
-        XCTAssertTrue(band.waitForExistence(timeout: 5)); XCTAssertEqual(band.label, "أسبوعك خطوات صغيرة؛ يكفي أن تبدأ")
         shot(app, "Final-habits-partial-L")
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "قراءة هادئة،")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5)); row.press(forDuration: 1)
@@ -173,7 +167,7 @@ import UIKit
         XCTAssertTrue(save.waitForExistence(timeout: 5)); XCTAssertTrue(save.label.contains("١٥"), save.label)
         XCTAssertTrue(save.label.contains("دقيقة"), save.label); shot(app, "Final-habits-past-amount-L")
         save.tap(); XCTAssertTrue(save.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(band.waitForExistence(timeout: 5)); XCTAssertEqual(band.label, "أسبوعك خطوات صغيرة؛ يكفي أن تبدأ")
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
         shot(app, "Final-habits-past-saved-L")
     }
     /// FB-35 (owner, 5 Nov): Madar's own habits wait in the habits room; one tap opens the editor on that source, and a
@@ -210,7 +204,6 @@ import UIKit
         shot(app,"FB39-habit-interval-editor-L")
         app.buttons["habit-save"].tap();XCTAssertTrue(name.waitForNonExistence(timeout:10))
         let row=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","habit-row-")).firstMatch
-        if !row.waitForExistence(timeout:5), app.buttons["habits-today-empty"].exists { app.buttons["habits-today-empty"].tap() }
         XCTAssertTrue(row.waitForExistence(timeout:10),app.debugDescription);shot(app,"FB39-habit-interval-room-L")
     }
     func testQuitHabitIsCreatedAndOnlyAnExplicitSlipLogsIt() throws {
@@ -222,11 +215,10 @@ import UIKit
         XCTAssertTrue(app.staticTexts["habit-abstain-hint"].waitForExistence(timeout:5))
         app.buttons["habit-save"].tap();XCTAssertTrue(name.waitForNonExistence(timeout:10))
         let row=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","habit-row-")).firstMatch
-        if !row.waitForExistence(timeout:5), app.buttons["habits-today-empty"].exists { app.buttons["habits-today-empty"].tap() }
         XCTAssertTrue(row.waitForExistence(timeout:10),app.debugDescription)
         // No ring or plus logs a quit habit: the row has no quick-log control.
         XCTAssertFalse(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","habit-quick-")).firstMatch.exists)
-        row.tap()
+        openDetail(app,row)
         let slip=app.buttons["habit-slip"];XCTAssertTrue(slip.waitForExistence(timeout:10),app.debugDescription)
         XCTAssertTrue(app.staticTexts["habit-quit-days"].exists)
         slip.tap()
@@ -246,15 +238,15 @@ import UIKit
         // One tap from the room, as from the lobby: the row's own button completes a once-a-day habit and then leaves.
         let quick=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","habit-quick-")).firstMatch
         XCTAssertTrue(quick.waitForExistence(timeout:5),app.debugDescription);shot(app,"GD-habits-quick-L");quick.tap();XCTAssertTrue(quick.waitForNonExistence(timeout:5))
-        row().tap();XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["habit-progress"].label.contains("١ من ١"));app.buttons["habit-freeze"].tap();app.buttons["جمّد حتى أفكّه"].tap();XCTAssertTrue(app.buttons["habit-freeze"].waitForNonExistence(timeout:5))
-        row().tap();XCTAssertTrue(app.buttons["habit-resume"].waitForExistence(timeout:5));shot(app,"M4-V02-frozen-L");app.buttons["habit-resume"].tap();XCTAssertTrue(app.buttons["habit-resume"].waitForNonExistence(timeout:5))
-        row().tap();app.buttons["habit-delete"].tap();app.buttons["habit-delete-confirm"].firstMatch.tap();XCTAssertTrue(app.buttons["habit-first"].waitForExistence(timeout:5));app.buttons["habit-archived"].tap();app.buttons["استعدها"].tap();XCTAssertTrue(row().waitForExistence(timeout:5))
+        openDetail(app,row());XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["habit-progress"].label.contains("١ من ١"));app.buttons["habit-freeze"].tap();app.buttons["جمّد حتى أفكّه"].tap();XCTAssertTrue(app.buttons["habit-freeze"].waitForNonExistence(timeout:5))
+        openDetail(app,row());XCTAssertTrue(app.buttons["habit-resume"].waitForExistence(timeout:5));shot(app,"M4-V02-frozen-L");app.buttons["habit-resume"].tap();XCTAssertTrue(app.buttons["habit-resume"].waitForNonExistence(timeout:5))
+        openDetail(app,row());app.buttons["habit-delete"].tap();app.buttons["habit-delete-confirm"].firstMatch.tap();XCTAssertTrue(app.buttons["habit-first"].waitForExistence(timeout:5));app.buttons["habit-archived"].tap();app.buttons["استعدها"].tap();XCTAssertTrue(row().waitForExistence(timeout:5))
         app.terminate();app.launch();open(app);XCTAssertTrue(row().waitForExistence(timeout:10));shot(app,"M4-V02-accessory-after-L");XCTAssertTrue(row().isHittable)
         let accessory=app.tabBars["fixed-tab-bar"] // FB-31: the native glass bar is a UITabBar.
         XCTAssertTrue(accessory.waitForExistence(timeout:10))
         XCTAssertLessThanOrEqual(row().frame.maxY,accessory.frame.minY,"The first habit row should finish above the glass tab bar.")
-        row().tap();XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["habit-progress"].label.contains("١ من ١"))
-        app.buttons["تمّ"].tap();row().tap();app.buttons["habit-delete"].tap();app.buttons["habit-delete-confirm"].firstMatch.tap()
+        openDetail(app,row());XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["habit-progress"].label.contains("١ من ١"))
+        app.buttons["تمّ"].tap();openDetail(app,row());app.buttons["habit-delete"].tap();app.buttons["habit-delete-confirm"].firstMatch.tap()
         XCTAssertTrue(app.buttons["habit-archived"].waitForExistence(timeout:5));app.buttons["habit-archived"].tap()
         let finalDelete=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","حذف نهائي")).firstMatch
         XCTAssertTrue(finalDelete.waitForExistence(timeout:5));finalDelete.tap()
@@ -268,69 +260,48 @@ import UIKit
         let restore=app.buttons["استعدها"];XCTAssertTrue(restore.waitForExistence(timeout:5));clear(restore);restore.tap()
         XCTAssertTrue(row().waitForExistence(timeout:5))
     }
-    func testTodayStepAndAllHabitsLists() throws {
+    func testDailyAndLongerListsStoryAndOrbit() throws {
         continueAfterFailure=false;let app=app("showcase");open(app);shot(app,"M4-V02-Adat-L")
-        // Owner 24 Oct «خطوة اليوم»: «اليوم» holds what is due now; the yearly habit waits in «كل عاداتي».
-        let today=app.buttons["habits-view-today"],all=app.buttons["habits-view-all"]
-        XCTAssertTrue(today.waitForExistence(timeout:5),app.debugDescription);XCTAssertTrue(today.isSelected)
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","الماء،")).firstMatch.exists)
+        // Canvas «Habits»: «يومية» then «أسبوعية وشهرية وسنوية», every habit in one of them, the orbit and the notes below.
+        XCTAssertTrue(app.staticTexts["يومية"].waitForExistence(timeout:5),app.debugDescription)
+        XCTAssertTrue(app.staticTexts["أسبوعية وشهرية وسنوية"].exists)
+        for frequency in ["daily","weekly","monthly","yearly"] { XCTAssertTrue(app.descendants(matching:.any)["habits-period-"+frequency].exists,frequency) }
+        for habit in ["الماء،","الاتصال بالأخوال","صدقة الشهر","العمرة"] {
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@","habit-row-",habit)).firstMatch.waitForExistence(timeout:5),habit)
+        }
         XCTAssertTrue(app.descendants(matching: .any)["habits-orbit"].exists)
         // The fixture has no events today, two completed weekly goals, and completed monthly/yearly goals.
         for (frequency, expected) in [("daily", "اليوم ٠٪"), ("weekly", "الأسبوع ١٠٠٪"), ("monthly", "الشهر ١٠٠٪"), ("yearly", "السنة ١٠٠٪")] {
             XCTAssertEqual(app.staticTexts["habit-orbit-progress-" + frequency].label, expected)
         }
-        XCTAssertFalse(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@","habit-row-", "العمرة")).firstMatch.exists)
+        XCTAssertFalse(app.descendants(matching:.any)["habit-story"].exists)
+        // A bead chooses its habit and opens the story; «التفاصيل» opens the sheet, as the row used to.
         let yearlyBead = app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-orbit-", "العمرة")).firstMatch
-        XCTAssertTrue(yearlyBead.exists); yearlyBead.tap()
+        XCTAssertTrue(yearlyBead.exists)
+        for _ in 0..<10 where !yearlyBead.isHittable { app.swipeUp(velocity:.slow) }
+        yearlyBead.tap()
+        XCTAssertTrue(app.descendants(matching:.any)["habit-story"].waitForExistence(timeout:5),app.debugDescription)
+        app.buttons["habit-story-details"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout: 5)); app.buttons["تمّ"].tap()
-        // The orbit sits above the lists, so rows are scrolled clear of the floating accessory before a tap.
-        let accessory=app.tabBars["fixed-tab-bar"] // FB-31: the native glass bar is a UITabBar.
-        func reveal(_ e:XCUIElement) {
-            for _ in 0..<8 {
-                let floor=accessory.exists ? accessory.frame.minY : app.frame.maxY-120
-                if e.isHittable && e.frame.minY >= 90 && e.frame.maxY <= floor { return }
-                if e.exists && e.frame.minY < 90 { app.swipeDown(velocity:.slow) } else { app.swipeUp(velocity:.slow) }
-            }
-        }
-        let water=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@","habit-row-","الماء،")).firstMatch
-        reveal(water);water.tap()
-        XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));shot(app,"M4-V02-detail-L");app.buttons["تمّ"].tap()
-        reveal(all);all.tap();XCTAssertTrue(all.isSelected)
-        for habit in ["الماء،","الاتصال بالأخوال","صدقة الشهر","العمرة"] {
-            XCTAssertTrue(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",habit)).firstMatch.waitForExistence(timeout:5),habit)
-        }
-        for kind in ["daily","weekly","monthly","yearly"] { XCTAssertTrue(app.descendants(matching:.any)["habits-group-"+kind].exists,kind) }
-        shot(app,"M4-V02-Adat-all-L");app.swipeUp(velocity:.slow);shot(app,"M4-V02-Adat-all-s1-L")
+        shot(app,"M4-V02-Adat-story-L")
         XCTAssertFalse(app.segmentedControls["عرض العادات"].exists) // RA8: alternate designs are v2; this is a filter.
     }
-    func testPeriodSummariesOpenTheirGroupsAndReturnToToday() throws {
+    func testChoosingAHabitOpensItsStoryAndClearReturnsToEveryHabit() throws {
         continueAfterFailure = false
         let app = app("showcase"); open(app)
-        let today = app.buttons["habits-view-today"], all = app.buttons["habits-view-all"]
-        XCTAssertTrue(today.isSelected, app.debugDescription)
-        for frequency in ["daily", "weekly", "monthly", "yearly"] {
-            XCTAssertTrue(app.buttons["habits-period-" + frequency].exists, frequency)
-        }
-        XCTAssertTrue(app.staticTexts["habits-today-group-daily"].exists, app.debugDescription)
-        shot(app, "OR-02-habits-today-L")
-        let weekly = app.buttons["habits-period-weekly"]
-        weekly.tap()
-        XCTAssertTrue(weekly.isSelected, app.debugDescription)
-        XCTAssertFalse(all.isSelected, "The whole-list filter is not selected while only one period is shown.")
-        XCTAssertTrue(app.descendants(matching: .any)["habits-group-weekly"].waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertFalse(app.descendants(matching: .any)["habits-group-daily"].exists)
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "الاتصال بالأخوال")).firstMatch.exists)
-        shot(app, "OR-02-habits-weekly-L")
-        all.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["habits-group-daily"].waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(app.descendants(matching: .any)["habits-group-weekly"].exists)
-        shot(app, "OR-02-habits-all-L")
-        app.swipeUp(velocity: .slow); shot(app, "OR-02-habits-all-s1-L")
-        app.swipeUp(velocity: .slow); shot(app, "OR-02-habits-all-s2-L")
-        app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
-        XCTAssertTrue(today.waitForExistence(timeout: 5)); today.tap()
-        XCTAssertTrue(today.isSelected)
-        XCTAssertTrue(app.staticTexts["habits-today-group-daily"].waitForExistence(timeout: 5))
+        let water=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@","habit-row-","الماء،")).firstMatch
+        XCTAssertTrue(water.waitForExistence(timeout:5)); shot(app, "OR-02-habits-today-L")
+        water.tap()
+        let story=app.descendants(matching:.any)["habit-story"]
+        XCTAssertTrue(story.waitForExistence(timeout:5),app.debugDescription)
+        XCTAssertTrue(app.staticTexts["قصة العادة"].exists)
+        XCTAssertTrue(app.staticTexts["أطول سلسلة"].exists && app.staticTexts["بدأتها"].exists && app.staticTexts["منذ بدأت"].exists)
+        shot(app, "OR-02-habits-story-L")
+        app.buttons["habit-story-clear"].firstMatch.tap()
+        XCTAssertTrue(story.waitForNonExistence(timeout:5))
+        // Tapping the chosen row again also clears it.
+        water.tap(); XCTAssertTrue(story.waitForExistence(timeout:5))
+        water.tap(); XCTAssertTrue(story.waitForNonExistence(timeout:5))
     }
     func testOrbitPercentageUpdatesAfterCompletionAndRelaunch() throws {
         continueAfterFailure = false
@@ -338,7 +309,9 @@ import UIKit
         let daily = app.staticTexts["habit-orbit-progress-daily"]
         XCTAssertEqual(daily.label, "اليوم ٠٪")
         let morning = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-orbit-", "أذكار الصباح")).firstMatch
+        for _ in 0..<10 where !morning.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(morning.isHittable); morning.tap()
+        let details = app.buttons["habit-story-details"].firstMatch; XCTAssertTrue(details.waitForExistence(timeout: 5)); details.tap()
         XCTAssertTrue(app.buttons["habit-complete"].waitForExistence(timeout: 5)); app.buttons["habit-complete"].tap()
         XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "اليوم ٣٣٪"), object: daily)], timeout: 10) == .completed)
         shot(app, "OR-02-orbit-one-of-three-L")
@@ -353,13 +326,14 @@ import UIKit
         shot(app, "M4-V02-scheduled-due-after-L")
         XCTAssertTrue(monthly.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(yearly.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "هدف شهري مرن")).firstMatch.exists, app.debugDescription)
+        // The longer list holds every longer habit, due or waiting (the flexible monthly goal included).
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "هدف شهري مرن")).firstMatch.exists, app.debugDescription)
     }
     func testPastDaySaveDisabledWhenSelectedPeriodHasZeroTarget() throws {
         continueAfterFailure = false
         let app = app("pastZeroTarget"); open(app)
         let daily = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "مشي يومي")).firstMatch
-        XCTAssertTrue(daily.waitForExistence(timeout: 5), app.debugDescription); daily.tap()
+        XCTAssertTrue(daily.waitForExistence(timeout: 5), app.debugDescription); openDetail(app, daily)
         XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout: 5), app.debugDescription)
         let past = app.buttons["habit-past-day"]
         for _ in 0..<8 where !past.isHittable { app.swipeUp(velocity: .slow) }
@@ -369,42 +343,34 @@ import UIKit
         XCTAssertFalse(save.isEnabled, app.debugDescription)
         XCTAssertTrue(app.staticTexts["habit-past-unavailable"].exists, app.debugDescription)
     }
-    func testFixedMonthlyAndYearlyHabitsStayHiddenBeforeTheirDates() {
+    func testFixedMonthlyAndYearlyHabitsWaitInTheirListBeforeTheirDates() {
         continueAfterFailure = false
         let app = app("scheduledEarly", now: "2026-12-25T20:00:00+03:00"); open(app)
         shot(app, "M4-V02-scheduled-early-L")
-        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "صدقة شهرية محددة")).firstMatch.exists, app.debugDescription)
-        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "موعد سنوي محدد")).firstMatch.exists, app.debugDescription)
+        // Before its date a fixed habit is in the longer list, saying it waits, and never in the daily list's count.
+        for name in ["صدقة شهرية محددة", "موعد سنوي محدد"] {
+            let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", name)).firstMatch
+            XCTAssertTrue(row.exists, app.debugDescription); XCTAssertTrue(row.label.contains("تنتظر"), row.label)
+        }
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "هدف شهري مرن")).firstMatch.exists, app.debugDescription)
     }
-    func testAtRiskFixedHabitsStayHiddenBeforeTheirDates() {
+    func testAtRiskFixedHabitsAreListedBeforeTheirDates() {
         continueAfterFailure = false
         let app = app("scheduledRisk", now: "2026-12-25T20:00:00+03:00"); open(app)
         // The today-list row only: the orbit's beads carry the same names.
         let monthly = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "صدقة شهرية محددة")).firstMatch
         let yearly = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "موعد سنوي محدد")).firstMatch
         shot(app, "M4-V02-scheduled-risk-early-L")
-        XCTAssertFalse(monthly.exists, app.debugDescription)
-        XCTAssertFalse(yearly.exists, app.debugDescription)
-        app.buttons["habits-view-all"].tap()
         XCTAssertTrue(monthly.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(yearly.waitForExistence(timeout: 5), app.debugDescription)
     }
     /// Item 26 «ب مع ج»: each rhythm draws itself in «كل عاداتي»; a yearly habit opens on «منذ آخر مرة» with both dates and
     /// its diary line, and «فعلتها في يوم سابق» logs a past day linked to that day's line.
-    func testRhythmBandsSinceLastTimeAndPastDay() throws {
+    func testSinceLastTimeAndPastDay() throws {
         continueAfterFailure=false;let app=app("since");open(app)
-        app.buttons["habits-view-all"].tap()
-        for kind in ["daily","weekly","monthly","yearly"] {
-            let band=app.descendants(matching:.any)["habits-band-"+kind]
-            for _ in 0..<4 where !band.exists { app.swipeUp(velocity:.slow) }
-            XCTAssertTrue(band.waitForExistence(timeout:5),kind)
-        }
-        XCTAssertTrue(app.descendants(matching:.any)["habits-band-yearly"].label.contains("آخر مرة منذ ٧ أشهر"),app.descendants(matching:.any)["habits-band-yearly"].label)
-        app.swipeDown(velocity:.fast);app.swipeDown(velocity:.fast);shot(app,"I26-bands-L");app.swipeUp(velocity:.slow);shot(app,"I26-bands-s1-L")
         let gift=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","إهداء من تحب")).firstMatch
         for _ in 0..<4 where !gift.isHittable { app.swipeUp(velocity:.slow) }
-        gift.tap()
+        openDetail(app,gift)
         let since=app.staticTexts["habit-since"];XCTAssertTrue(since.waitForExistence(timeout:5));XCTAssertEqual(since.label,"منذ ٧ أشهر")
         XCTAssertTrue(app.staticTexts["أهديت أمي عطرها الذي تحبه، وفرحت به كثيرًا."].exists)
         shot(app,"I26-since-L");app.swipeUp(velocity:.slow);shot(app,"I26-since-s1-L")
@@ -418,7 +384,7 @@ import UIKit
         shot(app,"I26-past-day-line-L");app.buttons["habit-past-save"].tap()
         XCTAssertTrue(app.buttons["habit-past-save"].waitForNonExistence(timeout:10))
         let again=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@","habit-row-","إهداء من تحب")).firstMatch
-        XCTAssertTrue(again.waitForExistence(timeout:10));for _ in 0..<4 where !again.isHittable { app.swipeUp(velocity:.slow) };again.tap()
+        XCTAssertTrue(again.waitForExistence(timeout:10));for _ in 0..<4 where !again.isHittable { app.swipeUp(velocity:.slow) };openDetail(app,again)
         XCTAssertTrue(since.waitForExistence(timeout:10));XCTAssertEqual(since.label,"منذ ٣ أيام")
         XCTAssertTrue(app.staticTexts["مشيت مع أخي بعد العصر."].exists);shot(app,"I26-since-after-L")
         // A forgotten day is a long-press away from the room's row.
@@ -433,7 +399,6 @@ import UIKit
     func testPastDayCancelStaysDisabledWhileHabitWriteIsPending() throws {
         continueAfterFailure = false
         let app = app("since", habitWriteHoldMS: 3000); open(app)
-        app.buttons["habits-view-all"].tap()
         let water = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "الماء،")).firstMatch
         for _ in 0..<6 where !water.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(water.isHittable, app.debugDescription); water.press(forDuration: 1.0)
@@ -454,17 +419,16 @@ import UIKit
         XCTAssertFalse(cancel.isEnabled)
         shot(app, "M4-V02-past-day-saving-L")
         XCTAssertTrue(save.waitForNonExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(app.buttons["habits-view-all"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 5), app.debugDescription)
     }
 
     func testSinceTimelineYearLabelsShowBothCalendarsInPreferenceOrder() throws {
         continueAfterFailure = false
         for (calendar, firstMarker) in [("hijri", "هـ"), ("gregorian", "م")] {
             let app = app("since", firstCalendar: calendar); open(app)
-            app.buttons["habits-view-all"].tap()
             let gift = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "إهداء من تحب")).firstMatch
             for _ in 0..<8 where !gift.isHittable { app.swipeUp(velocity: .slow) }
-            XCTAssertTrue(gift.isHittable, app.debugDescription); gift.tap()
+            XCTAssertTrue(gift.isHittable, app.debugDescription); openDetail(app,gift)
             let hijri = app.staticTexts["١٤٤٦ هـ – ١٤٤٧ هـ"]
             let gregorian = app.staticTexts["٢٠٢٥ م"]
             XCTAssertTrue(hijri.waitForExistence(timeout: 5), app.debugDescription)
@@ -525,11 +489,10 @@ import UIKit
         continueAfterFailure = false
         let app = app("since", rootRouteHarness: true)
         open(app)
-        app.buttons["habits-view-all"].tap()
         let gift = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "إهداء من تحب")).firstMatch
         for _ in 0..<8 where !gift.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(gift.isHittable, app.debugDescription)
-        gift.tap()
+        openDetail(app,gift)
 
         let past = app.buttons["habit-past-day"]
         for _ in 0..<6 where !past.isHittable { app.swipeUp(velocity: .slow) }
@@ -579,10 +542,9 @@ import UIKit
     func testOverdueYearlyHabitShowsTheGentleNudge() throws {
         continueAfterFailure = false
         let app = app("sinceOverdue"); open(app)
-        app.buttons["habits-view-all"].tap()
         let gift = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "إهداء من تحب")).firstMatch
         for _ in 0..<8 where !gift.isHittable { app.swipeUp(velocity: .slow) }
-        XCTAssertTrue(gift.isHittable); gift.tap()
+        XCTAssertTrue(gift.isHittable); openDetail(app,gift)
         let since = app.staticTexts["habit-since"]
         XCTAssertTrue(since.waitForExistence(timeout: 10)); XCTAssertEqual(since.label, "منذ سنة")
         XCTAssertTrue(app.staticTexts["مرّت سنة ولم تفعلها؛ لعلّ هذا وقتها"].exists)

@@ -85,6 +85,31 @@ extension AppSession {
             }
             try context.save(); return
         }
+        if variant == "history" {
+            // Five months of habits with a pattern the room can read: Thursdays and Fridays are missed, the last two months are kept
+            // better than the first three, each habit has its own hour, and one longer habit is kept on Fridays.
+            let today = GregorianDay.containing(prayerNow(), in: activePlace.timeZone)
+            let rows: [(String, String, Int)] = [("المشي", "daily", 17), ("القراءة", "daily", 21), ("أذكار الصباح", "daily", 7), ("الاتصال بالأهل", "weekly", 19)]
+            for (index, (name, frequency, hour)) in rows.enumerated() {
+                let start = today.adding(days: -150)
+                let habit = Habit(); habit.id = StableIdentity.uuid(for: "habit-history-\(index)"); habit.name = name; habit.order = index
+                habit.startDate = start.date(in: ActivePlace.riyadh.timeZone); context.insert(habit)
+                let p = HabitPolicy(); p.habitID = habit.id; p.effectiveFrom = start.description; p.frequency = frequency; p.measure = "once"; p.target = 1
+                p.monthCalendar = "gregorian"; context.insert(p)
+                for offset in 1...149 {
+                    let d = today.adding(days: -offset), weekday = HabitEngine.weekday(d)
+                    if frequency == "daily" {
+                        if weekday == 5 || weekday == 6 { continue }
+                        if offset > 60 && (offset + index) % 3 == 0 { continue }
+                    } else if weekday != 6 { continue }
+                    let event = HabitEvent(); event.habitID = habit.id; event.dayKey = d.description
+                    event.periodKey = frequency == "daily" ? d.description : MadarYear.week(d, start: .saturday).start.description
+                    event.delta = 1; event.eventAt = d.date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(Double(hour * 3600 + (offset % 5) * 900))
+                    event.tzID = "Asia/Riyadh"; event.dayPolicy = "midnight@1"; context.insert(event)
+                }
+            }
+            try context.save(); return
+        }
         let comingWidget = variant == "widgetComing"
         let atRisk = variant == "atRisk", overdue = variant == "sinceOverdue"
         let since = variant == "since" || overdue

@@ -25,6 +25,8 @@ public struct HabitReading: Identifiable, Sendable {
     public var latestRule: HabitRule? = nil
     /// When the newest logged times happened (up to 14, newest first); a push habit with no window is reminded at their median.
     public var eventTimes: [Date] = []
+    /// Every instant a log was made (up to 800, newest first): the hour chart of the habits room reads it.
+    public var loggedAt: [Date] = []
     /// The saved versions of the rule dated after today, oldest first: the steps of a growing goal or a Ramadan window.
     public var upcomingRules: [HabitRule] = []
     /// A habit you quit (owner, 17 Nov 2026, idea 10): never «open», never asked, logged only by an explicit slip.
@@ -241,6 +243,7 @@ public struct HabitRepository {
             result.append(.init(id: habit.id, name: habit.name, source: habit.linkedSource, archived: habit.archivedAt != nil, homeOnly: habit.homeOnly, reminder: habit.reminder, summary: summary, firstEffectiveFrom: firstDay, paused: breaks.contains { $0.contains(today) }, isNow: summary.current.map { HabitEngine.isNow($0, today: today, instant: now, window: window, pauses: breaks) } ?? false, times: times, breaks: breaks,
                                  latestRule: rules.max { $0.effectiveFrom < $1.effectiveFrom },
                                  eventTimes: habitEvents.filter { $0.delta > 0 }.map(\.eventAt).sorted(by: >).prefix(RoomReminders.learnedTimeSample).map { $0 },
+                                 loggedAt: habitEvents.filter { $0.delta > 0 }.map(\.eventAt).sorted(by: >).prefix(800).map { $0 },
                                  upcomingRules: rules.filter { $0.effectiveFrom > today }.sorted { $0.effectiveFrom < $1.effectiveFrom }))
         }
         return result

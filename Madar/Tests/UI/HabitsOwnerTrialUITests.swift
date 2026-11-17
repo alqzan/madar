@@ -40,9 +40,8 @@ import XCTest
         XCTAssertEqual(first["store.events"], expected)
         XCTAssertEqual(first["replay.created"], 0); XCTAssertEqual(first["replay.unchanged"], 1)
         open(app); shot(app, "TRIAL-habits-import-L")
-        let all = app.buttons["habits-view-all"]; XCTAssertTrue(all.waitForExistence(timeout: 5)); all.tap()
         let habit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "habit-row-")).firstMatch
-        XCTAssertTrue(habit.waitForExistence(timeout: 10)); shot(app, "TRIAL-habits-all-L"); habit.tap()
+        XCTAssertTrue(habit.waitForExistence(timeout: 10)); shot(app, "TRIAL-habits-all-L"); habit.tap(); let details = app.buttons["habit-story-details"].firstMatch; XCTAssertTrue(details.waitForExistence(timeout: 5)); details.tap()
         XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout: 10)); shot(app, "TRIAL-habits-history-L")
         app.terminate(); try FileManager.default.removeItem(at: output); app.launch()
         let replay = try report(output)
