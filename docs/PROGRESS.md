@@ -317,6 +317,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
   - The arrange, greeting and tab-bar tests now use the habits block and the remaining room tabs.
   - The diary test now saves with «تمّ». There has been no cancel for new words since 14 Nov (T10).
 - Not visually checked: the quit-habit hero, dark mode, Hijri-first, iPad.
+- Build 0.1.0 (56): archive succeeded, upload succeeded on 17 Nov 2026 (`Madar/Artifacts/OWNER-TestFlight-56/upload.log`). Apple processing was not awaited.
 
 ### Model/effort
 - claude-opus-5-5, effort not exposed. Helper: Sonnet (owner's order) for all three follow-ups.
