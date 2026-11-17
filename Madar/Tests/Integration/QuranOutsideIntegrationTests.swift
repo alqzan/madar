@@ -28,8 +28,11 @@ import MadarSnapshots
         let late = try XCTUnwrap(candidates.first { $0.id.hasSuffix(".late") })
         XCTAssertEqual(wird.dueAt, day.fajr.addingTimeInterval(30 * 60))
         XCTAssertEqual(late.dueAt, day.asr.addingTimeInterval(30 * 60))
+        // Owner, 17 Nov 2026: a wird asked after Fajr is asked once more after Isha while it is still not done.
+        let again = try XCTUnwrap(candidates.first { $0.id.hasSuffix(".again") })
+        XCTAssertEqual(again.dueAt, day.isha.addingTimeInterval(30 * 60))
         let budget = NotificationArbiter.plan(candidates: candidates, prayerDays: [day], now: now, timeZone: .init(identifier: "Asia/Riyadh")!, policy: .init(dailyBudget: 1, digestEnabled: false, staleNudgeEnabled: false, dayBoundary: .midnight))
-        XCTAssertEqual(budget.scheduled.map(\.id), [wird.id]); XCTAssertEqual(budget.droppedIDs, [late.id])
+        XCTAssertEqual(budget.scheduled.map(\.id), [wird.id]); XCTAssertEqual(Set(budget.droppedIDs), [late.id, again.id])
         let quiet = NotificationArbiter.plan(candidates: candidates, prayerDays: [day], now: now, timeZone: .init(identifier: "Asia/Riyadh")!, policy: .init(quietFromMinutes: 12 * 60, staleNudgeEnabled: false))
         XCTAssertTrue(quiet.droppedIDs.contains(late.id))
         try await app.applySettingsAndWait(["quran.wirdReminder": .string("off"), "quran.lateReminder": .bool(false)])

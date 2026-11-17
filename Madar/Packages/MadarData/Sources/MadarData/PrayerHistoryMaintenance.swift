@@ -52,4 +52,35 @@ import SwiftData
             throw error
         }
     }
+
+    /// Owner 17 Nov 2026 («امسح كل شي خلاص معاد ابيه»): every prayer log and qada row is removed for good.
+    /// Rows are tombstoned with a deletion barrier (not erased) so iCloud sync and old backups cannot bring them back.
+    /// It runs on every launch: a prayer command queued by an older extension before the update is cleared the next time.
+    @discardableResult
+    public static func removeAllPrayerRecords(in context: ModelContext, now: Date = .now) throws -> Int {
+        let logs = try context.fetch(FetchDescriptor<PrayerLog>(predicate: #Predicate { $0.deletedAt == nil }))
+            .filter { $0.mergedInto == nil }
+        let debts = try context.fetch(FetchDescriptor<QadaItem>(predicate: #Predicate { $0.deletedAt == nil }))
+            .filter { $0.mergedInto == nil }
+        guard !logs.isEmpty || !debts.isEmpty else { return 0 }
+        let writer = "system.prayer-records-removed-v2"
+        func tombstone(_ row: some MadarRecordModel) throws {
+            var record = try row.record()
+            let stamp = StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? .distantPast)
+            try record.set(stamp, for: "updatedAt")
+            try record.set(stamp, for: "deletedAt")
+            try record.set(stamp, for: "deletionBarrierAt")
+            try record.set(writer, for: "writerID")
+            try row.apply(record)
+        }
+        do {
+            for row in logs { try tombstone(row) }
+            for row in debts { try tombstone(row) }
+            try context.save()
+            return logs.count + debts.count
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
 }

@@ -51,7 +51,11 @@ final class AppSession {
     var settingsRoute: Route?
     var moneyExpenseSeed: MoneyExpenseSeed?
     @ObservationIgnored private var queuedMoneyExpenseSeeds: [MoneyExpenseSeed] = []
-    var habitsOpen = false
+    /// Owner 17 Nov 2026: habits are a tab of their own; opening them selects the tab.
+    var habitsOpen: Bool {
+        get { false }
+        set { if newValue { selectedTab = "habits" } }
+    }
     /// The lobby habits card's chosen period; kept here so a block rebuilt after a save (e.g. leaving «رتّب») keeps it.
     var lobbyHabitPeriod: String?
     /// A lobby-root link waits for the habits editor to close so its local, unsaved fields stay visible.
@@ -216,7 +220,7 @@ final class AppSession {
     @ObservationIgnored private var spotlightReconciliationTask: Task<Void, Never>?
     @ObservationIgnored private let spotlightIndexOperation: AppSpotlightIndexOperation
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.spotlightIndex", "core.essentials", "salah.pool", "salah.fridayTallArch", "salah.pendingDays", "salah.tripMethod", "salah.travelShortenCombine", "salah.askAfterAdhanMin", "salah.askReminder", "salah.beforeReminder", "salah.beforeAdhanMin", "notes.eveningLine", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.reminder", "bahw.travelFreezesHome", "bahw.smartPresence", "bahw.widgetScope"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.spotlightIndex", "core.essentials", "core.travelMode", "salah.tripMethod", "salah.travelShortenCombine", "notes.eveningLine", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.reminder", "bahw.travelFreezesHome", "bahw.smartPresence", "bahw.widgetScope"]
 
     init(
         container: ModelContainer,
@@ -269,6 +273,8 @@ final class AppSession {
         schema = try SettingsSchema.bundled()
         store = SettingsStore(context: container.mainContext, schema: schema)
         _ = try PrayerHistoryMaintenance.removeUnperformedPrayerHistory(in: container.mainContext, now: prayerNow())
+        _ = try PrayerHistoryMaintenance.removeAllPrayerRecords(in: container.mainContext, now: prayerNow())
+        _ = try? HabitJamaahConversion.convert(in: container.mainContext, today: GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone), now: prayerNow())
         #if DEBUG
         try preparePrayerUITestTrackingStart()
         try preparePrayerPolarNoTimesFixture(group: group)
@@ -836,8 +842,7 @@ final class AppSession {
             if route.room == .mal, route.path.isEmpty || route.path == ["now"] { moneyRootRequestID = UUID(); selectedTab = "money"; return }
             if route.room == .mal { moneyRoute = route; selectedTab = "money"; return }
             if route.room == .salah {
-                if route.path.isEmpty { prayerRootRequestID = UUID(); selectedTab = "prayer" }
-                else { prayerRoute = route; selectedTab = "prayer" }
+                selectedTab = "habits"
                 return
             }
             if route.room == .bahw, route.path.isEmpty {
@@ -867,7 +872,7 @@ final class AppSession {
             }
             if route.room == .mihbara { mihbaraRoute = route; selectedTab = "mihbara"; return }
             // A valid link whose inner screen has no direct route yet opens its room, never «هذا الرابط غير متاح».
-            let roomTabs: [Room: String] = [.salah: "prayer", .quran: "quran", .notes: "notes", .mal: "money", .mihbara: "mihbara", .bahw: "foundation", .year: "foundation"]
+            let roomTabs: [Room: String] = [.salah: "habits", .habits: "habits", .quran: "quran", .notes: "notes", .mal: "money", .mihbara: "mihbara", .bahw: "foundation", .year: "foundation"]
             if url.host == "search" {
                 searchRoute = route
                 selectedTab = route.parameters["room"].flatMap(Room.init(rawValue:)).flatMap { roomTabs[$0] } ?? "notes"
@@ -1070,10 +1075,10 @@ final class AppSession {
     @discardableResult
     /// T11: «تمّت» from a habit reminder is written through the same inbox queue the widgets use. The command id comes from the
     /// notification and the action, so a repeated delivery is the same command and records once.
-    func completeHabitFromNotification(habitID: UUID, dayKey: String, requestID: String) async throws {
+    func completeHabitFromNotification(habitID: UUID, dayKey: String, requestID: String, delta: Int = 1, action: String = "done") async throws {
         let day = try GregorianDay(dayKey)
-        _ = try HabitInboxCommandWriter.complete(inbox: pendingInbox, habitID: habitID, delta: 1, periodKey: dayKey, source: .notification,
-                                                 issuedAt: Date(), day: day, commandID: StableIdentity.uuid(for: "notification." + requestID + ".habit.done"))
+        _ = try HabitInboxCommandWriter.complete(inbox: pendingInbox, habitID: habitID, delta: max(1, delta), periodKey: dayKey, source: .notification,
+                                                 issuedAt: Date(), day: day, commandID: StableIdentity.uuid(for: "notification." + requestID + ".habit." + action))
         _ = try await drainInbox()
     }
     func drainInbox() async throws -> Bool {
@@ -1447,7 +1452,7 @@ final class AppSession {
         container = replacement
         let context = ModelContext(replacement)
         store = SettingsStore(context: context, schema: schema)
-        do { _ = try PrayerHistoryMaintenance.removeUnperformedPrayerHistory(in: context, now: prayerNow()) }
+        do { _ = try PrayerHistoryMaintenance.removeUnperformedPrayerHistory(in: context, now: prayerNow()); _ = try PrayerHistoryMaintenance.removeAllPrayerRecords(in: context, now: prayerNow()); _ = try? HabitJamaahConversion.convert(in: context, today: GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone), now: prayerNow()) }
         catch { errorMessage = "لم يكتمل تنظيف سجلات الصلاة القديمة. \(madarUserMessage(error))" }
         undoToken = nil; setUndoToast(false); expiryTask?.cancel()
     }

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import MadarCore
 import MadarCommands
 import MadarDesign
@@ -42,6 +43,8 @@ struct HabitEditorView:View {
         guard let estimate=paceGoal?.estimate(left:rule.target,unit:unit) else { return "كلما قرأت أكثر عرفتُ كم يأخذ هدفك من وقتك." }
         return "نحو "+habitUnitCount(estimate.amount,estimate.unit,digits,genitive:true)+" في اليوم بحسب وتيرتك الأخيرة."
     }
+    /// Idea 19 (owner, 17 Nov 2026): one new habit at a time — a habit begun in the last two weeks is named before adding another.
+    @State private var settlingHabit:(name:String,days:Int)?
     @State private var minimumOn=false
     @State private var windowOn=false
     @State private var homeOnly=false
@@ -69,9 +72,14 @@ struct HabitEditorView:View {
             if let issue { Text(issue).font(MadarTypography.caption()).foregroundStyle(theme.accent).frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,20).padding(.top,6).accessibilityIdentifier("habit-editor-error") }
             ScrollView {
                 VStack(alignment:.leading,spacing:18) {
+                    if reading == nil, let settling=settlingHabit {
+                        Label("بدأت «"+settling.name+"» "+(settling.days == 0 ? "اليوم" : "قبل "+habitPeriodCount(settling.days,.daily,digits))+"؛ العادة الجديدة تثبت أسرع إذا بدأتها وحدها أسبوعين.",systemImage:"leaf")
+                            .font(HabitType.caption()).foregroundStyle(theme.secondaryInk).frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,4)
+                            .accessibilityIdentifier("habit-one-at-a-time")
+                    }
                     section("العادة") {
                         TextField("اسم العادة",text:$name,prompt:Text("ورد قبل النوم")).font(MadarTypography.body()).frame(minHeight:44).accessibilityIdentifier("habit-name")
-                        if reading == nil { Picker("تسجيلها",selection:$source) { Text("أسجّلها هنا").tag("custom");Text("الجماعة من الصلاة").tag("jamaah");Text("ورد الحفظ من القرآن").tag("wird");Text("المراجعة من القرآن").tag("review");Text("القراءة من المحبرة").tag("reading");Text("سطر اليوم من المذكرات").tag("diaryLine");if HabitHealthStore.available {Text("المشي من الصحة").tag("walking")} }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-source") }
+                        if reading == nil { Picker("تسجيلها",selection:$source) { Text("أسجّلها هنا").tag("custom");Text("ورد الحفظ من القرآن").tag("wird");Text("المراجعة من القرآن").tag("review");Text("القراءة من المحبرة").tag("reading");Text("سطر اليوم من المذكرات").tag("diaryLine");if HabitHealthStore.available {Text("المشي من الصحة").tag("walking")} }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-source") }
                         else if let title=reading?.sourceTitle { Text("تُقرأ من "+title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     }
                     section("التكرار") {
@@ -181,10 +189,17 @@ struct HabitEditorView:View {
             if let loaded=try? service.load() { paceGoal=try? service.readingGoal(today:loaded.day,book:MihbaraStand.pick(from:loaded.books)) }
         }
         .onAppear {
-            let initialName = reading?.name ?? HabitEditorView.linkedDefaults[self.initialSource]?.name ?? ""
-            let initialSource = reading?.source ?? self.initialSource
+            if reading == nil, let all=try? HabitRepository(context:ModelContext(session.container)).readings(at:session.prayerNow()) {
+                let today=AppBahwService(session:session).today
+                settlingHabit=all.filter{!$0.archived && $0.firstEffectiveFrom <= today && MadarCalendarDays.distance(from:$0.firstEffectiveFrom,to:today) < 14}
+                    .max{$0.firstEffectiveFrom < $1.firstEffectiveFrom}.map{($0.name,MadarCalendarDays.distance(from:$0.firstEffectiveFrom,to:today))}
+            }
+            // Owner, 17 Nov 2026: «صليت كل الصلوات بجماعة» is the user's own once-a-day habit, asked an hour after Isha.
+            let jamaahPreset = reading == nil && self.initialSource == "preset.jamaah"
+            let initialName = jamaahPreset ? HabitJamaahConversion.name : reading?.name ?? HabitEditorView.linkedDefaults[self.initialSource]?.name ?? ""
+            let initialSource = jamaahPreset ? "custom" : reading?.source ?? self.initialSource
             // D6: a habit that has not started shows its saved rule and keeps its own start date.
-            var initialRule = reading?.summary.current?.rule ?? reading?.latestRule ?? HabitRule(effectiveFrom:AppBahwService(session:session).today)
+            var initialRule = jamaahPreset ? HabitJamaahConversion.rule(from:AppBahwService(session:session).today) : reading?.summary.current?.rule ?? reading?.latestRule ?? HabitRule(effectiveFrom:AppBahwService(session:session).today)
             if reading == nil, let linked = HabitEditorView.linkedDefaults[initialSource] { initialRule.measure = linked.measure;initialRule.unit=linked.unit;initialRule.target=linked.target }
             initialRule.effectiveFrom=editStart
             let initialMonthDays = initialRule.monthDays.map{digits.string($0)}.joined(separator:"، ")
@@ -192,7 +207,7 @@ struct HabitEditorView:View {
             let initialWindowOn = initialRule.windowStart != nil
             let initialHomeOnly = reading?.homeOnly ?? false
             let defaultReminder = session.string("bahw.reminder")
-            let initialReminder = reading?.reminder ?? (["dot", "push", "none"].contains(defaultReminder) ? defaultReminder : "dot")
+            let initialReminder = jamaahPreset ? "push" : reading?.reminder ?? (["dot", "push", "none"].contains(defaultReminder) ? defaultReminder : "dot")
             advancedOpen = initialWindowOn || initialHomeOnly || initialReminder != "dot" || !initialRule.restWeekdays.isEmpty
             name=initialName;source=initialSource;rule=initialRule;monthDays=initialMonthDays;minimumOn=initialMinimumOn;windowOn=initialWindowOn;homeOnly=initialHomeOnly;reminder=initialReminder
             initialSnapshot = .init(name:initialName,source:initialSource,rule:initialRule,monthDays:initialMonthDays,minimumOn:initialMinimumOn,windowOn:initialWindowOn,homeOnly:initialHomeOnly,reminder:initialReminder)

@@ -102,10 +102,9 @@ extension AppSession {
                 return await addDiaryLineFromIntent(text: kind == .idea ? "فكرة: " + line : line, day: "today", id: id)
             // FB-39: the Mihbara notebook has no entry point any more, so an idea lands on today's diary page where the owner can see it.
             case .mihbaraIdea(let idea): return await addDiaryLineFromIntent(text: "فكرة: " + idea, day: "today", id: id)
-            case .logPrayer(let prayer, let status, let shortened, let fridayKind):
-                return logPrayerFromCapture(prayer, status: status, shortened: shortened, fridayKind: fridayKind)
-            case .choosePrayerStatus(let prayer, _):
-                selectedTab = "prayer"; prayerLogRequest = prayer; return true
+            // Owner 17 Nov 2026: Madar no longer records prayers; a captured «صليت…» is not written anywhere.
+            case .logPrayer, .choosePrayerStatus:
+                errorMessage = "مدار لم يعد يسجّل الصلاة. أضف عادة لها من «العادات» إن أردت."; return true
             }
         }
     }
@@ -130,7 +129,7 @@ extension AppSession {
     /// The prayer day comes from the same snapshot as the prayer home (Fajr to the next Fajr).
     /// Friday Dhuhr said as «الظهر» is recorded as Dhuhr, never silently as Jumu'ah.
     private func logPrayerFromCapture(_ prayer: Prayer, status: String, shortened: Bool?, fridayKind: FridayPrayerKind?) -> Bool {
-        selectedTab = "prayer"
+        selectedTab = "habits"
         guard let snapshot = try? prayerSnapshot(at: prayerNow()),
               let cell = snapshot.today.cells.first(where: { $0.reference.prayer == prayer }) else {
             errorMessage = "تعذّر تحديد يوم الصلاة. افتح الصلاة وسجّلها من قوسها."; return true

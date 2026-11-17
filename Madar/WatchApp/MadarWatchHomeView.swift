@@ -25,7 +25,7 @@ struct MadarWatchHomeView: View {
             Text(store.envelope == nil ? "افتح مدار على الآيفون" : "افتح مدار لتحديث بيانات الساعة")
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .multilineTextAlignment(.center)
-            Text("ستظهر هنا الصلاة القادمة وملخص اليوم")
+            Text("ستظهر هنا عاداتك وملخص اليوم")
                 .font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
         .padding(14).frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -39,12 +39,12 @@ struct MadarWatchHomeView: View {
                     Text(snapshot.datePrimary).font(.system(size: 14, weight: .semibold, design: .rounded))
                     Text(snapshot.dateSecondary).font(.system(size: 11)).foregroundStyle(.secondary)
                 }
-                prayerCard(snapshot, timeZoneID: envelope.tzID, now: now)
-                if let quran = snapshot.quran {
-                    progressCard(title: "القرآن", symbol: "book.closed", progress: quran, snapshot: snapshot)
-                }
+                // Owner 17 Nov 2026: the prayer card gave way to today's habits (decision 1 of the habits-replace-prayer plan).
                 if let habits = snapshot.habits {
                     progressCard(title: "العادات", symbol: "leaf", progress: habits, snapshot: snapshot)
+                }
+                if let quran = snapshot.quran {
+                    progressCard(title: "القرآن", symbol: "book.closed", progress: quran, snapshot: snapshot)
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 6)

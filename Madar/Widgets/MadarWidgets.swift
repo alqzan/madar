@@ -41,14 +41,10 @@ private struct FoundationWidget: Widget {
     var body: some Widget {
         FoundationWidget()
         MadarMakerWidget()
-        NextPrayerWidget()
         QuranWidget()
         AdditionalRoomWidgets().body
         QuranReviewTimerControl()
-        PrayerCountdownActivityWidget()
         MadarContextActivityWidget()
-        PrayerLogControl()
-        PrayerCountdownControl()
     }
 }
 

@@ -31,7 +31,7 @@ struct HabitRhythmBand:View {
         .overlay { RoundedRectangle(cornerRadius:20).stroke(theme.line.opacity(0.7)) }
         .accessibilityElement().accessibilityLabel(caption).accessibilityIdentifier("habits-band-"+frequency.rawValue)
     }
-    private var label:some View { Text(caption).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(maxWidth:.infinity,alignment:.leading).fixedSize(horizontal:false,vertical:true) }
+    private var label:some View { Text(caption).font(HabitType.caption()).foregroundStyle(theme.secondaryInk).frame(maxWidth:.infinity,alignment:.leading).fixedSize(horizontal:false,vertical:true) }
     @ViewBuilder private var drawing:some View {
         switch frequency {
         case .daily, .interval: steps
@@ -83,7 +83,7 @@ struct HabitRhythmBand:View {
                         .overlay { Circle().stroke(on ? theme.accentFill : isToday ? theme.accent : theme.line,lineWidth:isToday ? 2 : 1.2) }
                         .overlay { if on { Image(systemName:"checkmark").font(.system(size:12,weight:.bold)).foregroundStyle(theme.onAccent) } }
                         .frame(width:30,height:30).opacity(day > today ? 0.55 : 1)
-                    Text(Self.weekday(day)).font(MadarTypography.fine()).foregroundStyle(isToday ? theme.ink : theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7)
+                    Text(Self.weekday(day)).font(HabitType.fine()).foregroundStyle(isToday ? theme.ink : theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7)
                 }.frame(maxWidth:.infinity)
             }
         }
@@ -107,7 +107,7 @@ struct HabitRhythmBand:View {
             }
             // The lit share of the ring is the month so far, as a crescent grows.
             Circle().trim(from:0,to:Double(index)/Double(total)).stroke(theme.accentFill.opacity(0.18),style:.init(lineWidth:10,lineCap:.round)).frame(width:72,height:72).rotationEffect(.degrees(-90))
-            VStack(spacing:0) { Text(digits.string(index)).font(MadarTypography.section()); Text("من "+digits.string(total)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+            VStack(spacing:0) { Text(digits.string(index)).font(HabitType.section()); Text("من "+digits.string(total)).font(HabitType.fine()).foregroundStyle(theme.secondaryInk) }
         }
     }
 
@@ -122,7 +122,7 @@ struct HabitRhythmBand:View {
                     .stroke(on ? theme.accentFill : current ? theme.accent : theme.line,style:.init(lineWidth:on ? 7 : current ? 4 : 3,lineCap:.round))
                     .frame(width:72,height:72).rotationEffect(.degrees(-90))
             }
-            VStack(spacing:0) { Text(digits.string(count)).font(MadarTypography.section()); Text("هذه السنة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7) }.frame(width:56)
+            VStack(spacing:0) { Text(digits.string(count)).font(HabitType.section()); Text("هذه السنة").font(HabitType.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7) }.frame(width:56)
         }
     }
     private func monthIndex(_ day:GregorianDay,_ p:HabitPeriodResult)->Int { min(11,max(0,span(p.start,day)*12/max(1,span(p.start,p.end)))) }

@@ -4,12 +4,6 @@ import AppIntents
 struct MadarPrayerShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
-            intent: LogPrayerIntent(),
-            phrases: ["سجّل صلاة في \(.applicationName)", "سجّل صلاتي في \(.applicationName)", "صلّيت \(\.$prayer) في \(.applicationName)"],
-            shortTitle: "سجّل صلاة",
-            systemImageName: "checkmark.circle"
-        )
-        AppShortcut(
             intent: CaptureIntent(),
             phrases: ["التقط في \(.applicationName)", "سجّل في \(.applicationName)"],
             shortTitle: "التقاط",
@@ -44,12 +38,6 @@ struct MadarPrayerShortcuts: AppShortcutsProvider {
             phrases: ["أكمل القراءة في \(.applicationName)", "أكمل كتابي في \(.applicationName)"],
             shortTitle: "أكمل القراءة",
             systemImageName: "book.pages"
-        )
-        AppShortcut(
-            intent: StartPrayerActivityIntent(),
-            phrases: ["ابدأ عداد الصلاة في \(.applicationName)", "تابع الصلاة القادمة في \(.applicationName)"],
-            shortTitle: "عدّاد الصلاة",
-            systemImageName: "timer"
         )
     }
 }

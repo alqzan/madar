@@ -14,6 +14,14 @@ struct HabitDetailView:View {
     let edit:()->Void
     @Environment(\.dismiss) private var dismiss
     @State private var busy=false
+    /// Idea 20 (owner, 17 Nov 2026): ending a habit shows what it was — how long it ran and how often it was kept.
+    @State private var ending=false
+    private var endingSummary:String {
+        let periods=reading.summary.periods.filter{$0.target > 0 && $0.end <= AppBahwService(session:session).today.adding(days:1)}
+        let kept=periods.filter(\.met).count
+        let days=max(1,MadarCalendarDays.distance(from:reading.firstEffectiveFrom,to:AppBahwService(session:session).today)+1)
+        return "«"+reading.name+"» معك منذ "+habitPeriodCount(days,.daily,digits)+(kept == 0 ? "، ولم تتمّها بعد" : "، أتممتها "+arabicCount(kept,["مرة واحدة","مرتين","مرات","مرة"],digits)+" من "+digits.string(periods.count))+". تبقى في سجلّك وتستطيع إرجاعها."
+    }
     @State private var pastDay=false
     /// Read once when the page opens; it was rebuilt from every prayer log on each redraw of the «جمّد» menu.
     @State private var onTrip=false
@@ -27,12 +35,12 @@ struct HabitDetailView:View {
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:18) {
-                HStack { Text(reading.name).font(MadarTypography.title());Spacer();Button{dismiss()}label:{Text("تمّ").padding(.horizontal,16).frame(minHeight:44).glassEffect(.regular.interactive(), in: .capsule)}.buttonStyle(.madarPlain) }
+                HStack { Text(reading.name).font(HabitType.title());Spacer();Button{dismiss()}label:{Text("تمّ").padding(.horizontal,16).frame(minHeight:44).glassEffect(.regular.interactive(), in: .capsule)}.buttonStyle(.madarPlain) }
                 if keptBySince { HabitSinceSection(session:session,reading:reading) }
                 if let current=reading.summary.current { hero(current) }
                 actions
                 if let current=reading.summary.current { history(current) }
-                Text("الحذف يحفظ سجلك؛ تستعيد العادة من «عادات محذوفة».").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                Text("الحذف يحفظ سجلك؛ تستعيد العادة من «عادات محذوفة».").font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
             }.padding(22)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.roomTheme,theme)
         .sheet(isPresented:$pastDay, onDismiss: { pastDayDraftPresented = false }) { HabitPastDaySheet(session:session,reading:reading) { dismiss() }.madarSheetErrorAlert(session) }
@@ -43,16 +51,16 @@ struct HabitDetailView:View {
         VStack(alignment:.leading,spacing:14) {
             HStack(alignment:.center,spacing:16) {
                 VStack(alignment:.leading,spacing:6) {
-                    Text(current.target == 0 ? "سجلك محفوظ" : habitProgressText(current.rule.measure == .once ? min(current.value,current.target) : current.value,current.target,current.rule.unit,digits)).font(MadarTypography.cardTitle()).accessibilityIdentifier("habit-progress")
-                    if let state = stateLine(current) { Text(state).font(MadarTypography.section()).foregroundStyle(theme.accent) }
-                    if reading.summary.streak > 1 { HabitFlame(count:reading.summary.streak,frequency:current.rule.frequency,digits:digits).scaleEffect(1.25,anchor:.leading) }
+                    Text(current.target == 0 ? "سجلك محفوظ" : habitProgressText(current.rule.measure == .once ? min(current.value,current.target) : current.value,current.target,current.rule.unit,digits)).font(HabitType.cardTitle()).accessibilityIdentifier("habit-progress")
+                    if let state = stateLine(current) { Text(state).font(HabitType.section()).foregroundStyle(theme.accent) }
+                    if reading.summary.streak > 1 || reading.summary.atRisk { HabitFlame(count:reading.summary.streak,frequency:current.rule.frequency,digits:digits,met:current.met,atRisk:reading.summary.atRisk && !current.met).scaleEffect(1.25,anchor:.leading) }
                 }
                 Spacer(minLength:0)
                 if !dynamicTypeSize.isAccessibilitySize { HabitRingGlyph(share:Double(current.value)/Double(max(1,current.target)),done:current.met,symbol:reading.source == nil ? nil : reading.symbol,lineWidth:5).frame(width:64,height:64) }
             }
             primary(current)
-            Text("تُقاس "+measured(current.rule.frequency)+"؛ "+habitBreakExplanation(Int(session.number("bahw.streakBreakAfter")),current.rule.frequency)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-            if current.rule.minimum != nil { Text("أقلّ القليل يحفظ السلسلة، ويظهر بعلامة أخفّ.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+            Text("تُقاس "+measured(current.rule.frequency)+"؛ "+habitBreakExplanation(Int(session.number("bahw.streakBreakAfter")),current.rule.frequency)).font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
+            if current.rule.minimum != nil { Text("أقلّ القليل يحفظ السلسلة، ويظهر بعلامة أخفّ.").font(HabitType.caption()).foregroundStyle(theme.secondaryInk) }
         }
         .padding(18).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:24))
     }
@@ -62,14 +70,13 @@ struct HabitDetailView:View {
         guard p.rule.measure != .once, p.value > 0, p.target > p.value else { return nil }
         return "بقي "+habitUnitCount(p.target-p.value,p.rule.unit,digits)
     }
-    private func filled(_ title:String)->some View { Text(title).font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
+    private func filled(_ title:String)->some View { Text(title).font(HabitType.section()).frame(maxWidth:.infinity,minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
     @ViewBuilder private func primary(_ current:HabitPeriodResult)->some View {
         if reading.source == "walking" {
-            if HabitHealthStore.available { Button {Task{do{try await HabitHealthStore.authorize(unit:reading.summary.current?.rule.unit ?? "steps");_ = try await HabitHealthStore.refresh(session:session);dismiss()}catch{session.errorMessage=madarUserMessage(error)}}} label: { filled("حدّث من الصحة") }.buttonStyle(.madarPlain) } else {Text("بيانات الصحة غير متاحة على هذا الجهاز").font(MadarTypography.caption())}
+            if HabitHealthStore.available { Button {Task{do{try await HabitHealthStore.authorize(unit:reading.summary.current?.rule.unit ?? "steps");_ = try await HabitHealthStore.refresh(session:session);dismiss()}catch{session.errorMessage=madarUserMessage(error)}}} label: { filled("حدّث من الصحة") }.buttonStyle(.madarPlain) } else {Text("بيانات الصحة غير متاحة على هذا الجهاز").font(HabitType.caption())}
         } else if let source=reading.source {
             Button {
                 switch source {
-                case "jamaah": session.selectedTab = "prayer"
                 case "review", "wird": session.selectedTab = "quran"
                 case "diaryLine": session.selectedTab = "notes"
                 case "reading", "hadith": session.selectedTab = "mihbara"
@@ -87,7 +94,7 @@ struct HabitDetailView:View {
             if let minimum=current.rule.minimum,current.value<minimum { Button { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(Double(minimum-current.value))]) } label: { outline(Text("سجّل أقلّ القليل: "+habitUnitCount(minimum,current.rule.unit,digits))) }.buttonStyle(.madarPlain).disabled(busy).accessibilityIdentifier("habit-minimum") }
         }
     }
-    private func outline<L:View>(_ label:L)->some View { label.font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:44).overlay { Capsule().stroke(theme.line) }.contentShape(.capsule) }
+    private func outline<L:View>(_ label:L)->some View { label.font(HabitType.caption()).frame(maxWidth:.infinity,minHeight:44).overlay { Capsule().stroke(theme.line) }.contentShape(.capsule) }
     private var actions:some View {
         HStack(spacing:8) {
             if reading.paused { Button { perform("habit.resume",["id":.string(reading.id.uuidString)]) } label: { outline(Label("فكّ التجميد",systemImage:"play")) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-resume") }
@@ -98,7 +105,11 @@ struct HabitDetailView:View {
                 } label: { outline(Label("جمّد",systemImage:"snowflake")) }.accessibilityIdentifier("habit-freeze")
             }
             Button { dismiss();edit() } label: { outline(Label("عدّل",systemImage:"pencil")) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-edit")
-            Button { perform("habit.archive",["id":.string(reading.id.uuidString),"archived":.bool(true)]) } label: { outline(Label("احذف",systemImage:"archivebox")) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-delete")
+            Button { ending=true } label: { outline(Label("أنهِها",systemImage:"archivebox")) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-delete")
+                .confirmationDialog(endingSummary,isPresented:$ending,titleVisibility:.visible) {
+                    Button("أنهِها وأبقِ سجلّها") { perform("habit.archive",["id":.string(reading.id.uuidString),"archived":.bool(true)]) }.accessibilityIdentifier("habit-delete-confirm")
+                    Button("تراجع",role:.cancel) {}
+                }
         }
     }
     /// The last fourteen periods as a row of small rings, oldest on the right as in the prayer footprint.
@@ -106,9 +117,9 @@ struct HabitDetailView:View {
         let periods = Array(reading.summary.periods.suffix(14))
         VStack(alignment:.leading,spacing:10) {
             let closed = periods.filter { $0.outcome != .waiting && $0.outcome != .excluded }
-            HStack { Text("آخر "+habitPeriodCount(14,current.rule.frequency,digits)).font(MadarTypography.section()); Spacer(); if !closed.isEmpty { Text(digits.string(closed.filter(\.met).count)+" من "+digits.string(closed.count)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) } }
+            HStack { Text("آخر "+habitPeriodCount(14,current.rule.frequency,digits)).font(HabitType.section()); Spacer(); if !closed.isEmpty { Text(digits.string(closed.filter(\.met).count)+" من "+digits.string(closed.count)).font(HabitType.caption()).foregroundStyle(theme.secondaryInk) } }
             if dynamicTypeSize.isAccessibilitySize {
-                ForEach(Array(periods.enumerated()),id:\.offset) { _,p in HStack { MadarDateLabel(session.dateLabels(p.start,compact:true)); Spacer(); Text(outcome(p)).font(MadarTypography.caption()) } }
+                ForEach(Array(periods.enumerated()),id:\.offset) { _,p in HStack { MadarDateLabel(session.dateLabels(p.start,compact:true)); Spacer(); Text(outcome(p)).font(HabitType.caption()) } }
             } else {
                 HStack(alignment:.bottom,spacing:4) { ForEach(Array(periods.enumerated()),id:\.offset) { _,p in
                     Group {

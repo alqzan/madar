@@ -110,11 +110,7 @@ struct LegacyMoveUndo {
         let place = app.activePlace, zone = place.timeZone, uuid = StableIdentity.uuid(for:)
         let observed = GregorianDay.containing(app.prayerNow(), in: zone)
         var rooms: [LegacyMoveRoom] = []
-        var prayer = LegacyMoveRoom(id: "prayer", title: "الصلاة", symbol: "moon.stars", lines: [])
-        if let plan = try? LegacyPrayerImport.plan(backup: data, home: place, uuid: uuid) {
-            if !plan.logs.isEmpty { prayer.lines.append(counted(plan.logs.count, ["صلاة واحدة مسجّلة", "صلاتان مسجّلتان", "صلوات مسجّلة", "صلاة مسجّلة"])) }
-        }
-        rooms.append(prayer)
+        // Owner 17 Nov 2026: «امسح كل شي» — prayer records are not imported any more.
         var quran = LegacyMoveRoom(id: "quran", title: "القرآن", symbol: "book", lines: [])
         if let catalog = try? QuranResources.catalog(), let plan = try? LegacyQuranImport.plan(backup: data, timeZone: zone, catalog: catalog, uuid: uuid) {
             if !plan.sessions.isEmpty { quran.lines.append(counted(plan.sessions.count, ["جلسة واحدة", "جلستان", "جلسات", "جلسة"])) }
@@ -181,7 +177,6 @@ struct LegacyMoveUndo {
                 do {
                     let counts: [String: Int]
                     switch room.id {
-                    case "prayer": counts = try app.importLegacyPrayer(preview.data, writer: writer, now: now)
                     case "quran": counts = try app.importLegacyQuran(preview.data, fileName: preview.fileName, writer: writer, now: now)
                     case "habits": counts = try LegacyHabitTrial.importBackup(preview.data, to: app.container, zone: zone, now: now, writer: writer)
                     case "personal": counts = try LegacyPersonalTrial.importBackup(preview.data, to: app.container, zone: zone, now: now, writer: writer)

@@ -66,7 +66,7 @@ import CryptoKit
         "accounts":[{"id":"a","kind":"account","last4":"9999","bank":"sab"},{"id":"card","kind":"card","last4":"1234","bank":"sab","fundingKind":"credit"}],"transactions":[{"id":"t","date":"2026-07-03","amount":12.3,"category":"c"}]}
         """#.utf8)
         let moved = try await service.commit(LegacyMovePreview(fileName: "synthetic.json", data: data, rooms: service.preview(data)), progress: { _ in })
-        XCTAssertEqual(Set(moved.outcomes.filter { $0.added > 0 && $0.failed == nil }.map(\.id)), Set(["prayer", "quran", "habits", "personal", "money"]))
+        XCTAssertEqual(Set(moved.outcomes.filter { $0.added > 0 && $0.failed == nil }.map(\.id)), Set(["quran", "habits", "personal", "money"]), "Owner, 17 Nov 2026: old prayer logs are no longer moved in.")
         let context = ModelContext(store.container)
         let entry = Entry(); entry.dayKey = "2026-10-21"; entry.text = "ذكرى اصطناعية"; context.insert(entry)
         let media = Media(), bytes = Data("synthetic attached media".utf8)

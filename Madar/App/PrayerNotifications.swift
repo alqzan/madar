@@ -108,6 +108,8 @@ struct PrayerNotificationSlot: Equatable {
 @MainActor
 final class PrayerNotificationCoordinator {
     static let categoryID = "salah.ask"
+    /// Owner 17 Nov 2026: the prayer room and its records are gone; prayer times stay as anchors for other reminders.
+    static let prayerLoggingRemoved = true
     static let habitCategoryID = "habits.reminder"
     static let habitDoneActionID = "habits.done"
     static let wirdCategoryID = "quran.wird"
@@ -143,7 +145,27 @@ final class PrayerNotificationCoordinator {
         // 14 Nov owner: finish the whole wird from its reminder. It opens Madar on the grade question; nothing is recorded in the background.
         let wirdDone = UNNotificationAction(identifier: Self.wirdDoneActionID, title: "أتممته", options: [.foreground])
         let wird = UNNotificationCategory(identifier: Self.wirdCategoryID, actions: [wirdDone], intentIdentifiers: [], options: [])
-        center.setNotificationCategories([category, friday, habit, wird])
+        baseCategories = [category, friday, habit, wird]
+        center.setNotificationCategories(baseCategories)
+    }
+    private var baseCategories: Set<UNNotificationCategory> = []
+    static let habitAmountPrefix = "habits.amount."
+    static func habitAmountCategoryID(_ habit: UUID) -> String { habitAmountPrefix + habit.uuidString }
+    /// Idea 1 (owner, 17 Nov 2026): a habit counted in an amount (cups, pages, minutes, km) is logged from its reminder:
+    /// the whole goal, half of it, or «كمية ثانية» for any number — even below the goal, saved as typed.
+    /// Each habit has its own category so the buttons name the real amount («٨ أكواب») instead of a label.
+    func registerHabitAmountCategories(_ readings: [HabitReading], digits: MadarNumberFormatter) {
+        guard !baseCategories.isEmpty else { return }
+        let amounts = readings.compactMap { reading -> UNNotificationCategory? in
+            guard reading.source == nil, !reading.archived, let rule = reading.summary.current?.rule,
+                  rule.measure == .count || rule.measure == .duration, rule.target > 1 else { return nil }
+            let unit = rule.measure == .duration ? (rule.unit ?? "minutes") : rule.unit
+            var actions: [UNNotificationAction] = [UNNotificationAction(identifier: Self.habitAmountPrefix + "full", title: habitUnitCount(rule.target, unit, digits), options: [])]
+            if rule.target >= 2 { actions.append(UNNotificationAction(identifier: Self.habitAmountPrefix + "half", title: habitUnitCount(rule.target / 2, unit, digits), options: [])) }
+            actions.append(UNTextInputNotificationAction(identifier: Self.habitAmountPrefix + "other", title: "كمية ثانية", options: [], textInputButtonTitle: "سجّل", textInputPlaceholder: unit.map { "كم " + habitUnitName($0) + "؟" } ?? "كم؟"))
+            return UNNotificationCategory(identifier: Self.habitAmountCategoryID(reading.id), actions: actions, intentIdentifiers: [], options: [])
+        }
+        center.setNotificationCategories(baseCategories.union(amounts))
     }
 
     func attach(to session: AppSession) async {
@@ -259,10 +281,11 @@ final class PrayerNotificationCoordinator {
         session.updateNotificationAuthorization(Self.authorizationCode(currentAuthorization))
 
         let remindersAllowed = session.bool("notif.thisDeviceReminders") && Self.canSchedule(currentAuthorization)
-        let requestsEnabled = session.bool("salah.askReminder") && remindersAllowed
+        // Owner 17 Nov 2026: no prayer logging, so no «صلّيتها؟» ask and no before-adhan alert; the times only anchor other reminders.
+        let requestsEnabled = !Self.prayerLoggingRemoved && session.bool("salah.askReminder") && remindersAllowed
         let existing = await center.pendingNotificationRequests()
         var candidates: [NotificationCandidate] = []
-        if session.bool("salah.beforeReminder") && remindersAllowed {
+        if !Self.prayerLoggingRemoved && session.bool("salah.beforeReminder") && remindersAllowed {
             candidates += PrayerNotificationSchedule.beforeCandidates(for: prayerSlots, sanctityWindows: sanctityWindows, minutesBefore: Int(session.number("salah.beforeAdhanMin")))
                 .filter { $0.dueAt <= now.addingTimeInterval(96 * 60 * 60) }
         }
@@ -355,6 +378,20 @@ final class PrayerNotificationCoordinator {
                 let info = response.notification.request.content.userInfo
                 guard let dayKey = info["dayKey"] as? String, let habit = (info["habit"] as? String).flatMap(UUID.init(uuidString:)) else { return }
                 try await session.completeHabitFromNotification(habitID: habit, dayKey: dayKey, requestID: response.notification.request.identifier)
+            } else if response.actionIdentifier.hasPrefix(Self.habitAmountPrefix) {
+                let info = response.notification.request.content.userInfo
+                guard let dayKey = info["dayKey"] as? String, let habit = (info["habit"] as? String).flatMap(UUID.init(uuidString:)) else { return }
+                let reading = try HabitRepository(context: ModelContext(session.container)).readings(at: Date()).first { $0.id == habit }
+                let target = reading?.summary.current?.target ?? 1
+                let action = String(response.actionIdentifier.dropFirst(Self.habitAmountPrefix.count))
+                let amount: Int?
+                switch action {
+                case "full": amount = target
+                case "half": amount = target / 2
+                default: amount = (response as? UNTextInputNotificationResponse).flatMap { Self.typedAmount($0.userText) }
+                }
+                guard let amount, amount > 0 else { session.errorMessage = "لم أفهم الكمية؛ اكتبها رقمًا."; return }
+                try await session.completeHabitFromNotification(habitID: habit, dayKey: dayKey, requestID: response.notification.request.identifier, delta: amount, action: action)
             } else if response.actionIdentifier == Self.wirdDoneActionID {
                 // A reminder left in the centre from an earlier day never finishes today's wird: it only opens the room.
                 let sent = response.notification.request.content.userInfo["dayKey"] as? String
@@ -366,6 +403,14 @@ final class PrayerNotificationCoordinator {
                 else { session.selectedTab = "prayer" }
             }
         } catch { session.errorMessage = "تعذّر تنفيذ تذكير الصلاة. \(madarUserMessage(error))" }
+    }
+
+    /// «٣»، «3»، «٢٫٥» → a whole amount (a fraction rounds to the nearest; below one half is not an amount).
+    nonisolated static func typedAmount(_ text: String) -> Int? {
+        let map: [Character: Character] = ["٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9","٫":".","،":".",",":"."]
+        let latin = String(text.trimmingCharacters(in: .whitespacesAndNewlines).map { map[$0] ?? $0 }.filter { $0.isNumber || $0 == "." })
+        guard let value = Double(latin), value.isFinite, value >= 0.5, value <= 100_000 else { return nil }
+        return Int(value.rounded())
     }
 
     func foregroundOptions(for notification: UNNotification) async -> UNNotificationPresentationOptions {
@@ -523,8 +568,9 @@ final class PrayerNotificationCoordinator {
             try session.notificationBudget.cancel(id: id, now: now)
             try updateLedger(requestID: id, state: "cancelled")
         }
-        let habitNames = targets.contains { $0.id.hasPrefix("habits.") }
-            ? Dictionary(try HabitRepository(context: ModelContext(session.container)).readings(at: now).map { ($0.id.uuidString, $0.name) }, uniquingKeysWith: { first, _ in first }) : [:]
+        let habitReadings = targets.contains { $0.id.hasPrefix("habits.") } ? try HabitRepository(context: ModelContext(session.container)).readings(at: now) : []
+        let habitNames = Dictionary(habitReadings.map { ($0.id.uuidString, $0.name) }, uniquingKeysWith: { first, _ in first })
+        if !habitReadings.isEmpty { registerHabitAmountCategories(habitReadings, digits: MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)) }
         for candidate in targets {
             let content = RoomNotificationContent.content(for: candidate, plan: plan, session: session, habitNames: habitNames)
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
@@ -633,7 +679,7 @@ final class PrayerNotificationCoordinator {
         // T01: any countdown whose adhan has passed is ended immediately on every refresh.
         for activity in liveActivities where activity.content.state.prayerAt <= now { try await endPrayerActivity(activity, now: now) }
         let active = liveActivities.filter { $0.content.state.prayerAt > now }
-        guard session.bool("salah.liveActivity"), session.bool("notif.thisDeviceReminders"),
+        guard !Self.prayerLoggingRemoved, session.bool("salah.liveActivity"), session.bool("notif.thisDeviceReminders"),
               ActivityAuthorizationInfo().areActivitiesEnabled else {
             for activity in active { try await endPrayerActivity(activity, now: now) }
             return

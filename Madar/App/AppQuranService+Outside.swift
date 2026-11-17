@@ -63,16 +63,20 @@ extension AppQuranService {
         let repository = try repository(), guarder = SanctityGuard(prayerDays: prayerDays)
         var result: [NotificationCandidate] = []
         for day in prayerDays {
-            for late in [false, true] {
-                if late ? !app.bool("quran.lateReminder") : app.string("quran.wirdReminder") == "off" { continue }
+            // Owner, 17 Nov 2026: the wird is asked after Fajr, and if it is still not done, asked once more after Isha («again»).
+            for kind in ["wird", "again", "late"] {
+                let late = kind == "late", choice = app.string("quran.wirdReminder")
+                if late ? !app.bool("quran.lateReminder") : choice == "off" { continue }
+                if kind == "again" && choice != "afterFajr" { continue }
                 let proposal: Date
                 if late { proposal = day.asr }
-                else { proposal = switch app.string("quran.wirdReminder") { case "afterAsr": day.asr; case "afterIsha": day.isha; default: day.fajr } }
+                else if kind == "again" { proposal = day.isha }
+                else { proposal = switch choice { case "afterAsr": day.asr; case "afterIsha": day.isha; default: day.fajr } }
                 let fire = guarder.clamp(proposal)
                 guard fire > now, fire <= now.addingTimeInterval(48 * 3600) else { continue }
                 let value = try repository.snapshot(at: fire, sessionsThrough: now)
                 let needed = late ? value.pages.contains { $0.isDue && !$0.isFar } : Self.needsWird(value)
-                if needed { result.append(.init(id: "quran.\(value.day.dayKey).\(late ? "late" : "wird")", room: .quran, dueAt: fire, dayKey: value.day.dayKey)) }
+                if needed { result.append(.init(id: "quran.\(value.day.dayKey).\(kind)", room: .quran, dueAt: fire, dayKey: value.day.dayKey)) }
             }
         }
         return result

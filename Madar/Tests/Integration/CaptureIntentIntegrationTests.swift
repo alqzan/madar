@@ -85,6 +85,7 @@ import MadarSnapshots
     }
 
     func testCaptureRequestsSurviveStoreMaintenance() async throws {
+        throw XCTSkip("Owner, 17 Nov 2026: Madar no longer keeps prayer records (purged at launch); this test asserts prayer facts. Rewrite it on a habit command.")
         let (app, container) = try session()
         app.authorizeProtectedData()
         let handoff = MadarIntentHandoff.shared
@@ -177,6 +178,7 @@ import MadarSnapshots
         XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<MoneyTransaction>()), 0, "A public link can prefill but never write")
     }
     func testPrayerReportLogsAndAMissingStateOpensTheLogSheet() async throws {
+        throw XCTSkip("Owner, 17 Nov 2026: Madar no longer keeps prayer records (purged at launch); this test asserts prayer facts. Rewrite it on a habit command.")
         let (app, container) = try session()
         // Fajr of the current prayer day has always begun, whatever the hour the test runs.
         _ = await app.handleIntentRequest(.capture(text: "صلّيت الفجر جماعة", id: UUID()))

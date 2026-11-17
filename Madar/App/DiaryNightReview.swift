@@ -12,11 +12,7 @@ enum DiaryNightReviewFacts {
     /// The page's automatic lines are the owning rooms' own records (prayers, Quran, habits), so they are summarised, not recounted.
     static func facts(page: DiaryDisplayDay, intention: DiaryIntention?, spentToday: String?, digits: MadarNumberFormatter) -> [DiaryReviewFact] {
         var result: [DiaryReviewFact] = []
-        let prayers = page.lines.filter { $0.kind == "salah" }.count
-        if prayers > 0 {
-            let text = prayers == 1 ? "سجّلت صلاة واحدة" : prayers == 2 ? "سجّلت صلاتين" : prayers <= 10 ? "سجّلت " + digits.string(prayers) + " صلوات" : "سجّلت " + digits.string(prayers) + " صلاة"
-            result.append(.init(id: "salah", text: text))
-        }
+        // Owner 17 Nov 2026 (decision 4): prayers are no longer recorded, so the review has no prayer line.
         for (kind, prefix) in [("quran", ""), ("habits", "")] {
             let texts = page.lines.filter { $0.kind == kind }.map(\.text)
             if !texts.isEmpty { result.append(.init(id: kind, text: prefix + MadarInlineText.joined(texts))) }

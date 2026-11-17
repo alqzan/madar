@@ -198,7 +198,7 @@ import MadarPrayer
     func testDefaultWidgetRoutesAndExistingPrayerAliasReachBuiltRooms() throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetRoutes-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let app=try AppSession(container:MadarContainerFactory.makeLocal(at:root),groupDirectory:root)
-        for url in ["madar://salah","madar://prayer"]{app.open(URL(string:url)!);XCTAssertEqual(app.selectedTab,"prayer");XCTAssertNil(app.errorMessage)}
+        for url in ["madar://salah","madar://prayer"]{app.open(URL(string:url)!);XCTAssertEqual(app.selectedTab,"habits","Owner, 17 Nov 2026: the old prayer links land on habits");XCTAssertNil(app.errorMessage)}
         for room in BuiltRoomWidget.allCases{app.open(URL(string:room.route)!);XCTAssertNil(app.errorMessage)}
         app.open(URL(string: BuiltRoomWidget.money.route)!)
         XCTAssertEqual(app.selectedTab, "money"); XCTAssertFalse(app.moneyOpen)

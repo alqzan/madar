@@ -272,7 +272,7 @@ struct MadarRoomRoot: View {
         NavigationStack {
             Group {
                 if tab == "customize" { CustomizeMadar(session: session) }
-                else if tab == "prayer" { PrayerTodayView(session: session) }
+                else if tab == "habits" { HabitsRoomView(session: session) }
                 else if tab == "quran" { QuranHomeView(service: AppQuranService(session: session)) }
                 else if tab == "notes" { DiaryRoomView(app: session) }
                 else if tab == "money" { MoneyRoomView(app: session, isTabRoot: true) }

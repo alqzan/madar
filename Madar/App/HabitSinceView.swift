@@ -19,15 +19,15 @@ struct HabitSinceSection:View {
         VStack(alignment:.leading,spacing:16) {
             if let last = reading.lastTime {
                 VStack(alignment:.leading,spacing:6) {
-                    Text("آخر مرة").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text("آخر مرة").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
                     Text(habitSince(last.day,today,digits)).font(.custom("thmanyahserifdisplay-Bold",size:34,relativeTo:.largeTitle)).accessibilityIdentifier("habit-since")
                     MadarDateLabel(session.dateLabels(last.day,weekday:true))
-                    if let rhythm { Text(rhythm).font(MadarTypography.caption()).foregroundStyle(theme.accent).padding(.top,2) }
+                    if let rhythm { Text(rhythm).font(HabitType.caption()).foregroundStyle(theme.accent).padding(.top,2) }
                 }
                 if reading.times.count > 1 { timeline }
                 memories
             } else {
-                Text("لم تسجّلها بعد؛ سجّل أول مرة اليوم أو في يوم مضى، وتظهر هنا مع سطر مذكراتك يومها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                Text("لم تسجّلها بعد؛ سجّل أول مرة اليوم أو في يوم مضى، وتظهر هنا مع سطر مذكراتك يومها.").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
             }
         }
         .task(id: reading.times.map(\.day.description)) { memoryLines = loadMemoryLines() }
@@ -51,7 +51,7 @@ struct HabitSinceSection:View {
         let first = reading.times.last!.day, total = max(1,HabitRhythmMath.days(first,today))
         let years = Array(Set(reading.times.map(\.day.year))).sorted()
         return VStack(alignment:.leading,spacing:8) {
-            Text("مراتك").font(MadarTypography.section())
+            Text("مراتك").font(HabitType.section())
             GeometryReader { geo in
                 let w = geo.size.width
                 ZStack(alignment:.topLeading) {
@@ -72,24 +72,24 @@ struct HabitSinceSection:View {
                 timelineYearLabel(first.year)
                 Spacer()
                 if years.count > 2 { timelineYearLabel(years[years.count/2]); Spacer() }
-                Text("اليوم").font(MadarTypography.fine())
+                Text("اليوم").font(HabitType.fine())
             }.foregroundStyle(theme.secondaryInk)
-            Text(arabicCount(reading.times.count,["مرة واحدة","مرتان","مرات","مرة"],digits)+" منذ أول تسجيل").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            Text(arabicCount(reading.times.count,["مرة واحدة","مرتان","مرات","مرة"],digits)+" منذ أول تسجيل").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
         }.accessibilityElement(children:.combine)
     }
     private func timelineYearLabel(_ year: Int) -> some View {
-        MadarDateLabel(session.yearLabels(year), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
+        MadarDateLabel(session.yearLabels(year), primaryFont: HabitType.caption(), secondaryFont: HabitType.fine())
     }
     /// The diary line linked to each of the last times, or that day's first line when none was linked.
     @ViewBuilder private var memories:some View {
         let lines = memoryLines
         if !lines.isEmpty {
             VStack(alignment:.leading,spacing:10) {
-                Text("من مذكراتك يومها").font(MadarTypography.section())
+                Text("من مذكراتك يومها").font(HabitType.section())
                 ForEach(lines,id:\.id) { line in
                     VStack(alignment:.leading,spacing:4) {
-                        Text(line.text).font(MadarTypography.body()).lineLimit(4)
-                        Text(session.dateLabels(line.day).combined).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        Text(line.text).font(HabitType.body()).lineLimit(4)
+                        Text(session.dateLabels(line.day).combined).font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
                     }
                     .padding(.leading,12).overlay(alignment:.leading) { Capsule().fill(theme.accentFill.opacity(0.5)).frame(width:3) }
                 }
@@ -149,7 +149,7 @@ struct HabitPastDaySheet:View {
         ScrollView {
             VStack(alignment:.leading,spacing:16) {
                 HStack {
-                    Text("فعلتها في يوم سابق").font(MadarTypography.title())
+                    Text("فعلتها في يوم سابق").font(HabitType.title())
 #if DEBUG
                     if ProcessInfo.processInfo.environment["MADAR_UI_BAHW_ROOT_ROUTE_HARNESS"] == "1" {
                         Button("اختبر رابط البهو") { session.open(URL(string: "madar://bahw")!) }
@@ -158,34 +158,34 @@ struct HabitPastDaySheet:View {
 #endif
                     Spacer(); Button {dismiss()} label: { Text("إلغاء").frame(minHeight:44).contentShape(Rectangle()) }.madarWaitsForSave()
                 }
-                Text(reading.name).font(MadarTypography.section()).foregroundStyle(theme.secondaryInk)
+                Text(reading.name).font(HabitType.section()).foregroundStyle(theme.secondaryInk)
                 if first < today {
                     DatePicker("اليوم",selection:$date,in:gmt(first)...gmt(today.adding(days:-1)),displayedComponents:.date)
                         .datePickerStyle(.graphical).environment(\.timeZone,.gmt).padding(8).background(theme.surface,in:.rect(cornerRadius:20)).accessibilityIdentifier("habit-past-date")
                     MadarDateLabel(session.dateLabels(day,weekday:true))
                     if !hasSelectedTarget {
-                        Text("هذا اليوم ليس من أيام العادة، اختر يومًا آخر.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Text("هذا اليوم ليس من أيام العادة، اختر يومًا آخر.").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
                             .accessibilityIdentifier("habit-past-unavailable")
                     }
                     let lines = dayLines
                     if !lines.isEmpty {
                         VStack(alignment:.leading,spacing:8) {
-                            Text("اربطها بسطر من مذكراتك يومها").font(MadarTypography.section())
+                            Text("اربطها بسطر من مذكراتك يومها").font(HabitType.section())
                             ForEach(lines,id:\.id) { line in
                                 let on = entry == line.id
                                 Button { entry = on ? nil : line.id } label: {
                                     HStack(alignment:.top,spacing:10) {
                                         Image(systemName:on ? "checkmark.circle.fill" : "circle").foregroundStyle(on ? theme.accent : theme.secondaryInk)
-                                        Text(line.text).font(MadarTypography.body()).lineLimit(3).frame(maxWidth:.infinity,alignment:.leading)
+                                        Text(line.text).font(HabitType.body()).lineLimit(3).frame(maxWidth:.infinity,alignment:.leading)
                                     }.padding(12).background(theme.surface,in:.rect(cornerRadius:16)).contentShape(.rect)
                                 }.buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("habit-past-line")
                             }
                         }
                     }
-                    Button { log() } label: { Text(saveTitle).font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
+                    Button { log() } label: { Text(saveTitle).font(HabitType.section()).frame(maxWidth:.infinity,minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
                         .buttonStyle(.madarPlain).disabled(busy || !hasSelectedTarget).accessibilityIdentifier("habit-past-save")
                 } else {
-                    Text("بدأت العادة اليوم؛ لا يوم قبله في سجلها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text("بدأت العادة اليوم؛ لا يوم قبله في سجلها.").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
                 }
             }.padding(22)
         }

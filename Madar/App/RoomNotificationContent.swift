@@ -29,6 +29,16 @@ import MadarPrayer
                 result.append(candidate)
             }
         }
+        // Owner, 17 Nov 2026: a daily habit missed yesterday is one miss from breaking. If it is still not done today,
+        // one last alert comes an hour and a half after Isha («سلسلة … بتروح الليلة»); then the streak resets and the longest stays.
+        for reading in try HabitRepository(context: ModelContext(session.container)).readings(at: now) {
+            guard reading.summary.atRisk, reading.reminder != "none", !reading.archived, !reading.paused,
+                  let current = reading.summary.current, current.rule.frequency == .daily, current.target > 0, !current.met,
+                  current.dueDays.contains(today), let isha = prayerDays.first(where: { $0.day == civil })?.isha else { continue }
+            let due = SanctityGuard(prayerDays: prayerDays).clamp(isha.addingTimeInterval(90 * 60))
+            guard due > now else { continue }
+            result.append(.init(id: "habits.\(today).final.\(reading.id.uuidString)", room: .habits, dueAt: due, dayKey: today.description))
+        }
         // Each family may read a whole room on the main thread: yield between them so a tap is never held behind all of them.
         result += try diaryCandidates(session: session, prayerDays: prayerDays, now: now); await Task.yield()
         result += limitCandidates(session: session, prayerDays: prayerDays, now: now); await Task.yield()
@@ -224,10 +234,20 @@ import MadarPrayer
             let habitID = String(id.split(separator: ".").last ?? "")
             content.title = habitNames[habitID] ?? "عادتك"
             // Never promise to keep a streak that does not exist: a first step starts one.
-            let streak = (try? HabitRepository(context: ModelContext(session.container)).readings(at: Date()))?.first { $0.id.uuidString == habitID }?.summary.streak ?? 0
+            let reading = (try? HabitRepository(context: ModelContext(session.container)).readings(at: Date()))?.first { $0.id.uuidString == habitID }
+            let streak = reading?.summary.streak ?? 0
             content.body = NudgeWording.body(streak > 0 ? .habitKeepStreak : .habitFirstStep, dayKey: candidate.dayKey)
+            if id.contains(".final.") {
+                let frequency = reading?.summary.current?.rule.frequency ?? .daily
+                content.title = "سلسلة " + (habitNames[habitID] ?? "عادتك") + " " + habitPeriodCount(streak, frequency, digits) + " بتروح الليلة"
+                content.body = "فاتتك أمس. سوّها الحين وتبقى."
+            }
             content.userInfo = ["dayKey": candidate.dayKey, "room": "habits", "habit": habitID]
-            content.categoryIdentifier = PrayerNotificationCoordinator.habitCategoryID
+            if reading?.source == nil {
+                let rule = reading?.summary.current?.rule
+                let amount = rule.map { ($0.measure == .count || $0.measure == .duration) && $0.target > 1 } ?? false
+                content.categoryIdentifier = amount ? PrayerNotificationCoordinator.habitAmountCategoryID(reading!.id) : PrayerNotificationCoordinator.habitCategoryID
+            }
         } else if id.hasPrefix("notes.") {
             // §8 item 10 matrix copy. Never diary text.
             content.title = "المذكرات"
@@ -302,6 +322,7 @@ import MadarPrayer
         }
         if id.hasPrefix("habits."), let habitID = UUID(uuidString: String(id.split(separator: ".").last ?? "")) {
             let reading = try HabitRepository(context: ModelContext(session.container)).readings(at: now).first { $0.id == habitID }
+            if id.contains(".final.") { return reading.map { $0.reminder != "none" && $0.summary.atRisk && !$0.paused && $0.summary.current?.met == false } ?? false }
             return reading.map { $0.reminder == "push" && !$0.paused && $0.summary.current?.met == false } ?? false
         }
         if id.hasPrefix("notes.") {
@@ -370,7 +391,7 @@ import MadarPrayer
             let sessionKind = id.hasSuffix(".late") ? "review" : "wird"
             session.open(URL(string: "madar://quran/session/\(sessionKind)")!)
         }
-        else if id.hasPrefix("qada.") { session.selectedTab = "prayer" }
+        else if id.hasPrefix("qada.") { session.selectedTab = "foundation" }
         else if id.hasPrefix("mal.cardDue.") || id.hasPrefix("mal.cardCash.") {
             let components = id.split(separator: ".")
             if components.count == 4, let cardID = UUID(uuidString: String(components[2])) {

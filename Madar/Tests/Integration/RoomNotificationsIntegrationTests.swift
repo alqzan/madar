@@ -47,8 +47,8 @@ import MadarCore
         XCTAssertEqual(app.quranRoute?.path, ["session", "review"])
 
         RoomNotificationContent.open("qada.\(day)", userInfo: ["dayKey": day], session: app)
-        XCTAssertNil(app.prayerRoute, "An already-delivered legacy debt reminder lands on the prayer home.")
-        XCTAssertEqual(app.selectedTab, "prayer")
+        XCTAssertNil(app.prayerRoute, "An already-delivered legacy debt reminder lands on the lobby (owner, 17 Nov 2026).")
+        XCTAssertEqual(app.selectedTab, "foundation")
 
         app.prayerRoute = nil
         RoomNotificationContent.open("notes.\(day).niyya", userInfo: ["dayKey": day, "room": "notes"], session: app)
@@ -283,9 +283,10 @@ import MadarCore
         let digest = RoomNotificationContent.content(for: NotificationCandidate(id: "digest.2026-10-15", room: .habits, dueAt: day.asr, dayKey: "2026-10-15"), plan: plan, session: app, habitNames: [:])
         XCTAssertEqual(digest.title, "ملخّص تذكيراتك")
         RoomNotificationContent.open(reminder.id, userInfo: h.userInfo, session: app)
-        XCTAssertEqual(app.selectedTab, "foundation"); XCTAssertTrue(app.habitsOpen); XCTAssertEqual(app.habitRouteID, habit)
+        // Owner, 17 Nov 2026: habits is its own tab now.
+        XCTAssertEqual(app.selectedTab, "habits"); XCTAssertEqual(app.habitRouteID, habit)
         RoomNotificationContent.open("qada.2026-10-15", userInfo: [:], session: app)
-        XCTAssertEqual(app.selectedTab, "prayer")
+        XCTAssertEqual(app.selectedTab, "foundation", "Prayer logging is gone; an old debt reminder lands on the lobby.")
     }
 
     func testHabitAndZakatCopySayWhenAndNeverPromiseAMissingStreak() throws {

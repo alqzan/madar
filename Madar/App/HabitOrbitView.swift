@@ -10,10 +10,7 @@ struct HabitOrbitView:View {
     let select:(HabitReading)->Void
     private let frequencies:[HabitFrequency] = [.daily,.weekly,.monthly,.yearly]
     /// A linked habit's bead takes its room's colour (prayer, Quran, diary, Mihbara), as W2 draws them.
-    private func beadColour(_ row:HabitReading)->Color {
-        let room:String? = switch row.source { case "jamaah": "salah"; case "review", "wird": "quran"; case "diaryLine": "notes"; case "reading","hadith": "mihbara"; default: nil }
-        return room.map { RoomTheme(room:$0,dark:theme.dark).accentFill } ?? theme.accentFill
-    }
+    private func beadColour(_ row:HabitReading)->Color { habitRoomColour(row.source,dark:theme.dark) }
     private var centreCount:String {
         let daily=readings.filter{$0.summary.current?.rule.frequency == .daily && ($0.summary.current?.target ?? 0)>0 && !$0.paused}
         return daily.isEmpty ? "اليوم راحة" : digits.string(daily.filter{$0.summary.current?.met == true}.count)+" من "+digits.string(daily.count)
@@ -28,7 +25,7 @@ struct HabitOrbitView:View {
                     Circle().trim(from:0,to:due.isEmpty ? 0 : Double(met)/Double(due.count)).stroke(theme.accentFill.opacity(0.6),style:.init(lineWidth:3.5,lineCap:.round)).rotationEffect(.degrees(-90)).frame(width:radius*2,height:radius*2).position(centre)
                     let period = f == .daily ? "اليوم" : f == .weekly ? "الأسبوع" : f == .monthly ? "الشهر" : "السنة"
                     let progress = due.isEmpty ? "" : " " + digits.percent(Int((Double(met) * 100 / Double(due.count)).rounded()))
-                    Text(period + progress).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    Text(period + progress).font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
                         .padding(.horizontal,5).background(theme.surface).position(x:centre.x,y:centre.y-radius)
                         .accessibilityIdentifier("habit-orbit-progress-" + f.rawValue)
                         .accessibilityLabel(period + (due.isEmpty ? "، لا أهداف في هذه الفترة" : progress))
@@ -37,14 +34,14 @@ struct HabitOrbitView:View {
                         Button { select(row) } label: {
                             VStack(spacing:2) {
                                 HabitBead(state:HabitBead.State(row),colour:beadColour(row),theme:theme).frame(width:17,height:17)
-                                Text(row.name).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1).padding(.horizontal,3).background(theme.background.opacity(0.92),in:.capsule)
+                                Text(row.name).font(.custom("thmanyahseriftext-Regular",size:11,relativeTo:.caption2)).lineLimit(1).padding(.horizontal,3).background(theme.background.opacity(0.92),in:.capsule)
                             }.frame(width:86,height:44)
                         }.buttonStyle(.madarPlain).accessibilityLabel(row.name+"، "+row.statusTitle).accessibilityIdentifier("habit-orbit-"+row.id.uuidString).position(x:centre.x+cos(angle)*radius,y:centre.y+sin(angle)*radius)
                     }
                     // The ring draws three beads; the rest are in the list below, so say how many are not drawn here.
                     if rows.count > 3 {
                         let angle=(Double(3)*100+30+Double(index)*35)*Double.pi/180
-                        Text("+" + digits.string(rows.count - 3)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        Text("+" + digits.string(rows.count - 3)).font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
                             .padding(.horizontal,6).frame(minHeight:22).background(theme.background.opacity(0.92),in:.capsule)
                             .position(x:centre.x+cos(angle)*radius,y:centre.y+sin(angle)*radius)
                             .accessibilityLabel("وعادات أخرى في القائمة: " + digits.string(rows.count - 3))
@@ -57,10 +54,10 @@ struct HabitOrbitView:View {
                             .accessibilityHidden(true)
                     }
                 }
-                VStack(spacing:4) { Text(centreCount).font(MadarTypography.cardTitle()); Text("عادات اليوم").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }.frame(width:88,height:88).background(theme.surface,in:.circle).overlay{Circle().stroke(theme.line)}.position(centre)
+                VStack(spacing:4) { Text(centreCount).font(HabitType.cardTitle()); Text("عادات اليوم").font(HabitType.fine()).foregroundStyle(theme.secondaryInk) }.frame(width:88,height:88).background(theme.surface,in:.circle).overlay{Circle().stroke(theme.line)}.position(centre)
             }.environment(\.layoutDirection,.leftToRight)
         }.frame(height:380)
-        .overlay(alignment:.bottom) { HStack(spacing:10) { ForEach([HabitBead.State.done,.waiting,.atRisk,.paused],id:\.self) { st in Label { Text(st.title) } icon: { HabitBead(state:st,colour:theme.accentFill,theme:theme).frame(width:11,height:11) } }; Label { Text("الآن") } icon: { Circle().fill(theme.ink).frame(width:6,height:6) } }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.bottom,8) }
+        .overlay(alignment:.bottom) { HStack(spacing:10) { ForEach([HabitBead.State.done,.waiting,.atRisk,.paused],id:\.self) { st in Label { Text(st.title) } icon: { HabitBead(state:st,colour:theme.accentFill,theme:theme).frame(width:11,height:11) } }; Label { Text("الآن") } icon: { Circle().fill(theme.ink).frame(width:6,height:6) } }.font(HabitType.fine()).foregroundStyle(theme.secondaryInk).padding(.bottom,8) }
         .background(theme.surface.opacity(0.35),in:.rect(cornerRadius:26)).overlay{RoundedRectangle(cornerRadius:26).stroke(theme.line)}
     }
 }

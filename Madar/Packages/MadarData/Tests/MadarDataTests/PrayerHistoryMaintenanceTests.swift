@@ -57,4 +57,42 @@ import Testing
         #expect(try PrayerHistoryMaintenance.removeUnperformedPrayerHistory(in: context, now: stamp.addingTimeInterval(180)) == 0)
         #expect(newPerformedQada.deletedAt == nil, "The one-time cleanup must not remove late prayers recorded after migration.")
     }
+
+    /// Owner 17 Nov 2026: every prayer and qada row is removed; other records stay; a second run finds nothing.
+    @Test func allPrayerRecordsAreTombstonedWithABarrierAndOtherRecordsStay() throws {
+        let container = try MadarContainerFactory.makeInMemory()
+        let context = container.mainContext
+        let stamp = Date(timeIntervalSince1970: 1_760_000_000)
+        for (index, status) in ["jamaah", "alone", "qada", "missed"].enumerated() {
+            let row = PrayerLog()
+            row.dayKey = String(format: "2026-11-%02d", index + 1)
+            row.prayer = "isha"
+            row.status = status
+            row.createdAt = stamp
+            row.updatedAt = stamp
+            context.insert(row)
+        }
+        let debt = QadaItem()
+        debt.prayer = "fajr"
+        debt.originalDayKey = "2026-11-01"
+        debt.createdAt = stamp
+        debt.updatedAt = stamp
+        context.insert(debt)
+        let keep = Setting()
+        keep.key = "salah.method"
+        keep.valueJSON = Data("\"ummAlQura\"".utf8)
+        keep.createdAt = stamp
+        keep.updatedAt = stamp
+        context.insert(keep)
+        try context.save()
+
+        let later = stamp.addingTimeInterval(120)
+        #expect(try PrayerHistoryMaintenance.removeAllPrayerRecords(in: context, now: later) == 5)
+        let logs = try context.fetch(FetchDescriptor<PrayerLog>())
+        #expect(logs.count == 4)
+        #expect(logs.allSatisfy { $0.deletedAt != nil && $0.deletionBarrierAt != nil && $0.writerID == "system.prayer-records-removed-v2" })
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).allSatisfy { $0.deletedAt != nil })
+        #expect(try context.fetch(FetchDescriptor<Setting>()).first { $0.key == "salah.method" }?.deletedAt == nil)
+        #expect(try PrayerHistoryMaintenance.removeAllPrayerRecords(in: context, now: later) == 0)
+    }
 }

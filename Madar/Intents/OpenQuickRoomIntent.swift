@@ -18,16 +18,15 @@ struct OpenHabitsRoomIntent:AppIntent {
 
 /// §9 OpenRoomIntent(room): built rooms only (including Mihbara after M6).
 enum MadarRoomDestination: String, AppEnum {
-    case lobby, salah, quran, notes, habits, year, money, mihbara
+    case lobby, quran, notes, habits, year, money, mihbara
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "الغرفة")
     static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
-        .money: "المال", .lobby: "البهو", .salah: "الصلاة", .quran: "القرآن", .notes: "المذكرات", .habits: "العادات", .year: "السنة وما يهمّك", .mihbara: "المحبرة"
+        .money: "المال", .lobby: "البهو", .quran: "القرآن", .notes: "المذكرات", .habits: "العادات", .year: "السنة وما يهمّك", .mihbara: "المحبرة"
     ]
     var url: URL {
         switch self {
         case .money: URL(string: "madar://mal")!
         case .lobby: URL(string: "madar://bahw")!
-        case .salah: URL(string: "madar://salah")!
         case .quran: URL(string: "madar://quran")!
         case .notes: URL(string: "madar://notes/today")!
         case .habits: URL(string: "madar://bahw/habits")!

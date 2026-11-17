@@ -26,7 +26,6 @@ enum RoomSettingsIndex {
                  "notes.sinceMetrics", "notes.includeDayOne", "notes.dictationFirst", "notes.serverDictationConsent", "notes.secondInk", "notes.ramadanStyle",
                  "notes.fridayStyle", "notes.autoLines", "notes.widgetContent"],
         .quran: ["quran.hifzLevel", "quran.reviewLevel", "quran.restDay", "quran.reviewSchedule", "quran.wirdReminder"],
-        .prayer: ["core.travelMode"],
     ]
     static var allKeys: Set<String> { Set(keys.values.flatMap { $0 }) }
 

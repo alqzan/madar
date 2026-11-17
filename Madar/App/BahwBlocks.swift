@@ -153,7 +153,6 @@ struct BahwBlockView: View {
         if row.source == "walking" { service.session.habitsOpen = true }
         else if let source = row.source {
             switch source {
-            case "jamaah": service.session.selectedTab = "prayer"
             case "review", "wird": service.session.selectedTab = "quran"
             case "diaryLine": service.session.selectedTab = "notes"
             case "reading", "hadith": service.session.selectedTab = "mihbara"
@@ -205,7 +204,7 @@ struct BahwBlockView: View {
                 }
                 Text(row.name).font(small).lineLimit(2, reservesSpace: true).multilineTextAlignment(.center)
                 // Tour 25 Oct: an empty ring already says «not yet»; the line below speaks only when it adds something.
-                if size != .wide, row.summary.streak > 1, current?.met != true { HabitFlame(count: row.summary.streak, frequency: current?.rule.frequency ?? .daily, digits: digits) }
+                if size != .wide, row.summary.streak > 1 || row.summary.atRisk, current?.met != true { HabitFlame(count: row.summary.streak, frequency: current?.rule.frequency ?? .daily, digits: digits, atRisk: row.summary.atRisk) }
                 else if progress != "لم تتمّها بعد" { Text(size == .wide && !row.paused && (current?.target ?? 0) > 0 ? compactProgress : progress).font(MadarTypography.fine()).foregroundStyle(room.secondaryInk).lineLimit(size == .wide ? 1 : 2).multilineTextAlignment(.center) }
             }
             .frame(maxWidth: .infinity, minHeight: size == .wide ? 78 : 100, maxHeight: size == .wide ? 78 : nil, alignment: .top)

@@ -8,14 +8,15 @@ import MadarPrayer
 /// A room enters the lobby after its milestone builds its block; RL9 still excludes deferred options.
 enum BahwBlock: String, CaseIterable {
     case habits, salah, quran, mal, year, upcoming, notes, mihbara
-    static let built: Set<BahwBlock> = [.habits, .salah, .quran, .mal, .year, .upcoming, .notes, .mihbara]
+    /// Owner 17 Nov 2026: the prayer room is gone; `.salah` stays only so saved layouts still decode.
+    static let built: Set<BahwBlock> = [.habits, .quran, .mal, .year, .upcoming, .notes, .mihbara]
     var title: String {
         switch self { case .habits: "عاداتك"; case .salah: "الصلاة"; case .quran: "القرآن"; case .mal: "المال"; case .year: "السنة"; case .upcoming: "الأيام القادمة"; case .notes: "المذكرات"; case .mihbara: "المحبرة" }
     }
     var symbol: String {
         switch self { case .habits: "MadarHabits"; case .salah: "MadarPrayer"; case .quran: "MadarQuran"; case .year: "MadarYear"; case .upcoming: "MadarUpcoming"; case .notes: "MadarDiary"; case .mihbara: "books.vertical"; case .mal: "banknote" }
     }
-    var tab: String? { switch self { case .salah: "prayer"; case .quran: "quran"; case .notes: "notes"; default: nil } }
+    var tab: String? { switch self { case .habits: "habits"; case .quran: "quran"; case .notes: "notes"; default: nil } }
 }
 
 struct BahwLayoutValue: Equatable {
@@ -386,8 +387,8 @@ private struct BahwSuggestionsView: View {
     }
     private func open(_ destination: BahwSuggestion.Destination) {
         switch destination {
-        case .prayer:
-            session.selectedTab = "prayer"
+        case .prayer, .habits:
+            session.selectedTab = "habits"
         case .habit(let id): session.habitRouteID = id; session.habitsOpen = true
         case .quran(let route):
             // Batch 3: the step opens the session itself (madar://quran/session/hifz|review|drill) when the Quran room has one ready.

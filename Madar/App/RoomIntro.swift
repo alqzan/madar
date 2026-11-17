@@ -9,9 +9,9 @@ extension BahwBlock: Identifiable { var id: String { rawValue } }
 /// Owner, 3 Nov 2026 («ابيه بالتدريج»): Madar starts with the prayer room only. The other rooms are added one at a time from the lobby,
 /// and each opens the first time with a short introduction and its few simple settings.
 extension AppSession {
-    static let roomTabs: [(block: BahwBlock, tab: String)] = [(.salah, "prayer"), (.quran, "quran"), (.notes, "notes"), (.mal, "money"), (.mihbara, "mihbara")]
+    static let roomTabs: [(block: BahwBlock, tab: String)] = [(.habits, "habits"), (.quran, "quran"), (.notes, "notes"), (.mal, "money"), (.mihbara, "mihbara")]
     static let tabInfo: [String: FoundationTab] = [
-        "prayer": .init(id: "prayer", title: "الصلاة", symbol: "MadarPrayer"), "quran": .init(id: "quran", title: "القرآن", symbol: "MadarQuran"),
+        "habits": .init(id: "habits", title: "العادات", symbol: "MadarHabits"), "quran": .init(id: "quran", title: "القرآن", symbol: "MadarQuran"),
         "notes": .init(id: "notes", title: "المذكرات", symbol: "MadarDiary"), "money": .init(id: "money", title: "المال", symbol: "wallet.bifold"),
         "mihbara": .init(id: "mihbara", title: "المحبرة", symbol: "books.vertical")]
 
@@ -53,7 +53,7 @@ extension AppSession {
 
     func openRoom(_ block: BahwBlock) {
         switch block {
-        case .habits: habitsOpen = true
+        case .habits: selectedTab = "habits"
         case .mal: open(URL(string: "madar://mal")!)
         case .mihbara: selectedTab = "mihbara"
         case .notes where (AppBahwService(session: self).diary()?.count ?? 0) == 0: open(URL(string: "madar://notes/write")!)

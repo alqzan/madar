@@ -21,6 +21,7 @@ struct QuranOutsideView: View {
                     // AU-34: the preview never promises a reminder this device will not send.
                     if app.bool("notif.thisDeviceReminders") && app.notificationsAuthorized {
                         if app.string("quran.wirdReminder") != "off" { reminder(QuranReminderCopy.title, detail: QuranReminderCopy.body, timing: reminderTitle) }
+                        if app.string("quran.wirdReminder") == "afterFajr" { reminder(QuranReminderCopy.title, detail: "إن لم تسجّل وردك بعد، يسألك مرة ثانية.", timing: "بعد العشاء") }
                         if app.bool("quran.lateReminder") { reminder(QuranReminderCopy.lateTitle, detail: QuranReminderCopy.lateBody, timing: "بعد العصر") }
                     } else if app.string("quran.wirdReminder") != "off" || app.bool("quran.lateReminder") {
                         Text("التذكيرات متوقفة على هذا الجهاز؛ شغّلها من «التذكير» أدناه").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-reminders-off")

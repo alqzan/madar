@@ -96,7 +96,7 @@ private struct MacRoomRoot: View {
             Group {
                 switch tab {
                 case "customize": CustomizeMadar(session: session)
-                case "prayer": PrayerTodayView(session: session)
+                case "habits": HabitsRoomView(session: session)
                 case "quran": QuranHomeView(service: AppQuranService(session: session))
                 case "notes": DiaryRoomView(app: session)
                 case "money": MoneyRoomView(app: session, isTabRoot: true)

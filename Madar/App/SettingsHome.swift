@@ -41,7 +41,8 @@ struct SettingsHome: View {
                 }
             }
             group("إعدادات كل قسم") {
-                if session.roomEnabled(.salah) { link("الصلاة", "المواقيت وطريقة الحساب والتنبيهات", "clock") { sectionsPage("الصلاة", ["الصلاة", "المواقيت"]) } }
+                // Owner 17 Nov 2026: the prayer room is gone; its times stay because reminders and the wird hang on them.
+                link("المواقيت", "طريقة الحساب والمذهب، وتستعملها التذكيرات", "clock") { sectionsPage("المواقيت", ["المواقيت"]) }
                 if session.roomEnabled(.habits) { link("العادات", "التذكير والسلسلة وما تعرضه الودجة", "checkmark.circle") { sectionsPage("العادات", ["العادات", "الذكاء"]) } }
                 if session.roomEnabled(.year) { link("السنة", "أي سنة تعرض", "calendar") { sectionsPage("السنة", ["السنة"]) } }
                 if session.roomEnabled(.upcoming) { link("الأيام القادمة", "عدد الأيام المعروضة", "hourglass") { sectionsPage("الأيام القادمة", ["الأيام القادمة"]) } }
@@ -80,7 +81,7 @@ struct SettingsHome: View {
             }
     }
 
-    private var hasRoomSettings: Bool { [BahwBlock.salah, .habits, .year, .upcoming, .quran, .notes, .mal, .mihbara].contains { session.roomEnabled($0) } }
+    private var hasRoomSettings: Bool { [BahwBlock.habits, .year, .upcoming, .quran, .notes, .mal, .mihbara].contains { session.roomEnabled($0) } }
 
     private func sectionsPage(_ title: String, _ sections: [String]) -> some View {
         SettingsPage(title: title) {

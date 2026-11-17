@@ -306,7 +306,7 @@ struct BahwUpcomingItem: Identifiable, Equatable {
 
 
 struct BahwSuggestion: Identifiable {
-    enum Destination { case prayer, habit(UUID), quran(route: String?), diary, money, mihbara(book: UUID?) }
+    enum Destination { case prayer, habit(UUID), habits, quran(route: String?), diary, money, mihbara(book: UUID?) }
     let id: String
     let title: String
     let detail: String
@@ -324,12 +324,12 @@ extension AppBahwService {
         // B3-1: the moment of the day decides which step leads. Inside a sanctity window the lobby offers nothing (RP3).
         let moment = lobbyMoment()
         if moment == .quiet { return [] }
-        if case .beforeAdhan(let prayer, let minutes) = moment {
+        if session.roomEnabled(.salah), case .beforeAdhan(let prayer, let minutes) = moment {
             let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
             result.append(.init(id: "nextPrayer", title: "صلاة " + (names[prayer] ?? "") + " بعد " + (minutes <= 1 ? "دقيقة" : minutes == 2 ? "دقيقتين" : digits.string(minutes) + ((3...10).contains(minutes) ? " دقائق" : " دقيقة")),
                                 detail: "استعدّ لها", symbol: "MadarPrayer", destination: .prayer))
         }
-        if let snapshot = try? session.prayerSnapshot(at: now) {
+        if session.roomEnabled(.salah), let snapshot = try? session.prayerSnapshot(at: now) {
             // Name the prayers themselves: «كيف صلّيت العشاء؟», not an anonymous «صلاة تنتظر».
             let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
             let waiting = snapshot.today.cells.filter { snapshot.pending.contains($0.reference) && $0.canLog }
@@ -344,6 +344,14 @@ extension AppBahwService {
         let due = readings.filter { !$0.paused && $0.summary.current?.met != true && ($0.summary.current?.target ?? 0) > 0 && $0.summary.current?.dueDays.contains(today) == true }
         if session.roomEnabled(.habits), let habit = due.first(where: \.isNow) ?? (includesToday ? due.first : nil) {
             result.append(.init(id: "habit", title: habit.name, detail: habit.isNow ? "وقتها الآن" : habitRemainingPhrase(habit), symbol: "MadarHabits", destination: .habit(habit.id)))
+        }
+        // Idea 5 (owner, 17 Nov 2026): on Friday the lobby carries the week's harvest of daily habits — a note, never a notification.
+        if session.roomEnabled(.habits), Calendar(identifier: .gregorian).component(.weekday, from: today.date(in: session.activePlace.timeZone).addingTimeInterval(43200)) == 6 {
+            let week = readings.filter { !$0.archived }.flatMap { $0.summary.periods.filter { $0.rule.frequency == .daily && $0.target > 0 && $0.start > today.adding(days: -7) && $0.start <= today } }
+            if !week.isEmpty {
+                let kept = week.filter(\.met).count
+                result.append(.init(id: "friday", title: "حصاد أسبوعك", detail: "أتممت " + digits.string(kept) + " من " + digits.string(week.count) + " من عاداتك اليومية في سبعة أيام", symbol: "MadarHabits", destination: .habits))
+            }
         }
         // T13: a bill, instalment, subscription or card statement due within two days enters the order (never an amount).
         if session.roomEnabled(.mal), let reading = try? AppMoneyService(app: session).loadObligations() {
