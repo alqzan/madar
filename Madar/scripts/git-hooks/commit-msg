@@ -1,0 +1,9 @@
+#!/bin/sh
+# Madar (owner, 17 Nov 2026): every commit states how it was verified — Claude, Codex or a person.
+# Add a line such as `Verified: build; HabitsUITests 12/12; smoke`, `Verified: docs only — links checked`
+# or `Verified: none — <reason>`. Merge and revert commits made by git itself pass.
+msg="$1"
+head -1 "$msg" | grep -qE '^(Merge|Revert) ' && exit 0
+grep -qE '^Verified: *[^ ]' "$msg" && exit 0
+echo "Madar: the commit message needs a 'Verified:' line (see .claude/skills/verify/SKILL.md)." >&2
+exit 1

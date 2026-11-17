@@ -130,11 +130,20 @@ Do not load the whole handoff into context. Each task card in `docs/PROGRESS.md`
 - Diagnose a failure once; try at most two evidence-based repairs for the same blocker, then record it and move to independent work. Do not silently skip or label failed/unrun checks passed.
 - Use synthetic isolated stores. Do not open/migrate/delete real owner/family records or run on their device without explicit authorization. Do not erase the shared simulator or its stores to make a test pass.
 
+### Verification loop — owner, 17 November 2026
+
+- Every session verifies its own work automatically, before each commit, with the `verify` skill: `.claude/skills/verify/SKILL.md` (Codex reads the file directly). It selects checks from the diff through `checklist.md` (trigger → check → incident) and `features.md` (area → end-to-end UI test class, integration tests, smoke path).
+- Order: cheap checks first (`git diff --check`, package tests, build), then the area's integration and end-to-end UI test classes, then the real app: `bash Madar/scripts/verify-smoke.sh [KEY=VALUE…]` launches it on the approved simulator with an isolated synthetic store, and the agent drives the changed flow with the simulator tools. End-to-end tests and running the app outrank unit tests whenever a user flow changed.
+- Every commit message carries one `Verified:` line naming what actually ran with executed counts, or `Verified: docs only — …` / `Verified: none — <reason>`. Git enforces it for every agent (`Madar/scripts/git-hooks/commit-msg`, set by `prepare-workspace.py`); Claude Code also has a PreToolUse gate (`.claude/hooks/commit-gate.py`).
+- Flaky or obsolete tests: no sleeps, no retry-until-green, no `XCTSkip` to get past a failure. Fix the cause, or delete the test and write why in the commit and handover. A removed feature's tests and feature-map rows go in the same request.
+- A failure that recurs becomes a new `checklist.md` row in the commit that fixes it. Never weaken a check, the checklist, the skill or the hooks inside the change they judge; change them in their own commit with the reason.
+- When a cheaper model builds part of a request on the owner's instruction, the main agent reviews its diff and re-runs the verification before committing.
+
 ## Usage, commits and handover
 
 - Check live five-hour and weekly usage at the start, after substantial work and before a new large batch/archive. Remaining = 100 minus used percent. Helpers share the allowance. If unavailable, say `not exposed`; do not estimate.
 - Keep working until the five-hour or weekly allowance is fully used (owner, 16 Nov 2026: «وقف على ١٠٠»); as it nears the end, reserve capacity for focused verification, commit, handover and the authorized TestFlight upload. Start archiving early enough to preserve that reserve. Never redeem reset credits without explicit confirmation.
-- Commit one coherent finished change with its board update: `[<existing-card>] <result> (codex|claude, model: <actual or not exposed>, effort: <actual or not exposed>)`; use `[OWNER]` for this request where no card applies. No record-only/handover-only commits unless documentation itself is the requested deliverable.
+- Commit one coherent finished change with its board update: `[<existing-card>] <result> (codex|claude, model: <actual or not exposed>, effort: <actual or not exposed>)` plus its `Verified:` line; use `[OWNER]` for this request where no card applies. No record-only/handover-only commits unless documentation itself is the requested deliverable.
 - Work on `main`; no branch/worktree per task. A single `codex/<section>` branch is allowed for multi-session work. Never force-push, rewrite history or delete another agent's work. Retained unused code need not be deleted as part of UX cleanup.
 - Keep one concise handover per session in `docs/PROGRESS.md` (no fixed length cap, owner 22 Oct): **Works now**, **Verified**, **Differences left**, **Not verified**, **Next**, **Model/effort**, **Usage**. Keep the newest three; archive older handovers. The newest current-work section wins over stale next steps in old handovers.
 

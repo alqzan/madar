@@ -92,6 +92,11 @@ def main():
         return 1
     print(f'FONT PREFLIGHT PASS: {count} font/license resources match provenance; {copied} copied')
     print('This checks fonts only; build, signing and runtime acceptance remain separate.')
+    # Owner, 17 Nov 2026: every commit states how it was verified (scripts/git-hooks/commit-msg).
+    import subprocess
+    hooks = Path(__file__).resolve().parent / 'git-hooks'
+    if subprocess.run(['git', '-C', str(hooks), 'config', 'core.hooksPath', str(hooks.relative_to(hooks.parents[2]))]).returncode == 0:
+        print('Git hooks: commit messages need a «Verified:» line (Madar/scripts/git-hooks).')
     return 0
 
 
