@@ -67,8 +67,8 @@ import SwiftData
         let writer = "system.prayer-records-removed-v2"
         func tombstone(_ row: some MadarRecordModel) throws {
             var record = try row.record()
-            // The tombstone keeps only the natural key; the personal content (heart state) goes with the record.
-            if record.fields["heart"] != nil { record.fields["heart"] = .null }
+            // The tombstone keeps only the natural key; the personal content goes with the record.
+            Self.scrubContent(&record)
             let stamp = StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? .distantPast)
             try record.set(stamp, for: "updatedAt")
             try record.set(stamp, for: "deletedAt")
@@ -87,26 +87,48 @@ import SwiftData
         }
     }
 
-    public static let heartScrubKey = "system.migration.prayer-tombstone-heart-scrubbed-v1"
+    public static let contentScrubKey = "system.migration.prayer-content-scrubbed-v1"
 
-    /// Tombstones written before 18 Nov 2026 kept the heart answer. One pass, guarded by a marker, clears it from rows that were already deleted.
-    /// The row's `updatedAt` and `deletedAt` are untouched, so sync order and the deletion barrier do not change.
+    /// Empties everything personal in a prayer or qada row and keeps only its natural key (`dayKey`+`prayer`, `originalDayKey`+`prayer`) so
+    /// sync and old backups still recognise the tombstone. Status becomes the neutral «no record».
+    static func scrubContent(_ record: inout DataRecord) {
+        switch record.model {
+        case "PrayerLog":
+            record.fields["status"] = .string("unrecordedHistory")
+            for key in ["heart", "loggedAt", "tripID", "pairID", "shortened"] where record.fields[key] != nil { record.fields[key] = .null }
+            record.fields["tzID"] = .string(""); record.fields["dayPolicy"] = .string(""); record.fields["source"] = .string("system")
+            if let created = record.fields["createdAt"] { record.fields["eventAt"] = created }
+        case "QadaItem":
+            if record.fields["madeUpAt"] != nil { record.fields["madeUpAt"] = .null }
+        default: break
+        }
+    }
+
+    /// One pass, guarded by a marker: clears the content of every prayer and qada row, including rows deleted by earlier builds, and removes the
+    /// frozen «salah» lines from stored diary day snapshots (other lines stay). `updatedAt` and `deletedAt` are untouched, so sync order and the barrier hold.
     static func scrubOldTombstoneHearts(in context: ModelContext, now: Date) throws {
-        let settings = try context.fetch(FetchDescriptor<Setting>(predicate: #Predicate { $0.key == "system.migration.prayer-tombstone-heart-scrubbed-v1" }))
+        let settings = try context.fetch(FetchDescriptor<Setting>(predicate: #Predicate { $0.key == "system.migration.prayer-content-scrubbed-v1" }))
         if settings.contains(where: { $0.deletedAt == nil }) { return }
         do {
-            for row in try context.fetch(FetchDescriptor<PrayerLog>(predicate: #Predicate { $0.deletedAt != nil })) {
-                var record = try row.record()
-                guard let heart = record.fields["heart"], heart != .null else { continue }
-                record.fields["heart"] = .null
-                try row.apply(record)
+            for row in try context.fetch(FetchDescriptor<PrayerLog>()) {
+                var record = try row.record(); scrubContent(&record); try row.apply(record)
+            }
+            for row in try context.fetch(FetchDescriptor<QadaItem>()) {
+                var record = try row.record(); scrubContent(&record); try row.apply(record)
+            }
+            for row in try context.fetch(FetchDescriptor<DeviceSetting>()) where row.key.hasPrefix("sys.diaryAutoLines.") {
+                guard var lines = (try? JSONSerialization.jsonObject(with: row.valueJSON)) as? [[String: Any]] else { continue }
+                let kept = lines.filter { ($0["kind"] as? String) != "salah" }
+                guard kept.count != lines.count else { continue }
+                lines = kept
+                row.valueJSON = try JSONSerialization.data(withJSONObject: lines)
             }
             let marker = Setting()
-            marker.id = StableIdentity.uuid(for: heartScrubKey)
-            marker.key = heartScrubKey
+            marker.id = StableIdentity.uuid(for: contentScrubKey)
+            marker.key = contentScrubKey
             marker.valueJSON = Data("true".utf8)
             marker.createdAt = now; marker.updatedAt = now
-            marker.writerID = "system.prayer-tombstone-heart-scrub-v1"
+            marker.writerID = "system.prayer-content-scrub-v1"
             context.insert(marker)
             try context.save()
         } catch {
