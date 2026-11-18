@@ -561,6 +561,7 @@
 		AC06A61EC033C36DD8EF19D5 /* RoomNotificationsIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CE395D307D64336BF294A06 /* RoomNotificationsIntegrationTests.swift */; };
 		AC561FF4B03A3F97788A62A0 /* HabitOrbitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0D3AB1B017DF9DCC476EE7 /* HabitOrbitView.swift */; };
 		ACF8D45E7B47DF98E40E506D /* DiaryYearbookIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D469796404360B49B02BC5E1 /* DiaryYearbookIntegrationTests.swift */; };
+		AD4815B5D6A5C56D7CA1AA91 /* RoomGlyphUITests.swift.bak in Resources */ = {isa = PBXBuildFile; fileRef = 23BB816D63D8185EAD3F7332 /* RoomGlyphUITests.swift.bak */; };
 		ADAA3E8FB93656DDB250C1E7 /* CompleteHabitIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66EDB55535EAFA21686E3D3E /* CompleteHabitIntent.swift */; };
 		AE416B416D39D53C03743ED2 /* OpenQuickRoomIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C92B7A356AA41F0E88F770 /* OpenQuickRoomIntent.swift */; };
 		AE4E3CECAA310E299D275D2C /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D5244CCC79BF2B66C486F51 /* AppSession.swift */; };
@@ -960,6 +961,7 @@
 		22667A11D78A7887B0C70B39 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2293299667730AD8A0496EBC /* MadarCommands */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarCommands; path = Packages/MadarCommands; sourceTree = SOURCE_ROOT; };
 		22DA2A4B369CB0EA9B77C259 /* MihbaraFinishPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraFinishPrompt.swift; sourceTree = "<group>"; };
+		23BB816D63D8185EAD3F7332 /* RoomGlyphUITests.swift.bak */ = {isa = PBXFileReference; path = RoomGlyphUITests.swift.bak; sourceTree = "<group>"; };
 		24560E5969E823668449B1D8 /* MadarData */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarData; path = Packages/MadarData; sourceTree = SOURCE_ROOT; };
 		249A748FAA0C40882A8F1B35 /* CustomizeSearchUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizeSearchUITests.swift; sourceTree = "<group>"; };
 		24C800DB76AE4D8973AA298C /* PrayerPaperCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerPaperCard.swift; sourceTree = "<group>"; };
@@ -1930,6 +1932,7 @@
 				3237B7C9B144CCBD5293A068 /* QuranWeekUITests.swift */,
 				E249F3B9FECA9C0E7D4FF8B8 /* QuranYearUITests.swift */,
 				6ED4EF15351D65F5D0541270 /* RoomGlyphUITests.swift */,
+				23BB816D63D8185EAD3F7332 /* RoomGlyphUITests.swift.bak */,
 				662BA644B81BA7A5A6AF6006 /* RoomWidgetsUITests.swift */,
 				0C9A92BA15E9DD05DF1BA621 /* TapCrawlUITests.swift */,
 				C0B38841267CB0E01EBC2842 /* WidgetMakerUITests.swift */,
@@ -2473,6 +2476,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AD4815B5D6A5C56D7CA1AA91 /* RoomGlyphUITests.swift.bak in Resources */,
 				1440A0ECB247647341D7C97B /* arabic-reader-poc.epub in Resources */,
 				9718E129D0BA1C83119E3CA6 /* dayone-synthetic.zip in Resources */,
 				B4BBACECE399D157E8A1EBF4 /* english-import-poc.epub in Resources */,
@@ -3372,7 +3376,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 56;
+				CURRENT_PROJECT_VERSION = 57;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = V8YZL4R65K;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -3480,7 +3484,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 56;
+				CURRENT_PROJECT_VERSION = 57;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = V8YZL4R65K;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

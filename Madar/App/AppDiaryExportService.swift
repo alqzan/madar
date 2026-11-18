@@ -45,6 +45,9 @@ extension AppDiaryService {
         keys.formUnion(try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).map(\.writtenDayKey))
         keys.formUnion(try context.fetch(FetchDescriptor<Niyya>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).map(\.dayKey))
         keys.formUnion(try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).filter { $0.key.hasPrefix("sys.diaryAutoLines.") }.map { String($0.key.dropFirst("sys.diaryAutoLines.".count)) })
+        // An opened letter is exported on the day it was opened, so that day counts too (its date only, never its text).
+        let zone = app.activePlace.timeZone
+        keys.formUnion(try context.fetch(FetchDescriptor<Letter>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.state == "opened" })).map { GregorianDay.containing($0.openedAt ?? $0.createdAt, in: zone).description })
         let today = try currentDay()
         return Set(keys.compactMap { try? GregorianDay($0) }.filter { $0 <= today }.map(\.year) + [today.year]).sorted(by: >)
     }
@@ -71,7 +74,7 @@ extension AppDiaryService {
         let snapshots=try context.fetch(FetchDescriptor<DeviceSetting>(predicate:#Predicate{$0.deletedAt == nil && $0.mergedInto == nil})).filter{$0.key.hasPrefix("sys.diaryAutoLines.")}
         var frozen:[String:[DiaryDisplayLine]]=[:]
         // A damaged snapshot is skipped: that day falls back to its live lines instead of stopping every export.
-        for row in snapshots {if let lines=try? JSONDecoder().decode([DiaryDisplayLine].self,from:row.valueJSON){frozen[String(row.key.dropFirst("sys.diaryAutoLines.".count))]=lines}}
+        for row in snapshots {if let lines=(try? JSONDecoder().decode([DiaryDisplayLine].self,from:row.valueJSON))?.filter({$0.kind != "salah"}){frozen[String(row.key.dropFirst("sys.diaryAutoLines.".count))]=lines}}
         var keys = Set(entriesByDay.keys)
         keys.formUnion(pages.filter { $0.photoMediaID != nil || $0.questionAnswer != nil }.map(\.dayKey))
         keys.formUnion(margins.map(\.writtenDayKey))

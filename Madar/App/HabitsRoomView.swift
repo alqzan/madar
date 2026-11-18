@@ -394,7 +394,7 @@ struct HabitsRoomView: View {
                             Text(row.name).font(HabitType.section()).fixedSize(horizontal:false,vertical:true)
                             if let tag = row.sourceTitle { Text(tag).font(HabitType.fine()).foregroundStyle(colour).padding(.horizontal,8).padding(.vertical,1).background(colour.opacity(0.1),in:.rect(cornerRadius:8)) }
                         }
-                        Text(rowLine(row)).font(HabitType.caption()).foregroundStyle(risky ? HabitFlame.riskColour : theme.secondaryInk).fixedSize(horizontal:false,vertical:true)
+                        Text(rowLine(row)).font(HabitType.caption()).foregroundStyle(risky ? theme.risk : theme.secondaryInk).fixedSize(horizontal:false,vertical:true)
                         // Idea 6 (owner, 17 Nov 2026): a quiet milestone on the day a daily streak reaches 30, 100 or 365 — no sound, no pop-up.
                         if met, p?.rule.frequency == .daily, [30,100,365].contains(row.summary.streak) {
                             Text(habitPeriodCount(row.summary.streak,.daily,digits)+" — «أحبّ الأعمال إلى الله أدومها وإن قلّ»").font(HabitType.fine()).foregroundStyle(colour)
@@ -540,10 +540,8 @@ struct HabitFlame:View {
     var atRisk:Bool = false
     var tint:Color? = nil
     @Environment(\.roomTheme) private var theme
-    static let riskColour = Color(red:0.647,green:0.306,blue:0.204)
-    private static var risk:Color { riskColour }
-    private var ink:Color { atRisk ? Self.risk : met ? (tint ?? theme.accent) : theme.secondaryInk }
-    private var fill:Color { atRisk ? Self.risk.opacity(0.12) : met ? (tint ?? theme.accent).opacity(0.14) : theme.ink.opacity(0.06) }
+    private var ink:Color { atRisk ? theme.risk : met ? (tint ?? theme.accent) : theme.secondaryInk }
+    private var fill:Color { atRisk ? theme.risk.opacity(0.12) : met ? (tint ?? theme.accent).opacity(0.14) : theme.ink.opacity(0.06) }
     var body:some View {
         HStack(spacing:3) {
             Image(systemName: met && !atRisk ? "flame.fill" : "flame").font(.system(size:11,weight:.semibold))
@@ -552,8 +550,8 @@ struct HabitFlame:View {
         .foregroundStyle(ink).padding(.horizontal,8).frame(minHeight:22).background(fill,in:.capsule)
         .overlay(alignment:.topLeading) {
             if atRisk {
-                Image(systemName:"hourglass").font(.system(size:8,weight:.bold)).foregroundStyle(.white)
-                    .frame(width:15,height:15).background(Self.risk,in:.circle).overlay(Circle().stroke(theme.surface,lineWidth:1.5))
+                Image(systemName:"hourglass").font(.system(size:8,weight:.bold)).foregroundStyle(theme.surface)
+                    .frame(width:15,height:15).background(theme.risk,in:.circle).overlay(Circle().stroke(theme.surface,lineWidth:1.5))
                     .offset(x:-6,y:-6).accessibilityHidden(true)
             }
         }

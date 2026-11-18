@@ -92,7 +92,7 @@ private struct LegacyReceiptScope: Codable {
         let migratedScope = try JSONDecoder().decode(LegacyReceiptScope.self, from: currentScope.valueJSON)
         #expect(migratedScope.generationID == migrated.binding.generationID)
 
-        let bus = CommandBus(adapter: DurableCommandAdapter(containerProvider: { try migrated.containerForTransaction() },
+        let bus = CommandBus(adapter: legacyPrayerAdapter(containerProvider: { try migrated.containerForTransaction() },
             lockDirectory: root, transactionClock: { $0 }, generationProvider: { migrated.binding.generationID }))
         let undo = CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(commandID.uuidString)]), issuedAt: eventAt)
         #expect(try await bus.execute(undo, now: eventAt.addingTimeInterval(1)).status == .applied)

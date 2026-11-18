@@ -20,7 +20,7 @@ import MadarInbox
         let daysSinceFriday = (calendar.component(.weekday, from: day.date(in: calendar.timeZone)) + 1) % 7
         _ = try settings.stage(["salah.trackingStart": .object(["dayKey": .string(day.adding(days: -(daysSinceFriday == 0 ? 7 : daysSinceFriday)).description), "edits": .number(0)])], now: now)
         try context.save()
-        return (container, DurableCommandAdapter(container: container, lockDirectory: directory, transactionClock: { $0 }), PendingInbox(directory: directory.appending(path: "PendingInbox")))
+        return (container, legacyPrayerAdapter(container: container, lockDirectory: directory, transactionClock: { $0 }), PendingInbox(directory: directory.appending(path: "PendingInbox")))
     }
     private func prayer(id: UUID = UUID(), generation: UUID, now: Date = Self.fixedNow) -> InboxRecord {
         .init(expectedGenerationID: generation, command: .init(commandID: id, name: "prayer.log", payload: .object(["dayKey": .string((now == Self.fixedNow ? Self.fixedDay : prayerDay(now)).description), "prayer": .string("fajr"), "status": .string("jamaah")]), source: .notification, issuedAt: now))
@@ -288,7 +288,7 @@ import MadarInbox
         let stamp = try #require(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.updatedAt)
         #expect(!((try inbox.wasCommitted(commandID: first.command.commandID, generationID: generation))))
         let reopened = try MadarContainerFactory.makeLocal(at: adapter.lockDirectory)
-        let restartedAdapter = DurableCommandAdapter(container: reopened, lockDirectory: adapter.lockDirectory, generationProvider: { generation })
+        let restartedAdapter = legacyPrayerAdapter(container: reopened, lockDirectory: adapter.lockDirectory, generationProvider: { generation })
         let restarted = InboxDrainer(inbox: PendingInbox(directory: inbox.directory), bus: CommandBus(adapter: restartedAdapter), generation: { .init(generationID: generation, acceptsUnstampedDeliveries: false) }, hasReceipt: { try restartedAdapter.hasReceipt(commandID: $0) }, refresh: {})
         try await restarted.drain()
         #expect(try inbox.processingFiles().isEmpty)
@@ -335,7 +335,7 @@ import MadarInbox
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarCollectedReceipt-\(UUID())")
         let managed = try ManagedDataStore(root: root)
         let inbox = PendingInbox(directory: root.appending(path: "PendingInbox"))
-        let adapter = DurableCommandAdapter(containerProvider: { try managed.containerForTransaction() }, lockDirectory: root, transactionClock: { $0 }, generationProvider: { managed.binding.generationID })
+        let adapter = legacyPrayerAdapter(containerProvider: { try managed.containerForTransaction() }, lockDirectory: root, transactionClock: { $0 }, generationProvider: { managed.binding.generationID })
         let oldGeneration = managed.binding.generationID, deviceStore = managed.binding.deviceStoreURL, now = Self.fixedNow
         let first = prayer(generation: oldGeneration, now: now)
         var refreshes = 0

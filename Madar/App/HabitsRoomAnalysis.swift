@@ -7,7 +7,6 @@ import MadarDesign
 /// story card of a chosen habit, «ما لاحظه مدار» and the year. Every number is read from the habits' own periods and log times
 /// through `HabitRoomInsights`; below AX1 each drawing is replaced by its list.
 
-private let habitRisk = Color(red: 0.647, green: 0.306, blue: 0.204)
 private let habitWeekdayNames = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
 private let habitWeekdayLetters = ["ح", "ن", "ث", "ر", "خ", "ج", "س"]
 
@@ -52,8 +51,10 @@ struct HabitStoryCard: View {
     var breakAfter = 2
     let clear: () -> Void; let details: () -> Void
     @Environment(\.colorScheme) private var colorScheme
-    private var ink: Color { Color(red: 0.984, green: 0.969, blue: 0.933) }
-    private var card: Color { colorScheme == .dark ? Color(red: 0.2, green: 0.17, blue: 0.14) : Color(red: 0.141, green: 0.114, blue: 0.086) }
+    @Environment(\.roomTheme) private var theme
+    /// The story card is the room's ink on paper (light) or its raised surface (dark); text takes the opposite role.
+    private var ink: Color { colorScheme == .dark ? theme.ink : theme.background }
+    private var card: Color { colorScheme == .dark ? theme.surface : theme.ink }
     private var frequency: HabitFrequency { reading.summary.current?.rule.frequency ?? .daily }
     private var longest: (length: Int, end: GregorianDay)? { HabitRoomInsights.longestStreak(reading.summary.periods, today: today, breakAfter: breakAfter) }
     private var kept: Int { HabitRoomInsights.keptPeriods(reading.summary.periods).kept }
@@ -198,7 +199,7 @@ struct HabitRoomAnalysis: View {
             if dynamicTypeSize.isAccessibilitySize {
                 ForEach(Array(rates.enumerated()).compactMap { i, r in r.map { (i, $0) } }, id: \.0) { _, r in Text(percent(r)).font(HabitType.caption()) }
             } else {
-                HabitTrendLine(values: rates, colour: falling ? habitRisk : theme.accent, fill: theme.accentFill.opacity(0.14), ring: theme.surface)
+                HabitTrendLine(values: rates, colour: falling ? theme.risk : theme.accent, fill: theme.accentFill.opacity(0.14), ring: theme.surface)
                     .frame(height: 70).accessibilityHidden(true)
             }
         }.accessibilityIdentifier("habits-trend")
@@ -225,7 +226,7 @@ struct HabitRoomAnalysis: View {
                     ForEach(Array(order.enumerated()), id: \.offset) { i, w in
                         let v = rates[i]
                         let fill: Color = chosenIsLonger ? (v == top ? theme.accent : theme.accentFill.opacity(0.4))
-                            : (weakest?.contains(w) == true && v == low ? habitRisk : theme.accentFill.opacity(0.55))
+                            : (weakest?.contains(w) == true && v == low ? theme.risk : theme.accentFill.opacity(0.55))
                         VStack(spacing: 6) {
                             RoundedRectangle(cornerRadius: 7).fill(fill).frame(height: max(5, 66 * CGFloat(chosenIsLonger ? v / top : v)))
                             Text(habitWeekdayLetters[w - 1]).font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
@@ -286,7 +287,7 @@ struct HabitRoomAnalysis: View {
                 }
             } else {
                 ForEach(months, id: \.index) { m in
-                    let mark = m.index - 1 == extremes?.best ? theme.accent : m.index - 1 == extremes?.worst ? habitRisk : theme.secondaryInk
+                    let mark = m.index - 1 == extremes?.best ? theme.accent : m.index - 1 == extremes?.worst ? theme.risk : theme.secondaryInk
                     HStack(spacing: 6) {
                         Text(monthNames[m.index - 1]).font(HabitType.fine()).foregroundStyle(mark).lineLimit(1).minimumScaleFactor(0.7).frame(width: 62, alignment: .leading)
                         HabitYearRow(start: m.start, length: m.length, today: today, rates: rates, theme: theme, level: level).frame(height: 8)
@@ -308,12 +309,12 @@ struct HabitRoomAnalysis: View {
             Text(counting ? "مرّاتها كل شهر" : "التزامك كل شهر").font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
             VStack(spacing: 6) {
                 ForEach(months, id: \.index) { m in
-                    let v = values[m.index - 1], mark = m.index - 1 == extremes?.best ? theme.accent : m.index - 1 == extremes?.worst ? habitRisk : theme.secondaryInk
+                    let v = values[m.index - 1], mark = m.index - 1 == extremes?.best ? theme.accent : m.index - 1 == extremes?.worst ? theme.risk : theme.secondaryInk
                     HStack(spacing: 8) {
                         Text(monthNames[m.index - 1]).font(HabitType.fine()).foregroundStyle(mark).lineLimit(1).minimumScaleFactor(0.7).frame(width: 62, alignment: .leading)
                         if !dynamicTypeSize.isAccessibilitySize {
                             Capsule().fill(theme.ink.opacity(0.05)).frame(height: 10).overlay(alignment: .leading) {
-                                if let v { Capsule().fill(m.index - 1 == extremes?.best ? theme.accent : m.index - 1 == extremes?.worst ? habitRisk : theme.accentFill.opacity(0.38)).scaleEffect(x: max(0.03, v / top), anchor: .leading) }
+                                if let v { Capsule().fill(m.index - 1 == extremes?.best ? theme.accent : m.index - 1 == extremes?.worst ? theme.risk : theme.accentFill.opacity(0.38)).scaleEffect(x: max(0.03, v / top), anchor: .leading) }
                             }
                         } else { Spacer(minLength: 0) }
                         Text(v.map(text) ?? (m.start > today ? "لم يأتِ" : "")).font(HabitType.fine()).foregroundStyle(mark).frame(minWidth: 54, alignment: .trailing)
@@ -323,7 +324,7 @@ struct HabitRoomAnalysis: View {
             if let extremes {
                 HStack(spacing: 10) {
                     extremeBox("أحسن شهر", extremes.best, values, months, tint: theme.accent, text: text)
-                    if let worst = extremes.worst { extremeBox("أقل شهر", worst, values, months, tint: habitRisk, text: text) }
+                    if let worst = extremes.worst { extremeBox("أقل شهر", worst, values, months, tint: theme.risk, text: text) }
                 }
             }
         }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 24)).accessibilityIdentifier("habits-months")

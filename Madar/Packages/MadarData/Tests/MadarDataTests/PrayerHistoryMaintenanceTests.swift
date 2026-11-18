@@ -95,4 +95,19 @@ import Testing
         #expect(try context.fetch(FetchDescriptor<Setting>()).first { $0.key == "salah.method" }?.deletedAt == nil)
         #expect(try PrayerHistoryMaintenance.removeAllPrayerRecords(in: context, now: later) == 0)
     }
+
+    @Test func oneTimeScrubClearsHeartFromRowsDeletedBeforeTheScrubExisted() throws {
+        let context = ModelContext(try MadarContainerFactory.makeInMemory())
+        let stamp = Date(timeIntervalSince1970: 1_800_000_000)
+        let row = PrayerLog()
+        row.dayKey = "2026-11-10"; row.prayer = "fajr"; row.status = "jamaah"; row.heart = "present"
+        row.createdAt = stamp; row.updatedAt = stamp; row.deletedAt = stamp; row.deletionBarrierAt = stamp
+        context.insert(row)
+        try context.save()
+        _ = try PrayerHistoryMaintenance.removeAllPrayerRecords(in: context, now: stamp.addingTimeInterval(60))
+        let after = try #require(try context.fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(after.heart == nil)
+        #expect(after.deletedAt == stamp && after.updatedAt == stamp)
+        #expect(try context.fetch(FetchDescriptor<Setting>()).contains { $0.key == PrayerHistoryMaintenance.heartScrubKey })
+    }
 }

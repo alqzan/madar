@@ -38,6 +38,8 @@ enum CaptureIntentResponse: Equatable {
     case choosePrayerStatus
     case prayerRequestSent
     case heldPrayer
+    /// Madar no longer records prayers (owner, 17 Nov 2026): a captured «صليت…» gets this plain answer, never «request sent».
+    case prayerRetired
     case empty
     case tooLong
 
@@ -52,6 +54,7 @@ enum CaptureIntentResponse: Equatable {
         case .choosePrayerStatus: "اختر حالة الصلاة في مدار لإكمال تسجيلها."
         case .prayerRequestSent: "وصل طلب تسجيل الصلاة إلى مدار."
         case .heldPrayer: "افتح الصلاة وأكمل تسجيلها في مدار."
+        case .prayerRetired: "مدار لم يعد يسجّل الصلاة. أضف عادة لها من «العادات» إن أردت."
         case .empty: "اكتب شيئًا لالتقاطه في مدار."
         case .tooLong: "النص أطول من سطر واحد في صفحة اليوم."
         }
@@ -63,8 +66,7 @@ enum CaptureIntentResponse: Equatable {
         case .mihbaraIdea: handled ? .added : .heldDiary
         case .empty: .empty
         case .tooLong: .tooLong
-        case .logPrayer: handled ? .prayerRequestSent : .heldPrayer
-        case .choosePrayerStatus: handled ? .choosePrayerStatus : .heldPrayer
+        case .logPrayer, .choosePrayerStatus: .prayerRetired
         case .diaryLine: handled ? .added : .heldDiary
         }
     }

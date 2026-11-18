@@ -9,7 +9,7 @@ import MadarData
     private func fixture() throws -> (ModelContainer, CommandBus, URL) {
         let root = FileManager.default.temporaryDirectory.appending(path: "DiaryCommands-\(UUID())")
         let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
-        return (container, CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 })), root)
+        return (container, CommandBus(adapter: legacyPrayerAdapter(container: container, lockDirectory: root, transactionClock: { $0 })), root)
     }
     private func instant(_ value: String) -> Date { ISO8601DateFormatter().date(from: value)! }
     @Test func appendReplayUndoAndStoredDaySurviveBoundaryChange() async throws {

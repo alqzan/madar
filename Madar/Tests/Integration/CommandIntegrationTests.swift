@@ -13,29 +13,17 @@ import MadarData
         let container = try MadarContainerFactory.makeLocal(at: directory)
         return (container, CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: directory, transactionClock: { $0 })), directory)
     }
-    func testNotificationAndWidgetUpsertProduceOneDurablePrayerLog() async throws {
+    /// Prayer records were retired (owner, 17 Nov 2026): the old notification/widget upsert test is replaced by proof that nothing writes one.
+    func testNotificationAndWidgetPrayerLogsAreRejectedAndWriteNothing() async throws {
         let (container, bus, directory) = try fixture()
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-10T12:00:00+03:00"))
-        let fixtureContext = ModelContext(container)
-        _ = try SettingsStore(context: fixtureContext).stage(["salah.trackingStart": .object(["dayKey": .string("2026-10-10"), "edits": .number(0)])], now: now)
-        try fixtureContext.save()
         let payload = MadarCore.JSONValue.object(["dayKey": .string("2026-10-10"), "prayer": .string("fajr"), "status": .string("jamaah")])
-        let notification = CommandEnvelope(name: "prayer.log", payload: payload, source: .notification, issuedAt: now)
-        let initial = try await bus.execute(notification, now: now)
-        XCTAssertEqual(initial.status, .applied)
-        let widget = CommandEnvelope(name: "prayer.log", payload: payload, source: .widget, issuedAt: now)
-        let repeated = try await bus.execute(widget, now: now)
-        XCTAssertEqual(repeated.status, .duplicate)
-        _ = try await bus.execute(notification, now: now)
-        let context = ModelContext(container)
-        XCTAssertEqual(try context.fetchCount(FetchDescriptor<PrayerLog>()), 1)
-        XCTAssertEqual(try context.fetchCount(FetchDescriptor<MadarData.CommandReceipt>()), 2)
-        let reopened = try MadarContainerFactory.makeLocal(at: directory)
-        let persisted = try ModelContext(reopened).fetch(FetchDescriptor<PrayerLog>())
-        XCTAssertEqual(persisted.count, 1)
-        let saved = try XCTUnwrap(persisted.first)
-        XCTAssertEqual(saved.status, "jamaah")
-        XCTAssertEqual(saved.dayPolicy, "prayerDay@1")
+        for source in [CommandSource.notification, .widget] {
+            let result = try await bus.execute(CommandEnvelope(name: "prayer.log", payload: payload, source: source, issuedAt: now), now: now)
+            XCTAssertEqual(result.status, .rejected)
+        }
+        XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<PrayerLog>()), 0)
+        _ = directory
     }
     func testPresetUndoImmediateAndExpiresAtSixtySeconds() async throws {
         let (container, bus, _) = try fixture()

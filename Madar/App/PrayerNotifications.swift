@@ -361,19 +361,8 @@ final class PrayerNotificationCoordinator {
             if response.actionIdentifier == Self.snoozeActionID {
                 try await scheduleSnoozeLocked(for: response.notification.request, tapTime: Date())
             } else if response.actionIdentifier == Self.jamaahActionID || response.actionIdentifier == Self.aloneActionID {
-                let info = response.notification.request.content.userInfo
-                guard let dayKey = info["dayKey"] as? String, let day = try? GregorianDay(dayKey),
-                      let prayer = (info["prayer"] as? String).flatMap(Prayer.init(rawValue:)) else { return }
-                let reference = PrayerReference(day: day, prayer: prayer)
-                let alone = response.actionIdentifier == Self.aloneActionID
-                var calendar = Calendar(identifier: .gregorian); calendar.timeZone = session.activePlace.timeZone
-                let friday = prayer == .dhuhr && calendar.component(.weekday, from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600)) == 6
-                if friday && !alone {
-                    // RP5: Friday noon in congregation needs an explicit Jumu'ah/Dhuhr choice, so the app opens for it.
-                    session.selectedTab = "prayer"; session.prayerLogRequest = .dhuhr
-                } else {
-                    session.recordPrayer(reference, status: alone ? .alone : .jamaah, fridayKind: friday ? .dhuhr : nil)
-                }
+                // Prayer records were retired (owner, 17 Nov 2026): an old notification's button writes nothing and says so.
+                session.errorMessage = "مدار لم يعد يسجّل الصلاة. أضف عادة لها من «العادات» إن أردت."
             } else if response.actionIdentifier == Self.habitDoneActionID {
                 let info = response.notification.request.content.userInfo
                 guard let dayKey = info["dayKey"] as? String, let habit = (info["habit"] as? String).flatMap(UUID.init(uuidString:)) else { return }

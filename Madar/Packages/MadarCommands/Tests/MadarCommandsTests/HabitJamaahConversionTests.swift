@@ -11,7 +11,7 @@ import MadarData
     let now = ISO8601DateFormatter().date(from: "2026-11-17T20:00:00+03:00")!
     @Test func jamaahHabitBecomesAManualOnceHabitAnchoredAfterIsha() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitJamaah-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
-        let container = try MadarContainerFactory.makeLocal(at: root), bus = CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 }))
+        let container = try MadarContainerFactory.makeLocal(at: root), bus = CommandBus(adapter: legacyPrayerAdapter(container: container, lockDirectory: root, transactionClock: { $0 }))
         var rule = HabitRule(effectiveFrom: try GregorianDay("2026-11-10")); rule.measure = .count; rule.unit = "صلاة"; rule.target = 5
         let id = UUID(), other = UUID()
         func save(_ id: UUID, _ name: String, _ source: String?) async throws {

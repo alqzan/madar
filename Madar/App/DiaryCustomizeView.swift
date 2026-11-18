@@ -199,7 +199,7 @@ struct DiaryCustomizeView: View {
     private var metricControls: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("مقاييس منذ ذاك اليوم").font(MadarTypography.section())
-            ForEach([("sadr", "في صدرك"), ("fajrJamaah", "الفجر جماعة")], id: \.0) { id, title in
+            ForEach([("sadr", "في صدرك")], id: \.0) { id, title in
                 Toggle(title, isOn: Binding(get: { app.values["notes.sinceMetrics"]?.array?.contains(.string(id)) == true }, set: { on in
                     var values = app.values["notes.sinceMetrics"]?.array ?? []; values.removeAll { $0 == .string(id) }; if on { values.append(.string(id)) }; app.set(.array(values), key: "notes.sinceMetrics")
                 })).font(MadarTypography.body()).tint(theme.color("ghad")).disabled(app.settingsWriteInProgress).accessibilityIdentifier("diary-metric-" + id)
@@ -209,7 +209,7 @@ struct DiaryCustomizeView: View {
     private var autoControls: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("اليوم يكتب نفسه").font(MadarTypography.section())
-            ForEach([("salah", "الصلاة"), ("quran", "القرآن"), ("habits", "العادات"), ("mihbara", "المحبرة")], id: \.0) { id, title in
+            ForEach([("quran", "القرآن"), ("habits", "العادات"), ("mihbara", "المحبرة")], id: \.0) { id, title in
                 Toggle(title, isOn: Binding(get: { app.values["notes.autoLines"]?.object?[id] == .bool(true) || (id == "habits" && app.values["notes.autoLines"]?.object?["habits"] == nil) }, set: { on in
                     var values = app.values["notes.autoLines"]?.object ?? [:]; values[id] = .bool(on); app.set(.object(values), key: "notes.autoLines")
                 })).font(MadarTypography.body()).tint(theme.color("ghad")).disabled(app.settingsWriteInProgress).accessibilityIdentifier("diary-auto-" + id)

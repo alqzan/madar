@@ -189,7 +189,7 @@ final class AppSession {
     #endif
     var settingsQuery = ""
     private let bus: CommandBus
-    private let commandAdapter: DurableCommandAdapter
+    let commandAdapter: DurableCommandAdapter
     let pendingInbox: PendingInbox
     @ObservationIgnored private lazy var inboxDrainer = InboxDrainer(inbox: pendingInbox, bus: bus, generation: { [weak self] in
         guard let self else { throw DataError.invalidValue("session unavailable") }

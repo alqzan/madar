@@ -112,23 +112,23 @@ final class LockedFlags: @unchecked Sendable {
         sealed.text="DO-NOT-EXPORT-SEALED";context.insert(sealed)
         note.targetDayKey=entry.dayKey;note.writtenDayKey="2024-03-12";note.text="هامش تاريخي";context.insert(note)
         prayer.dayKey=entry.dayKey;prayer.prayer="fajr";prayer.status="alone";context.insert(prayer)
-        frozen.key="sys.diaryAutoLines."+entry.dayKey;frozen.valueJSON=try JSONEncoder().encode([DiaryAutoLine(id:"frozen",at:entry.eventAt,text:"صلّيت الفجر جماعة",kind:"salah")]);context.insert(frozen);try context.save()
+        frozen.key="sys.diaryAutoLines."+entry.dayKey;frozen.valueJSON=try JSONEncoder().encode([DiaryAutoLine(id:"frozen",at:entry.eventAt,text:"صلّيت الفجر جماعة",kind:"salah"),DiaryAutoLine(id:"frozen-quran",at:entry.eventAt,text:"قرأت صفحة من الورد",kind:"quran")]);context.insert(frozen);try context.save()
         var options=DiaryExportOptions();options.year=2024;options.month=3
         let standalone=DayPage();standalone.dayKey="2024-03-12";standalone.photoMediaID=photo.id;context.insert(standalone);try context.save()
         try await app.applySettingsAndWait(["notes.showPhoto":.bool(false)])
-        let pages=try service.exportPages(options);XCTAssertEqual(pages.first{$0.day.description=="2024-03-12"}?.media.map(\.id),[photo.id]);XCTAssertTrue(pages.flatMap(\.lines).contains{$0.text=="صلّيت الفجر جماعة"});XCTAssertFalse(pages.flatMap(\.lines).contains{$0.text.contains("وحدي") || $0.text.contains("DO-NOT")})
+        let pages=try service.exportPages(options);XCTAssertEqual(pages.first{$0.day.description=="2024-03-12"}?.media.map(\.id),[photo.id]);XCTAssertTrue(pages.flatMap(\.lines).contains{$0.text=="قرأت صفحة من الورد"});XCTAssertFalse(pages.flatMap(\.lines).contains{$0.text=="صلّيت الفجر جماعة"},"Frozen prayer lines stay stored but are no longer exported");XCTAssertFalse(pages.flatMap(\.lines).contains{$0.text.contains("وحدي") || $0.text.contains("DO-NOT")})
         let pdf=try await service.exportDiary(options);defer{try? FileManager.default.removeItem(at:pdf.url.deletingLastPathComponent())}
         let document=try XCTUnwrap(PDFDocument(url:pdf.url));XCTAssertGreaterThan(document.pageCount,3);XCTAssertTrue(document.string?.contains("LAST-PARAGRAPH")==true)
         options.format="markdown";let md=try await service.exportDiary(options);defer{try? FileManager.default.removeItem(at:md.url.deletingLastPathComponent())}
         let files=try DiaryExportArchive.files(Data(contentsOf:md.url));XCTAssertEqual(files["media/"+audio.id.uuidString+".mp4"],audio.data);XCTAssertEqual(files["media/"+photo.id.uuidString+".jpeg"],photo.data)
-        let text=String(data:try XCTUnwrap(files["days/2024-03-11.md"]),encoding:.utf8)!;XCTAssertTrue(text.contains("هامش تاريخي"));XCTAssertTrue(text.contains("صلّيت الفجر جماعة"));XCTAssertFalse(text.contains("DO-NOT"))
+        let text=String(data:try XCTUnwrap(files["days/2024-03-11.md"]),encoding:.utf8)!;XCTAssertTrue(text.contains("هامش تاريخي"));XCTAssertTrue(text.contains("قرأت صفحة من الورد"));XCTAssertFalse(text.contains("صلّيت الفجر جماعة"));XCTAssertFalse(text.contains("DO-NOT"))
         options.format="json";let json=try await service.exportDiary(options);defer{try? FileManager.default.removeItem(at:json.url.deletingLastPathComponent())}
         let jsonFiles=try DiaryExportArchive.files(Data(contentsOf:json.url)),object=try XCTUnwrap(JSONSerialization.jsonObject(with:try XCTUnwrap(jsonFiles["Journal.json"])) as? [String:Any]),rows=try XCTUnwrap(object["entries"] as? [[String:Any]])
         XCTAssertEqual((object["metadata"] as? [String:String])?["version"],"1.0");let row=try XCTUnwrap(rows.first);XCTAssertEqual((row["uuid"] as? String)?.count,32);XCTAssertTrue((row["text"] as? String)?.contains("dayone-moment://")==true);XCTAssertEqual((row["photos"] as? [[String:Any]])?.count,1)
         XCTAssertFalse(String(data:try XCTUnwrap(jsonFiles["Journal.json"]),encoding:.utf8)!.contains("DO-NOT"))
         // B2-3: every line keeps its own time and zone, and the one sealed letter is named as left out.
         let lineFile=try XCTUnwrap(JSONSerialization.jsonObject(with:try XCTUnwrap(jsonFiles["Madar-lines.json"])) as? [String:Any]),lineRows=try XCTUnwrap(lineFile["lines"] as? [[String:Any]])
-        XCTAssertTrue(lineRows.contains{($0["text"] as? String)=="صلّيت الفجر جماعة" && ($0["at"] as? String)?.isEmpty==false && ($0["timeZone"] as? String)?.isEmpty==false})
+        XCTAssertTrue(lineRows.contains{($0["text"] as? String)=="قرأت صفحة من الورد" && ($0["at"] as? String)?.isEmpty==false && ($0["timeZone"] as? String)?.isEmpty==false})
         XCTAssertFalse(String(data:try XCTUnwrap(jsonFiles["Madar-lines.json"]),encoding:.utf8)!.contains("DO-NOT"))
         XCTAssertEqual(json.omittedNote,"لا يشمل رسالة مختومة واحدة لم تُفتح بعد.")
         options.sources=false;options.margins=false;XCTAssertFalse(try service.exportPages(options).flatMap(\.lines).contains{["margin","salah"].contains($0.kind)})

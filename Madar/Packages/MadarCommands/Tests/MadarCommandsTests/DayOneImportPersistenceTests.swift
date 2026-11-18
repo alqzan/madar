@@ -88,6 +88,26 @@ import MadarData
         #expect(try pages(context).map(\.origin) == Array(repeating: "dayOne", count: 5))
     }
 
+    /// Audit 18 Nov 2026: a failure after the first saved media batch is a partial import, never «nothing changed», and undo removes what was saved.
+    @Test func failureAfterASavedMediaBatchIsPartialAndUndoRemovesTheSavedMedia() async throws {
+        let (container, root) = try store(); defer { try? FileManager.default.removeItem(at: root) }
+        let context = ModelContext(container)
+        var batchID: UUID?
+        do {
+            let zip = try archive()
+            _ = try await DayOneImportHandler.commit(try DayOneParser.plan(zip), archive: zip, fileName: "Journal.zip", fileHash: "test", context: context, now: now, writer: "test", flushBytes: 1, failAfterFlushForTesting: true)
+            Issue.record("the import should have stopped")
+        }
+        catch DayOneImportError.partial(let id) { batchID = id }
+        let id = try #require(batchID)
+        let saved = try media(ModelContext(container))
+        #expect(!saved.isEmpty, "the first batch was saved")
+        let batch = try #require(try ModelContext(container).fetch(FetchDescriptor<ImportBatch>()).first { $0.id == id })
+        #expect(batch.status == "partial")
+        try DayOneImportHandler.undo(batch: id, context: ModelContext(container), now: now.addingTimeInterval(60), writer: "test")
+        #expect(try media(ModelContext(container)).isEmpty, "undo removes the media the partial import saved")
+    }
+
     @Test func reimportingTheSameExportAddsNothing() async throws {
         let (container, root) = try store(); defer { try? FileManager.default.removeItem(at: root) }
         let context = ModelContext(container), zip = try archive()

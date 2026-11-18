@@ -3,7 +3,7 @@ import MadarSnapshots
 
 struct MadarWatchHomeView: View {
     @EnvironmentObject private var store: WatchSnapshotStore
-    private let gold = Color(red: 0.82, green: 0.67, blue: 0.40)
+    private let gold = Color("WatchGold")
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
@@ -65,7 +65,7 @@ struct MadarWatchHomeView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading).padding(9)
-        .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
     }
 
     private func countdown(_ interval: TimeInterval, snapshot: WatchDashboardSnapshot) -> String {

@@ -60,7 +60,7 @@ struct HabitOrbitView:View {
                                 .accessibilityLabel(row.name+"، "+row.statusTitle).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("habit-orbit-"+row.id.uuidString)
                                 .position(x:x,y:y)
                                 if on {
-                                    Text(row.name).font(HabitType.fine()).foregroundStyle(.white).padding(.horizontal,8).padding(.vertical,2).background(theme.accent,in:.rect(cornerRadius:10))
+                                    Text(row.name).font(HabitType.fine()).foregroundStyle(theme.surface).padding(.horizontal,8).padding(.vertical,2).background(theme.accent,in:.rect(cornerRadius:10))
                                         .position(x:min(max(x,40),size-40),y:y+26).allowsHitTesting(false)
                                 }
                             }

@@ -9,6 +9,8 @@ import CryptoKit
 public enum DayOneImportError: Error, Equatable, Sendable {
     case noJournal
     case archive(ZIPReaderError)
+    /// The import stopped after part of it was saved (a media batch). The batch record holds what was written, so it can be undone.
+    case partial(batch: UUID)
 }
 
 public struct DayOneMediaRef: Codable, Equatable, Hashable, Sendable {

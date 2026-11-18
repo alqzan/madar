@@ -204,6 +204,7 @@ private struct DiaryDayReadConfiguration: Sendable {
         let auto = app.values["notes.autoLines"]?.object ?? [:]
         var kinds = Set(auto.compactMap { $0.value == .bool(true) ? $0.key : nil })
         if auto["habits"] == nil { kinds.insert("habits") }
+        kinds.remove("salah") // prayer recording is retired: its auto lines (live or frozen) are not shown
         return .init(timeZoneID: app.activePlace.timeZoneID, firstCalendar: app.diaryFirstCalendar,
             hijriSource: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura,
             sightingOffset: Int(app.number("core.hijriOffset")),
@@ -393,7 +394,8 @@ private struct DiaryDayReadConfiguration: Sendable {
         let frozen = try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == frozenKey && $0.deletedAt == nil && $0.mergedInto == nil })).first
         do {
             let auto: [DiaryDisplayLine]
-            if let frozen { auto = try JSONDecoder().decode([DiaryDisplayLine].self, from: frozen.valueJSON) }
+            // Prayer lines were frozen into old days before prayer recording was retired (17 Nov 2026); they stay stored but are no longer shown.
+            if let frozen { auto = try JSONDecoder().decode([DiaryDisplayLine].self, from: frozen.valueJSON).filter { $0.kind != "salah" } }
             else { auto = liveAutoLines }
             lines += auto.filter { configuration.enabledAutoLineKinds.contains($0.kind) }.map { line in
                 var dated = line

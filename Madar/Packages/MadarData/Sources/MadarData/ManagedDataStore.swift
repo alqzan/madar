@@ -40,6 +40,7 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
         self.root = root; self.commandLockURL = commandLockURL ?? root.appendingPathComponent("CommandBus.lock")
         provisionedContainer = MadarCloudMirror.provisionedContainerIdentifier
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
+        LegacyGenerationMigration.protectSafetyCopies(root:root)
         let lease = StoreLease(lockURL:self.commandLockURL); try lease.acquire(failIfMaintenance:false); defer { lease.release() }
         let pointerURL = root.appendingPathComponent("ActiveGeneration.json")
         var pointer: ManagedPointer

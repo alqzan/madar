@@ -89,6 +89,27 @@ import Testing
         #expect(try store.container.mainContext.fetch(FetchDescriptor<Entry>()).map(\.text) == ["synthetic"])
     }
 
+    /// Audit High 10: the account a generation was mirrored with is remembered per generation, so turning sync off and on
+    /// again under a different account is still seen as a switch.
+    @Test func mirroredAccountSurvivesSyncOffAndReopen() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarMirrorAccount-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        MadarCloudMirror.provisionedContainerIdentifier = nil
+        let first = try ManagedDataStore(root: root, cloudKitContainerIdentifier: nil)
+        let pointerURL = root.appendingPathComponent("ActiveGeneration.json")
+        var pointer = try JSONDecoder().decode(ManagedPointer.self, from: Data(contentsOf: pointerURL))
+        #expect(pointer.mirroredAccountHash == nil)
+        pointer.mirroredAccountHash = "account-a"
+        try JSONEncoder().encode(pointer).write(to: pointerURL)
+        let reopened = try ManagedDataStore(root: root, cloudKitContainerIdentifier: nil)
+        #expect(reopened.mirroredAccountHash == "account-a")
+        try reopened.bindCloudMirror(enabled: false, accountHash: "account-b")
+        #expect(reopened.mirroredAccountHash == "account-a", "turning sync off never forgets which account the rows were mirrored with")
+        let stored = try JSONDecoder().decode(ManagedPointer.self, from: Data(contentsOf: pointerURL))
+        #expect(stored.mirroredAccountHash == "account-a")
+        _ = first
+    }
+
     @Test func syncedAndDeviceSchemasAreDisjoint() {
         #expect(Set(synced.entities.map(\.name)).isDisjoint(with: device.entities.map(\.name)))
     }

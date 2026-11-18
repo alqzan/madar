@@ -259,6 +259,21 @@ import MadarCore
         XCTAssertEqual(calendar.component(.day, from: candidate.dueAt), 16)
     }
 
+    /// Audit High 7: a daily habit whose window already passed today is asked for tomorrow's window, and the tap is keyed to tomorrow, never today.
+    func testDailyHabitWhoseWindowPassedIsKeyedToTomorrow() async throws {
+        let (app, _, _, _) = try fixture(["core.dayStart": .string("midnight")])
+        let now = ISO8601DateFormatter().date(from: "2026-10-15T20:00:00Z")! // 23:00 in Riyadh, after the 08:00 window
+        let context = ModelContext(app.container)
+        let habit = addPushHabit(context, name: "مشي", clockStart: 8 * 60)
+        try context.save(); try app.reload()
+        let place = ActivePlace.riyadh
+        let days = (0..<3).compactMap { PrayerTimesEngine.calculate(day: try! GregorianDay("2026-10-15").adding(days: $0), place: place) }
+        let candidates = try await RoomNotificationContent.candidates(session: app, prayerDays: days, now: now)
+        let mine = candidates.filter { $0.id.hasSuffix(habit.id.uuidString) && $0.id.hasPrefix("habits.") && !$0.id.contains("risk") }
+        XCTAssertTrue(mine.contains { $0.dayKey == "2026-10-16" && $0.id == "habits.2026-10-16.\(habit.id.uuidString)" }, mine.map(\.id).joined(separator: ","))
+        XCTAssertFalse(mine.contains { $0.dayKey == "2026-10-15" }, "a window that has passed is never asked again for today")
+    }
+
     /// Rows for a custom push habit: daily or weekly, with an optional clock window or Fajr-anchored window.
     private func addPushHabit(_ context: ModelContext, name: String, frequency: String = "daily", weekdays: [String]? = nil, clockStart: Int? = nil, anchor: (start: Int, end: Int)? = nil) -> Habit {
         let habit = Habit(); habit.name = name; habit.reminder = "push"; habit.startDate = ISO8601DateFormatter().date(from: "2026-09-01T00:00:00Z")!; context.insert(habit)

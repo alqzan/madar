@@ -39,7 +39,7 @@ import UIKit
         try await app.executeDiaryCommand("diary.freezeDay", payload: ["dayKey": .string(previous.description)])
         prayer.status = "alone"; try context.save()
         let frozen = try service.day(previous)
-        XCTAssertTrue(frozen.lines.contains { $0.text == "صلّيت الفجر جماعة" })
+        XCTAssertFalse(frozen.lines.contains { $0.text == "صلّيت الفجر جماعة" }, "Frozen prayer lines stay stored but are no longer shown (prayer recording retired)")
         XCTAssertFalse(frozen.lines.contains { $0.text == "صلّيت الفجر وحدي" })
         let unrelated = MarginNote(); unrelated.targetDayKey = "2024-01-01"; unrelated.writtenDayKey = "2024-01-02"; unrelated.text = "هامش بعيد"; context.insert(unrelated)
         let deleted = MarginNote(); deleted.targetDayKey = previous.description; deleted.writtenDayKey = today.description; deleted.text = "هامش محذوف"; deleted.deletedAt = now; context.insert(deleted)

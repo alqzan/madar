@@ -166,8 +166,11 @@ public struct DayOneReceipt: Equatable, Sendable {
     /// Writes one ImportBatch. Entries, media, pages and projects are tied to it so `undo` can reverse it in one step.
     /// Media bytes are inflated off the main actor; the context is saved every ~64 MB so a large export does not
     /// hold every file in memory. A re-run after a failure resumes by natural keys (same hash → skipped).
+    private struct InjectedFailure: Error {}
+
     public static func commit(_ plan: DayOnePlan, archive: ZIPReader, fileName: String, fileHash: String, choice: DayOneMerge.Choice = .automatic,
-                              context: ModelContext, now: Date, writer: String, progress: (@MainActor (Int, Int) -> Void)? = nil) async throws -> DayOneReceipt {
+                              context: ModelContext, now: Date, writer: String, progress: (@MainActor (Int, Int) -> Void)? = nil,
+                              flushBytes: Int = 64 * 1024 * 1024, failAfterFlushForTesting: Bool = false) async throws -> DayOneReceipt {
         let env = try environment(context), existing = try existingEntries(context)
         let preview = try preview(plan, choice: choice, context: context)
         let batch = ImportBatch(); batch.kind = "dayOne"; batch.fileName = fileName; batch.fileHash = fileHash
@@ -177,6 +180,7 @@ public struct DayOneReceipt: Equatable, Sendable {
         func created(_ model: String, _ id: UUID) { summary.created[model, default: []].append(id) }
         // Only rows an undone import tombstoned come back; a row the owner deleted stays deleted (§11).
         let undone = try undoneRows(context)
+        var flushed = false
         do {
             // Media: one row per file (natural key = md5), reused across entries and re-imports.
             let writing = plan.entries.filter { [.add, .update, .keepBoth, .backfillTags].contains(preview.actions[$0.sourceID]) }
@@ -209,7 +213,13 @@ public struct DayOneReceipt: Equatable, Sendable {
                 if bytes != nil { summary.mediaFound[ref.kind, default: 0] += 1 } else if tooLarge { summary.tooLarge.append(note) } else { summary.missing.append(note) }
                 mediaIDs[key] = row.id
                 pending += bytes?.count ?? 0; done += 1; progress?(done, refs.count)
-                if pending > 64 * 1024 * 1024 { try context.save(); pending = 0 }
+                if pending > flushBytes {
+                    // What is saved here is already part of the diary: keep the batch's summary current in the same save, so a later
+                    // failure still leaves a batch that can be undone.
+                    batch.summaryJSON = try JSONEncoder().encode(summary); batch.status = "running"
+                    try context.save(); pending = 0; flushed = true
+                    if failAfterFlushForTesting { throw InjectedFailure() }
+                }
             }
             // The original journal JSON is archived as it was: tags, mood, weather, starred and unknown fields are never lost.
             for journal in plan.journals {
@@ -322,7 +332,13 @@ public struct DayOneReceipt: Equatable, Sendable {
             return .init(batchID: batch.id, status: batch.status, summary: summary)
         } catch {
             context.rollback()
-            if let row = try? context.fetch(FetchDescriptor<ImportBatch>()).first(where: { $0.id == batch.id }) { row.status = "failed"; row.finishedAt = now; try? context.save() }
+            if let row = try? context.fetch(FetchDescriptor<ImportBatch>()).first(where: { $0.id == batch.id }) {
+                row.status = flushed ? "partial" : "failed"; row.finishedAt = now
+                // Rows committed by earlier batches are listed in the summary written with them, so undo reverses exactly those.
+                if flushed, let data = try? JSONEncoder().encode(summary) { row.summaryJSON = data }
+                try? context.save()
+            }
+            if flushed { throw DayOneImportError.partial(batch: batch.id) }
             throw error
         }
     }

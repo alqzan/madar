@@ -5,6 +5,7 @@ import ImageIO
 import MadarCore
 @testable import MadarData
 import MadarInbox
+@testable import MadarCommands
 import MadarSnapshots
 @testable import Madar
 
@@ -27,6 +28,8 @@ import MadarSnapshots
         _ = try SettingsStore(context: settings).stage(["salah.trackingStart": .object(["dayKey": .string("2026-10-01"), "edits": .number(0)])])
         try settings.save()
         let session = try AppSession(container: managed.container, managedStore: managed, groupDirectory: root)
+        // Prayer logging is closed in production (17 Nov 2026); these inbox-lifecycle tests use the prayer handler as their vehicle.
+        session.commandAdapter.prayerLoggingRetired = false
         XCTAssertTrue(UIApplication.shared.isProtectedDataAvailable, "App-host drain requires an unlocked device")
         return Fixture(root: root, managed: managed, session: session)
     }

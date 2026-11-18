@@ -151,13 +151,12 @@ import MadarSnapshots
         XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<MoneyTransaction>()), 0, "A public link can prefill but never write")
     }
 
-    func testCaptureDialogDoesNotSayPrayerWasAddedBeforeItsStateIsChosen() {
-        let incomplete = CaptureRouter.route("صليت المغرب")
-        XCTAssertEqual(CaptureIntentResponse.make(route: incomplete, handled: true), .choosePrayerStatus)
-        XCTAssertEqual(CaptureIntentResponse.make(route: incomplete, handled: false), .heldPrayer)
-
-        let complete = CaptureRouter.route("صليت الفجر جماعة")
-        XCTAssertEqual(CaptureIntentResponse.make(route: complete, handled: true), .prayerRequestSent)
+    func testCaptureNeverSaysAPrayerWasRecordedBecauseMadarNoLongerRecordsPrayer() {
+        for text in ["صليت المغرب", "صليت الفجر جماعة"] {
+            let route = CaptureRouter.route(text)
+            XCTAssertEqual(CaptureIntentResponse.make(route: route, handled: true), .prayerRetired)
+            XCTAssertEqual(CaptureIntentResponse.make(route: route, handled: false), .prayerRetired)
+        }
     }
 
     func testHabitShortcutsListOnlyCustomHabitsAndHideUnderAppLock() async throws {

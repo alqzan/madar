@@ -62,6 +62,7 @@ import SwiftData
         let reread = try JSONDecoder().decode([DataRecord].self,from:Data(contentsOf:safety.appendingPathComponent("RecordsV1.json")))
         guard try RecordFingerprint.hash(reread) == RecordFingerprint.hash(original) else { throw BackupOperationError.invalidManagedStore }
         try DurableFiles.encode(try RecordFingerprint.hash(original),to:safety.appendingPathComponent("RecordsV1.sha256.json"))
+        Self.protectSafetyCopies(root: root)
         if interruption == .afterCopy { throw BackupOperationError.simulatedInterruption("migration afterCopy") }
         let converted = try SchemaCompatibility.currentRecords(original,from:1)
         let synced = converted.filter { MadarSchema.syncedNames.contains($0.model) }
@@ -199,5 +200,19 @@ import SwiftData
             changed = true
         }
         if changed { try context.save() }
+    }
+}
+
+extension LegacyGenerationMigration {
+    /// Migration safety copies hold the owner's private records in the clear: they get the same file protection as the live store
+    /// (a no-op where the platform has none). Idempotent, so it also covers copies made by older builds; nothing is deleted or moved.
+    static func protectSafetyCopies(root: URL) {
+        let safety = root.appendingPathComponent("MigrationSafety", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: safety.path) else { return }
+        let attributes: [FileAttributeKey: Any] = [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
+        if let walker = FileManager.default.enumerator(at: safety, includingPropertiesForKeys: nil) {
+            for case let url as URL in walker { try? FileManager.default.setAttributes(attributes, ofItemAtPath: url.path) }
+        }
+        try? FileManager.default.setAttributes(attributes, ofItemAtPath: safety.path)
     }
 }

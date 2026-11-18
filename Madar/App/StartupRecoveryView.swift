@@ -37,7 +37,7 @@ struct StartupRecoveryView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(title(item)).font(.subheadline.weight(.semibold))
-                                Text(item.date.formatted(date: .abbreviated, time: .shortened) + " · " + Self.hijri(item.date) + " · " + ByteCountFormatter.string(fromByteCount: item.bytes, countStyle: .file))
+                                Text(item.date.formatted(date: .abbreviated, time: .shortened) + "، " + Self.hijri(item.date) + "، " + ByteCountFormatter.string(fromByteCount: item.bytes, countStyle: .file))
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()

@@ -65,6 +65,7 @@ struct DayOneImportDraft: Identifiable {
         switch error {
         case DayOneImportError.noJournal: "لم نجد في الملف دفترًا من داي ون. صدّر من داي ون بصيغة JSON، ثم اختر ملف ZIP كما هو."
         case DayOneImportError.archive(let inner): message(inner)
+        case DayOneImportError.partial: "توقّف الاستيراد في منتصفه، وبعض ما قرأه صار في دفترك. تراجع عنه من سجل الاستيراد، أو أعد المحاولة بالملف نفسه ليكمل من حيث توقف."
         case ZIPReaderError.notZIP: "هذا الملف ليس ملف ZIP. اختر الملف الذي أعطاك إياه داي ون عند التصدير بصيغة JSON."
         case ZIPReaderError.encrypted: "الملف مقفل بكلمة سر. صدّره من داي ون دون تشفير ثم أعد المحاولة."
         case ZIPReaderError.tooLarge: "في الملف مرفق أكبر مما يستطيع مدار فتحه دفعة واحدة. لم يُكتب شيء."
@@ -72,7 +73,7 @@ struct DayOneImportDraft: Identifiable {
         case ZIPReaderError.corrupt, ZIPReaderError.checksum, ZIPReaderError.unsafePath: "الملف ناقص أو تالف. أعد التصدير من داي ون ثم جرّب مرة أخرى."
         case let error as DataError: if case .invalidValue(let text) = error, text.contains("مقفلة") { "افتح المذكرات أولًا ثم أعد المحاولة." } else { "لم يكتمل الاستيراد، ولم يتغيّر شيء في دفترك." }
         case is BackupOperationError: "مدار مشغول بنسخة احتياطية الآن. أعد المحاولة بعد قليل."
-        default: "لم يكتمل الاستيراد، ولم يتغيّر شيء في دفترك."
+        default: "لم يكتمل الاستيراد قبل أن يُحفظ شيء، فدفترك كما كان."
         }
     }
 }

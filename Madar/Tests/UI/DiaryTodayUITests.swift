@@ -42,7 +42,7 @@ import XCTest
         continueAfterFailure = false
         let app = launch("today")
         XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 25)); app.buttons["diary-today"].tap()
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "صلّيت الفجر جماعة")).firstMatch.waitForExistence(timeout: 10)); capture(app, "M3-V05-today-L")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "قهوة الضحى")).firstMatch.waitForExistence(timeout: 10)); capture(app, "M3-V05-today-L")
         app.swipeUp(); capture(app, "M3-V05-today-scrolled-L")
         app.buttons["diary-day-year"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "عشاء عند أهلي")).firstMatch.waitForExistence(timeout: 10))

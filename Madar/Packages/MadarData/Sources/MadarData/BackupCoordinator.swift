@@ -348,18 +348,44 @@ import Darwin
         if existing.isEmpty { return incoming } // Clean restore preserves every timestamp, alias, tombstone and media byte.
         return BackupBookFiles.retainingLocalFiles(try planned(existing:existing,incoming:incoming,mode:mode,now:now,writerID:writerID),existing:existing)
     }
+    /// A book removed for good keeps only an emptied tombstone. Nothing an older backup carries for it may come back live:
+    /// its highlights, notes, words, cover/ink media and the book's own file (known from the incoming book row).
+    static func droppingPurgedBookDependents(_ incoming: [DataRecord], existing: [DataRecord]) -> [DataRecord] {
+        let purged = Set(existing.filter { $0.model == "Book" && $0.deletedAt != nil && $0.fields["title"] == .string("") }.map(\.id))
+        guard !purged.isEmpty else { return incoming }
+        let purgedText = Set(purged.map(\.uuidString))
+        let fileIDs = Set(incoming.filter { $0.model == "Book" && purged.contains($0.id) }.compactMap { $0.fields["mediaID"]?.string })
+        let otherBooksFiles = Set(incoming.filter { $0.model == "Book" && !purged.contains($0.id) && $0.isLive }.compactMap { $0.fields["mediaID"]?.string })
+        return incoming.filter { row in
+            guard row.isLive else { return true }
+            switch row.model {
+            case "Highlight", "UserWord": return !(row.fields["bookID"]?.string.map(purgedText.contains) ?? false)
+            case "NotebookNote":
+                guard let target = row.fields["targetID"]?.string, purgedText.contains(target) else { return true }
+                // The purge keeps a book's own «general» notes (only the Goodreads private note goes with it): they stay too.
+                let goodreads = StableIdentity.uuid(for: "GoodreadsPrivateNote:\(target)")
+                return row.fields["link"]?.string == "general" && row.id != goodreads
+            case "Media":
+                if fileIDs.contains(row.id.uuidString) && !otherBooksFiles.contains(row.id.uuidString) { return false }
+                guard let source = row.fields["sourceID"]?.string else { return true }
+                return !purgedText.contains { source == "book-cover:" + $0 || source.hasPrefix("pdf-ink:" + $0 + ":") }
+            default: return true
+            }
+        }
+    }
     private static func planned(existing: [DataRecord], incoming: [DataRecord], mode: RestoreMode, now: Date, writerID: String) throws -> [DataRecord] {
+        let incomingKept = Self.droppingPurgedBookDependents(incoming, existing: existing)
         if mode == .merge {
             var rows = existing
-            for record in incoming {
+            for record in incomingKept {
                 if let index = rows.firstIndex(where: { RecordFingerprint.key($0) == RecordFingerprint.key(record) }) { rows[index] = try RowMerger.mergeVersions(rows[index],record) }
                 else { rows.append(record) }
             }
             return try RowMerger.reconciled(rows)
         }
-        let keys = Set(incoming.map(RecordFingerprint.key))
+        let keys = Set(incomingKept.map(RecordFingerprint.key))
         // A book the owner removed for good (emptied tombstone) is not brought back by an older copy inside a backup.
-        var rows = incoming.map { row -> DataRecord in
+        var rows = incomingKept.map { row -> DataRecord in
             guard row.model == "Book", row.isLive,
                   let current = existing.first(where: { RecordFingerprint.key($0) == RecordFingerprint.key(row) }),
                   current.deletedAt != nil, current.fields["title"] == .string("") else { return row }

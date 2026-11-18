@@ -24,6 +24,8 @@ public struct RoomTheme: Sendable {
     public var accent: Color { color("accentText") }
     public var accentFill: Color { color("accentFill") }
     public var onAccent: Color { color("onAccent") }
+    /// A falling trend, a weakest day, a missed flame: the habits room's warning clay (design-tokens `salah.missedText`, 4.78:1 on the surface), light and dark. Safe for small text and shapes.
+    public var risk: Color { MadarToken.colors["rooms.salah.\(dark ? "dark" : "light").missedText"] ?? color("accent") }
 }
 
 public extension EnvironmentValues {

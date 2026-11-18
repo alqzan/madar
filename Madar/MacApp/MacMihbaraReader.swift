@@ -19,6 +19,7 @@ struct MihbaraReaderView: View {
     let book: MihbaraBook
     var volume: Int? = nil
     var initialLocatorJSON: String? = nil
+    /// A book converted from a PDF names its source in the EPUB identifier; «الأصل» opens that PDF (the Mac reader has no printed-page list, so it opens at the first page).
     var originalPDF: ((String) -> UUID?)? = nil
     var openOriginal: ((UUID, Int) -> Void)? = nil
     let close: () -> Void
@@ -46,6 +47,7 @@ struct MihbaraReaderView: View {
     @State private var paragraph: MacEPUBParagraph?
     @State private var noteDraft: String?
     @State private var finishing = false
+    @State private var originalID: UUID?
     /// One id per note being written, so a repeated tap after a slow save updates the same note instead of adding a second.
     @State private var noteDraftID = UUID()
     @State private var footnote: String?
@@ -134,7 +136,10 @@ struct MihbaraReaderView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
-                Button("إغلاق", action: finish).keyboardShortcut(.cancelAction)
+                if let originalID, let openOriginal {
+                    Button("الأصل PDF") { finish { openOriginal(originalID, 0) } }.help("افتح الكتاب الأصلي PDF")
+                }
+                Button("إغلاق") { finish() }.keyboardShortcut(.cancelAction)
                 Spacer()
                 Text(book.title).font(MadarTypography.section()).lineLimit(1)
                 Spacer()
@@ -277,7 +282,8 @@ struct MihbaraReaderView: View {
             contentRuleList = try await MacEPUBWebPolicy.blockRemoteContent()
             let data = try await AppMihbaraService(app: app).epubDataOffMain(for: book)
             let opened = try await Task.detached { try MacEPUB(data: data) }.value
-            let saved = initialLocatorJSON ?? book.locatorJSON.flatMap { String(data: $0, encoding: .utf8) }
+            // The stored place belongs to the volume last read; a volume chosen on purpose never opens at another volume's position.
+            let saved = initialLocatorJSON ?? ((volume ?? 0) == 0 ? book.locatorJSON.flatMap { String(data: $0, encoding: .utf8) } : nil)
             if let saved, let place = opened.place(fromLocatorJSON: saved) {
                 chapter = place.chapter; startProgression = place.progression; page.fragment = place.fragment
             } else if let volume, volume > 0, opened.spine.count > 1 {
@@ -287,6 +293,7 @@ struct MihbaraReaderView: View {
             // Seed the restored location before the clock can observe or save it.
             page.progression = startProgression
             publication = opened
+            originalID = opened.originalPDFIdentifier.flatMap { originalPDF?($0) }
             page.onChange = { [self] progression in observe(progression) }
             page.onParagraph = { [self] tapped in if tapped.chapter == chapter { paragraph = tapped } }
             page.onSelection = { [self] tapped in if tapped.chapter == chapter { selection = tapped } }
@@ -456,7 +463,7 @@ struct MihbaraReaderView: View {
     }
 
     /// Closing waits for the reading position to be written; if the write failed, the reader stays open with the reason instead of losing it.
-    private func finish() {
+    private func finish(then next: (() -> Void)? = nil) {
         guard !finishing else { return }
         finishing = true
         save()
@@ -466,7 +473,7 @@ struct MihbaraReaderView: View {
             finishing = false
             if coordinator.hasPending {
                 app.errorMessage = "تعذّر حفظ موضع قراءتك بعد. أبقيتُ الكتاب مفتوحًا؛ أغلقه مرة أخرى بعد قليل."
-            } else { close() }
+            } else if let next { next() } else { close() }
         }
     }
 }
@@ -504,6 +511,8 @@ struct MacEPUB: Sendable {
     let sizes: [Int]
     /// The book's own table of contents (EPUB 3 nav, else the EPUB 2 NCX), each entry pointing at a spine chapter.
     let contents: [MacEPUBContentsEntry]
+    /// The hash after `urn:madar:pdf:` in the package identifier, when this EPUB was converted from a stored PDF.
+    let originalPDFIdentifier: String?
 
     init(data: Data) throws {
         let zip = try ZIPReader(data: data)
@@ -532,6 +541,9 @@ struct MacEPUB: Sendable {
         guard !spine.isEmpty else { throw MacEPUBError.unreadable }
         self.root = root
         self.spine = spine
+        self.originalPDFIdentifier = String(data: opf, encoding: .utf8).flatMap { text in
+            text.range(of: "urn:madar:pdf:").map { r in String(text[r.upperBound...].prefix { $0.isHexDigit || $0 == "-" }) }
+        }.flatMap { $0.isEmpty ? nil : $0 }
         var navPath: String?
         if let nav = parsed.nav { navPath = Self.resolveReference(nav, relativeTo: opfPath)?.path }
         else if let ncx = parsed.ncx { navPath = Self.resolveReference(ncx, relativeTo: opfPath)?.path }

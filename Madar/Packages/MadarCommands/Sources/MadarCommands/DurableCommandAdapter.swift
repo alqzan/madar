@@ -42,7 +42,8 @@ private struct ReceiptWire: Codable {
 /// No actor suspension occurs between lock, dedupe, mutations and durable receipt save.
 @MainActor public final class DurableCommandAdapter: CommandStoreAdapter {
     /// Prayer records were retired (owner, 17 Nov 2026). The prayer-times engine stays; only the recording is closed.
-    static let prayerLoggingRetired = true
+    /// Internal so that legacy engine-mechanics tests (replay, inbox, undo) can still use the prayer handler as a vehicle; every production path keeps the default.
+    var prayerLoggingRetired = true
     private let containerProvider: @MainActor () throws -> ModelContainer
     let lockDirectory: URL
     private let transactionClock: @Sendable (Date) -> Date
@@ -252,8 +253,8 @@ private struct ReceiptWire: Codable {
                 }
                 if let undo = staged.inverse { inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], quranMutation: undo) }
             case .logPrayer(let dayKey, let prayer, let status, let heart, let shortened, let fridayKind):
-                // Prayer records were retired (owner, 17 Nov 2026): no old Siri phrase, Shortcut or Control Center control writes one (the in-app and notification paths are cleared at launch).
-                if Self.prayerLoggingRetired, [.siri, .shortcut, .control].contains(request.envelope.source) { return .init(status: .rejected, reason: "prayerLoggingRetired") }
+                // Prayer records were retired (owner, 17 Nov 2026): nothing writes one, whatever its source (Siri, Shortcut, control, notification, widget, in-app).
+                if prayerLoggingRetired { return .init(status: .rejected, reason: "prayerLoggingRetired") }
                 guard let referenceDay = try? GregorianDay(dayKey), let storedStatus = PrayerStoredStatus(rawValue: status) else {
                     return .init(status: .rejected, reason: "invalidPrayer")
                 }

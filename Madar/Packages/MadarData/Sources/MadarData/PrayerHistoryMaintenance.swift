@@ -58,6 +58,7 @@ import SwiftData
     /// It runs on every launch: a prayer command queued by an older extension before the update is cleared the next time.
     @discardableResult
     public static func removeAllPrayerRecords(in context: ModelContext, now: Date = .now) throws -> Int {
+        try scrubOldTombstoneHearts(in: context, now: now)
         let logs = try context.fetch(FetchDescriptor<PrayerLog>(predicate: #Predicate { $0.deletedAt == nil }))
             .filter { $0.mergedInto == nil }
         let debts = try context.fetch(FetchDescriptor<QadaItem>(predicate: #Predicate { $0.deletedAt == nil }))
@@ -80,6 +81,34 @@ import SwiftData
             for row in debts { try tombstone(row) }
             try context.save()
             return logs.count + debts.count
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
+    public static let heartScrubKey = "system.migration.prayer-tombstone-heart-scrubbed-v1"
+
+    /// Tombstones written before 18 Nov 2026 kept the heart answer. One pass, guarded by a marker, clears it from rows that were already deleted.
+    /// The row's `updatedAt` and `deletedAt` are untouched, so sync order and the deletion barrier do not change.
+    static func scrubOldTombstoneHearts(in context: ModelContext, now: Date) throws {
+        let settings = try context.fetch(FetchDescriptor<Setting>(predicate: #Predicate { $0.key == "system.migration.prayer-tombstone-heart-scrubbed-v1" }))
+        if settings.contains(where: { $0.deletedAt == nil }) { return }
+        do {
+            for row in try context.fetch(FetchDescriptor<PrayerLog>(predicate: #Predicate { $0.deletedAt != nil })) {
+                var record = try row.record()
+                guard let heart = record.fields["heart"], heart != .null else { continue }
+                record.fields["heart"] = .null
+                try row.apply(record)
+            }
+            let marker = Setting()
+            marker.id = StableIdentity.uuid(for: heartScrubKey)
+            marker.key = heartScrubKey
+            marker.valueJSON = Data("true".utf8)
+            marker.createdAt = now; marker.updatedAt = now
+            marker.writerID = "system.prayer-tombstone-heart-scrub-v1"
+            context.insert(marker)
+            try context.save()
         } catch {
             context.rollback()
             throw error

@@ -24,7 +24,7 @@ private struct LegacySettingsInverseFixture: Codable {
         let trackDay = currentDay.adding(days: -(daysSinceFriday == 0 ? 7 : daysSinceFriday))
         _ = try settings.stage(["salah.trackingStart": .object(["dayKey": .string(trackDay.description), "edits": .number(0)])], now: now)
         try context.save()
-        return (container, CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: directory, transactionClock: { $0 })), directory)
+        return (container, CommandBus(adapter: legacyPrayerAdapter(container: container, lockDirectory: directory, transactionClock: { $0 })), directory)
     }
     private func prayer(_ status: String = "jamaah", id: UUID = UUID(), now: Date) -> CommandEnvelope {
         .init(commandID: id, name: "prayer.log", payload: .object(["dayKey": .string(prayerDay(now).description), "prayer": .string("fajr"), "status": .string(status)]), source: .widget, issuedAt: now)
@@ -157,7 +157,7 @@ private struct LegacySettingsInverseFixture: Codable {
         let unrecorded = CommandEnvelope(name: "prayer.setHeart", payload: .object(["dayKey": .string(day), "prayer": .string("asr"), "heart": .string("present")]), issuedAt: now)
         #expect(try await bus.execute(unrecorded, now: now).status == .rejected)
         let reopened = try MadarContainerFactory.makeLocal(at: directory)
-        let second = CommandBus(adapter: DurableCommandAdapter(container: reopened, lockDirectory: directory, transactionClock: { $0 }))
+        let second = CommandBus(adapter: legacyPrayerAdapter(container: reopened, lockDirectory: directory, transactionClock: { $0 }))
         let cleared = try await second.execute(heart(.null), now: now.addingTimeInterval(2))
         #expect(cleared.status == .applied)
         #expect(try ModelContext(reopened).fetch(FetchDescriptor<PrayerLog>()).first?.heart == nil)
@@ -201,7 +201,7 @@ private struct LegacySettingsInverseFixture: Codable {
         _ = try await bus.execute(b, now: now)
         _ = try await bus.execute(prayer("alone", now: now.addingTimeInterval(1)), now: now.addingTimeInterval(1))
         let reopened = try MadarContainerFactory.makeLocal(at: directory)
-        let second = CommandBus(adapter: DurableCommandAdapter(container: reopened, lockDirectory: directory, transactionClock: { $0 }))
+        let second = CommandBus(adapter: legacyPrayerAdapter(container: reopened, lockDirectory: directory, transactionClock: { $0 }))
         #expect(try await second.execute(b, now: now.addingTimeInterval(8 * 86400)).status == .duplicate)
         #expect(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.status == "alone")
     }
