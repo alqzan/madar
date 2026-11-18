@@ -248,6 +248,9 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 ### Delivery
 - Build 0.1.0 (57): archive succeeded, export + upload to App Store Connect succeeded (`Madar/Artifacts/OWNER-TestFlight-57/upload.log`: «Upload succeeded»). Apple processing and owner-device acceptance not checked (not awaited).
 
+### Delivery 58
+- Build 0.1.0 (58): archive succeeded; first export failed with «No Accounts with App Store Connect Access» (Xcode session, attempt log kept as `upload-attempt1.log`), the retry uploaded: «Upload succeeded» in `Madar/Artifacts/OWNER-TestFlight-58/upload.log`. Apple processing and device acceptance not checked.
+
 ### Build 58 — copy pruning (owner: «احذف عادي»)
 - After the active generation opens, `pruneOldCopies` deletes older `Generations/<uuid>` folders and older `MigrationSafety/<uuid>` copies. It keeps the active generation, the pointer's previous generation and the newest safety copy, skips folders touched in the last 24 hours, non-UUID names and any pending restore journal, and never fails opening. Tests: `PruneOldCopiesTests` (keep/delete rules, journal guard); MadarData 144, MadarCommands 332, MadarSync 10 pass.
 - Focused review (advisor model) checked: every pointer rewrite (restore, legacy migration, cloud-mirror bind) sets previous = the former active, so no path reopens a third generation; `StartupRecovery` lists backup files, not generations; the store is opened only by the app processes (`MadarApp`, `MadarMacApp`), never a widget or intent. Not observed: pruning has never run on the owner's device; it runs there for the first time when build 58 opens.
