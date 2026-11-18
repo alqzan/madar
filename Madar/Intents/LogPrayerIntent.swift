@@ -65,6 +65,8 @@ struct LogPrayerIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        // Prayer records were retired (owner, 17 Nov 2026): an old Shortcut gets a plain answer, never a silent write.
+        throw LogPrayerIntentError.retired
         let now = Date()
         guard let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else {
             throw LogPrayerIntentError.openMadar
@@ -127,10 +129,11 @@ struct LogPrayerIntent: AppIntent {
 }
 
 private enum LogPrayerIntentError: LocalizedError {
-    case openMadar, refreshMadar, prayerNotOccurred, jumuahRequiresCongregation, invalidDayKey, invalidSelection
+    case retired, openMadar, refreshMadar, prayerNotOccurred, jumuahRequiresCongregation, invalidDayKey, invalidSelection
 
     var errorDescription: String? {
         switch self {
+        case .retired: "تسجيل الصلاة لم يعد في مدار؛ حذّف هذا الاختصار من تطبيق الاختصارات."
         case .openMadar: "افتح مدار أولًا ثم أعد المحاولة."
         case .refreshMadar: "حدّث مدار ثم أعد المحاولة."
         case .prayerNotOccurred: "لم يدخل وقت هذه الصلاة بعد."

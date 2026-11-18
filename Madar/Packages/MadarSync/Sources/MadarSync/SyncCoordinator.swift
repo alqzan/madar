@@ -94,6 +94,10 @@ private struct PendingCloudImport: Equatable {
                         let saved = try await adapter.checkpointAndSuspend(reason: .accountChange)
                         guard saved.generationID == binding.generationID else { throw SyncFailure.generationChanged }
                         try saved.verifyFile(); checkpoint = saved; pendingPreference = preference
+                        // The old account's rows must not keep mirroring while the person decides.
+                        if binding.cloudEnabled {
+                            try await adapter.activate(.init(accountHash: binding.accountHash, cloudEnabled: false, dataChoice: .keepDevice, checkpoint: nil, generationBefore: binding.generationID, requestedDevicePreference: preference))
+                        }
                     }
                     pendingAccountHash = hash
                     set(.waitingForAccountChoice, "تغيّر حساب iCloud — أبقِ بيانات هذا الجهاز أو استعمل بيانات الحساب الجديد")

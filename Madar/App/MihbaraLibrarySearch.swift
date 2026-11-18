@@ -69,7 +69,7 @@ struct MihbaraTextHit: Identifiable {
     private struct MacMatch: Sendable { let before: String, match: String, after: String, locator: String? }
 
     @concurrent private static func macMatches(_ needle: String, in data: Data, limit: Int) async -> [MacMatch] {
-        guard let publication = try? MacEPUB(data: data) else { return [] }
+        guard !Task.isCancelled, let publication = try? MacEPUB(data: data) else { return [] }
         defer { publication.discard() }
         var matches: [MacMatch] = []
         for chapter in publication.spine.indices where matches.count < limit && !Task.isCancelled {

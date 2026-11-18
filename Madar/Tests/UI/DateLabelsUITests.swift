@@ -11,7 +11,7 @@ import XCTest
         XCTAssertTrue(date.waitForExistence(timeout: 10)); XCTAssertTrue(date.label.contains("١٤٤٨")); XCTAssertTrue(date.label.contains("٢٠٢٦"))
         capture(app, "UX-11-lobby-L")
         app.swipeUp(velocity: .slow); capture(app, "UX-11-upcoming-L"); app.swipeDown(velocity: .fast)
-        app.buttons["tab-prayer"].tap(); XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "prayer-today-header").firstMatch.waitForExistence(timeout: 10)); capture(app, "UX-11-prayer-L")
+        app.buttons["tab-habits"].tap(); XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "habits-title").firstMatch.waitForExistence(timeout: 10)); capture(app, "UX-11-habits-L")
         app.buttons["tab-customize"].tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("core.firstCalendar\n")
         let gregorian = app.buttons["option-core.firstCalendar-gregorian"]; XCTAssertTrue(gregorian.waitForExistence(timeout: 5)); gregorian.tap()

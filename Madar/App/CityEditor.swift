@@ -4,6 +4,8 @@ import MadarDesign
 
 struct CityEditor: View {
     @Bindable var session: AppSession
+    /// Called once the person's own choice is saved (the first-run page waits for it instead of assuming the default city).
+    var onSaved: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var latitude = ""
@@ -81,7 +83,7 @@ struct CityEditor: View {
         guard TimeZone(identifier: timeZone) != nil else { validationError = "المنطقة الزمنية بالإنجليزية، مثل Asia/Riyadh"; return }
         guard Locale.Region.isoRegions.map(\.identifier).contains(country.uppercased()) else { validationError = "رمز البلد حرفان، مثل SA"; return }
         guard Locale.Currency.isoCurrencies.map(\.identifier).contains(currency.uppercased()) else { validationError = "رمز العملة ثلاثة أحرف، مثل SAR"; return }
-        session.set(.object(["name": .string(trimmed), "country": .string(country.uppercased()), "lat": .number(lat), "lon": .number(lon), "tz": .string(timeZone), "currency": .string(currency.uppercased())]), key: "core.homeCity") { dismiss() }
+        session.set(.object(["name": .string(trimmed), "country": .string(country.uppercased()), "lat": .number(lat), "lon": .number(lon), "tz": .string(timeZone), "currency": .string(currency.uppercased())]), key: "core.homeCity") { onSaved?(); dismiss() }
     }
 }
 

@@ -1147,7 +1147,7 @@ final class AppSession {
         let result = try await withSerializedPrayerNotificationMutation {
             let result = try await bus.execute(CommandEnvelope(name: name, payload: .object(payload)))
             guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "Quran command") }
-            try reload(); try publishSnapshot()
+            refreshAfterCommit()
             return result
         }
         if let id = result.undoToken, let receipt = try ModelContext(container).fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }), let deadline = receipt.undoExpiresAt {
@@ -1235,6 +1235,13 @@ final class AppSession {
         if let token = result.undoToken, name != "money.linkRefund" { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة" : name == "money.logExpense" ? "سُجّل المصروف" : name == "money.deleteTransaction" ? "حُذفت الحركة" : name == "money.removeAccount" ? "حُذف الحساب" : "حُفظ التغيير") }
     }
 
+    /// The command is already committed when this runs: a failed refresh is reported as a refresh problem, never as a failed save,
+    /// so the person does not repeat a write that was kept (a repeat could record it twice).
+    func refreshAfterCommit() {
+        do { try reload(); try publishSnapshot() }
+        catch { errorMessage = "حُفظ التغيير، لكن تعذّر تحديث العرض. أغلق الصفحة وافتحها مرة أخرى." }
+    }
+
     func executeBookCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID(), undoMessage: String = "حُفظ في المحبرة") async throws {
         guard protectedDataAuthorized else { throw DataError.authenticationFailed }
         guard beginWrite() else { throw BackupOperationError.busy }
@@ -1267,7 +1274,7 @@ final class AppSession {
         let now = prayerNow()
         let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "تعذّر حفظ الكتاب") }
-        try reload(); try publishSnapshot()
+        refreshAfterCommit()
         if ["book.importPDF", "book.importEPUB", "book.importGoodreads", "book.savePaper", "book.updatePaper", "book.delete", "book.restore"].contains(name) {
             await reconcileSpotlightIndex()
         }
@@ -1297,7 +1304,7 @@ final class AppSession {
         func run() async throws -> CommandOutcome {
             let result = try await bus.execute(CommandEnvelope(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
             guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "diary command") }
-            if updatesPresentation { try reload(); try publishSnapshot() }
+            if updatesPresentation { refreshAfterCommit() }
             return result
         }
         // F02/V12: a habit change, an intention or a letter reschedules its reminder (a met habit or written intention stops reminding).
@@ -1342,7 +1349,7 @@ final class AppSession {
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { endWrite() }
         let result = try await body(prayerNow())
-        try reload(); try publishSnapshot(); WidgetCenter.shared.reloadAllTimelines()
+        refreshAfterCommit(); WidgetCenter.shared.reloadAllTimelines()
         return result
     }
 
@@ -1559,9 +1566,6 @@ final class AppSession {
     }
 #if os(iOS)
     private func publishWatchDashboard(at instant: Date, dayKey: String, timeZoneID: String, dayEnd: Date) {
-        let prayerSchedule = snapshotStore.read("prayerNext", as: PrayerNextSnapshot.self, now: instant)?.payload.items
-            .filter { $0.at > instant }
-            .map { WatchDashboardSnapshot.NextPrayer(name: $0.name, at: $0.at) } ?? []
         let quran = snapshotStore.read("quran", as: QuranWidgetSnapshot.self, now: instant)?.payload
         let habits = snapshotStore.read(BuiltRoomWidget.habits.rawValue, as: RoomWidgetSnapshot.self, now: instant)
         let foundation = snapshotStore.read("foundation", as: FoundationSnapshot.self, now: instant)?.payload
@@ -1577,7 +1581,7 @@ final class AppSession {
             datePrimary: dates.primary,
             dateSecondary: dates.secondary,
             numerals: foundation?.numerals ?? string("core.numerals"),
-            prayers: prayerSchedule,
+            prayers: [], // the watch no longer shows prayer times; the field stays so an older watch still decodes
             quran: quran.map { .init(completed: $0.done, total: $0.total) },
             habits: habitProgress
         )

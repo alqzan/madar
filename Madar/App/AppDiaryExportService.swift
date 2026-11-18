@@ -36,6 +36,18 @@ struct DiaryExportArtifact: Identifiable {
 extension AppDiaryService {
     /// Test hook: called from the thread that builds the export file.
     nonisolated(unsafe) static var exportBuildProbe: (@Sendable () -> Void)?
+    /// The years that have writing, from day keys alone: opening the export screen must not read photos, audio or frozen lines.
+    func exportYears() throws -> [Int] {
+        try authorizeRead()
+        let context = ModelContext(app.container)
+        var keys = Set(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).map(\.dayKey))
+        keys.formUnion(try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).filter { $0.photoMediaID != nil || $0.questionAnswer != nil }.map(\.dayKey))
+        keys.formUnion(try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).map(\.writtenDayKey))
+        keys.formUnion(try context.fetch(FetchDescriptor<Niyya>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).map(\.dayKey))
+        keys.formUnion(try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).filter { $0.key.hasPrefix("sys.diaryAutoLines.") }.map { String($0.key.dropFirst("sys.diaryAutoLines.".count)) })
+        let today = try currentDay()
+        return Set(keys.compactMap { try? GregorianDay($0) }.filter { $0 <= today }.map(\.year) + [today.year]).sorted(by: >)
+    }
     func exportPages(_ options:DiaryExportOptions) throws -> [DiaryExportPage] {
         try authorizeRead()
         let context = ModelContext(app.container)
@@ -58,7 +70,8 @@ extension AppDiaryService {
         }
         let snapshots=try context.fetch(FetchDescriptor<DeviceSetting>(predicate:#Predicate{$0.deletedAt == nil && $0.mergedInto == nil})).filter{$0.key.hasPrefix("sys.diaryAutoLines.")}
         var frozen:[String:[DiaryDisplayLine]]=[:]
-        for row in snapshots {frozen[String(row.key.dropFirst("sys.diaryAutoLines.".count))]=try JSONDecoder().decode([DiaryDisplayLine].self,from:row.valueJSON)}
+        // A damaged snapshot is skipped: that day falls back to its live lines instead of stopping every export.
+        for row in snapshots {if let lines=try? JSONDecoder().decode([DiaryDisplayLine].self,from:row.valueJSON){frozen[String(row.key.dropFirst("sys.diaryAutoLines.".count))]=lines}}
         var keys = Set(entriesByDay.keys)
         keys.formUnion(pages.filter { $0.photoMediaID != nil || $0.questionAnswer != nil }.map(\.dayKey))
         keys.formUnion(margins.map(\.writtenDayKey))
@@ -66,7 +79,6 @@ extension AppDiaryService {
         keys.formUnion(lettersByDay.keys)
         keys.formUnion(frozen.keys)
         if options.sources {
-            keys.formUnion(try context.fetch(FetchDescriptor<PrayerLog>(predicate:#Predicate{$0.deletedAt == nil && $0.mergedInto == nil})).map(\.dayKey))
             keys.formUnion(try context.fetch(FetchDescriptor<HifzSession>(predicate:#Predicate{$0.deletedAt == nil && $0.mergedInto == nil})).map(\.dayKey))
         }
         let today=try currentDay()

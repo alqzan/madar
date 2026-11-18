@@ -44,6 +44,7 @@ struct LogConfiguredPrayerControlIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
+        throw PrayerControlIntentError.retired
         guard let prayer, let status else { throw PrayerControlIntentError.configureFirst }
         let now = Date()
         guard let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else {
@@ -135,10 +136,11 @@ extension PrayerIntentFridayKind {
 }
 
 private enum PrayerControlIntentError: LocalizedError {
-    case configureFirst, openMadar, refreshMadar, prayerNotOccurred, fridayKindRequired, jumuahRequiresCongregation, invalidSelection
+    case retired, configureFirst, openMadar, refreshMadar, prayerNotOccurred, fridayKindRequired, jumuahRequiresCongregation, invalidSelection
 
     var errorDescription: String? {
         switch self {
+        case .retired: "تسجيل الصلاة لم يعد في مدار؛ احذف هذا التحكم."
         case .configureFirst: "أكمل إعداد التحكم واختر الصلاة والحالة."
         case .openMadar: "تعذّر الوصول إلى مدار. افتح التطبيق ثم أعد المحاولة."
         case .refreshMadar: "حدّث مواقيت الصلاة في مدار ثم أعد المحاولة."

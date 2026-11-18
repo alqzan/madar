@@ -45,6 +45,9 @@ struct MihbaraReaderView: View {
     @State private var highlights: [MihbaraHighlight] = []
     @State private var paragraph: MacEPUBParagraph?
     @State private var noteDraft: String?
+    @State private var finishing = false
+    /// One id per note being written, so a repeated tap after a slow save updates the same note instead of adding a second.
+    @State private var noteDraftID = UUID()
     @State private var footnote: String?
     @State private var scrollRequest = 0
     @State private var selection: MacEPUBSelection?
@@ -332,9 +335,9 @@ struct MihbaraReaderView: View {
                                                     selector: paragraph.selector, text: paragraph.text) else { return }
         do {
             try await app.executeBookCommand("notebook.savePage", payload: [
-                "id": .string(UUID().uuidString), "bookID": .string(book.id.uuidString), "text": .string(text), "locator": .string(locator)
+                "id": .string(noteDraftID.uuidString), "bookID": .string(book.id.uuidString), "text": .string(text), "locator": .string(locator)
             ], undoMessage: "دُوّنت في حاشية الكتاب")
-            noteDraft = nil
+            noteDraft = nil; noteDraftID = UUID()
         } catch { app.errorMessage = madarUserMessage(error) }
     }
 
@@ -452,7 +455,20 @@ struct MihbaraReaderView: View {
                                        digits: AppMihbaraService(app: app).digits)
     }
 
-    private func finish() { save(); close() }
+    /// Closing waits for the reading position to be written; if the write failed, the reader stays open with the reason instead of losing it.
+    private func finish() {
+        guard !finishing else { return }
+        finishing = true
+        save()
+        Task { @MainActor in
+            let coordinator = MihbaraReadingSaveCoordinator.forSession(app)
+            await coordinator.waitForCurrentAttempt()
+            finishing = false
+            if coordinator.hasPending {
+                app.errorMessage = "تعذّر حفظ موضع قراءتك بعد. أبقيتُ الكتاب مفتوحًا؛ أغلقه مرة أخرى بعد قليل."
+            } else { close() }
+        }
+    }
 }
 
 /// The scroll position the web view reports, kept outside SwiftUI state so a scroll does not redraw the reader.
@@ -497,6 +513,7 @@ struct MacEPUB: Sendable {
         defer { if !completed { try? FileManager.default.removeItem(at: root) } }
         var writtenPaths = Set<String>()
         for member in zip.members where !member.isDirectory && !member.isSymbolicLink && !member.isEncrypted {
+            try Task.checkCancellation() // a cancelled search stops unpacking the book
             guard let path = Self.safePath(member.path), !path.isEmpty,
                   writtenPaths.insert(path).inserted else { continue }
             let target = root.appending(path: path, directoryHint: .notDirectory)

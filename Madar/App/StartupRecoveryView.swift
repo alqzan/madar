@@ -37,7 +37,7 @@ struct StartupRecoveryView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(title(item)).font(.subheadline.weight(.semibold))
-                                Text(item.date.formatted(date: .abbreviated, time: .shortened) + " · " + ByteCountFormatter.string(fromByteCount: item.bytes, countStyle: .file))
+                                Text(item.date.formatted(date: .abbreviated, time: .shortened) + " · " + Self.hijri(item.date) + " · " + ByteCountFormatter.string(fromByteCount: item.bytes, countStyle: .file))
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -70,5 +70,10 @@ struct StartupRecoveryView: View {
         case .automatic: "نسخة تلقائية"
         case .preMigration: "نسخة قبل الترحيل"
         }
+    }
+    /// Both calendars always, even here where no store is open yet (so no settings): the Umm al-Qura date beside the Gregorian one.
+    private static func hijri(_ date: Date) -> String {
+        var calendar = Calendar(identifier: .islamicUmmAlQura); calendar.locale = Locale(identifier: "ar")
+        return date.formatted(Date.FormatStyle(date: .abbreviated, locale: Locale(identifier: "ar"), calendar: calendar))
     }
 }

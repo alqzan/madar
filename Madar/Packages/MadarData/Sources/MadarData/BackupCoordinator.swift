@@ -135,7 +135,7 @@ import Darwin
             let writer = try SettingsStore(context:writerContext).writerIDForWrite(now:now); try writerContext.save()
             let planned = try Self.plan(existing:current,incoming:preview.validated.records,mode:mode,now:now,writerID:writer)
             let id = UUID(); stagedGeneration = id
-            var journal = RestoreJournal(operationID:UUID(),oldGenerationID:store.binding.generationID,newGenerationID:id,phase:.preparing,hooksPending:true)
+            var journal = RestoreJournal(operationID:UUID(),oldGenerationID:store.binding.generationID,newGenerationID:id,phase:.preparing,hooksPending:true,keepSessionDrafts:mode == .merge)
             try DurableFiles.encode(journal,to:store.journalURL); try checkpoint(.afterJournal)
             try await stage(records:planned,id:id,cancellation:cancellation,progress:progress,now:now)
             try checkpoint(.afterStagingSave); try validation(); try cancellation.check()
@@ -314,7 +314,7 @@ import Darwin
             // Restore changes facts. A model-name conversion preserves every fact and local row.
             if store.journal()?.preserveDeviceRows != true {
                 for row in try context.fetch(FetchDescriptor<PageSchedule>()) { context.delete(row) }
-                for row in try context.fetch(FetchDescriptor<SessionDraft>()) { context.delete(row) }
+                if store.journal()?.keepSessionDrafts != true { for row in try context.fetch(FetchDescriptor<SessionDraft>()) { context.delete(row) } }
                 for row in try context.fetch(FetchDescriptor<ProcessingJob>()) { context.delete(row) }
             }
             if context.hasChanges { try context.save() }
@@ -357,7 +357,14 @@ import Darwin
             }
             return try RowMerger.reconciled(rows)
         }
-        let keys = Set(incoming.map(RecordFingerprint.key)); var rows = incoming
+        let keys = Set(incoming.map(RecordFingerprint.key))
+        // A book the owner removed for good (emptied tombstone) is not brought back by an older copy inside a backup.
+        var rows = incoming.map { row -> DataRecord in
+            guard row.model == "Book", row.isLive,
+                  let current = existing.first(where: { RecordFingerprint.key($0) == RecordFingerprint.key(row) }),
+                  current.deletedAt != nil, current.fields["title"] == .string("") else { return row }
+            return current
+        }
         for i in rows.indices {
             let current = existing.first { RecordFingerprint.key($0) == RecordFingerprint.key(rows[i]) }
             let previous = max(rows[i].date("updatedAt") ?? .distantPast,current?.date("updatedAt") ?? .distantPast)

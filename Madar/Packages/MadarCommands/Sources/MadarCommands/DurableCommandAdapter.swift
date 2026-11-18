@@ -41,6 +41,8 @@ private struct ReceiptWire: Codable {
 /// App-only adapter. The lease excludes app maintenance; each transaction uses a fresh context.
 /// No actor suspension occurs between lock, dedupe, mutations and durable receipt save.
 @MainActor public final class DurableCommandAdapter: CommandStoreAdapter {
+    /// Prayer records were retired (owner, 17 Nov 2026). The prayer-times engine stays; only the recording is closed.
+    static let prayerLoggingRetired = true
     private let containerProvider: @MainActor () throws -> ModelContainer
     let lockDirectory: URL
     private let transactionClock: @Sendable (Date) -> Date
@@ -93,7 +95,7 @@ private struct ReceiptWire: Codable {
             // Fixed-container callers have no replacement pointer. Their local namespace is
             // stable across reopen; managed production callers always supply the real pointer.
             let generationID = activeGeneration ?? request.generationID ?? StableIdentity.uuid(for: "CommandGeneration:\(lockDirectory.standardizedFileURL.resolvingSymlinksInPath().path)")
-            let namespaces = try context.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key.hasPrefix("sys.commandReceiptScope:") && $0.deletedAt == nil && $0.mergedInto == nil }
+            let namespaces = try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key.starts(with: "sys.commandReceiptScope:") && $0.deletedAt == nil && $0.mergedInto == nil }))
             // Import/replay can hold thousands of receipts. Index once instead of scanning all scopes for every
             // receipt; keep every duplicate in its group so ambiguous scopes still fail closed.
             let namespacesByKey = Dictionary(grouping: namespaces, by: \.key)
@@ -102,7 +104,7 @@ private struct ReceiptWire: Codable {
                 guard matches.count == 1, let value = try? JSONDecoder().decode(ReceiptNamespace.self, from: matches[0].valueJSON), value.version == 1 else { return nil }
                 return value
             }
-            let allReceiptRows = try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            let allReceiptRows = try context.fetch(FetchDescriptor<MadarData.CommandReceipt>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
             // Existing identities from another or unknown generation are unresolved, even
             // when the newly delivered envelope bears today's snapshot stamp.
             for row in allReceiptRows where row.commandID == request.envelope.commandID {
@@ -250,6 +252,8 @@ private struct ReceiptWire: Codable {
                 }
                 if let undo = staged.inverse { inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], quranMutation: undo) }
             case .logPrayer(let dayKey, let prayer, let status, let heart, let shortened, let fridayKind):
+                // Prayer records were retired (owner, 17 Nov 2026): no old Siri phrase, Shortcut or Control Center control writes one (the in-app and notification paths are cleared at launch).
+                if Self.prayerLoggingRetired, [.siri, .shortcut, .control].contains(request.envelope.source) { return .init(status: .rejected, reason: "prayerLoggingRetired") }
                 guard let referenceDay = try? GregorianDay(dayKey), let storedStatus = PrayerStoredStatus(rawValue: status) else {
                     return .init(status: .rejected, reason: "invalidPrayer")
                 }

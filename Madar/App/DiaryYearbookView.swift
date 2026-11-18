@@ -60,7 +60,7 @@ struct DiaryYearbookView:View {
                 .toolbar{ToolbarItemGroup(placement:.topBarLeading){Button{dismiss()}label:{HStack{Image(systemName:"chevron.backward");Text("رجوع").font(DiaryType.label)}}.disabled(busy).accessibilityIdentifier("diary-book-close")
                 }}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
                 .task(id:attempt){do{
-                    years=Set(try service.exportPages(.init()).map(\.day.year)+[service.currentDay().year]).sorted(by:>)
+                    years=try service.exportYears()
                     load()
                     #if DEBUG
                     let environment = ProcessInfo.processInfo.environment

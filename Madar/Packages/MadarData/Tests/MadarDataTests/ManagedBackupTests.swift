@@ -265,6 +265,18 @@ import Testing
         let recovery = BackupCoordinator(store:reopened,backupDirectory:coordinator.backupDirectory,keyStore:keys)
         #expect(try await recovery.recoverPendingLifecycle().isEmpty); #expect(!reopened.recoveryRequiresRefresh)
     }
+    /// Audit 18 Nov 2026: «السجلات الحالية ستبقى» also covers a Quran session draft the person has not recorded yet.
+    @Test func mergeKeepsAnUnrecordedSessionDraftWhileReplaceStillClearsIt() async throws {
+        let base = try scratch(); defer { try? FileManager.default.removeItem(at:base) }
+        let (store,coordinator,_) = try await makeCoordinator(base:base)
+        let draft = SessionDraft(); store.container.mainContext.insert(draft); store.container.mainContext.insert(PageSchedule()); try store.container.mainContext.save()
+        let source = try MadarContainerFactory.makeInMemory(); try fixture(source.mainContext)
+        let file = try backupFile(RecordBridge.all(source.mainContext),base:base)
+        let preview = try await coordinator.preview(file:file,passphrase:"correct long password")
+        _ = try await coordinator.restore(preview:preview,mode:.merge)
+        #expect(try store.container.mainContext.fetch(FetchDescriptor<SessionDraft>()).count == 1)
+        #expect(try store.container.mainContext.fetch(FetchDescriptor<PageSchedule>()).isEmpty)
+    }
     @Test func initializationJournalRetryAndLocalAccountRotationKeepDeviceStore() async throws {
         let base = try scratch(); defer { try? FileManager.default.removeItem(at:base) }
         let root = base.appendingPathComponent("Managed"); try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true)

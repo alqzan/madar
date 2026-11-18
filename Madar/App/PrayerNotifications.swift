@@ -382,7 +382,7 @@ final class PrayerNotificationCoordinator {
                 let info = response.notification.request.content.userInfo
                 guard let dayKey = info["dayKey"] as? String, let habit = (info["habit"] as? String).flatMap(UUID.init(uuidString:)) else { return }
                 let reading = try HabitRepository(context: ModelContext(session.container)).readings(at: Date()).first { $0.id == habit }
-                let target = reading?.summary.current?.target ?? 1
+                let target = (info["amount"] as? Int) ?? reading?.summary.current?.target ?? 1
                 let action = String(response.actionIdentifier.dropFirst(Self.habitAmountPrefix.count))
                 let amount: Int?
                 switch action {

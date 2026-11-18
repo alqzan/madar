@@ -35,7 +35,9 @@ private struct UnprovisionedAccountProvider: CloudAccountProviding {
                 // A store that mirrored under one account never attaches under another: CloudKit mirroring can purge
                 // rows it holds for the old account. The data stays on the device and sync stays off until a device
                 // trial proves the switch; the person's account choice is kept.
-                let switchingAccount = store.mirrorBound && store.binding.accountHash != nil && request.accountHash != store.binding.accountHash
+                // The account is remembered per generation even after sync was switched off (a pointer from before this field falls back to the bound account).
+                let mirroredAccount = store.mirroredAccountHash ?? (store.mirrorBound ? store.binding.accountHash : nil)
+                let switchingAccount = mirroredAccount != nil && request.accountHash != mirroredAccount
                 let mirror = request.cloudEnabled && containerID != nil && !switchingAccount
                 let preference = request.requestedDevicePreference && !switchingAccount
                 if mirror != store.binding.cloudEnabled || request.accountHash != store.binding.accountHash || switchingAccount {

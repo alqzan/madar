@@ -162,6 +162,8 @@ import MadarData
         let session = ReadingSession(); session.id = UUID(); session.bookID = bookID; session.start = now; session.end = now.addingTimeInterval(120); session.activeSeconds = 120; session.fromPage = 1; session.toPage = 3; session.pagesCounted = 2; context.insert(session)
         let highlight = Highlight(); highlight.id = UUID(); highlight.bookID = bookID; highlight.locatorJSON = Data("{\"href\":\"a\"}".utf8); highlight.color = "yellow"; highlight.note = "ملاحظة التظليل"; context.insert(highlight)
         let note = NotebookNote(); note.id = UUID(); note.text = "ملاحظة على الكتاب"; note.link = "book"; note.targetID = bookID; context.insert(note)
+        // The Goodreads private note is a "general" note tied to the book by its fixed id; it goes with the book (audit 18 Nov 2026).
+        let goodreadsNote = NotebookNote(); goodreadsNote.id = StableIdentity.uuid(for: "GoodreadsPrivateNote:\(bookID.uuidString)"); goodreadsNote.text = "ملاحظتي الخاصة من Goodreads"; goodreadsNote.link = "general"; goodreadsNote.targetID = bookID; goodreadsNote.isPrivate = true; context.insert(goodreadsNote)
         let unrelated = NotebookNote(); unrelated.id = UUID(); unrelated.text = "ملاحظة عامة تبقى"; unrelated.link = "general"; context.insert(unrelated)
         let word = UserWord(); word.id = UUID(); word.word = "كلمة"; word.bookID = bookID; word.bookTitle = "كتاب سيُحذف نهائيًا"; word.context = "سياق الكلمة"; context.insert(word)
         try context.save()
@@ -191,6 +193,7 @@ import MadarData
         #expect(h.deletedAt != nil && h.locatorJSON.isEmpty && h.note == nil)
         #expect(try #require(after.fetch(FetchDescriptor<NotebookNote>()).first { $0.id == note.id }).text.isEmpty)
         #expect(try #require(after.fetch(FetchDescriptor<NotebookNote>()).first { $0.id == note.id }).deletedAt != nil)
+        let goodreads = try #require(after.fetch(FetchDescriptor<NotebookNote>()).first { $0.id == goodreadsNote.id }); #expect(goodreads.text.isEmpty && goodreads.deletedAt != nil)
         let w = try #require(after.fetch(FetchDescriptor<UserWord>()).first { $0.id == word.id })
         #expect(w.deletedAt != nil && w.word.isEmpty && w.context.isEmpty && w.bookTitle.isEmpty)
         // Everything that is not this book's content stays.

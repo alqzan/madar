@@ -34,6 +34,13 @@ public enum HabitSchedule {
         return spans
     }
 
+    /// The highest goal a growing plan really reaches inside the stored steps and horizon. A cap above it is a promise the plan cannot keep.
+    public static func reachableCap(start: Int, step: Int, everyDays: Int, cap: Int) -> Int {
+        guard step > 0, everyDays > 0, cap > start else { return min(start, cap) }
+        let steps = min(maximumSteps, horizonDays / everyDays)
+        return min(cap, start + steps * step)
+    }
+
     /// `rule` is today's version (its target is the start value); `steps` are the later versions, each a full rule.
     public static func plan(base rule: HabitRule, ramp: HabitRamp?, ramadan: HabitRamadanWindow?, today: GregorianDay, days: MadarCalendarDays) -> (rule: HabitRule, steps: [HabitRule]) {
         let origin = max(rule.effectiveFrom, today)

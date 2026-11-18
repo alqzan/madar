@@ -58,7 +58,7 @@ struct FirstRunView: View {
         case 1:
             Button(locator.working ? "أبحث عن موقعك…" : "اسمح بالموقع") { locator.start(save) }
                 .buttonStyle(MadarPrimaryButton()).disabled(locator.working).accessibilityIdentifier("first-run-locate")
-            NavigationLink("اختر مدينتي بنفسي") { CityEditor(session: session).onDisappear { if !session.cityName.isEmpty { session.completeOnboarding() } } }
+            NavigationLink("اختر مدينتي بنفسي") { CityEditor(session: session, onSaved: { session.completeOnboarding() }) }
                 .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("first-run-city")
         default:
             // B2-12: the photo permission is asked at the first photo the writer adds, not here.
@@ -66,9 +66,10 @@ struct FirstRunView: View {
         }
     }
 
-    /// The located city is saved at once; only its name is kept, never the position.
+    /// Prayer times need a city, not a doorstep: the position is rounded to about a kilometre before it is saved.
+    private static func cityScale(_ degrees: Double) -> Double { (degrees * 100).rounded() / 100 }
     private func save(_ found: CityLocator.Found) {
-        session.set(.object(["name": .string(found.name), "country": .string(found.country), "lat": .number(found.lat), "lon": .number(found.lon),
+        session.set(.object(["name": .string(found.name), "country": .string(found.country), "lat": .number(Self.cityScale(found.lat)), "lon": .number(Self.cityScale(found.lon)),
                              "tz": .string(found.tz), "currency": .string(found.currency)]), key: "core.homeCity")
         session.completeOnboarding()
     }

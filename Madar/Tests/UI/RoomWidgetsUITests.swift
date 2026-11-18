@@ -121,12 +121,6 @@ import XCTest
         shot(app, "OR-04-lock-circles-L")
         circle.tap(); XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10))
     }
-    func testPrayerWidgetPreviewOpensPrayerDirectly() throws {
-        continueAfterFailure=false;let app=openGallery(prayerFixture:"homeShowcase",now:"2026-10-07T16:20:00+03:00");app.links["room-widget-prayer"].tap()
-        XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForNonExistence(timeout:5))
-        XCTAssertTrue(app.buttons["tab-prayer"].isSelected)
-        shot(app,"PERF05-transition-prayer-room-L")
-    }
     func testMihbaraWidgetPreviewOpensRoomDirectly() throws {
         continueAfterFailure=false;let app=openGallery(),mihbara=app.links["room-widget-mihbara"]
         for _ in 0..<5 where !mihbara.isHittable{app.swipeUp(velocity:.slow)}

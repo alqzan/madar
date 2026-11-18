@@ -51,28 +51,6 @@ struct MadarWatchHomeView: View {
         }
     }
 
-    private func prayerCard(_ snapshot: WatchDashboardSnapshot, timeZoneID: String, now: Date) -> some View {
-        VStack(spacing: 5) {
-            Label("الصلاة القادمة", systemImage: "sun.horizon")
-                .font(.system(size: 11, weight: .medium)).foregroundStyle(gold)
-            if let prayer = snapshot.nextPrayer(after: now) {
-                Text(prayer.name).font(.system(size: 20, weight: .semibold, design: .rounded))
-                Text(formattedTime(prayer.at, numerals: snapshot.numerals, timeZoneID: timeZoneID))
-                    .font(.system(size: 13, weight: .medium, design: .rounded)).foregroundStyle(.secondary)
-                if prayer.at > now {
-                    Text(countdown(prayer.at.timeIntervalSince(now), snapshot: snapshot))
-                        .font(.system(size: 16, weight: .semibold, design: .rounded).monospacedDigit())
-                        .contentTransition(.numericText())
-                }
-            } else {
-                Text("لا تتوفر مواقيت الآن").font(.system(size: 13)).foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity).padding(.vertical, 10)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(gold.opacity(0.22), lineWidth: 1))
-    }
-
     private func progressCard(title: String, symbol: String, progress: WatchDashboardSnapshot.Progress,
                               snapshot: WatchDashboardSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -97,11 +75,4 @@ struct MadarWatchHomeView: View {
         return hoursText + ":" + snapshot.digits(remainder / 10) + snapshot.digits(remainder % 10)
     }
 
-    private func formattedTime(_ date: Date, numerals: String, timeZoneID: String) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: numerals == "western" ? "en_US" : "ar_SA")
-        formatter.timeZone = TimeZone(identifier: timeZoneID) ?? .current
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
-    }
 }

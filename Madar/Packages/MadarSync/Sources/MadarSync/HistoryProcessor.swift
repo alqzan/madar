@@ -26,7 +26,8 @@ public struct HistoryDrainReport: Equatable, Sendable {
     public func drain(container: ModelContainer, generationID: UUID, publishSnapshots: (Set<String>) throws -> Void) throws -> HistoryDrainReport {
         let interval = signposter.beginInterval("HistoryDrain"); defer { signposter.endInterval("HistoryDrain", interval) }
         let context = ModelContext(container); context.autosaveEnabled = false; context.author = Self.author
-        let cursorRows = try context.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key == cursorKey && $0.deletedAt == nil && $0.mergedInto == nil }
+        let key = cursorKey
+        let cursorRows = try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key })).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let cursorRow = cursorRows.max { $0.updatedAt < $1.updatedAt }
         let envelope = cursorRow.flatMap { try? JSONDecoder().decode(CursorEnvelope.self, from: $0.valueJSON) }
         let valid = envelope?.version == 1 && envelope?.generationID == generationID

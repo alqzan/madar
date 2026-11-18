@@ -231,6 +231,28 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 # Handovers
 
+## Handover — إصلاحات تدقيق مدار التقني — 2026-11-18 — Claude
+
+### Works now
+- All ten High findings and most Medium/Low ones from the 18 Nov audit are fixed (see the 18 Nov row in `docs/DECISIONS.md`): Mac target builds (`habitAmountCategoryID`); merge restore keeps `SessionDraft`; Siri/Shortcut/Control prayer logging is refused (intents throw, executor rejects sources siri/shortcut/control); book purge also wipes the Goodreads private note and a replace restore cannot revive a purged book; ZIP64 sizes use `Int(exactly:)`; habit reminders fix the day key (tomorrow's window) and the amount at planning; goal editor no longer crashes at the limit and refuses a cap the plan cannot reach (`HabitSchedule.reachableCap`); `AppSession.refreshAfterCommit()` stops a refresh failure reading as a failed save; the mirrored iCloud account is stored per generation (`ManagedPointer.mirroredAccountHash`); transfer sheet hides balances; first run needs an explicit city and rounds coordinates; recovery finds backups without the catalogue and shows both dates; Mac reader waits for the position save; Mac paper-book form; export opens on year keys only; habits tab stops polling Health off-screen; watch payload no longer carries prayers.
+
+### Verified
+- `swift test`: MadarCommands 330/330, MadarCore 275/275 (incl. ZIPReaderBoundsTests, HabitRampReachTests), MadarSync 10/10, MadarData targeted (mergeKeepsAnUnrecordedSessionDraft, committedHookFailureResumes, schemaV14 — the full MadarData run had one flaky schemaV14 file-hash failure that passes alone, with and without these changes).
+- MadarTests (iOS 27.0, Madar 15 Pro Max): 297 executed; after the eve-key fix RoomNotificationsIntegrationTests 18/18.
+- Builds: Madar iOS, MadarMac, MadarWatch succeeded. `verify-smoke.sh` PASSED. UI: HabitsUITests + DateLabelsUITests 26/26.
+
+### Differences left
+- `RoomGlyphUITests.testWalkBuiltRoomsWithNativeRoomGlyphs` still fails at launch (the first screen no longer offers the diary/tab marker the test waits for); stale since habits replaced prayer; two repairs tried, recorded here.
+- `check-shipping-sources.py` now passes the target inventory but reports handwritten colours in HabitOrbitView and HabitsRoomAnalysis (existing debt, not part of this request).
+- Not done: retention policy for previous generations and `RecordsV1.json` (data-deletion rule, needs the owner); narrowing `AppSession.reload()`'s global `prayerRevision`; iPad sidebar/plus-button overlap and AX5 cards fixed from source only, not checked on the iPad simulator; frozen prayer lines inside the diary stay (the owner's own writing, export test expects them).
+- Not verified: MadarInbox package tests after the macOS 27 platform bump; Mac run of the new paper-book form; iCloud isolation needs a signed two-account trial.
+
+### Next
+- Owner: decide retention for old generations and migration copies.
+
+### Model/effort
+- claude-sonnet-5-5, effort not exposed. Usage not exposed.
+
 ## Handover — العادات بدل الصلاة — 2026-11-17 — Claude
 
 ### Works now

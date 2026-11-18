@@ -26,16 +26,19 @@ import MadarPrayer
             let learned = current.rule.windowStart == nil ? RoomReminders.learnedHabitMinute(eventTimes: reading.eventTimes, timeZone: place.timeZone) : nil
             guard current.rule.windowStart != nil || learned != nil else { continue }
             // Today's window, or tomorrow's when it opens the evening before (idea 17); each needs its own day to be due.
-            var eveningBefore = false
+            var eveningBefore = false, askedOffset = 0
             let start = (0...1).lazy.compactMap { offset -> (Date, Int)? in
                 let dueDay = today.adding(days: offset), civilDay = civil.adding(days: offset)
                 guard current.dueDays.contains(dueDay) || (offset == 1 && HabitEngine.schedulesDay(current.rule, dueDay)) else { return nil }
                 if let learned { return RoomReminders.habitLearnedStart(minute: learned, on: civilDay, timeZone: place.timeZone).map { ($0, offset) } }
                 return (HabitEngine.window(rule: current.rule, civilDay: civilDay, place: place, prayer: prayerDays.first { $0.day == civilDay })?.start).map { ($0, offset) }
-            }.first { $0.0 > now }.map { found -> Date in eveningBefore = found.1 == 1 && !current.dueDays.contains(today); return found.0 }
-            if var candidate = RoomReminders.habit(id: reading.id, windowStart: start, dayKey: today.description, prayerDays: prayerDays, now: now) {
+            }.first { $0.0 > now }.map { found -> Date in eveningBefore = found.1 == 1 && !current.dueDays.contains(today); askedOffset = found.1; return found.0 }
+            // A window that opens tomorrow belongs to tomorrow's day: the key is fixed here, so «تمّت» tapped tomorrow morning
+            // never writes yesterday.
+            let askedDay = eveningBefore ? today : today.adding(days: askedOffset) // the night-before ask keeps today's key: it only asks, never logs
+            if var candidate = RoomReminders.habit(id: reading.id, windowStart: start, dayKey: askedDay.description, prayerDays: prayerDays, now: now) {
                 // A reminder for tomorrow's day (the fast asked the night before) only asks; it never logs tonight.
-                if eveningBefore { candidate = .init(id: "habits.\(today).eve.\(reading.id.uuidString)", room: .habits, dueAt: candidate.dueAt, dayKey: candidate.dayKey) }
+                if eveningBefore { candidate = .init(id: "habits.\(askedDay).eve.\(reading.id.uuidString)", room: .habits, dueAt: candidate.dueAt, dayKey: candidate.dayKey) }
                 result.append(candidate)
             }
         }
@@ -264,6 +267,8 @@ import MadarPrayer
                 content.body = "فاتتك أمس. سوّها الحين وتبقى."
             }
             content.userInfo = ["dayKey": candidate.dayKey, "room": "habits", "habit": habitID]
+            // The amount the buttons name is fixed when the reminder is planned, so a plan edited before the tap cannot change what a tap logs.
+            if let target = reading?.summary.current?.rule.target, target > 1 { content.userInfo["amount"] = target }
             if reading?.source == nil, !id.contains(".eve.") {
                 let rule = reading?.summary.current?.rule
                 let amount = rule.map { ($0.measure == .count || $0.measure == .duration) && $0.target > 1 } ?? false

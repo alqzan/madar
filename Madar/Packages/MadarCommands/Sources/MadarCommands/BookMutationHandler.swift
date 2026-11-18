@@ -216,6 +216,8 @@ private struct GoodreadsImportSummary: Codable {
             let rows = books.filter { $0.id == id && $0.mergedInto == nil && $0.deletedAt != nil && !$0.title.isEmpty }
             guard !rows.isEmpty else { throw DataError.invalidValue("الكتاب ليس في سلة المحذوفات") }
             let fileIDs = Set(rows.compactMap(\.mediaID))
+            // The Goodreads private note is stored as a "general" note tied to this book by a fixed id: it goes with the book.
+            let goodreadsNoteID = StableIdentity.uuid(for: "GoodreadsPrivateNote:\(id.uuidString)")
             let coverKey = "book-cover:\(id.uuidString)", inkPrefix = "pdf-ink:\(id.uuidString):"
             for media in try context.fetch(FetchDescriptor<Media>()) where media.mergedInto == nil {
                 let isFile = fileIDs.contains(media.id)
@@ -234,7 +236,7 @@ private struct GoodreadsImportSummary: Codable {
             for h in try context.fetch(FetchDescriptor<Highlight>()) where h.bookID == id && h.mergedInto == nil {
                 tombstone({ h.locatorJSON = Data(); h.note = nil; h.pageLabel = nil }, deletedAt: &h.deletedAt, barrier: &h.deletionBarrierAt, updatedAt: &h.updatedAt, writerID: &h.writerID)
             }
-            for n in try context.fetch(FetchDescriptor<NotebookNote>()) where n.targetID == id && n.link != "general" && n.mergedInto == nil {
+            for n in try context.fetch(FetchDescriptor<NotebookNote>()) where n.targetID == id && (n.link != "general" || n.id == goodreadsNoteID) && n.mergedInto == nil {
                 tombstone({ n.text = ""; n.locatorJSON = nil }, deletedAt: &n.deletedAt, barrier: &n.deletionBarrierAt, updatedAt: &n.updatedAt, writerID: &n.writerID)
             }
             for w in try context.fetch(FetchDescriptor<UserWord>()) where w.bookID == id && w.mergedInto == nil {

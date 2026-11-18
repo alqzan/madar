@@ -23,6 +23,13 @@ public enum StartupRecovery {
                 result.append(.init(url: url, date: receipt.createdAt, bytes: size(of: url), source: receipt.kind == .manual ? .manual : .automatic))
             }
         }
+        // A missing or damaged catalogue must not hide backups that are still on disk: unlisted files are found by their extension.
+        let listed = Set(result.map(\.url.lastPathComponent))
+        for url in (try? fm.contentsOfDirectory(at: backups, includingPropertiesForKeys: [.contentModificationDateKey], options: [.skipsHiddenFiles])) ?? []
+        where ["madarbackup", "madarbackupset"].contains(url.pathExtension) && !listed.contains(url.lastPathComponent) {
+            let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            result.append(.init(url: url, date: date, bytes: size(of: url), source: .automatic))
+        }
         for folder in (try? MadarContainerFactory.preMigrationBackups(in: groupDirectory)) ?? [] {
             let date = (try? fm.attributesOfItem(atPath: folder.path)[.modificationDate] as? Date) ?? .distantPast
             result.append(.init(url: folder, date: date, bytes: size(of: folder), source: .preMigration))

@@ -49,7 +49,7 @@ struct DiaryExportView:View {
             }.background(theme.background).foregroundStyle(theme.ink).navigationBarTitleDisplayMode(.inline)
                 .toolbar{ToolbarItemGroup(placement:.topBarLeading){Button{dismiss()}label:{HStack{Image(systemName:"chevron.backward");Text("رجوع").font(DiaryType.label)}}.disabled(busy).accessibilityIdentifier("diary-export-close")
                 }}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
-                .task{do{years=Set(try service.exportPages(.init()).map(\.day.year)+[service.currentDay().year]).sorted(by:>)}catch{failure=madarUserMessage(error)}}
+                .task{do{years=try service.exportYears()}catch{failure=madarUserMessage(error)}}
                 .onChange(of:options.year){_,_ in options.month=nil;clear()}.onChange(of:options.month){_,_ in clear()}.onChange(of:options.format){_,_ in clear()}.onChange(of:options.margins){_,_ in clear()}.onChange(of:options.sources){_,_ in clear()}
                 .onChange(of:phase){_,value in if value == .background {preview=false;clear()}}
                 .sheet(isPresented:$preview){if let artifact {DiaryQuickLook(url:artifact.url)}}

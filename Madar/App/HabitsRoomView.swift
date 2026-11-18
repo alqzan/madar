@@ -59,6 +59,8 @@ struct HabitsRoomView: View {
     @State private var completionInFlight: Set<UUID> = []
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @AppStorage("Madar.pad.sidebarHidden") private var sidebarHidden = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var theme: RoomTheme { .init(room:"bahw",dark:colorScheme == .dark) }
     private var digits: MadarNumberFormatter { .init(style:session.string("core.numerals") == "western" ? .western : .hindi) }
@@ -74,6 +76,8 @@ struct HabitsRoomView: View {
                 Spacer()
                 Button { editor = .init(id:UUID()) } label: { Image(systemName:"plus").frame(width:44,height:44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("عادة جديدة").accessibilityIdentifier("habit-add")
             }.padding(.horizontal,14).padding(.vertical,8)
+                // iPad with the sidebar folded: its «أظهر القائمة» button sits in this corner, so the add button steps inward.
+                .padding(.trailing, sidebarHidden && isPadWide(sizeClass) ? 56 : 0)
             ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment:.leading,spacing:20) {
@@ -116,10 +120,13 @@ struct HabitsRoomView: View {
             }
         }
         .onChange(of: detailPastDayDraftPresented) { _, _ in applyPendingBahwRootIfReady() }
+        // A room left open across midnight shows the new day without waiting for a Health change.
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in reload() }
         .task { do {liveHealth=try await HabitHealthStore.refresh(session:session);reload()} catch {session.errorMessage="لم تتجدد قراءة الصحة؛ سجلك السابق محفوظ."} }
         .task {
             while !Task.isCancelled {
-                do { let fresh=try await HabitHealthStore.refresh(session:session,closedDays:false); if fresh != liveHealth { liveHealth=fresh;reload() } }catch{}
+                // The tab stays alive behind the others: only poll Health while habits is the room being looked at.
+                if session.selectedTab == "habits" { do { let fresh=try await HabitHealthStore.refresh(session:session,closedDays:false); if fresh != liveHealth { liveHealth=fresh;reload() } }catch{} }
                 try? await Task.sleep(for:.seconds(60))
             }
         }
@@ -250,7 +257,9 @@ struct HabitsRoomView: View {
     /// The four period cards. With a habit chosen they tell that habit's own day, week, month and year.
     private var periodSummaries: some View {
         let cards: [HabitCardModel] = selectedReading.map(selectedCards) ?? [HabitFrequency.daily, .weekly, .monthly, .yearly].map(allCard)
-        return HStack(spacing: 8) {
+        // From the accessibility sizes the four cards stack, one full-width card per period, instead of squeezing into one row.
+        let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+        return layout {
             ForEach(cards, id: \.frequency) { card in
                 HabitPeriodSummaryCard(title: card.title, count: card.count, share: card.share, frequency: card.frequency, theme: theme, showsRing: !dynamicTypeSize.isAccessibilitySize)
             }

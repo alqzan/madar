@@ -160,8 +160,9 @@ struct HabitEditorView:View {
                             if minimumOn { Stepper("أقلّ القليل: "+habitUnitCount(min(rule.target,rule.minimum ?? 1),rule.unit,digits),value:Binding(get:{min(rule.target,rule.minimum ?? 1)},set:{rule.minimum=$0}),in:1...max(1,rule.target)).frame(minHeight:44) }
                         }
                         if [.count,.duration].contains(rule.measure) && !((!rule.weekdays.isEmpty && rule.frequency == .weekly) || (!monthDays.isEmpty && rule.frequency == .monthly)) {
-                            Toggle("يكبر تدريجيًا",isOn:$rampOn).frame(minHeight:44).accessibilityIdentifier("habit-ramp-toggle")
-                            if rampOn {
+                            if rule.target < targetLimit { Toggle("يكبر تدريجيًا",isOn:$rampOn).frame(minHeight:44).accessibilityIdentifier("habit-ramp-toggle") }
+                            else { Text("الهدف بلغ الحدّ الأقصى؛ لا مجال لأن يكبر.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                            if rampOn, rule.target < targetLimit {
                                 Stepper("يزيد: "+habitUnitCount(rampStep,rule.unit,digits),value:$rampStep,in:1...max(1,targetLimit/10)).frame(minHeight:44).accessibilityIdentifier("habit-ramp-step")
                                 Stepper("كل "+(rampWeeks ? WidgetCopy.agree(rampEvery,digits,one:"أسبوع",two:"أسبوعين",few:"أسابيع",many:"أسبوعًا") : WidgetCopy.agree(rampEvery,digits,one:"يوم",two:"يومين",few:"أيام",many:"يومًا")),value:$rampEvery,in:1...52).frame(minHeight:44).accessibilityIdentifier("habit-ramp-every")
                                 Picker("المدة",selection:$rampWeeks){Text("أسابيع").tag(true);Text("أيام").tag(false)}.pickerStyle(.segmented)
@@ -326,6 +327,7 @@ struct HabitEditorView:View {
             var steps:[HabitRule]=[]
             if saved.measure != .abstain,rampOn || (ramadanOn && windowOn) {
                 if rampOn,rampCap <= saved.target {issue="اجعل الحدّ الأعلى أكبر من بداية الهدف.";busy=false;return}
+                if rampOn,HabitSchedule.reachableCap(start:saved.target,step:rampStep,everyDays:rampWeeks ? rampEvery*7 : rampEvery,cap:rampCap) < rampCap {issue="الخطة لا تبلغ هذا الحدّ خلال عشر سنوات؛ اخفض الحدّ الأعلى أو قصّر المدة أو كبّر الزيادة.";busy=false;return}
                 let calendar=MadarCalendarDays(zone:session.activePlace.timeZone,source:HijriSource(rawValue:session.string("core.hijriSource")) ?? .ummAlQura,offset:Int(session.number("core.hijriOffset")))
                 let plan=HabitSchedule.plan(base:saved,ramp:rampOn ? HabitRamp(step:rampStep,everyDays:rampWeeks ? rampEvery*7 : rampEvery,cap:rampCap) : nil,
                                             ramadan:ramadanOn && windowOn ? HabitRamadanWindow(anchor:ramadanAnchor,start:ramadanStart,end:ramadanEnd) : nil,today:AppBahwService(session:session).today,days:calendar)

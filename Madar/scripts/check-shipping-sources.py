@@ -28,6 +28,8 @@ REMOTE_PRODUCTS = {
 }
 
 
+SHIPPING_TARGETS = {'Madar', 'MadarWidgets', 'MadarMac', 'MadarWatchApp'}
+
 def resolved_pins(root):
     path = root / 'Madar.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved'
     document = json.loads(path.read_text())
@@ -156,8 +158,9 @@ def build_files(project, root):
     pins = None
     targets = [o for o in objects.values() if o['isa'] == 'PBXNativeTarget'
                and o['productType'] in ('com.apple.product-type.application', 'com.apple.product-type.app-extension')]
-    if {o['name'] for o in targets} != {'Madar', 'MadarWidgets'}:
-        raise ValueError('shipping target set changed; inventory required')
+    # Every shipped product: iPhone/iPad app and widgets, the Mac app, the Watch app. A new product needs an inventory decision here.
+    if {o['name'] for o in targets} != SHIPPING_TARGETS:
+        raise ValueError('shipping target set changed; inventory required: ' + ', '.join(sorted({o['name'] for o in targets} ^ SHIPPING_TARGETS)))
     for target in targets:
         target_names.append(target['name'])
         if target.get('fileSystemSynchronizedGroups'):

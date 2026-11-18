@@ -62,6 +62,9 @@ struct MihbaraPDFReaderView: View {
         return label
     }
 
+    /// Read here, on the main actor, so the `Sendable` measuring closure captures a plain `Bool`.
+    private var wide: Bool { isPadWide(sizeClass) }
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 5)) { tick in
             VStack(spacing: 0) {
@@ -70,7 +73,7 @@ struct MihbaraPDFReaderView: View {
                 if let document {
                     MihbaraPDFPage(document: document, pageIndex: pageIndex, paper: paper, ink: inkLayer, inking: inking, twoUp: twoUp, onPageChange: pageChanged)
                         .accessibilityIdentifier("mihbara-pdf-content")
-                        .onGeometryChange(for: Bool.self) { isPadWide(sizeClass) && $0.size.width > $0.size.height && $0.size.width >= 900 } action: { twoUp = $0 }
+                        .onGeometryChange(for: Bool.self) { [wide] in wide && $0.size.width > $0.size.height && $0.size.width >= 900 } action: { twoUp = $0 }
                         .allowsHitTesting(!closing)
                 } else {
                     VStack(spacing: 18) {

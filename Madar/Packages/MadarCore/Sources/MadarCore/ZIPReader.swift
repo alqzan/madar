@@ -52,16 +52,16 @@ public struct ZIPReader: Sendable {
             // ZIP64 end-of-central-directory locator sits 20 bytes before the classic record.
             let locator = eocd - 20
             guard locator >= 0, Self.u32(data, locator) == 0x07064b50 else { throw ZIPReaderError.corrupt }
-            let record = Int(Self.u64(data, locator + 8))
-            guard record >= 0, record + 56 <= data.count, Self.u32(data, record) == 0x06064b50 else { throw ZIPReaderError.corrupt }
-            count = Int(Self.u64(data, record + 32)); centralSize = Int(Self.u64(data, record + 40)); centralOffset = Int(Self.u64(data, record + 48))
+            guard let record = Int(exactly: Self.u64(data, locator + 8)), record >= 0, record <= data.count - 56, Self.u32(data, record) == 0x06064b50 else { throw ZIPReaderError.corrupt }
+            guard let c = Int(exactly: Self.u64(data, record + 32)), let cs = Int(exactly: Self.u64(data, record + 40)), let co = Int(exactly: Self.u64(data, record + 48)) else { throw ZIPReaderError.corrupt }
+            count = c; centralSize = cs; centralOffset = co
         }
-        guard centralOffset >= 0, centralSize >= 0, centralOffset + centralSize <= data.count, count < 1_000_000 else { throw ZIPReaderError.corrupt }
+        guard count >= 0, centralOffset >= 0, centralSize >= 0, centralOffset <= data.count, centralSize <= data.count - centralOffset, count < 1_000_000 else { throw ZIPReaderError.corrupt }
         var members: [Member] = []; members.reserveCapacity(count)
         var at = centralOffset
         var seen = Set<String>()
         for _ in 0..<count {
-            guard at + 46 <= data.count, Self.u32(data, at) == 0x02014b50 else { throw ZIPReaderError.corrupt }
+            guard at >= 0, at <= data.count - 46, Self.u32(data, at) == 0x02014b50 else { throw ZIPReaderError.corrupt }
             let madeBy = Self.u16(data, at + 4)
             let flags = Self.u16(data, at + 8), method = Self.u16(data, at + 10), crc = Self.u32(data, at + 16)
             let externalAttributes = Self.u32(data, at + 38)
@@ -69,7 +69,7 @@ public struct ZIPReader: Sendable {
             let nameLength = Int(Self.u16(data, at + 28)), extraLength = Int(Self.u16(data, at + 30)), commentLength = Int(Self.u16(data, at + 32))
             var offset = Int(Self.u32(data, at + 42))
             let nameStart = at + 46
-            guard nameStart + nameLength + extraLength + commentLength <= data.count else { throw ZIPReaderError.corrupt }
+            guard nameStart <= data.count, nameLength + extraLength + commentLength <= data.count - nameStart else { throw ZIPReaderError.corrupt }
             let nameBytes = data.subdata(in: nameStart..<nameStart + nameLength)
             // Bit 11 = UTF-8. Older tools write CP437; Day One writes UTF-8 either way, so fall back to Latin-1 rather than fail.
             let path = String(data: nameBytes, encoding: .utf8) ?? String(data: nameBytes, encoding: .isoLatin1) ?? ""
@@ -80,9 +80,9 @@ public struct ZIPReader: Sendable {
                 let tag = Self.u16(data, extra), length = Int(Self.u16(data, extra + 2))
                 if tag == 0x0001 {
                     var field = extra + 4
-                    if size == 0xFFFF_FFFF, field + 8 <= extra + 4 + length { size = Int(Self.u64(data, field)); field += 8 }
-                    if compressed == 0xFFFF_FFFF, field + 8 <= extra + 4 + length { compressed = Int(Self.u64(data, field)); field += 8 }
-                    if offset == 0xFFFF_FFFF, field + 8 <= extra + 4 + length { offset = Int(Self.u64(data, field)) }
+                    if size == 0xFFFF_FFFF, field + 8 <= extra + 4 + length { guard let v = Int(exactly: Self.u64(data, field)) else { throw ZIPReaderError.corrupt }; size = v; field += 8 }
+                    if compressed == 0xFFFF_FFFF, field + 8 <= extra + 4 + length { guard let v = Int(exactly: Self.u64(data, field)) else { throw ZIPReaderError.corrupt }; compressed = v; field += 8 }
+                    if offset == 0xFFFF_FFFF, field + 8 <= extra + 4 + length { guard let v = Int(exactly: Self.u64(data, field)) else { throw ZIPReaderError.corrupt }; offset = v }
                 }
                 extra += 4 + length
             }
@@ -106,7 +106,7 @@ public struct ZIPReader: Sendable {
         guard !member.isEncrypted else { throw ZIPReaderError.encrypted }
         guard member.size <= Self.memberLimit, member.compressedSize <= data.count else { throw ZIPReaderError.tooLarge }
         let local = member.localOffset
-        guard local + 30 <= data.count, Self.u32(data, local) == 0x04034b50 else { throw ZIPReaderError.corrupt }
+        guard local >= 0, local <= data.count - 30, Self.u32(data, local) == 0x04034b50 else { throw ZIPReaderError.corrupt }
         let localFlags = Self.u16(data, local + 6), localMethod = Self.u16(data, local + 8)
         let nameLength = Int(Self.u16(data, local + 26)), extraLength = Int(Self.u16(data, local + 28))
         guard localFlags == member.flags, localMethod == member.method,

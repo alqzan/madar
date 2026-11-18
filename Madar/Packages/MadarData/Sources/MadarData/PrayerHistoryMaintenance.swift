@@ -66,6 +66,8 @@ import SwiftData
         let writer = "system.prayer-records-removed-v2"
         func tombstone(_ row: some MadarRecordModel) throws {
             var record = try row.record()
+            // The tombstone keeps only the natural key; the personal content (heart state) goes with the record.
+            if record.fields["heart"] != nil { record.fields["heart"] = .null }
             let stamp = StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? .distantPast)
             try record.set(stamp, for: "updatedAt")
             try record.set(stamp, for: "deletedAt")

@@ -82,7 +82,7 @@ struct MoneyAccountsView: View {
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).toolbar(.hidden, for: .navigationBar, .tabBar)
             .task { load(); withAnimation(reduceMotion ? nil : .easeOut(duration: 0.5)) { appeared = true } }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $selected) { MoneyAccountSheet(app: app, original: $0, visible: visible, revealed: $revealed) }.sheet(item: $selectedSource) { source($0) }
-            .sheet(isPresented: $transferOpen, onDismiss: load) { if let r = reading { MoneyTransferView(app: app, accounts: transferable(r)).environment(\.roomTheme, theme) } }
+            .sheet(isPresented: $transferOpen, onDismiss: load) { if let r = reading { MoneyTransferView(app: app, accounts: transferable(r), visible: visible).environment(\.roomTheme, theme) } }
             .navigationDestination(isPresented: $reconcileOpen) { MoneyReconcileView(app: app, revealed: $revealed) }
             .accessibilityIdentifier("money-accounts")
     }
@@ -197,6 +197,8 @@ extension MoneyAccountsView {
 private struct MoneyTransferView: View {
     let app: AppSession
     let accounts: [MoneyAccountRow]
+    /// «أخفِ الأرقام حتى ألمس»: balances stay hidden here too until the person reveals them on the accounts page.
+    let visible: Bool
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @State private var fromID: UUID?
@@ -234,6 +236,9 @@ private struct MoneyTransferView: View {
                 MadarDateLabel(app.dateLabels(.containing(date, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
                 TextField("ملاحظة، إن أردت", text: $note).frame(minHeight: 44).accessibilityIdentifier("money-transfer-note")
                 if let problem { Text(problem).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
+                else if !visible, from != nil, to != nil, amountMinor != nil {
+                    Text(withdrawal ? "سجّل السحب لتراه في حساباتك." : "سجّل التحويل لتراه في حساباتك.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-transfer-preview")
+                }
                 else if let from, let to, let minor = amountMinor, let fromBalance = from.amountMinor, let toBalance = to.amountMinor {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(figure: "يصير «" + from.name + "» " + service.amount(fromBalance - minor, currency: from.currency) + "، و«" + to.name + "» " + service.amount(toBalance + minor, currency: to.currency) + ".").font(MadarTypography.body())
@@ -260,7 +265,7 @@ private struct MoneyTransferView: View {
                     ForEach(accounts) { account in
                         let selected = selection.wrappedValue == account.accountID
                         Button { selection.wrappedValue = account.accountID } label: {
-                            VStack(alignment: .leading, spacing: 2) { Text(account.name).font(MadarTypography.caption().bold()); Text(figure: account.amountMinor.map { service.amount($0, currency: account.currency) } ?? "—").font(MadarTypography.fine()) }
+                            VStack(alignment: .leading, spacing: 2) { Text(account.name).font(MadarTypography.caption().bold()); Text(figure: visible ? (account.amountMinor.map { service.amount($0, currency: account.currency) } ?? "—") : "••••").font(MadarTypography.fine()) }
                                 .padding(.horizontal, 14).frame(minHeight: 48)
                                 .foregroundStyle(selected ? theme.onAccent : theme.ink)
                                 .background(selected ? theme.color("accent") : theme.surface, in: .rect(cornerRadius: 14))

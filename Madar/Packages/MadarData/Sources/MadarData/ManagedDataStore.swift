@@ -4,11 +4,16 @@ import Darwin
 
 struct ManagedPointer: Codable {
     let version: Int; let generationID: UUID; let previousGenerationID: UUID?; let accountHash: String?; let cloudKitContainerIdentifier: String?
+    /// The account this generation has mirrored under, kept even after sync is switched off, so a later switch can never
+    /// attach the same rows to a different account.
+    var mirroredAccountHash: String? = nil
 }
 struct RestoreJournal: Codable {
     enum Phase: String, Codable { case preparing, ready, promoted }
     let operationID: UUID; let oldGenerationID: UUID; let newGenerationID: UUID; var phase: Phase; var hooksPending: Bool
     var preserveDeviceRows: Bool? = nil
+    /// A merge keeps every current row, so an unrecorded Quran session draft stays valid (nil/false: replace invalidates it).
+    var keepSessionDrafts: Bool? = nil
 }
 struct GenerationReady: Codable { let version: Int; let generationID: UUID; let recordsHash: String; let createdAt: Date }
 
@@ -23,6 +28,7 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
     /// still opens on the device first; the mirror attaches only after the iCloud account is confirmed the same
     /// (`bindCloudMirror`), because CloudKit mirroring opened under a changed account can purge local rows.
     public private(set) var mirrorBound = false
+    public private(set) var mirroredAccountHash: String?
     public var isCloudBacked: Bool { binding.cloudEnabled }
     public var recoveryRequiresRefresh: Bool { journal()?.hooksPending ?? false }
     var pointerURL: URL { root.appendingPathComponent("ActiveGeneration.json") }
@@ -61,6 +67,7 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
         guard FileManager.default.fileExists(atPath:directory.appendingPathComponent("GenerationReady.json").path) else { throw BackupOperationError.invalidManagedStore }
         // Always opens on the device; a bound pointer is remembered and re-attached after the account check.
         mirrorBound = MadarCloudMirror.target(pointerIdentifier:pointer.cloudKitContainerIdentifier,provisioned:provisionedContainer) != .local
+        mirroredAccountHash = pointer.mirroredAccountHash
         binding = .init(generationID:pointer.generationID,syncedDirectory:directory,deviceStoreURL:root.appendingPathComponent("Device.store"),accountHash:pointer.accountHash,cloudEnabled:false)
         container = try MadarContainerFactory.make(at:directory,deviceStoreURL:binding.deviceStoreURL); container.mainContext.autosaveEnabled = false
         try recoverInterruptedOperation(pointer:pointer)
@@ -144,6 +151,7 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
         guard FileManager.default.fileExists(atPath:directory.appendingPathComponent("GenerationReady.json").path) else { throw BackupOperationError.invalidManagedStore }
         let replacement = try MadarContainerFactory.make(at:directory,deviceStoreURL:binding.deviceStoreURL); replacement.mainContext.autosaveEnabled = false
         mirrorBound = MadarCloudMirror.target(pointerIdentifier:pointer.cloudKitContainerIdentifier,provisioned:provisionedContainer) != .local
+        mirroredAccountHash = pointer.mirroredAccountHash
         container = replacement; binding = .init(generationID:pointer.generationID,syncedDirectory:directory,deviceStoreURL:binding.deviceStoreURL,accountHash:pointer.accountHash,cloudEnabled:false)
     }
     public func containerForTransaction() throws -> ModelContainer { try refreshIfNeeded(); return container }
@@ -170,14 +178,14 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
         guard current.version == 1, current.generationID == binding.generationID else { throw BackupOperationError.invalidManagedStore }
         let identifier = enabled ? provisionedContainer : nil
         if enabled && identifier == nil { throw BackupOperationError.cloudRestoreUnsupported }
-        let pointer = ManagedPointer(version:1,generationID:current.generationID,previousGenerationID:current.previousGenerationID,accountHash:accountHash,cloudKitContainerIdentifier:identifier)
+        let pointer = ManagedPointer(version:1,generationID:current.generationID,previousGenerationID:current.previousGenerationID,accountHash:accountHash,cloudKitContainerIdentifier:identifier,mirroredAccountHash:enabled ? accountHash : current.mirroredAccountHash)
         let directory = generationDirectory(pointer.generationID)
         // The old container stays active until the replacement opens and the pointer is durable; a failure
         // leaves both exactly as they were. The caller hands the new container to every holder (bindContainer).
         let replacement = try MadarContainerFactory.make(at:directory,deviceStoreURL:binding.deviceStoreURL,cloudKitContainerIdentifier:identifier,provisionedContainer:provisionedContainer)
         replacement.mainContext.autosaveEnabled = false
         try DurableFiles.encode(pointer,to:pointerURL)
-        container = replacement; mirrorBound = identifier != nil
+        container = replacement; mirrorBound = identifier != nil; mirroredAccountHash = pointer.mirroredAccountHash
         binding = .init(generationID:pointer.generationID,syncedDirectory:directory,deviceStoreURL:binding.deviceStoreURL,accountHash:accountHash,cloudEnabled:identifier != nil)
     }
     private func recoverInterruptedOperation(pointer: ManagedPointer) throws {
