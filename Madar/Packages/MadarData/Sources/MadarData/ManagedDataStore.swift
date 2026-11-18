@@ -72,6 +72,8 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
         binding = .init(generationID:pointer.generationID,syncedDirectory:directory,deviceStoreURL:root.appendingPathComponent("Device.store"),accountHash:pointer.accountHash,cloudEnabled:false)
         container = try MadarContainerFactory.make(at:directory,deviceStoreURL:binding.deviceStoreURL); container.mainContext.autosaveEnabled = false
         try recoverInterruptedOperation(pointer:pointer)
+        // Owner, 18 Nov 2026: keep only the last previous copy. Best-effort and after the active generation opened; never fails opening.
+        Self.pruneOldCopies(root:root,pointer:pointer,journalPending:journal() != nil)
         try lease.endMaintenance()
     }
     public static func adopt(from source: ModelContainer, at root: URL, commandLockURL: URL? = nil) throws -> ManagedDataStore {
@@ -199,5 +201,34 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
             if FileManager.default.fileExists(atPath:staging.path) { try FileManager.default.removeItem(at:staging) }
             try FileManager.default.removeItem(at:journalURL)
         } else { throw BackupOperationError.invalidManagedStore }
+    }
+}
+
+extension ManagedDataStore {
+    /// Keeps the active generation, the newest previous one (the pointer's `previousGenerationID`) and the newest migration safety copy;
+    /// deletes older generation folders and older safety copies. Runs only after the active generation opened and verified, never while a
+    /// restore journal is pending, only touches UUID-named folders, and leaves anything modified in the last 24 hours alone.
+    @discardableResult
+    static func pruneOldCopies(root: URL, pointer: ManagedPointer, journalPending: Bool, now: Date = Date()) -> [String] {
+        guard !journalPending else { return [] }
+        let fm = FileManager.default
+        var removed: [String] = []
+        func recent(_ url: URL) -> Bool {
+            ((try? fm.attributesOfItem(atPath: url.path)[.modificationDate]) as? Date).map { now.timeIntervalSince($0) < 24 * 3600 } ?? true
+        }
+        let generations = root.appendingPathComponent("Generations", isDirectory: true)
+        let keep = Set([pointer.generationID, pointer.previousGenerationID].compactMap { $0?.uuidString })
+        for url in (try? fm.contentsOfDirectory(at: generations, includingPropertiesForKeys: nil)) ?? [] {
+            guard UUID(uuidString: url.lastPathComponent) != nil, !keep.contains(url.lastPathComponent), !recent(url) else { continue }
+            if (try? fm.removeItem(at: url)) != nil { removed.append("Generations/" + url.lastPathComponent) }
+        }
+        let safety = root.appendingPathComponent("MigrationSafety", isDirectory: true)
+        let copies = ((try? fm.contentsOfDirectory(at: safety, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [])
+            .filter { UUID(uuidString: $0.lastPathComponent) != nil }
+            .sorted { (((try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)) > (((try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)) }
+        for url in copies.dropFirst() where !recent(url) {
+            if (try? fm.removeItem(at: url)) != nil { removed.append("MigrationSafety/" + url.lastPathComponent) }
+        }
+        return removed
     }
 }
