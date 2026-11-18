@@ -251,6 +251,9 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 ### Delivery 58
 - Build 0.1.0 (58): archive succeeded; first export failed with «No Accounts with App Store Connect Access» (Xcode session, attempt log kept as `upload-attempt1.log`), the retry uploaded: «Upload succeeded» in `Madar/Artifacts/OWNER-TestFlight-58/upload.log`. Apple processing and device acceptance not checked.
 
+### Delivery 59
+- Build 0.1.0 (59): archive and export + upload succeeded: «Upload succeeded» in `Madar/Artifacts/OWNER-TestFlight-59/upload.log`. Apple processing and device acceptance not checked.
+
 ### Build 59 — prayer content erased (owner: «امسح كل شي»)
 - `PrayerHistoryMaintenance.scrubContent` + one-time pass: tests `PrayerHistoryMaintenanceTests` 3/3, MadarData 144, MadarTests 298/0 failures. iCloud: the account-change path already detaches the mirror after the checkpoint and before waiting for the choice (`SyncCoordinator`), with no unit test for a mirror-bound binding; a signed two-account trial is still needed. The rest of the owner's remaining list (global reload signal, Mac «الأصل» page, window close, iPad/AX5 checks, five known-failing UI tests) is unchanged.
 
