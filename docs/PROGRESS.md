@@ -245,6 +245,9 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - Builds: Madar iOS, MadarMac, MadarWatch succeeded. `verify-smoke.sh` PASSED on iPhone and iPad (launch only).
 - UI (earlier in the request): HabitsUITests + DateLabelsUITests 26/26, RoomGlyphUITests 1/1 after adding the onboarding helper. UI run after the final edits: see the commit's `Verified:` line.
 
+### Delivery
+- Build 0.1.0 (57): archive succeeded, export + upload to App Store Connect succeeded (`Madar/Artifacts/OWNER-TestFlight-57/upload.log`: «Upload succeeded»). Apple processing and owner-device acceptance not checked (not awaited).
+
 ### Differences left
 - Not done: narrowing `AppSession.reload()`'s global `prayerRevision` (many rooms use it as their data-changed signal; changing it needs its own pass); the Mac window red-close button saves the position through the shared coordinator but cannot wait for it; Mac «الأصل PDF» opens page 1 (the Mac reader has no printed-page list); opened-letter days in `exportYears` have no dedicated test; iPad sidebar / plus-button overlap fixed from source only (smoke reached the welcome screen only, no captured habits header); AX5 cards unverified.
 - Known failing before this request and left: `DiaryTodayUITests` (2 tests), `FoundationUITests` M0T17, M0S2_RU3, M0S2_Backup — see the baseline line in the commit. 31 `FoundationUITests` tests that needed the removed `tab-prayer` were deleted in this request (feature removed 17 Nov); their feature-map rows are unchanged.
