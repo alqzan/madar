@@ -250,6 +250,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - UI run 1 (`Artifacts/OWNER-22nov/ui1.xcresult`): 22 tests, 15 pass; run 2 (`ui2.xcresult`): M0T17, LegacyMove long preview, all 14 MoneyAccounts but one (fixed after), rates and income tests, MoneyLog arcade, QuranCoach 2/2, QuranDayClose 3/3, MoneyCategories new tests pass.
 
 ### Not verified / still failing
+- `MoneyLogUITests.testEditingAConfirmedMovementChangesItsLabelAndAmount` and `testDeletingAConfirmedMovementAsksFirst` (new, ui2) FAIL: the edit/delete sheet flow is unverified in the app — fix first. The commit message's "edit … tests pass" is wrong for these two.
 - `MoneyCategoriesUITests.testLimit80AlertIsDeliveredWithPrivacySafeCopy` (no system notification within 180 s) and `testPercentLimitDisplaysHundredths` (shows ٠٫٠١٪). Check first whether the prayer-notification refactor or the categories load change caused them.
 - `FoundationUITests.test_M0S2_BackupPasswordConfirmationAndFixtureIsolation`: no hittable ت/t key (keyboard). The diary, accounts and night-review test fixes made after run 2 were not re-run.
 - No `verify-smoke.sh` run and no screenshots of the new money sheets (usage limit).
