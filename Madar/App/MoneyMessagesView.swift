@@ -70,7 +70,7 @@ struct MoneyMessagesView: View {
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
-            .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .task { load() }.onChange(of: app.moneyRevision) { load() }
             .sheet(item: $categorizing) { MoneyCategorizeSheet(app: app, draft: $0).environment(\.roomTheme, theme) }
             .fullScreenCover(item: $bigExpense) { route in MoneyBigExpenseView(app: app, route: route, revealed: $revealed) { bigExpense = nil; load() } }
             .navigationDestination(isPresented: $guideOpen) { MoneyShortcutGuideView(app: app) }

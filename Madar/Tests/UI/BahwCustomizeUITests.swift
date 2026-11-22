@@ -5,8 +5,7 @@ import XCTest
     func testBlocksSizeHideAndReset() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00",
-                                 "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app)
         func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
         XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout: 15), app.debugDescription)
@@ -17,7 +16,7 @@ import XCTest
             XCTAssertTrue(element("bahw-custom-blocks").waitForExistence(timeout: 10), app.debugDescription)
         }
         openSections()
-        for block in ["habits", "salah", "quran", "mal", "year", "upcoming", "notes", "mihbara"] {
+        for block in ["habits", "quran", "mal", "year", "upcoming", "notes", "mihbara"] {
             XCTAssertTrue(element("bahw-custom-block-" + block).exists, block)
         }
         capture(app, "M4-V04-customize-L")

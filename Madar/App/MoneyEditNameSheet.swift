@@ -12,7 +12,9 @@ import MadarCommands
 struct MoneyEditNameSheet: View {
     enum Target: Identifiable {
         case obligation(UUID), envelope(UUID)
-        var id: String { switch self { case .obligation(let id): "o-" + id.uuidString; case .envelope(let id): "e-" + id.uuidString } }
+        /// Owner, 22 Nov 2026: a category's name; nil = a new category.
+        case category(UUID?)
+        var id: String { switch self { case .obligation(let id): "o-" + id.uuidString; case .envelope(let id): "e-" + id.uuidString; case .category(let id): "c-" + (id?.uuidString ?? "new") } }
     }
     let app: AppSession
     let target: Target
@@ -36,15 +38,16 @@ struct MoneyEditNameSheet: View {
     private var isObligation: Bool { if case .obligation = target { true } else { false } }
     private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var newAmount: Int { recurring ? (amountMinor ?? original.amount) : original.amount }
+    private var isCategory: Bool { if case .category = target { true } else { false } }
     private var changed: Bool { trimmed != original.name || (isObligation && newAmount != original.amount) }
-    private var canSave: Bool { loaded && !saving && !trimmed.isEmpty && trimmed.count <= 60 && changed && (!recurring || rawAmount.isEmpty || amountMinor != nil) }
+    private var canSave: Bool { loaded && !saving && !trimmed.isEmpty && trimmed.count <= (isCategory ? 30 : 60) && changed && (!recurring || rawAmount.isEmpty || amountMinor != nil) }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
-                        Text(isObligation ? "عدّل الالتزام" : "عدّل اسم المظروف").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
+                        Text(isObligation ? "عدّل الالتزام" : isCategory ? (target.id == "c-new" ? "أضف تصنيفًا" : "عدّل اسم التصنيف") : "عدّل اسم المظروف").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
                         Spacer()
                         Button { dismiss() } label: { Text("تمّ").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-edit-close")
                     }
@@ -61,7 +64,7 @@ struct MoneyEditNameSheet: View {
                     }
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-edit-error") }
                     Button(action: save) {
-                        Text(saving ? "جارٍ الحفظ…" : "احفظ التعديل").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54)
+                        Text(saving ? "جارٍ الحفظ…" : target.id == "c-new" ? "أضف التصنيف" : "احفظ التعديل").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54)
                             .background(theme.ink.opacity(canSave ? 1 : 0.35)).foregroundStyle(theme.background)
                     }.buttonStyle(.madarPlain).disabled(!canSave).accessibilityIdentifier("money-edit-save")
                 }.padding(20)
@@ -88,6 +91,10 @@ struct MoneyEditNameSheet: View {
             guard let row = try? context.fetch(FetchDescriptor<Obligation>()).first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { failure = "لم يعد هذا الالتزام موجودًا."; return }
             original = (row.name, row.amountMinor); recurring = row.kind == "bill" || row.kind == "subscription"; currency = row.currency
             rawAmount = visible && recurring ? Self.decimal(row.amountMinor, exponent: exponent) : ""
+        case .category(let id):
+            guard let id else { break }
+            guard let row = try? context.fetch(FetchDescriptor<MadarData.Category>()).first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { failure = "لم يعد هذا التصنيف موجودًا."; return }
+            original = (row.name, 0)
         case .envelope(let id):
             guard let row = try? context.fetch(FetchDescriptor<Envelope>()).first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { failure = "لم يعد هذا المظروف موجودًا."; return }
             original = (row.name, row.balanceMinor)
@@ -102,10 +109,14 @@ struct MoneyEditNameSheet: View {
         switch target {
         case .obligation(let id): command = "money.editObligation"; payload = ["id": .string(id.uuidString), "name": .string(trimmed), "amountMinor": .string(String(newAmount))]
         case .envelope(let id): command = "money.renameEnvelope"; payload = ["id": .string(id.uuidString), "name": .string(trimmed)]
+        case .category(let id):
+            command = "money.saveCategory"; var rows: [String: MadarCore.JSONValue] = ["name": .string(trimmed)]
+            if let id { rows["id"] = .string(id.uuidString) }
+            payload = rows
         }
         Task {
             do { try await app.executeMoneyCommand(command, payload: payload); dismiss() }
-            catch { saving = false; failure = "لم يُحفظ التعديل الآن. حاول مرة أخرى بعد قليل." }
+            catch { saving = false; failure = isCategory ? "لم يُحفظ؛ ربما سمّيت تصنيفًا آخر بهذا الاسم." : "لم يُحفظ التعديل الآن. حاول مرة أخرى بعد قليل." }
         }
     }
 

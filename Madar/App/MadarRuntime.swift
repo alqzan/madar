@@ -115,7 +115,6 @@ struct MadarLaunchPlaceholder: View {
 #if DEBUG
             await opened.runLegacyMoneyTrialIfRequested()
             await opened.runLegacyQuranTrialIfRequested()
-            await opened.runLegacyPrayerTrialIfRequested()
             await opened.runLegacyHabitTrialIfRequested()
             await opened.runLegacyPersonalTrialIfRequested()
 #endif

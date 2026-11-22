@@ -76,7 +76,7 @@ extension AppMoneyService {
     func loadMessages(at instant: Date? = nil) throws -> MoneyMessagesReading {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
         guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
-        _ = app.prayerRevision
+        _ = app.moneyRevision
         let context = ModelContext(app.container), repo = MoneyRepository(context: context), now = instant ?? app.prayerNow()
         let zone = app.activePlace.timeZone, today = try DiaryLineRenderer.today(context: context, now: now)
         func live<T: MadarRecordModel>(_ row: T) -> Bool { (try? row.record().isLive) == true }

@@ -56,9 +56,9 @@ import XCTest
         let app = launch("periods"); openToday(app)
         XCTAssertFalse(app.descendants(matching: .any)["diary-review-field"].exists, "The review never opens by itself")
         openMenuItem(app, "diary-day-review")
-        XCTAssertTrue(app.descendants(matching: .any)["diary-review-facts"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["diary-review-fact-salah"].exists, "The prayer logged today is summarised from its room")
-        XCTAssertTrue(app.staticTexts["diary-review-question"].exists)
+        // Prayer records are gone (owner, 17 Nov 2026): this day has no room facts, so the review opens on its question.
+        XCTAssertTrue(app.staticTexts["diary-review-question"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["diary-review-fact-salah"].exists)
         let field = app.textFields["diary-review-field"]
         XCTAssertTrue(field.waitForExistence(timeout: 5)); field.tap(); field.typeText("alhamdulillah")
         app.buttons["diary-review-save"].tap()

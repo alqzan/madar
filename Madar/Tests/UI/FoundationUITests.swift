@@ -60,44 +60,6 @@ import XCTest
         app.terminate()
     }
 
-    func test_M1T04_RealAppNotificationSchedulingSnoozeAndCancellation() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
-        app.launchEnvironment["MADAR_NOTIFICATION_TEST_FLOW"] = "1"
-        app.launch()
-
-        let authorize = app.buttons["notification-test-authorize"]
-        if authorize.waitForExistence(timeout: 3) {
-            authorize.tap()
-            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-            let alert = springboard.alerts.firstMatch
-            XCTAssertTrue(alert.waitForExistence(timeout: 10), springboard.debugDescription)
-            let allow = alert.buttons.allElementsBoundByIndex.first { button in
-                let label = button.label
-                let normalized = label.replacingOccurrences(of: "’", with: "'")
-                let positive = normalized.localizedCaseInsensitiveContains("allow") || label.contains("السماح")
-                let negative = normalized.localizedCaseInsensitiveContains("don't") || label.localizedCaseInsensitiveContains("deny")
-                    || label.contains("لا تسمح") || label.contains("عدم")
-                return positive && !negative
-            }
-            XCTAssertNotNil(allow, "Notification prompt buttons: \(alert.buttons.allElementsBoundByIndex.map(\.label))")
-            try XCTUnwrap(allow).tap()
-        }
-
-        let run = app.buttons["notification-test-run"]
-        XCTAssertTrue(run.waitForExistence(timeout: 15), app.debugDescription)
-        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: run)
-        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 15), .completed, app.debugDescription)
-        run.tap()
-
-        let result = app.staticTexts["notification-test-result"]
-        let passed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "PASS"), object: result)
-        XCTAssertEqual(XCTWaiter.wait(for: [passed], timeout: 35), .completed, app.debugDescription)
-        XCTAssertTrue(result.label.contains("Fajr"), result.label)
-        XCTAssertTrue(result.label.contains("Maghrib"), result.label)
-    }
-
     func test_M1T04_QuietHoursSettings() throws {
         continueAfterFailure = false
         for size in ["L"] {
@@ -163,37 +125,6 @@ import XCTest
         }
     }
 
-    func test_M0T10_TodayPrayerTimesAtDefaultAndDark() throws {
-        continueAfterFailure = false
-        for (size, theme) in [("L", "light"), ("L", "dark")] {
-            let app = XCUIApplication()
-            app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
-            app.launchEnvironment["MADAR_UI_SIZE"] = size
-            app.launchEnvironment["MADAR_UI_THEME"] = theme
-            app.launchEnvironment["MADAR_UI_NOW"] = "2026-10-15T12:00:00+03:00"
-            app.launch(); finishOnboarding(app)
-            let content = app.scrollViews.firstMatch
-            XCTAssertTrue(content.waitForExistence(timeout: 10), app.debugDescription)
-            let names = [("fajr", "الفجر"), ("dhuhr", "الظهر"), ("asr", "العصر"), ("maghrib", "المغرب"), ("isha", "العشاء")]
-            for (index, pair) in names.enumerated() {
-                let row = app.descendants(matching: .any).matching(identifier: "foundation-prayer-time-\(pair.0)").firstMatch
-                // Offscreen SwiftUI rows may not exist in the accessibility tree yet.
-                for _ in 0..<12 {
-                    if row.exists && row.isHittable { break }
-                    content.swipeUp()
-                }
-                XCTAssertTrue(row.exists, app.debugDescription)
-                XCTAssertTrue(row.isHittable, app.debugDescription)
-                XCTAssertTrue(row.label.hasPrefix("\(pair.1)، "), row.label)
-                XCTAssertTrue(NSPredicate(format: "SELF MATCHES %@", "[^،]+، [٠-٩]{2}:[٠-٩]{2}").evaluate(with: row.label), row.label)
-                if index == 0 || index == names.count - 1 { attachScreenshot(app, named: "M0-today-times-\(pair.0)-\(theme)-\(size)") }
-                XCTAssertFalse(app.buttons["foundation-prayer-time-\(pair.0)"].exists, "Foundation clocks are read-only.")
-            }
-            XCTAssertFalse(app.buttons["prayer-log"].exists)
-            app.terminate()
-        }
-    }
-
     func test_M0T08_PlainExportNativeShareAtDefaultAndDark() throws {
         continueAfterFailure = false
         for (size, theme) in [("L", "light"), ("L", "dark")] {
@@ -248,10 +179,11 @@ import XCTest
             app.launch(); finishOnboarding(app)
             XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout: 10))
             app.buttons["tab-customize"].tap()
-            let changes = app.staticTexts["customization-changes"]
+            // The count line is the subtitle of the reset door (SettingsHome «أعِد الإعدادات المتفق عليها»).
+            let changes = app.buttons["settings-door-أعِد الإعدادات المتفق عليها"]
             XCTAssertTrue(changes.waitForExistence(timeout: 10))
             // The app lock is off by default now, so a fresh store has no saved change.
-            XCTAssertEqual(changes.label, "كما اتفقنا")
+            XCTAssertTrue(changes.label.contains("كما اتفقنا"), changes.label)
             attachScreenshot(app, named: "M0-RU3-fixture-baseline-\(size)")
             let edits = [
                 ("core.theme", "light", "تعديل واحد عن المتفق عليه"),
@@ -272,7 +204,7 @@ import XCTest
                 XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout: 10))
                 app.buttons["tab-customize"].tap()
                 XCTAssertTrue(changes.waitForExistence(timeout: 10))
-                XCTAssertEqual(changes.label, expected)
+                XCTAssertTrue(changes.label.contains(expected), changes.label)
                 attachScreenshot(app, named: "M0-RU3-\(key)-\(size)")
             }
             app.terminate()
@@ -510,7 +442,6 @@ import XCTest
         finishOnboarding(app)
         let settings = app.buttons["tab-customize"]
         XCTAssertTrue(settings.waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertTrue(app.buttons["الصلاة"].exists, "The M1 prayer screen is the first built room.")
         XCTAssertTrue(app.buttons["القرآن"].exists, "M2 Quran home is now built.")
         let mihbara = app.buttons["المحبرة"]
         XCTAssertTrue(mihbara.waitForExistence(timeout: 8), app.debugDescription)
@@ -518,54 +449,10 @@ import XCTest
         mihbara.tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
         settings.tap()
-        XCTAssertTrue(app.buttons["reset-settings"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["settings-door-أعِد الإعدادات المتفق عليها"].waitForExistence(timeout: 10), app.debugDescription)
         attachScreenshot(app, named: "M0-customize-RTL")
     }
 
-    func test_M1T01_PrayerLogsPersistThroughRelaunch() throws {
-        continueAfterFailure = false
-        let storeID = UUID().uuidString
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": storeID, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
-        app.launch(); finishOnboarding(app)
-
-        func openPrayer(_ target: XCUIApplication) {
-            let tab = target.buttons["الصلاة"]
-            XCTAssertTrue(tab.waitForExistence(timeout: 10), target.debugDescription)
-            tab.tap()
-            XCTAssertTrue(target.staticTexts["الصلاة"].waitForExistence(timeout: 10), target.debugDescription)
-        }
-        func fajrArch(_ target: XCUIApplication) -> XCUIElement {
-            target.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
-        }
-        func record(_ status: String, in target: XCUIApplication) {
-            let arch = fajrArch(target)
-            XCTAssertTrue(arch.waitForExistence(timeout: 10), target.debugDescription)
-            arch.tap()
-            let choice = target.buttons["prayer-status-\(status)"]
-            XCTAssertTrue(choice.waitForExistence(timeout: 10), target.debugDescription)
-            choice.tap()
-            let skipHeartQuestion = target.buttons["prayer-heart-skip"]
-            if skipHeartQuestion.waitForExistence(timeout: 3) {
-                skipHeartQuestion.tap()
-                XCTAssertTrue(skipHeartQuestion.waitForNonExistence(timeout: 10), target.debugDescription)
-            }
-        }
-
-        openPrayer(app)
-        let firstScreen = XCTAttachment(screenshot: app.screenshot())
-        firstScreen.name = "M1-T01-prayer-today-default-L"; firstScreen.lifetime = .keepAlways; add(firstScreen)
-        record("jamaah", in: app)
-        XCTAssertFalse(app.buttons["undo-button"].waitForExistence(timeout: 1), "Prayer logs no longer show the global undo toast.")
-        app.terminate(); app.launch(); finishOnboarding(app); openPrayer(app)
-        XCTAssertTrue(fajrArch(app).label.contains("جماعة"), fajrArch(app).label)
-
-        record("alone", in: app)
-        XCTAssertFalse(app.buttons["undo-button"].waitForExistence(timeout: 1), "Prayer logs no longer show the global undo toast.")
-        app.terminate(); app.launch(); finishOnboarding(app); openPrayer(app)
-        XCTAssertTrue(fajrArch(app).label.contains("وحدي"), fajrArch(app).label)
-        app.terminate()
-    }
     func testLightDarkAndAccessibilityScreenshots() throws {
         continueAfterFailure = false
         for theme in ["light", "dark"] {
@@ -579,7 +466,7 @@ import XCTest
                 XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout: 15))
                 let home = XCTAttachment(screenshot: app.screenshot()); home.name = "M0-home-\(theme)-\(size)"; home.lifetime = .keepAlways; add(home)
                 app.buttons["tab-customize"].tap()
-                XCTAssertTrue(app.buttons["reset-settings"].waitForExistence(timeout: 10))
+                XCTAssertTrue(app.buttons["settings-door-أعِد الإعدادات المتفق عليها"].waitForExistence(timeout: 10))
                 let settings = XCTAttachment(screenshot: app.screenshot()); settings.name = "M0-settings-\(theme)-\(size)"; settings.lifetime = .keepAlways; add(settings)
                 app.terminate()
             }
@@ -612,7 +499,7 @@ import XCTest
         newSearch.tap(); newSearch.typeText("core.theme\n")
         XCTAssertTrue(app.buttons["option-core.theme-dark"].isSelected)
         app.buttons["settings-clear-search"].tap()
-        let resetSettings = app.buttons["reset-settings"]
+        let resetSettings = app.buttons["settings-door-أعِد الإعدادات المتفق عليها"]
         scrollTo(resetSettings, in: app); resetSettings.tap()
         app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "أعِد الافتراضي", "reset-settings")).firstMatch.tap()
         XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 10))
@@ -662,11 +549,12 @@ import XCTest
 
         app.terminate(); app.launch(); finishOnboarding(app)
         XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
-        let cityOnHome = app.descendants(matching: .any).matching(NSPredicate(
-            format: "label CONTAINS %@", "مكة المكرمة"
-        )).firstMatch
-        XCTAssertTrue(cityOnHome.exists, app.debugDescription)
         settings.tap()
+        // The lobby no longer shows the city or prayer times: the saved city is read back from its setting.
+        filterSettings("core.homeCity")
+        let cityAfterRelaunch = app.descendants(matching: .any).matching(identifier: "setting-core.homeCity").firstMatch
+        XCTAssertTrue(cityAfterRelaunch.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(cityAfterRelaunch.label.contains("مكة المكرمة"), cityAfterRelaunch.label)
         filterSettings("core.numerals")
         let western = app.buttons["option-core.numerals-western"]
         XCTAssertTrue(western.waitForExistence(timeout: 10), app.debugDescription)
@@ -679,7 +567,7 @@ import XCTest
         filterSettings("core.numerals")
         XCTAssertTrue(app.buttons["option-core.numerals-western"].isSelected)
         app.buttons["settings-clear-search"].tap()
-        let resetSettings = app.buttons["reset-settings"]
+        let resetSettings = app.buttons["settings-door-أعِد الإعدادات المتفق عليها"]
         scrollTo(resetSettings, in: app); resetSettings.tap()
         let reset = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "أعِد الافتراضي", "reset-settings")).firstMatch
         XCTAssertTrue(reset.waitForExistence(timeout: 10), app.debugDescription)
@@ -702,32 +590,11 @@ import XCTest
         XCTAssertTrue(app.buttons["option-core.numerals-western"].isSelected)
 
         app.terminate(); app.launch(); finishOnboarding(app)
-        let restoredCity = app.descendants(matching: .any).matching(NSPredicate(
-            format: "label CONTAINS %@", "مكة المكرمة"
-        )).firstMatch
+        settings.tap()
+        filterSettings("core.homeCity")
+        let restoredCity = app.descendants(matching: .any).matching(identifier: "setting-core.homeCity").firstMatch
         XCTAssertTrue(restoredCity.waitForExistence(timeout: 10), app.debugDescription)
-        let home = XCTAttachment(screenshot: app.screenshot())
-        home.name = "M0-T17-foundation-makkah-western-L"; home.lifetime = .keepAlways; add(home)
-        let content = app.scrollViews.firstMatch
-        XCTAssertTrue(content.waitForExistence(timeout: 10), app.debugDescription)
-        let prayers = [("fajr", "الفجر"), ("dhuhr", "الظهر"), ("asr", "العصر"), ("maghrib", "المغرب"), ("isha", "العشاء")]
-        for (index, prayer) in prayers.enumerated() {
-            let row = app.descendants(matching: .any).matching(identifier: "foundation-prayer-time-\(prayer.0)").firstMatch
-            for _ in 0..<12 {
-                if row.exists && row.isHittable { break }
-                content.swipeUp()
-            }
-            XCTAssertTrue(row.exists, app.debugDescription)
-            XCTAssertTrue(row.isHittable, app.debugDescription)
-            XCTAssertTrue(row.label.hasPrefix("\(prayer.1)، "), row.label)
-            XCTAssertTrue(NSPredicate(format: "SELF MATCHES %@", "[^،]+، [0-9]{2}:[0-9]{2}").evaluate(with: row.label), row.label)
-            if index == 0 || index == prayers.count - 1 {
-                let screenshot = XCTAttachment(screenshot: app.screenshot())
-                screenshot.name = "M0-T17-today-\(prayer.0)-makkah-western-L"; screenshot.lifetime = .keepAlways; add(screenshot)
-            }
-            XCTAssertFalse(app.buttons["foundation-prayer-time-\(prayer.0)"].exists, "Foundation clocks remain read-only.")
-        }
-        XCTAssertFalse(app.buttons["prayer-log"].exists)
+        XCTAssertTrue(restoredCity.label.contains("مكة المكرمة"), restoredCity.label)
         app.terminate()
     }
     func testSharedComponentsAtEveryRequiredSizeAndMode() throws {
@@ -772,9 +639,12 @@ import XCTest
         return query.allElementsBoundByIndex.first { elementIsOnscreenAndHittable($0, in: app) }
     }
     private func elementIsOnscreenAndHittable(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
-        guard element.exists, element.isHittable else { return false }
+        // Ask for hittability only of a key with an on-screen frame: XCTest fails outright on a hidden keyboard copy whose
+        // activation point is invalid (the second layout the system keeps off screen).
+        guard element.exists else { return false }
         let frame = element.frame
-        return frame.width > 0 && frame.height > 0 && app.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
+        guard frame.width > 0 && frame.height > 0 && app.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) else { return false }
+        return element.isHittable
     }
     private func openBackupSettings(_ app: XCUIApplication) {
         finishOnboarding(app)
@@ -827,15 +697,6 @@ import XCTest
         XCTAssertTrue(export.exists, app.debugDescription)
         XCTAssertTrue(export.isHittable, app.debugDescription)
     }
-    /// Home «سلاسلك» → details sheet → «حالي».
-    private func openHali(_ app: XCUIApplication) {
-        let streaks = app.buttons["prayer-streaks"]
-        scrollTo(streaks, in: app); streaks.tap()
-        let hali = app.buttons["prayer-history"]
-        XCTAssertTrue(hali.waitForExistence(timeout: 10), app.debugDescription)
-        scrollTo(hali, in: app); hali.tap()
-    }
-
     private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<12 {
             if element.isHittable { break }

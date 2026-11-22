@@ -112,7 +112,7 @@ struct QuranSessionLogView: View {
             .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy)
             .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app).accessibilityIdentifier("quran-history-undo") } }
             .task(id: reloadAttempt) { await load() }
-            .onChange(of: app.prayerRevision) { _, _ in
+            .onChange(of: app.quranRevision) { _, _ in
                 guard error == nil else { return }
                 reloadAttempt &+= 1
             }

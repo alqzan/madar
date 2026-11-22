@@ -8,6 +8,8 @@ import XCTest
         app.launch()
         let begin = app.buttons["quran-begin"]
         XCTAssertTrue(begin.waitForExistence(timeout: 20)); begin.tap()
+        let toCoach = app.buttons["quran-readgrade-to-coach"]
+        XCTAssertTrue(toCoach.waitForExistence(timeout: 15), app.debugDescription); toCoach.tap()
         XCTAssertTrue(app.buttons["quran-session-method"].waitForExistence(timeout: 15))
         app.buttons["quran-session-method"].tap()
         app.buttons["quran-method-completeAyah"].tap()
@@ -64,6 +66,8 @@ import XCTest
         app.launch()
         let begin = app.buttons["quran-begin"]
         XCTAssertTrue(begin.waitForExistence(timeout: 20), app.debugDescription); begin.tap()
+        let toCoach = app.buttons["quran-readgrade-to-coach"]
+        XCTAssertTrue(toCoach.waitForExistence(timeout: 15), app.debugDescription); toCoach.tap()
         XCTAssertTrue(app.buttons["quran-session-method"].waitForExistence(timeout: 15), app.debugDescription)
         app.buttons["quran-session-method"].tap()
         app.buttons["quran-method-completeAyah"].tap()

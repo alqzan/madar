@@ -39,7 +39,7 @@ struct MoneyShortcutGuideView: View {
             Text("وصول رسالة يثبت تلك الرسالة فقط؛ لا يستطيع مدار معرفة أن أتمتتك ستبقى مفعّلة. الراتب والمصروف الكبير والمطابقة تنتظر قرارك داخل التطبيق. إذا تعطل الاختصار، استخدم «الصق رسائل» في رسائل البنك أو سجّل مصروفًا يدويًا.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             Link("دليل Apple لإنشاء التحكم التلقائي", destination: URL(string: "https://support.apple.com/ar-sa/guide/shortcuts/apdfbdbd7123/ios")!).font(MadarTypography.caption()).frame(minHeight: 44)
         }.padding(20).frame(maxWidth: 620).frame(maxWidth: .infinity) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).toolbarVisibility(.hidden, for: .navigationBar)
-            .onChange(of: app.prayerRevision) { if baseline != nil { check() } }
+            .onChange(of: app.moneyRevision) { if baseline != nil { check() } }
             .onChange(of: scene) { if scene == .active && baseline != nil { check() } }
     }
     private func step(_ n: Int, _ title: String, icon: String, chips: [String], detail: String) -> some View {

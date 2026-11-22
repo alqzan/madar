@@ -8,6 +8,8 @@ import XCTest
         app.launch()
         XCTAssertTrue(app.buttons["quran-begin"].waitForExistence(timeout: 20), app.debugDescription)
         app.buttons["quran-begin"].tap()
+        let toCoach = app.buttons["quran-readgrade-to-coach"]
+        XCTAssertTrue(toCoach.waitForExistence(timeout: 15), app.debugDescription); toCoach.tap()
         let advance = app.buttons["quran-session-advance"]
         XCTAssertTrue(advance.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertEqual(advance.label, "كرّرتها ٠ من ٥")
@@ -52,6 +54,34 @@ import XCTest
         app.buttons["quran-session-discard"].tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["quran-resume"].exists)
+        app.terminate()
+    }
+    /// Owner 22 Nov: «ابدأ» opens read-then-grade: the passage in front, one grade, then «أنهِ وسجّل».
+    func testHifzStartsWithReadThenGrade() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home"]
+        app.launch()
+        XCTAssertTrue(app.buttons["quran-begin"].waitForExistence(timeout: 20), app.debugDescription)
+        app.buttons["quran-begin"].tap()
+        let advance = app.buttons["quran-session-advance"]
+        XCTAssertTrue(advance.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "اقرأ ثم قيّم")).firstMatch.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["quran-readgrade-to-coach"].exists)
+        XCTAssertFalse(app.buttons["quran-session-hint"].exists, "no ayah-by-ayah controls in read-then-grade")
+        let passage = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "،")).firstMatch
+        XCTAssertTrue(passage.waitForExistence(timeout: 10), "the passage is visible")
+        for _ in 0..<6 where !advance.label.contains("سجّل") {
+            advance.tap()
+            let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: advance)
+            XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 10), .completed)
+        }
+        let grade = app.buttons["quran-coach-grade-mastered"]
+        XCTAssertTrue(grade.waitForExistence(timeout: 10), app.debugDescription); grade.tap()
+        let save = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@ AND enabled == true", "أنهِ وسجّل"), object: advance)
+        XCTAssertEqual(XCTWaiter.wait(for: [save], timeout: 10), .completed, app.debugDescription)
+        advance.tap()
+        XCTAssertTrue(app.staticTexts["quran-day-close-title"].waitForExistence(timeout: 15), app.debugDescription)
         app.terminate()
     }
     private func waitLabel(_ element: XCUIElement, contains text: String) {

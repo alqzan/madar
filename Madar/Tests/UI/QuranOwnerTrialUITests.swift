@@ -35,8 +35,6 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": store, "MADAR_TRIAL_QURAN": backup, "MADAR_TRIAL_RUN": stamp + "-first",
                                  "MADAR_UI_TRAVEL_FIX": "24.7136,46.6753,الرياض,SA,Asia/Riyadh", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         if let money = ProcessInfo.processInfo.environment["MADAR_TRIAL_MONEY"] { app.launchEnvironment["MADAR_TRIAL_MONEY"] = money }
-        let prayer = ProcessInfo.processInfo.environment["MADAR_TRIAL_PRAYER"]
-        if let prayer { app.launchEnvironment["MADAR_TRIAL_PRAYER"] = prayer }
         app.launch()
         let first = try report(backup, stamp + "-first")
         XCTAssertNil(first["failed"], first.description)
@@ -72,23 +70,8 @@ import XCTest
         if streak.waitForExistence(timeout: 3) { streak.tap(); Thread.sleep(forTimeInterval: 1.5); shot(app, "TRIAL-quran-plan-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-quran-plan-s1-L"); close(app) }
         let begin = app.buttons["quran-begin"]
         if begin.waitForExistence(timeout: 3) { begin.tap(); Thread.sleep(forTimeInterval: 2); shot(app, "TRIAL-quran-session-L") }
-        if let prayer {
-            let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: prayer).deletingLastPathComponent().appendingPathComponent("prayer-import-\(stamp)-first.json"))) as? [String: Int])
-            XCTAssertNil(report["failed"], report.description)
-            app.terminate(); app.launch()
-            let tab = app.buttons["tab-prayer"].firstMatch
-            XCTAssertTrue(tab.waitForExistence(timeout: 30)); tab.tap(); Thread.sleep(forTimeInterval: 2)
-            shot(app, "TRIAL-prayer-home-L")
-            for i in 1...5 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-prayer-home-s\(i)-L") }
-        }
         app.terminate()
         app.launchEnvironment["MADAR_TRIAL_RUN"] = stamp + "-second"; app.launchEnvironment["MADAR_TRIAL_MONEY"] = nil; app.launch()
-        if let prayer {
-            let url = URL(fileURLWithPath: prayer).deletingLastPathComponent().appendingPathComponent("prayer-import-\(stamp)-second.json")
-            let deadline = Date().addingTimeInterval(120); while !FileManager.default.fileExists(atPath: url.path) && Date() < deadline { Thread.sleep(forTimeInterval: 1) }
-            let again = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Int])
-            XCTAssertNil(again["logs.created"]); XCTAssertNil(again["qada.created"])
-        }
         let second = try report(backup, stamp + "-second")
         XCTAssertNil(second["failed"], second.description)
         for key in ["store.sessions", "store.grades", "store.spots", "store.importLinks", "store.plans", "derived.coveredAyahs", "derived.completedPages"] {

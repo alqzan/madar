@@ -119,10 +119,28 @@ extension AppQuranService {
             return .completed(summary: state.summary, reachedKhatm: reachedKhatm)
         case .saveProgress: break
         case .changeMethod(let method):
-            guard draft.kind == .hifz ? QuranLearningMethod(rawValue: method) != nil : method == "continuous" else { throw DataError.invalidValue("هذه الطريقة غير متاحة للجلسة") }
+            guard draft.kind == .hifz ? (QuranLearningMethod(rawValue: method) != nil || method == "readGrade") : method == "continuous" else { throw DataError.invalidValue("هذه الطريقة غير متاحة للجلسة") }
             if method == "link", draft.page == 1 { throw QuranPlanError.invalidPages }
             if method == "next", draft.ayahID == 1 { throw QuranPlanError.invalidSession }
+            let wasReadGrade = value.method == "readGrade"
             value.method = method
+            if method == "readGrade" {
+                // Owner 22 Nov: read the passage, then one grade. Same recorded shape as «أتممته كاملًا»: every planned ayah counts as
+                // recited and every page of the draft's portions carries the chosen grade (suggested «جيد» until the learner picks).
+                let pages = try readGradePages(draft, catalog: catalog)
+                draft.blindPassedAyahs.formUnion(planned)
+                for page in pages where !draft.grades.contains(where: { $0.page == page }) { draft.grades.append(QuranDraftGrade(page: page, rating: .good)) }
+                if let first = pages.first {
+                    draft.page = first; draft.ayahID = catalog.ayahs(on: first).first(where: { planned.contains($0.id) })?.id ?? draft.ayahID
+                }
+                draft.coachStage = .rating; value.revealedAyahs = []
+                if var coach = value.coach { coach.bridgePending = false; coach.repetitions = 0; value.coach = coach }
+            } else if wasReadGrade {
+                // Back to the ayah-by-ayah coach exactly as it starts today.
+                draft.grades = []; draft.blindPassedAyahs = []; draft.coachStage = .repetition; value.revealedAyahs = []
+                if let first = draft.portions.first, let page = catalog.ayah(id: first.first)?.page { draft.page = page; draft.ayahID = first.first }
+                value.coach = QuranCoachProgress(bridgeAyahs: [], intensity: try snapshot().plan?.plan.intensity ?? .balanced)
+            }
             if value.coach != nil, [.repetition, .lineStarts, .promptedRecall].contains(draft.coachStage) {
                 value.coach?.repetitions = 0; draft.coachStage = .repetition; value.revealedAyahs = []
             }
@@ -155,7 +173,14 @@ extension AppQuranService {
                   try draft.portions.contains(where: { try QuranPortionEngine.pages(for: $0, catalog: catalog).contains { $0.page == page } }) else { throw QuranPlanError.invalidPages }
             if try draft.kind == .free && !snapshot().coverage.completedPages.contains(page) { throw DataError.invalidValue("هذا الوجه للقراءة فقط؛ لم يُحفظ بعد") }
             let isTest = value.testPages?.contains(page) == true && draft.kind == .review
-            draft.grades.removeAll { $0.page == page }; draft.grades.append(QuranDraftGrade(page: page, rating: rating, isTest: isTest))
+            if value.method == "readGrade" {
+                // One grade for the whole passage.
+                for each in try readGradePages(draft, catalog: catalog) {
+                    draft.grades.removeAll { $0.page == each }; draft.grades.append(QuranDraftGrade(page: each, rating: rating))
+                }
+            } else {
+                draft.grades.removeAll { $0.page == page }; draft.grades.append(QuranDraftGrade(page: page, rating: rating, isTest: isTest))
+            }
         case .advance:
             if draft.kind == .qiyam {
                 let pages = qiyamPages(draft, catalog: catalog), total = value.rakats ?? 2
@@ -170,6 +195,14 @@ extension AppQuranService {
                     draft.coachStage = .blindRecitation
                     if pages.indices.contains(index + 1) { draft.page = pages[index + 1]; draft.ayahID = catalog.ayahs(on: draft.page).first!.id }
                 }
+            } else if draft.kind == .hifz && value.method == "readGrade" {
+                // Reading the passage page by page; the grade and «أنهِ وسجّل» wait on the last page.
+                let pages = try readGradePages(draft, catalog: catalog)
+                if let current = pages.firstIndex(of: draft.page), pages.indices.contains(current + 1) {
+                    draft.page = pages[current + 1]
+                    draft.ayahID = catalog.ayahs(on: draft.page).first(where: { planned.contains($0.id) })?.id ?? draft.ayahID
+                }
+                value.revealedAyahs = []
             } else if draft.kind == .hifz {
                 if var coach = value.coach, coach.bridgePending {
                     coach.bridgePending = false; value.coach = coach; value.draft = draft
@@ -243,6 +276,10 @@ extension AppQuranService {
         value.draft = draft; try await save(value)
         return .active(try await sessionState(value))
     }
+    private func readGradePages(_ draft: QuranSessionDraft, catalog: QuranResourceCatalog) throws -> [Int] {
+        var seen = Set<Int>()
+        return try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }.filter { seen.insert($0).inserted }
+    }
     /// «أتممته كاملًا»: the learner already knows the wird. Every planned ayah counts as recited blind and every page of the
     /// draft's own portions takes the grade the learner just chose. A failure discards the draft so «ابدأ» is never blocked.
     func finishWhole(stepID: String?, range: QuranUIRange?, grade: QuranUIGrade) async throws -> QuranUISessionResult {
@@ -287,7 +324,7 @@ extension AppQuranService {
         let hifzComplete = draft.kind == .hifz && ids.isSubset(of: draft.blindPassedAyahs)
         var orderedSeen = Set<Int>()
         let orderedPages = try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }.filter { orderedSeen.insert($0).inserted }
-        let finished = draft.coachStage == .rating && (draft.kind != .hifz || hifzComplete) && (![.review, .free].contains(draft.kind) || draft.page == orderedPages.last) || draft.kind == .drill && !draft.mistakes.isEmpty
+        let finished = draft.coachStage == .rating && (draft.kind != .hifz || hifzComplete) && (![.review, .free].contains(draft.kind) || draft.page == orderedPages.last) && (value.method != "readGrade" || draft.page == orderedPages.last) || draft.kind == .drill && !draft.mistakes.isEmpty
         let readOnlyFinished = finished && draft.kind == .free && draft.grades.isEmpty
         var state = QuranUISessionState(id: draft.id, title: draft.kind == .hifz ? "الورد" : "المراجعة", segmentTitle: "الوجه " + numerals.string(draft.page), stage: stage,
             progress: ids.isEmpty ? 0 : Double(draft.blindPassedAyahs.count) / Double(ids.count), prompt: "أكمل ثم سجّل ما تمّ", verses: verses,
@@ -305,7 +342,7 @@ extension AppQuranService {
             let isBridge = coach.bridgePending
             if isBridge, let id = coach.bridgeAyahs.last, let bridge = catalog.ayah(id: id) { state.page = try await page(bridge.page) }
             state.title = isBridge ? "ورد أمس" : "ورد اليوم"
-            state.segmentTitle = MadarInlineText.joined([portionTitle(try QuranAyahRange(first: ids.min()!, last: ids.max()!), catalog: catalog), QuranLearningMethod(rawValue: value.method)?.title ?? "المدرّب الموجّه"])
+            state.segmentTitle = MadarInlineText.joined([portionTitle(try QuranAyahRange(first: ids.min()!, last: ids.max()!), catalog: catalog), value.method == "readGrade" ? "اقرأ ثم قيّم" : QuranLearningMethod(rawValue: value.method)?.title ?? "المدرّب الموجّه"])
             let stageTitle: String = switch draft.coachStage { case .repetition: "التكرار"; case .lineStarts: "أوائل الأسطر"; case .promptedRecall: "استرجاع بالتلقين"; case .blindRecitation: "تسميع مستور"; case .rating: "تقييمك" }
             var caption: String = switch draft.coachStage {
             case .repetition: "كرّر الآية " + ayahNumber + " وهي أمامك"

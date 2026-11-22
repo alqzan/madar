@@ -238,6 +238,10 @@ extension AppSession {
             if ProcessInfo.processInfo.environment["MADAR_UI_UNKNOWN_BALANCE"] == "1" { account.balanceAt = nil; account.balanceMinor = 0 }
             let wallet = Account(); wallet.name = "المحفظة الرقمية"; wallet.kind = "wallet"; wallet.balanceAt = cycle.start; c.insert(wallet)
             let other = Account(); other.name = "حساب آخر"; other.bank = "بنك الاختبار"; other.last4 = "9999"; other.ownership = "notMine"; other.balanceMinor = 1_420_000; other.balanceAt = cycle.start; c.insert(other); try c.save()
+            if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FOREIGN_ACCOUNT"] == "1" {
+                let dollars = Account(); dollars.name = "حساب الدولار"; dollars.bank = "بنك الاختبار"; dollars.last4 = "4411"; dollars.currency = "USD"
+                dollars.balanceMinor = 100_000; dollars.balanceAt = cycle.start; c.insert(dollars); try c.save()
+            }
             if ProcessInfo.processInfo.environment["MADAR_UI_WRAPPED_ACCOUNTS"] == "1" {
                 for index in 1...7 {
                     let extra = Account()

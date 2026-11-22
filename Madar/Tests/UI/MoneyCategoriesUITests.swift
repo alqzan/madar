@@ -230,11 +230,7 @@ import XCTest
 
         let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10))
-        search.tap(); search.typeText("salah.askReminder\n")
-        let prayerAsk = app.switches["setting-salah.askReminder"]
-        XCTAssertTrue(prayerAsk.waitForExistence(timeout: 10), app.debugDescription)
-        if (prayerAsk.value as? String) != "0" { prayerAsk.tap() }
-
+        // Prayer asks are gone (owner, 17 Nov 2026), so nothing else competes with the limit alert.
         search.tap(); search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 32)); search.typeText("المال")
         let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
         let categories = app.buttons["money-categories-open"]; XCTAssertTrue(categories.waitForExistence(timeout: 10))
@@ -261,5 +257,52 @@ import XCTest
         XCTAssertNil(body.label.replacingOccurrences(of: "٨٠٪", with: "").rangeOfCharacter(from: .decimalDigits), body.label)
         XCTAssertTrue(body.label.contains("مطاعم"), body.label)
         shot(springboard, "M5-V10-a80-real-privacy-safe-L")
+    }
+
+    // Owner, 22 Nov 2026: add, rename and remove a category.
+    private func openCategories() -> XCUIApplication {
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        app.launch()
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let open = app.buttons["money-categories-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !open.isHittable { app.swipeUp(velocity: .slow) }
+        for _ in 0..<4 where open.frame.maxY > app.frame.maxY - 140 { app.swipeUp(velocity: .slow) }
+        open.tap()
+        XCTAssertTrue(app.buttons["money-shelf-مطاعم"].waitForExistence(timeout: 10), app.debugDescription)
+        return app
+    }
+    private func removeButton(_ app: XCUIApplication) -> XCUIElement { app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'money-category-remove-' AND NOT identifier ENDSWITH 'failure'")).firstMatch }
+    func testNewCategoryCanBeAddedAndThenRemoved() throws {
+        continueAfterFailure = false
+        let app = openCategories()
+        app.buttons["money-category-add"].tap()
+        let name = app.textFields["money-edit-name"]; XCTAssertTrue(name.waitForExistence(timeout: 8), app.debugDescription)
+        name.tap(); name.typeText("هدايا")
+        app.buttons["money-edit-save"].tap()
+        let shelf = app.buttons["money-shelf-هدايا"]; XCTAssertTrue(shelf.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<6 where !shelf.isHittable { app.swipeUp(velocity: .slow) }
+        shelf.tap()
+        let remove = removeButton(app)
+        for _ in 0..<8 where !remove.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(remove.waitForExistence(timeout: 5), app.debugDescription); remove.tap()
+        let confirm = app.buttons.matching(NSPredicate(format: "label == %@", "احذف التصنيف")).allElementsBoundByIndex.last
+        XCTAssertTrue(try XCTUnwrap(confirm).waitForExistence(timeout: 5), app.debugDescription); confirm?.tap()
+        XCTAssertTrue(app.buttons["money-shelf-هدايا"].waitForNonExistence(timeout: 10), app.debugDescription)
+    }
+    func testCategoryWithRecordedMovementsExplainsWhyItStays() throws {
+        continueAfterFailure = false
+        let app = openCategories()
+        let remove = removeButton(app)
+        for _ in 0..<8 where !remove.exists || !remove.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(remove.waitForExistence(timeout: 5), app.debugDescription); remove.tap()
+        let confirm = app.buttons.matching(NSPredicate(format: "label == %@", "احذف التصنيف")).allElementsBoundByIndex.last
+        XCTAssertTrue(try XCTUnwrap(confirm).waitForExistence(timeout: 5), app.debugDescription); confirm?.tap()
+        let why = app.staticTexts["money-category-remove-failure"]
+        for _ in 0..<6 where !why.exists { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(why.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(why.label.contains("عليها حركات مسجّلة"), why.label)
     }
 }

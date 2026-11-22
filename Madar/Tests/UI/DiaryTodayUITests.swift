@@ -32,8 +32,10 @@ import XCTest
         XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25))
         XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
         app.buttons["diary-days"].tap()
+        // The hub opens on the days timeline (owner, 14 Nov); the month grid lives under «السنوات».
+        let index = app.buttons["diary-hub-index"]; XCTAssertTrue(index.waitForExistence(timeout: 10), app.debugDescription); index.tap()
         let month = app.buttons["diary-month-10"]
-        XCTAssertTrue(month.waitForExistence(timeout: 10))
+        XCTAssertTrue(month.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(month.label.contains("أكتوبر"))
         XCTAssertTrue(month.label.contains("ربيع"), "Month accessibility includes the other calendar")
         capture(app, "M3-restored-hub-L")
@@ -42,7 +44,7 @@ import XCTest
         continueAfterFailure = false
         let app = launch("today")
         XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 25)); app.buttons["diary-today"].tap()
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "قهوة الضحى")).firstMatch.waitForExistence(timeout: 10)); capture(app, "M3-V05-today-L")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "قهوة على الشرفة")).firstMatch.waitForExistence(timeout: 10), app.debugDescription); capture(app, "M3-V05-today-L")
         app.swipeUp(); capture(app, "M3-V05-today-scrolled-L")
         app.buttons["diary-day-year"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "عشاء عند أهلي")).firstMatch.waitForExistence(timeout: 10))

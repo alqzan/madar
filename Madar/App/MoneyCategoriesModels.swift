@@ -71,7 +71,7 @@ struct MoneyCategoriesReading: Equatable {
 extension AppMoneyService {
     func loadCategories() throws -> MoneyCategoriesReading {
         guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
-        _ = app.prayerRevision
+        _ = app.moneyRevision
         let context = ModelContext(app.container), repo = MoneyRepository(context: context), now = app.prayerNow()
         func live<T: MadarRecordModel>(_ row: T) -> Bool { (try? row.record().isLive) == true }
         let cycle = try repo.cycle(at: now)

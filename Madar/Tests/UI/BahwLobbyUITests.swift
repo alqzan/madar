@@ -6,7 +6,6 @@ import XCTest
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00",
-                                 "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_PRAYER_FIXTURE": "homeShowcaseFriday",
                                  "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_DIARY_FIXTURE": "home", "MADAR_UI_HABIT_FIXTURE": "showcase",
                                  "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app)

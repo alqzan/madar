@@ -154,7 +154,7 @@ struct TabShell<Content: View>: View {
 
     private var hasProtectedDraft: Bool {
         !session.diaryRootDraftBlockers.isEmpty || !session.moneyRootDraftBlockers.isEmpty
-            || !session.mihbaraRootDraftBlockers.isEmpty || !session.prayerRootDraftBlockers.isEmpty
+            || !session.mihbaraRootDraftBlockers.isEmpty
     }
 
     private var barShown: Bool { session.accessoryHiders.isEmpty }

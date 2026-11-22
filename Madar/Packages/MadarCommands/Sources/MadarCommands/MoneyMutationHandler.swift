@@ -517,6 +517,57 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 try touch(allocation, now, writer, deleting: true)
             }
             for message in try messages(for: row, context) { message.status = "ignored"; try touch(message, now, writer) }
+        case "money.setCurrencyRate":
+            // Owner, 22 Nov 2026: one manual rate per currency outside travel, kept as history with its date. Movements already
+            // recorded keep their own frozen rate; only readings at or after this instant use it.
+            let code = text(p, "currency").uppercased(), raw = text(p, "rate").trimmingCharacters(in: .whitespaces)
+            try currency(code)
+            let home = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
+            guard code != home else { throw MoneyCommandError.invalidCurrency }
+            guard (try? FX.parseRate(raw)) != nil, (try? FX.homeAmount(amountMinor: 100_000_000_000, currency: code, rate: raw, home: home)) != nil else { throw MoneyCommandError.invalidAmount }
+            let row = CurrencyRate(); row.id = id; row.currency = code; row.rateToHome = raw; row.homeCurrency = home; row.setAt = now; row.createdAt = now
+            context.insert(row); try touch(row, now, writer)
+        case "money.logIncome":
+            // Owner, 22 Nov 2026: income without a salary message. It lands in one tracked account of the user's own and is
+            // neutral for the daily budget, like a confirmed bank deposit.
+            guard let toID = uuid(p, "toAccountID"), let account = try context.fetch(FetchDescriptor<Account>()).first(where: { $0.id == toID && live($0) }),
+                  account.ownership == "mine", account.tracked else { throw MoneyCommandError.invalidReference }
+            let row = MoneyTransaction(); row.id = id; row.kind = "income"; row.source = "manual"; row.method = account.kind == "cash" ? "cash" : "transfer"
+            row.amountMinor = MoneyCommandPayload.integer(p["amountMinor"]) ?? 0; row.currency = account.currency; row.toAccountID = toID
+            row.homeCurrency = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
+            row.merchant = optionalText(p, "merchant").flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            row.rateAtTime = optionalText(p, "rateAtTime"); row.rateSource = row.rateAtTime == nil ? nil : "manual"
+            row.showInDiary = false
+            try stampDay(row, at: MoneyCommandPayload.date(p["eventAt"]) ?? issuedAt, context: context, now: now)
+            row.reviewState = "needsLook"; row.createdAt = now; context.insert(row)
+            try confirm(row, payload: [:], commandID: id, context: context, now: now, writer: writer)
+        case "money.editTransaction":
+            try editTransaction(p, context: context, now: now, writer: writer)
+        case "money.saveCategory":
+            let name = text(p, "name").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, name.count <= 30 else { throw MoneyCommandError.invalidReference }
+            let categories = try context.fetch(FetchDescriptor<MadarData.Category>()).filter { live($0) }
+            func same(_ a: String, _ b: String) -> Bool { a.compare(b, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) == .orderedSame }
+            if let editID = uuid(p, "id") {
+                guard let row = categories.first(where: { $0.id == editID }) else { throw MoneyCommandError.missingRow }
+                guard !categories.contains(where: { $0.id != editID && same($0.name.trimmingCharacters(in: .whitespacesAndNewlines), name) }) else { throw MoneyCommandError.invalidReference }
+                if row.name != name { row.name = name; try touch(row, now, writer) }
+            } else {
+                guard !categories.contains(where: { same($0.name.trimmingCharacters(in: .whitespacesAndNewlines), name) }) else { throw MoneyCommandError.invalidReference }
+                let row = MadarData.Category(); row.id = id; row.name = name; row.order = (categories.map(\.order).max() ?? -1) + 1; row.createdAt = now
+                context.insert(row); try touch(row, now, writer)
+            }
+        case "money.removeCategory":
+            // softRestrict: a category a recorded movement carries stays (it can be renamed); drafts only lose the suggestion.
+            // Its limit and merchant rules go with it, in the same undo.
+            guard let categoryID = uuid(p, "id"),
+                  let row = try context.fetch(FetchDescriptor<MadarData.Category>()).first(where: { $0.id == categoryID && live($0) }) else { throw MoneyCommandError.missingRow }
+            let carrying = try transactions(context).filter { $0.categoryID == categoryID }
+            guard !carrying.contains(where: { $0.reviewState == "ok" }) else { throw MoneyCommandError.invalidReference }
+            for draft in carrying { draft.categoryID = nil; draft.categorySource = nil; try touch(draft, now, writer) }
+            for limit in try context.fetch(FetchDescriptor<CategoryLimit>()) where limit.categoryID == categoryID && live(limit) { try touch(limit, now, writer, deleting: true) }
+            for rule in try context.fetch(FetchDescriptor<MerchantRule>()) where rule.categoryID == categoryID && live(rule) { try touch(rule, now, writer, deleting: true) }
+            try touch(row, now, writer, deleting: true)
         default: throw MoneyCommandError.invalidReference
         }
         try rebuildEnvelopes(context, now, writer)
@@ -712,6 +763,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 row.homeAmountMinor = stated; row.rateAtTime = try FX.impliedRate(amountMinor: row.amountMinor, currency: row.currency, homeMinor: stated, home: row.homeCurrency); row.rateSource = "message"
             } else if row.currency != row.homeCurrency, let trip = try MoneyRepository(context: context).trip(at: row.eventAt), trip.currency == row.currency, let rate = trip.fxRateToHome {
                 row.rateAtTime = rate; row.rateSource = "trip"
+                row.homeAmountMinor = try FX.homeAmount(amountMinor: row.amountMinor, currency: row.currency, rate: rate, home: row.homeCurrency)
+            } else if row.currency != row.homeCurrency, let rate = try MoneyRepository(context: context).enteredRate(for: row.currency, at: row.eventAt, home: row.homeCurrency)
+                        ?? MoneyRepository(context: context).enteredRate(for: row.currency, at: now, home: row.homeCurrency) {
+                row.rateAtTime = rate; row.rateSource = "manual"
                 row.homeAmountMinor = try FX.homeAmount(amountMinor: row.amountMinor, currency: row.currency, rate: rate, home: row.homeCurrency)
             }
             // Historical category rules stay stored but never force the next purchase into that category.
@@ -1033,7 +1088,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let messages = try context.fetch(FetchDescriptor<BankMessage>())
         let existing = rows.compactMap { old -> BankDedupe.Movement? in
             // M5-V17: an expense recorded by hand has no message; it still counts, so its bank message waits for a decision.
-            let fingerprint = messages.first(where: { $0.id == old.messageID })?.fingerprint ?? (old.messageID == nil && old.source == "manual" && ["expense", "transfer", "withdrawal"].contains(old.kind) ? "manual:" + old.id.uuidString : nil)
+            let fingerprint = messages.first(where: { $0.id == old.messageID })?.fingerprint ?? (old.messageID == nil && old.source == "manual" && ["expense", "transfer", "withdrawal", "income"].contains(old.kind) ? "manual:" + old.id.uuidString : nil)
             guard let fingerprint else { return nil }
             return .init(accountKey: key.uuidString, amountMinor: old.amountMinor, merchant: old.merchant, at: old.eventAt, fingerprint: fingerprint)
         }
@@ -1166,6 +1221,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             if row.currency != row.homeCurrency && row.rateAtTime == nil {
                 if let trip = try MoneyRepository(context: context).trip(at: row.eventAt), trip.currency == row.currency, let rate = trip.fxRateToHome {
                     row.rateAtTime = rate; row.rateSource = "trip"
+                } else if let rate = try MoneyRepository(context: context).enteredRate(for: row.currency, at: row.eventAt, home: row.homeCurrency)
+                            ?? MoneyRepository(context: context).enteredRate(for: row.currency, at: now, home: row.homeCurrency) {
+                    // Owner 22 Nov 2026: the rate the user entered, frozen into this movement; one dated before the first rate takes the latest known now.
+                    row.rateAtTime = rate; row.rateSource = "manual"
                 } else { throw MoneyCommandError.missingRate }
             }
             if row.rateSource != "message" { row.homeAmountMinor = try FX.homeAmount(amountMinor: row.amountMinor, currency: row.currency, rate: row.rateAtTime ?? "1", home: row.homeCurrency) }
@@ -1229,6 +1288,81 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
         row.reviewState = "ok"; try touch(row, now, writer)
         for message in try messages(for: row, context) { message.status = "ok"; try touch(message, now, writer) }
+    }
+
+    /// Owner, 22 Nov 2026: correct a confirmed movement. The label and category may change on any movement. The amount and
+    /// time change only on a plain purchase, fee, withdrawal, transfer or income that no refund, instalment or obligation leans
+    /// on, filed in a cycle that is still open, and the new time must stay in that cycle and trip. The budget charge is spread
+    /// again over the same targets in the same proportions (same idempotency keys), and a foreign amount keeps its frozen rate.
+    private static func editTransaction(_ p: [String: MadarCore.JSONValue], context: ModelContext, now: Date, writer: String) throws {
+        let row = try transaction(uuid(p, "id"), context)
+        guard row.reviewState == "ok" else { throw MoneyCommandError.invalidReference }
+        var changed = false
+        if p["merchant"] != nil {
+            let label = optionalText(p, "merchant")?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let value = label?.isEmpty == false ? label : nil
+            if row.merchant != value { row.merchant = value; changed = true }
+        }
+        if p["categoryID"] != nil {
+            let category = uuid(p, "categoryID")
+            if let category, !(try context.fetch(FetchDescriptor<MadarData.Category>())).contains(where: { $0.id == category && live($0) }) { throw MoneyCommandError.invalidReference }
+            if row.categoryID != category {
+                // A refund follows its purchase's category; the purchase's refunds move with it.
+                guard !(row.kind == "refund" && row.relatedTransactionID != nil) else { throw MoneyCommandError.invalidReference }
+                row.categoryID = category; row.categorySource = category == nil ? nil : "manual"; changed = true
+                for refund in try transactions(context) where refund.kind == "refund" && refund.relatedTransactionID == row.id && refund.categoryID != category {
+                    refund.categoryID = category; refund.categorySource = row.categorySource; try touch(refund, now, writer)
+                }
+            }
+        }
+        let newAmount = MoneyCommandPayload.integer(p["amountMinor"]), newTime = MoneyCommandPayload.date(p["eventAt"])
+        let amountChanges = newAmount.map { $0 != row.amountMinor } ?? false
+        let timeChanges = newTime.map { abs($0.timeIntervalSince(row.eventAt)) >= 1 } ?? false
+        if amountChanges || timeChanges {
+            guard ["expense", "fee", "withdrawal", "transfer", "income"].contains(row.kind), row.obligationID == nil, row.installmentID == nil,
+                  row.relatedTransactionID == nil, !(try transactions(context)).contains(where: { $0.relatedTransactionID == row.id }) else { throw MoneyCommandError.invalidReference }
+            // A movement left out of the budget, or spread by a big-expense plan, keeps its amount and time: lifting the stamp
+            // and the plan's repayment total both lean on the recorded figure.
+            guard !row.ignoredFromBudget, try !context.fetch(FetchDescriptor<EnvelopePlan>()).contains(where: { $0.id == row.id && live($0) }) else { throw MoneyCommandError.invalidReference }
+            // A balance already squared against the bank stays squared: nothing on or before an account's latest reconciliation moves.
+            let sides = Set([row.fromAccountID, row.toAccountID, row.cardID].compactMap { $0 })
+            let squared = try context.fetch(FetchDescriptor<Reconciliation>()).filter { live($0) && ([$0.accountID, $0.cardID].compactMap { $0 }).contains(where: sides.contains) }.map(\.at).max()
+            if let squared { guard row.eventAt > squared, (newTime ?? row.eventAt) > squared else { throw MoneyCommandError.invalidReference } }
+            // Moving a movement across an account's opening balance date would silently add it to, or drop it from, that balance.
+            if let newTime, timeChanges {
+                for account in try context.fetch(FetchDescriptor<Account>()) where sides.contains(account.id) && live(account) {
+                    if let opening = account.balanceAt { guard (row.eventAt < opening) == (newTime < opening) else { throw MoneyCommandError.invalidReference } }
+                }
+            }
+            let cycles = try context.fetch(FetchDescriptor<Cycle>()).filter { live($0) }
+            if let cycleID = row.cycleID { guard let cycle = cycles.first(where: { $0.id == cycleID }), cycle.closedAt == nil else { throw MoneyCommandError.invalidReference } }
+            if let newTime, timeChanges {
+                let trip = row.tripID, cycle = row.cycleID
+                try stampDay(row, at: newTime, context: context, now: now)
+                let filed = cycles.filter { $0.start <= row.eventAt && ($0.end == nil || row.eventAt < $0.end!) }.max { $0.start < $1.start }?.id
+                guard row.tripID == trip, filed == cycle else { throw MoneyCommandError.invalidReference }
+            }
+            if let newAmount, amountChanges {
+                row.amountMinor = newAmount
+                if row.currency == row.homeCurrency { row.homeAmountMinor = newAmount }
+                else {
+                    guard let rate = row.rateAtTime else { throw MoneyCommandError.missingRate }
+                    row.homeAmountMinor = try FX.homeAmount(amountMinor: newAmount, currency: row.currency, rate: rate, home: row.homeCurrency)
+                }
+                guard row.homeAmountMinor > 0 && row.homeAmountMinor <= 9_007_199_254_740_991 else { throw MoneyCommandError.invalidAmount }
+                let rowID: UUID? = row.id
+                let spends = try context.fetch(FetchDescriptor<Allocation>(predicate: #Predicate { $0.transactionID == rowID }))
+                    .filter { live($0) && $0.kind == "spend" }.sorted { $0.idempotencyKey < $1.idempotencyKey }
+                if !spends.isEmpty {
+                    let charge = try MoneyRepository(context: context).effect(of: row).budgetChargeMinor
+                    guard charge > 0, spends.contains(where: { $0.amountMinor < 0 }) else { throw MoneyCommandError.invalidSplit }
+                    let parts = AllocationEngine.distribute(charge, weights: spends.map { max(0, -$0.amountMinor) })
+                    for (allocation, part) in zip(spends, parts) where allocation.amountMinor != -part { allocation.amountMinor = -part; try touch(allocation, now, writer) }
+                }
+            }
+            changed = true
+        }
+        if changed { try touch(row, now, writer) }
     }
 
     /// F06: remove only budget allocations; keep the movement and its cash/debt effect.
@@ -1419,6 +1553,19 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                current.contains(where: { $0.model == "MoneyTransaction" && $0.isLive && !changedIDs.contains($0.id) && $0.fields["relatedTransactionID"]?.string == after.id.uuidString }) {
                 throw MoneyCommandError.undoSuperseded
             }
+            if after.model == "MoneyTransaction", let before = inverse.before.first(where: { recordKey($0) == recordKey(after) }), before.isLive {
+                // Owner 22 Nov 2026 (edit a confirmed movement): undoing an amount or time change must not rewrite a purchase a later
+                // refund now leans on, or one filed in a cycle that closed since.
+                if after.isLive, ["amountMinor", "homeAmountMinor", "eventAt"].contains(where: { before.fields[$0] != after.fields[$0] }) {
+                    if current.contains(where: { $0.model == "MoneyTransaction" && $0.isLive && !changedIDs.contains($0.id) && $0.fields["relatedTransactionID"]?.string.flatMap(UUID.init(uuidString:)) == after.id }) { throw MoneyCommandError.undoSuperseded }
+                    if let cycle = after.fields["cycleID"]?.string.flatMap(UUID.init(uuidString:)),
+                       current.contains(where: { $0.model == "Cycle" && $0.id == cycle && ($0.fields["closedAt"].map { $0 != .null } ?? false) }) { throw MoneyCommandError.undoSuperseded }
+                }
+                // A movement brought back never points at a category removed since.
+                if let category = before.fields["categoryID"]?.string.flatMap(UUID.init(uuidString:)),
+                   !current.contains(where: { $0.model == "Category" && $0.id == category && $0.isLive }),
+                   !inverse.before.contains(where: { $0.model == "Category" && $0.id == category && $0.isLive }) { throw MoneyCommandError.undoSuperseded }
+            }
             // Never remove the account/card/original while a later live movement depends on it.
             if !inverse.before.contains(where: { recordKey($0) == recordKey(after) }), ["Account", "Card", "MoneyTransaction", "Cycle", "Obligation"].contains(after.model) {
                 let dependencies = current.filter { $0.isLive && !changedIDs.contains($0.id) }
@@ -1550,6 +1697,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             case is AccountTail: 20
             case is BankReading: 21
             case is UpcomingDue: 22
+            case is CurrencyRate: 23
             default: nil
             }
         }
@@ -1595,6 +1743,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         rows += try context.fetch(FetchDescriptor<AccountTail>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<BankReading>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<UpcomingDue>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<CurrencyRate>()).map { try $0.record() }
         return rows
     }
     private static func rebuildEnvelopes(_ context: ModelContext, _ now: Date, _ writer: String) throws {

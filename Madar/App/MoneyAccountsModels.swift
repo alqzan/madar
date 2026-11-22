@@ -92,3 +92,52 @@ extension AppMoneyService {
     }
     static func accountKind(_ raw: String) -> String { switch raw { case "savings": "ادخار"; case "cash": "نقد"; case "wallet": "محفظة"; default: "جاري" } }
 }
+
+
+/// Owner, 22 Nov 2026: one foreign currency and the latest rate the user entered for it (nil until they do).
+struct MoneyRateRow: Identifiable, Sendable {
+    var code: String
+    var name: String
+    var rate: String?
+    var setAt: Date?
+    /// Names of my tracked accounts in this currency; empty for a currency that only has an old rate.
+    var accounts: [String]
+    var id: String { code }
+}
+extension AppMoneyService {
+    /// Each non-home currency my tracked accounts use, plus any currency already given a rate, with its latest entered rate.
+    func loadRates() throws -> [MoneyRateRow] {
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        let context = ModelContext(app.container), repo = MoneyRepository(context: context), home = app.string("core.currency")
+        var latest: [String: CurrencyRate] = [:]
+        for row in try repo.enteredRates() { latest[row.currency] = row }
+        let accounts = try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.ownership == "mine" && $0.tracked && $0.currency != home }
+        let byCurrency = Dictionary(grouping: accounts, by: \.currency)
+        let codes = Set(byCurrency.keys).union(latest.keys.filter { $0 != home })
+        return codes.map { code in
+            MoneyRateRow(code: code, name: currencyName(code), rate: latest[code]?.rateToHome, setAt: latest[code]?.setAt, accounts: (byCurrency[code] ?? []).map(\.name).sorted())
+        }.sorted { ($0.accounts.isEmpty ? 1 : 0, $0.code) < ($1.accounts.isEmpty ? 1 : 0, $1.code) }
+    }
+    /// «٣٫٧٥» or "3.75" or «3,75» becomes the canonical ASCII decimal the engine stores; anything else is nil.
+    static func canonicalRate(_ raw: String) -> String? {
+        var out = ""
+        for c in raw.trimmingCharacters(in: .whitespacesAndNewlines) {
+            if let n = c.wholeNumberValue, n < 10 { out += String(n) }
+            else if "٫.,".contains(c) { out += "." }
+            else { return nil }
+        }
+        guard (try? FX.parseRate(out)) != nil else { return nil }
+        return out
+    }
+    /// «١٠٠ دولار أمريكي = ٣٧٥ ريال»: what a typed rate means, in an amount the user can picture.
+    func rateExample(code: String, rate: String) -> String? {
+        guard let value = try? FX.parseRate(rate) else { return nil }
+        var minor = value * 10_000, source = minor, rounded = Decimal()
+        NSDecimalRound(&rounded, &source, 0, .plain); minor = rounded
+        guard minor < Decimal(Int64.max / 2) else { return nil }
+        let cents = NSDecimalNumber(decimal: minor).int64Value, whole = cents % 100 == 0
+        let home = app.string("core.currency")
+        let homeName = home == "SAR" ? "ريال" : currencyName(home)
+        return digits.string(100) + " " + currencyName(code) + " = " + digits.amount(minorUnits: whole ? cents / 100 : cents, fractionDigits: whole ? 0 : 2, signed: false) + " " + homeName
+    }
+}

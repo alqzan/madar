@@ -14,7 +14,7 @@ settings:
     DEVELOPMENT_TEAM: V8YZL4R65K
     CODE_SIGN_STYLE: Automatic
     MARKETING_VERSION: '0.1.0'
-    CURRENT_PROJECT_VERSION: '59'
+    CURRENT_PROJECT_VERSION: '60'
     GENERATE_INFOPLIST_FILE: true
 packages:
   MadarCore:
@@ -47,7 +47,6 @@ targets:
     sources:
       - path: App
       - Intents
-      - Widgets/NextPrayerWidget.swift
     dependencies:
       - package: MadarCore
       - package: MadarData
@@ -105,7 +104,7 @@ targets:
             UTTypeConformsTo: [com.apple.package]
             UTTypeTagSpecification:
               public.filename-extension: [madarbackupset]
-        UIBackgroundModes: [processing, audio]
+        UIBackgroundModes: [processing, audio, remote-notification]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         "UISupportedInterfaceOrientations~ipad": [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         MadarCloudKitContainer: $(MADAR_CLOUDKIT_CONTAINER)
@@ -202,11 +201,8 @@ targets:
     sources:
       - Widgets
       - App/PrayerActivityAttributes.swift
-      - Intents/LogPrayerIntent.swift
       - Intents/OpenQuickRoomIntent.swift
-      - Intents/PrayerControlIntent.swift
       - Intents/StartQuranSessionIntent.swift
-      - Intents/StartPrayerActivityIntent.swift
       - App/QuranWidgetContent.swift
       - App/RoomWidgetContent.swift
       - App/WidgetMakerContent.swift

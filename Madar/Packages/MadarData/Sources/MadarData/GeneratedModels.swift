@@ -3979,3 +3979,52 @@ extension MushafBookmark: MadarRecordModel {
         name = try record.decode("name", as: String.self)
     }
 }
+/// V19 (owner 22 Nov 2026): a manual exchange rate the user entered for one currency outside travel. Rows are history; the reading at an
+/// instant takes the latest live row set at or before it for the current home currency. Recorded movements keep their own frozen rate.
+@Model public final class CurrencyRate {
+    public var id: UUID = UUID()
+    public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
+    public var deletedAt: Date? = nil
+    public var writerID: String = ""
+    public var mergedInto: UUID? = nil
+    public var deletionBarrierAt: Date? = nil
+    public var restoredAt: Date? = nil
+    public var currency: String = ""
+    public var rateToHome: String = ""
+    public var homeCurrency: String = "SAR"
+    public var setAt: Date = Date()
+    public init() {}
+}
+extension CurrencyRate: MadarRecordModel {
+    public func record() throws -> DataRecord {
+        try DataRecord(model: "CurrencyRate", fields: [
+            "id": JSONValue.encode(id),
+            "createdAt": JSONValue.encode(createdAt),
+            "updatedAt": JSONValue.encode(updatedAt),
+            "deletedAt": JSONValue.encode(deletedAt),
+            "writerID": JSONValue.encode(writerID),
+            "mergedInto": JSONValue.encode(mergedInto),
+            "deletionBarrierAt": JSONValue.encode(deletionBarrierAt),
+            "restoredAt": JSONValue.encode(restoredAt),
+            "currency": JSONValue.encode(currency),
+            "rateToHome": JSONValue.encode(rateToHome),
+            "homeCurrency": JSONValue.encode(homeCurrency),
+            "setAt": JSONValue.encode(setAt),
+        ])
+    }
+    public func apply(_ record: DataRecord) throws {
+        id = try record.decode("id", as: UUID.self)
+        createdAt = try record.decode("createdAt", as: Date.self)
+        updatedAt = try record.decode("updatedAt", as: Date.self)
+        deletedAt = try record.decode("deletedAt", as: Date?.self)
+        writerID = try record.decode("writerID", as: String.self)
+        mergedInto = try record.decode("mergedInto", as: UUID?.self)
+        deletionBarrierAt = try record.decode("deletionBarrierAt", as: Date?.self)
+        restoredAt = try record.decode("restoredAt", as: Date?.self)
+        currency = try record.decode("currency", as: String.self)
+        rateToHome = try record.decode("rateToHome", as: String.self)
+        homeCurrency = try record.decode("homeCurrency", as: String.self)
+        setAt = try record.decode("setAt", as: Date.self)
+    }
+}

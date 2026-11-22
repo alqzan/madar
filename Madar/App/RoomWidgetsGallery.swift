@@ -20,10 +20,6 @@ struct RoomWidgetsGallery:View {
                     #if os(iOS)
                     NavigationLink {LockWidgetGallery(session:session)} label:{Label("القفل والاستعداد ومركز التحكم",systemImage:"lock.rectangle").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:44)}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widgets-lock")
                     #endif
-                    Link(destination:URL(string:"madar://salah")!) {
-                        let prayers=session.snapshotStore.read("prayerNext",as:PrayerNextSnapshot.self,now:now)
-                        NextPrayerView(entry:.init(date:now,snapshot:prayers?.payload,tzID:prayers?.tzID ?? session.activePlace.timeZoneID),previewFamily:.systemMedium).padding(16).frame(height:160).background(theme.surface,in:.rect(cornerRadius:26))
-                    }.buttonStyle(.madarPlain).accessibilityIdentifier("room-widget-prayer")
                     HStack(alignment:.top,spacing:12) {
                         Link(destination:URL(string:"madar://quran")!) {QuranWidgetContent(snapshot:session.snapshotStore.read("quran",as:QuranWidgetSnapshot.self,now:now)?.payload,template:.path,compact:true,smallHome:true).padding(14).frame(height:170).frame(maxWidth:.infinity).background(RoomTheme(room:"quran",dark:colorScheme == .dark).surface,in:.rect(cornerRadius:24))}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widget-quran")
                         preview(.habits,family:.systemSmall,template:"today").frame(height:170)

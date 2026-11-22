@@ -640,7 +640,7 @@ extension AppMoneyService {
             do {
                 try requireReadableStore()
                 guard !session.settingsWriteInProgress else { throw BackupOperationError.busy }
-                let revision = session.prayerRevision, generation = session.storeGeneration, container = session.container
+                let revision = session.moneyRevision, container = session.container
                 let request = analysisReadRequest(period: period, offset: offset, at: now)
                 let readTask = Task.detached(priority: .userInitiated) {
                     let worker = MoneyAnalysisReadActor(modelContainer: container)
@@ -649,8 +649,8 @@ extension AppMoneyService {
                 let reading = try await withTaskCancellationHandler { try await readTask.value } onCancel: { readTask.cancel() }
                 try Task.checkCancellation()
                 try requireReadableStore()
-                guard !session.settingsWriteInProgress, session.prayerRevision == revision,
-                      session.storeGeneration == generation, session.container === container else { throw CancellationError() }
+                guard !session.settingsWriteInProgress, session.moneyRevision == revision,
+                      session.container === container else { throw CancellationError() }
                 return reading
             } catch is CancellationError {
                 try Task.checkCancellation()

@@ -77,7 +77,7 @@ extension AppMoneyService {
 
     func loadObligations() throws -> MoneyObligationsReading {
         guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
-        _ = app.prayerRevision
+        _ = app.moneyRevision
         let context = ModelContext(app.container), now = app.prayerNow(), zone = app.activePlace.timeZone, home = app.string("core.currency")
         let today = try DiaryLineRenderer.today(context: context, now: now)
         let cycle = try MoneyRepository(context: context).cycle(at: now)

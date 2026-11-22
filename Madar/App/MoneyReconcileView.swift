@@ -78,7 +78,7 @@ struct MoneyReconcileView: View {
         .safeAreaInset(edge: .bottom) { if reading?.rows.isEmpty == false { saveButton } }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .task { load() }.onChange(of: app.prayerRevision) { load() }
+        .task { load() }.onChange(of: app.moneyRevision) { load() }
         .madarSheetLock(saving: saving)
         .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
         .sheet(item: $unknownAccount, onDismiss: load) { MoneyAccountSheet(app: app, original: $0, visible: visible, revealed: $revealed) }

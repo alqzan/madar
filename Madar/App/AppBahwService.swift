@@ -19,15 +19,6 @@ struct BahwHabitOrbitSchedule {
 }
 
 /// §7.1 lobby read models. Every number is read from the room that owns it; the lobby stores only its layout.
-struct BahwPrayerModel: Equatable {
-    struct Arch: Identifiable, Equatable { let id: String; let name: String; let time: String; let clock24: String; let done: Bool; let next: Bool }
-    let arches: [Arch]
-    let done: Int
-    let nextName: String?
-    let nextAt: Date?
-    let nextTime: String?
-    let nextAfter: String?
-}
 struct BahwQuranModel: Equatable {
     let coverage: String
     let next: String
@@ -143,36 +134,6 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         return positions
     }
 
-    func prayer() -> BahwPrayerModel? {
-        guard let snapshot = try? session.prayerSnapshot(at: now) else { return nil }
-        return prayer(snapshot: snapshot)
-    }
-    func prayer(snapshot: PrayerSnapshot) -> BahwPrayerModel {
-        let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
-        let zone = snapshot.next?.place.timeZone ?? session.activePlace.timeZone, instant = now
-        let upcoming = snapshot.next
-        func clock(_ date: Date?) -> String {
-            guard let date else { return "" }
-            var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
-            let parts = calendar.dateComponents([.hour, .minute], from: date), hour = (parts.hour ?? 0) % 12 == 0 ? 12 : (parts.hour ?? 0) % 12
-            return digits.string(hour) + ":" + ((parts.minute ?? 0) < 10 ? digits.string(0) : "") + digits.string(parts.minute ?? 0)
-        }
-        func clock24(_ date: Date?) -> String {
-            guard let date else { return "" }
-            var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
-            let parts = calendar.dateComponents([.hour, .minute], from: date)
-            return digits.localized(String(format: "%02d:%02d", locale: Locale(identifier: "en_US_POSIX"), parts.hour ?? 0, parts.minute ?? 0))
-        }
-        // §7.2: on Friday the Dhuhr arch reads «الجمعة» here as in the prayer room.
-        func name(_ reference: PrayerReference) -> String? {
-            snapshot.today.cells.contains { $0.reference == reference && $0.isFriday && reference.prayer == .dhuhr } ? "الجمعة" : names[reference.prayer]
-        }
-        let arches = snapshot.today.cells.map { cell in
-            BahwPrayerModel.Arch(id: cell.reference.prayer.rawValue, name: name(cell.reference) ?? "", time: clock(cell.prayerTime), clock24: clock24(cell.prayerTime), done: [.jamaah, .alone, .qada].contains(cell.status), next: cell.reference == upcoming?.reference)
-        }
-        return .init(arches: arches, done: arches.filter(\.done).count, nextName: upcoming.flatMap { up in name(up.reference).map { snapshot.today.cells.contains { $0.reference == up.reference } ? $0 : $0 + " غدًا" } }, nextAt: upcoming?.time, nextTime: clock(upcoming?.time),
-                     nextAfter: upcoming.map { $0.time }.map { PrayerCopy.after(seconds: $0.timeIntervalSince(instant), digits: digits) })
-    }
     /// FB-32 (owner: no freezes): the lobby body asks for these on every render; the Quran snapshot and the diary day
     /// are read once per store generation, day and minute, not on each frame.
     private static var quranCache: (key: String, value: BahwQuranModel?)?
@@ -306,7 +267,7 @@ struct BahwUpcomingItem: Identifiable, Equatable {
 
 
 struct BahwSuggestion: Identifiable {
-    enum Destination { case prayer, habit(UUID), habits, quran(route: String?), diary, money, mihbara(book: UUID?) }
+    enum Destination { case habit(UUID), habits, quran(route: String?), diary, money, mihbara(book: UUID?) }
     let id: String
     let title: String
     let detail: String
@@ -324,22 +285,6 @@ extension AppBahwService {
         // B3-1: the moment of the day decides which step leads. Inside a sanctity window the lobby offers nothing (RP3).
         let moment = lobbyMoment()
         if moment == .quiet { return [] }
-        if session.roomEnabled(.salah), case .beforeAdhan(let prayer, let minutes) = moment {
-            let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
-            result.append(.init(id: "nextPrayer", title: "صلاة " + (names[prayer] ?? "") + " بعد " + (minutes <= 1 ? "دقيقة" : minutes == 2 ? "دقيقتين" : digits.string(minutes) + ((3...10).contains(minutes) ? " دقائق" : " دقيقة")),
-                                detail: "استعدّ لها", symbol: "MadarPrayer", destination: .prayer))
-        }
-        if session.roomEnabled(.salah), let snapshot = try? session.prayerSnapshot(at: now) {
-            // Name the prayers themselves: «كيف صلّيت العشاء؟», not an anonymous «صلاة تنتظر».
-            let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
-            let waiting = snapshot.today.cells.filter { snapshot.pending.contains($0.reference) && $0.canLog }
-                .compactMap { $0.isFriday && $0.reference.prayer == .dhuhr ? "الجمعة" : names[$0.reference.prayer] }
-            if waiting.count == 1 {
-                result.append(.init(id: "prayer", title: "كيف صلّيت " + waiting[0] + "؟", detail: "سجّلها متى كنت مستعدًا", symbol: "MadarPrayer", destination: .prayer))
-            } else if !waiting.isEmpty {
-                result.append(.init(id: "prayer", title: "كيف صلّيت؟", detail: waiting.joined(separator: "، ") + " لم تُسجَّل بعد", symbol: "MadarPrayer", destination: .prayer))
-            }
-        }
         let readings = session.habitReadings(at: now)
         let due = readings.filter { !$0.paused && $0.summary.current?.met != true && ($0.summary.current?.target ?? 0) > 0 && $0.summary.current?.dueDays.contains(today) == true }
         if session.roomEnabled(.habits), let habit = due.first(where: \.isNow) ?? (includesToday ? due.first : nil) {

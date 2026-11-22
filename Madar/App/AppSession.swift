@@ -24,8 +24,6 @@ final class AppSession {
     /// A diary root link waits for child editors that own an explicit save/discard path.
     var diaryRootRequestID: UUID?
     var diaryRootDraftBlockers: Set<UUID> = []
-    var prayerRoute: Route?
-    var prayerRootRequestID: UUID?
     var quranRoute: Route?
     /// M4-V03: «السنة وما يهمّك» pushed from the lobby (`madar://bahw/year`).
     var yearOpen = false
@@ -43,7 +41,6 @@ final class AppSession {
     var moneyRootDraftBlockers: Set<UUID> = []
     /// A Mihbara link waits while a note editor (reader page note, notebook note) holds unsaved text.
     var mihbaraRootDraftBlockers: Set<UUID> = []
-    var prayerRootDraftBlockers: Set<UUID> = []
     var mihbaraOpen = false
     var mihbaraBookToOpen: UUID?
     var mihbaraRoute: Route?
@@ -60,8 +57,6 @@ final class AppSession {
     var lobbyHabitPeriod: String?
     /// A lobby-root link waits for the habits editor to close so its local, unsaved fields stay visible.
     var bahwRootRequestID: UUID?
-    /// A capture named a prayer without its state; the prayer home opens that prayer's log sheet.
-    var prayerLogRequest: Prayer?
     var habitRouteID:UUID?
     private(set) var container: ModelContainer
     let managedStore: ManagedDataStore?
@@ -80,7 +75,6 @@ final class AppSession {
     private(set) var notificationAuthorization = "unknown"
     private(set) var bahwReturnPlanDay: Int?
 #if DEBUG
-    var notificationTestResult = ""
     var bankCorpusImportedInputCount = 0
     var diaryBoundaryUITestClockOverride: Date?
 #endif
@@ -129,7 +123,14 @@ final class AppSession {
     var tabBarHeight: CGFloat = 0
     /// Raised by a lobby suggestion to open the «شيء ينتظرك» sheet instead of a room.
     var attentionRequest = 0
+    /// Bumped by every reload that may have changed data: the lobby, the widget maker and the diary (which shows every room's
+    /// day) read it. A room's own pages read their room's counter instead, so a write in one room does not reload the others.
     private(set) var prayerRevision = 0
+    private(set) var moneyRevision = 0
+    private(set) var quranRevision = 0
+    private(set) var booksRevision = 0
+    /// Habits also count reading, wird and review, so Quran and Mihbara writes bump it too.
+    private(set) var habitsRevision = 0
     /// T08: the lobby money tile reads this cached payload; the store is read again only when a write (a revision or a money
     /// command) or the five-minute bucket changes, never inside a view's `body` on every render.
     private(set) var moneyPayloadEpoch = 0
@@ -170,7 +171,6 @@ final class AppSession {
         }
         return stale.rows
     }
-    private(set) var prayerWriteInProgress = false
     /// Caches for `AppBahwService.prayerLocation()` and `.today`, keyed by [prayerRevision, minute].
     @ObservationIgnored var bahwLocationCache: (key: [Int], place: ActivePlace, options: PrayerCalculationOptions)?
     @ObservationIgnored var bahwTodayCache: (key: [Int], day: GregorianDay)?
@@ -276,12 +276,7 @@ final class AppSession {
         _ = try PrayerHistoryMaintenance.removeAllPrayerRecords(in: container.mainContext, now: prayerNow())
         _ = try? HabitJamaahConversion.convert(in: container.mainContext, today: GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone), now: prayerNow())
         #if DEBUG
-        try preparePrayerUITestTrackingStart()
-        try preparePrayerPolarNoTimesFixture(group: group)
         try prepareStyleSettingsFixture()
-        try preparePrayerStatisticsFixture()
-        try preparePrayerHomeShowcaseFixture()
-        try preparePrayerStreakShowcaseFixture()
         try prepareQuranHomeFixture(group: group)
         try prepareDiaryHomeFixture(group: group)
         try prepareLegacyTrial()
@@ -290,12 +285,6 @@ final class AppSession {
         try prepareMihbaraFixture(group: group)
         // Opens a room at launch for layout checks (iPad captures cannot tap the sidebar).
         if ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil, let tab = ProcessInfo.processInfo.environment["MADAR_UI_START_TAB"] { selectedTab = tab }
-        let uiTestEnvironment = ProcessInfo.processInfo.environment
-        if uiTestEnvironment["MADAR_UI_STORE_ID"] == group.lastPathComponent,
-           group.deletingLastPathComponent().lastPathComponent == "UITestStores",
-           let prayer = uiTestEnvironment["MADAR_UI_PRAYER_OPEN_REQUEST"].flatMap(Prayer.init(rawValue:)) {
-            prayerLogRequest = prayer
-        }
         #endif
         try reload()
         let devices = try container.mainContext.fetch(FetchDescriptor<DeviceSetting>())
@@ -306,8 +295,12 @@ final class AppSession {
     /// Bumped on every store reload (after each write and each return to the app): derived read caches key on it.
     @ObservationIgnored private(set) var storeGeneration = 0
     @ObservationIgnored let bahwReads = BahwReadCache()
-    func reload() throws {
-        storeGeneration &+= 1
+    /// `domains`: the rooms whose data may have changed. A command names its own room; settings, sync, undo, a restore and a
+    /// return to the app reload all. An empty set (a read-only refresh such as the reminder re-plan) bumps no counter unless
+    /// the store itself was swapped underneath.
+    func reload(domains: DataDomains = .all) throws {
+        if !domains.isEmpty { storeGeneration &+= 1 }
+        let previousContainer = container
         if let managedStore { try managedStore.refreshIfNeeded(); container = managedStore.container }
         store = SettingsStore(context: ModelContext(container), schema: schema)
         // One read per table, not one per setting: this runs after every write and every return to the app.
@@ -316,16 +309,15 @@ final class AppSession {
         if case .string(let currency) = values["core.currency"], let defaults = UserDefaults(suiteName: "group.com.alqzan.madar2"), defaults.string(forKey: "core.currency") != currency {
             defaults.set(currency, forKey: "core.currency")
         }
+        let changed = container === previousContainer ? domains : .all
+        guard !changed.isEmpty else { return }
+        if domains.isEmpty { storeGeneration &+= 1 }
         prayerRevision &+= 1
+        if changed.contains(.money) { moneyRevision &+= 1 }
+        if changed.contains(.quran) { quranRevision &+= 1 }
+        if changed.contains(.books) { booksRevision &+= 1 }
+        if !changed.isDisjoint(with: [.habits, .quran, .books]) { habitsRevision &+= 1 }
     }
-#if DEBUG
-    func advancePrayerRevisionForUITest() {
-        let environment = ProcessInfo.processInfo.environment
-        guard environment["MADAR_UI_PRAYER_SNAPSHOT_REVISION_HARNESS"] == "1",
-              environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil else { return }
-        prayerRevision &+= 1
-    }
-#endif
     /// Records an authorized app visit. The state lives in a local DeviceSetting and is never sent to CloudKit.
     func recordBahwReturnVisit() {
         guard protectedDataAuthorized else { return }
@@ -468,27 +460,6 @@ final class AppSession {
         prayerSnapshotCache.rows[bucket] = snapshot
         return snapshot
     }
-    func prayerSnapshotOffMain(at now: Date) async throws -> PrayerSnapshot {
-        let revision = prayerRevision, generation = storeGeneration, container = self.container
-        let bucket = Int(now.timeIntervalSince1970 / 60)
-        if prayerSnapshotCache.revision != revision { prayerSnapshotCache = (revision, [:]) }
-        if let cached = prayerSnapshotCache.rows[bucket] { return cached }
-        let worker = Task.detached(priority: .userInitiated) {
-            try Task.checkCancellation()
-            let snapshot = try PrayerRepository(context: ModelContext(container)).snapshot(now: now)
-            try Task.checkCancellation()
-            return snapshot
-        }
-        let snapshot = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
-        try Task.checkCancellation()
-        guard !maintenanceInProgress else { throw BackupOperationError.busy }
-        guard prayerRevision == revision, storeGeneration == generation, self.container === container else { throw CancellationError() }
-        if prayerSnapshotCache.revision != revision { prayerSnapshotCache = (revision, [:]) }
-        if let cached = prayerSnapshotCache.rows[bucket] { return cached }
-        if prayerSnapshotCache.rows.count >= 8 { prayerSnapshotCache.rows.removeAll() }
-        prayerSnapshotCache.rows[bucket] = snapshot
-        return snapshot
-    }
     @ObservationIgnored private var prayerSnapshotCache: (revision: Int, rows: [Int: PrayerSnapshot]) = (-1, [:])
     /// Day-boundary checks use PrayerRepository too. Plan timelines and the Quran room share one read per minute
     /// so checking whether the day changed never scans prayer history on the main actor.
@@ -543,128 +514,6 @@ final class AppSession {
             .addingTimeInterval(Double(hours) * 60 * 60)
     }
 #endif
-    func recordPrayer(_ reference: PrayerReference, status: PrayerStoredStatus, fridayKind: FridayPrayerKind? = nil, completion: ((Bool) -> Void)? = nil) {
-        guard [.jamaah, .alone, .qada].contains(status) else { completion?(false); return }
-        let payload: MadarCore.JSONValue = .object([
-            "dayKey": .string(reference.day.description),
-            "prayer": .string(reference.prayer.rawValue),
-            "status": .string(status.rawValue),
-            "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null
-        ])
-        sendPrayerCommand(name: "prayer.log", payload: payload,
-            undoMessage: status == .qada ? "سُجّلت الصلاة قضاءً" : "سُجّلت الصلاة", completion: completion)
-    }
-    func qiyamRequiresRestore(_ night: GregorianDay) throws -> Bool {
-        try PrayerRepository(context: ModelContext(container)).nightRequiresRestore(night)
-    }
-    func recordQiyamNight(_ night: GregorianDay, rakaat: Int, witr: Bool, restoreDeleted: Bool = false, completion: ((Bool) -> Void)? = nil) {
-        sendPrayerCommand(name: "prayer.logQiyam", payload: .object([
-            "nightKey": .string(night.description), "rakaat": .number(Double(rakaat)), "witr": .bool(witr), "restoreDeleted": .bool(restoreDeleted)
-        ]), undoMessage: "حُفظ قيام الليلة", completion: completion)
-    }
-    func answerPrayerHeart(_ reference: PrayerReference, heart: PrayerHeart?, completion: ((Bool) -> Void)? = nil) {
-        sendPrayerCommand(name: "prayer.setHeart", payload: .object([
-            "dayKey": .string(reference.day.description), "prayer": .string(reference.prayer.rawValue),
-            "heart": heart.map { .string($0.rawValue) } ?? .null
-        ]), undoMessage: "حُفظت إجابة القلب", completion: completion)
-    }
-    /// P04: the tracking start moves once, up to 30 days before the first run. The engine enforces both limits.
-    func editPrayerTrackingStart(_ day: GregorianDay, completion: ((Bool) -> Void)? = nil) {
-        sendPrayerCommand(name: "prayer.editTrackingStart", payload: .object(["dayKey": .string(day.description)]),
-            undoMessage: "عُدّلت بداية التتبّع", completion: completion)
-    }
-    /// RP4/RP7: the owner answered the one question. The method is stored first; times then use it for this trip only.
-    func startPrayerTrip(city: String, country: String, place: ActivePlace, homeKm: Double?, method: PrayerCalculationMethod, completion: ((Bool) -> Void)? = nil) {
-        setWithResult(.string(method.rawValue), key: "salah.tripMethod") { [self] saved in
-            guard saved else { completion?(false); return }
-            var payload: [String: MadarCore.JSONValue] = ["city": .string(city), "country": .string(country), "lat": .number(place.latitude), "lon": .number(place.longitude), "tzID": .string(place.timeZoneID)]
-            if let homeKm { payload["homeKm"] = .number(homeKm) }
-            sendPrayerCommand(name: "prayer.startTrip", payload: .object(payload), undoMessage: "بدأت الرحلة", completion: completion)
-        }
-    }
-    /// OR-09: the trip moves on to another country; the open leg closes and the next joins the same journey (one undo).
-    func continuePrayerTrip(city: String, country: String, place: ActivePlace, homeKm: Double?, completion: ((Bool) -> Void)? = nil) {
-        var payload: [String: MadarCore.JSONValue] = ["city": .string(city), "country": .string(country), "lat": .number(place.latitude), "lon": .number(place.longitude), "tzID": .string(place.timeZoneID)]
-        if let homeKm { payload["homeKm"] = .number(homeKm) }
-        sendPrayerCommand(name: "prayer.continueTrip", payload: .object(payload), undoMessage: "أُضيفت " + city + " إلى رحلتك", completion: completion)
-    }
-    func endPrayerTrip(_ id: UUID, completion: ((Bool) -> Void)? = nil) {
-        sendPrayerCommand(name: "prayer.endTrip", payload: .object(["tripID": .string(id.uuidString)]), undoMessage: "انتهت الرحلة", completion: completion)
-    }
-    func logPrayerPair(day: GregorianDay, pair: PrayerPair, status: PrayerStoredStatus, shortened: Bool, mode: PrayerPairMode, completion: ((Bool) -> Void)? = nil) {
-        sendPrayerCommand(name: "prayer.logPair", payload: .object(["dayKey": .string(day.description), "pair": .string(pair.rawValue), "status": .string(status.rawValue), "shortened": .bool(shortened), "mode": .string(mode.rawValue)]),
-            undoMessage: "سُجّلت الصلاتان", completion: completion)
-    }
-    func makeUpPrayer(_ reference: PrayerReference, fridayKind: FridayPrayerKind? = nil, completion: ((Bool) -> Void)? = nil) {
-        let payload: MadarCore.JSONValue = .object([
-            "dayKey": .string(reference.day.description),
-            "prayer": .string(reference.prayer.rawValue),
-            "status": .string(PrayerStoredStatus.qada.rawValue),
-            "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null
-        ])
-        sendPrayerCommand(name: "prayer.log", payload: payload, undoMessage: "سُجّلت الصلاة قضاءً", completion: completion)
-    }
-    /// Capture's prayer report uses the same command, undo and refresh as a tap on the arch.
-    @discardableResult
-    func logCapturedPrayer(payload: MadarCore.JSONValue, undoMessage: String) -> Bool {
-        sendPrayerCommand(name: "prayer.log", payload: payload, undoMessage: undoMessage)
-    }
-    @discardableResult
-    private func sendPrayerCommand(name: String, payload: MadarCore.JSONValue, undoMessage: String, completion: ((Bool) -> Void)? = nil) -> Bool {
-        guard !prayerWriteInProgress, beginWrite() else { completion?(false); return false }
-        prayerWriteInProgress = true
-        let now = prayerNow()
-        Task {
-            var succeeded = false
-            defer {
-                endWrite()
-                prayerWriteInProgress = false
-                completion?(succeeded)
-                Task { await MadarIntentHandoff.shared.flush() }
-            }
-            do {
-                succeeded = try await withSerializedPrayerNotificationMutation {
-                    let command = CommandEnvelope(name: name, payload: payload, source: .app, issuedAt: now)
-                    let result = try await bus.execute(command, now: now)
-                    guard result.status == .applied || result.status == .duplicate else {
-                        errorMessage = prayerFailure(result.reason)
-                        return false
-                    }
-                    clearRecoveredMaintenanceError()
-                    try reload()
-                    if let id = result.undoToken {
-                        let context = ModelContext(container)
-                        if let receipt = try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }),
-                           let deadline = receipt.undoExpiresAt {
-                            showUndo(AppUndoToken(id: id, expiresAt: deadline), message: undoMessage)
-                        }
-                    }
-                    try publishSnapshot()
-                    WidgetCenter.shared.reloadAllTimelines()
-                    return true
-                }
-            } catch {
-                errorMessage = "لم يُسجّل التغيير. \(madarUserMessage(error))"
-            }
-        }
-        return true
-    }
-    private func prayerFailure(_ reason: String?) -> String {
-        switch reason {
-        case "futurePrayer": "لم يحن وقت الصلاة بعد."
-        case "prayerWindowOpen": "لم ينته وقت الصلاة بعد؛ يمكنك تسجيلها عند انتهائه."
-        case "unavailablePrayerTimes": "لا تتوفر مواقيت مؤكدة لهذا الفرض."
-        case "beforeTrackingStart": "هذا اليوم يسبق بداية التسجيل."
-        case "explicitRestoreRequired": "يتطلب هذا السجل استعادة صريحة."
-        case "invalidRecord": "نوع الجمعة متاح لظهر الجمعة فقط."
-        case "noActiveTrip": "لا توجد رحلة جارية."
-        case "invalidPair": "هاتان الصلاتان لا تُجمعان الآن."
-        case "invalidShortening": "القصر لا ينطبق على هذه الصلاة."
-        case "trackingAlreadyEdited": "اكتمل التعديل الوحيد لبداية التتبّع."
-        case "invalidTrackingStart": "البداية خارج المدى: حتى ثلاثين يومًا قبل أول تشغيل."
-        default: "لم تُسجّل الصلاة. حاول مرة أخرى."
-        }
-    }
     #if DEBUG
     /// OR-15/16/27 screenshots: picks one of the appearance looks in an isolated UI-test store, e.g.
     /// MADAR_UI_STYLE_SETTINGS="mal.hawlStyle=orbit,notes.fridayStyle=medallion". Only these keys are accepted.
@@ -679,127 +528,6 @@ final class AppSession {
         }
         try container.mainContext.save()
     }
-    /// Isolated UI-test fixture for the contract that polar days have no invented times but remain manually loggable.
-    private func preparePrayerPolarNoTimesFixture(group: URL) throws {
-        let environment = ProcessInfo.processInfo.environment
-        guard UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
-              environment["MADAR_UI_STORE_ID"] == group.lastPathComponent,
-              group.deletingLastPathComponent().lastPathComponent == "UITestStores",
-              environment["MADAR_UI_PRAYER_FIXTURE"] == "polarNoTimes" else { return }
-        // This fixture already supplies its city. A delayed first-run cover otherwise
-        // intercepts scrolling after the test has read the room behind it.
-        let context = container.mainContext
-        if !(try context.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.onboardingCompleted" }) {
-            let marker = DeviceSetting()
-            marker.key = "sys.onboardingCompleted"
-            marker.valueJSON = Data("true".utf8)
-            context.insert(marker)
-        }
-        try store.prepare(.object([
-            "name": .string("Tromsø"), "country": .string("NO"),
-            "lat": .number(69.6492), "lon": .number(18.9553),
-            "tz": .string("Europe/Oslo"), "currency": .string("NOK")
-        ]), for: "core.homeCity", now: prayerNow())
-        try store.prepare(.string("manual"), for: "core.travelMode", now: prayerNow())
-        try container.mainContext.save()
-    }
-
-    private func preparePrayerStatisticsFixture() throws {
-        guard ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
-              ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_FIXTURE"] == "ratio26of30" else { return }
-        let context = ModelContext(container)
-        // Seed only once in an explicitly isolated DEBUG UI-test store. Values come
-        // from the hand-authored §7.2 example, never from engine output.
-        guard try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty else { return }
-        for index in 0..<28 {
-            let row = PrayerLog()
-            row.dayKey = String(format: "2026-10-%02d", index / 5 + 1)
-            row.prayer = Prayer.allCases[index % 5].rawValue
-            row.status = index < 26 ? "jamaah" : "qada"
-            row.tzID = "Asia/Riyadh"
-            row.eventAt = try GregorianDay(row.dayKey).date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(12 * 3600)
-            row.source = "user"
-            context.insert(row)
-        }
-        try context.save()
-    }
-    /// DEBUG-only S1 showcase in an isolated UI-test store: a week shaped like the canonical
-    /// home (three prayers recorded today, last night's Isha unrecorded, three performed qada prayers).
-    /// Hand-authored rows, never engine output; use with MADAR_UI_NOW 2026-10-07T16:20+03:00.
-    private func preparePrayerHomeShowcaseFixture() throws {
-        guard ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
-              let fixture = ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_FIXTURE"], ["homeShowcase", "homeShowcaseFriday"].contains(fixture) else { return }
-        // `homeShowcaseFriday` is the same week carried to Friday 2026-10-09 (use MADAR_UI_NOW 2026-10-09T16:20+03:00).
-        let lastDay = fixture == "homeShowcaseFriday" ? 9 : 7
-        let context = ModelContext(container)
-        guard try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty else { return }
-        let alone: Set<String> = ["2026-10-03.dhuhr", "2026-10-05.fajr", "2026-10-07.asr"]
-        let qada: Set<String> = ["2026-10-02.asr", "2026-10-03.fajr", "2026-10-04.isha"]
-        for day in 1...lastDay {
-            let dayKey = String(format: "2026-10-%02d", day)
-            for prayer in Prayer.allCases {
-                let key = dayKey + "." + prayer.rawValue
-                if dayKey == "2026-10-06" && prayer == .isha { continue }
-                if day == lastDay && [.maghrib, .isha].contains(prayer) { continue }
-                let row = PrayerLog()
-                row.dayKey = dayKey
-                row.prayer = prayer.rawValue
-                row.status = qada.contains(key) ? "qada" : alone.contains(key) ? "alone" : "jamaah"
-                if prayer == .dhuhr && (day == 2 || day == 9) { row.fridayKind = row.status == "jamaah" ? "jumuah" : "dhuhr" }
-                row.tzID = "Asia/Riyadh"
-                row.eventAt = try GregorianDay(dayKey).date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(12 * 3600)
-                row.source = "user"
-                context.insert(row)
-            }
-        }
-        for (night, rakaat, witr) in [("2026-10-01", 8, true), ("2026-10-02", 4, false), ("2026-10-04", 2, true), ("2026-10-05", 8, true)] {
-            let row = QiyamNight(); row.nightKey = night; row.rakaat = rakaat; row.witr = witr; row.tzID = "Asia/Riyadh"
-            context.insert(row)
-        }
-        try context.save()
-    }
-    /// DEBUG-only «سلاسلك» showcase: the hand-worked week of `PrayerStreakTests` (a made-up Fajr on 3 Oct,
-    /// Asr alone on 4 Oct, Isha unrecorded on 6 Oct). Expected: congregation 2, on time 3, completion 6.
-    /// Use with MADAR_UI_NOW 2026-10-08T16:20+03:00 and MADAR_UI_TRACKING_START 2026-10-01.
-    private func preparePrayerStreakShowcaseFixture() throws {
-        guard ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
-              let fixture = ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_FIXTURE"], ["streakShowcase", "streakShowcaseMonth"].contains(fixture) else { return }
-        let context = ModelContext(container)
-        guard try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty else { return }
-        // `streakShowcaseMonth` (tracking start 2026-09-12): Asr was performed late on 13 Sep, Fajr qada on 21 Sep,
-        // Dhuhr alone on 28 Sep. Expected: congregation 9, on time 16, completion 24.
-        let month = fixture == "streakShowcaseMonth"
-        let keys = month ? (12...30).map { String(format: "2026-09-%02d", $0) } + (1...8).map { String(format: "2026-10-%02d", $0) }
-                         : (1...8).map { String(format: "2026-10-%02d", $0) }
-        let qadaDay = month ? "2026-09-21" : "2026-10-03", aloneDay = month ? "2026-09-28" : "2026-10-04"
-        let aloneSlot: Prayer = month ? .dhuhr : .asr
-        let fridays: Set<String> = ["2026-09-18", "2026-09-25", "2026-10-02"]
-        for dayKey in keys {
-            for prayer in Prayer.allCases {
-                if !month && dayKey == "2026-10-06" && prayer == .isha { continue }
-                if dayKey == "2026-10-08" && ![.fajr, .dhuhr].contains(prayer) { continue }
-                let row = PrayerLog()
-                row.dayKey = dayKey
-                row.prayer = prayer.rawValue
-                row.status = month && dayKey == "2026-09-13" && prayer == .asr ? "qada"
-                    : dayKey == qadaDay && prayer == .fajr ? "qada" : dayKey == aloneDay && prayer == aloneSlot ? "alone" : "jamaah"
-                if prayer == .dhuhr && fridays.contains(dayKey) && row.status == "jamaah" { row.fridayKind = "jumuah" }
-                row.tzID = "Asia/Riyadh"
-                row.eventAt = try GregorianDay(dayKey).date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(12 * 3600)
-                row.source = "user"
-                context.insert(row)
-            }
-        }
-        try context.save()
-    }
-    private func preparePrayerUITestTrackingStart() throws {
-        guard let raw = ProcessInfo.processInfo.environment["MADAR_UI_TRACKING_START"],
-              let day = try? GregorianDay(raw) else { return }
-        let context = ModelContext(container)
-        let testStore = SettingsStore(context: context, schema: schema)
-        try testStore.prepare(.object(["dayKey": .string(day.description), "edits": .number(0)]), for: "salah.trackingStart")
-        try context.save()
-    }
     #endif
     var settingsWriteInProgress: Bool { pendingWrites > 0 || maintenanceInProgress }
     func string(_ key: String) -> String { if case .string(let v) = values[key] { v } else { "" } }
@@ -808,10 +536,6 @@ final class AppSession {
     func setDiaryRootDraftBlocker(_ id: UUID, active: Bool) {
         if active { diaryRootDraftBlockers.insert(id) }
         else { diaryRootDraftBlockers.remove(id) }
-    }
-    func setPrayerRootDraftBlocker(_ id: UUID, active: Bool) {
-        if active { prayerRootDraftBlockers.insert(id) }
-        else { prayerRootDraftBlockers.remove(id) }
     }
     func setMihbaraRootDraftBlocker(_ id: UUID, active: Bool) {
         if active { mihbaraRootDraftBlockers.insert(id) }
@@ -1147,7 +871,7 @@ final class AppSession {
         let result = try await withSerializedPrayerNotificationMutation {
             let result = try await bus.execute(CommandEnvelope(name: name, payload: .object(payload)))
             guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "Quran command") }
-            refreshAfterCommit()
+            refreshAfterCommit(domains: .quran)
             return result
         }
         if let id = result.undoToken, let receipt = try ModelContext(container).fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }), let deadline = receipt.undoExpiresAt {
@@ -1228,17 +952,17 @@ final class AppSession {
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "money command") }
         if result.status == .applied {
             // The command is committed: a failed refresh must not read as a failed save, or a retry with a new ID records it twice.
-            do { try reload(); try publishSnapshot() } catch { errorMessage = "حُفظ التغيير، لكن تعذّر تحديث العرض. أغلق الصفحة وافتحها مرة أخرى." }
+            do { try reload(domains: .money); try publishSnapshot() } catch { errorMessage = "حُفظ التغيير، لكن تعذّر تحديث العرض. أغلق الصفحة وافتحها مرة أخرى." }
             // A confirmed spend can cross a category's 80% line (M5-V10); re-plan room reminders through the one arbiter.
             requestPrayerNotificationRefresh()
         }
-        if let token = result.undoToken, name != "money.linkRefund" { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة" : name == "money.logExpense" ? "سُجّل المصروف" : name == "money.deleteTransaction" ? "حُذفت الحركة" : name == "money.removeAccount" ? "حُذف الحساب" : "حُفظ التغيير") }
+        if let token = result.undoToken, name != "money.linkRefund" { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة" : name == "money.logExpense" ? "سُجّل المصروف" : name == "money.deleteTransaction" ? "حُذفت الحركة" : name == "money.removeAccount" ? "حُذف الحساب" : name == "money.setCurrencyRate" ? "حُفظ السعر" : name == "money.editTransaction" ? "عُدّلت الحركة" : name == "money.logIncome" ? "سُجّل الدخل" : name == "money.saveCategory" ? "حُفظت الفئة" : name == "money.removeCategory" ? "حُذفت الفئة" : "حُفظ التغيير") }
     }
 
     /// The command is already committed when this runs: a failed refresh is reported as a refresh problem, never as a failed save,
     /// so the person does not repeat a write that was kept (a repeat could record it twice).
-    func refreshAfterCommit() {
-        do { try reload(); try publishSnapshot() }
+    func refreshAfterCommit(domains: DataDomains = .all) {
+        do { try reload(domains: domains); try publishSnapshot() }
         catch { errorMessage = "حُفظ التغيير، لكن تعذّر تحديث العرض. أغلق الصفحة وافتحها مرة أخرى." }
     }
 
@@ -1274,7 +998,7 @@ final class AppSession {
         let now = prayerNow()
         let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "تعذّر حفظ الكتاب") }
-        refreshAfterCommit()
+        refreshAfterCommit(domains: .books)
         if ["book.importPDF", "book.importEPUB", "book.importGoodreads", "book.savePaper", "book.updatePaper", "book.delete", "book.restore"].contains(name) {
             await reconcileSpotlightIndex()
         }
@@ -1304,7 +1028,7 @@ final class AppSession {
         func run() async throws -> CommandOutcome {
             let result = try await bus.execute(CommandEnvelope(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
             guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "diary command") }
-            if updatesPresentation { refreshAfterCommit() }
+            if updatesPresentation { refreshAfterCommit(domains: name.hasPrefix("habit.") ? .habits : .all) }
             return result
         }
         // F02/V12: a habit change, an intention or a letter reschedules its reminder (a met habit or written intention stops reminding).
@@ -1416,20 +1140,6 @@ final class AppSession {
             catch { errorMessage = "تعذّر طلب إذن الإشعارات. \(madarUserMessage(error))" }
         }
     }
-#if DEBUG
-    func runNotificationScenarioForTesting() {
-        guard let coordinator = prayerNotifications else {
-            notificationTestResult = "FAIL — notification coordinator is not attached"
-            return
-        }
-        notificationTestResult = "RUNNING"
-        Task { [weak self, coordinator] in
-            guard let self else { return }
-            do { notificationTestResult = try await coordinator.runSimulatorAcceptanceScenarioForTesting() }
-            catch { notificationTestResult = "FAIL — \(error.localizedDescription)" }
-        }
-    }
-#endif
     func openPrayerNotificationSettings() {
         MadarPlatform.openNotificationSettings()
     }
@@ -1467,7 +1177,8 @@ final class AppSession {
     /// a «تراجع» chip. Only a removal (something the user would lose) shows it now; every other change is simply done, and is corrected
     /// where it was made. The undo token itself is unchanged, so the screens that offer their own undo still work.
     static func undoIsWorthShowing(_ message: String) -> Bool {
-        ["حُذف", "حذف", "أُزيل", "أزيل"].contains { message.hasPrefix($0) }
+        // A removal, or a confirmed return of every setting to the agreed defaults (the protocol keeps a reset undoable).
+        ["حُذف", "حذف", "أُزيل", "أزيل", "عادت الإعدادات المتفق عليها"].contains { message.hasPrefix($0) }
     }
     private func showUndo(_ token: AppUndoToken, message: String) {
         undoToken = token; undoMessage = message; expiryTask?.cancel(); toastTask?.cancel()
@@ -1628,4 +1339,15 @@ func prayerUITestClock(_ fallback: Date) -> Date {
     }
     #endif
     return fallback
+}
+
+/// The rooms a store reload concerns (owner, 22 Nov 2026: a write in one room no longer reloads every other room's pages).
+struct DataDomains: OptionSet, Sendable {
+    let rawValue: Int
+    static let money = DataDomains(rawValue: 1 << 0)
+    static let quran = DataDomains(rawValue: 1 << 1)
+    static let books = DataDomains(rawValue: 1 << 2)
+    static let habits = DataDomains(rawValue: 1 << 3)
+    /// Settings, diary, sync, undo, restore and a return to the app: anything may have changed.
+    static let all: DataDomains = [.money, .quran, .books, .habits, DataDomains(rawValue: 1 << 4)]
 }

@@ -48,10 +48,6 @@ import MadarPrayer
         let windows = PrayerNotificationSchedule.sanctityWindows(for: slots)
         let dhuhrWindow = try XCTUnwrap(windows.first { $0.prayer == .dhuhr && $0.start == dhuhr.occurrence.time })
         XCTAssertEqual(dhuhrWindow.end, dhuhrWindow.start.addingTimeInterval(30 * 60), "Friday Dhuhr follows the 30-minute sanctity window")
-        let candidate = try XCTUnwrap(PrayerNotificationSchedule.candidates(for: slots, sanctityWindows: windows,
-                                                                            askAfterAdhanMinutes: 30)
-            .first { $0.id == "salah.2026-03-20.dhuhr" })
-        XCTAssertEqual(candidate.dueAt, dhuhrWindow.end)
     }
     func testSanctityWindowsRemainThirtyMinutesAndMaghribTwentyOnIOS27() throws {
         let friday = try XCTUnwrap(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
@@ -79,29 +75,6 @@ import MadarPrayer
         try app.publishNotificationBudget(at: now)
         XCTAssertThrowsError(try app.notificationBudget.reservePrayerActivity(id: "device.off", now: now)) { XCTAssertEqual($0 as? NotificationBudgetError, .disabled) }
         XCTAssertEqual(try app.notificationBudget.reservations().count, 1, "Disabling does not refund a submitted start without OS cancellation")
-    }
-    func testStarterReservesBeforeOSCallAndRefundsExplicitFailure() async throws {
-        let (app, _) = try fixture()
-        try await app.applySettingsAndWait(["salah.liveActivity": .bool(true)])
-        try app.publishNotificationBudget(at: now)
-        enum Simulated: Error { case rejected }
-        do {
-            try await PrayerActivityStarter.start(budget: app.notificationBudget, now: now) { reserved in
-                XCTAssertEqual(try app.notificationBudget.reservations(), [reserved.reservation])
-                XCTAssertEqual(reserved.reservation.scheduledAt, self.now)
-                throw Simulated.rejected
-            }
-            XCTFail("The OS rejection must propagate")
-        } catch Simulated.rejected { }
-        XCTAssertTrue(try app.notificationBudget.reservations().isEmpty)
-        var calls = 0
-        try await PrayerActivityStarter.start(budget: app.notificationBudget, now: now) { _ in calls += 1 }
-        do {
-            try await PrayerActivityStarter.start(budget: app.notificationBudget, now: now) { _ in calls += 1 }
-            XCTFail("Repeated start should be deduplicated")
-        } catch NotificationBudgetError.duplicate { }
-        XCTAssertEqual(calls, 1)
-        XCTAssertEqual(try ModelContext(app.container).fetchCount(FetchDescriptor<PrayerLog>()), 0)
     }
     func testExistingDeviceLedgerSeedsSharedBudgetWithoutPrayerAsks() async throws {
         let (app, _) = try fixture()

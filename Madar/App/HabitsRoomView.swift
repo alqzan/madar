@@ -105,7 +105,7 @@ struct HabitsRoomView: View {
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent)
         .toolbarVisibility(.hidden,for:.navigationBar).environment(\.roomTheme,theme)
-        .task(id:session.prayerRevision) { reload() }
+        .task(id:session.habitsRevision) { reload() }
         .onChange(of: session.habitRouteID) { _, routeID in
             guard routeID != nil else { return }
             reload()

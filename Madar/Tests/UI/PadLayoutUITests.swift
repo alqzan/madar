@@ -27,11 +27,11 @@ import XCTest
         hide.tap()
         let show = app.buttons["أظهر القائمة"]
         XCTAssertTrue(show.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertFalse(app.buttons["الصلاة"].exists)
+        XCTAssertFalse(app.buttons["القرآن"].exists)
         sleep(1)
         try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: out).appending(path: "pad-sidebar-folded.png"))
         show.tap()
-        XCTAssertTrue(app.buttons["الصلاة"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["القرآن"].waitForExistence(timeout: 5), app.debugDescription)
     }
 
     func testSidebarRoomChangesKeepAnUnsavedExpenseOpen() throws {
@@ -55,7 +55,7 @@ import XCTest
         app.buttons["money-expense-key-2"].tap()
         XCTAssertTrue(amount.label.contains("٤٢"), amount.label)
 
-        for room in ["prayer", "quran", "notes", "mihbara"] {
+        for room in ["quran", "notes", "mihbara"] {
             let destination = app.buttons["tab-" + room]
             XCTAssertTrue(destination.waitForExistence(timeout: 5), "Missing iPad room destination: \(room)")
             destination.tap()
@@ -72,7 +72,6 @@ import XCTest
         try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad || out.isEmpty)
         XCUIDevice.shared.orientation = .landscapeLeft
         let rooms: [(String, [String: String], String)] = [
-            ("prayer", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_NOW": "2026-10-08T16:20:00+03:00"], "prayer-today-summary"),
             ("notes", ["MADAR_UI_DIARY_FIXTURE": "entryRoute", "MADAR_UI_DIARY_ROOT": "1", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"], "diary-day-more"),
             ("foundation", ["MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"], "bahw-habits-open"),
             ("mihbara", ["MADAR_UI_MIHBARA_FIXTURE": "home", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"], "mihbara-library"),

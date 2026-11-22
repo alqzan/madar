@@ -387,7 +387,7 @@ private struct BahwSuggestionsView: View {
     }
     private func open(_ destination: BahwSuggestion.Destination) {
         switch destination {
-        case .prayer, .habits:
+        case .habits:
             session.selectedTab = "habits"
         case .habit(let id): session.habitRouteID = id; session.habitsOpen = true
         case .quran(let route):

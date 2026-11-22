@@ -45,12 +45,12 @@ struct QuranPlanSetupView: View {
         } catch { self.error = quranUserMessage(error) }
     }
     private var visibleForecastDay: GregorianDay? {
-        guard forecastDayRevision == service.app.prayerRevision,
-              forecastDayGeneration == service.app.storeGeneration else { return nil }
+        guard forecastDayRevision == service.app.quranRevision,
+              forecastDayGeneration == service.app.quranRevision else { return nil }
         return loadedForecastDay
     }
     private func dayReadKey(at instant: Date) -> [Int] {
-        [Int(instant.timeIntervalSince1970 / 60), service.app.prayerRevision, service.app.storeGeneration, isFrontRoom ? 1 : 0]
+        [Int(instant.timeIntervalSince1970 / 60), service.app.quranRevision, service.app.quranRevision, isFrontRoom ? 1 : 0]
     }
     @MainActor private func refreshForecastDay(at instant: Date, key: [Int]) async {
         guard isFrontRoom else { return }

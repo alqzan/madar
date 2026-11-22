@@ -97,7 +97,7 @@ public struct QuranStagedResult: Sendable {
             guard let data = Data(base64Encoded: text("draft")) else { throw DataError.invalidValue("Quran draft") }
             let value = try JSONDecoder().decode(QuranDraftPayload.self, from: data), draft = value.draft
             guard draft.startedAt <= now, [.hifz, .review, .free, .qiyam, .drill].contains(draft.kind),
-                  ["coach", "completeAyah", "gradual", "next", "link", "continuous"].contains(value.method) else { throw DataError.invalidValue("Quran draft") }
+                  ["coach", "completeAyah", "gradual", "next", "link", "continuous", "readGrade"].contains(value.method) else { throw DataError.invalidValue("Quran draft") }
             if draft.kind == .qiyam {
                 guard value.nightKey != nil, let rakats = value.rakats, [2, 4, 6, 8].contains(rakats), (0...rakats).contains(value.qiyamRakahIndex ?? draft.grades.count) else { throw DataError.invalidValue("Quran qiyam draft") }
             }
@@ -179,7 +179,7 @@ public struct QuranStagedResult: Sendable {
             session.commitID = commit.commitID; session.planID = commit.planID; session.dayKey = commit.storedDay.dayKey
             session.tzID = commit.storedDay.timeZoneID; session.dayPolicy = "\(commit.storedDay.boundary.rawValue)@1"
             session.kind = commit.kind.rawValue; session.fromAyah = commit.ayahs.first; session.toAyah = commit.ayahs.last
-            session.endedAt = commit.endedAt; session.pages = commit.pages; session.method = value.method
+            session.endedAt = commit.endedAt; session.pages = commit.pages; session.method = value.method == "readGrade" ? "coach" : value.method
             session.mistakes = commit.mistakes.filter { $0.kind == .mistake }.count; session.createdAt = now
             context.insert(session); try touch(session)
             for grade in commit.grades {

@@ -1,7 +1,7 @@
 import AppIntents
 
 /// The app's single AppShortcutsProvider: Siri phrases for v1 actions of built rooms only (§9).
-struct MadarPrayerShortcuts: AppShortcutsProvider {
+struct MadarShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: CaptureIntent(),

@@ -125,26 +125,4 @@ extension AppSession {
         catch { errorMessage = "لم يُضف السطر. \(madarUserMessage(error))" }
         return true
     }
-
-    /// The prayer day comes from the same snapshot as the prayer home (Fajr to the next Fajr).
-    /// Friday Dhuhr said as «الظهر» is recorded as Dhuhr, never silently as Jumu'ah.
-    private func logPrayerFromCapture(_ prayer: Prayer, status: String, shortened: Bool?, fridayKind: FridayPrayerKind?) -> Bool {
-        selectedTab = "habits"
-        guard let snapshot = try? prayerSnapshot(at: prayerNow()),
-              let cell = snapshot.today.cells.first(where: { $0.reference.prayer == prayer }) else {
-            errorMessage = "تعذّر تحديد يوم الصلاة. افتح الصلاة وسجّلها من قوسها."; return true
-        }
-        if fridayKind == .jumuah, !cell.isFriday { errorMessage = "اليوم ليس جمعة؛ سجّل الظهر من قوسها."; return true }
-        var payload: [String: MadarCore.JSONValue] = [
-            "dayKey": .string(cell.reference.day.description), "prayer": .string(prayer.rawValue), "status": .string(status)
-        ]
-        if let shortened { payload["shortened"] = .bool(shortened) }
-        if prayer == .dhuhr, cell.isFriday { payload["fridayKind"] = .string((fridayKind ?? .dhuhr).rawValue) }
-        return logCapturedPrayer(payload: .object(payload), undoMessage: "سُجّلت " + Self.prayerName(prayer, friday: payload["fridayKind"] == .string("jumuah")) + (status == "jamaah" ? " جماعة" : " منفردًا") + "")
-    }
-
-    static func prayerName(_ prayer: Prayer, friday: Bool) -> String {
-        if friday { return "الجمعة" }
-        return [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"][prayer] ?? ""
-    }
 }

@@ -3,12 +3,12 @@ import MadarData
 
 /// B2-18 (owner, 10 Nov 2026): the settings a room edits on its own page, found by the central search too.
 /// Only keys whose editor was checked in the room's own screens are listed (Money's settings page, the diary's customize
-/// page, the Quran plan, the prayer customize page); a search hit opens that place, never an empty result.
+/// page, the Quran plan); a search hit opens that place, never an empty result.
 enum RoomSettingsIndex {
     enum Place: String, CaseIterable {
-        case money, diary, quran, prayer
+        case money, diary, quran
         var roomName: String {
-            switch self { case .money: "المال"; case .diary: "المذكرات"; case .quran: "القرآن"; case .prayer: "الصلاة" }
+            switch self { case .money: "المال"; case .diary: "المذكرات"; case .quran: "القرآن" }
         }
     }
     struct Hit: Identifiable, Equatable {

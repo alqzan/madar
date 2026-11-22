@@ -7,7 +7,6 @@ import XCTest
     private struct Finding { let room: String; let kind: String; let key: String }
     private var findings: [Finding] = []
 
-    func testCrawlPrayer() throws { try crawl("prayer", ["MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01"]) }
     func testCrawlQuran() throws { try crawl("quran", ["MADAR_UI_QURAN_FIXTURE": "home"]) }
     func testCrawlMoney() throws { try crawl("money", ["MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00"]) }
     func testCrawlDiary() throws { try crawl("notes", ["MADAR_UI_DIARY_FIXTURE": "home"]) }
@@ -102,7 +101,7 @@ import XCTest
         if app.descendants(matching: .any).matching(identifier: rootIdentifier).firstMatch.waitForExistence(timeout: 5) {
             return true
         }
-        let tabTitles = ["foundation": "البهو", "prayer": "الصلاة", "quran": "القرآن", "money": "المال", "mihbara": "المحبرة", "notes": "المذكرات", "customize": "خصّص"]
+        let tabTitles = ["foundation": "البهو", "quran": "القرآن", "money": "المال", "mihbara": "المحبرة", "notes": "المذكرات", "customize": "خصّص"]
         let nativeTab = tabTitles[tab].map { app.otherElements["fixed-tab-bar"].buttons[$0].firstMatch }
         let shortcut = app.buttons["tab-\(tab)"].firstMatch
         if let nativeTab, nativeTab.waitForExistence(timeout: 10) {

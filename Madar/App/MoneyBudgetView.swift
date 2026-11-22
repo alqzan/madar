@@ -54,7 +54,7 @@ struct MoneyBudgetView: View {
             }.padding(.horizontal, 20).padding(.bottom, 28).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme)
             .toolbarVisibility(.hidden, for: .navigationBar).accessibilityIdentifier("money-budget")
-            .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .task { load() }.onChange(of: app.moneyRevision) { load() }
             .sheet(item: $selected) { row in MoneyBudgetReceipt(app: app, row: row, revealed: $revealed) }
     }
     private func summary(_ r: MoneyBudgetReading) -> some View {

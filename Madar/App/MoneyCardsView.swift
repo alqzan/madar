@@ -78,7 +78,7 @@ struct MoneyCardsView: View {
             }.padding(.horizontal, 20).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme)
             .toolbarVisibility(.hidden, for: .navigationBar).accessibilityIdentifier("money-cards")
-            .task(id: initialRouteRequestID) { load(routeRequestID: initialRouteRequestID) }.onChange(of: app.prayerRevision) { load() }
+            .task(id: initialRouteRequestID) { load(routeRequestID: initialRouteRequestID) }.onChange(of: app.moneyRevision) { load() }
             .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $jarOpen) { MoneyCashbackView(app: app, revealed: $revealed) }
             .sheet(isPresented: $adding, onDismiss: { load() }) { MoneyCardSheet(app: app) }

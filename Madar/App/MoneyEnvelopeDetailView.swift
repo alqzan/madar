@@ -80,7 +80,7 @@ struct MoneyEnvelopeDetailView: View {
                 else { ProgressView().frame(maxWidth: .infinity) }
             }.padding(18).padding(.bottom, 22).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).toolbarVisibility(.hidden, for: .navigationBar)
-            .accessibilityIdentifier("money-envelope-detail").task { load() }.onChange(of: app.prayerRevision) { load() }
+            .accessibilityIdentifier("money-envelope-detail").task { load() }.onChange(of: app.moneyRevision) { load() }
             .sheet(isPresented: $repayOpen) {
                 if let reading { MoneyRepaymentView(app: app, reading: reading, initialSalaries: suggestedSalaries(reading)).environment(\.roomTheme, theme) }
             }

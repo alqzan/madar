@@ -14,43 +14,6 @@ import MadarCommands
 extension AppSession {
     static let legacyMoveWriter = "madar.app.legacyMove"
 
-    func importLegacyPrayer(_ backup: Data, writer: String = AppSession.legacyMoveWriter, now: Date) throws -> [String: Int] {
-        let home = activePlace
-        let plan = try LegacyPrayerImport.plan(backup: backup, home: home, uuid: StableIdentity.uuid(for:))
-        var counts = plan.counts
-        let context = ModelContext(container)
-        let logs = try context.fetch(FetchDescriptor<PrayerLog>())
-        let logIDs = Set(logs.map(\.id))
-        let native = Set(logs.filter { $0.deletedAt == nil }.map { $0.dayKey + "|" + $0.prayer })
-        let linkIDs = Set(try context.fetch(FetchDescriptor<ImportLink>()).map(\.id))
-        for log in plan.logs where !logIDs.contains(log.id) {
-            guard !native.contains(log.dayKey + "|" + log.prayer.rawValue) else { counts["logs.keptNative", default: 0] += 1; continue }
-            let row = PrayerLog(); row.id = log.id; row.dayKey = log.dayKey; row.prayer = log.prayer.rawValue; row.status = log.status.rawValue
-            row.heart = log.heart?.rawValue; row.eventAt = log.eventAt; row.loggedAt = log.loggedAt; row.fridayKind = log.fridayKind?.rawValue
-            row.tzID = home.timeZoneID; row.dayPolicy = "legacy@0"; row.source = "import"
-            row.createdAt = log.loggedAt ?? log.eventAt; row.updatedAt = row.createdAt; row.writerID = writer; context.insert(row)
-            counts["logs.created", default: 0] += 1
-        }
-        for archive in plan.archives {
-            let id = StableIdentity.uuid(for: "myDream:ImportLink:PrayerDay:\(archive.dayKey)")
-            guard !linkIDs.contains(id) else { continue }
-            let link = ImportLink(); link.id = id; link.source = "myDream"; link.sourceModel = "PrayerLog"; link.sourceID = archive.dayKey
-            link.targetModel = "PrayerLog"; link.unmappedJSON = archive.json
-            link.createdAt = now; link.updatedAt = now; link.importedAt = now; link.writerID = writer; context.insert(link)
-        }
-        // Tracking starts at the first old day so the history counts, but never later than the owner's own start.
-        if let start = plan.trackingStart {
-            let settings = SettingsStore(context: context, schema: schema)
-            let current = (try? settings.value(for: "salah.trackingStart"))?.object?["dayKey"]?.string
-            if current.map({ start.description < $0 }) ?? true {
-                try settings.prepare(.object(["dayKey": .string(start.description), "edits": .number(0)]), for: "salah.trackingStart")
-                counts["trackingStart.moved"] = 1
-            }
-        }
-        try context.save()
-        return counts
-    }
-
     func importLegacyQuran(_ backup: Data, fileName: String, writer: String = AppSession.legacyMoveWriter, now: Date) throws -> [String: Int] {
         let catalog = try QuranResources.catalog(), zone = activePlace.timeZone
         let plan = try LegacyQuranImport.plan(backup: backup, timeZone: zone, catalog: catalog, uuid: StableIdentity.uuid(for:))

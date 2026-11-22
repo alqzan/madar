@@ -82,24 +82,24 @@ struct MihbaraHomeReading {
     func loadOffMain(at instant: Date? = nil) async throws -> MihbaraHomeReading {
         let reading = try loadHome(at: instant)
         var links = MihbaraConversions.links(app)
-        let container = app.container, generation = app.storeGeneration
+        let container = app.container, generation = app.booksRevision
 
         for book in reading.books where book.isReadableEPUB {
             try Task.checkCancellation()
-            guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+            guard app.booksRevision == generation, app.container === container else { throw CancellationError() }
             guard let epubHash = book.fileHash else { continue }
             if links[epubHash] == nil, let mediaID = book.mediaID {
                 let request = MihbaraEPUBLinkScanRequest(bookID: book.id, mediaID: mediaID, epubHash: epubHash)
                 let sourcePDFHash = try await Self.sourcePDFHashOffMain(container: container, request: request)
                 try Task.checkCancellation()
-                guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+                guard app.booksRevision == generation, app.container === container else { throw CancellationError() }
                 links[epubHash] = sourcePDFHash ?? ""
                 MihbaraConversions.link(epub: epubHash, toPDF: sourcePDFHash ?? "", app: app)
             }
         }
 
         try Task.checkCancellation()
-        guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+        guard app.booksRevision == generation, app.container === container else { throw CancellationError() }
         return Self.filterConvertedPDFs(in: reading, links: links)
     }
 

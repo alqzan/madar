@@ -23,13 +23,31 @@ extension MoneyRepository {
     }
     /// Latest explicit rate by currency, including returned trips; the date is always visible at the editor.
     /// No market rate is fetched or guessed. An explicit caller override takes precedence.
+    /// Owner, 22 Nov 2026: a rate the user entered for a currency outside travel (`CurrencyRate`) counts too; the latest of either
+    /// source set at or before the instant wins. A rate entered for another home currency is never read.
     public func manualRates(at instant: Date) throws -> [String: String] {
         let trips = try context.fetch(FetchDescriptor<Trip>()).filter {
             $0.deletedAt == nil && $0.mergedInto == nil && !$0.dismissed && $0.start.map { $0 <= instant } == true && ($0.fxSetAt ?? .distantPast) <= instant
-        }.sorted { ($0.fxSetAt ?? .distantPast, $0.id.uuidString) < ($1.fxSetAt ?? .distantPast, $1.id.uuidString) }
+        }
+        var dated: [(at: Date, tie: String, code: String, rate: String)] = []
+        for trip in trips { if let code = trip.currency, let rate = trip.fxRateToHome, (try? FX.parseRate(rate)) != nil { dated.append((trip.fxSetAt ?? .distantPast, trip.id.uuidString, code, rate)) } }
+        for row in try enteredRates(at: instant) { dated.append((row.setAt, row.id.uuidString, row.currency, row.rateToHome)) }
         var rates: [String: String] = [:]
-        for trip in trips { if let code = trip.currency, let rate = trip.fxRateToHome, (try? FX.parseRate(rate)) != nil { rates[code] = rate } }
+        for item in dated.sorted(by: { ($0.at, $0.tie) < ($1.at, $1.tie) }) { rates[item.code] = item.rate }
         return rates
+    }
+    /// Live rates the user entered for the current home currency, set at or before the instant, oldest first.
+    public func enteredRates(at instant: Date = .distantFuture) throws -> [CurrencyRate] {
+        let home = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
+        return try context.fetch(FetchDescriptor<CurrencyRate>()).filter {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.homeCurrency == home && $0.setAt <= instant && (try? FX.parseRate($0.rateToHome)) != nil
+        }.sorted { ($0.setAt, $0.id.uuidString) < ($1.setAt, $1.id.uuidString) }
+    }
+    /// The latest entered rate for one currency at an instant, for the given home currency.
+    public func enteredRate(for currency: String, at instant: Date, home: String) throws -> String? {
+        try context.fetch(FetchDescriptor<CurrencyRate>()).filter {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.currency == currency && $0.homeCurrency == home && $0.setAt <= instant && (try? FX.parseRate($0.rateToHome)) != nil
+        }.max { ($0.setAt, $0.id.uuidString) < ($1.setAt, $1.id.uuidString) }?.rateToHome
     }
     public func tripEnvelope(_ trip: Trip) throws -> Envelope? {
         try context.fetch(FetchDescriptor<Envelope>()).first { $0.id == trip.journeyKey && $0.role == "trip" && $0.deletedAt == nil && $0.mergedInto == nil }

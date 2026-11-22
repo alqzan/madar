@@ -5,8 +5,7 @@ import XCTest
     func testYearScreenAndUserDay() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00",
-                                 "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app)
         func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
         XCTAssertTrue(element("bahw-block-year").waitForExistence(timeout: 15), app.debugDescription)
@@ -40,8 +39,7 @@ import XCTest
         for (mode, attachment) in [("hijri", "M4-V03-year-hijri-paired-L"), ("gregorian", "M4-V03-year-gregorian-paired-L")] {
             let app = XCUIApplication()
             app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
-                "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
-                "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light", "MADAR_UI_UNDO_SECONDS": "2"]
+                "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00", "MADAR_UI_THEME": "light", "MADAR_UI_UNDO_SECONDS": "2"]
             app.launch(); finishOnboarding(app)
             // The lobby's own «خصّص مدار» door: the path a person takes.
             let customize = app.buttons["bahw-customize"]

@@ -1,9 +1,8 @@
 import XCTest
 @MainActor final class RoomWidgetsUITests:XCTestCase {
-    private func openGallery(quranFixture: String? = nil, prayerFixture:String? = nil, habitFixture:String="showcase", now:String="2026-10-15T20:00:00+03:00")->XCUIApplication {
+    private func openGallery(quranFixture: String? = nil, habitFixture:String="showcase", now:String="2026-10-15T20:00:00+03:00")->XCUIApplication {
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":habitFixture,"MADAR_UI_MIHBARA_FIXTURE":"home","MADAR_UI_NOW":now,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
         if let quranFixture { app.launchEnvironment["MADAR_UI_QURAN_FIXTURE"] = quranFixture }
-        if let prayerFixture { app.launchEnvironment["MADAR_UI_PRAYER_FIXTURE"] = prayerFixture }
         app.launch(); finishOnboarding(app)
         XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout:20));app.buttons["tab-customize"].tap()
         let search=app.textFields["settings-search"];XCTAssertTrue(search.waitForExistence(timeout:10));search.tap();search.typeText("خارج التطبيق")

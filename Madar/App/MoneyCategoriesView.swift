@@ -26,6 +26,9 @@ struct MoneyCategoriesView: View {
     @State private var saving = false
     @State private var saveFailure: String?
     @State private var revealed = false
+    @State private var nameTarget: MoneyEditNameSheet.Target?
+    @State private var removing: MoneyCategoryShelf?
+    @State private var removeFailure: String?
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var homeCurrencyName: String { app.string("core.currency") == "SAR" ? "ريال" : service.currencyName(app.string("core.currency")) }
@@ -88,13 +91,18 @@ struct MoneyCategoriesView: View {
                     }.buttonStyle(.madarPlain).disabled(saving).accessibilityLabel("إغلاق").accessibilityIdentifier("money-categories-close")
                     Text("التصنيفات والحدود").font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer()
+                    if reading != nil {
+                        Button { nameTarget = .category(nil) } label: {
+                            Image(systemName: "plus").font(.title3).frame(width: 52, height: 52).glassEffect(.regular.interactive(), in: .circle)
+                        }.buttonStyle(.madarPlain).disabled(saving).accessibilityLabel("أضف تصنيفًا").accessibilityIdentifier("money-category-add")
+                    }
                 }.padding(.top, 8)
                 if let reading {
                     if !amountLimitFocused {
                         header(reading)
                         if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) } }
                         if reading.shelves.isEmpty {
-                            Text("لا تصنيفات بعد. تُنشأ حين تصنّف أول حركة في رسائل البنك.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                            Text("لا تصنيفات بعد. أضف أولها بزر +، أو تُنشأ حين تصنّف أول حركة في رسائل البنك.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
                         }
                         ForEach(Array(reading.shelves.enumerated()), id: \.element.id) { shelf($0.element, tint: binding($0.offset)) }
                         if !reading.shelves.isEmpty {
@@ -118,7 +126,12 @@ struct MoneyCategoriesView: View {
                     Button("تمّ") { amountLimitFocused = false }.accessibilityIdentifier("money-limit-keyboard-done")
                 }
             }
-            .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .task { load() }.onChange(of: app.moneyRevision) { load() }
+            .sheet(item: $nameTarget, onDismiss: load) { MoneyEditNameSheet(app: app, target: $0, visible: visible).environment(\.roomTheme, theme) }
+            .confirmationDialog(removing.map { "تحذف تصنيف «" + $0.name + "»؟ يذهب حدّه وقواعد تاجره معه." } ?? "", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {
+                if let shelf = removing { Button("احذف التصنيف", role: .destructive) { remove(shelf) } }
+                Button("ليس الآن", role: .cancel) { removing = nil }
+            }
             .onChange(of: amountLimitFocused) { _, focused in
                 guard focused else { return }
                 withAnimation(MadarMotion.quick.animation) { proxy.scrollTo("money-limit-editor", anchor: .bottom) }
@@ -262,6 +275,15 @@ struct MoneyCategoriesView: View {
                     .accessibilityIdentifier("money-limit-save").layoutPriority(1)
             }
             if let saveFailure { Text(saveFailure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-limit-failure") }
+            HStack(spacing: 10) {
+                Button { nameTarget = .category(s.id) } label: {
+                    Text("غيّر الاسم").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 48).glassEffect(.regular.interactive(), in: .capsule)
+                }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-category-rename-" + s.id.uuidString)
+                Button { removeFailure = nil; removing = s } label: {
+                    Text("احذف التصنيف").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).frame(maxWidth: .infinity, minHeight: 48).glassEffect(.regular.interactive(), in: .capsule)
+                }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-category-remove-" + s.id.uuidString)
+            }
+            if let removeFailure { Text(removeFailure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-category-remove-failure") }
         }.padding(.top, 6)
     }
     private func modeButton(_ title: String, _ on: Bool, id: String, action: @escaping () -> Void) -> some View {
@@ -294,8 +316,18 @@ struct MoneyCategoriesView: View {
         do {
             let first = reading == nil
             reading = try service.loadCategories(); failure = nil
-            if first, let shelf = reading?.shelves.first { pick(shelf) }
+            if first || !(reading?.shelves.contains { $0.id == selected } ?? false), let shelf = reading?.shelves.first { pick(shelf) }
         } catch { reading = nil; failure = "تعذّرت قراءة التصنيفات الآن." }  // AU-95: never stale limits with a hidden reason
+    }
+    /// The engine keeps a category a recorded movement carries; then the way forward is the new name.
+    private func remove(_ s: MoneyCategoryShelf) {
+        guard !saving else { return }
+        removing = nil; saving = true; removeFailure = nil
+        Task {
+            do { try await app.executeMoneyCommand("money.removeCategory", payload: ["id": .string(s.id.uuidString)]) }
+            catch { removeFailure = "عليها حركات مسجّلة؛ يمكنك تغيير اسمها." }
+            saving = false; load()
+        }
     }
     private func save(_ s: MoneyCategoryShelf, none: Bool) {
         guard !saving else { return }

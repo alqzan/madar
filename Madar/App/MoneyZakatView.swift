@@ -83,7 +83,7 @@ struct MoneyZakatView: View {
                 } else { Text(failure ?? "جارٍ قراءة الحساب…").font(MadarTypography.body()) }
             }.padding(.horizontal, 18).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).environment(\.roomTheme, theme).toolbar(.hidden, for: .navigationBar, .tabBar)
-            .task { load(); entered = true }.onChange(of: app.prayerRevision) { load() }.onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
+            .task { load(); entered = true }.onChange(of: app.moneyRevision) { load() }.onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
             .sheet(isPresented: $editor, onDismiss: load) { if let r = reading { MoneyZakatEditor(app: app, reading: r, basis: basis, chosen: basisChosen, debt: debt, visible: visible, revealed: $revealed) } }
             .accessibilityIdentifier("money-zakat")
     }

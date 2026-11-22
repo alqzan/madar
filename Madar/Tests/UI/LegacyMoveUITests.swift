@@ -36,7 +36,7 @@ import XCTest
         for _ in 0..<14 where !link.isHittable { app.swipeUp(velocity: .fast) }
         XCTAssertTrue(link.isHittable); link.tap()
         tap(app, "legacy-move-choose")
-        XCTAssertTrue(app.descendants(matching: .any)["legacy-move-room-prayer"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.descendants(matching: .any)["legacy-move-room-habits"].waitForExistence(timeout: 20))
         let commit = app.buttons["legacy-move-commit"]
         shot(app, "L01-synthetic-preview-L")
         XCTAssertTrue(commit.isHittable, "Commit must be visible before scrolling the room preview")
@@ -88,15 +88,16 @@ import XCTest
         shot(app, "L01-move-start-L")
 
         tap(app, "legacy-move-choose")
-        let prayer = app.descendants(matching: .any)["legacy-move-room-prayer"]
-        XCTAssertTrue(prayer.waitForExistence(timeout: 30)); XCTAssertTrue(prayer.label.contains("مسجّل"), prayer.label)
+        // Owner 17 Nov 2026: prayer records are not moved any more; habits lead the preview.
+        let habits = app.descendants(matching: .any)["legacy-move-room-habits"]
+        XCTAssertTrue(habits.waitForExistence(timeout: 30)); XCTAssertTrue(habits.label.contains("عاد"), habits.label)
         XCTAssertTrue(app.descendants(matching: .any)["legacy-move-room-money"].label.contains("حرك"))
         shot(app, "L01-move-preview-L"); app.swipeUp(velocity: .slow); shot(app, "L01-move-preview-s1-L")
 
         let first = move(app)
         XCTAssertEqual(first, "انتقلت غرفك إلى مدار.")
-        let prayerOutcome = app.descendants(matching: .any)["legacy-move-outcome-prayer"]
-        XCTAssertTrue(prayerOutcome.label.contains("وصل"), prayerOutcome.label)
+        let habitsOutcome = app.descendants(matching: .any)["legacy-move-outcome-habits"]
+        XCTAssertTrue(habitsOutcome.label.contains("وصل"), habitsOutcome.label)
         shot(app, "L01-move-result-L"); app.swipeUp(velocity: .slow); shot(app, "L01-move-result-s1-L")
 
         tap(app, "legacy-move-again"); tap(app, "legacy-move-choose")
@@ -111,7 +112,7 @@ import XCTest
 
         tap(app, "legacy-move-restart"); tap(app, "legacy-move-choose")
         XCTAssertEqual(move(app), "انتقلت غرفك إلى مدار.", "After undo the same file must move again")
-        XCTAssertTrue(app.descendants(matching: .any)["legacy-move-outcome-prayer"].label.contains("وصل"))
+        XCTAssertTrue(app.descendants(matching: .any)["legacy-move-outcome-habits"].label.contains("وصل"))
         let money = app.descendants(matching: .any)["legacy-move-outcome-money"]
         XCTAssertTrue(money.label.contains("حرك"), "Undo must clear the bus receipts so money moves again: " + money.label)
         // Messages left for review are one tap away from the result.

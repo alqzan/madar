@@ -90,8 +90,8 @@ import XCTest
         app.buttons["money-account-keyboard-done"].tap()
         let save = app.buttons["money-account-save"]; for _ in 0..<5 where !save.isHittable { app.swipeUp(velocity: .slow) }; shot(app, "M5-V19-add-L"); save.tap()
         XCTAssertTrue(app.buttons["money-account-حساب الأسرة"].waitForExistence(timeout: 10)); XCTAssertEqual(net.label, before)
-        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
-        XCTAssertFalse(app.buttons["money-account-حساب الأسرة"].exists); XCTAssertEqual(net.label, before)
+        // Owner, 5 Nov 2026: only a removal offers the undo line; saving an account stays quiet.
+        XCTAssertFalse(app.buttons["undo-button"].exists)
     }
     func testKnownEditableOpeningBalanceCannotBeClearedAndSaved() {
         continueAfterFailure = false
@@ -239,5 +239,41 @@ import XCTest
         route.tap()
         XCTAssertTrue(name.waitForExistence(timeout: 3), "A route must wait even when an unchanged account is saving.")
         XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 15), app.debugDescription)
+    }
+
+    // Owner, 22 Nov 2026: exchange rates and manual income from the accounts screen.
+    private func openWithForeignAccount() -> XCUIApplication {
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "accounts", "MADAR_UI_MONEY_FOREIGN_ACCOUNT": "1", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
+        app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
+        let door = app.buttons["money-accounts-open"]; XCTAssertTrue(door.waitForExistence(timeout: 10)); for _ in 0..<8 where !door.isHittable { app.swipeUp(velocity: .slow) }; door.tap()
+        XCTAssertTrue(app.staticTexts["money-accounts-net"].waitForExistence(timeout: 10))
+        return app
+    }
+    func testRatesSheetNormalisesArabicDigitsAndShowsAConcreteExample() {
+        continueAfterFailure = false
+        let app = openWithForeignAccount()
+        let door = app.buttons["money-rates-door"]
+        for _ in 0..<8 where !door.exists || !door.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(door.waitForExistence(timeout: 5), app.debugDescription); door.tap()
+        let field = app.textFields["money-rate-field-USD"]; XCTAssertTrue(field.waitForExistence(timeout: 8), app.debugDescription)
+        field.tap(); field.typeText("٣٫٧٥")
+        let example = app.staticTexts["money-rate-example-USD"]; XCTAssertTrue(example.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(example.label.contains("١٠٠") && example.label.contains("٣٧٥"), example.label)
+        app.buttons["money-rate-save-USD"].tap()
+        let current = app.staticTexts["money-rate-current-USD"]; XCTAssertTrue(current.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(current.label.contains("٣٫٧٥"), current.label)
+    }
+    func testManualIncomeIsLoggedIntoATrackedAccount() {
+        continueAfterFailure = false
+        let app = openWithForeignAccount()
+        let door = app.buttons["money-income-door"]
+        for _ in 0..<8 where !door.exists || !door.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(door.waitForExistence(timeout: 5), app.debugDescription); door.tap()
+        let amount = app.textFields["money-income-amount"]; XCTAssertTrue(amount.waitForExistence(timeout: 8), app.debugDescription)
+        let save = app.buttons["money-income-save"]; XCTAssertFalse(save.isEnabled)
+        amount.tap(); amount.typeText("250")
+        XCTAssertTrue(save.isEnabled); save.tap()
+        XCTAssertTrue(amount.waitForNonExistence(timeout: 10), "The sheet closes once the income is recorded.")
     }
 }

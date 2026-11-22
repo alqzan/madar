@@ -228,7 +228,7 @@ struct QuranHomeView: View {
                     Button { detail = nil } label: { Text("تمّ").font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).foregroundStyle(theme.ink) }
                 } else if step.available, !step.completed, state?.draft == nil {
                     // Owner 20 Oct: the day's order is a suggestion, not a gate; any open step can start now.
-                    Button(step.id == next?.id ? "ابدأ" : "ابدأ بها الآن") { detail = nil; run { active = try await service.start(kind: step.kind, stepID: step.id, range: step.range, rakaat: nil, spotID: nil) } }.disabled(busy)
+                    Button(step.id == next?.id ? "ابدأ" : "ابدأ بها الآن") { detail = nil; run { active = try await beginSession(step) } }.disabled(busy)
                         .font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()).contentShape(Capsule())
                         .disabled(busy).accessibilityIdentifier("quran-step-start")
                     Button { detail = nil } label: { Text("تمّ").font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).foregroundStyle(theme.ink) }
@@ -466,7 +466,7 @@ struct QuranHomeView: View {
                 }.frame(minHeight: 50).strikethrough(step.completed).opacity(step.completed ? 0.55 : 1).contentShape(Rectangle())
             }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-step-" + step.id)
             if step.id == next?.id, state?.draft == nil {
-                Button("ابدأ") { run { active = try await service.start(kind: step.kind, stepID: step.id, range: step.range, rakaat: nil, spotID: nil) } }.disabled(busy)
+                Button("ابدأ") { run { active = try await beginSession(step) } }.disabled(busy)
                     .font(bodyFont(14, bold: true)).foregroundStyle(theme.onAccent).padding(.horizontal, 20).frame(minHeight: 44)
                     .background(theme.color("accent"), in: Capsule()).contentShape(Capsule()).contentShape(.capsule).disabled(busy).accessibilityIdentifier("quran-begin")
                 if step.kind == .hifz, step.range != nil, !step.completed, state?.draft == nil {
@@ -662,8 +662,17 @@ struct QuranHomeView: View {
         else if route.path.first == "session" {
             if route.path.last == "qiyam" { return }
             else if let draft = state?.draft { active = try await service.resume(draftID: draft.id) }
-            else if let kind = QuranUIKind(rawValue: route.path.last == "wird" ? "hifz" : route.path.last ?? "") { active = try await service.start(kind: kind, stepID: nil, range: nil, rakaat: nil, spotID: nil) }
+            else if let kind = QuranUIKind(rawValue: route.path.last == "wird" ? "hifz" : route.path.last ?? "") { let started = try await service.start(kind: kind, stepID: nil, range: nil, rakaat: nil, spotID: nil); active = kind == .hifz ? try await readGradeStart(started) : started }
         }
+    }
+    /// Owner 22 Nov: a wird starts as «اقرأ ثم قيّم» (read, then one grade); the ayah-by-ayah coach is one tap inside the session.
+    private func beginSession(_ step: QuranUIStep) async throws -> QuranUISessionState {
+        let started = try await service.start(kind: step.kind, stepID: step.id, range: step.range, rakaat: nil, spotID: nil)
+        return step.kind == .hifz ? try await readGradeStart(started) : started
+    }
+    private func readGradeStart(_ started: QuranUISessionState) async throws -> QuranUISessionState {
+        if case .active(let next) = try await service.session(draftID: started.id, action: .changeMethod("readGrade")) { return next }
+        return started
     }
     private func finishWhole(_ step: QuranUIStep, grade: QuranUIGrade) {
         wholeStep = nil

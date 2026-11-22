@@ -58,7 +58,7 @@ struct MoneyCashbackView: View {
                 } else { ProgressView().frame(maxWidth: .infinity, minHeight: 260) }
             }.padding(.horizontal, 16).padding(.bottom, 96).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
-            .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .task { load() }.onChange(of: app.moneyRevision) { load() }
             .sheet(item: $rateCard) { card in
                 MoneyCashbackRateSheet(app: app, card: card, visible: visible) { rateCard = nil; load() }.environment(\.roomTheme, theme)
             }

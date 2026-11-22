@@ -98,7 +98,7 @@ struct MoneyHomeReading: Sendable {
     func requireReadableStore() throws {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
         guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
-        _ = app.prayerRevision
+        _ = app.moneyRevision
     }
     func load(at instant: Date? = nil) throws -> MoneyHomeReading {
         try requireReadableStore()
@@ -111,7 +111,7 @@ struct MoneyHomeReading: Sendable {
         let session = app
         try requireReadableStore()
         guard !session.settingsWriteInProgress else { throw BackupOperationError.busy }
-        let revision = session.prayerRevision, generation = session.storeGeneration, container = session.container
+        let revision = session.moneyRevision, container = session.container
         let request = MoneyHomeReadRequest(now: instant ?? session.prayerNow(), currency: session.string("core.currency"),
             timeZoneIdentifier: session.activePlace.timeZone.identifier)
         let readTask = Task.detached(priority: .userInitiated) {
@@ -121,8 +121,8 @@ struct MoneyHomeReading: Sendable {
         let reading = try await withTaskCancellationHandler { try await readTask.value } onCancel: { readTask.cancel() }
         try Task.checkCancellation()
         try requireReadableStore()
-        guard !session.settingsWriteInProgress, session.prayerRevision == revision,
-              session.storeGeneration == generation, session.container === container else { throw CancellationError() }
+        guard !session.settingsWriteInProgress, session.moneyRevision == revision,
+              session.container === container else { throw CancellationError() }
         return reading
     }
 

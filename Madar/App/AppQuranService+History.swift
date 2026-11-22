@@ -135,7 +135,7 @@ extension AppQuranService {
     func sessionLogOffMain(at instant: Date? = nil) async throws -> QuranUISessionLog {
         let app = app, evaluatedAt = instant ?? clock()
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
-        let container = app.container, generation = app.storeGeneration, revision = app.prayerRevision
+        let container = app.container, revision = app.quranRevision
         let configuration = QuranSessionLogProjectionConfiguration(timeZone: app.activePlace.timeZone,
             firstCalendar: FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri,
             hijriSource: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura,
@@ -157,7 +157,7 @@ extension AppQuranService {
         let result = try await withTaskCancellationHandler { try await readTask.value } onCancel: { readTask.cancel() }
         try Task.checkCancellation()
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
-        guard app.prayerRevision == revision, app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+        guard app.quranRevision == revision, app.container === container else { throw CancellationError() }
         return result
     }
     /// The same «في صدرك» phrase as the room's home: whole parts first, then the faces outside them.

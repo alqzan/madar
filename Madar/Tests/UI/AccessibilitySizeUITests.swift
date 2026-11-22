@@ -21,7 +21,6 @@ import XCTest
         XCTAssertEqual(app.state, .runningForeground)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "ax5-\(tab)"; shot.lifetime = .keepAlways; add(shot)
     }
-    func testPrayerAX5() { open("prayer", ["MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_TRACKING_START": "2026-10-01"], contentIdentifier: "prayer-today-header") }
     func testQuranAX5() { open("quran", ["MADAR_UI_QURAN_FIXTURE": "home"], contentIdentifier: "quran-home") }
     func testMoneyAX5() { open("money", ["MADAR_UI_MONEY_FIXTURE": "showcase"], contentIdentifier: "money-title") }
     func testDiaryAX5() { open("notes", ["MADAR_UI_DIARY_FIXTURE": "entryRoute", "MADAR_UI_DIARY_ROOT": "1"], contentIdentifier: "diary-day-more") }

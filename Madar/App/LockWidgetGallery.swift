@@ -32,8 +32,6 @@ struct LockWidgetGallery:View {
                     }.padding(14).background(theme.surface, in: .rect(cornerRadius: 22))
                     RoomWidgetContent(room:.upcoming,snapshot:value(.upcoming),family:.accessoryInline).padding(14).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:18))
                     HStack(spacing:16) {
-                        let next=session.snapshotStore.read("prayerNext",as:PrayerNextSnapshot.self,now:session.prayerNow())
-                        NextPrayerView(entry:.init(date:session.prayerNow(),snapshot:next?.payload,tzID:next?.tzID ?? session.activePlace.timeZoneID),previewFamily:.accessoryRectangular)
                         preview(.habits,family:.accessoryRectangular)
                     }.frame(height:78).padding(14).background(theme.surface,in:.rect(cornerRadius:22))
                     Text("مركز التحكم وزر الإجراء").font(MadarTypography.section())

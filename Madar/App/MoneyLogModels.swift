@@ -22,6 +22,24 @@ struct MoneyLogMovement: Identifiable, Sendable {
     var detail: MoneySourceDetail
     var searchIndex: String
     var searchIndexWithAmount: String
+    /// What the edit sheet needs; nil for a movement that still waits for a decision.
+    var edit: MoneyMovementEdit? = nil
+}
+/// Owner, 22 Nov 2026: a confirmed movement can be corrected. Label and category always; amount and time only when
+/// nothing leans on it (`lockReason` says what does, in one short line).
+struct MoneyMovementEdit: Sendable {
+    var merchant: String?
+    var categoryID: UUID?
+    /// The movement's own currency, in which `amountMinor` is written (the home amount follows the frozen rate).
+    var currency: String
+    var amountMinor: Int
+    var lockReason: String?
+    /// A refund takes its purchase's category, so its own sheet shows no category choice.
+    var categoryFollowsPurchase = false
+}
+struct MoneyCategoryChoice: Identifiable, Sendable, Hashable {
+    var id: UUID
+    var name: String
 }
 struct MoneyLogDay: Identifiable, Sendable {
     var id: String { day.description }
@@ -182,6 +200,10 @@ enum MoneyLogReadingBuilder {
         var movements: [MoneyLogMovement] = [], kept: [MoneyTransaction] = []
         let owned = Set(accounts.filter { $0.ownership == "mine" && $0.tracked }.map(\.id))
         let effects = try repo.effectContext()
+        let closedCycleIDs = Set(try context.fetch(FetchDescriptor<Cycle>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.closedAt != nil }.map(\.id))
+        let pointedAt = Set(tx.compactMap(\.relatedTransactionID))
+        let plannedIDs = Set(try context.fetch(FetchDescriptor<EnvelopePlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.map(\.id))
+        let reconciliations = try context.fetch(FetchDescriptor<Reconciliation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         for (index, row) in tx.enumerated() {
             if index.isMultiple(of: 64) { try Task.checkCancellation() }
             if let card = row.cardID.flatMap({ cardByID[$0] }), let account = card.accountID, !owned.contains(account) { continue }
@@ -220,7 +242,19 @@ enum MoneyLogReadingBuilder {
             }
             movements.append(.init(id: row.id, day: day, at: row.eventAt, title: title, category: category, payment: payment, kind: row.kind, cardID: row.cardID,
                 cash: row.fromAccountID.map(cashAccountIDs.contains) ?? false, bnpl: row.method == "bnpl" || row.kind == "repayment", amountMinor: row.homeAmountMinor,
-                confirmed: confirmed, budgetLabel: budgetLabel, detail: detail, searchIndex: searchIndex, searchIndexWithAmount: searchIndexWithAmount))
+                confirmed: confirmed, budgetLabel: budgetLabel, detail: detail, searchIndex: searchIndex, searchIndexWithAmount: searchIndexWithAmount,
+                edit: !confirmed ? nil : .init(merchant: row.merchant, categoryID: row.categoryID, currency: row.currency, amountMinor: row.amountMinor, lockReason: {
+                    if !["expense", "fee", "withdrawal", "transfer", "income"].contains(row.kind) { return "هذا النوع من الحركات لا يتغيّر مبلغه ولا وقته." }
+                    if row.obligationID != nil || row.installmentID != nil { return "مرتبطة بالتزام، فمبلغها ووقتها ثابتان." }
+                    if row.relatedTransactionID != nil || pointedAt.contains(row.id) { return "مرتبطة بردّ، فمبلغها ووقتها ثابتان." }
+                    if let cycleID = row.cycleID, closedCycleIDs.contains(cycleID) { return "دورتها مقفلة، فمبلغها ووقتها ثابتان." }
+                    if row.ignoredFromBudget { return "مستثناة من الميزانية؛ أعِدها إليها لتغيّر مبلغها أو وقتها." }
+                    if plannedIDs.contains(row.id) { return "لها خطة سداد، فمبلغها ووقتها ثابتان." }
+                    let sides = Set([row.fromAccountID, row.toAccountID, row.cardID].compactMap { $0 })
+                    if reconciliations.contains(where: { r in [r.accountID, r.cardID].compactMap { $0 }.contains(where: sides.contains) && row.eventAt <= r.at }) { return "طوبق رصيدها مع البنك بعدها، فمبلغها ووقتها ثابتان." }
+                    if row.currency != row.homeCurrency && row.rateAtTime == nil { return "بلا سعر صرف محفوظ، فمبلغها ثابت." }
+                    return nil
+                }(), categoryFollowsPurchase: row.kind == "refund" && row.relatedTransactionID != nil)))
         }
         let drafted = Set(tx.compactMap(\.messageID))
         for message in messages where ["needsLook", "possibleDuplicate"].contains(message.status) && !drafted.contains(message.id) {
@@ -315,7 +349,7 @@ extension AppMoneyService {
             do {
                 try requireReadableStore()
                 guard !session.settingsWriteInProgress else { throw BackupOperationError.busy }
-                let revision = session.prayerRevision, generation = session.storeGeneration, container = session.container
+                let revision = session.moneyRevision, container = session.container
                 let request = logReadRequest(month: month, at: now)
                 let readTask = Task.detached(priority: .userInitiated) {
                     let worker = MoneyLogReadActor(modelContainer: container)
@@ -324,8 +358,8 @@ extension AppMoneyService {
                 let reading = try await withTaskCancellationHandler { try await readTask.value } onCancel: { readTask.cancel() }
                 try Task.checkCancellation()
                 try requireReadableStore()
-                guard !session.settingsWriteInProgress, session.prayerRevision == revision,
-                      session.storeGeneration == generation, session.container === container else { throw CancellationError() }
+                guard !session.settingsWriteInProgress, session.moneyRevision == revision,
+                      session.container === container else { throw CancellationError() }
                 return reading
             } catch is CancellationError {
                 try Task.checkCancellation()
@@ -347,5 +381,15 @@ extension AppMoneyService {
             hijriOffset: Int(app.number("core.hijriOffset")),
             numerals: app.string("core.numerals") == "western" ? .western : .hindi,
             currency: app.string("core.currency"))
+    }
+}
+
+extension AppMoneyService {
+    /// The live categories, in the order the shelves use, for the movement edit sheet's picker.
+    func loadCategoryChoices() throws -> [MoneyCategoryChoice] {
+        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        let context = ModelContext(app.container)
+        return try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            .sorted { $0.order == $1.order ? $0.name < $1.name : $0.order < $1.order }.map { .init(id: $0.id, name: $0.name) }
     }
 }

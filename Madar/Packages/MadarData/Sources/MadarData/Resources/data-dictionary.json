@@ -66,9 +66,9 @@
     }
   ],
   "modelCount": {
-    "synced": 59,
+    "synced": 61,
     "deviceOnly": 6,
-    "total": 65
+    "total": 67
   },
   "reconcileOrder": [
     "Setting",
@@ -130,7 +130,8 @@
     "AccountTail",
     "BankReading",
     "UpcomingDue",
-    "MushafBookmark"
+    "MushafBookmark",
+    "CurrencyRate"
   ],
   "models": [
     {
@@ -5763,6 +5764,55 @@
           "note": "the owner's name for the bookmark"
         }
       ]
+    },
+    {
+      "name": "CurrencyRate",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [
+        "currency is an ISO 4217 code different from homeCurrency",
+        "rateToHome parses as a positive Decimal",
+        "rows are history: the reading at an instant uses the latest live row with setAt <= instant and homeCurrency == core.currency"
+      ],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "a manual exchange rate the user entered for one currency outside travel; recorded movements keep their own frozen rateAtTime",
+      "amendedBy": "owner 22 Nov 2026, manual rate per currency (schema V19)",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "currency",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "ISO 4217"
+        },
+        {
+          "name": "rateToHome",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "Decimal as canonical String (ASCII, \".\" separator): home units per 1 unit of `currency`"
+        },
+        {
+          "name": "homeCurrency",
+          "type": "String",
+          "optional": false,
+          "default": "SAR",
+          "unit": "ISO 4217",
+          "note": "core.currency when the rate was entered; a rate for another home currency is not read"
+        },
+        {
+          "name": "setAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()",
+          "note": "when the user entered the rate; shown with both calendars beside it"
+        }
+      ]
     }
   ],
   "snapshotEnvelope": {
@@ -6292,5 +6342,5 @@
       "execution": "Immediately on press, within undo window"
     }
   },
-  "storeSchemaVersion": 18
+  "storeSchemaVersion": 19
 }

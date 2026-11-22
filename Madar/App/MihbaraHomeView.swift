@@ -97,7 +97,7 @@ struct MihbaraHomeView: View {
             if empty, let route = app.mihbaraRoute { openRoute(route) }
         }
         .onChange(of: app.undoToken?.id) { load() }
-        .onChange(of: app.prayerRevision) { load() }
+        .onChange(of: app.booksRevision) { load() }
         .modifier(MihbaraHomeConfirmations(
             slotBook: $slotBook, pendingRemoval: $pendingRemoval,
             replacementBooks: { replacementBooks(for: $0) },

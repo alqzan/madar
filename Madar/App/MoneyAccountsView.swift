@@ -17,6 +17,8 @@ struct MoneyAccountsView: View {
     @State private var appeared = false
     @State private var reconcileOpen = false
     @State private var transferOpen = false
+    @State private var ratesOpen = false
+    @State private var incomeOpen = false
     #if DEBUG
     @State private var injectedReadFailure = false
     #endif
@@ -68,6 +70,16 @@ struct MoneyAccountsView: View {
                         Button { transferOpen = true } label: { Label("حوّل بين حساباتي أو اسحب نقدًا", systemImage: "arrow.left.arrow.right").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48) }
                             .buttonStyle(.madarPlain).foregroundStyle(theme.accent).background(theme.surface, in: .rect(cornerRadius: 14)).accessibilityIdentifier("money-accounts-transfer")
                     }
+                    // Owner, 22 Nov 2026: money that came in without a bank message, and the rates that let a foreign account count.
+                    if !incomeTargets(r).isEmpty {
+                        Button { incomeOpen = true } label: { Label("أضف دخلاً", systemImage: "plus.circle").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48) }
+                            .buttonStyle(.madarPlain).foregroundStyle(theme.accent).background(theme.surface, in: .rect(cornerRadius: 14)).accessibilityIdentifier("money-income-door")
+                    }
+                    if needsRates(r) {
+                        Button { ratesOpen = true } label: {
+                            Label(r.basis == nil ? "أسعار الصرف: ناقصة" : "أسعار الصرف", systemImage: "coloncurrencysign.arrow.circlepath").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48)
+                        }.buttonStyle(.madarPlain).foregroundStyle(theme.accent).background(theme.surface, in: .rect(cornerRadius: 14)).accessibilityIdentifier("money-rates-door")
+                    }
                     HStack(spacing: 8) {
                         Label(r.shortcutAt == nil ? "لم تصل رسالة عبر الاختصار بعد" : "رسائل عبر الاختصار", systemImage: r.shortcutAt == nil ? "tray" : "checkmark.circle").font(MadarTypography.caption())
                         Spacer(minLength: 0)
@@ -80,9 +92,11 @@ struct MoneyAccountsView: View {
                 else { ProgressView().frame(height: 250) }
             }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).toolbar(.hidden, for: .navigationBar, .tabBar)
-            .task { load(); withAnimation(reduceMotion ? nil : .easeOut(duration: 0.5)) { appeared = true } }.onChange(of: app.prayerRevision) { load() }
+            .task { load(); withAnimation(reduceMotion ? nil : .easeOut(duration: 0.5)) { appeared = true } }.onChange(of: app.moneyRevision) { load() }
             .sheet(item: $selected) { MoneyAccountSheet(app: app, original: $0, visible: visible, revealed: $revealed) }.sheet(item: $selectedSource) { source($0) }
             .sheet(isPresented: $transferOpen, onDismiss: load) { if let r = reading { MoneyTransferView(app: app, accounts: transferable(r), visible: visible).environment(\.roomTheme, theme) } }
+            .sheet(isPresented: $ratesOpen, onDismiss: load) { MoneyRatesSheet(app: app).environment(\.roomTheme, theme) }
+            .sheet(isPresented: $incomeOpen, onDismiss: load) { if let r = reading { MoneyIncomeSheet(app: app, accounts: incomeTargets(r)).environment(\.roomTheme, theme) } }
             .navigationDestination(isPresented: $reconcileOpen) { MoneyReconcileView(app: app, revealed: $revealed) }
             .accessibilityIdentifier("money-accounts")
     }
@@ -186,6 +200,14 @@ struct MoneyAccountsView: View {
 }
 
 extension MoneyAccountsView {
+    /// My tracked accounts: the only ones income can be logged into.
+    func incomeTargets(_ r: MoneyAccountsReading) -> [MoneyAccountRow] {
+        r.rows.filter { $0.side == .cash && $0.accountID != nil && $0.edit?.ownership == "mine" && $0.edit?.tracked == true }
+    }
+    /// A tracked account in a foreign currency is the reason to offer rates.
+    func needsRates(_ r: MoneyAccountsReading) -> Bool {
+        r.rows.contains { $0.side == .cash && $0.accountID != nil && $0.edit?.ownership == "mine" && $0.edit?.tracked == true && $0.currency != app.string("core.currency") }
+    }
     /// Own tracked accounts with a known balance: the only ones money can move between.
     func transferable(_ r: MoneyAccountsReading) -> [MoneyAccountRow] {
         r.rows.filter { $0.side == .cash && $0.accountID != nil && $0.edit?.ownership == "mine" && $0.edit?.tracked == true && $0.amountMinor != nil }
@@ -286,6 +308,147 @@ private struct MoneyTransferView: View {
             defer { working = false }
             do { try await app.executeMoneyCommand("money.logTransfer", payload: payload); dismiss() }
             catch { errorMessage = "لم يُسجَّل؛ تأكد من الحسابين والمبلغ ثم أعد المحاولة." }
+        }
+    }
+}
+
+/// «أسعار الصرف»: how many home units one unit of each foreign currency is worth. A new rate is kept as history, the latest
+/// counts for balances from now on, and movements already recorded keep the rate they were written with.
+private struct MoneyRatesSheet: View {
+    let app: AppSession
+    @Environment(\.roomTheme) private var theme
+    @Environment(\.dismiss) private var dismiss
+    @State private var rows: [MoneyRateRow] = []
+    @State private var loaded = false
+    @State private var inputs: [String: String] = [:]
+    @State private var working: String?
+    @State private var errors: [String: String] = [:]
+    @State private var readFailure = false
+    private var service: AppMoneyService { .init(app: app) }
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                MoneyPageHeader(title: "أسعار الصرف", close: { dismiss() }, closeDisabled: working != nil)
+                if readFailure { Text("لم تكتمل قراءة الأسعار. أغلق الصفحة وافتحها مرة أخرى.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-rates-read-error") }
+                else if loaded && rows.isEmpty { Text("حساباتك كلها بعملتك الأساسية؛ لا تحتاج سعرًا.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-rates-empty") }
+                else if loaded { Text("اكتب كم تساوي وحدة واحدة من العملة بعملتك الأساسية. الحركات المسجّلة تحتفظ بسعرها وقت تسجيلها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true) }
+                ForEach(rows) { row in rateCard(row) }
+            }.padding(20)
+        }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
+            .presentationDetents([.large]).presentationDragIndicator(.visible).madarSheetLock(saving: working != nil, draft: inputs.values.contains { !$0.isEmpty })
+            .task { reload() }.accessibilityIdentifier("money-rates")
+    }
+    private func rateCard(_ row: MoneyRateRow) -> some View {
+        let typed = inputs[row.code] ?? "", canonical = AppMoneyService.canonicalRate(typed)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(row.name + " (" + row.code + ")").font(MadarTypography.cardTitle())
+            if !row.accounts.isEmpty { Text("حسابات: " + row.accounts.joined(separator: "، ")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+            if let rate = row.rate, let at = row.setAt {
+                Text(figure: "السعر الآن " + service.localizedRate(rate)).font(MadarTypography.body()).accessibilityIdentifier("money-rate-current-" + row.code)
+                MadarDateLabel(app.dateLabels(.containing(at, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
+            } else {
+                Text("لم تُدخل سعرًا بعد؛ الحساب خارج المجموع حتى تفعل.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
+            }
+            HStack(spacing: 8) {
+                TextField("السعر الجديد", text: Binding(get: { inputs[row.code] ?? "" }, set: { inputs[row.code] = $0; errors[row.code] = nil }))
+                    .keyboardType(.decimalPad).font(MadarTypography.body()).padding(10).frame(minHeight: 44).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
+                    .accessibilityIdentifier("money-rate-field-" + row.code)
+                Button(working == row.code ? "جارٍ الحفظ…" : "احفظ") { save(row, canonical ?? "") }
+                    .font(MadarTypography.body().bold()).padding(.horizontal, 16).frame(minHeight: 44).foregroundStyle(theme.onAccent)
+                    .background(theme.color("accent").opacity(canonical == nil || working != nil ? 0.4 : 1), in: Capsule())
+                    .disabled(canonical == nil || working != nil).accessibilityIdentifier("money-rate-save-" + row.code)
+            }
+            if let canonical, let example = service.rateExample(code: row.code, rate: canonical) {
+                Text(figure: example).font(MadarTypography.caption()).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-rate-example-" + row.code)
+            } else if !typed.isEmpty {
+                Text("اكتب رقمًا مثل ٣٫٧٥.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
+            }
+            if let message = errors[row.code] { Text(message).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-rate-error-" + row.code) }
+        }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 14))
+    }
+    private func reload() {
+        do { rows = try service.loadRates(); readFailure = false } catch { readFailure = rows.isEmpty }
+        loaded = true
+    }
+    private func save(_ row: MoneyRateRow, _ rate: String) {
+        guard working == nil, !rate.isEmpty else { return }
+        working = row.code; errors[row.code] = nil
+        Task {
+            defer { working = nil }
+            do {
+                try await app.executeMoneyCommand("money.setCurrencyRate", payload: ["currency": .string(row.code), "rate": .string(rate)])
+                inputs[row.code] = ""; reload()
+            } catch { errors[row.code] = "لم يُحفظ السعر الآن. حاول مرة أخرى بعد قليل." }
+        }
+    }
+}
+
+/// «أضف دخلاً»: money that came in without a salary message, into one of my tracked accounts.
+private struct MoneyIncomeSheet: View {
+    let app: AppSession
+    let accounts: [MoneyAccountRow]
+    @Environment(\.roomTheme) private var theme
+    @Environment(\.dismiss) private var dismiss
+    @State private var toID: UUID?
+    @State private var input = ""
+    @State private var label = ""
+    @State private var date = Date()
+    @State private var working = false
+    @State private var errorMessage: String?
+    @FocusState private var focused: Bool
+    private var service: AppMoneyService { .init(app: app) }
+    private var target: MoneyAccountRow? { accounts.first { $0.accountID == toID } }
+    private var amountMinor: Int? {
+        guard let currency = target?.currency, let exponent = CurrencyExponents.specified.exponent(currency),
+              let minor = MoneyAmountInput.minor(input, exponent: exponent), minor > 0 else { return nil }
+        return minor
+    }
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                MoneyPageHeader(title: "أضف دخلاً", close: { dismiss() }, closeDisabled: working)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("يدخل إلى").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 8) {
+                            ForEach(accounts) { account in
+                                let on = toID == account.accountID
+                                Button { toID = account.accountID } label: {
+                                    Text(account.name).font(MadarTypography.caption().bold()).padding(.horizontal, 14).frame(minHeight: 48)
+                                        .foregroundStyle(on ? theme.onAccent : theme.ink).background(on ? theme.color("accent") : theme.surface, in: .rect(cornerRadius: 14))
+                                }.buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("money-income-account-" + account.name)
+                            }
+                        }
+                    }.scrollIndicators(.hidden)
+                }
+                TextField(target.map { "المبلغ بـ" + ($0.currency == "SAR" ? "ريال" : service.currencyName($0.currency)) } ?? "المبلغ", text: $input)
+                    .keyboardType(.decimalPad).focused($focused).font(MadarTypography.cardTitle()).padding(14)
+                    .overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.line, lineWidth: 1) }.accessibilityIdentifier("money-income-amount")
+                TextField("مصدر الدخل، إن أردت", text: $label).frame(minHeight: 44).accessibilityIdentifier("money-income-label")
+                DatePicker("الوقت", selection: $date, in: ...app.prayerNow(), displayedComponents: [.date, .hourAndMinute]).environment(\.timeZone, app.activePlace.timeZone).frame(minHeight: 44)
+                MadarDateLabel(app.dateLabels(.containing(date, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
+                if let target, target.currency != app.string("core.currency") {
+                    Text("حساب بعملة أخرى: يلزمه سعر صرف من «أسعار الصرف» قبل التسجيل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                }
+                if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-income-error") }
+                Button(working ? "جارٍ الحفظ…" : "سجّل الدخل", action: save).buttonStyle(MadarPrimaryButton())
+                    .disabled(working || target == nil || amountMinor == nil).accessibilityIdentifier("money-income-save")
+            }.padding(20)
+        }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
+            .presentationDetents([.large]).presentationDragIndicator(.visible).madarSheetLock(saving: working, draft: !input.isEmpty)
+            .onAppear { if toID == nil { toID = accounts.first { $0.edit?.kind != "cash" }?.accountID ?? accounts.first?.accountID }; date = app.prayerNow() }
+            .accessibilityIdentifier("money-income")
+    }
+    private func save() {
+        guard !working, let to = target?.accountID, let minor = amountMinor else { return }
+        focused = false; working = true; errorMessage = nil
+        var payload: [String: MadarCore.JSONValue] = ["amountMinor": .string(String(minor)), "toAccountID": .string(to.uuidString), "eventAt": .string(ISO8601DateFormatter().string(from: date))]
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { payload["merchant"] = .string(String(trimmed.prefix(80))) }
+        Task {
+            defer { working = false }
+            do { try await app.executeMoneyCommand("money.logIncome", payload: payload); dismiss() }
+            catch { errorMessage = "لم يُسجَّل الدخل؛ تأكد من الحساب والمبلغ" + (target?.currency != app.string("core.currency") ? " وسعر صرف عملته" : "") + " ثم أعد المحاولة." }
         }
     }
 }

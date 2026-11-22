@@ -1,7 +1,7 @@
 import XCTest
 
 /// Owner real-data trial, item 19 (24 Oct 2026). Runs only when TEST_RUNNER_MADAR_TRIAL_BACKUP names the old backup and
-/// TEST_RUNNER_MADAR_TRIAL_ZIP its diary as a Day One ZIP on this Mac: money, Quran, prayer and diary go into ONE fresh
+/// TEST_RUNNER_MADAR_TRIAL_ZIP its diary as a Day One ZIP on this Mac: money, Quran, habits and diary go into ONE fresh
 /// UI-test store, then the money room, the diary and the Mihbara are walked with all of it present.
 @MainActor final class OwnerAllDataTrialUITests: XCTestCase {
     /// Records and dismisses any app alert so the walk continues; the alert text is a finding.
@@ -127,11 +127,11 @@ import XCTest
         let stamp = "all-" + String(Int(Date().timeIntervalSince1970))
         let diaryReport = folder.appendingPathComponent("diary-import-\(stamp).json")
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_TRIAL_MONEY": backup, "MADAR_TRIAL_QURAN": backup, "MADAR_TRIAL_PRAYER": backup, "MADAR_TRIAL_HABITS": backup, "MADAR_TRIAL_PERSONAL": backup,
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_TRIAL_MONEY": backup, "MADAR_TRIAL_QURAN": backup, "MADAR_TRIAL_HABITS": backup, "MADAR_TRIAL_PERSONAL": backup,
                                  "MADAR_UI_LEGACY_DIARY_ZIP": zip, "MADAR_UI_LEGACY_REPORT": diaryReport.path, "MADAR_TRIAL_RUN": stamp,
                                  "MADAR_UI_TRAVEL_FIX": "24.7136,46.6753,الرياض,SA,Asia/Riyadh", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         app.launch()
-        for room in ["money", "quran", "prayer", "habits", "personal"] {
+        for room in ["money", "quran", "habits", "personal"] {
             let r = try report(folder.appendingPathComponent("\(room)-import-\(stamp).json"), timeout: 1200)
             XCTAssertNil(r["failed"], "\(room): \(r)")
             if room == "habits" || room == "personal" {
@@ -187,12 +187,12 @@ import XCTest
         let bahwTab = app.buttons["tab-foundation"].firstMatch, bahw = bahwTab.waitForExistence(timeout: 5) ? bahwTab : app.buttons["البهو"].firstMatch
         XCTAssertTrue(bahw.waitForExistence(timeout: 10), "The lobby is a required room")
         if bahw.exists { bahw.tap(); Thread.sleep(forTimeInterval: 2); shot(app, "TRIAL-bahw-L"); for i in 1...3 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-bahw-s\(i)-L") } }
-        // Prayer and Quran homes, then the habits room from the lobby (Claude, 24 Oct tour).
-        for (tab, name) in [("الصلاة", "prayer"), ("القرآن", "quran")] {
+        // The Quran home, then the habits room from the lobby (Claude, 24 Oct tour).
+        for (tab, name) in [("القرآن", "quran")] {
             let button = app.otherElements["fixed-tab-bar"].buttons[tab].firstMatch
             guard button.waitForExistence(timeout: 10) else { XCTFail("Required room tab missing: " + tab); continue }
             button.tap(); Thread.sleep(forTimeInterval: 2); clearAlert(app, name)
-            let marker = app.descendants(matching: .any).matching(identifier: name == "prayer" ? "prayer-today-header" : "quran-coverage-title").firstMatch
+            let marker = app.descendants(matching: .any).matching(identifier: "quran-coverage-title").firstMatch
             XCTAssertTrue(marker.waitForExistence(timeout: 20), "The " + name + " home must actually open; a tab tap alone is not proof")
             shot(app, "TRIAL-\(name)-home-L")
             for i in 1...4 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-\(name)-home-s\(i)-L") }

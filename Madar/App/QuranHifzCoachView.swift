@@ -42,6 +42,12 @@ struct QuranHifzCoachView: View {
             }
             if !fullPage {
                 if state.stage == .grading {
+                    if state.method == "readGrade" {
+                        Button { action(.changeMethod("coach")) } label: {
+                            Text("مدرّب آية بآية").font(font(12, bold: true)).foregroundStyle(theme.secondaryInk)
+                                .frame(minHeight: 44).padding(.horizontal, 16).contentShape(Capsule())
+                        }.buttonStyle(.madarPlain).disabled(busy).accessibilityIdentifier("quran-readgrade-to-coach")
+                    }
                     HStack(spacing: 8) {
                         VStack(spacing: 4) {
                             ForEach(state.grades) { grade in

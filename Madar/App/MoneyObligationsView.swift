@@ -84,7 +84,7 @@ struct MoneyObligationsView: View {
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
-            .task(id: "\(app.prayerRevision)-\(retryAttempt)") { load() }
+            .task(id: "\(app.moneyRevision)-\(retryAttempt)") { load() }
             .sheet(item: $editing, onDismiss: load) { MoneyEditNameSheet(app: app, target: $0, visible: visible).environment(\.roomTheme, theme) }
             .sheet(item: $obligationSheet) { route in
                 if let reading {

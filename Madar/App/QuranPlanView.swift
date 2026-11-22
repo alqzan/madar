@@ -20,11 +20,11 @@ struct QuranPlanView: View {
     @State private var madarDayGeneration = -1
     private var app: AppSession { service.app }
     private var displayedMadarDay: GregorianDay? {
-        guard madarDayRevision == app.prayerRevision, madarDayGeneration == app.storeGeneration else { return nil }
+        guard madarDayRevision == app.quranRevision, madarDayGeneration == app.quranRevision else { return nil }
         return loadedMadarDay
     }
     private func dayReadKey(at instant: Date) -> [Int] {
-        [Int(instant.timeIntervalSince1970 / 60), app.prayerRevision, app.storeGeneration, isFrontRoom ? 1 : 0]
+        [Int(instant.timeIntervalSince1970 / 60), app.quranRevision, app.quranRevision, isFrontRoom ? 1 : 0]
     }
     private let resetKeys = ["quran.hifzLevel", "quran.reviewLevel", "quran.restDay", "quran.wirdReminder", "quran.reviewSchedule"]
     init(service: AppQuranService, close: @escaping () -> Void, onSetupPresentationChange: @escaping (Bool) -> Void = { _ in }) {

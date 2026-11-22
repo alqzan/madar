@@ -30,7 +30,7 @@ struct MoneyRoomView: View {
             }
             else if trip { MoneyTravelView(app: app, revealed: $revealed, isTabRoot: isTabRoot) }
             else { MoneyHomeView(app: app, isTabRoot: isTabRoot) }
-        }.task(id: "\(app.prayerRevision)-\(retryAttempt)") { load() }
+        }.task(id: "\(app.moneyRevision)-\(retryAttempt)") { load() }
     }
     private func load() {
         do {
@@ -121,7 +121,7 @@ struct MoneyTravelView: View {
                 } else { Text("لا رحلة جارية. تبدأ حين تؤكد سفرك في غرفة الصلاة.").font(MadarTypography.body()).padding(24) }
             }.padding(.horizontal, 18).padding(.top, 6).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).environment(\.roomTheme, theme)
-            .toolbar(.hidden, for: .navigationBar, .tabBar).task(id: "\(app.prayerRevision)-\(retryAttempt)") { load(); entered = true }
+            .toolbar(.hidden, for: .navigationBar, .tabBar).task(id: "\(app.moneyRevision)-\(retryAttempt)") { load(); entered = true }
             .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
             .accessibilityIdentifier("money-travel")
             .sheet(isPresented: $editor) { if let r = reading { MoneyTripRateSheet(app: app, reading: r, visible: visible) } }

@@ -62,7 +62,6 @@ struct PrayerNotificationSlot: Equatable {
     let prayer: Prayer
     let prayerDay: PrayerDay
     let occurrence: PrayerOccurrence
-    let recorded: Bool
 }
 
 @MainActor enum PrayerNotificationSchedule {
@@ -75,7 +74,7 @@ struct PrayerNotificationSlot: Equatable {
                 guard let actualDay = PrayerTimesEngine.calculate(day: cell.reference.day, place: occurrence.place, options: options),
                       abs(actualDay.time(for: cell.reference.prayer).timeIntervalSince(occurrence.time)) < 1 else { continue }
                 result.append(.init(reference: cell.reference, prayer: cell.reference.prayer, prayerDay: actualDay,
-                                    occurrence: occurrence, recorded: PrayerNotificationCoordinator.isRecorded(cell.status)))
+                                    occurrence: occurrence))
             }
         }
         return result
@@ -84,41 +83,14 @@ struct PrayerNotificationSlot: Equatable {
     static func sanctityWindows(for slots: [PrayerNotificationSlot]) -> [SanctityWindow] {
         slots.compactMap { slot in slot.prayerDay.sanctityWindows.first { $0.prayer == slot.prayer } }
     }
-
-    static func candidates(for slots: [PrayerNotificationSlot], sanctityWindows: [SanctityWindow], askAfterAdhanMinutes: Int) -> [NotificationCandidate] {
-        slots.compactMap { slot in
-            NotificationArbiter.prayerAsk(day: slot.prayerDay, prayer: slot.prayer,
-                                           askAfterAdhanMinutes: askAfterAdhanMinutes, recorded: slot.recorded,
-                                           sanctityWindows: sanctityWindows)
-        }
-    }
-
-    /// «قبل الأذان»: the prayer-time alert, placed before the adhan because nothing may arrive during the sanctity window (RP3).
-    static func beforeCandidates(for slots: [PrayerNotificationSlot], sanctityWindows: [SanctityWindow], minutesBefore: Int) -> [NotificationCandidate] {
-        slots.compactMap { slot in
-            NotificationArbiter.prayerBefore(day: slot.prayerDay, prayer: slot.prayer, minutesBefore: minutesBefore, sanctityWindows: sanctityWindows)
-        }
-    }
-
-    static func timeZone(for reference: PrayerReference, repository: PrayerRepository, fallbackAt: Date) -> TimeZone {
-        repository.occurrence(reference)?.place.timeZone ?? repository.place(at: fallbackAt).timeZone
-    }
 }
 
 @MainActor
 final class PrayerNotificationCoordinator {
-    static let categoryID = "salah.ask"
-    /// Owner 17 Nov 2026: the prayer room and its records are gone; prayer times stay as anchors for other reminders.
-    static let prayerLoggingRemoved = true
     static let habitCategoryID = "habits.reminder"
     static let habitDoneActionID = "habits.done"
     static let wirdCategoryID = "quran.wird"
     static let wirdDoneActionID = "quran.wirdDone"
-    /// Friday noon: «في جماعة» needs the Jumu'ah/Dhuhr choice (RP5), so that button opens the app on the choice instead of recording.
-    static let fridayCategoryID = "salah.ask.friday"
-    static let snoozeActionID = "salah.snooze"
-    static let jamaahActionID = "salah.jamaah"
-    static let aloneActionID = "salah.alone"
     private static let requestPrefix = "salah."
 
     private let center: UNUserNotificationCenter
@@ -131,21 +103,13 @@ final class PrayerNotificationCoordinator {
 
     func install(delegate: UNUserNotificationCenterDelegate) {
         center.delegate = delegate
-        let snooze = UNNotificationAction(identifier: Self.snoozeActionID, title: "ذكّرني بعد ساعة", options: [])
-        // S10: record from the notification. «فاتتني» is not offered here: before the prayer's window ends it is not allowed (RP2).
-        let jamaah = UNNotificationAction(identifier: Self.jamaahActionID, title: "في جماعة", options: [])
-        let alone = UNNotificationAction(identifier: Self.aloneActionID, title: "وحدي", options: [])
-        let category = UNNotificationCategory(identifier: Self.categoryID, actions: [jamaah, alone, snooze], intentIdentifiers: [], options: [])
-        // FB-39: the old Friday «في جماعة» ran in the background, could not open the app, and so recorded nothing.
-        let fridayJamaah = UNNotificationAction(identifier: Self.jamaahActionID, title: "في جماعة", options: [.foreground])
-        let friday = UNNotificationCategory(identifier: Self.fridayCategoryID, actions: [fridayJamaah, alone, snooze], intentIdentifiers: [], options: [])
         // T11: a habit reminder can be finished from the notification itself.
         let habitDone = UNNotificationAction(identifier: Self.habitDoneActionID, title: "تمّت", options: [])
         let habit = UNNotificationCategory(identifier: Self.habitCategoryID, actions: [habitDone], intentIdentifiers: [], options: [])
         // 14 Nov owner: finish the whole wird from its reminder. It opens Madar on the grade question; nothing is recorded in the background.
         let wirdDone = UNNotificationAction(identifier: Self.wirdDoneActionID, title: "أتممته", options: [.foreground])
         let wird = UNNotificationCategory(identifier: Self.wirdCategoryID, actions: [wirdDone], intentIdentifiers: [], options: [])
-        baseCategories = [category, friday, habit, wird]
+        baseCategories = [habit, wird]
         center.setNotificationCategories(baseCategories)
     }
     private var baseCategories: Set<UNNotificationCategory> = []
@@ -269,7 +233,8 @@ final class PrayerNotificationCoordinator {
     }
 
     private func refreshLocked(session: AppSession, suppliedNow: Date?) async throws {
-        try session.reload()
+        // A read for the re-plan: every writer reloads its own rooms, so this one does not reload every page again.
+        try session.reload(domains: [])
         let now = suppliedNow ?? session.prayerNow()
         try session.publishNotificationBudget(at: now)
         pruneLedgerOncePerDay(now: now)
@@ -280,21 +245,9 @@ final class PrayerNotificationCoordinator {
         let currentAuthorization = await authorizationStatus()
         session.updateNotificationAuthorization(Self.authorizationCode(currentAuthorization))
 
-        let remindersAllowed = session.bool("notif.thisDeviceReminders") && Self.canSchedule(currentAuthorization)
         // Owner 17 Nov 2026: no prayer logging, so no «صلّيتها؟» ask and no before-adhan alert; the times only anchor other reminders.
-        let requestsEnabled = !Self.prayerLoggingRemoved && session.bool("salah.askReminder") && remindersAllowed
         let existing = await center.pendingNotificationRequests()
         var candidates: [NotificationCandidate] = []
-        if !Self.prayerLoggingRemoved && session.bool("salah.beforeReminder") && remindersAllowed {
-            candidates += PrayerNotificationSchedule.beforeCandidates(for: prayerSlots, sanctityWindows: sanctityWindows, minutesBefore: Int(session.number("salah.beforeAdhanMin")))
-                .filter { $0.dueAt <= now.addingTimeInterval(96 * 60 * 60) }
-        }
-        if requestsEnabled {
-            let askAfter = Int(session.number("salah.askAfterAdhanMin"))
-            candidates += PrayerNotificationSchedule.candidates(for: prayerSlots, sanctityWindows: sanctityWindows, askAfterAdhanMinutes: askAfter)
-                .filter { $0.dueAt <= now.addingTimeInterval(96 * 60 * 60) }
-            candidates += Self.pendingSnoozes(from: existing, prayerDays: days, sanctityWindows: sanctityWindows, repository: repository, now: now)
-        }
 
         let globalEnabled = session.bool("notif.thisDeviceReminders") && Self.canSchedule(currentAuthorization)
         if globalEnabled {
@@ -329,11 +282,9 @@ final class PrayerNotificationCoordinator {
             // The arbiter uses only the windows it is given, so the extension days planned for room reminders (zakat, annual) carry their own windows too.
             sanctityWindows: sanctityWindows + planningDays.flatMap(\.sanctityWindows)
         )
-        try await reconcile(plan: plan, candidates: candidates,
-                            current: existing.filter { $0.identifier.hasPrefix(Self.requestPrefix) },
-                            repository: repository)
+        try cancelRetiredPrayerRequests(existing.filter { $0.identifier.hasPrefix(Self.requestPrefix) })
         try await reconcileRooms(plan: plan, candidates: candidates, current: existing.filter { RoomNotificationContent.isRoomRequest($0.identifier) }, timeZone: repository.place(at: now).timeZone, consumed: Set(consumed.map(\.requestID)), prayerDays: planningDays, now: now)
-        try await reconcilePrayerActivity(prayerSlots: prayerSlots, sanctityWindows: sanctityWindows, repository: repository, now: now, session: session)
+        try await endRetiredPrayerCountdowns(now: now)
         try await reconcileContextActivities(prayerDays: days, prayerSlots: prayerSlots, sanctityWindows: sanctityWindows,
                                             repository: repository, now: now, session: session)
     }
@@ -358,12 +309,7 @@ final class PrayerNotificationCoordinator {
         defer { releaseLifecycleLock() }
         do {
             try updateLedger(requestID: response.notification.request.identifier, state: "observed")
-            if response.actionIdentifier == Self.snoozeActionID {
-                try await scheduleSnoozeLocked(for: response.notification.request, tapTime: Date())
-            } else if response.actionIdentifier == Self.jamaahActionID || response.actionIdentifier == Self.aloneActionID {
-                // Prayer records were retired (owner, 17 Nov 2026): an old notification's button writes nothing and says so.
-                session.errorMessage = "مدار لم يعد يسجّل الصلاة. أضف عادة لها من «العادات» إن أردت."
-            } else if response.actionIdentifier == Self.habitDoneActionID {
+            if response.actionIdentifier == Self.habitDoneActionID {
                 let info = response.notification.request.content.userInfo
                 guard let dayKey = info["dayKey"] as? String, let habit = (info["habit"] as? String).flatMap(UUID.init(uuidString:)) else { return }
                 try await session.completeHabitFromNotification(habitID: habit, dayKey: dayKey, requestID: response.notification.request.identifier)
@@ -389,7 +335,7 @@ final class PrayerNotificationCoordinator {
             } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
                 let request = response.notification.request
                 if RoomNotificationContent.isRoomRequest(request.identifier) { RoomNotificationContent.open(request.identifier, userInfo: request.content.userInfo, session: session) }
-                else { session.selectedTab = "prayer" }
+                else { session.selectedTab = "habits" }
             }
         } catch { session.errorMessage = "تعذّر تنفيذ تذكير الصلاة. \(madarUserMessage(error))" }
     }
@@ -409,8 +355,7 @@ final class PrayerNotificationCoordinator {
         defer { releaseLifecycleLock() }
         let now = Date()
         do {
-            try session.reload()
-            let userInfo = notification.request.content.userInfo
+            try session.reload(domains: [])
             if RoomNotificationContent.isRoomRequest(notification.request.identifier) {
                 guard session.bool("notif.thisDeviceReminders") else { return [] }
                 let repository = try PrayerRepository(context: ModelContext(session.container)), days = prayerDays(repository: repository, now: now)
@@ -419,132 +364,14 @@ final class PrayerNotificationCoordinator {
                 try updateLedger(requestID: notification.request.identifier, state: "observed")
                 return [.banner, .list, .sound]
             }
-            if notification.request.identifier.hasSuffix(".before") {
-                // Before the adhan only: it never shows inside a sanctity window, and it does not depend on the ask setting.
-                guard session.bool("salah.beforeReminder"), session.bool("notif.thisDeviceReminders") else { return [] }
-                let repository = try PrayerRepository(context: ModelContext(session.container))
-                let slots = try PrayerNotificationSchedule.slots(repository: repository, days: prayerDays(repository: repository, now: now), now: now)
-                guard SanctityGuard(windows: PrayerNotificationSchedule.sanctityWindows(for: slots)).clamp(now) == now else { return [] }
-                try updateLedger(requestID: notification.request.identifier, state: "observed")
-                return [.banner, .list, .sound]
-            }
-            guard session.bool("salah.askReminder"), session.bool("notif.thisDeviceReminders"),
-                  let dayKey = userInfo["dayKey"] as? String,
-                  let prayerRaw = userInfo["prayer"] as? String,
-                  let prayer = Prayer(rawValue: prayerRaw) else { return [] }
-            let repository = try PrayerRepository(context: ModelContext(session.container))
-            let days = prayerDays(repository: repository, now: now)
-            let slots = try PrayerNotificationSchedule.slots(repository: repository, days: days, now: now)
-            let sanctityWindows = PrayerNotificationSchedule.sanctityWindows(for: slots)
-            guard let day = days.first(where: { $0.day.description == dayKey }),
-                  let cell = try repository.day(day.day, now: now).cells.first(where: { $0.reference.prayer == prayer }),
-                  !Self.isRecorded(cell.status) else { return [] }
-            let guarder = SanctityGuard(windows: sanctityWindows)
-            if guarder.clamp(now) > now {
-                let candidate = NotificationCandidate(id: notification.request.identifier, room: .salah, kind: .prayerAsk,
-                                                       dueAt: guarder.clamp(now), dayKey: dayKey)
-                let timeZone = PrayerNotificationSchedule.timeZone(for: .init(day: day.day, prayer: prayer), repository: repository, fallbackAt: now)
-                try await center.add(Self.makeRequest(candidate: candidate, prayer: prayer, timeZone: timeZone, snooze: candidate.id.hasSuffix(".snooze")))
-                try updateLedger(requestID: candidate.id, dayKey: dayKey, prayer: prayer, dueAt: candidate.dueAt,
-                                 state: "submitted", kind: candidate.id.hasSuffix(".snooze") ? "snooze" : "ask")
-                return []
-            }
-            try updateLedger(requestID: notification.request.identifier, state: "observed")
-            return [.banner, .list, .sound]
+            // Anything else is a leftover of the retired prayer ask: it never shows.
+            return []
         } catch {
             session.errorMessage = "تعذّر التحقق من وقت التذكير. \(madarUserMessage(error))"
             return []
         }
     }
 
-    func scheduleSnooze(for request: UNNotificationRequest, tapTime: Date) async throws {
-        guard let session, session.beginNotificationStoreAccess() else { return }
-        defer { session.endNotificationStoreAccess() }
-        await acquireLifecycleLock()
-        defer { releaseLifecycleLock() }
-        try await scheduleSnoozeLocked(for: request, tapTime: tapTime)
-    }
-
-    private func scheduleSnoozeLocked(for request: UNNotificationRequest, tapTime: Date) async throws {
-        guard let session else { return }
-        let content = request.content
-        guard let dayKey = content.userInfo["dayKey"] as? String,
-              let prayerRaw = content.userInfo["prayer"] as? String,
-              let prayer = Prayer(rawValue: prayerRaw) else { return }
-        let existing = await center.pendingNotificationRequests()
-        let authorization = await authorizationStatus()
-        try session.reload()
-        guard session.bool("salah.askReminder"), session.bool("notif.thisDeviceReminders"),
-              Self.canSchedule(authorization) else { return }
-        let repository = try PrayerRepository(context: ModelContext(session.container))
-        let days = prayerDays(repository: repository, now: tapTime)
-        let slots = try PrayerNotificationSchedule.slots(repository: repository, days: days, now: tapTime)
-        let sanctityWindows = PrayerNotificationSchedule.sanctityWindows(for: slots)
-        guard let day = days.first(where: { $0.day.description == dayKey }),
-              let cell = try repository.day(day.day, now: tapTime).cells.first(where: { $0.reference.prayer == prayer }),
-              !Self.isRecorded(cell.status) else { return }
-
-        let requestID = request.identifier.hasSuffix(".snooze")
-            ? String(request.identifier.dropLast(".snooze".count))
-            : request.identifier
-        // «ذكّرني بعد ساعة» obeys the same quiet hours as every other reminder.
-        let quietParts = session.string("notif.quietFrom").split(separator: ":").compactMap { Int($0) }
-        let snoozeQuietMinutes: Int? = session.bool("notif.quietAfterIsha") ? (quietParts.count == 2 ? quietParts[0] * 60 + quietParts[1] : 0) : nil
-        let candidate = NotificationCandidate(id: requestID + ".snooze", room: .salah, kind: .prayerAsk,
-                                               dueAt: tapTime.addingTimeInterval(60 * 60), dayKey: dayKey)
-        let occupiedCount = existing.count - (existing.contains(where: { $0.identifier == candidate.id }) ? 1 : 0)
-        let plan = NotificationArbiter.plan(candidates: [candidate], prayerDays: days, now: tapTime,
-                                             timeZone: repository.place(at: tapTime).timeZone,
-                                             policy: .init(quietFromMinutes: snoozeQuietMinutes, quietUntil: quietEnd, thisDeviceRemindersEnabled: true, staleNudgeEnabled: false),
-                                             existingPendingCount: occupiedCount, sanctityWindows: sanctityWindows)
-        guard let scheduled = plan.scheduled.first(where: { $0.id == candidate.id }) else {
-            try updateLedger(requestID: candidate.id, dayKey: dayKey, prayer: prayer, dueAt: candidate.dueAt,
-                             state: "dropped", reason: "cap", kind: "snooze")
-            return
-        }
-        let timeZone = PrayerNotificationSchedule.timeZone(for: .init(day: day.day, prayer: prayer), repository: repository, fallbackAt: tapTime)
-        try await center.add(Self.makeRequest(candidate: scheduled, prayer: prayer, timeZone: timeZone, snooze: true))
-        try updateLedger(requestID: scheduled.id, dayKey: scheduled.dayKey, prayer: prayer, dueAt: scheduled.dueAt,
-                         state: "submitted", kind: "snooze")
-    }
-
-    private func reconcile(plan: NotificationPlan, candidates: [NotificationCandidate], current: [UNNotificationRequest], repository: PrayerRepository) async throws {
-        let candidateByID = Dictionary(candidates.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let requested = Dictionary(plan.scheduled.compactMap { item -> (String, NotificationCandidate)? in
-            guard Self.prayer(for: item.id) != nil else { return nil }
-            return (item.id, item)
-        }, uniquingKeysWith: { first, _ in first })
-        let currentByID = Dictionary(current.map { ($0.identifier, $0) }, uniquingKeysWith: { first, _ in first })
-        let obsolete = current.filter { request in
-            guard let target = requested[request.identifier] else { return true }
-            return !Self.matches(request, dueAt: target.dueAt)
-        }.map(\.identifier)
-        if !obsolete.isEmpty {
-            center.removePendingNotificationRequests(withIdentifiers: obsolete)
-            for identifier in obsolete { try updateLedger(requestID: identifier, state: "cancelled") }
-        }
-
-        for (identifier, candidate) in requested.sorted(by: { $0.key < $1.key }) {
-            guard let prayer = Self.prayer(for: identifier), let day = try? GregorianDay(candidate.dayKey) else { continue }
-            let timeZone = PrayerNotificationSchedule.timeZone(for: .init(day: day, prayer: prayer), repository: repository, fallbackAt: candidate.dueAt)
-            if let current = currentByID[identifier], Self.matches(current, dueAt: candidate.dueAt) {
-                try updateLedger(requestID: identifier, dayKey: candidate.dayKey, prayer: prayer, dueAt: candidate.dueAt,
-                                 state: "submitted", kind: Self.ledgerKind(identifier))
-                continue
-            }
-            try await center.add(Self.makeRequest(candidate: candidate, prayer: prayer, timeZone: timeZone, snooze: identifier.hasSuffix(".snooze"), before: candidate.kind == .prayerBefore))
-            try updateLedger(requestID: identifier, dayKey: candidate.dayKey, prayer: prayer, dueAt: candidate.dueAt,
-                             state: "submitted", kind: Self.ledgerKind(identifier))
-        }
-        for identifier in plan.droppedIDs {
-            guard let candidate = candidateByID[identifier], candidate.kind.isPrayerLane else { continue }
-            try updateLedger(requestID: identifier, dayKey: candidate.dayKey,
-                             prayer: Self.prayer(for: identifier), dueAt: candidate.dueAt,
-                             state: "dropped", reason: candidate.kind == .prayerBefore ? "guard" : "cap", kind: Self.ledgerKind(identifier))
-        }
-    }
-
-    private static func ledgerKind(_ id: String) -> String { id.hasSuffix(".snooze") ? "snooze" : id.hasSuffix(".before") ? "before" : "ask" }
     private static func manages(_ id: String) -> Bool { id.hasPrefix(requestPrefix) || RoomNotificationContent.isRoomRequest(id) }
     /// Every non-prayer request (Quran, qada, habits, digest, nudge) through one path: a kind turned off
     /// leaves nothing pending and is logged as cancelled; drops and digests are logged for every room.
@@ -599,150 +426,30 @@ final class PrayerNotificationCoordinator {
         }
     }
 
-    private static func pendingSnoozes(from requests: [UNNotificationRequest], prayerDays: [PrayerDay], sanctityWindows: [SanctityWindow], repository: PrayerRepository, now: Date) -> [NotificationCandidate] {
-        let guarder = SanctityGuard(windows: sanctityWindows)
-        return requests.compactMap { request in
-            guard request.identifier.hasPrefix(Self.requestPrefix), request.identifier.hasSuffix(".snooze"),
-                  let dayKey = request.content.userInfo["dayKey"] as? String,
-                  let prayer = Prayer(rawValue: request.content.userInfo["prayer"] as? String ?? ""),
-                  let day = prayerDays.first(where: { $0.day.description == dayKey }),
-                  let trigger = request.trigger as? UNCalendarNotificationTrigger,
-                  let dueAt = trigger.nextTriggerDate(),
-                  let cell = try? repository.day(day.day, now: now).cells.first(where: { $0.reference.prayer == prayer }),
-                  !isRecorded(cell.status) else { return nil }
-            let guarded = guarder.clamp(dueAt)
-            return .init(id: request.identifier, room: .salah, kind: .prayerAsk, dueAt: guarded, dayKey: dayKey)
-        }
-    }
-
-    static func isRecorded(_ status: PrayerDisplayStatus) -> Bool {
-        switch status {
-        case .jamaah, .alone, .qada: true
-        case .missed, .unrecordedHistory, .unconfirmed, .excused, .pending, .future: false
-        }
-    }
-
-    private static func prayer(for requestID: String) -> Prayer? {
-        let parts = requestID.split(separator: ".")
-        guard parts.count >= 3 else { return nil }
-        return Prayer(rawValue: String(parts[2]))
-    }
-
-    static func isFridayNoon(dayKey: String, prayer: Prayer, timeZone: TimeZone) -> Bool {
-        guard prayer == .dhuhr, let day = try? GregorianDay(dayKey) else { return false }
-        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
-        return calendar.component(.weekday, from: day.date(in: timeZone).addingTimeInterval(12 * 3600)) == 6
-    }
-
-    private static func makeRequest(candidate: NotificationCandidate, prayer: Prayer, timeZone: TimeZone, snooze: Bool, before: Bool = false) -> UNNotificationRequest {
-        let content = UNMutableNotificationContent()
-        content.title = title(prayer)
-        content.body = snooze ? "صلّيتها؟" : "مرّ وقت على الأذان. صلّيتها؟"
-        // The record actions (في جماعة / وحدي) belong to the ask only: a prayer cannot be recorded before its adhan (RP2).
-        if before { content.body = "يقترب الأذان" } else { content.categoryIdentifier = isFridayNoon(dayKey: candidate.dayKey, prayer: prayer, timeZone: timeZone) ? Self.fridayCategoryID : Self.categoryID }
-        content.threadIdentifier = "salah.\(candidate.dayKey)"
-        content.sound = .default
-        content.userInfo = ["requestID": candidate.id, "dayKey": candidate.dayKey, "prayer": prayer.rawValue, "snooze": snooze, "before": before]
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
-        var components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: candidate.dueAt)
-        components.timeZone = timeZone
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        return UNNotificationRequest(identifier: candidate.id, content: content, trigger: trigger)
-    }
-
     private static func matches(_ request: UNNotificationRequest, dueAt: Date) -> Bool {
         guard let trigger = request.trigger as? UNCalendarNotificationTrigger,
               let date = trigger.nextTriggerDate() else { return false }
         return abs(date.timeIntervalSince(dueAt)) < 1
     }
 
-    private func reconcilePrayerActivity(prayerSlots: [PrayerNotificationSlot], sanctityWindows: [SanctityWindow], repository: PrayerRepository,
-                                         now: Date, session: AppSession) async throws {
-        let activities = Activity<PrayerCountdownAttributes>.activities.filter {
-            $0.activityState == .active || $0.activityState == .pending || $0.activityState == .stale
-        }
-        let stale = activities.filter { $0.activityState == .stale }
-        let liveActivities = activities.filter { $0.activityState == .active || $0.activityState == .pending }
-        for activity in stale { try await endPrayerActivity(activity, now: now) }
-        // T01: any countdown whose adhan has passed is ended immediately on every refresh.
-        for activity in liveActivities where activity.content.state.prayerAt <= now { try await endPrayerActivity(activity, now: now) }
-        let active = liveActivities.filter { $0.content.state.prayerAt > now }
-        guard !Self.prayerLoggingRemoved, session.bool("salah.liveActivity"), session.bool("notif.thisDeviceReminders"),
-              ActivityAuthorizationInfo().areActivitiesEnabled else {
-            for activity in active { try await endPrayerActivity(activity, now: now) }
-            return
-        }
-        let occurrences = prayerSlots.map { ($0.occurrence.time, $0.prayer) }.sorted { $0.0 < $1.0 }
-        let guarder = SanctityGuard(windows: sanctityWindows)
-        let startAt = now
-        guard guarder.clamp(startAt) == startAt else {
-            for activity in active { try await endPrayerActivity(activity, now: now) }
-            return
-        }
-        let timeZone = repository.place(at: now).timeZone
-        guard !Self.isQuiet(startAt, timeZone: timeZone,
-                            quietAfterIsha: session.bool("notif.quietAfterIsha"),
-                            quietFrom: session.string("notif.quietFrom"), until: quietEnd,
-                            prayerDays: prayerDays(repository: repository, now: now)) else {
-            for activity in active { try await endPrayerActivity(activity, now: now) }
-            return
-        }
-        // ActivityKit may retain the Lock Screen presentation for four hours
-        // after its eight-hour active lifetime ends.
-        let maximumDisplayedLifetimeEnd = startAt.addingTimeInterval(NotificationArbiter.liveActivityMaximumDisplayedDuration)
-        guard let nextIsha = occurrences.first(where: { $0.1 == .isha && $0.0 > startAt }),
-              nextIsha.0 > maximumDisplayedLifetimeEnd else {
-            for activity in active { try await endPrayerActivity(activity, now: now) }
-            return
-        }
-        guard let next = occurrences.first(where: { $0.0 > startAt }),
-              next.0.timeIntervalSince(startAt) <= 8 * 60 * 60 else {
-            for activity in active { try await endPrayerActivity(activity, now: now) }
-            return
-        }
-        let previous = occurrences.last(where: { $0.0 <= startAt })
-        if previous?.1 == .isha && next.1 == .fajr {
-            for activity in active { try await endPrayerActivity(activity, now: now) }
-            return
-        }
-        if active.contains(where: {
-            $0.attributes.activityKey == "prayer.next" && abs($0.content.state.prayerAt.timeIntervalSince(next.0)) < 1
-        }) { return }
-        // Only foreground requests are authorized by RL5. A refresh caused by an
-        // inbox/background notification must never try to start an activity.
-        guard UIApplication.shared.applicationState == .active else { return }
-        let requestID = "activity." + UUID().uuidString
-        let reservation: ReservedPrayerActivity
-        do { reservation = try session.notificationBudget.reservePrayerActivity(id: requestID, now: now) }
-        catch NotificationBudgetError.full { return }
-        catch NotificationBudgetError.disabled { return }
-        catch NotificationBudgetError.duplicate { return }
-        for activity in active { try await endPrayerActivity(activity, now: now) }
-        let attributes = PrayerCountdownAttributes(activityKey: "prayer.next", scheduledStartAt: startAt, budgetRequestID: requestID, numerals: reservation.numerals)
-        let state = PrayerCountdownAttributes.ContentState(prayerName: Self.title(next.1), prayerAt: next.0)
-        let content = ActivityContent(state: state, staleDate: next.0, relevanceScore: 1)
-        // Persist the reservation before asking the OS, so a failed save can never
-        // leave a scheduled alert outside the device ledger.
-        try updateLedger(requestID: requestID, dayKey: reservation.reservation.dayKey, dueAt: reservation.reservation.scheduledAt,
-                         state: "submitted", kind: "activityStart")
-        do {
-            _ = try Activity.request(attributes: attributes, content: content, pushType: nil, style: .standard)
-        } catch {
-            try session.notificationBudget.cancel(id: requestID, now: now, requestFailed: true)
-            try updateLedger(requestID: requestID, state: "cancelled")
-            throw error
+    /// The prayer countdown Live Activity is retired with the prayer room: any one still running (an old install) ends now.
+    private func endRetiredPrayerCountdowns(now: Date) async throws {
+        for activity in Activity<PrayerCountdownAttributes>.activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
+            // A submitted start keeps consuming its slot once its scheduled time has passed; only a future one is refunded.
+            if activity.attributes.scheduledStartAt > now, let id = activity.attributes.budgetRequestID {
+                try session?.notificationBudget.cancel(id: id, now: now)
+                try updateLedger(requestID: id, state: "cancelled")
+            }
         }
     }
 
-    private func endPrayerActivity(_ activity: Activity<PrayerCountdownAttributes>, now: Date) async throws {
-        await activity.end(nil, dismissalPolicy: .immediate)
-        // A submitted start keeps consuming its slot once its scheduled time has
-        // passed; we do not infer whether the system delivered the alert.
-        if activity.attributes.scheduledStartAt > now, let id = activity.attributes.budgetRequestID {
-            try session?.notificationBudget.cancel(id: id, now: now)
-            try updateLedger(requestID: id, state: "cancelled")
-        }
+    /// Old installs may still hold pending «صلّيتها؟» requests: cancel them all and say so in the ledger.
+    private func cancelRetiredPrayerRequests(_ current: [UNNotificationRequest]) throws {
+        guard !current.isEmpty else { return }
+        let ids = current.map(\.identifier)
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+        for id in ids { try updateLedger(requestID: id, state: "cancelled") }
     }
 
     /// Context surfaces have no alert configuration, but RL5 still budgets every start and gates its window.
@@ -922,7 +629,7 @@ final class PrayerNotificationCoordinator {
         } catch { }
     }
 
-    private func updateLedger(requestID: String, dayKey: String? = nil, prayer: Prayer? = nil, dueAt: Date? = nil,
+    private func updateLedger(requestID: String, dayKey: String? = nil, dueAt: Date? = nil,
                               state: String, reason: String? = nil, kind: String? = nil) throws {
         guard let session else { return }
         let container: ModelContainer
@@ -965,7 +672,6 @@ final class PrayerNotificationCoordinator {
             }
         }
         try context.save()
-        _ = prayer
     }
 
     private func updateAuthorizationState() async {
@@ -991,16 +697,6 @@ final class PrayerNotificationCoordinator {
 
     private static func canSchedule(_ status: UNAuthorizationStatus) -> Bool {
         status == .authorized || status == .provisional || status == .ephemeral
-    }
-
-    private static func title(_ prayer: Prayer) -> String {
-        switch prayer {
-        case .fajr: "الفجر"
-        case .dhuhr: "الظهر"
-        case .asr: "العصر"
-        case .maghrib: "المغرب"
-        case .isha: "العشاء"
-        }
     }
 }
 
@@ -1043,108 +739,6 @@ final class MadarApplicationDelegate: NSObject, UIApplicationDelegate, UNUserNot
 }
 
 #if DEBUG
-private struct NotificationScenarioFailure: LocalizedError {
-    let message: String
-    var errorDescription: String? { message }
-}
-
-extension PrayerNotificationCoordinator {
-    func runSimulatorAcceptanceScenarioForTesting() async throws -> String {
-        guard let session else { throw NotificationScenarioFailure(message: "Notification test session is unavailable") }
-        guard session.bool("salah.askReminder"), session.bool("notif.thisDeviceReminders") else {
-            throw NotificationScenarioFailure(message: "Prayer reminders are disabled in the test store")
-        }
-        guard Self.canSchedule(await authorizationStatus()) else {
-            throw NotificationScenarioFailure(message: "The app process does not have notification authorization")
-        }
-
-        let alreadyPending = await center.pendingNotificationRequests()
-        let priorPrayerIDs = alreadyPending.map(\.identifier).filter { $0.hasPrefix(Self.requestPrefix) }
-        var cleanupIDs = Set(priorPrayerIDs)
-        center.removePendingNotificationRequests(withIdentifiers: priorPrayerIDs)
-        defer {
-            center.removePendingNotificationRequests(withIdentifiers: Array(cleanupIDs))
-        }
-
-        let now = Date()
-        let repository = try PrayerRepository(context: ModelContext(session.container))
-        let days = prayerDays(repository: repository, now: now)
-        guard let target = days.first(where: { $0.fajr > now.addingTimeInterval(2 * 60 * 60) }) else {
-            throw NotificationScenarioFailure(message: "No upcoming Fajr found inside the test horizon")
-        }
-        let fajrID = "salah.\(target.day.description).fajr"
-        let snoozeID = "salah.\(target.day.description).maghrib.snooze"
-
-        try await refresh(now: now)
-        var pending = await center.pendingNotificationRequests()
-        cleanupIDs.formUnion(pending.map(\.identifier).filter { $0.hasPrefix(Self.requestPrefix) })
-        guard let fajrRequest = pending.first(where: { $0.identifier == fajrID }),
-              let fajrAt = (fajrRequest.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate(),
-              abs(fajrAt.timeIntervalSince(target.fajr.addingTimeInterval(30 * 60))) < 1 else {
-            throw NotificationScenarioFailure(message: "The app process did not schedule the expected Fajr request")
-        }
-
-        guard let ishaWindow = target.sanctityWindows.first(where: { $0.prayer == .isha }) else {
-            throw NotificationScenarioFailure(message: "The Isha sanctity fixture is unavailable")
-        }
-        let content = UNMutableNotificationContent()
-        content.userInfo = ["dayKey": target.day.description, "prayer": Prayer.maghrib.rawValue]
-        let source = UNNotificationRequest(identifier: "salah.\(target.day.description).maghrib", content: content, trigger: nil)
-        try await scheduleSnooze(for: source, tapTime: target.isha.addingTimeInterval(-50 * 60))
-
-        pending = await center.pendingNotificationRequests()
-        cleanupIDs.formUnion(pending.map(\.identifier).filter { $0.hasPrefix(Self.requestPrefix) })
-        guard let snoozeRequest = pending.first(where: { $0.identifier == snoozeID }),
-              let snoozeAt = (snoozeRequest.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate(),
-              abs(snoozeAt.timeIntervalSince(ishaWindow.end)) < 1,
-              !ishaWindow.contains(snoozeAt) else {
-            throw NotificationScenarioFailure(message: "The Maghrib snooze was not clamped past Isha sanctity")
-        }
-
-        let cancellationDay = target.day.adding(days: -1)
-        let cancellationID = "salah.\(cancellationDay.description).fajr"
-        guard repository.prayerDay(at: now) == cancellationDay,
-              let cancellationPrayerAt = repository.occurrence(.init(day: cancellationDay, prayer: .fajr))?.time,
-              cancellationPrayerAt <= now else {
-            throw NotificationScenarioFailure(message: "No completed Fajr is available for the logging cancellation check")
-        }
-        let cancellationDueAt = now.addingTimeInterval(6 * 60 * 60)
-        let cancellationCandidate = NotificationCandidate(id: cancellationID, room: .salah, kind: .prayerAsk,
-                                                            dueAt: cancellationDueAt, dayKey: cancellationDay.description)
-        try await center.add(Self.makeRequest(candidate: cancellationCandidate, prayer: .fajr,
-                                              timeZone: target.place.timeZone, snooze: false))
-        try updateLedger(requestID: cancellationID, dayKey: cancellationDay.description, prayer: .fajr,
-                         dueAt: cancellationDueAt, state: "submitted", kind: "ask")
-        cleanupIDs.insert(cancellationID)
-
-        let logged = await withCheckedContinuation { continuation in
-            session.recordPrayer(.init(day: cancellationDay, prayer: .fajr), status: .jamaah) {
-                continuation.resume(returning: $0)
-            }
-        }
-        guard logged else { throw NotificationScenarioFailure(message: session.errorMessage ?? "Fajr log did not commit") }
-
-        // A foreground save commits before the coalesced notification refresh. Observe its
-        // outcome instead of treating the write completion as a planning completion.
-        let deadline = ContinuousClock.now.advanced(by: .seconds(10))
-        while true {
-            pending = await center.pendingNotificationRequests()
-            let ledgerRows = try ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>())
-                .filter { $0.deletedAt == nil && $0.requestID == cancellationID }
-            if !pending.contains(where: { $0.identifier == cancellationID }),
-               pending.contains(where: { $0.identifier == snoozeID }),
-               ledgerRows.max(by: { $0.updatedAt < $1.updatedAt })?.state == "cancelled" { break }
-            guard ContinuousClock.now < deadline else {
-                throw NotificationScenarioFailure(message: "Prayer refresh did not cancel Fajr, retain Maghrib snooze and record cancellation")
-            }
-            try await Task.sleep(for: .milliseconds(100))
-        }
-
-        for identifier in cleanupIDs { try updateLedger(requestID: identifier, state: "cancelled") }
-        return "PASS — scheduled Fajr, clamped Maghrib snooze past Isha, and cancelled Fajr after logging"
-    }
-}
-
 struct PrayerNotificationAcceptanceHarness: View {
     let session: AppSession
 
@@ -1162,12 +756,6 @@ struct PrayerNotificationAcceptanceHarness: View {
                 Button("فتح إعدادات الإشعارات") { session.openPrayerNotificationSettings() }
                     .accessibilityIdentifier("notification-test-settings")
             }
-            Button("تشغيل سيناريو التحقق") { session.runNotificationScenarioForTesting() }
-                .disabled(!session.notificationsAuthorized)
-                .accessibilityIdentifier("notification-test-run")
-            Text(session.notificationTestResult.isEmpty ? "بانتظار التشغيل" : session.notificationTestResult)
-                .accessibilityIdentifier("notification-test-result")
-                .accessibilityLabel(session.notificationTestResult.isEmpty ? "بانتظار التشغيل" : session.notificationTestResult)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

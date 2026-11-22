@@ -57,6 +57,7 @@ Owner requests in force: whole-app usability, reliability and responsiveness wit
 | 28 | Owner 15 Nov (to Claude): «نسخه الماك خلاص بنفعل مزامنه الايكلاود» — iCloud sync is approved so the Mac and the iPhone share one Madar. Lifts RA1 for sync. | blocked for live CloudKit activation, implemented and source/build accepted: completed-event observation is filtered to the active synced store and generation; imports queue before acquiring the shared lease, drain history/merge and refresh snapshots, and remain pending for retries if the lease is busy. The default build stays local-only. SwiftData CloudKit compatibility was reviewed from source: optional fields, no unique constraints or relationships, optional UUID links and external storage for large attachment data. Generic Mac/iOS builds succeed. The Mac target now shares `com.alqzan.madar2` with iOS, and macOS was added to the existing App Store Connect record `6830247088` (iOS and macOS version 1.0, both Prepare for Submission). This machine has no Apple Development identity for team V8YZL4R65K (the available identity is for team 6JU2NX526Y) and no provisioning profile in the standard installed-profiles directory; signed CloudKit development build and synthetic cross-store sync are unavailable. The iCloud container state remains unverified. No production schema deployed and no owner data opened. |
 | 29 | Owner 16 Nov: «ابن مدار للساعه من الي تراه مناسب ويناسب مدار بالساعه» — build a Madar watch companion with judgment. | built — awaiting owner: a native watchOS 27 read-only dashboard shows next prayer from the full schedule, Quran and habit progress, and both dates. iPhone sends a privacy-minimal snapshot over WatchConnectivity; the watch resolves the next prayer locally and expires stale snapshots at eight hours or the Madar day boundary. No money, diary/book text, writes, alerts or complications. Standalone watchOS build succeeds and the iOS build embeds and validates the Watch app. Sol accepted source/build. No Watch simulator or owner Watch was used; runtime delivery and owner acceptance remain unverified. |
 | 30 | Owner 16 Nov: hide prayer logging and its records everywhere; habits become the main room in the prayer room's identity (riwaq, gold, reflection); the prayer-time engine stays hidden for reminders and the post-Fajr wird; keep old prayer records untouched and unconverted. Phase 1 = review and design only. | waiting on the owner (Claude): impact map and 7 open decisions in `docs/plans/habits-replace-prayer.md`; SwiftUI previews (synthetic data, real prayer shapes/fonts/theme) at `Madar/Artifacts/habits-redesign-preview/` rendered by `HabitsRedesignPreviewTests` 1/1. Owner 16 Nov: «الاقواس… غباء» — arches rejected for habits; round 2 = two arch-free directions, A «المسبحة» (one bead per unit, day ring, week bars) and B «النسيج» (14-day woven knots per habit, stat tiles, per-habit unit chart): `habits-A-tasbih-L.png`, `habits-B-loom-L.png`, test 1/1. Then rounds 3–4 rejected (shamsa/lanterns/bands: «كلها مهب حلوه»; owner wants «هادئ ذكي جميل واضح») and «ابيها طريقة تستطيع أي عادة تكون فت معها». Round 5 = one universal rule over the engine's fields (measure once/count/duration/health × frequency daily/weekly/monthly/yearly/interval): every row = name, period time left, amount in its unit, step line (≤10 discrete steps) or continuous line, one action by measure; «الأقرب للتمام» card chosen by rule; `habits-G-universal-{L,D}.png`, test 1/1. Owner then explained the flow (none of the rounds fit): habits are logged OUTSIDE the room — a question at the time the user sets per habit, one last call if still open, lobby logs anything missed; the room is opened to add a habit and read long-range statistics and smart notes. Round 6: `habits-H-outside-L.png` (question by measure with the usual amount, last call, lobby block; linked wird auto, sanctity delay) and `habits-H-room-L.png` (add habit, «ما لاحظه مدار», a 12-month strip per habit, stats), test 1/1. Round 6 also not liked («ماجاز لي مره… صمّم كل الواجهات أوضح وأذكى»). Round 7 = all habit screens: `habits-I1-home.png` (one smart headline + a card per habit with its period number in its unit and a 10-week rhythm), `I2-habit` (year rhythm, when you usually do it, weekday pattern with a suggestion), `I3-new` (fill-in sentence: what, amount, unit, frequency, ask time, last call, preview of the notification), `I4-outside` (notification with the usual amount, lobby line), test 1/1. Owner: «الى الان لا» — round 7 not accepted either. Next: stop guessing; get a reference (screenshot or app the owner likes) or the owner's own words on what is wrong, then one round on that. The flow itself (log outside, room for stats/adding) stands. Owner then: «أبي شي أنت تجيبه من ذكاءك». Round 8 = «الوتيرة»: each habit shows ahead/behind its own plan to date in its unit (gold actual line vs dashed plan), when you catch up, and smart notes (usual time, weakest day, streak): `habits-J1-pace-home.png`, `habits-J2-pace-habit.png`, test 1/1. Owner: «لا». Eight rounds rejected (arches, tasbih, loom, shamsa/lanterns/bands, calm checklist, universal rows, notification+stats room, all screens, pace). Claude stopped at 100% weekly usage. Next agent: do NOT start a ninth guess blind; first get from the owner which element of any round he liked, or a reference app/screenshot, then one round. Owner answered: «اعجبتني الالوان وكذا بس الباقي ماش» — keep the prayer palette (paper, gold, accent brown, Thmanyah type); every layout/shape idea so far is rejected. 17 Nov owner: «شف التطبيقات وأبي شي جميل وخورافي». Round 9 (after looking at Streaks, Apple Fitness rings, Gentler Streak; nothing copied): «سماء يومك» — the day's light from Fajr to Isha (prayer-time engine) with each habit placed at its ask time and a sun at now; a bold ring token per habit (symbol, period share, amount in unit); November as small daily rings; habit page = big token, three stats, month rings, smart notes. `habits-K1-sky-home.png`, `habits-K2-sky-habit.png`, test 1/1. Previews are rendered by `Madar/Tests/Integration/HabitsRedesignPreviewTests.swift` (only the latest round is in the file; earlier rounds are in git history and `Madar/Artifacts/habits-redesign-preview/`). Owner: round 9 «مسخره وسيء… شف التصميم الي بالبداية… استعمل /design». Round 10 on a Claude design canvas (https://claude.ai/artifact/4Gvv3Bz9ckqtkonPq6q7bZ): home + habit page in the original S1 style (serif hero, hadith rule, bead arc, stars). Owner: «ماخذ سكشن الصلاة بزيادة… تحرر منه». Round 11 on the same canvas: three free directions, A «نسيج السنة» (giant month %, year dot fabric, monthly totals per unit), B «الأوعية» (dark day ring, tiles that fill like a vessel, week squares), C «مدار يحكي» (data-written headline, year-vs-last-year curve, time-of-day, a habit sliding with a one-tap suggestion). Owner: «اقسم بالله ولا واحد». Eleven rounds rejected; asked the owner for one reference screenshot/app and what bothers him most before any further round. Owner then gave the structure (17 Nov): liked the 2026 year commitment (A) and the smart analysis (C), and before that the old W2 circle; wants top to bottom: today's habits, the circle used better, the smart notes (notices behaviour, when he does each habit, amount/frequency trends), then the year analysis; tapping a habit gives its full story (start date, when done, best/worst month) with good graphs, interactive. Round 12 = one interactive artboard `Habits.dc.html` on the canvas: habit chips on top (الكل + each habit), concentric rings today/week/month/year in each habit's unit, a habit profile (start in both calendars, total since start, longest streak), three smart cards (time of day, 8-week trend, weekday pattern), year dot fabric and monthly bars with best/worst month; tapping a chip switches every section. Owner clarified «قصدي ذولي» with the original W2 screens: the circle he means is the W2 orbit (habits as beads on day/week/month/year rings) and the W2 list rows (icon ring, name, detail, streak number, dots). Round 13 (same artboard): W2 list rows on top (daily, then weekly/monthly/yearly), tap a row or a bead to select it; the selected habit's story card; the orbit with period arcs and a now-marker per ring, selected bead glows while others fade; period cells; then the smart cards and the year fabric with best/worst month. Owner: «الخط والأشياء هذي غبية… سوّها بنفس الصورة اللي مرسلك». Round 14 = native SwiftUI in the W2 look (bahw paper, real Thmanyah serif/sans, white cards, W2 rows and period cards, W2 orbit on light paper) with the same order: `habits-L1-w2-all.png` (all habits) and `habits-L2-w2-walk.png` (المشي chosen: row highlighted, story card, bead glows, every section in km), rendered by `HabitsRedesignPreviewTests` 1/1. The web canvas fonts were dropped because Thmanyah is not on the canvas. App source untouched; phase 2 (hiding prayer logging) not started. Today the app sends one reminder with a single «تمّت» action and no last call. No app source or data model changed. Phase 2 starts only after approval. | Round 15 (17 Nov, design canvas first): the owner asked for «نار بسيطة بأسلوب مدار» that changes as a streak lasts more days or months, then «سوها بالتصميم أول قبل ما تحطها بالكود» (native code change reverted), then full month names and «ذكاء واقتراحات لتغيير بعض الأشياء بالعادات بناءً على سلوكي». Canvas board Flame.dc.html: five flame stages (spark under a week, flame from a week, lamp in a mihrab arch from a month, eight-point star from three months, gold star at a year), the fill shows today (lit, filling, waiting, ash when broken), list rows with the flame, and behaviour suggestions with apply / keep / undo (reminder earlier, Thursday rest day, raise reading goal, drop last water reminder, easier sleep goal for a month). Awaiting owner. Round 16: owner «عقدتها، أبيها خفيفة وواضحة»: just a flame and the day count; one missed day keeps the streak and puts a warning mark on the flame; on the second missed day one final notification («سوّها الحين أو تروح»); not done, it resets to zero and the longest is kept. No extra shapes. Canvas now uses the original Thmanyah fonts (uploaded privately to the owner's artifact at his request). The suggestions part is held back until the owner asks for it again. Grace-day streak rule awaits approval with the design. Round 17: owner wants the streak inside the habits screen in the earlier light design, and one screen per Thmanyah font. Canvas now has five copies of the habits screen (F1 Sans Regular, F2 Sans Light/Medium, F3 Sans Medium with Display Black titles, F4 Serif Text, F5 Serif Text with Display Black titles); each row shows a small flame and the streak number, and الرياضة shows the one-missed-day warning. Awaiting the owner's font choice. Round 18: owner chose the font «ثمانية النسخي، عناوين Display Black» («هذا الخط اعتمده»): Thmanyah Serif Text for text, Thmanyah Serif Display Black for titles (applies to the habits room; app change waits for phase 2). Owner liked from the original W2: room tags in room colours (المحبرة، القرآن، المذكرات، المال), the orbit, and the simple period cards on top; and asked that a habit drops to the bottom as soon as it is done. Canvas now one screen in that font: period cards on top, daily list with room tags and colours (tap the ring to mark done, it moves down and its streak rises), then weekly/monthly/yearly, the story on tap, the orbit with beads in room colours (filled done, hollow waiting, half missed once), smart notes, and the year with full month names (month bars as rows). Round 19: owner «الشعلة مبالغ فيها، خلها أخف… والباقي تمام»: the flame is now a small faint mark and the streak number is plain ink; a missed day is a small red dot. Ideas board for the owner (none built): amount buttons in the notification, weekly behaviour suggestion, travel/sick pause that keeps streaks, linking habits done back to back, Friday note in the lobby, quiet milestone at 30/100/365 days, Lock Screen widget line, a goal that grows gradually. Owner asked for 20 ideas to choose from; added 9-20: reminder that learns your time, a habit to quit (days since), one word after logging, an earned rest day every 30 days, log by Siri, auto-log from Health, Control Center button, Ramadan mode, Monday/Thursday fasting, same month last year, one new habit at a time, ending a habit with its summary. Awaiting the owner's picks. Owner: the light flame is now too faint («هونت»); asked for 5 shapes with all their states. Canvas board «أشكال الشعلة»: A solid medium flame, B flame in a tinted capsule, C gold flame with a paper core, D thin line flame, E a small siraj lamp; each shown done today, waiting, missed yesterday (warning dot) and broken. Owner decisions (17 Nov): ideas approved 1 (amount buttons in the notification plus «كمية ثانية» for any number, even below the goal, saved as entered, for every quantity habit: km, pages, minutes, cups), 2, 3, 4, 5, 6, 8, 9, 10, 12, 14, 16 («خرافي»), 17, 19, 20; rejected 7 (notifications are enough), 11, 13, 15, 18 (current statistics are enough). Flame: B (capsule) chosen; a missed day shows the flame unlit (not filled) with an hourglass badge in its corner. Applied to the habits screen and the ideas board marks approved/rejected. Built 17 Nov (Claude, build 53): habits tab replaces the prayer tab (iPhone, Mac); prayer screens, widgets, controls, Live Activity, Siri shortcuts, watch card, night-review and diary lines, legacy prayer import and prayer settings are hidden; prayer-time engine kept («المواقيت» in Settings). All PrayerLog/QadaItem rows are tombstoned with a deletion barrier at every launch (owner order «امسح كل شي»; test passes). A Jama'a-linked habit becomes the user's own daily habit «صليت كل الصلوات بجماعة», asked by push one hour after Isha (window Isha+60…+240), and is offered as a ready preset; the wird is asked after Fajr and once more after Isha while not done. Streak capsule «ب» (room colour + lit flame done, grey waiting, red tint + unlit flame + hourglass when missed once); one final alert 90 min after Isha on the second day; room-coloured tags and orbit beads; Thmanyah Serif Text + Display Black across the habits room. Ideas built: 1 (notification buttons with the real goal, half of it, and «كمية ثانية» text input), 5 (Friday harvest note in the lobby), 6 (quiet 30/100/365 milestone with the hadith), 19 (a habit begun in the last 14 days is named in the new-habit editor), 20 (ending a habit shows its summary and confirmation). Already present before: 3 (pause/travel freeze keeps streaks). Left for the next agent: 2, 4, 8, 9, 10, 12, 14 (sleep/workouts), 16, 17; full-month names already used (no abbreviations found); period-card restyle beyond fonts not done. Owner 17 Nov: apply the Claude Code team's verification article automatically in every session — done: `verify` skill, feature map, reliability checklist, `verify-smoke.sh`, `Verified:` line enforced by a git commit-msg hook and a Claude Code hook, the 4 skipped prayer tests deleted. Owner 17 Nov: the remaining ideas (2, 4, 8, 9, 10, 12, 14, 16, 17), UI tests, screenshots and the period-card redesign go to Sonnet, with Claude reviewing behind it. Owner 17 Nov: «هل متاكد انه نفس التصميم» then «Yes, match it». Build 56 puts the room in the approved canvas order (see handover, third follow-up).
+| 31 | Owner 22 Nov (to Claude): «سوها كلها… اي شي تبيني فيه اسالني الان وسو سب ايجنتس كثير يساعدونك» — one build for: (a) iCloud sync live; owner answers: switch OFF by default, the agent deploys the CloudKit schema to Production («ماعرف ولكن سوه انت»), the trial runs on the simulator after the owner signs in to iCloud there; (b) delete the compiled-but-unreachable prayer code; (c) narrow the global `prayerRevision` reload signal; (d) repair the five known-failing UI tests; (e) Money: a manual exchange rate per currency, edit/delete a confirmed movement, manual income, user categories; (f) Quran: «read then grade» by default. Owner also answered: lobby stays as it is; the Mihbara reader stays. | built (build 60 uploaded at the end of the request; iCloud go-live waits on the owner, see handover 22 Nov) |
 
 
 ### طلب المالك: إعادة بناء المذكرات — ٩ نوفمبر
@@ -173,7 +174,7 @@ Bigger improvement ideas from Claude or Codex (new features, rule or data-model 
 |---|---|---|---|
 | Keep or delete old store generations and migration safety copies | Previous generations under `Generations/` and `MigrationSafety/…/RecordsV1.json` hold full copies of your private records on the device. They now have file protection, but they stay and grow. Options: keep the last one only; keep for 30 days; keep forever. Deleting data is a rule change, so nothing is deleted until you choose. | Claude (18 Nov audit) | **decided 18 Nov: keep only the last copy; built in build 58** (`ManagedDataStore.pruneOldCopies`). |
 | Mac sees the iPhone's data | The Mac app is local-only (RA1), so it starts with an empty store. Two routes: restore an encrypted backup file on the Mac, or activate CloudKit sync. | Claude 15 Nov (Mac start) | **Approved 15 Nov: iCloud sync** («بنفعل مزامنه الايكلاود») — queue row 28 |
-| Manual rates for valid foreign accounts and obligations outside travel | Current global basis can only read manually recorded trip rates; the trip rate editor requires a real trip. Define an explicit per-currency source and date/precision policy before adding general rates. Preserve frozen transaction rates and never guess a conversion or create a fake trip. | Whole-app cleanup, 8 Nov 2026 | Awaiting owner: rule/data-model extension; not included in this UI fix. |
+| Manual rates for valid foreign accounts and obligations outside travel | Current global basis can only read manually recorded trip rates; the trip rate editor requires a real trip. Define an explicit per-currency source and date/precision policy before adding general rates. Preserve frozen transaction rates and never guess a conversion or create a fake trip. | Whole-app cleanup, 8 Nov 2026 | **Approved 22 Nov:** a manual rate per currency with its date; recorded movements keep their frozen rate — queue row 31 |
 | Apple Intelligence for Diary and Money, with Arabic output | On-demand Arabic questions across a selected diary day, one whole memo, month, custom range, or all diary entries; and a money week, month, cycle, custom range, or complete history. Results show their coverage and AI origin; follow-ups stay temporary in that scope. Apple Translation bridges Arabic and the on-device Foundation Model. Money amounts and comparisons are computed by the app, never the model. | Owner request, 2 Nov 2026 | **Approved and implemented on iOS 27.0; generic simulator build exits 0. Simulator UI and device/model validation remain open.** |
 | Grade-less mistakes in a free Quran session | The free-session flow lets a reader enter slips without a page grade, but saving rejects that session, so the slips are not kept. Decide whether a slips-only partial may be saved or whether the app should require a grade before the slips can be recorded; this changes the session-recording rule. | Claude handover, 29 Oct | Answered 2 Nov: save the session with its mistakes; built in 1c371b6d (AU-96). |
 | تفسير الورد وسياق آياته | مع كل ورد يقرؤه المستخدم، يعرض تفسير الآيات المرتبطة به، وسبب النزول إن ورد بمصدر موثوق، والقصة أو السياق التاريخي إن أثبته المصدر. تُذكر إحالة واضحة للكتاب والمؤلف والجزء/الصفحة ورابط المصدر من تراث حيث يتوفر. لا يُخترع سبب نزول أو قصة؛ وإذا لم يوجد توثيق معتبر يقال ذلك بوضوح. قبل البناء تُحسم قائمة المصادر وتراخيص عرض النصوص وربط كل شرح بآيات الورد. | طلب المالك، 31 Oct | **Approved by owner, 31 Oct; add to Quran work.** |
@@ -193,14 +194,14 @@ Bigger improvement ideas from Claude or Codex (new features, rule or data-model 
 | End a trip-linked habit pause when a trip is dismissed | A restored or synced `Trip` with `dismissed == true` and no end date can leave a linked open `HabitPause` frozen indefinitely: `HabitRepository` only derives the pause end from `Trip.end`. The current travel question stores «لا، أنا مقيم هنا» separately, so this state is not produced by the current UI. Before legacy/restored/synced dismissed trips can reach users, decide whether dismissal ends the pause on that Madar day and what provenance must be saved for deterministic replay/history; this changes behavior/data and waits for owner direction. | Codex journey scan, 26 Oct | Answered 27 Oct: the habit resumes on the dismissal day. Ready, not built: `HabitRepository` still derives the pause end from `Trip.end` only. |
 | Money amounts in diary export | Diary auto lines «صرفت ٤٥ ر.س في …» (kind `mal`, default on) go into the PDF/Markdown export as-is, even when `core.hideMoneyOutside` (default on: «أخفِ المال خارج التطبيق») or `core.hideMoneyUntilTouch` is set. An export leaves the app, so the owner should choose: keep amounts (the user asked for the export), drop the amount and keep «صرفت في …», or ask in the export sheet. Inside the app the diary and lobby are not «outside», so they stay as they are. | Claude audit, 26 Oct | Answered 27 Oct: keep the amounts; no change needed (closed). |
 | App lock: remove or restore the switch | ~730 lines (`MadarLock`, `ScenePrivacyPresenter`, `AppPrivacyService`) existed while the release build disabled the lock. Mechanism deleted (owner 10 Nov, see DECISIONS); `CLAUDE.md`/`AGENTS.md` updated. | Review 10 Nov (قرار ١) | Done 10 Nov (claude): build + MadarData 121/121, MadarCommands 280/280, integration `MadarTests` 260 run with 2 failures not from this change (BahwAttention date window, MihbaraHome undo toast); `cross-process-test.py` fails on its fixed 2026-10-10 day (historical probe); UI tests could not be confirmed (simulator shared with another session). Awaiting TestFlight build |
-| Full Mihbara reader: keep, simplify or remove | Removing it drops Readium and 7 dependent libraries. | Review 10 Nov (قرار ٢) | Pending |
-| Exchange rate for a foreign account outside a trip | An account in a foreign currency without a rate empties the Money home (`MoneyRepository.swift:138-146`). | Review 10 Nov (قرار ٣) | Pending |
+| Full Mihbara reader: keep, simplify or remove | Removing it drops Readium and 7 dependent libraries. | Review 10 Nov (قرار ٢) | **Owner 22 Nov: keep as it is** — closed |
+| Exchange rate for a foreign account outside a trip | An account in a foreign currency without a rate empties the Money home (`MoneyRepository.swift:138-146`). | Review 10 Nov (قرار ٣) | **Owner 22 Nov: manual rate per currency** (the 10 Nov fix already keeps the home from emptying) — queue row 31 |
 | Move the store outside the App Group container | Context: the `0xDEAD10CC` suspensions; needs a real data migration. | Review 10 Nov (قرار ٤) | Pending |
 | `Referer` header for Turath | Remove it or ask the site for permission (`App/MihbaraTurathView.swift:26,62`). | Review 10 Nov (قرار ٥) | Pending |
-| New Money features | Edit/delete a confirmed movement, manual income without a salary message (`App/MoneyHomeView.swift:335-340`), user-made categories. | Review 10 Nov (قرار ٦) | Pending |
+| New Money features | Edit/delete a confirmed movement, manual income without a salary message (`App/MoneyHomeView.swift:335-340`), user-made categories. | Review 10 Nov (قرار ٦) | **Approved 22 Nov: all three** (edit/delete a confirmed movement, manual income, user categories) — queue row 31 |
 | Remove retired settings keys | `salah.beforeReminder`, `beforeAdhanMin`, `askHeart` were retired by earlier decisions; deleting them from `settings-schema.json` needs the owner. | Review 10 Nov (قرار ٧) | Pending |
-| Quran default coach | About 7 taps per ayah (`CoachProgress.swift:51-65`); change the default to «read then grade»? | Review 10 Nov (قرار ٨) | Pending |
-| Simplify the lobby | Drop the four tile sizes and the widget maker? Drop the three diary shapes (`notes.homeShape`)? | Review 10 Nov (قرار ٩) | Pending |
+| Quran default coach | About 7 taps per ayah (`CoachProgress.swift:51-65`); change the default to «read then grade»? | Review 10 Nov (قرار ٨) | **Approved 22 Nov: «read then grade» by default**, the coach stays an option — queue row 31 |
+| Simplify the lobby | Drop the four tile sizes and the widget maker? Drop the three diary shapes (`notes.homeShape`)? | Review 10 Nov (قرار ٩) | **Owner 22 Nov: keep everything** — closed |
 | Ideas needing data or a rule | Travel by time zone, a log button on the lock-screen widget, adaptive repetition, prayer-time forecasting. | Review 10 Nov (قرار ١٠) | Pending |
 | Server dictation consent | Saved once (`App/DiaryVoiceController.swift:196-199`): a permanent indicator or ask every time? | Review 10 Nov (قرار ١١) | Pending |
 | Delay impact in days (Quran) | «تأجيل ورد اليوم يؤخر الختمة يومين» beside the skip/postpone choices and in the exit dialog. Needs a decision where it shows (exit dialog vs plan page) and which pace it assumes (plan pace vs the last 14 days), because the two disagree after a gap. Pure read of the plan; no data change. | Claude, B3-2 (10 Nov) | built — awaiting owner (Batch 3, 10 Nov) |
@@ -231,6 +232,41 @@ M0-T06 paperwork, M0-T09 privacy matrix, M0-T12 contrast inspector, app-switcher
 M7 still needs owner-device/system acceptance, measured real-device Release performance and final resource/public-release evidence. Internal TestFlight uploads are authorized and have succeeded; public release and App Review are separate. Direct @als remains deferred. CloudKit development activation is authorized but currently blocked by the verified signing/profile failure in row 28; do not infer a blocker from older snapshots when the task resumes.
 
 # Handovers
+
+## Handover — «سوها كلها»: المال، حذف كود الصلاة، تحديث كل غرفة وحدها — 2026-11-22 — Claude
+
+### Works now
+- Money (owner's three features + manual rate): `money.setCurrencyRate` (history row `CurrencyRate`, schema V19, lightweight V18→V19), `money.editTransaction`, `money.logIncome`, `money.saveCategory`, `money.removeCategory`. Screens: «أسعار الصرف» and «أضف دخلاً» on the accounts page, tap a confirmed movement in the log to edit/delete it (lock reason line when amount/time cannot change), add/rename/remove categories. Written by a Sonnet helper, reviewed here.
+- Focused money review (Opus helper) found 4 High issues; all fixed with tests: a movement dated before the first rate takes the latest rate; no amount/time edit on an excluded movement, a big-expense plan, before the latest reconciliation, or across the opening-balance date; undo of an edit refused after a refund or a closed cycle; undo never restores a movement into a removed category. Also: manual income dedupes against the bank deposit, refunds follow the purchase category, absurd rates refused.
+- Dead prayer code deleted (≈6.6k lines: prayer room, intents, widgets, legacy prayer import, PrayerQuickLog); `PrayerCopy` → `ArabicPluralCopy.swift`.
+- Reload narrowed (`DataDomains`): money/Quran/Mihbara/habits pages listen to their own counter; the reminder re-plan no longer reloads every page.
+- Quran «اقرأ ثم قيّم» is the default (Quran helper), coach stays one tap away.
+- Undo line now shows after «أعِد الإعدادات المتفق عليها» (protocol: reset is undoable).
+- Stale UI tests repaired: RU3, M0T17, LegacyMove (habits room), DiaryToday ×2 (hub opens on الأيام; today-fixture text), DiaryBatchC review (no salah fact), accounts test (no undo after a save), limit test (no prayer-ask switch).
+
+### Verified
+- Packages: MadarCore 263, MadarMoney 309 (+14 XCTest), MadarCommands 342 (incl. 10 new `MoneyOwnerEditsTests`), MadarData 145, MadarPrayer 35, MadarInbox 23, MadarSnapshots 16 — all pass.
+- iOS `build-for-testing` succeeded (DerivedData). Integration: QuranReadGrade 2/2 (after keeping the session alive), BahwPrayer 3, LegacyMoveNativeWins 11, PrayerActivity 10, RoomNotifications 19 — pass.
+- UI run 1 (`Artifacts/OWNER-22nov/ui1.xcresult`): 22 tests, 15 pass; run 2 (`ui2.xcresult`): M0T17, LegacyMove long preview, all 14 MoneyAccounts but one (fixed after), rates and income tests, MoneyLog arcade, QuranCoach 2/2, QuranDayClose 3/3, MoneyCategories new tests pass.
+
+### Not verified / still failing
+- `MoneyCategoriesUITests.testLimit80AlertIsDeliveredWithPrivacySafeCopy` (no system notification within 180 s) and `testPercentLimitDisplaysHundredths` (shows ٠٫٠١٪). Check first whether the prayer-notification refactor or the categories load change caused them.
+- `FoundationUITests.test_M0S2_BackupPasswordConfirmationAndFixtureIsolation`: no hittable ت/t key (keyboard). The diary, accounts and night-review test fixes made after run 2 were not re-run.
+- No `verify-smoke.sh` run and no screenshots of the new money sheets (usage limit).
+
+### iCloud — blocked on the owner
+- Code ready: `remote-notification` background mode, Mac push entitlement, debug-only `MadarCloudSchemaInitializer` (throwaway store) behind `MADAR_CLOUDKIT_SCHEMA_INIT=1` in both apps.
+- Blockers: the simulator has no iCloud account (owner must sign in on «Madar 15 Pro Max»); the Mac route needs this Mac registered as a development device (account change, ask first); Production deploy needs the owner signed in to CloudKit Console. Build 60 therefore ships local-only (no CloudKit entitlement), the toggle stays hidden.
+- Next agent: after the owner signs in, build team-signed for the simulator with `MADAR_CLOUDKIT_CONTAINER=iCloud.com.alqzan.madar2 MADAR_APP_ENTITLEMENTS=App/Madar-CloudKit.entitlements`, launch with `MADAR_CLOUDKIT_SCHEMA_INIT=1`, read `madar-cloud-schema.txt` in the app tmp folder, deploy Development → Production in CloudKit Console, then archive with the CloudKit settings and verify the entitlements.
+
+### Delivery
+- Build 0.1.0 (60): see the delivery line added after the upload.
+
+### Model/effort
+- Claude Opus 5.5 (main), helpers: Sonnet (money screens, prayer deletion, Quran), Opus (money review). Effort not exposed.
+
+### Usage
+- 5-hour 92% used at wrap-up; weekly 38%.
 
 ## Handover — إصلاحات تدقيق مدار التقني — 2026-11-18 — Claude
 
@@ -365,202 +401,3 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Usage
 - Five-hour window 63% used at commit time (37% left); weekly 10% used.
-
-## Handover — المحبرة والساعة والمزامنة — 2026-11-16 — Codex
-
-### Works now
-- المحبرة على Mac تشمل قارئ PDF وEPUB وأدوات القراءة: الفهرس، تظليل الفقرة، الحاشية، روابط الفصول، بطاقة الكلمة والاقتباس، الترجمة، وإعدادات مستقلة لكل لغة مع إعادة ضبطها. الاختيار والنص مرتبطان بهوية الفصل لرفض الرسائل القديمة بعد التنقل. رسم PDF يستخدم إحداثيات PencilKit باتجاه ثابت.
-- تطبيق ساعة أصلي watchOS 27 مضمّن في تطبيق iOS. يعرض الصلاة التالية من الجدول المحلي، تقدم القرآن والعادات، والتاريخين. لقطة WatchConnectivity بلا بيانات مال أو مذكرات أو نصوص كتب، ولا كتابة أو تنبيه.
-- توصيل CloudKit الاختياري يراقب أحداث الاستيراد المكتملة، ويطابق المخزن والجيل النشطين، ويعالج السجل قبل إعلان الاستيراد. الاحتفاظ بالمزامنة الافتراضية المحلية قائم.
-
-### Verified
-- BUILD SUCCEEDED لـ Mac (/tmp/madar-mac-final-20261116.log)، iOS مع تضمين Watch والتحقق من الثنائي (/tmp/madar-ios-final-20261116.log)، وWatch المستقل (/tmp/madar-watch-final-20261116.log). سجلات البناء الثلاثة تستخدم CODE_SIGNING_ALLOWED=NO.
-- قبول Sol: مصدر وبناء Mac وWatch وCloudKit مقبول؛ وبعد عرض نتيجة التشغيل الاصطناعي قبِل أيضًا تشغيل مسارات Mac المحلية التي جُرّبت.
-- فشل توقيع Mac CloudKit في /tmp/madar-cloud-mac-sign.log كان قبل توحيد المعرّف: لم يتوفر ملف تطوير لـ`com.alqzan.madar2.mac` ولا أجهزة مسجلة يمكن لـXcode أن يولّد منها الملف التعريفي. لم يُنشر مخطط الإنتاج؛ حالة الفريق الحالية موضحة في متابعة المالك أدناه.
-- تشغيل يدوي للماك بمخزن MADAR_UI_STORE_ID=codex-mac-20261116: استيراد Madar/Tests/Fixtures/Mihbara/english-import-poc.epub وقراءته بالإنجليزية من اليسار إلى اليمين؛ فتح إعدادات الصفحة وبطاقة الكلمة والاقتباس، وظهور نص الترجمة العربية المحلية. أنشئ /tmp/madar-pdf-synthetic-20261116.pdf من صفحة واحدة؛ استورد وعُرض عبر PDFKit، ورُسمت ضربة PencilKit ثم أُغلق القارئ وفُتح ثانية وبقيت الضربة في موضعها. هذا تحقق يدوي من fixtures، لا اختبار آلي.
-
-### Differences left
-- CloudKit لم يُفعّل على إصدار موقّع، ولم تُجرّب مزامنة تطوير بين مخازن اصطناعية. حالة الحاوية والمنصة في App Store Connect لم تُتحقق.
-- قبول Sol يشمل الآن تشغيل Mac المحلي على fixtures اصطناعية؛ يظل تشغيل WatchConnectivity ومزامنة CloudKit الفعلية غير متحققين، ولا يحل قبول الشيفرة محل قبول المالك.
-
-### Not verified
-- مزامنة موضع EPUB وحبر PDF بين Mac وiPhone، وWatchConnectivity فعليًا، والساعة على جهاز مالك لم تُتحقق. لا بيانات مالك فُتحت أو نُقلت.
-- لا محاكي ساعة أو جهاز مالك استُخدم. لم تُشغّل اختبارات آلية أثناء المراجعة الأصلية للمحبرة/الساعة/CloudKit؛ تشغيل حزم المزامنة واللقطات في متابعة المالك أدناه. `git diff --check` اجتاز بعد التحديث الأخير.
-
-### Next
-- بعد توفير هوية وملف تطوير صالحين للفريق، تحقق من تفعيل حاوية iCloud لمنصتي iOS وMac، ثم ابنِ بتوقيع CloudKit وجرّب مخزنين اصطناعيين وراجع الاستيراد والتعارض والحذف. لا بيانات مالك ولا مخطط إنتاج قبل هذه البوابة.
-- آخر رفع داخلي هو 0.1.0 (52)؛ لا أرشيف/رفع جديد في هذه المتابعة. عند اكتمال الطلب والتحقق، يكون رقم الرفع التالي 53. قبول المالك على أجهزته منفصل.
-
-### Review by Claude — 2026-11-16
-- `SyncCoordinator`: the first-account bind started iCloud mirroring when the saved preference was on, with `checkpoint: nil` (the comment said a checkpoint is taken first). `firstAccountBindsLocallyWithoutChoiceOrCheckpoint` failed (2 issues). Restored the local first bind; the existing-binding path still writes a verified checkpoint before attaching iCloud. `swift test` in MadarSync: 10 tests passed.
-- Watch: the single-target SwiftUI watch app declared `WKWatchKitApp` (the old two-part WatchKit app key, which needs an extension) — replaced with `WKApplication` in `project.yml` and `WatchApp/Info.plist` so App Store validation accepts the embedded watch app. MadarSnapshots: 20 tests passed. iOS (with the watch app) and Mac: BUILD SUCCEEDED (unsigned).
-- Note at the time of this review: `com.alqzan.madar2.mac` would have made Mac a separate App Store Connect record. The owner's follow-up below supersedes that choice and restores the shared iOS bundle ID.
-
-### Model/effort
-- Codex: غير معروض. Sol: غير معروض.
-
-### Usage
-- قراءة النهاية: خمس ساعات 33٪ مستخدمة، الأسبوع 35٪ مستخدم؛ لم تُستخدم أرصدة إعادة الضبط.
-
-### Owner follow-up — توحيد هوية Mac والتحقق — Codex، 2026-11-16
-
-- **Works now:** هدف `MadarMac` و`MacApp/Info.plist` يستخدمان `com.alqzan.madar2` مثل iOS؛ أعيد توليد `Madar.xcodeproj` من XcodeGen. لا تغيير في مزامنة البيانات أو مفاتيح الساعة.
-- **Verified:** `swift test --package-path Madar/Packages/MadarSync` — 10/10؛ `swift test --package-path Madar/Packages/MadarSnapshots` — 20/20. نجح `MadarMac` على macOS 27، و`Madar` على iOS Simulator 27 مع تضمين الساعة، و`MadarWatch` على watchOS 27 (`CODE_SIGNING_ALLOWED=NO`). ناتجا iOS وMac يحملان `com.alqzan.madar2`. ناتج الساعة يحمل `WKApplication=true` و`WKCompanionAppBundleIdentifier=com.alqzan.madar2`، ولا يحمل `WKWatchKitApp`. `git diff --check` نظيف.
-- **Differences left:** منصة macOS أضيفت إلى سجل «المدار» نفسه `6830247088`؛ iOS وmacOS كلاهما `Prepare for Submission`. لم يُرفع TestFlight.
-- **Not verified:** لا تجربة مزامنة CloudKit موقّعة، ولا تجربة على هاتف/ساعة فعلية أو تسليم WatchConnectivity. الشهادة المحلية الوحيدة Apple Development تخص الفريق `6JU2NX526Y`، لا الفريق `V8YZL4R65K`; لم يظهر ملف تعريف في مجلد ملفات التوقيع المعتاد. لم تتحقق حالة حاوية iCloud.
-- **Next:** وفّر شهادة/ملف توقيع للفريق `V8YZL4R65K` وللمعرّف المشترك قبل مزامنة تطوير فعلية. الرفع إلى TestFlight ينتظر توقيع التوزيع.
-- **Model/effort:** غير معروض. **Usage:** خمس ساعات 3٪ مستخدمة، الأسبوع 36٪ مستخدم؛ لم تُستخدم أرصدة إعادة الضبط.
-
-## Handover — المحبرة على الماك — 2026-11-15 — Claude
-
-- **Works now:** (تحديث: جلسات القراءة، البحث في النصوص، الفهرس، تظليل الفقرة وحاشيتها، الحواشي والروابط الداخلية، لون الصفحة وحجم الخط المشتركان مع الآيفون) المحبرة غرفة في شريط الماك الجانبي (⌘6) ومفعّلة في `BahwBlock.built` لكل المنصات؛ المكتبة والرفوف من `MihbaraHomeView` المشترك؛ قراءة PDF عبر PDFKit (`MacApp/MacMihbaraPDF.swift`)؛ قارئ EPUB للماك بـ WKWebView (`MacApp/MacMihbaraReader.swift`) يفك الملف بـ `ZIPReader` ويقرأ ترتيب الفصول من OPF ويحفظ الموضع بصيغة Readium نفسها عبر `MihbaraReadingSaveCoordinator` (نُقل إلى ملف مشترك). طلب `mihbaraOpen` على الماك يختار غرفة المحبرة.
-- **Verified:** `xcodebuild -scheme MadarMac … build` → BUILD SUCCEEDED؛ `xcodebuild -scheme Madar -destination 'generic/platform=iOS Simulator' … build` → BUILD SUCCEEDED؛ تشغيل الماك بمخزن تجريبي `MADAR_UI_STORE_ID=mac-trial-1` وفتح المحبرة من قائمة «الغرف»: المكتبة الفارغة وبطاقة وِرد القراءة تظهران.
-- **Differences left:** انظر الصف ٢٧ (a–e): لم يُفتح كتاب فعلي على الماك بعد؛ استيراد EPUB صار يعمل على الماك (يُتحقق منه بقارئ الماك بدل Readium) ولم يُجرَّب بملف حقيقي؛ أدوات القارئ الإضافية (بطاقة الكلمة والاقتباس، الترجمة، الإعدادات، الإعدادات) غير موجودة على الماك؛ تظليل الفقرة وحاشيتها صارا على الماك ولم يُجرَّب في نافذة؛ قارئ EPUB يسجّل جلسات القراءة ويقسمها عند حد اليوم؛ البحث داخل النصوص يعمل على الماك؛ مجلد الفك المؤقت يُحذف عند الإغلاق.
-- **Verified (headless):** محلل `MacEPUB` على EPUB اصطناعي: ترتيب الفصول، حفظ الموضع واستعادته (ومنه صيغة Readium `/OEBPS/c2.xhtml#x`)، التقدم الموزون بحجم الفصول، المواضع، البحث بتجاهل التشكيل، الفهرس من nav وNCX، وحذف المجلد المؤقت.
-- **Not verified:** فتح EPUB/PDF حقيقي على الماك واستكمال الموضع على الآيفون؛ اختبارات وحدة لـ `MacEPUB` (place/locatorJSON) لم تُكتب؛ لا رفع TestFlight (ثنائي iOS لم يتغير سلوكه؛ إضافة منصة macOS في App Store Connect ما زالت عند المالك).
-- **Next (Codex):** (1) الصف ٢٧ a (ومعه تجربة التظليل بين الآيفون والماك) ثم d؛ (2) الصف ٢٨ مزامنة iCloud: بيئة التطوير ومخازن اصطناعية ومراجعة مركّزة قبل أي بيانات حقيقية أو مخطط إنتاج.
-- **Model/effort:** Claude Opus 5.5 (`claude-opus-5-5`)، الجهد غير معروض.
-- **Usage:** بعد طلب المالك «أكمل الباقي» أُضيفت: جلسات القراءة وتقسيمها عند حد اليوم، البحث في النصوص، الفهرس، تظليل الفقرة وحاشيتها، الحواشي والروابط، لون الصفحة وحجم الخط المشتركان. عند الإيقاف: الأسبوعي ٩٤٪ مستخدم والخمس ساعات ٦٩٪.
-- **Remaining for Codex (Mihbara on Mac):** تجربة كتب حقيقية في نافذة (EPUB وPDF، التظليل بين الجهازين)؛ بطاقة الكلمة والاقتباس والترجمة؛ الكتابة على PDF (قرار أداة الرسم على الماك)؛ ثم مزامنة iCloud (الصف ٢٨).
-
-## قرارات تنتظر المالك — 2026-11-13 (من المراجعة الخارجية)
-- T10 إعادة تصميم غرفة المذكرات: موافقة على الحفظ التلقائي ودمج الأسطر تلقائيًا؟
-- #35 الهدف حين تُختار أيام أسبوع/شهر: إخفاء العدّاد يغيّر معنى الهدف (عدد الأيام = هدف الفترة). أيّ المعنيين؟
-- #18 مسار «اسألني» عبر NotificationArbiter: يخضع الآن لحارس القدسية فقط؛ إخضاعه للسقف قد يُسقط تذكيرًا مطلوبًا.
-- رخصة lioicons (من ملف PDF): استعمال أم لا.
-- لم يُنفَّذ: T14 (٢٠ اختبارًا)، T01 اختبار التكامل، بقية T11 (وِرد/بنك)، تحديث المولّد.
-- #25 حقل كتابة الحد في الفئات أُضيف؛ #7 و#40 و#29 كانت منفّذة.
-- رفع 44: الأرشيف ناجح والتصدير فشل مرتين: «Failed to Use Accounts» لفريق V8YZL4R65K رغم تسجيل الدخول.
-
-### تحديث 2026-11-13 مساءً
-- lioicons: المالك أكد الاستعمال مسموح (ومصدر الأيقونات المرجّح Lineicons: المجانية MIT). لا دمج حتى الحاجة.
-- #35 نُفّذ: العدّاد يختفي عند اختيار أيام ويظهر «في الأيام التي اخترتها».
-- أُضيفت اختبارات: حدود الحرمة (3) وفاصلة المبلغ (3)، كلها نجحت.
-- بقي: T10 (يحتاج موافقة الحفظ التلقائي)، #18، بقية T14/T01/T11.
-- رفع 44: التصدير فشل ثالث مرة «Failed to Use Accounts»؛ الأرشيف جاهز في Artifacts/OWNER-TestFlight-44.
-
-### 2026-11-14
-- Build 0.1.0 (44) رُفع إلى TestFlight (Upload succeeded 09:54) بعد تسجيل الدخول في Xcode. لم يُنتظر معالجة Apple.
-- #18 أُسقط بقرار المالك. T01: اختبار مسح كل الغرف × الصلوات × ٣ إزاحات (نجح). T11: العادة موجودة؛ لا إشعار للرسالة البنكية أصلًا؛ وِرد «أتممته كاملًا» يحتاج قاعدة منتج (أي تقدير يُسجَّل؟) فلم يُبنَ.
-- T10: عُرض مخطط المقارنة للمالك قبل التنفيذ؛ بانتظار قراره.
-
-### T10 — مراجعة Opus (2026-11-14، النموذج كما ذكره المراجع نفسه: claude-opus-5-5، غير متحقَّق منه من الأداة)
-الحكم: AMEND. التعديلات المعتمدة: (١) الحفظ التلقائي = saveDraft بتأخير 600ms الموجود؛ commitDraft عند الحدود فقط (تمّ، فقدان التركيز، الخلفية، مغادرة الصفحة، تغيّر اليوم، إرفاق صورة) لا بمؤقت خمول؛ (٢) لا يُحذف DiaryTextEditor الآن (الكتابة في الهامش والأيام السابقة تمر به)؛ يُنقل إلى T12؛ (٣) لا شارة تراجع للحفظ الضمني، «حُفظ» فقط؛ (٤) «قبل سنة» تتبع notes.calendarFirst وتعرض التاريخين.
-الترتيب الآمن: ١ مجمّع فصول وملخص نقي بأمثلة يدوية؛ ٢ صور بعرض العمود (منفّذ)؛ ٣ طيّ سطور مدار لكل فصل مع بقاء مراسي «اكتب بعده»؛ ٤ إزالة ⋯ وتأكيد الحذف (منفّذ)؛ ٥ تقسيم DiaryDayView (٤٦ @State)؛ ٦ اليوم صفحة جذر و«أيامك» بثلاثة تبويبات؛ ٧ الحفظ الحدودي مع اختبارات الالتزام المزدوج والتراجع بعد الحفظ؛ ٨ شريط المفاتيح المحصور؛ ٩ شريط ٩٦ ثابت يفتح النافذة بلمسة؛ ١٠ السحب أخيرًا (مؤجل).
-الورد: «أتممته كاملًا» يفتح سؤال تقدير واحدًا ثم quran.commitSession؛ إجراء الإشعار .foreground فقط.
-لم يُنفَّذ شيء من T10 بعد؛ الخطوتان ٢ و٤ كانتا منفّذتين أصلًا.
-
-## العمل الجاري بعد النسخة 50 — تحديث 14 نوفمبر 2026
-
-1. **صور المذكرات المزروعة:** اتضح أن سبب فشل الاختبار كان افتراضه تاريخًا ثابتًا للصورة المزروعة. صار الاختبار يقرأ يوم العينة ويثبت أن يومين مختلفين يعرض كل منهما صورته وحدها. OWNER-notes-accessibility-photos-20261114.xcresult: ٩/٩؛ بلا فشل، مع تحذيرين وقت تشغيل عن أبعاد إطار غير صالحة.
-2. **إخفاقات واجهة المحبرة التسعة:** صُنّفت في OWNER-mihbara-nine-20261114.xcresult: ٧ إخفاقات و٢ نجاح. العيب الإنتاجي كان سباق عرض «حوّله» بعد استيراد PDF بسبب قراءة رف قديمة قبل اكتمال القراءة الجديدة؛ صار عرض التحويل ينتظر القراءة الناجحة ويحمل هوية الكتاب الفعلية، حتى عند استعادة كتاب موجود. نجحت الاختبارات الثلاثة للتحويل/الإلغاء في التشغيل اللاحق. باقي التوقعات كانت تمريرًا تحت الشريط السفلي أو نص حوار قديمًا أو تحديد WebKit متغيرًا أو توقع تراجع للاستيراد يخالف قرار ٥ نوفمبر. اختبارات الحالات السبع التي كانت تفشل نجحت في OWNER-final-focused-20261114.xcresult.
-3. **تنظيف T12:** أزيلت واجهة التحفيز وبياناتها والرموز الميتة من المحبرة، وأزيل استثناء QuranRoom.swift من فاحص الشحن. بقي setStand لأنه يُستخدم عند اختيار كتاب للطاولة. فحص الشحن: نجاح ثابت لـ٤٩٤ ملف Swift و٤ كتالوجات و٣٨ زوج ألوان M0؛ ظهرت ٩٥ ملاحظة حركة/نصف قطر وطلب الفحص تتبعًا يدويًا، فلا تُعدّ نتيجة تحقق يدوي كامل.
-4. **تقاعد ١٢ مفتاح إعداد خامد:** فوّض المالك القرار في 14 نوفمبر، وأوصى سول `gpt-6.1-sol` بجهد high بتقاعدها؛ لم يجد مستهلكًا حيًا. أُزيلت التعريفات الاثنا عشر فقط من المخطط: `quran.hifzMethod`, `quran.reviewMethod`, `quran.similarAlert`, `mal.firstNumber`, `mal.curveRange`, `mal.logView`, `mal.utilizationWarn`, `notes.suggestLine`, `notes.marginAlsoToday`, `mihbara.hadithCollection`, `mihbara.hadithView`, `mihbara.readingReminder`. صار العدد 138 بدل 150 والأنماط 62 بدل 68. لم تُحذف أو تُكتب صفوف `Setting` أو `DeviceSetting` أو `Preset` أو إيصالات التراجع؛ النسخ القديمة تتجاوز `removedKeys` المعروفة في الذاكرة فقط، وتبقى المفاتيح المجهولة مرفوضة. مفاتيح RA8 و`mihbara.layout` و`notes.homeShape` و`tabbar.items/searchTab` باقية؛ `quran.tapForTafsir` مؤجل لبوابة ترخيص M2. التحقق: DataTests/ReplayTests 1/1 لكل اختبار مركّز؛ `OWNER-retired-settings-20261114.xcresult` 1/1. اختبار البيانات يقارن كامل حقول الصفوف بعد الإغلاق وإعادة الفتح والنسخ الاحتياطي/الاستعادة. سول قبل التغيير وبعده لم يجد مانع High/Critical.
-5. **T14 #15:** أضيف حقن فشل خاص بمثيل الاختبار بعد إدخال أول Allocation في تقسيم مصروف. swift test --package-path Madar/Packages/MadarCommands --filter MoneyPersistenceTests: ٦٠ اختبارًا في suite واحدة، كلها نجحت. الاختبار الجديد يفتح مخزنًا معزولًا من جديد بعد الفشل، يتحقق من rollback ثم يعيد الأمر نفسه بنجاح بلا تكرار.
-6. **AccessibilitySizeUITests:** اختبارات AX5 أصبحت تتحقق من معرّف خاص بكل غرفة. أخفق تشغيل وسيط في عنصر اليوم المكرر واختبار البهو، ثم اجتاز التشغيل اللاحق OWNER-notes-accessibility-photos-20261114.xcresult الاختبارات السبعة لكل الغرف مع اختبارَي الصور: ٩/٩.
-7. **iPad:** أُخفي شريط السنة حتى يكتمل قياس العرض، وقُوّي اختبار غياب لوحة المفاتيح بعد التدوير. OWNER-notes-ipad-full-20261114.xcresult: ٣/٣ على Madar iPad Pro 13 iOS 27.0. قبول شكل الجهاز الحقيقي ما زال عند المالك.
-8. **رسالة البنك «صحيح»:** حُسم بقرار المالك ١٤ نوفمبر: لا إشعار مستقل عند وصول الرسالة؛ تبقى مراجعتها داخل غرفة المال فقط.
-9. **قبول جهاز المالك:** ما زالت تجربة شريط السنة، إجراء «أتممته» في إشعار الورد، بديل رموز التعرف على الصوت 1101/203، وشكل iPad بيد المالك فقط. قبول سول يغطي الشيفرة والاختبارات، ولا يحل محل قبول الجهاز الحقيقي.
-10. **استعراض الذكريات بعد مراجعة سول:** صار تاريخ اليوم بالتقويمين أول ما يظهر في صفحة المذكرات، وبعده شريط ذكريات مختصر ومدخل واحد «كل الذكريات». داخل الأرشيف تبويبات واضحة «الأيام / السنوات / الرسائل»، وقائمة واحدة لطريقة عرض الأيام (الأيام/التقويم/الصور)؛ مطابقة الذكرى للتاريخ الميلادي أو الهجري صارت قائمة مسماة بدل أزرار مبهمة. بطاقة السنة تفتح تقويمها، وفيه «كل السنوات» للرجوع إلى فهرس السنوات. اليوم التاريخي يحمل التاريخين وزر «العودة إلى اليوم». أزيل تكرار «اليوم/أمس/قبل سنة» ومداخل الأرشيف. استُلهمت بساطة بطاقات `My-dream` فقط دون نسخ بيانات أو واجهات. لا تغيير في النموذج أو قواعد التاريخ.
-
-## تسليم 2026-11-14 (هـ) — استعراض الأيام وتحسينات المذكرات وإصلاحات التسع
-
-### Works now
-- زر «أيامك» ظاهر بالاسم في صفحة اليوم، ويفتح تقويم الأرشيف مباشرة. يمكن فتح تاريخ سابق، والعودة لليوم بزر ظاهر حتى في الجمعة وصفحة السفر؛ الرابط الجذري madar://notes يعيد اليوم. لا يعاد إنشاء صفحة الجذر في العودة.
-- مسودات اليوم السابق واليوم الحالي مستقلة، وتبقى قيمتهما الدقيقة بعد التنقل وإعادة تشغيل التطبيق.
-- أسئلة الكتابة ومراجعة النيّة صارتا متاحتين من صفحة اليوم بعد تحويلها إلى جذر الغرفة.
-- تحويل PDF يعرض الكتاب الذي أُضيف فعلًا بعد اكتمال قراءة الرف؛ لم يعد يعتمد على بيانات رف قديمة.
-- اختبار تقسيم المال يثبت تراجع الكتابة الجزئية وإمكانية إعادة الأمر دون مضاعفة الإيصال أو الحركة.
-
-### Verified
-- iPhone 15 Pro Max, iOS 27.0: OWNER-final-focused-20261114.xcresult — ١١/١١، صفر فشل أو تخطٍّ. شمل اختبارات اليوم/الجمعة/الرابط الجذري/فصل المسودات، و٧ اختبارات محبرة كانت تفشل سابقًا.
-- OWNER-notes-acceptance-r6-20261114.xcresult — ٢/٢؛ OWNER-notes-navigation-full-20261114.xcresult — ١٥/١٥؛ OWNER-notes-ipad-full-20261114.xcresult — ٣/٣؛ OWNER-notes-accessibility-photos-20261114.xcresult — ٩/٩.
-- swift test --package-path Madar/Packages/MadarCommands --filter MoneyPersistenceTests — ٦٠/٦٠.
-- مراجعة القبول: gpt-6.1-sol بجهد high — قبول نطاق المذكرات وPDF واختبار المال؛ لا ملاحظات Critical/High. لم يشغّل المراجع اختبارات ولم يغيّر ملفات.
-- git diff --check نظيف. تحقق فاحص الشحن ثابتًا كما في البند ٣، مع تحذيراته المذكورة.
-
-### Differences left
-- الأرشيف وعودة اليوم تغييرات مقصودة فوق حالة «اليوم فقط» السابقة؛ لا ادعاء بمطابقة بكسلية للمرجع القديم. اللقطات المرجعية للمقارنة: قبل Madar/Artifacts/owner-notes-navigation-shots-20261114/T10-root-today-L.png؛ بعد Madar/Artifacts/owner-notes-navigation-shots-20261114/OWNER-notes-days-entry-L.png وMadar/Artifacts/owner-notes-navigation-shots-20261114/OWNER-notes-historical-friday-return-after-L.png وMadar/Artifacts/owner-notes-navigation-shots-20261114/OWNER-notes-historical-travel-return-after-L.png. مقارنة canonical: Madar/Artifacts/compare/today.html؛ الفروق مقصودة.
-- عند هذا التسليم لم تكن مفاتيح الإعدادات قد تقاعدت بعد؛ فوّض المالك القرار لاحقًا، ونُفّذ في تسليم الإعدادات التالي. أبقيت مفاتيح v2 والمفتاح المرتبط ببوابة الترخيص المؤجل كما هما.
-- إشعار البنك غير مضاف عمدًا بقرار المالك: تبقى المراجعة داخل غرفة المال.
-
-### Not verified
-- قبول iPhone المالك أو iPad حقيقي غير متحقق. البناء 48 يمثل لقطة سابقة؛ إعدادات هذا التسليم مضمّنة في بناء 49 بعد تحققها.
-- تجربة الرموز 1101/203 و«أتممته» والسحب على الجهاز الحقيقي.
-
-### Next
-- قرار تقاعد المفاتيح نُفّذ واختُبر في تسليم 14 نوفمبر التالي؛ لا ترحيل ولا حذف لبيانات الإعدادات القديمة. التثبيت والقبول على جهاز المالك بعد اكتمال معالجة Apple.
-- يبقى قبول الجهاز الحقيقي للمالك.
-
-### Model/effort
-- الوكيل الرئيسي: model/effort not exposed. مستشار القبول: gpt-6.1-sol, high.
-
-### Usage
-- عند التسليم: الخمس ساعات ١١٪ مستخدمة، والأسبوع ٩٪ مستخدم. لم تُستخدم أرصدة إعادة الضبط.
-
-## تسليم 2026-11-14 (و) — تقاعد الإعدادات الآمن ورفع نسخة 49
-
-### Works now
-- تقاعدت 12 تعريفًا لإعدادات لم تعد لها قراءة حية. تختفي من الإعدادات والبحث المركزي، وتبقى بياناتها المخزنة كما هي.
-- النمط القديم والتراجع القديم يتجاهلان المفاتيح المتقاعدة المعروفة فقط؛ أي مفتاح غير معروف يظل مرفوضًا مع rollback.
-- استعراض الأيام والرجوع إلى اليوم، وتحسينات المذكرات السابقة، مشمولة في النسخة الجديدة مع هذا التنظيف.
-- قرار البنك مستمر: لا إشعار محلي مستقل؛ المراجعة داخل غرفة المال فقط.
-
-### Verified
-- `swift test --filter DataTests.retiredSettingsStayStoredAndLegacyPresetAndUndoSkipOnlyRetiredKeys` — 1/1، ويتحقق من كل حقول الصفوف الاثني عشر بعد reopen ونسخ احتياطي/استعادة اصطناعيين.
-- `swift test --filter DataTests.settingsDefaultsPersistenceAndInvalidRejection` — 1/1؛ `swift test --filter ReplayTests.legacyPresetAndUndoSkipRetiredSettingsButRejectUnknownKeys` — 1/1.
-- محاكي iOS 27.0 `Madar 15 Pro Max`: `OWNER-retired-settings-20261114.xcresult` — اختبار التكامل 1/1، مفاتيح التقاعد غير موجودة في شاشة/بحث الإعدادات.
-- سول `gpt-6.1-sol`, high: قبول مراجعة التغيير؛ لا High/Critical. النسخ الثلاث من schema متطابقة، 138 إعدادًا، 62 منها تدخل في الأنماط؛ مفاتيح RA8 باقية.
-- أُرشفت نسخة 0.1.0 (49) على Xcode 27.2 ورُفعت داخليًا بنجاح في 14 نوفمبر 2026، 21:05 بتوقيت الرياض (`Madar/Artifacts/OWNER-TestFlight-49/upload.log`). أفاد Xcode أن الحزمة بدأت معالجة Apple؛ لم ننتظر اكتمالها.
-
-### Differences left
-- القيم القديمة للـ12 لا تظهر ولا تؤثر في السلوك، لكن صفوفها تظل في المخزن والنسخ الاحتياطية بلا تعديل.
-- القبول على iPhone المالك يظل مطلوبًا بعد أن تعلن Apple توفر النسخة؛ لم يُفتح مخزنه ولم تُشغّل نسخته الحقيقية.
-
-### Not verified
-- اكتمال معالجة Apple وتوفر البناء في TestFlight، ثم قبول المالك على جهازه.
-
-### Next
-- بعد إتاحة البناء في TestFlight، يثبته المالك ويقبل مظهر المذكرات وعودة اليوم والإعدادات.
-
-### Model/effort
-- الوكيل الرئيسي: model/effort not exposed. مستشار القبول: `gpt-6.1-sol`, high.
-
-### Usage
-- خمس ساعات: ٢٤٪ مستخدمة؛ الأسبوع: ١١٪ مستخدم. لم تُستخدم أرصدة إعادة ضبط.
-
-## تسليم 2026-11-14 (د) — كل ما أمكن، النسخة 48
-- **يعمل:** المذكرات على iPad العريض صفحة اليوم وبجانبها عمود (ذكريات، أيام، أسئلة) بدل الرئيسية القديمة، ومكانها ثابت فلا تُبنى من جديد عند التدوير؛ «خصّص المذكرات» يخفي شريط السنة؛ شريطا صور اليوم يُسقطان الصورة المربوطة معًا (من الحقل ومن العارض)؛ قاعدة «لم يدخل وقتها» في LogPrayerIntent صارت دالة نقية في MadarCore بسلوك مطابق؛ حُذف الميت: QuranRoom.swift، مكتب المحبرة القديم، motivationCues.
-- **اختبارات جديدة (T14):** حدود رمضان (٧ شعبان/١ رمضان/٢٩ رمضان/١ شوال)، لندن يوم تغيير الساعة، أوسلو، السلسلة بعد حذف سجل، سقف ٥١٢ م.ب، الرصيد لا يظهر نصًّا في اللقطة المخفية، AX5 لكل غرفة، iPad بتأكيدات (جهة العمود والتدوير). MadarCore 239 و MadarData 136 نجحتا.
-- **حالة build 48 عند تسليمه:** لا إشعار بنكي مستقل حسب قرار المالك؛ قائمة «٣٦» لم تكن موثقة. في متابعة 14 نوفمبر تقاعدت الـ١٢ المؤكدة فقط مع إبقاء البيانات؛ #15 صار لديه اختبار تراجع وإعادة تنفيذ ناجح في التسليم الأحدث.
-- **لم يُتحقق منه:** اختبار الصور المزروعة testDayPhotosLinkOnce ما زال يفشل عند زرع الصور (الشريطان؛ الاختبار الافتراضي يتخطاه)؛ 9 اختبارات واجهة قديمة للمحبرة تفشل بلا علاقة بهذا العمل (ثُبت بإعادة التشغيل دون التعديل)؛ بقايا ميتة صغيرة: manuallyOpen/tableBook/motivationCues في MihbaraHomeView؛ AccessibilitySizeUITests يثبت عدم الانهيار وظهور زر، لا صلاحية الغرفة كاملة.
-- **Model/effort:** claude-sonnet-5-5 / غير معروض. **Usage:** not exposed.
-
-## تسليم 2026-11-14 (ز) — ذكريات السنوات وترتيب أرشيف المذكرات، النسخة 50
-
-### Works now
-- تاريخ اليوم بالتقويمين صار أول ما يظهر في صفحة المذكرات، يليه شريط ذكريات مختصر ومدخل واحد «كل الذكريات». مدخل السنوات مستقل وواضح داخل الأرشيف بجانب الأيام والرسائل؛ بطاقة السنة تفتح تقويمها و«كل السنوات» يعيد لفهرس السنوات.
-- طريقة عرض سجل الأيام (الأيام/التقويم/الصور) ومطابقة الذكرى (ميلادي/هجري) صارتا اختيارين مسميين داخل قائمتين واضحتين. أزيل تكرار «اليوم/أمس/قبل سنة» ومداخل الأرشيف.
-- اليوم التاريخي يعرض التاريخين وزر «العودة إلى اليوم». في قارئ الأرشيف يوضح زر الإغلاق أنه يعود إلى «الذكريات»، وإغلاق الأرشيف يعود إلى «المذكرات». إذا اختفى شريط الذكريات أو كبر حجم الوصول يبقى مدخل أرشيف واحد.
-
-### Verified
-- Xcode 27.2: بناء Debug نجح على `Madar 15 Pro Max`, iOS 27.0 (`Madar/Artifacts/owner-diary-years-navigation-20261114/debug-build.log`). أرشيف Release نجح في `Madar/Artifacts/OWNER-TestFlight-50/archive.log`; إصدار التطبيق والودجت 0.1.0 (50)، الهدف 27.0، العائلات 1 و2، وتوقيعهما صالحان. لم يظهر entitlement لـ iCloud/ubiquity. الرفع الداخلي نجح عند 23:21 في `Madar/Artifacts/OWNER-TestFlight-50/upload.log`، وXcode يقول إن Apple بدأت المعالجة. إعداد الرفع مباشر ولا يُنشئ IPA محليًا.
-- لقطة Light وDark من محاكي iPhone، ببيانات اختبار اصطناعية فقط: `Madar/Artifacts/owner-diary-years-navigation-20261114/OWNER-notes-home-years-L.png` و`OWNER-notes-home-years-D.png`؛ اختفت صفوف الأزرار المكررة. مقارنة المرجع أنشئت في `Madar/Artifacts/compare/N1-Nafidha.html`، والفروق في الترتيب مقصودة.
-- مراجعة سول `gpt-6.1-sol`, high، شملت تجربة الاستخدام: أوصى بتقديم تاريخ اليوم، جمع الأرشيف تحت «الأيام/السنوات/الرسائل»، تسمية اختيارات المطابقة والعرض، وإظهار الرجوع من تقويم السنة. نُفذت التوصيات وصُحح زر الإغلاق الذي كان يصف الوجهة خطأ؛ أكد سول القبول النهائي. لا موانع Critical/High، ولم يعدل المراجع ملفات أو يشغّل build/tests.
-- لم تُشغّل اختبارات في هذه الجولة. `git diff --check` نظيف عند التسليم.
-
-### Differences left
-- لقطة الجذر مُعاينة بصريًا. لم تُفتح واجهة Simulator رسوميًا للتنقل باللمس بين بطاقة سنة وصفحة الأرشيف والعودة؛ تقييم سول كان للمصدر فقط.
-- مستودع My-dream ألهم طريقة عرض البطاقة فقط. لا ادعاء بمطابقة الشاشة المرجعية أو باعتماد المالك للتصميم.
-
-### Not verified
-- قبول المالك على iPhone حقيقي أو iPad غير متحقق. معالجة Apple وتوفر TestFlight لا يُنتظران بعد الرفع.
-
-### Next
-- بعد اكتمال معالجة Apple وتوفر النسخة 50 في TestFlight، يثبتها المالك ويجرّب «كل الذكريات»، تبويب «السنوات»، فتح سنة، والعودة إلى اليوم. معالجة Apple لم يُنتظر اكتمالها.
-
-### Model/effort
-- الوكيل الرئيسي: model/effort not exposed. مستشار القبول: `gpt-6.1-sol`, high.
-
-### Usage
-- عند التسليم: خمس ساعات ٦٢٪ مستخدمة، والأسبوع ١٧٪ مستخدم؛ لم تُستخدم أرصدة إعادة الضبط.

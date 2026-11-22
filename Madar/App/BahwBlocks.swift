@@ -22,9 +22,6 @@ struct BahwBlockView: View {
         nonmutating set { service.session.lobbyHabitPeriod = newValue?.rawValue }
     }
     @State private var completionInFlight: Set<UUID> = []
-    /// The lobby reads the full prayer history once per minute off the main actor, then reuses its projection for redraws.
-    @State private var prayerModel: BahwPrayerModel?
-    @State private var prayerLoadedKey: [Int] = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.roomTheme) private var lobby
@@ -59,12 +56,7 @@ struct BahwBlockView: View {
         switch block {
         case .mal: money
         case .habits: habits
-        case .salah:
-            let key = prayerKey, isFront = isFrontRoom
-            salah.task(id: key + [isFront ? 1 : 0]) {
-                guard isFront else { return }
-                await refreshPrayer(for: key)
-            }
+        case .salah: EmptyView() // The prayer block was retired with the prayer room; the case stays to decode saved layouts.
         case .quran: quran
         case .notes: notes
         case .year: year
@@ -403,83 +395,6 @@ struct BahwBlockView: View {
                 Spacer(minLength:0)
             }
         }
-        }
-    }
-
-    // MARK: prayer
-    private var prayerKey: [Int] {
-        [Int(service.now.timeIntervalSince1970 / 60), service.session.prayerRevision]
-    }
-    private var currentPrayer: BahwPrayerModel? {
-        let key = prayerKey, instant = service.now
-        if prayerLoadedKey == key { return prayerModel }
-        guard prayerLoadedKey.count == 2,
-              prayerLoadedKey[1] == key[1],
-              prayerModel?.nextAt.map({ $0 > instant }) == true else { return nil }
-        return prayerModel
-    }
-    private func refreshPrayer(for key: [Int]) async {
-        guard block == .salah, prayerLoadedKey != key else { return }
-        let instant = service.now
-        guard key == [Int(instant.timeIntervalSince1970 / 60), service.session.prayerRevision] else { return }
-        do {
-            let snapshot = try await service.session.prayerSnapshotOffMain(at: instant)
-            try Task.checkCancellation()
-            guard key == prayerKey else { return }
-            prayerModel = AppBahwService(session: service.session, evaluationDate: instant).prayer(snapshot: snapshot)
-            prayerLoadedKey = key
-        } catch is CancellationError {
-        } catch {
-            guard key == prayerKey else { return }
-            prayerModel = nil
-            prayerLoadedKey = key
-        }
-    }
-    @ViewBuilder private var salah: some View {
-        if let model = currentPrayer {
-            if size == .icon {
-                VStack(spacing: 2) { Text(model.nextName ?? "الصلاة").font(small).foregroundStyle(room.secondaryInk); Text(model.nextTime ?? "").font(big).minimumScaleFactor(0.6) }.frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                VStack(alignment: .leading, spacing: size == .small ? 8 : 6) {
-                    HStack { title(room.accent).accessibilityLabel("الصلاة في " + service.session.cityName); Spacer(); if model.done > 0 { Text(digits.string(model.done) + " من " + digits.string(5)).font(small).foregroundStyle(room.secondaryInk).accessibilityIdentifier("bahw-salah-done") } }
-                    HStack(alignment: .bottom, spacing: size == .small ? 4 : 10) {
-                        ForEach(model.arches) { arch in
-                            VStack(spacing: 4) {
-                                // DA-05: W1's arches: a star in each (prayed in ink, the next faint, the rest paler),
-                                // Jumu'ah stands taller, and prayers still ahead are drawn lighter than the day's done ones.
-                                let jumuah = arch.name == "الجمعة", ahead = !arch.done && !arch.next
-                                ZStack {
-                                    PrayerHorseshoe().fill(arch.done ? room.color("goldMid").opacity(0.45) : room.surface)
-                                    PrayerHorseshoe().stroke(room.accent.opacity(ahead ? 0.4 : 1), lineWidth: arch.next ? 2.4 : 1.2)
-                                    PrayerStar().fill(arch.done ? room.accent : arch.next ? room.accent.opacity(0.35) : room.ink.opacity(0.14))
-                                        .frame(width: 10, height: 10).offset(y: -2)
-                                }.frame(maxWidth: size == .small ? 26 : 34).frame(height: (size == .small ? 36 : 40) + (jumuah ? 8 : 0)).accessibilityHidden(true)
-                                if size != .small { Text(arch.name + " " + arch.time).font(small).lineLimit(1).minimumScaleFactor(0.6) }
-                            }.frame(maxWidth: .infinity)
-                                .accessibilityElement(children: .ignore).accessibilityLabel(arch.name + "، " + arch.clock24 + (arch.done ? "، صُلّيت" : ""))
-                                .accessibilityIdentifier("foundation-prayer-time-" + arch.id)
-                        }
-                    }
-                    Spacer(minLength: 0)
-                    if let name = model.nextName {
-                        let layout = size == .small ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2)) : AnyLayout(HStackLayout(alignment: .lastTextBaseline, spacing: 8))
-                        layout {
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text("القادمة").font(small).foregroundStyle(room.secondaryInk)
-                                Text(name + " " + (model.nextTime ?? "")).font(.custom("thmanyahserifdisplay-Bold", size: size == .small ? 20 : 24, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.7)
-                            }
-                            if size != .small { Spacer(minLength: 0) }
-                            if let after = model.nextAfter { Text(after).font(label).foregroundStyle(room.accent).lineLimit(1).minimumScaleFactor(0.8) }
-                        }.accessibilityElement(children: .combine).accessibilityIdentifier("bahw-salah-next")
-                    }
-                }
-            }
-        } else if prayerLoadedKey != prayerKey {
-            ProgressView().controlSize(.small).tint(room.accent)
-                .accessibilityLabel("جارٍ تحديث مواقيت الصلاة")
-                .accessibilityIdentifier("bahw-salah-loading")
-        } else {
-            Text("المواقيت غير متاحة لهذا الموقع اليوم.").font(small).foregroundStyle(room.secondaryInk)
         }
     }
 

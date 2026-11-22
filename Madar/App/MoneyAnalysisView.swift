@@ -109,7 +109,7 @@ struct MoneyAnalysisView: View {
                 load()
                 aiAvailability = await MadarAIAvailabilityChecker.check()
             }
-            .onChange(of: app.prayerRevision) {
+            .onChange(of: app.moneyRevision) {
                 load()
                 aiAvailability = .checking
                 Task { aiAvailability = await MadarAIAvailabilityChecker.check() }

@@ -47,10 +47,9 @@ import MadarCore
         XCTAssertEqual(app.quranRoute?.path, ["session", "review"])
 
         RoomNotificationContent.open("qada.\(day)", userInfo: ["dayKey": day], session: app)
-        XCTAssertNil(app.prayerRoute, "An already-delivered legacy debt reminder lands on the lobby (owner, 17 Nov 2026).")
+        // An already-delivered legacy debt reminder lands on the lobby (owner, 17 Nov 2026).
         XCTAssertEqual(app.selectedTab, "foundation")
 
-        app.prayerRoute = nil
         RoomNotificationContent.open("notes.\(day).niyya", userInfo: ["dayKey": day, "room": "notes"], session: app)
         XCTAssertEqual(app.diaryRoute?.path, ["day", day])
         XCTAssertEqual(app.selectedTab, "notes")

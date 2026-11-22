@@ -186,7 +186,7 @@ struct MoneyHomeView: View {
             visitChecked = true
             if service.sinceDue(today: reading.cycle?.today ?? GregorianDay.containing(app.prayerNow(), in: app.activePlace.timeZone)) { sinceOpen = true }
             else { try? await app.executeMoneyCommand("money.markVisit") }
-        }.onChange(of: app.prayerRevision) { if isFrontRoom { load() } }
+        }.onChange(of: app.moneyRevision) { if isFrontRoom { load() } }
         .onChange(of: app.moneyRoute, initial: true) { _, route in if let route { openMoneyRoute(route) } }
         .onChange(of: app.moneyRootRequestID) { _, requestID in
             guard requestID != nil else { return }

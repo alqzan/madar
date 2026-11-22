@@ -204,7 +204,6 @@ struct CustomizeMadar: View {
         case .money: session.moneyOpensSettings = true; session.moneyOpen = true
         case .diary: diarySettings = true
         case .quran: session.selectedTab = "quran"
-        case .prayer: session.selectedTab = "prayer"
         }
     }
     private var showsRoomLayouts: Bool { query.isEmpty || normalized("ما يعرضه كل باب ترتيب الغرف").contains(normalized(query)) }

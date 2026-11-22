@@ -4,6 +4,13 @@ import AppIntents
 import MadarSnapshots
 import MadarDesign
 
+enum MadarWidgetFamilies {
+    static var homeAndAccessories: [WidgetFamily] {
+        [.systemSmall, .systemMedium, .systemLarge, .systemExtraLargePortrait,
+         .accessoryCircular, .accessoryRectangular, .accessoryInline]
+    }
+}
+
 protocol FixedRoomConfiguration:WidgetConfigurationIntent {
     static var room:BuiltRoomWidget{get}
     static var defaultTemplate:String{get}

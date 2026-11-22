@@ -262,7 +262,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 18)
+        #expect(MadarSchema.version == 19)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -285,7 +285,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 18)
+        #expect(MadarSchema.version == 19)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
@@ -886,6 +886,44 @@ import Testing
         #expect(try context.fetchCount(FetchDescriptor<MushafBookmark>()) == 0)
         let expected = try SchemaCompatibility.currentRecords(before, from: 17)
         #expect(expected.first { $0.model == "Trip" }?.fields["dismissedAt"] == .null)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(context, syncedOnly: false)) == RecordFingerprint.hash(expected))
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+    }
+
+    /// V19 adds only `CurrencyRate` (owner, 22 Nov 2026): every stored V18 row keeps its values and the rate table starts empty.
+    @Test func schemaV18UpgradeKeepsEveryRowAndStartsWithNoManualRates() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV19-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let stamp = Date(timeIntervalSince1970: 1_797_000_000), accountID = UUID(), bookmarkID = UUID()
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV18.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV18.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV18.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+            let account = Account(); account.id = accountID; account.name = "synthetic account"; account.currency = "USD"; account.createdAt = stamp
+            account.updatedAt = stamp; account.writerID = "synthetic-v18"; old.mainContext.insert(account); before.append(try account.record())
+            let bookmark = MushafBookmark(); bookmark.id = bookmarkID; bookmark.page = 77; bookmark.name = "synthetic"; bookmark.createdAt = stamp
+            bookmark.updatedAt = stamp; bookmark.writerID = "synthetic-v18"; old.mainContext.insert(bookmark); before.append(try bookmark.record())
+            try old.mainContext.save()
+        }
+        try DurableFiles.encode(18, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: stamp), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        let context = upgraded.container.mainContext
+        let account = try #require(try context.fetch(FetchDescriptor<Account>()).first { $0.id == accountID })
+        #expect(account.name == "synthetic account" && account.currency == "USD")
+        #expect(try context.fetch(FetchDescriptor<MushafBookmark>()).first { $0.id == bookmarkID }?.page == 77)
+        #expect(try context.fetchCount(FetchDescriptor<CurrencyRate>()) == 0)
+        let expected = try SchemaCompatibility.currentRecords(before, from: 18)
         #expect(try RecordFingerprint.hash(RecordBridge.all(context, syncedOnly: false)) == RecordFingerprint.hash(expected))
         let reopened = try ManagedDataStore(root: root)
         #expect(reopened.binding.generationID == upgraded.binding.generationID)

@@ -10,6 +10,20 @@ import MadarCommands
 @main
 struct MadarApp: App {
     @UIApplicationDelegateAdaptor(MadarApplicationDelegate.self) private var appDelegate
+    #if DEBUG
+    init() {
+        // Owner, 22 Nov 2026: `MADAR_CLOUDKIT_SCHEMA_INIT=1` in a team-signed iCloud debug build, on a simulator signed in to iCloud,
+        // creates the CloudKit development schema from a throwaway store; the result is written to the app's temporary folder.
+        if ProcessInfo.processInfo.environment["MADAR_CLOUDKIT_SCHEMA_INIT"] == "1" {
+            let id = Bundle.main.object(forInfoDictionaryKey: "MadarCloudKitContainer") as? String ?? ""
+            let result: String
+            do { result = "MADAR_SCHEMA_OK " + (try MadarCloudSchemaInitializer.initializeDevelopmentSchema(containerIdentifier: id)).joined(separator: ",") }
+            catch { result = "MADAR_SCHEMA_FAILED \(error)" }
+            print(result)
+            try? result.write(to: FileManager.default.temporaryDirectory.appending(path: "madar-cloud-schema.txt"), atomically: true, encoding: .utf8)
+        }
+    }
+    #endif
     var body: some Scene { WindowGroup { MadarSceneContent(runtime: appDelegate.runtime) } }
 }
 

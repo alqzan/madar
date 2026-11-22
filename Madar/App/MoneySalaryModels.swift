@@ -55,7 +55,7 @@ extension AppMoneyService {
 
     func loadSalary(id: UUID, previewCycle: UUID, remainderTo: SalaryRemainder? = nil) throws -> MoneySalaryReading {
         guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
-        _ = app.prayerRevision
+        _ = app.moneyRevision
         let context = ModelContext(app.container)
         let opening = try MoneyRepository(context: context).salaryOpening(salaryID: id, newCycleID: previewCycle, remainderOverride: remainderTo)
         let plan = opening.plan, salary = opening.salaryMinor, length = opening.input.expectedLengthDays

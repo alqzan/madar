@@ -22,6 +22,7 @@ struct MoneyLogView: View {
     @State private var searching = false
     @FocusState private var searchFocused: Bool
     @State private var source: MoneySourceDetail?
+    @State private var editing: MoneyLogMovement?
     @State private var messagesOpen = false
     @State private var failure: String?
     @State private var isRefreshing = false
@@ -95,9 +96,10 @@ struct MoneyLogView: View {
             }.padding(.horizontal, 20).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task(id: initialRouteRequestID) { load() }
-            .onChange(of: app.prayerRevision) { load() }
+            .onChange(of: app.moneyRevision) { load() }
             .onDisappear { readingLoadTask?.cancel(); readingLoadTask = nil }
             .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
+            .sheet(item: $editing) { MoneyMovementEditSheet(app: app, movement: $0, visible: visible).environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $messagesOpen) { MoneyMessagesView(app: app, revealed: $revealed) }.accessibilityIdentifier("money-log")
     }
     private func arcade(_ r: MoneyLogReading) -> some View {
@@ -210,7 +212,7 @@ struct MoneyLogView: View {
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicType.isAccessibilitySize ? 300 : 150), spacing: 8)], spacing: 8) {
                 ForEach(rows) { row in
-                    Button { source = row.detail } label: {
+                    Button { open(row) } label: {
                         VStack(alignment: .leading, spacing: 7) {
                             HStack { Text(row.title).font(MadarTypography.body()).bold(); Spacer(minLength: 2); Text(service.time(row.at)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             HStack(alignment: .center, spacing: 4) {
@@ -222,6 +224,7 @@ struct MoneyLogView: View {
                         }.padding(12).frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading).background(theme.surface)
                             .overlay(alignment: .top) { Rectangle().fill(row.confirmed ? theme.color("surplusText") : theme.secondaryInk).frame(height: 3) }.overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("money-log-row-" + row.title)
+                        .accessibilityElement(children: .contain).accessibilityIdentifier("money-log-row-" + row.id.uuidString)
                 }
             }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("money-log-detail")
@@ -276,7 +279,7 @@ struct MoneyLogView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("نتائج البحث: " + service.digits.string(rows.count)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 ForEach(rows) { row in
-                    Button { source = row.detail } label: {
+                    Button { open(row) } label: {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(row.title).font(MadarTypography.body()).bold()
@@ -291,6 +294,10 @@ struct MoneyLogView: View {
                 }
             }.accessibilityElement(children: .contain).accessibilityIdentifier("money-log-search-results")
         }
+    }
+    /// A confirmed movement opens its edit sheet (which also says how it counted); one that still waits for a decision opens its source.
+    private func open(_ row: MoneyLogMovement) {
+        if row.confirmed, row.edit != nil { editing = row } else { source = row.detail }
     }
     private func load() {
         readingLoadTask?.cancel()
@@ -362,6 +369,132 @@ struct MoneyLogView: View {
                 failure = "لم تكتمل قراءة السجل. حاول مرة أخرى."
                 withAnimation(MadarMotion.quick.animation(reduceMotion: reduceMotion)) { isRefreshing = false }
             }
+        }
+    }
+}
+
+
+/// Owner, 22 Nov 2026: correct a confirmed movement. Label and category always; amount and time only when nothing leans
+/// on it, and then one short line says what does. Delete asks first. One command each, so one undo each.
+private struct MoneyMovementEditSheet: View {
+    let app: AppSession
+    let movement: MoneyLogMovement
+    let visible: Bool
+    @Environment(\.roomTheme) private var theme
+    @Environment(\.dismiss) private var dismiss
+    @State private var label = ""
+    @State private var rawAmount = ""
+    @State private var date = Date()
+    @State private var categoryID: UUID?
+    @State private var categories: [MoneyCategoryChoice] = []
+    @State private var loaded = false
+    @State private var saving = false
+    @State private var failure: String?
+    @State private var confirmDelete = false
+    @FocusState private var focused: Bool
+    private var service: AppMoneyService { .init(app: app) }
+    private var edit: MoneyMovementEdit { movement.edit ?? .init(merchant: nil, categoryID: nil, currency: app.string("core.currency"), amountMinor: movement.amountMinor, lockReason: nil) }
+    private var exponent: Int? { CurrencyExponents.specified.exponent(edit.currency) }
+    private var trimmedLabel: String { String(label.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80)) }
+    private var labelChanged: Bool { trimmedLabel != (edit.merchant ?? "") }
+    private var categoryChanged: Bool { categoryID != edit.categoryID }
+    private var typedAmount: Int? { exponent.flatMap { MoneyAmountInput.minor(rawAmount, exponent: $0) }.flatMap { $0 > 0 ? $0 : nil } }
+    private var amountChanged: Bool { !rawAmount.isEmpty && typedAmount != nil && typedAmount != edit.amountMinor }
+    private var amountInvalid: Bool { !rawAmount.isEmpty && typedAmount == nil }
+    private var timeChanged: Bool { abs(date.timeIntervalSince(movement.at)) >= 60 }
+    private var canSave: Bool { loaded && !saving && !amountInvalid && (labelChanged || categoryChanged || (edit.lockReason == nil && (amountChanged || timeChanged))) }
+    private var unitName: String { edit.currency == app.string("core.currency") && edit.currency == "SAR" ? "ريال" : service.currencyName(edit.currency) }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                MoneyPageHeader(title: "عدّل الحركة", close: { dismiss() }, closeDisabled: saving)
+                Text(figure: visible ? service.amount(movement.amountMinor) : "•••").font(.custom("thmanyahserifdisplay-Black", size: 34, relativeTo: .largeTitle))
+                Text(movement.detail.explanation).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                field("الاسم") { TextField(movement.title, text: $label).focused($focused).submitLabel(.done).accessibilityIdentifier("money-edit-label") }
+                if edit.categoryFollowsPurchase {
+                    Text("يتبع تصنيفُه تصنيفَ الشراء الذي رُدّ منه.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                } else { VStack(alignment: .leading, spacing: 6) {
+                    Text("التصنيف").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 8) {
+                            chip("بلا تصنيف", categoryID == nil, id: "money-edit-category-none") { categoryID = nil }
+                            ForEach(categories) { c in chip(c.name, categoryID == c.id, id: "money-edit-category-" + c.name) { categoryID = c.id } }
+                        }
+                    }.scrollIndicators(.hidden)
+                } }
+                if let reason = edit.lockReason {
+                    Text(reason).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("money-edit-locked")
+                } else {
+                    field("المبلغ بـ" + unitName) {
+                        TextField(visible ? "" : "اكتب المبلغ الجديد إن تغيّر", text: $rawAmount).keyboardType(.decimalPad).focused($focused).accessibilityIdentifier("money-edit-amount")
+                    }
+                    if amountInvalid { Text("اكتب مبلغًا صحيحًا.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
+                    DatePicker("الوقت", selection: $date, in: ...app.prayerNow(), displayedComponents: [.date, .hourAndMinute]).environment(\.timeZone, app.activePlace.timeZone)
+                        .frame(minHeight: 44).accessibilityIdentifier("money-edit-time")
+                    MadarDateLabel(app.dateLabels(.containing(date, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
+                }
+                if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-edit-error") }
+                Button(saving ? "جارٍ الحفظ…" : "احفظ التعديل", action: save).buttonStyle(MadarPrimaryButton()).disabled(!canSave).opacity(canSave ? 1 : 0.5).accessibilityIdentifier("money-edit-save")
+                Button(role: .destructive) { confirmDelete = true } label: { Text("احذف الحركة").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48) }
+                    .disabled(saving).accessibilityIdentifier("money-edit-delete")
+                if visible, let message = movement.detail.message {
+                    Divider().overlay(theme.line)
+                    Text("الرسالة المصدر").font(MadarTypography.section())
+                    Text(message).font(MadarTypography.body()).textSelection(.enabled)
+                }
+            }.padding(20)
+        }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
+            .presentationDetents([.large]).presentationDragIndicator(.visible).madarSheetLock(saving: saving, draft: loaded && (labelChanged || categoryChanged || amountChanged || timeChanged))
+            .confirmationDialog("تُحذف هذه الحركة وتعود أرقامك كأنها لم تُسجَّل. يمكنك التراجع بعدها.", isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("احذف الحركة", role: .destructive, action: delete)
+                Button("ليس الآن", role: .cancel) {}
+            }
+            .task {
+                guard !loaded else { return }
+                categories = (try? service.loadCategoryChoices()) ?? []
+                label = edit.merchant ?? ""; categoryID = edit.categoryID; date = movement.at
+                if visible, edit.lockReason == nil { rawAmount = MoneyEditNameSheet.decimal(edit.amountMinor, exponent: exponent) }
+                loaded = true
+            }
+            .accessibilityIdentifier("money-edit-sheet")
+    }
+    private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            content().font(MadarTypography.body()).padding(10).frame(minHeight: 44).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
+        }.disabled(saving)
+    }
+    private func chip(_ title: String, _ on: Bool, id: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44)
+                .foregroundStyle(on ? theme.onAccent : theme.ink).background(on ? theme.color("accent") : theme.surface, in: Capsule())
+        }.buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier(id)
+    }
+    private func save() {
+        guard canSave else { return }
+        focused = false; saving = true; failure = nil
+        var payload: [String: MadarCore.JSONValue] = ["id": .string(movement.id.uuidString)]
+        if labelChanged { payload["merchant"] = .string(trimmedLabel) }
+        if categoryChanged { payload["categoryID"] = categoryID.map { MadarCore.JSONValue.string($0.uuidString) } ?? MadarCore.JSONValue.null }
+        if edit.lockReason == nil {
+            if amountChanged, let minor = typedAmount { payload["amountMinor"] = .string(String(minor)) }
+            if timeChanged { payload["eventAt"] = .string(ISO8601DateFormatter().string(from: date)) }
+        }
+        Task {
+            do { try await app.executeMoneyCommand("money.editTransaction", payload: payload); dismiss() }
+            catch {
+                saving = false
+                failure = timeChanged ? "لم يُحفظ التعديل. الوقت الجديد يبقى في دورة الحركة ورحلتها ولا يكون في المستقبل." : "لم يُحفظ التعديل الآن. حاول مرة أخرى بعد قليل."
+            }
+        }
+    }
+    private func delete() {
+        guard !saving else { return }
+        saving = true; failure = nil
+        Task {
+            do { try await app.executeMoneyCommand("money.deleteTransaction", payload: ["id": .string(movement.id.uuidString)]); dismiss() }
+            catch { saving = false; failure = "لم تُحذف الحركة الآن. حاول مرة أخرى بعد قليل." }
         }
     }
 }

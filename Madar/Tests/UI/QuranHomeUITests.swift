@@ -405,7 +405,7 @@ import XCTest
         if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
         let tabBar = app.otherElements["fixed-tab-bar"]
         XCTAssertTrue(tabBar.waitForExistence(timeout: 10), app.debugDescription)
-        for title in ["البهو", "الصلاة", "القرآن", "المال", "المحبرة"] {
+        for title in ["البهو", "العادات", "القرآن", "المال", "المحبرة"] {
             XCTAssertTrue(tabBar.buttons[title].waitForExistence(timeout: 5), "Missing native destination: \(title)\n\(app.debugDescription)")
         }
         let notes = app.buttons["tab-notes"]

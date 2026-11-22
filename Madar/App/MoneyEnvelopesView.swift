@@ -83,7 +83,7 @@ struct MoneyEnvelopesView: View {
             }.padding(.horizontal, 18).padding(.top, 0).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
-            .task(id: initialRouteRequestID) { load(routeRequestID: initialRouteRequestID) }.onChange(of: app.prayerRevision) { load() }
+            .task(id: initialRouteRequestID) { load(routeRequestID: initialRouteRequestID) }.onChange(of: app.moneyRevision) { load() }
             .sheet(isPresented: $targetOpen) { MoneyReserveTargetView(app: app, current: reading?.reserveTargetMinor, visible: visible, revealed: $revealed) { load() }.environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $goalOpen) { MoneyGoalView(app: app, revealed: $revealed).environment(\.roomTheme, theme) }
             .onChange(of: goalOpen) { if !goalOpen { load() } }

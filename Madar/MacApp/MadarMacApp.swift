@@ -12,7 +12,19 @@ import MadarCommands
 @main
 struct MadarMacApp: App {
     @State private var runtime = MadarRuntime()
-    init() { MacFonts.registerBundled() }
+    init() {
+#if DEBUG
+        // Owner, 22 Nov 2026: `MADAR_CLOUDKIT_SCHEMA_INIT=1` in a team-signed iCloud debug build creates the CloudKit development
+        // schema from a throwaway store and quits before any window or real store opens.
+        if ProcessInfo.processInfo.environment["MADAR_CLOUDKIT_SCHEMA_INIT"] == "1" {
+            let id = Bundle.main.object(forInfoDictionaryKey: "MadarCloudKitContainer") as? String ?? ""
+            do { print("MADAR_SCHEMA_OK", try MadarCloudSchemaInitializer.initializeDevelopmentSchema(containerIdentifier: id).joined(separator: ",")) }
+            catch { print("MADAR_SCHEMA_FAILED", error) }
+            exit(0)
+        }
+#endif
+        MacFonts.registerBundled()
+    }
     var body: some Scene {
         WindowGroup("مدار", id: "main") {
             MacSceneContent(runtime: runtime)

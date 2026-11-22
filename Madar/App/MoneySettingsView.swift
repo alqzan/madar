@@ -186,7 +186,7 @@ struct MoneySettingsView: View {
                         Button("تمّ") { editing = false }.accessibilityIdentifier("money-settings-keyboard-done")
                     }
                 }
-                .task { load() }.onChange(of: app.prayerRevision) { refreshAfterSettingsChange() }.onChange(of: unit) {
+                .task { load() }.onChange(of: app.moneyRevision) { refreshAfterSettingsChange() }.onChange(of: unit) {
                     every = min(every, unit.maxEvery)
                 }
                 .accessibilityIdentifier("money-settings")

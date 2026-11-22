@@ -28,6 +28,7 @@ enum SchemaCompatibility {
         case 15: MadarSchemaV15.syncedNames
         case 16: MadarSchemaV16.syncedNames
         case 17: MadarSchemaV17.syncedNames
+        case 18: MadarSchemaV18.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }

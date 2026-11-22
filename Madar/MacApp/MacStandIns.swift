@@ -18,9 +18,6 @@ import MadarDesign
     func requestAuthorization() async throws {}
     func refreshAfterSerializedMutation() async {}
     func withSerializedMutation<T>(_ operation: @MainActor () async throws -> T) async rethrows -> T { try await operation() }
-    #if DEBUG
-    func runSimulatorAcceptanceScenarioForTesting() async throws -> String { "UNAVAILABLE — macOS" }
-    #endif
 }
 
 

@@ -8,7 +8,8 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.removeAccount", "money.confirmClear", "money.markVisit", "money.seedCategories", "money.rereadStoredMessages",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.editObligation", "money.renameEnvelope", "money.setCategoryLimit", "money.setCategoryPreferredCard", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.saveZakat", "money.prepareGoal", "money.logTransfer", "money.moveEnvelope", "money.attachTail", "money.dismissDue", "money.linkRefund"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.editObligation", "money.renameEnvelope", "money.setCategoryLimit", "money.setCategoryPreferredCard", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.saveZakat", "money.prepareGoal", "money.logTransfer", "money.moveEnvelope", "money.attachTail", "money.dismissDue", "money.linkRefund",
+        "money.setCurrencyRate", "money.editTransaction", "money.logIncome", "money.saveCategory", "money.removeCategory"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
     /// M5-X00: the budget-ignore stamp's optional reason.
@@ -190,6 +191,23 @@ public enum MoneyCommandPayload {
             guard let splits = p["allocations"] else { return true }
             return allocationRows(splits)
         case "money.deleteTransaction": return Set(p.keys) == ["id"] && id("id")
+        case "money.setCurrencyRate":
+            // Owner, 22 Nov 2026: a manual rate for one currency outside travel (home units per one unit), kept as history.
+            return Set(p.keys) == ["currency", "rate"] && text("currency", max: 3) && text("rate", max: 40)
+        case "money.editTransaction":
+            // Owner, 22 Nov 2026: a confirmed movement's amount, label, time or category; at least one of them.
+            let keys = Set(p.keys)
+            return keys.contains("id") && keys.count > 1 && keys.isSubset(of: ["id", "amountMinor", "merchant", "eventAt", "categoryID"]) && id("id")
+                && (p["amountMinor"] == nil || positive("amountMinor")) && optionalText("merchant")
+                && (p["eventAt"] == nil || date(p["eventAt"]) != nil) && optionalID("categoryID")
+        case "money.logIncome":
+            // Owner, 22 Nov 2026: money that came in without a salary message, into one of the user's own accounts.
+            return Set(p.keys).isSubset(of: ["amountMinor", "toAccountID", "merchant", "eventAt", "rateAtTime"]) && positive("amountMinor") && id("toAccountID")
+                && optionalText("merchant") && (p["eventAt"] == nil || date(p["eventAt"]) != nil) && optionalText("rateAtTime", max: 40)
+        case "money.saveCategory":
+            // Owner, 22 Nov 2026: a category the user names, or a new name for an existing one.
+            return Set(p.keys).isSubset(of: ["id", "name"]) && text("name", max: 30) && optionalID("id")
+        case "money.removeCategory": return Set(p.keys) == ["id"] && id("id")
         case "money.reconcile":
             // M5-V15: every line of one «محضر» in one command and one undo. A line names one account, card, or
             // installment obligation; the handler rechecks the shown book before it records the provider's figure.
