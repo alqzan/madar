@@ -6,9 +6,9 @@ import XCTest
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
         if let writeHoldMS { app.launchEnvironment["MADAR_UI_MONEY_WRITE_HOLD_MS"] = String(writeHoldMS) }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
-        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 10))
-        for _ in 0..<12 where !money.isHittable { app.swipeUp(velocity: .slow) }
-        XCTAssertTrue(money.isHittable); money.tap()
+        // The settings home lists rooms by their doors now; the search still offers the money room itself (as MoneyAccountsUITests).
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 10)); money.tap()
         let open = app.buttons["money-reconcile-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10)); for _ in 0..<10 where !open.isHittable { app.swipeUp(velocity: .slow) }; open.tap()
         return app
     }
