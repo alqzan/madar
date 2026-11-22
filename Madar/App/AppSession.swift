@@ -629,6 +629,51 @@ final class AppSession {
     private func setWithResult(_ value: JSONValue, key: String, completion: @escaping (Bool) -> Void) {
         execute(name: "settings.set", values: [key: value], message: "حُفظ التعديل", resultCompletion: completion)
     }
+    /// Travel stays after the prayer room left (owner plan, 17 Nov 2026: «يبقى… الموقع والسفر»). The trip feeds
+    /// travel prayer times (habit windows, the post-Fajr wird), home-only habits, the diary's travel lines and the money trip.
+    private(set) var tripWriteInProgress = false
+    func startTrip(city: String, country: String, place: ActivePlace, homeKm: Double?, method: PrayerCalculationMethod, completion: ((Bool) -> Void)? = nil) {
+        setWithResult(.string(method.rawValue), key: "salah.tripMethod") { [self] saved in
+            guard saved else { completion?(false); return }
+            sendTripCommand(name: "prayer.startTrip", payload: tripPayload(city: city, country: country, place: place, homeKm: homeKm), completion: completion)
+        }
+    }
+    /// OR-09: the trip moves on to another city; the open leg closes and the next joins the same journey.
+    func continueTrip(city: String, country: String, place: ActivePlace, homeKm: Double?, completion: ((Bool) -> Void)? = nil) {
+        sendTripCommand(name: "prayer.continueTrip", payload: tripPayload(city: city, country: country, place: place, homeKm: homeKm), completion: completion)
+    }
+    func endTrip(_ id: UUID, completion: ((Bool) -> Void)? = nil) {
+        sendTripCommand(name: "prayer.endTrip", payload: ["tripID": .string(id.uuidString)], completion: completion)
+    }
+    private func tripPayload(city: String, country: String, place: ActivePlace, homeKm: Double?) -> [String: MadarCore.JSONValue] {
+        var payload: [String: MadarCore.JSONValue] = ["city": .string(city), "country": .string(country), "lat": .number(place.latitude), "lon": .number(place.longitude), "tzID": .string(place.timeZoneID)]
+        if let homeKm { payload["homeKm"] = .number(homeKm) }
+        return payload
+    }
+    private func sendTripCommand(name: String, payload: [String: MadarCore.JSONValue], completion: ((Bool) -> Void)?) {
+        guard !tripWriteInProgress, beginWrite() else { completion?(false); return }
+        tripWriteInProgress = true
+        let now = prayerNow()
+        Task {
+            var succeeded = false
+            defer { endWrite(); tripWriteInProgress = false; completion?(succeeded) }
+            do {
+                succeeded = try await withSerializedPrayerNotificationMutation {
+                    let result = try await bus.execute(CommandEnvelope(name: name, payload: .object(payload), source: .app, issuedAt: now), now: now)
+                    guard result.status == .applied || result.status == .duplicate else {
+                        errorMessage = result.reason == "noActiveTrip" ? "لا توجد رحلة جارية." : "لم تُحفظ الرحلة. حاول مرة أخرى."
+                        return false
+                    }
+                    try reload()
+                    try publishSnapshot()
+                    WidgetCenter.shared.reloadAllTimelines()
+                    return true
+                }
+            } catch {
+                errorMessage = "لم تُحفظ الرحلة. \(madarUserMessage(error))"
+            }
+        }
+    }
     func setMany(_ values: [String: JSONValue], completion: (() -> Void)? = nil) {
         execute(name: "settings.set", values: values, message: "حُفظ التعديل", completion: completion)
     }

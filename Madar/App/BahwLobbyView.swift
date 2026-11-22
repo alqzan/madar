@@ -75,6 +75,12 @@ private struct BahwMinuteTimelineSchedule: TimelineSchedule, Equatable, Sendable
     }
 }
 
+enum BahwTravelSheet: Identifiable {
+    case question(TravelFix, Double)
+    case trip(PrayerTrip)
+    var id: String { switch self { case .question(let fix, _): "q-" + fix.city; case .trip(let trip): "t-" + trip.id.uuidString } }
+}
+
 struct BahwLobbyView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isFrontRoom) private var isFrontRoom
@@ -88,6 +94,8 @@ struct BahwLobbyView: View {
     @State private var moneyRevealed = false
     @State private var moneyRevealID = 0
     @State private var searchOpen = false
+    @State private var travel = BahwTravelModel()
+    @State private var travelSheet: BahwTravelSheet?
     /// The tiles fade up one after another the first time the lobby appears in a launch, never on every return.
     @State private var entered = BahwEntrance.played
     @Environment(\.scenePhase) private var scenePhase
@@ -99,6 +107,10 @@ struct BahwLobbyView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header.padding(.top, 8).padding(.bottom, 4)
+                    if !arranging, let text = travel.pillText(session) {
+                        BahwTravelPill(text: text, onTrip: travel.trip != nil) { openTravel() }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                     if !arranging, let day = session.bahwReturnPlanDay {
                         BahwReturnPlanCard(day: day, digits: service.digits, theme: theme,
                                            openQuran: { session.selectedTab = "quran" },
@@ -159,6 +171,15 @@ struct BahwLobbyView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $session.habitsOpen) { HabitsRoomView(session: session) }
         .navigationDestination(isPresented: $session.yearOpen) { BahwYearView(session: session) }
+        .sheet(item: $travelSheet, onDismiss: { travel.refresh(session) }) { sheet in
+            Group {
+                switch sheet {
+                case .question(let fix, let km): BahwTravelQuestionSheet(session: session, fix: fix, homeKm: km) { travelSheet = nil }
+                case .trip(let trip): BahwTripSheet(session: session, trip: trip, legs: travel.legs, fix: travel.locator.fix, thresholdKm: travel.thresholdKm(session)) { travelSheet = nil }
+                }
+            }.madarSheetErrorAlert(session)
+        }
+        .task { travel.refresh(session) }
         .sheet(isPresented: $searchOpen) { MadarSearchView(session: session).madarSheetErrorAlert(session) }
         .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]).madarSheetErrorAlert(session) }
         .onChange(of: arranging) { _, on in wiggle = on && !reduceMotion }
@@ -175,7 +196,7 @@ struct BahwLobbyView: View {
         // On opening, after the splash has settled: what waits (unlogged prayers, unsorted messages) appears once, never as a notification.
         .task { try? await Task.sleep(for: .seconds(1.4)); presentAttention(force: false) }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { try? await Task.sleep(for: .seconds(0.9)); presentAttention(force: false) } }
+            if phase == .active { travel.refresh(session); Task { try? await Task.sleep(for: .seconds(0.9)); presentAttention(force: false) } }
         }
         .onChange(of: session.attentionRequest) { _, _ in presentAttention(force: true) }
         // FB-39: an app opened into another room (a widget, a notification) never showed what waits once the lobby came to the front.
@@ -184,9 +205,15 @@ struct BahwLobbyView: View {
         }
     }
 
+    private func openTravel() {
+        if let trip = travel.trip { travelSheet = .trip(trip); return }
+        guard let fix = travel.awayFix(session) else { return }
+        travelSheet = .question(fix, max(0, TravelRule.distanceKm(from: session.activePlace, to: fix.place) - TravelRule.homeRadiusKm))
+    }
+
     private func presentAttention(force: Bool) {
         // Never over the first-run welcome (it opened on top of it and hid the welcome until dismissed).
-        guard session.onboardingComplete, session.pendingIntro == nil, !arranging, !drawerOpen, !searchOpen, attention == nil, session.selectedTab == "foundation" else { return }
+        guard session.onboardingComplete, session.pendingIntro == nil, !arranging, !drawerOpen, !searchOpen, travelSheet == nil, attention == nil, session.selectedTab == "foundation" else { return }
         let value = service.attention(includeReconcile: true, ignoringThrottle: force)
         #if DEBUG
         // UI tests drive the lobby behind a fixed clock and a fresh store; the sheet is opened there only on request (`MADAR_UI_ATTENTION=1`).

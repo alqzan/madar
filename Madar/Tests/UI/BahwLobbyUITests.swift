@@ -421,6 +421,63 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any)["habit-progress"].waitForExistence(timeout: 10), app.debugDescription)
     }
 
+    /// Travel stays after the prayer room left (17 Nov plan): away from home the lobby asks once, starts and ends the trip.
+    func testTravelQuestionStartsAndEndsATripFromTheLobby() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+                                 "MADAR_UI_HABIT_FIXTURE": "lobbySix", "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light",
+                                 "MADAR_UI_TRAVEL_FIX": "21.4858,39.1925,جدة,SA,Asia/Riyadh"]
+        app.launch(); finishOnboarding(app)
+        let pill = app.buttons["bahw-travel-pill"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(pill.label.contains("خارج مدينتك"), pill.label)
+        // The store has loaded (the lobby counts the fixture's six habits) before the first sheet is asked for.
+        let loaded = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "bahw-habits-open", "من ٦")).firstMatch
+        XCTAssertTrue(loaded.waitForExistence(timeout: 15), app.debugDescription)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: pill)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed, app.debugDescription)
+        pill.tap()
+        let yes = app.buttons["bahw-travel-yes"]
+        XCTAssertTrue(yes.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "أنت الآن في جدة")).firstMatch.exists, app.debugDescription)
+        capture(app, "OWNER-22nov-travel-question-L")
+        yes.tap()
+        XCTAssertTrue(yes.waitForNonExistence(timeout: 10), app.debugDescription)
+        let onTrip = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "bahw-travel-pill", "مسافر في جدة")).firstMatch
+        XCTAssertTrue(onTrip.waitForExistence(timeout: 10), app.debugDescription)
+        onTrip.tap()
+        let end = app.buttons["bahw-trip-end"]
+        XCTAssertTrue(end.waitForExistence(timeout: 8), app.debugDescription)
+        capture(app, "OWNER-22nov-trip-sheet-L")
+        end.tap()
+        XCTAssertTrue(end.waitForNonExistence(timeout: 10), app.debugDescription)
+        // Ending the trip while still far away counts as «مقيم هنا» for this place: no pill, no repeated question.
+        XCTAssertTrue(pill.waitForNonExistence(timeout: 10), app.debugDescription)
+    }
+    func testTravelQuestionAnsweredResidentStaysQuietAfterRelaunch() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+                                 "MADAR_UI_HABIT_FIXTURE": "lobbySix", "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light",
+                                 "MADAR_UI_TRAVEL_FIX": "21.4858,39.1925,جدة,SA,Asia/Riyadh"]
+        app.launch(); finishOnboarding(app)
+        let pill = app.buttons["bahw-travel-pill"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 15), app.debugDescription)
+        // The store has loaded (the lobby counts the fixture's six habits) before the first sheet is asked for.
+        let loaded = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "bahw-habits-open", "من ٦")).firstMatch
+        XCTAssertTrue(loaded.waitForExistence(timeout: 15), app.debugDescription)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: pill)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed, app.debugDescription)
+        pill.tap()
+        let no = app.buttons["bahw-travel-no"]
+        XCTAssertTrue(no.waitForExistence(timeout: 8), app.debugDescription); no.tap()
+        XCTAssertTrue(pill.waitForNonExistence(timeout: 10), app.debugDescription)
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.staticTexts["bahw-greeting"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertFalse(pill.waitForExistence(timeout: 3), "«لا، أنا مقيم هنا» is remembered for this place.")
+    }
+
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
