@@ -47,7 +47,8 @@ import XCTest
         let field = app.textFields["money-trip-rate-input"]; XCTAssertTrue(field.waitForExistence(timeout: 5)); field.tap(); field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10) + "0.2")
         app.buttons["money-trip-keyboard-done"].tap(); XCTAssertTrue(app.staticTexts["money-trip-rate-preview"].label.contains("٢٠")); shot(app, "M5-V21-rate-L")
         app.buttons["money-trip-rate-save"].tap()
-        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
+        // FB-32 (owner, 5 Nov 2026): a save is simply done, with no «تراجع»; it is corrected where it was made.
+        XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout: 2), "A rate save offers no undo")
         let report = app.buttons["money-travel-report"]; reach(app, report); shot(app, "M5-V21-travel-s1-L"); report.tap()
         let closeReport = app.buttons["money-trip-report-close"]
         XCTAssertTrue(closeReport.waitForExistence(timeout: 5), app.debugDescription)
@@ -80,12 +81,12 @@ import XCTest
         amount.tap(); amount.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10) + "100"); app.buttons["money-trip-keyboard-done"].tap()
         XCTAssertTrue(hint.waitForNonExistence(timeout: 5)); XCTAssertTrue(save.isEnabled)
         shot(app, "M5-V21-fund-L"); app.buttons["money-trip-fund-save"].tap()
-        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5)); XCTAssertNotEqual(remaining.label, original); app.buttons["تراجع"].tap(); XCTAssertEqual(remaining.label, original)
+        XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout: 2), "FB-32: funding offers no undo"); XCTAssertNotEqual(remaining.label, original)
         for _ in 0..<4 where !app.buttons["money-travel-rate"].isHittable { app.swipeDown(velocity: .slow) }; app.buttons["money-travel-rate"].tap()
         let rate = app.textFields["money-trip-rate-input"]; XCTAssertTrue(rate.waitForExistence(timeout: 5)); rate.tap(); rate.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10) + "0.2"); app.buttons["money-trip-keyboard-done"].tap(); app.buttons["money-trip-rate-save"].tap()
         XCTAssertTrue(remaining.waitForExistence(timeout: 5)); let beforeReprice = remaining.label
-        app.buttons["money-travel-rate"].tap(); app.buttons["money-trip-reprice-preview"].tap(); let apply = app.buttons["money-trip-reprice-apply"]; XCTAssertTrue(apply.waitForExistence(timeout: 5)); shot(app, "M5-V21-reprice-L"); apply.tap()
-        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5)); XCTAssertNotEqual(remaining.label, beforeReprice); app.buttons["تراجع"].tap(); XCTAssertEqual(remaining.label, beforeReprice)
+        app.buttons["money-travel-rate"].tap(); let preview = app.buttons["money-trip-reprice-preview"]; expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: preview); waitForExpectations(timeout: 8); preview.tap(); let apply = app.buttons["money-trip-reprice-apply"]; XCTAssertTrue(apply.waitForExistence(timeout: 5)); shot(app, "M5-V21-reprice-L"); apply.tap()
+        XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout: 2), "FB-32: repricing offers no undo"); XCTAssertNotEqual(remaining.label, beforeReprice)
     }
 
     func testTripRateFundingAndRepriceStayOpenWhileSaving() {
@@ -125,6 +126,8 @@ import XCTest
         app.buttons["money-travel-rate"].tap()
         let previewButton = app.buttons["money-trip-reprice-preview"]
         XCTAssertTrue(previewButton.waitForExistence(timeout: 8), app.debugDescription)
+        // The rate sheet is still sliding in when the button exists; a tap then is dropped (checklist row 20).
+        expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: previewButton); waitForExpectations(timeout: 8)
         previewButton.tap()
         let previewClose = app.buttons["money-trip-reprice-close"]
         let apply = app.buttons["money-trip-reprice-apply"]

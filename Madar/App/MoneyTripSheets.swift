@@ -37,10 +37,12 @@ struct MoneyTripRateSheet: View {
             if !visible { Text("أرقامك مخفية؛ أظهرها من صفحة الرحلة لتحفظ").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-trip-hidden-hint") }
             Button { save() } label: { Text(saving ? "جارٍ الحفظ…" : "احفظ السعر").frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || rate == nil || !visible).accessibilityIdentifier("money-trip-rate-save")
             if reading.currency != app.string("core.currency"), reading.rate != nil {
-                Button("عاين أثر السعر على حركات الرحلة") {
+                // The 44 pt height sat outside the label, so only the line of text took a tap (14.8 pt): the whole row does now.
+                Button {
                     do { preview = try MoneyRepository(context: ModelContext(app.container)).previewTripReprice(id: reading.id, rate: reading.rate!, at: app.prayerNow()); previewOpen = true }
                     catch { failure = "تعذّرت المعاينة. افتح الورقة من جديد وحاول مرة أخرى." }
-                }.disabled(!visible || saving).font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-trip-reprice-preview")
+                } label: { Text("عاين أثر السعر على حركات الرحلة").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle()) }
+                    .disabled(!visible || saving).accessibilityIdentifier("money-trip-reprice-preview")
             }
         }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { focused = false }.accessibilityIdentifier("money-trip-keyboard-done") } }

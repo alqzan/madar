@@ -25,8 +25,9 @@ import XCTest
         let price=app.buttons["money-zakat-price"];for _ in 0..<4 where !price.isHittable{app.swipeUp(velocity:.slow)};shot(app,"M5-V22-zakat-s1-L");price.tap()
         let field=app.textFields["money-zakat-gold-price"];XCTAssertTrue(field.waitForExistence(timeout:5));field.tap();field.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:12)+"410");app.buttons["money-zakat-keyboard-done"].tap()
         let save=app.buttons["money-zakat-save"];for _ in 0..<5 where !save.isHittable{app.swipeUp(velocity:.slow)};shot(app,"M5-V22-editor-L");save.tap()
-        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout:5));XCTAssertEqual(app.staticTexts["money-zakat-result"].label,before);app.buttons["تراجع"].tap()
-        XCTAssertTrue(app.staticTexts["السعر أقدم من ٣٠ يومًا؛ حدّثه"].exists)
+        // FB-32 (owner, 5 Nov 2026): a save is simply done, with no «تراجع». The new price does not change the result and is no longer stale.
+        XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout:2));XCTAssertEqual(app.staticTexts["money-zakat-result"].label,before)
+        XCTAssertFalse(app.staticTexts["السعر أقدم من ٣٠ يومًا؛ حدّثه"].exists)
     }
     func testZakatEditorStaysOpenWhileSaving(){
         continueAfterFailure=false
@@ -83,9 +84,8 @@ import XCTest
         shot(app,"M5-V22-zakat-reminder-s1-L")
         save.tap()
         XCTAssertTrue(app.staticTexts["money-zakat-reminder-state"].waitForExistence(timeout:5))
-        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout:5))
-        app.buttons["تراجع"].tap()
-        XCTAssertFalse(app.staticTexts["money-zakat-reminder-state"].exists,"Undo restores the default off setting")
-        XCTAssertFalse(week.isSelected)
+        // FB-32: a save is simply done, with no «تراجع»; the reminder stays on until it is turned off where it was set.
+        XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout:2))
+        XCTAssertTrue(week.isSelected)
     }
 }
