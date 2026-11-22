@@ -255,7 +255,8 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - `FoundationUITests.test_M0S2_BackupPasswordConfirmationAndFixtureIsolation`: no hittable ت/t key (keyboard). The diary, accounts and night-review test fixes made after run 2 were not re-run.
 - No `verify-smoke.sh` run and no screenshots of the new money sheets (usage limit).
 
-### iCloud — blocked on the owner
+### iCloud — waits for the owner (decision 22 Nov: «كمل بدونها»)
+- Owner (via a side chat, 22 Nov): skip the simulator iCloud sign-in for now. Build 60 ships with sync unavailable; schema creation, the Production deploy and the live sync trial wait until the owner tries a development build on his phone or signs in to the simulator. Do not ask again before then.
 - Code ready: `remote-notification` background mode, Mac push entitlement, debug-only `MadarCloudSchemaInitializer` (throwaway store) behind `MADAR_CLOUDKIT_SCHEMA_INIT=1` in both apps.
 - Blockers: the simulator has no iCloud account (owner must sign in on «Madar 15 Pro Max»); the Mac route needs this Mac registered as a development device (account change, ask first); Production deploy needs the owner signed in to CloudKit Console. Build 60 therefore ships local-only (no CloudKit entitlement), the toggle stays hidden.
 - Next agent: after the owner signs in, build team-signed for the simulator with `MADAR_CLOUDKIT_CONTAINER=iCloud.com.alqzan.madar2 MADAR_APP_ENTITLEMENTS=App/Madar-CloudKit.entitlements`, launch with `MADAR_CLOUDKIT_SCHEMA_INIT=1`, read `madar-cloud-schema.txt` in the app tmp folder, deploy Development → Production in CloudKit Console, then archive with the CloudKit settings and verify the entitlements.
