@@ -42,7 +42,7 @@ struct QuranHifzCoachView: View {
             }
             if !fullPage {
                 if state.stage == .grading {
-                    if state.method == "readGrade" {
+                    if state.method == "readGrade", !coach.pastDay {
                         Button { action(.changeMethod("coach")) } label: {
                             Text("مدرّب آية بآية").font(font(12, bold: true)).foregroundStyle(theme.secondaryInk)
                                 .frame(minHeight: 44).padding(.horizontal, 16).contentShape(Capsule())
@@ -66,7 +66,7 @@ struct QuranHifzCoachView: View {
                                     }
                                 }
                             }
-                        }.accessibilityLabel("تقييمك لهذا الوجه")
+                        }.accessibilityLabel(state.method == "readGrade" ? "تقييمك لهذا الورد" : "تقييمك لهذا الوجه")
                         Button { action(state.primaryAction) } label: {
                             Image(systemName: "arrow.left").font(.system(size: 16, weight: .semibold))
                                 .frame(width: 44, height: 36).foregroundStyle(theme.onAccent)
@@ -111,15 +111,19 @@ struct QuranHifzCoachView: View {
                         }
                         Button { sheet = nil } label: { Text("تمّ").font(font(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-method-done")
                     } else {
-                        Text(coach.pastDay ? "هذه جلسة من يوم سابق. احتفظ بها كمسودة، أو سجّل ما تمّ بيومه، أو احذفها." : "خطواتك محفوظة تلقائيًا كمسودة. احتفظ بها للمتابعة لاحقًا، سجّل ما أنجزته، أو احذفها.")
+                        Text(state.method == "readGrade" ? "موضعك محفوظ تلقائيًا. يمكنك متابعة القراءة من هذا الوجه." : coach.pastDay ? "هذه جلسة من يوم سابق. احتفظ بها كمسودة، أو سجّل ما تمّ بيومه، أو احذفها." : "خطواتك محفوظة تلقائيًا كمسودة. احتفظ بها للمتابعة لاحقًا، سجّل ما أنجزته، أو احذفها.")
                             .font(font(14)).foregroundStyle(theme.secondaryInk)
                         sheetButton("احتفظ بها كمسودة", id: "quran-session-keep") { close() }
-                        sheetButton("سجّل ما أنجزته", id: "quran-session-save-partial") { action(.commitPartial) }
+                        if state.method != "readGrade" {
+                            sheetButton("سجّل ما أنجزته", id: "quran-session-save-partial") { action(.commitPartial) }
+                        }
                         Text("«حذف الجلسة» لا يسجّل شيئًا مما أنجزته الآن.")
                             .font(font(12)).foregroundStyle(theme.secondaryInk)
                             .accessibilityIdentifier("quran-session-discard-explanation")
                         sheetButton("احذف الجلسة", id: "quran-session-discard") { action(.discard) }
-                        if !coach.pastDay { sheetButton("تابع الجلسة", id: "quran-session-continue") { } }
+                        if !coach.pastDay || state.method == "readGrade" {
+                            sheetButton("تابع الجلسة", id: "quran-session-continue") { }
+                        }
                     }
                 }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
             }

@@ -374,12 +374,13 @@ import XCTest
             let keySetup = app.staticTexts["backup-key-setup"]
             scrollBackupForm(to: keySetup, in: app)
             XCTAssertTrue(keySetup.exists, "A fresh fixture must not inherit a configured backup key.")
-            let passphrase = "test-only-passphrase"
+            // The approved simulator uses an Arabic keyboard. Secure entry
+            // cannot insert characters that are absent from the active layout.
+            let passphrase = "تجربةنسخةمدارطويلة"
             let export = app.buttons["backup-now"]
             let password = app.secureTextFields["backup-password"]
             scrollBackupForm(to: password, in: app, towardsTop: true)
             password.tap()
-            try selectEnglishKeyboard(app)
             let keyboardDone = app.buttons["backup-keyboard-done"]
             XCTAssertTrue(keyboardDone.waitForExistence(timeout: 10), app.debugDescription)
             password.typeText(passphrase)
@@ -389,8 +390,7 @@ import XCTest
             // instead of tapping a row whose frame may be outside that area.
             password.typeText("\n")
             let confirmation = app.secureTextFields["backup-password-confirmation"]
-            let mismatch = passphrase + "!"
-            try selectEnglishKeyboard(app)
+            let mismatch = passphrase + "ب"
             confirmation.typeText(mismatch)
             // The toolbar mirrors the predicate driving the virtualized export
             // button's disabled state. Do not change focus just to query that row.
@@ -412,6 +412,11 @@ import XCTest
             // asserting absence, so an offscreen cell cannot masquerade as persistence.
             scrollBackupForm(to: app.buttons["backup-now"], in: app)
             XCTAssertFalse(keySetup.exists, "The same fixture must retain its configured key after relaunch.")
+            app.terminate()
+            app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+            app.launch(); openBackupSettings(app)
+            scrollBackupForm(to: keySetup, in: app)
+            XCTAssertTrue(keySetup.exists, "A separate fixture must have its own backup key.")
             app.terminate()
         }
     }
@@ -610,33 +615,6 @@ import XCTest
                 app.terminate()
             }
         }
-    }
-    private func selectEnglishKeyboard(_ app: XCUIApplication) throws {
-        // XCTest secure typing uses the current keyboard's characters. Observe the
-        // real layout before sending this test's Latin fixture passphrase.
-        let knownKeys = app.keyboards.keys.matching(NSPredicate(format: "label IN %@", ["ت", "t"] as NSArray))
-        let currentKey = try XCTUnwrap(waitForHittableElement(knownKeys, in: app), "A real Arabic or English software keyboard must be visible.")
-        if currentKey.label == "t" { return }
-        let switchButtons = app.buttons.matching(NSPredicate(format: "label IN %@", ["لوحة المفاتيح التالية", "Next keyboard"] as NSArray))
-        let nextKeyboard = try XCTUnwrap(waitForHittableElement(switchButtons, in: app), "The observed native next-keyboard control must be hittable.")
-        let nextLayout = nextKeyboard.value as? String ?? ""
-        print("M0 native next keyboard: \(nextLayout)")
-        // The captured Arabic keyboard announces English (UK). Make one switch;
-        // never cycle through unknown layouts or assume a keyboard from locale.
-        let englishSwitch = try XCTUnwrap(nextLayout.hasPrefix("English") ? nextKeyboard : nil, "The next keyboard must announce English before selecting it.")
-        englishSwitch.tap()
-        let englishKeys = app.keyboards.keys.matching(NSPredicate(format: "label == %@", "t"))
-        _ = try XCTUnwrap(waitForHittableElement(englishKeys, in: app), "The selected English keyboard must expose a hittable t key.")
-    }
-    private func waitForHittableElement(_ query: XCUIElementQuery, in app: XCUIApplication) -> XCUIElement? {
-        let ready = NSPredicate { _, _ in
-            MainActor.assumeIsolated {
-                query.allElementsBoundByIndex.contains { self.elementIsOnscreenAndHittable($0, in: app) }
-            }
-        }
-        let readiness = XCTNSPredicateExpectation(predicate: ready, object: nil)
-        guard XCTWaiter.wait(for: [readiness], timeout: 10) == .completed else { return nil }
-        return query.allElementsBoundByIndex.first { elementIsOnscreenAndHittable($0, in: app) }
     }
     private func elementIsOnscreenAndHittable(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
         // Ask for hittability only of a key with an on-screen frame: XCTest fails outright on a hidden keyboard copy whose

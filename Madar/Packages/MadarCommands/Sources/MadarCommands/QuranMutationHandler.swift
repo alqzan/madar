@@ -16,6 +16,8 @@ public struct QuranDraftPayload: Codable, Sendable {
     public var coach: QuranCoachProgress?
     public var reviewSections: [QuranReviewSection]?
     public var qiyamRakahIndex: Int?
+    /// The passage grade is provisional until the reader finishes the last page.
+    public var readGradeRating: QuranReviewRating?
     public init(draft: QuranSessionDraft, method: String = "coach", nightKey: GregorianDay? = nil, rakats: Int? = nil, witr: Bool? = nil, drillKey: QuranMistakeKey? = nil, testPages: [Int]? = nil, revealedAyahs: Set<Int>? = nil) {
         self.draft = draft; self.revealedAyahs = revealedAyahs; self.testPages = testPages; self.drillKey = drillKey; self.method = method; self.nightKey = nightKey; self.rakats = rakats; self.witr = witr
     }
@@ -169,7 +171,17 @@ public struct QuranStagedResult: Sendable {
                 return QuranStagedResult(inverse: nil, duplicate: true)
             }
             guard let row else { throw DataError.invalidValue("Quran draft missing") }
-            let value = try JSONDecoder().decode(QuranDraftPayload.self, from: row.provisionalJSON)
+            var value = try JSONDecoder().decode(QuranDraftPayload.self, from: row.provisionalJSON)
+            if value.method == "readGrade" {
+                var seen = Set<Int>()
+                let pages = try value.draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }
+                    .filter { seen.insert($0).inserted }
+                guard value.draft.kind == .hifz, let last = pages.last, value.draft.page == last, let rating = value.readGradeRating else {
+                    throw DataError.invalidValue("أكمل قراءة الورد قبل تسجيله")
+                }
+                value.draft.blindPassedAyahs.formUnion(value.draft.portions.flatMap { $0.first...$0.last })
+                value.draft.grades = pages.map { QuranDraftGrade(page: $0, rating: rating) }
+            }
             let snapshot = try repository.snapshot(at: now)
             guard let commit = try QuranSessionEngine.prepareCommit(draft: value.draft, endedAt: now,
                 alreadyCommitted: Set(existing.compactMap(\.commitID)), coverage: snapshot.coverage, catalog: catalog) else {

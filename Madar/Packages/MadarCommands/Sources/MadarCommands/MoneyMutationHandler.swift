@@ -503,13 +503,21 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             message.status = "ignored"; try touch(message, now, writer)
         case "money.deleteTransaction":
             let row = try transaction(uuid(p, "id"), context)
-            guard !(try transactions(context)).contains(where: { $0.relatedTransactionID == row.id }) else { throw MoneyCommandError.invalidReference }
+            let movements = try transactions(context)
+            if row.reviewState == "ok" {
+                let checks = try MoneyRepository(context: context).deletionChecks(transactions: movements,
+                    cycles: context.fetch(FetchDescriptor<Cycle>()), plans: context.fetch(FetchDescriptor<EnvelopePlan>()),
+                    reconciliations: context.fetch(FetchDescriptor<Reconciliation>()))
+                guard checks.reason(for: row) == nil else { throw MoneyCommandError.invalidReference }
+            } else {
+                guard !movements.contains(where: { $0.relatedTransactionID == row.id }) else { throw MoneyCommandError.invalidReference }
+            }
             if row.kind == "repayment", row.reviewState == "ok", let itemID = row.installmentID,
                let item = try context.fetch(FetchDescriptor<InstallmentItem>()).first(where: { $0.id == itemID && live($0) }) {
                 let paid = try installmentAmount(row, item: item, context: context)
                 guard item.paidMinor >= paid else { throw MoneyCommandError.invalidAmount }
                 item.paidMinor -= paid
-                let prior = try transactions(context).filter { $0.id != row.id && $0.installmentID == itemID && $0.reviewState == "ok" }.max { $0.eventAt < $1.eventAt }
+                let prior = movements.filter { $0.id != row.id && $0.installmentID == itemID && $0.reviewState == "ok" }.max { $0.eventAt < $1.eventAt }
                 item.paidTransactionID = prior?.id; item.paidAt = prior?.eventAt; try touch(item, now, writer)
             }
             try touch(row, now, writer, deleting: true)
@@ -1331,16 +1339,29 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             // Moving a movement across an account's opening balance date would silently add it to, or drop it from, that balance.
             if let newTime, timeChanges {
                 for account in try context.fetch(FetchDescriptor<Account>()) where sides.contains(account.id) && live(account) {
-                    if let opening = account.balanceAt { guard (row.eventAt < opening) == (newTime < opening) else { throw MoneyCommandError.invalidReference } }
+                    if let opening = account.balanceAt { guard (row.eventAt > opening) == (newTime > opening) else { throw MoneyCommandError.invalidReference } }
                 }
             }
             let cycles = try context.fetch(FetchDescriptor<Cycle>()).filter { live($0) }
             if let cycleID = row.cycleID { guard let cycle = cycles.first(where: { $0.id == cycleID }), cycle.closedAt == nil else { throw MoneyCommandError.invalidReference } }
             if let newTime, timeChanges {
-                let trip = row.tripID, cycle = row.cycleID
-                try stampDay(row, at: newTime, context: context, now: now)
-                let filed = cycles.filter { $0.start <= row.eventAt && ($0.end == nil || row.eventAt < $0.end!) }.max { $0.start < $1.start }?.id
-                guard row.tripID == trip, filed == cycle else { throw MoneyCommandError.invalidReference }
+                guard newTime <= now, try MoneyRepository(context: context).trip(at: newTime)?.id == row.tripID else {
+                    throw MoneyCommandError.invalidReference
+                }
+                func cycle(at instant: Date) -> UUID? {
+                    cycles.filter { $0.start <= instant && ($0.end.map { instant < $0 } ?? true) }.max { $0.start < $1.start }?.id
+                }
+                guard cycle(at: newTime) == (row.cycleID ?? cycle(at: row.eventAt)) else { throw MoneyCommandError.invalidReference }
+                // A clock correction uses the movement's stored day policy and never rewrites its key or provenance.
+                let prayer = try PrayerRepository(context: context), place = prayer.place(at: row.eventAt)
+                let boundary = DayBoundary(rawValue: row.dayPolicy.components(separatedBy: "@").first ?? "") ?? .midnight
+                let civil = GregorianDay.containing(newTime, in: place.timeZone)
+                let prayers = PrayerTimesEngine.calculate(day: civil, place: place, options: prayer.calculationOptions(at: row.eventAt))
+                guard row.tzID.isEmpty || row.tzID == place.timeZoneID,
+                      try MadarDay.resolve(instant: newTime, place: place, boundary: boundary, prayerDays: prayers.map { [$0] } ?? []).dayKey == row.dayKey else {
+                    throw MoneyCommandError.invalidReference
+                }
+                row.eventAt = newTime
             }
             if let newAmount, amountChanges {
                 row.amountMinor = newAmount
@@ -1554,24 +1575,34 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 throw MoneyCommandError.undoSuperseded
             }
             if after.model == "MoneyTransaction", let before = inverse.before.first(where: { recordKey($0) == recordKey(after) }), before.isLive {
-                // Owner 22 Nov 2026 (edit a confirmed movement): undoing an amount or time change must not rewrite a purchase a later
-                // refund now leans on, or one filed in a cycle that closed since.
-                if after.isLive, ["amountMinor", "homeAmountMinor", "eventAt"].contains(where: { before.fields[$0] != after.fields[$0] }) {
-                    if current.contains(where: { $0.model == "MoneyTransaction" && $0.isLive && !changedIDs.contains($0.id) && $0.fields["relatedTransactionID"]?.string.flatMap(UUID.init(uuidString:)) == after.id }) { throw MoneyCommandError.undoSuperseded }
+                let amountOrTimeChanged = ["amountMinor", "homeAmountMinor", "eventAt"].contains { before.fields[$0] != after.fields[$0] }
+                let categoryChanged = before.fields["categoryID"] != after.fields["categoryID"]
+                if after.isLive && (amountOrTimeChanged || categoryChanged),
+                   current.contains(where: { $0.model == "MoneyTransaction" && $0.isLive && !changedIDs.contains($0.id) && $0.fields["relatedTransactionID"]?.string.flatMap(UUID.init(uuidString:)) == after.id }) {
+                    throw MoneyCommandError.undoSuperseded
+                }
+                if amountOrTimeChanged || (!after.isLive && before.fields["reviewState"]?.string == "ok") {
                     if let cycle = after.fields["cycleID"]?.string.flatMap(UUID.init(uuidString:)),
-                       current.contains(where: { $0.model == "Cycle" && $0.id == cycle && ($0.fields["closedAt"].map { $0 != .null } ?? false) }) { throw MoneyCommandError.undoSuperseded }
+                       current.contains(where: { $0.model == "Cycle" && $0.id == cycle && $0.isLive && $0.date("closedAt") != nil }) { throw MoneyCommandError.undoSuperseded }
+                    let sides = Set(["fromAccountID", "toAccountID", "cardID", "obligationID"].compactMap { after.fields[$0]?.string.flatMap(UUID.init(uuidString:)) })
+                    let eventAt = min(before.date("eventAt") ?? .distantFuture, after.date("eventAt") ?? .distantFuture)
+                    if current.contains(where: { record in
+                        record.model == "Reconciliation" && record.isLive && !changedIDs.contains(record.id)
+                            && (record.date("at") ?? .distantPast) >= eventAt
+                            && ["accountID", "cardID", "obligationID"].compactMap { record.fields[$0]?.string.flatMap(UUID.init(uuidString:)) }.contains(where: sides.contains)
+                    }) { throw MoneyCommandError.undoSuperseded }
                 }
                 // A movement brought back never points at a category removed since.
                 if let category = before.fields["categoryID"]?.string.flatMap(UUID.init(uuidString:)),
                    !current.contains(where: { $0.model == "Category" && $0.id == category && $0.isLive }),
                    !inverse.before.contains(where: { $0.model == "Category" && $0.id == category && $0.isLive }) { throw MoneyCommandError.undoSuperseded }
             }
-            // Never remove the account/card/original while a later live movement depends on it.
-            if !inverse.before.contains(where: { recordKey($0) == recordKey(after) }), ["Account", "Card", "MoneyTransaction", "Cycle", "Obligation"].contains(after.model) {
+            // Never undo creation while a later live row depends on the created record.
+            if !inverse.before.contains(where: { recordKey($0) == recordKey(after) }), ["Account", "Card", "MoneyTransaction", "Cycle", "Obligation", "Category"].contains(after.model) {
                 let dependencies = current.filter { $0.isLive && !changedIDs.contains($0.id) }
                 // A cycle opened by a salary stays once later movements or allocations were filed into it.
-                let referenceKeys = ["accountID", "fromAccountID", "toAccountID", "cardID", "relatedTransactionID", "cycleID", "obligationID"]
-                guard !dependencies.contains(where: { record in referenceKeys.contains { record.fields[$0]?.string == after.id.uuidString } }) else { throw MoneyCommandError.undoSuperseded }
+                let referenceKeys = ["accountID", "fromAccountID", "toAccountID", "cardID", "relatedTransactionID", "cycleID", "obligationID", "categoryID"]
+                guard !dependencies.contains(where: { record in referenceKeys.contains { record.fields[$0]?.string.flatMap(UUID.init(uuidString:)) == after.id } }) else { throw MoneyCommandError.undoSuperseded }
             }
             // Bringing a removed account back must not leave two live accounts of one bank with the same last 4 (RM5).
             if after.model == "Account", after.deletedAt != nil, let before = inverse.before.first(where: { recordKey($0) == recordKey(after) }), before.isLive,

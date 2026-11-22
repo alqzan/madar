@@ -34,6 +34,8 @@ import XCTest
         app.buttons["diary-days"].tap()
         // The hub opens on the days timeline (owner, 14 Nov); the month grid lives under «السنوات».
         let index = app.buttons["diary-hub-index"]; XCTAssertTrue(index.waitForExistence(timeout: 10), app.debugDescription); index.tap()
+        let restoredYear = app.buttons["diary-hub-index-year-2025"]
+        XCTAssertTrue(restoredYear.waitForExistence(timeout: 10), app.debugDescription); restoredYear.tap()
         let month = app.buttons["diary-month-10"]
         XCTAssertTrue(month.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(month.label.contains("أكتوبر"))
@@ -46,15 +48,24 @@ import XCTest
         XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 25)); app.buttons["diary-today"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "قهوة على الشرفة")).firstMatch.waitForExistence(timeout: 10), app.debugDescription); capture(app, "M3-V05-today-L")
         app.swipeUp(); capture(app, "M3-V05-today-scrolled-L")
-        app.buttons["diary-day-year"].tap()
+        app.closeDiaryDay()
+        let year = app.buttons["diary-year-2025-10-15"]
+        XCTAssertTrue(year.waitForExistence(timeout: 10), app.debugDescription); year.tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "عشاء عند أهلي")).firstMatch.waitForExistence(timeout: 10))
-        app.buttons["diary-day-yesterday"].tap()
+        app.closeDiaryDay()
+        let yesterday = app.buttons["diary-recent-2026-10-14"]
+        XCTAssertTrue(yesterday.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<4 where !yesterday.isHittable { app.swipeUp(velocity: .slow) }
+        yesterday.tap()
         XCTAssertTrue(app.staticTexts["دوام طويل. وصلت البيت قبل العشاء بدقائق."].waitForExistence(timeout: 10))
         app.closeDiaryDay(); app.openDiaryEditorFromHome()
         let editor = app.textViews["diary-editor-text"]; XCTAssertTrue(editor.waitForExistence(timeout: 10))
         app.buttons["diary-editor-yesterday"].tap(); editor.tap(); editor.typeText("سطر متأخر محفوظ في أمس"); app.buttons["diary-editor-save"].tap()
-        // Saving returns to today's page, where the tabs are.
-        app.buttons["diary-day-yesterday"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 10), app.debugDescription)
+        app.closeDiaryDay()
+        XCTAssertTrue(yesterday.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<4 where !yesterday.isHittable { app.swipeUp(velocity: .slow) }
+        yesterday.tap()
         let late = app.staticTexts["سطر متأخر محفوظ في أمس"]; for _ in 0..<4 where !late.isHittable { app.swipeUp() }
         XCTAssertTrue(late.exists); XCTAssertTrue(app.staticTexts["كُتبت لاحقًا"].exists)
     }

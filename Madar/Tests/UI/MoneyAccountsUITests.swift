@@ -263,6 +263,24 @@ import XCTest
         app.buttons["money-rate-save-USD"].tap()
         let current = app.staticTexts["money-rate-current-USD"]; XCTAssertTrue(current.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(current.label.contains("٣٫٧٥"), current.label)
+
+        let currencyPicker = app.buttons["money-rate-add-currency"]
+        for _ in 0..<4 where !currencyPicker.isHittable { app.swipeDown(velocity: .slow) }
+        currencyPicker.tap()
+        let dirham = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "(AED)")).firstMatch
+        XCTAssertTrue(dirham.waitForExistence(timeout: 5), app.debugDescription)
+        dirham.tap()
+        let newField = app.textFields["money-rate-field-AED"]
+        XCTAssertTrue(newField.waitForExistence(timeout: 5), app.debugDescription)
+        newField.tap(); newField.typeText("١٫٠٢")
+        app.buttons["money-rate-save-AED"].tap()
+        let newRate = app.staticTexts["money-rate-current-AED"]
+        XCTAssertTrue(newRate.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(newRate.label.contains("١٫٠٢"), newRate.label)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "owner-money-rates-L"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
     }
     func testManualIncomeIsLoggedIntoATrackedAccount() {
         continueAfterFailure = false

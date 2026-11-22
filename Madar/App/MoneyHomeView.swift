@@ -538,7 +538,7 @@ struct MoneyHomeView: View {
         catch is CancellationError { return }
         catch MoneyCommandError.missingRate {
             guard !Task.isCancelled, readingLoadID == id else { return }
-            failure = "عندك حساب بعملة غير عملة البيت بلا سعر تحويل، ومدار لا يخمّن الأرقام. افتح «الحسابات» وصحّح عملة الحساب إن كانت خطأ، أو أدخل سعر الصرف من «السفر»."
+            failure = "عندك حساب بعملة غير عملة البيت بلا سعر صرف. افتح «الحسابات» وصحّح عملة الحساب أو أدخل سعرها في «أسعار الصرف»."
             reading = nil
         }
         catch {

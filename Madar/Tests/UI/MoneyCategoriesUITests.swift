@@ -66,10 +66,12 @@ import XCTest
         open.tap()
         let shelf = app.buttons["money-shelf-بقالة"]; XCTAssertTrue(shelf.waitForExistence(timeout: 10), app.debugDescription)
         shelf.tap()
+        XCTAssertTrue(app.staticTexts["حدّ بقالة"].waitForExistence(timeout: 5), app.debugDescription)
+        let value = app.staticTexts["money-limit-value"]
+        XCTAssertTrue(value.label.contains("٤٬٠٠٠"), value.debugDescription)
         let percentMode = app.buttons["money-limit-mode-percent"]
         for _ in 0..<8 where !percentMode.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(percentMode.waitForExistence(timeout: 10), app.debugDescription); percentMode.tap()
-        let value = app.staticTexts["money-limit-value"]
         XCTAssertTrue(value.waitForExistence(timeout: 10), app.debugDescription)
         let normalizedValue = value.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "")
         XCTAssertEqual(normalizedValue, "٢٦٫٦٦٪")
@@ -247,11 +249,11 @@ import XCTest
         save.tap()
         let saved = app.buttons["money-shelf-مطاعم"]
         XCTAssertTrue(NSPredicate(format: "label CONTAINS %@", "٥٠٠").evaluate(with: saved) || saved.label.contains("500"), saved.debugDescription)
-        app.terminate()
+        XCUIDevice.shared.press(.home)
 
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard"); springboard.activate()
-        springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.02))
-            .press(forDuration: 0.1, thenDragTo: springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.72)))
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.001))
+            .press(forDuration: 0.1, thenDragTo: springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.72)))
         let body = springboard.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "بلغت ٨٠٪ من حد «مطاعم» لهذه الدورة")).firstMatch
         XCTAssertTrue(body.waitForExistence(timeout: 180), springboard.debugDescription)
         XCTAssertNil(body.label.replacingOccurrences(of: "٨٠٪", with: "").rangeOfCharacter(from: .decimalDigits), body.label)

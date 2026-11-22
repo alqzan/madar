@@ -69,6 +69,15 @@ import XCTest
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "اقرأ ثم قيّم")).firstMatch.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons["quran-readgrade-to-coach"].exists)
         XCTAssertFalse(app.buttons["quran-session-hint"].exists, "no ayah-by-ayah controls in read-then-grade")
+        app.buttons["quran-session-close"].tap()
+        let keep = app.buttons["quran-session-keep"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["quran-session-save-partial"].exists)
+        attach(app, "owner-quran-readgrade-exit-L")
+        keep.tap()
+        let resume = app.buttons["quran-resume"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 10), app.debugDescription); resume.tap()
+        XCTAssertTrue(advance.waitForExistence(timeout: 15), app.debugDescription)
         let passage = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "،")).firstMatch
         XCTAssertTrue(passage.waitForExistence(timeout: 10), "the passage is visible")
         for _ in 0..<6 where !advance.label.contains("سجّل") {

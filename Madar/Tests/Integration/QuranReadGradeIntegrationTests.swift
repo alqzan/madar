@@ -25,16 +25,30 @@ import MadarCommands
         XCTAssertEqual(state.stage, .grading)
         XCTAssertTrue(state.verses.allSatisfy { !$0.hidden }, "the whole passage is visible")
         guard case .active(let graded) = try await service.session(draftID: started.id, action: .grade(page: state.page?.page ?? 22, grade: .mastered)) else { return XCTFail() }
-        XCTAssertEqual(Set(try service.savedDraft(started.id).draft.grades.map(\.page)), [22, 23], "one grade reaches every page of the passage")
-        XCTAssertTrue(try service.savedDraft(started.id).draft.grades.allSatisfy { $0.rating.storedRaw == "mastered" })
-        XCTAssertEqual(graded.primaryTitle, "الوجه التالي", "the commit waits on the last page")
-        _ = try await service.session(draftID: started.id, action: .advance)
-        let last = try await service.resume(draftID: started.id)
-        XCTAssertEqual(last.primaryTitle, "أنهِ وسجّل")
-        _ = try await service.session(draftID: started.id, action: .commit)
+        let pending = try service.savedDraft(started.id)
+        XCTAssertEqual(pending.readGradeRating, .mastered)
+        XCTAssertTrue(pending.draft.grades.isEmpty)
+        XCTAssertTrue(pending.draft.blindPassedAyahs.isEmpty)
         let context = ModelContext(app.container)
+        for action in [QuranUISessionAction.commit, .commitPartial] {
+            do {
+                _ = try await service.session(draftID: started.id, action: action)
+                XCTFail("The first of two pages cannot record the passage")
+            } catch DataError.invalidValue { }
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<HifzSession>()), 0)
+        XCTAssertEqual(graded.primaryTitle, "الوجه التالي", "the commit waits on the last page")
+        let readingDay = pending.draft.storedDay.dayKey
+        let tomorrow = AppQuranService(session: app, clock: { pending.draft.startedAt.addingTimeInterval(86_400) })
+        let resumed = try await tomorrow.resume(draftID: started.id)
+        XCTAssertTrue(resumed.coach?.pastDay == true)
+        _ = try await tomorrow.session(draftID: started.id, action: .advance)
+        let last = try await tomorrow.resume(draftID: started.id)
+        XCTAssertEqual(last.primaryTitle, "أنهِ وسجّل")
+        _ = try await tomorrow.session(draftID: started.id, action: .commit)
         let session = try XCTUnwrap(context.fetch(FetchDescriptor<HifzSession>()).first)
         XCTAssertEqual(session.pages, [22, 23]); XCTAssertEqual(session.fromAyah, 149)
+        XCTAssertEqual(session.dayKey, readingDay)
         XCTAssertEqual(Set(try context.fetch(FetchDescriptor<PageGrade>()).map(\.page)), [22, 23])
         XCTAssertTrue(try context.fetch(FetchDescriptor<PageGrade>()).allSatisfy { $0.grade == "mastered" })
         XCTAssertEqual(session.mistakes, 0)

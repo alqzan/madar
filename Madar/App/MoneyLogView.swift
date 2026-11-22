@@ -404,6 +404,7 @@ private struct MoneyMovementEditSheet: View {
     private var timeChanged: Bool { abs(date.timeIntervalSince(movement.at)) >= 60 }
     private var canSave: Bool { loaded && !saving && !amountInvalid && (labelChanged || categoryChanged || (edit.lockReason == nil && (amountChanged || timeChanged))) }
     private var unitName: String { edit.currency == app.string("core.currency") && edit.currency == "SAR" ? "ريال" : service.currencyName(edit.currency) }
+    private var timeZone: TimeZone { edit.timeZoneID.flatMap(TimeZone.init(identifier:)) ?? app.activePlace.timeZone }
 
     var body: some View {
         ScrollView {
@@ -430,14 +431,21 @@ private struct MoneyMovementEditSheet: View {
                         TextField(visible ? "" : "اكتب المبلغ الجديد إن تغيّر", text: $rawAmount).keyboardType(.decimalPad).focused($focused).accessibilityIdentifier("money-edit-amount")
                     }
                     if amountInvalid { Text("اكتب مبلغًا صحيحًا.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
-                    DatePicker("الوقت", selection: $date, in: ...app.prayerNow(), displayedComponents: [.date, .hourAndMinute]).environment(\.timeZone, app.activePlace.timeZone)
+                    DatePicker("الوقت", selection: $date, in: ...app.prayerNow(), displayedComponents: .hourAndMinute).environment(\.timeZone, timeZone)
                         .frame(minHeight: 44).accessibilityIdentifier("money-edit-time")
-                    MadarDateLabel(app.dateLabels(.containing(date, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
+                    MadarDateLabel(app.dateLabels(movement.day), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
                 }
                 if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-edit-error") }
                 Button(saving ? "جارٍ الحفظ…" : "احفظ التعديل", action: save).buttonStyle(MadarPrimaryButton()).disabled(!canSave).opacity(canSave ? 1 : 0.5).accessibilityIdentifier("money-edit-save")
-                Button(role: .destructive) { confirmDelete = true } label: { Text("احذف الحركة").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48) }
+                if let reason = edit.deletionReason {
+                    Text(reason).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        .accessibilityIdentifier("money-edit-delete-locked")
+                } else {
+                    Button(role: .destructive) { confirmDelete = true } label: {
+                        Text("احذف الحركة").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48)
+                    }
                     .disabled(saving).accessibilityIdentifier("money-edit-delete")
+                }
                 if visible, let message = movement.detail.message {
                     Divider().overlay(theme.line)
                     Text("الرسالة المصدر").font(MadarTypography.section())
@@ -447,7 +455,7 @@ private struct MoneyMovementEditSheet: View {
         }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .presentationDetents([.large]).presentationDragIndicator(.visible).madarSheetLock(saving: saving, draft: loaded && (labelChanged || categoryChanged || amountChanged || timeChanged))
             .confirmationDialog("تُحذف هذه الحركة وتعود أرقامك كأنها لم تُسجَّل. يمكنك التراجع بعدها.", isPresented: $confirmDelete, titleVisibility: .visible) {
-                Button("احذف الحركة", role: .destructive, action: delete)
+                Button("احذف الحركة", role: .destructive, action: delete).accessibilityIdentifier("money-edit-confirm-delete")
                 Button("ليس الآن", role: .cancel) {}
             }
             .task {
@@ -485,12 +493,12 @@ private struct MoneyMovementEditSheet: View {
             do { try await app.executeMoneyCommand("money.editTransaction", payload: payload); dismiss() }
             catch {
                 saving = false
-                failure = timeChanged ? "لم يُحفظ التعديل. الوقت الجديد يبقى في دورة الحركة ورحلتها ولا يكون في المستقبل." : "لم يُحفظ التعديل الآن. حاول مرة أخرى بعد قليل."
+                failure = timeChanged ? "لم يُحفظ التعديل. اختر وقتًا في يوم الحركة نفسه وقبل الوقت الحالي." : "لم يُحفظ التعديل الآن. حاول مرة أخرى بعد قليل."
             }
         }
     }
     private func delete() {
-        guard !saving else { return }
+        guard !saving, edit.deletionReason == nil else { return }
         saving = true; failure = nil
         Task {
             do { try await app.executeMoneyCommand("money.deleteTransaction", payload: ["id": .string(movement.id.uuidString)]); dismiss() }

@@ -67,8 +67,7 @@ struct MoneyCategoriesView: View {
     private func basisPoints(amount: Int, of base: Int) -> Int {
         guard amount > 0, base > 0 else { return 0 }
         guard amount < base else { return 10_000 }
-        let scaled = Decimal(Int64(amount)) * Decimal(10_000) / Decimal(Int64(base))
-        return min(10_000, max(0, NSDecimalNumber(decimal: scaled).intValue))
+        return MoneySafeArithmetic.ratio(amount, multiplier: 10_000, over: base)
     }
     private func isAtLeastEightyPercent(spent: Int, limit: Int) -> Bool {
         guard limit > 0 else { return false }

@@ -7,6 +7,25 @@ import SwiftData
 @testable import Madar
 
 @MainActor final class BahwPrayerIntegrationTests: XCTestCase {
+    func testRoomWritesAndReminderReadsKeepOtherRoomRevisionsStable() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "RoomReload-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        func revisions() -> [Int] { [app.moneyRevision, app.quranRevision, app.booksRevision, app.habitsRevision] }
+        let before = revisions()
+        try await app.executeMoneyCommand("money.saveCategory", payload: ["name": .string("تجربة")])
+        let afterMoney = [before[0] + 1, before[1], before[2], before[3]]
+        XCTAssertEqual(revisions(), afterMoney)
+        let generation = app.storeGeneration
+        try app.reload(domains: [])
+        XCTAssertEqual(revisions(), afterMoney)
+        XCTAssertEqual(app.storeGeneration, generation)
+        try app.reload(domains: .quran)
+        XCTAssertEqual(revisions(), [afterMoney[0], before[1] + 1, before[2], before[3] + 1])
+    }
+
     func testUpcomingIsReadOncePerStoreGeneration() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "UpcomingCache-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

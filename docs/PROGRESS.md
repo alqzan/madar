@@ -1,12 +1,14 @@
-# Current work — 16 November 2026
+# Current work — 22 November 2026
 
-Owner requests in force: whole-app usability, reliability and responsiveness without extra weight (row 12); dedicated iPad layouts (row 13); the Mac Mihbara (row 27); CloudKit development activation (row 28, authorized but blocked by signed provisioning); and the read-only Watch app (row 29). The 15 Nov follow-up fixes the diary invitation collision and checks related text layouts (row 25). For this review, stop with at least 10% remaining in the five-hour window, per the owner's latest instruction. Internal TestFlight uploads are authorized. The 16 Nov continuation covers the Mac Mihbara, a new read-only Watch dashboard, and the CloudKit import bridge; generic Mac, iOS and watchOS builds succeeded. Sol accepted source/build for all three scopes; after the synthetic Mac run, Sol also accepted the tested local Mac paths. CloudKit development activation remains blocked by signing/provisioning, so no release archive or upload was made.
+The current continuation is the owner’s request to review Claude’s build 60 and finish the unfinished verification (row 31). Whole-app usability and the dedicated iPad layouts remain standing work. Mac Mihbara and the read-only Watch app remain in scope. On 22 November the owner deferred iCloud until his development trial, so the current delivery stays local. Use the current limit rule in `AGENTS.md`.
+
+- **Continuation of row 31:** CLI and simulator verification complete for the money, Quran, settings, diary, backup and reminder paths. The continuation's distribution build is 0.1.0 (61). See the new handover for results and archive/upload evidence.
 
 - **Owner follow-up, 16 Nov:** the native Mac target now shares `com.alqzan.madar2` with iOS. Added macOS to the existing «المدار» App Store Connect record (ID `6830247088`); it now contains iOS and macOS version 1.0, both `Prepare for Submission`. Sync tests passed 10/10, snapshot/watch-data tests 20/20, and generic macOS, iOS-with-embedded-Watch, and standalone watchOS builds succeeded. No App Review submission or public release was made.
 
 ## Verified baseline and delivery
 
-- M0–M6 software is on main; M7 owner-device/system acceptance remains open. Latest uploaded build: 0.1.0 (55), 17 Nov 2026 19:50 Riyadh, quit habit, growing goal, Ramadan times (handover 17 Nov; two export tries failed on Apple network errors before the upload). Previous: 0.1.0 (54) 18:54; 0.1.0 (53) 17:31; 0.1.0 (52), commit 3c9cd6a6, uploaded 15 Nov 2026 14:27:42 Riyadh; Xcode reports EXPORT SUCCEEDED, Upload succeeded, and that Apple processing started (Madar/Artifacts/OWNER-TestFlight-52/upload.log). Xcode 27.2 archived Release; app and widget archive signatures verify, both bundle versions are 52, minimum OS is 27.0, device families are 1 and 2, and neither has an iCloud/ubiquity entitlement. Owner-device installation and acceptance are not implied. Earlier builds and evidence remain in their version folders.
+- M0–M6 software is on main; M7 owner-device/system acceptance remains open. Build 0.1.0 (60), source `bef2b256`, was uploaded internally on 22 November at 16:41 Riyadh. The archive contains one installed app, with the widget and Watch app embedded at build 60. The upload log reports success. Apple processing and owner-device acceptance remain open. See `Madar/Artifacts/OWNER-TestFlight-60/` and Claude’s 22 November handover for the prior evidence and failures.
 - Simulators: `Madar 15 Pro Max` and `Madar iPad Pro 13`, both iOS 27.0, no others. Storage remains local-only (RA1); this request used synthetic stores only and did not open or migrate owner data. Owner-device installation and acceptance are separate.
 - Package baseline passes (rows 16–17). Current continuation: prayer history read failures propagate and remain retryable (42/42 prayer, 26/26 command/replay tests). Polar manual logging, habit delete/undo/relaunch and both year-calendar settings paths now pass on iOS 27.0; details in row 18. General no-trip FX rates still need an owner rule/data-model decision. The 9 handwritten-colour findings are resolved in row 19: static shipping-source scan passes (464 sources, 4 catalogs, 38 independently measured token pairs); its manual trace requirement remains separate.
 - Build 22 includes the changes after 21: lazy prayer/night reads and per-day prayer-time memoization, scoped habit undo reads, 1922 dead-code lines removed, stale-test cleanup, and the current continuation fixes. Signature verification passed; app/widget versions are both 0.1.0 (22), minimum OS 27.0, device families 1 and 2, and no iCloud/ubiquity entitlements. No owner-device performance measurement is implied.
@@ -233,6 +235,40 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 # Handovers
 
+## Handover — مراجعة البناء ٦٠ واستكماله — 2026-11-22 — Codex
+
+### Works now
+
+- Confirmed movements edit from the log. The stored day and historical time zone guide clock edits. Deletion explains when a movement supports a salary cycle, repayment, reconciliation, cashback entry, refund or closed cycle. Undo protects reconciled balances and categories already in use.
+- Add an exchange rate for a supported currency from Accounts, including currencies without an account. Fixed limits now convert to a two-decimal percentage correctly. The 80% alert was delivered by iOS with the category name and no transaction amount.
+- Quran read-then-grade records completion only from the last face. Existing read-then-grade drafts retain their place and grade. A draft resumed on a later day keeps its original day when recorded.
+
+### Verified
+
+- Eight Swift package suites, 1,241 tests passed. Includes MadarCommands 345 and MadarData 145, with the V18→V19 fixture. iPhone build-for-testing and unsigned Mac build passed.
+- Madar 15 Pro Max on iOS 27.0, synthetic stores. Integration 68/68. Final outcomes for 20 distinct UI tests passed. Evidence in `Madar/Artifacts/OWNER-Codex-22nov/`: `integration-r1.xcresult`, `owner-ui-r2.xcresult` (9/9), `carryover-ui-r1.xcresult` (3 confirmed passes including system delivery), `remaining-ui-r2.xcresult` (6 confirmed passes) and `final-repairs-ui.xcresult` (2/2, supersedes the diary and backup failures). The prior failures remain visible in their own bundles. No tests skipped in these slices.
+- `verify-smoke.sh` passed with an isolated expense fixture. RU1 check and `git diff --check` passed. Default-size money sheet and Quran exit evidence is attached to `owner-ui-r2.xcresult`. These sheet states have no canonical images.
+
+### Differences left
+
+- Money and Quran sheet refinements are built — awaiting owner.
+
+### Not verified
+
+- Owner-device acceptance, physical Watch behavior, iPad layout and Apple processing. iCloud development and Production deployment remain deferred by the owner.
+
+### Next
+
+- Build 0.1.0 (61) distribution evidence: `Madar/Artifacts/OWNER-TestFlight-61/archive.log` and `Madar/Artifacts/OWNER-TestFlight-61/upload.log`. Check each log for its outcome. The delivery is for internal TestFlight.
+
+### Model/effort
+
+- Codex, model and effort not exposed. Two read-only focused reviews covered money and Quran.
+
+### Usage
+
+- Before archiving: five-hour 82% used, weekly 13% used.
+
 ## Handover — «سوها كلها»: المال، حذف كود الصلاة، تحديث كل غرفة وحدها — 2026-11-22 — Claude
 
 ### Works now
@@ -309,97 +345,3 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Model/effort
 - claude-sonnet-5-5, effort not exposed. Usage not exposed.
-
-## Handover — العادات بدل الصلاة — 2026-11-17 — Claude
-
-### Works now
-- «العادات» is the first tab on iPhone and Mac, in place of the prayer tab; `madar://salah` and `madar://prayer` open habits. Prayer screens, widgets, controls, Live Activity, Siri shortcuts, the watch prayer card, the night-review prayer line, legacy prayer import and prayer-only settings have no entry point. The prayer-time engine stays («المواقيت» in Settings) for prayer-anchored habit times. `PrayerNotificationCoordinator.prayerLoggingRemoved = true` switches off prayer requests and ends any countdown activity.
-- Every launch tombstones all live `PrayerLog` and `QadaItem` rows with a deletion barrier (`PrayerHistoryMaintenance.removeAllPrayerRecords`), on the owner's explicit order «امسح كل شي خلاص معاد ابيه».
-- `HabitJamaahConversion` turns a Jama'a-linked habit into the user's own daily habit «صليت كل الصلوات بجماعة» (push, Isha +60…+240 min, new rule from today; older rules kept). The habits room offers it as a ready preset; the editor no longer offers the Jama'a source.
-- Quran wird: with «بعد الفجر», a second request `quran.<day>.again` comes after Isha while the wird is still not done.
-- Streak capsule «ب» (`HabitFlame`): room colour and a lit flame when done, grey when waiting, red tint, unlit flame and hourglass when missed once. One final alert `habits.<day>.final.<id>` 90 min after Isha on the second day. Room-coloured tags and orbit beads (`habitRoomColour`). `HabitType` sets the habits room in Thmanyah Serif Text and Serif Display Black.
-- Ideas: 1 (per-habit notification category with the goal, half the goal and «كمية ثانية» text input), 5 (Friday lobby note), 6 (30/100/365 milestone line), 19 (one-at-a-time note in the new-habit editor), 20 (ending a habit shows its summary first).
-
-### Verified
-- iOS Simulator build and test build succeeded (iOS 27.0, `Madar 15 Pro Max`).
-- `swift test`: PrayerHistoryMaintenanceTests 2/2; HabitJamaahConversionTests and HabitWirdTests 2/2.
-- MadarTests (integration) full run: 296 executed, 15 assertion failures in 6 tests, all from prayer removal. After the fixes the affected suites ran 41 tests, 0 failures, 4 skipped on purpose (`XCTSkip`: AppInboxLifecycle ×2 and CaptureIntent ×2 assert prayer facts and need rewriting on a habit command). Quran/notifications 19/19.
-- Build 0.1.0 (53): ARCHIVE SUCCEEDED, EXPORT SUCCEEDED, «Upload succeeded» at 17:31 Riyadh, 17 Nov (`Madar/Artifacts/OWNER-TestFlight-53/upload.log`). Apple processing not awaited. The first export failed («method» had no options) because the Codex watch app was archived as a second top-level app; `MadarWatchApp` now has `SKIP_INSTALL: YES`, so it ships only inside Madar.app.
-
-### Differences left
-- No screenshots captured of the new habits look (capsule, tags, fonts). The period cards keep their old layout with the new fonts.
-- Prayer views, intents and widget structs are still compiled but unreachable. `PrayerFirstDayUITests`, `PrayerCountdownUITests` and the other prayer UI tests were not run and will fail; remove or rewrite them.
-
-### Not verified
-- UI tests were not run (HabitsUITests was updated for the new end-habit confirmation). Owner-device acceptance and notification delivery on a real device are not verified.
-
-### Next
-- Remaining approved ideas: 2 (weekly behaviour suggestion, applied only on approval), 4 (one notification for habits done back to back), 8 (a goal that grows gradually), 9 (a reminder that learns the usual logging time), 10 (a habit you quit, counted as days since), 12 (an earned rest day every 30 days), 14 (Health sleep and workouts), 16 (Ramadan mode), 17 (Monday/Thursday fasting asked the night before: weekly weekdays [2,5] with a Fajr-anchored window starting about −480 min). 8, 12 and 16 touch the habit rule or engine, so they need engine tests from the spec.
-- Rewrite the 4 skipped tests on a habit command, and delete or rewrite the prayer UI tests.
-
-### Follow-up the same day (build 54) — Sonnet built, Claude reviewed
-- Built by Sonnet on the owner's order, reviewed and re-verified by Claude:
-  - Period cards redesigned (ring, title, «x من y»).
-  - 17: a «صيام الإثنين والخميس» preset, asked the night before. Claude made the night-before ask a plain question with no log button (`habits.<day>.eve.<id>`), so it can no longer log Sunday.
-  - 4: reminders within 15 minutes arrive as one notification.
-  - 9: a push habit with no window is reminded at the median of its last 14 logged times (needs 3 logs).
-  - 2: a Saturday lobby suggestion for a daily habit met fewer than 3 of 7 days. It opens the habit and changes nothing.
-  - 14: sleep and workout units from Health (HealthKit queries compile only, not verified on a device).
-  - 12: one earned rest day per 30 met days.
-  - 16: Ramadan presets (qiyam after Isha, wird before Suhoor), shown in Ramadan only.
-  - Prayer UI tests deleted.
-  - HabitsUITests repaired. Claude made `testAtRiskFixedHabitsStayHiddenBeforeTheirDates` match only `habit-row-` rows; it had matched the orbit beads.
-- Not built:
-  - 10 (a habit you quit). Needs a new `HabitMeasure.abstain` and many surfaces; no schema change.
-  - 8 as a user feature. The engine already handles dated rule versions; `habit.save` must write future-dated steps.
-  - 16 for existing habits shifting their times. Needs a per-policy Ramadan window field.
-- Verified by Claude:
-  - MadarCore 251/251 and MadarCommands 325/325.
-  - App integration slice 28 executed, then RoomNotificationsIntegrationTests 18/18 after the eve fix.
-  - MadarUITests/HabitsUITests 25/25 (`Artifacts/review-1794929621.xcresult`).
-  - Screenshots `Madar/Artifacts/verify/habits-showcase.png` and `habits-atRisk.png`.
-- Untracked `.codex/` and `.agents/skills/verify/` appeared from an outside copy of the verify setup (not from this session) and were left uncommitted.
-
-### Second follow-up (build 55): «كملها كلها»
-- Built by Sonnet and reviewed by Claude. No schema change.
-- Idea 10, a habit you quit (`HabitMeasure.abstain`):
-  - The streak is clean days since the last slip. Only an explicit «زلّة» with confirmation logs.
-  - Excluded from reminders, the lobby, widgets, intents and the orbit.
-- Idea 8, a goal that grows («يكبر تدريجيًا»): `HabitSchedule.plan` writes future-dated policy steps in the same `habit.save`.
-- Ramadan times for any windowed habit: policies dated 1 Ramadan and 1 Shawwal, from the Hijri calendar.
-- Review fix by Claude: a later save had tombstoned all future steps, even on a rename. Now an edit that leaves the rule unchanged re-sends the planned steps; only a change to the goal or time replaces them, and the editor copy says so.
-- Data safety: future steps are tombstoned with `deletedAt` and `deletionBarrierAt`, restored rows get `restoredAt`, and undo goes through the inverse change list.
-- Verified by Claude:
-  - MadarCore 258/258 and MadarCommands 330/330.
-  - App integration 53/53 and HabitsUITests 26/26 (`Artifacts/review3-1794932729.xcresult`).
-  - `verify-smoke.sh` passed on its first real run.
-  - The editor's Ramadan controls were checked on the simulator.
-  - Not visually checked: the quit-habit hero and the next-step line.
-
-### Third follow-up (build 56): «Yes, match it» — the room now follows the approved canvas
-- The owner asked if the room matched the approved design (`Habits.dc.html`, artifact 4Gvv3Bz9ckqtkonPq6q7bZ). It did not, and Claude said so. This build fixes it. Sonnet built it and Claude reviewed it.
-- Room order, top to bottom:
-  - the period cards
-  - the daily habits
-  - the longer-period habits
-  - archived habits
-  - the selected habit's story card (`habit-story`; selecting a habit scrolls to it)
-  - the orbit, in room colours
-  - the analysis cards from the new pure `HabitRoomInsights` (MadarCore, 13 tests): trend, weekday pattern, best and worst month
-  - «عادة صغيرة جديدة»
-  - the room tags
-  - the hadith footer
-- Removed: the extra «سجّل الماء» card and the segmented switch. Neither is in the canvas.
-- A new `history` fixture backs the analysis cards in tests. `HabitRepository` now records `loggedAt`.
-- Lobby UI tests brought up to date with removed features (no XCTSkip):
-  - Deleted `testLobbyLeadsWithNextPrayerBeforeAdhanAndIsQuietInsideTheWindow` and `testNextFajrAfterIsha`. They tested the lobby's next-prayer block and suggestion, which ended with the prayer room on 17 Nov. Sanctity itself stays covered by the engine tests.
-  - The arrange, greeting and tab-bar tests now use the habits block and the remaining room tabs.
-  - The diary test now saves with «تمّ». There has been no cancel for new words since 14 Nov (T10).
-- Not visually checked: the quit-habit hero, dark mode, Hijri-first, iPad.
-- Build 0.1.0 (56): archive succeeded, upload succeeded on 17 Nov 2026 (`Madar/Artifacts/OWNER-TestFlight-56/upload.log`). Apple processing was not awaited.
-
-### Model/effort
-- claude-opus-5-5, effort not exposed. Helper: Sonnet (owner's order) for all three follow-ups.
-
-### Usage
-- Five-hour window 63% used at commit time (37% left); weekly 10% used.

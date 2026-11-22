@@ -48,3 +48,97 @@
 - **Next:** يجرّب المالك المذكرات على الآيفون ويعطي ملاحظاته. لقطات الآيباد لصفحة اليوم والرئيسية. تذكير المالك بتغيير «المشاريع» بعد FB-27.
 - **Model/effort:** التنفيذ Sonnet 5.5 بجهد medium، والمراجعة والتحقق النهائي Opus 5.5 والجهد غير معروض.
 - **Usage** (قبل الأرشفة): حد الخمس ساعات ٦٠٪ مستخدم (يبقى ٤٠٪)، والأسبوعي ٦٤٪ مستخدم (يبقى ٣٦٪).
+
+## Handover — العادات بدل الصلاة — 2026-11-17 — Claude
+
+### Works now
+- «العادات» is the first tab on iPhone and Mac, in place of the prayer tab; `madar://salah` and `madar://prayer` open habits. Prayer screens, widgets, controls, Live Activity, Siri shortcuts, the watch prayer card, the night-review prayer line, legacy prayer import and prayer-only settings have no entry point. The prayer-time engine stays («المواقيت» in Settings) for prayer-anchored habit times. `PrayerNotificationCoordinator.prayerLoggingRemoved = true` switches off prayer requests and ends any countdown activity.
+- Every launch tombstones all live `PrayerLog` and `QadaItem` rows with a deletion barrier (`PrayerHistoryMaintenance.removeAllPrayerRecords`), on the owner's explicit order «امسح كل شي خلاص معاد ابيه».
+- `HabitJamaahConversion` turns a Jama'a-linked habit into the user's own daily habit «صليت كل الصلوات بجماعة» (push, Isha +60…+240 min, new rule from today; older rules kept). The habits room offers it as a ready preset; the editor no longer offers the Jama'a source.
+- Quran wird: with «بعد الفجر», a second request `quran.<day>.again` comes after Isha while the wird is still not done.
+- Streak capsule «ب» (`HabitFlame`): room colour and a lit flame when done, grey when waiting, red tint, unlit flame and hourglass when missed once. One final alert `habits.<day>.final.<id>` 90 min after Isha on the second day. Room-coloured tags and orbit beads (`habitRoomColour`). `HabitType` sets the habits room in Thmanyah Serif Text and Serif Display Black.
+- Ideas: 1 (per-habit notification category with the goal, half the goal and «كمية ثانية» text input), 5 (Friday lobby note), 6 (30/100/365 milestone line), 19 (one-at-a-time note in the new-habit editor), 20 (ending a habit shows its summary first).
+
+### Verified
+- iOS Simulator build and test build succeeded (iOS 27.0, `Madar 15 Pro Max`).
+- `swift test`: PrayerHistoryMaintenanceTests 2/2; HabitJamaahConversionTests and HabitWirdTests 2/2.
+- MadarTests (integration) full run: 296 executed, 15 assertion failures in 6 tests, all from prayer removal. After the fixes the affected suites ran 41 tests, 0 failures, 4 skipped on purpose (`XCTSkip`: AppInboxLifecycle ×2 and CaptureIntent ×2 assert prayer facts and need rewriting on a habit command). Quran/notifications 19/19.
+- Build 0.1.0 (53): ARCHIVE SUCCEEDED, EXPORT SUCCEEDED, «Upload succeeded» at 17:31 Riyadh, 17 Nov (`Madar/Artifacts/OWNER-TestFlight-53/upload.log`). Apple processing not awaited. The first export failed («method» had no options) because the Codex watch app was archived as a second top-level app; `MadarWatchApp` now has `SKIP_INSTALL: YES`, so it ships only inside Madar.app.
+
+### Differences left
+- No screenshots captured of the new habits look (capsule, tags, fonts). The period cards keep their old layout with the new fonts.
+- Prayer views, intents and widget structs are still compiled but unreachable. `PrayerFirstDayUITests`, `PrayerCountdownUITests` and the other prayer UI tests were not run and will fail; remove or rewrite them.
+
+### Not verified
+- UI tests were not run (HabitsUITests was updated for the new end-habit confirmation). Owner-device acceptance and notification delivery on a real device are not verified.
+
+### Next
+- Remaining approved ideas: 2 (weekly behaviour suggestion, applied only on approval), 4 (one notification for habits done back to back), 8 (a goal that grows gradually), 9 (a reminder that learns the usual logging time), 10 (a habit you quit, counted as days since), 12 (an earned rest day every 30 days), 14 (Health sleep and workouts), 16 (Ramadan mode), 17 (Monday/Thursday fasting asked the night before: weekly weekdays [2,5] with a Fajr-anchored window starting about −480 min). 8, 12 and 16 touch the habit rule or engine, so they need engine tests from the spec.
+- Rewrite the 4 skipped tests on a habit command, and delete or rewrite the prayer UI tests.
+
+### Follow-up the same day (build 54) — Sonnet built, Claude reviewed
+- Built by Sonnet on the owner's order, reviewed and re-verified by Claude:
+  - Period cards redesigned (ring, title, «x من y»).
+  - 17: a «صيام الإثنين والخميس» preset, asked the night before. Claude made the night-before ask a plain question with no log button (`habits.<day>.eve.<id>`), so it can no longer log Sunday.
+  - 4: reminders within 15 minutes arrive as one notification.
+  - 9: a push habit with no window is reminded at the median of its last 14 logged times (needs 3 logs).
+  - 2: a Saturday lobby suggestion for a daily habit met fewer than 3 of 7 days. It opens the habit and changes nothing.
+  - 14: sleep and workout units from Health (HealthKit queries compile only, not verified on a device).
+  - 12: one earned rest day per 30 met days.
+  - 16: Ramadan presets (qiyam after Isha, wird before Suhoor), shown in Ramadan only.
+  - Prayer UI tests deleted.
+  - HabitsUITests repaired. Claude made `testAtRiskFixedHabitsStayHiddenBeforeTheirDates` match only `habit-row-` rows; it had matched the orbit beads.
+- Not built:
+  - 10 (a habit you quit). Needs a new `HabitMeasure.abstain` and many surfaces; no schema change.
+  - 8 as a user feature. The engine already handles dated rule versions; `habit.save` must write future-dated steps.
+  - 16 for existing habits shifting their times. Needs a per-policy Ramadan window field.
+- Verified by Claude:
+  - MadarCore 251/251 and MadarCommands 325/325.
+  - App integration slice 28 executed, then RoomNotificationsIntegrationTests 18/18 after the eve fix.
+  - MadarUITests/HabitsUITests 25/25 (`Artifacts/review-1794929621.xcresult`).
+  - Screenshots `Madar/Artifacts/verify/habits-showcase.png` and `habits-atRisk.png`.
+- Untracked `.codex/` and `.agents/skills/verify/` appeared from an outside copy of the verify setup (not from this session) and were left uncommitted.
+
+### Second follow-up (build 55): «كملها كلها»
+- Built by Sonnet and reviewed by Claude. No schema change.
+- Idea 10, a habit you quit (`HabitMeasure.abstain`):
+  - The streak is clean days since the last slip. Only an explicit «زلّة» with confirmation logs.
+  - Excluded from reminders, the lobby, widgets, intents and the orbit.
+- Idea 8, a goal that grows («يكبر تدريجيًا»): `HabitSchedule.plan` writes future-dated policy steps in the same `habit.save`.
+- Ramadan times for any windowed habit: policies dated 1 Ramadan and 1 Shawwal, from the Hijri calendar.
+- Review fix by Claude: a later save had tombstoned all future steps, even on a rename. Now an edit that leaves the rule unchanged re-sends the planned steps; only a change to the goal or time replaces them, and the editor copy says so.
+- Data safety: future steps are tombstoned with `deletedAt` and `deletionBarrierAt`, restored rows get `restoredAt`, and undo goes through the inverse change list.
+- Verified by Claude:
+  - MadarCore 258/258 and MadarCommands 330/330.
+  - App integration 53/53 and HabitsUITests 26/26 (`Artifacts/review3-1794932729.xcresult`).
+  - `verify-smoke.sh` passed on its first real run.
+  - The editor's Ramadan controls were checked on the simulator.
+  - Not visually checked: the quit-habit hero and the next-step line.
+
+### Third follow-up (build 56): «Yes, match it» — the room now follows the approved canvas
+- The owner asked if the room matched the approved design (`Habits.dc.html`, artifact 4Gvv3Bz9ckqtkonPq6q7bZ). It did not, and Claude said so. This build fixes it. Sonnet built it and Claude reviewed it.
+- Room order, top to bottom:
+  - the period cards
+  - the daily habits
+  - the longer-period habits
+  - archived habits
+  - the selected habit's story card (`habit-story`; selecting a habit scrolls to it)
+  - the orbit, in room colours
+  - the analysis cards from the new pure `HabitRoomInsights` (MadarCore, 13 tests): trend, weekday pattern, best and worst month
+  - «عادة صغيرة جديدة»
+  - the room tags
+  - the hadith footer
+- Removed: the extra «سجّل الماء» card and the segmented switch. Neither is in the canvas.
+- A new `history` fixture backs the analysis cards in tests. `HabitRepository` now records `loggedAt`.
+- Lobby UI tests brought up to date with removed features (no XCTSkip):
+  - Deleted `testLobbyLeadsWithNextPrayerBeforeAdhanAndIsQuietInsideTheWindow` and `testNextFajrAfterIsha`. They tested the lobby's next-prayer block and suggestion, which ended with the prayer room on 17 Nov. Sanctity itself stays covered by the engine tests.
+  - The arrange, greeting and tab-bar tests now use the habits block and the remaining room tabs.
+  - The diary test now saves with «تمّ». There has been no cancel for new words since 14 Nov (T10).
+- Not visually checked: the quit-habit hero, dark mode, Hijri-first, iPad.
+- Build 0.1.0 (56): archive succeeded, upload succeeded on 17 Nov 2026 (`Madar/Artifacts/OWNER-TestFlight-56/upload.log`). Apple processing was not awaited.
+
+### Model/effort
+- claude-opus-5-5, effort not exposed. Helper: Sonnet (owner's order) for all three follow-ups.
+
+### Usage
+- Five-hour window 63% used at commit time (37% left); weekly 10% used.

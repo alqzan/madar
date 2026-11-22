@@ -21,3 +21,4 @@ Run an item only when its trigger matches the diff. Each row names the incident 
 | 15 | Copy the user reads | Arabic, RTL; concrete amounts instead of multipliers; no repeated sentence on one screen | Owner UX rules |
 | 16 | Removing a feature | Delete its tests (no `XCTSkip`), its entry points, settings keys, widgets, intents and feature-map rows in the same request | Verification practice, 17 Nov |
 | 17 | Undo toast or its timing | Short, swipe-away, not repeated | Owner remarks (undo toast) |
+| 18 | A fixed money limit changes to a percentage | Run `MoneyCategoriesUITests.testPercentLimitDisplaysHundredths`. A 4,000 limit on 15,000 income displays 26.66%. | Build 60 rounded a recurring decimal ratio to 0.01% on the simulator |

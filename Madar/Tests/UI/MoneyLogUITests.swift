@@ -67,6 +67,8 @@ import XCTest
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
         let log = app.buttons["money-log-open"]; XCTAssertTrue(log.waitForExistence(timeout: 10)); for _ in 0..<8 where !log.isHittable { app.swipeUp(velocity: .slow) }; log.tap()
         XCTAssertTrue(app.otherElements["money-log-arcade"].waitForExistence(timeout: 10))
+        app.buttons["money-log-mode"].tap()
+        XCTAssertTrue(app.otherElements["money-log-month-grid"].waitForExistence(timeout: 5))
         let yesterday = app.buttons["money-log-day-2026-10-16"]; XCTAssertTrue(yesterday.waitForExistence(timeout: 5)); yesterday.tap()
         return app
     }
@@ -79,20 +81,32 @@ import XCTest
         continueAfterFailure = false
         let app = openExpenseLog(); tapRow(app, "مقهى الزاوية")
         let label = app.textFields["money-edit-label"]; XCTAssertTrue(label.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "owner-money-edit-L")
         let save = app.buttons["money-edit-save"]; XCTAssertFalse(save.isEnabled, "Nothing changed yet.")
-        XCTAssertTrue(app.textFields["money-edit-amount"].exists, "A plain purchase in an open cycle can change its amount.")
-        label.tap(); label.typeText(" الجديد")
+        let amount = app.textFields["money-edit-amount"]
+        XCTAssertTrue(amount.exists, "A plain purchase in an open cycle can change its amount.")
+        label.tap(); label.typeText(" الجديد\n")
+        let originalAmount = try XCTUnwrap(amount.value as? String)
+        for _ in 0..<5 where !amount.isHittable { app.swipeUp(velocity: .slow) }
+        amount.tap()
+        amount.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: originalAmount.count) + "25")
+        for _ in 0..<5 where !save.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(save.isEnabled); save.tap()
         XCTAssertTrue(label.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["money-log-row-مقهى الزاوية الجديد"].waitForExistence(timeout: 10), app.debugDescription)
+        let edited = app.buttons["money-log-row-مقهى الزاوية الجديد"]
+        XCTAssertTrue(edited.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(edited.label.contains("٢٥"), edited.debugDescription)
     }
     func testDeletingAConfirmedMovementAsksFirst() throws {
         continueAfterFailure = false
         let app = openExpenseLog(); tapRow(app, "متجر الحي")
         let delete = app.buttons["money-edit-delete"]; XCTAssertTrue(delete.waitForExistence(timeout: 8), app.debugDescription)
+        for _ in 0..<5 where !delete.isHittable { app.swipeUp(velocity: .slow) }
         delete.tap()
-        let confirm = app.buttons.matching(NSPredicate(format: "label == %@", "احذف الحركة")).allElementsBoundByIndex.last
-        XCTAssertTrue(try XCTUnwrap(confirm).waitForExistence(timeout: 5), app.debugDescription); confirm?.tap()
+        let confirm = app.sheets.buttons.matching(identifier: "money-edit-confirm-delete").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription)
+        shot(app, "owner-money-delete-confirm-L")
+        confirm.tap()
         XCTAssertTrue(delete.waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.buttons["money-log-row-متجر الحي"].waitForNonExistence(timeout: 10), app.debugDescription)
     }

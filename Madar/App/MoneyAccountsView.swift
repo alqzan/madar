@@ -324,14 +324,35 @@ private struct MoneyRatesSheet: View {
     @State private var working: String?
     @State private var errors: [String: String] = [:]
     @State private var readFailure = false
+    @State private var newCurrency: String?
     private var service: AppMoneyService { .init(app: app) }
+    private var availableCurrencies: [String] {
+        let listed = Set(rows.map(\.code))
+        let home = app.string("core.currency")
+        return CurrencyExponents.specified.exponents.keys.filter { $0 != home && !listed.contains($0) }.sorted()
+    }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 MoneyPageHeader(title: "أسعار الصرف", close: { dismiss() }, closeDisabled: working != nil)
                 if readFailure { Text("لم تكتمل قراءة الأسعار. أغلق الصفحة وافتحها مرة أخرى.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-rates-read-error") }
-                else if loaded && rows.isEmpty { Text("حساباتك كلها بعملتك الأساسية؛ لا تحتاج سعرًا.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-rates-empty") }
-                else if loaded { Text("اكتب كم تساوي وحدة واحدة من العملة بعملتك الأساسية. الحركات المسجّلة تحتفظ بسعرها وقت تسجيلها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true) }
+                else if loaded {
+                    Text("اكتب كم تساوي وحدة واحدة من العملة بعملتك الأساسية. الحركات المسجّلة تحتفظ بسعرها وقت تسجيلها.")
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                    if !availableCurrencies.isEmpty {
+                        Picker("أضف عملة", selection: $newCurrency) {
+                            Text("اختر عملة").tag(nil as String?)
+                            ForEach(availableCurrencies, id: \.self) { code in
+                                Text(service.currencyName(code) + " (" + code + ")").tag(Optional(code))
+                                    .accessibilityIdentifier("money-rate-currency-" + code)
+                            }
+                        }.pickerStyle(.menu).disabled(working != nil).frame(minHeight: 44)
+                            .accessibilityIdentifier("money-rate-add-currency")
+                    }
+                    if let code = newCurrency {
+                        rateCard(.init(code: code, name: service.currencyName(code), accounts: []))
+                    }
+                }
                 ForEach(rows) { row in rateCard(row) }
             }.padding(20)
         }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
@@ -346,7 +367,7 @@ private struct MoneyRatesSheet: View {
             if let rate = row.rate, let at = row.setAt {
                 Text(figure: "السعر الآن " + service.localizedRate(rate)).font(MadarTypography.body()).accessibilityIdentifier("money-rate-current-" + row.code)
                 MadarDateLabel(app.dateLabels(.containing(at, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
-            } else {
+            } else if !row.accounts.isEmpty {
                 Text("لم تُدخل سعرًا بعد؛ الحساب خارج المجموع حتى تفعل.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
             }
             HStack(spacing: 8) {
@@ -377,7 +398,9 @@ private struct MoneyRatesSheet: View {
             defer { working = nil }
             do {
                 try await app.executeMoneyCommand("money.setCurrencyRate", payload: ["currency": .string(row.code), "rate": .string(rate)])
-                inputs[row.code] = ""; reload()
+                inputs[row.code] = ""
+                if newCurrency == row.code { newCurrency = nil }
+                reload()
             } catch { errors[row.code] = "لم يُحفظ السعر الآن. حاول مرة أخرى بعد قليل." }
         }
     }

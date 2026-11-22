@@ -51,6 +51,56 @@ import MadarMoney
 }
 
 @MainActor struct MoneyOwnerEditsTests {
+    @Test func deletionKeepsMovementsReferencedByFinancialRecords() async throws {
+        let f = try OwnerMoneyFixture(); defer { f.clean() }; try await f.setup()
+        let ids = (0..<6).map { _ in UUID() }
+        for id in ids { _ = try await f.expense(2_500, id: id) }
+        let c = f.context
+        let cycle = Cycle(); cycle.salaryTransactionID = ids[0]; c.insert(cycle)
+        let plan = EnvelopePlan(); plan.id = ids[1]; plan.kind = "repay"; c.insert(plan)
+        let cashback = CashbackEntry(); cashback.transactionID = ids[2]; c.insert(cashback)
+        let reconciliation = Reconciliation(); reconciliation.adjustmentTransactionID = ids[3]; c.insert(reconciliation)
+        let envelopeID = UUID()
+        let oldPlan = EnvelopePlan(); oldPlan.id = ids[4]; oldPlan.kind = "repay"; oldPlan.source = "daily"
+        oldPlan.envelopeID = envelopeID; oldPlan.deletedAt = f.now; c.insert(oldPlan)
+        let replacement = EnvelopePlan(); replacement.kind = "repay"; replacement.source = "salary"
+        replacement.envelopeID = envelopeID; c.insert(replacement)
+        try c.save()
+        for id in ids.prefix(5) {
+            #expect(try await f.run("money.deleteTransaction", ["id": .string(id.uuidString)]).status == .rejected)
+            #expect(try f.transaction(id).amountMinor == 2_500 && f.spends(id) == [-2_500])
+        }
+        let plain = ids[5], deletion = UUID()
+        #expect(try await f.run("money.deleteTransaction", ["id": .string(plain.uuidString)], id: deletion).status == .applied)
+        #expect(try f.spends(plain).isEmpty)
+        #expect(try await f.run("system.undo", ["undoToken": .string(deletion.uuidString)]).status == .applied)
+        #expect(try f.transaction(plain).amountMinor == 2_500 && f.spends(plain) == [-2_500])
+    }
+
+    @Test func amountEditCannotBeUndoneAfterItsBalanceIsReconciled() async throws {
+        let f = try OwnerMoneyFixture(); defer { f.clean() }; try await f.setup()
+        let id = try await f.expense(2_500), edit = UUID()
+        #expect(try await f.run("money.editTransaction", ["id": .string(id.uuidString), "amountMinor": .string("3000")], id: edit).status == .applied)
+        let c = f.context, reconciliation = Reconciliation()
+        reconciliation.accountID = f.bank; reconciliation.at = f.now
+        c.insert(reconciliation); try c.save()
+        await #expect(throws: MoneyCommandError.undoSuperseded) {
+            try await f.run("system.undo", ["undoToken": .string(edit.uuidString)])
+        }
+        #expect(try f.transaction(id).amountMinor == 3_000 && f.spends(id) == [-3_000])
+    }
+
+    @Test func creatingACategoryCannotBeUndoneAfterAMovementUsesIt() async throws {
+        let f = try OwnerMoneyFixture(); defer { f.clean() }; try await f.setup()
+        let creation = UUID()
+        #expect(try await f.run("money.saveCategory", ["name": .string("مشتريات")], id: creation).status == .applied)
+        let expense = try await f.expense(2_500, extra: ["categoryID": .string(creation.uuidString)])
+        #expect(try f.transaction(expense).categoryID == creation)
+        await #expect(throws: MoneyCommandError.undoSuperseded) {
+            try await f.run("system.undo", ["undoToken": .string(creation.uuidString)])
+        }
+    }
+
     @Test func enteredRateIsHistoryAndNeverRewritesARecordedMovement() async throws {
         let f = try OwnerMoneyFixture(); defer { f.clean() }; try await f.setup()
         #expect(try f.repository.unratedAccountNames(at: f.now) == ["savingsUSD"])
@@ -133,10 +183,12 @@ import MadarMoney
         #expect(try await f.run("money.editTransaction", ["id": .string(id.uuidString), "categoryID": .string(UUID().uuidString)]).status == .rejected)
         // The same values again change nothing.
         #expect(try await f.run("money.editTransaction", ["id": .string(id.uuidString), "merchant": .string("سوق الخضار")]).status == .duplicate)
-        // A new time moves the stored day; a time in the future is refused.
-        #expect(try await f.run("money.editTransaction", ["id": .string(id.uuidString), "eventAt": .string("2026-11-19T10:00:00+03:00")]).status == .applied)
+        // The clock can be corrected, while the stored day stays fixed.
+        #expect(try await f.run("money.editTransaction", ["id": .string(id.uuidString), "eventAt": .string("2026-11-20T11:00:00+03:00")]).status == .applied)
         row = try f.transaction(id)
-        #expect(row.dayKey == "2026-11-19")
+        #expect(row.dayKey == "2026-11-20")
+        #expect(row.eventAt == ISO8601DateFormatter().date(from: "2026-11-20T11:00:00+03:00"))
+        #expect(try await f.run("money.editTransaction", ["id": .string(id.uuidString), "eventAt": .string("2026-11-19T10:00:00+03:00")]).status == .rejected)
         #expect(try await f.run("money.editTransaction", ["id": .string(id.uuidString), "eventAt": .string("2026-11-21T10:00:00+03:00")]).status == .rejected)
         // A draft is confirmed, not edited.
         let draft = MoneyTransaction(); draft.kind = "expense"; draft.amountMinor = 100; draft.homeAmountMinor = 100; draft.reviewState = "needsLook"
@@ -156,7 +208,7 @@ import MadarMoney
         #expect(try f.transaction(id).cycleID == current.id)
         // Moving the time into the previous cycle is refused; inside the same cycle it is fine.
         #expect(try await f.run("money.editTransaction", ["id": .string(id.uuidString), "eventAt": .string("2026-11-18T22:00:00+03:00")]).status == .rejected)
-        #expect(try await f.run("money.editTransaction", ["id": .string(id.uuidString), "eventAt": .string("2026-11-19T08:00:00+03:00")]).status == .applied)
+        #expect(try await f.run("money.editTransaction", ["id": .string(id.uuidString), "eventAt": .string("2026-11-20T08:00:00+03:00")]).status == .applied)
         // A closed cycle keeps its amounts; the label can still be corrected.
         let close = f.context; let open = try #require(try close.fetch(FetchDescriptor<Cycle>()).first { $0.id == current.id }); open.closedAt = f.now; try close.save()
         #expect(try await f.run("money.editTransaction", ["id": .string(id.uuidString), "amountMinor": .string("3000")]).status == .rejected)

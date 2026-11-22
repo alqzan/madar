@@ -13,7 +13,15 @@ extension AppQuranService {
     func savedDraft(_ id: UUID) throws -> QuranDraftPayload {
         let context = try repository().context
         guard let row = try context.fetch(FetchDescriptor<SessionDraft>()).first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("تعذّر العثور على المسودة") }
-        return try JSONDecoder().decode(QuranDraftPayload.self, from: row.provisionalJSON)
+        var value = try JSONDecoder().decode(QuranDraftPayload.self, from: row.provisionalJSON)
+        if value.method == "readGrade", value.readGradeRating == nil {
+            // Build 60 prefilled both arrays when reading began. Retain the page and
+            // selected grade, but let an explicit finish record completion.
+            value.readGradeRating = value.draft.grades.first?.rating ?? .good
+            value.draft.grades = []
+            value.draft.blindPassedAyahs = []
+        }
+        return value
     }
     func save(_ value: QuranDraftPayload) async throws {
         try await command("quran.saveDraft", ["draft": .string(JSONEncoder().encode(value).base64EncodedString())])
@@ -90,6 +98,8 @@ extension AppQuranService {
         if draft.storedDay.date != (try snapshot().day.date) {
             switch action {
             case .commitPartial, .discard, .saveProgress: break
+            case .advance, .grade, .commit:
+                guard value.method == "readGrade" else { throw DataError.invalidValue("احفظ ما تمّ من الجلسة السابقة أو تجاهلها") }
             default: throw DataError.invalidValue("احفظ ما تمّ من الجلسة السابقة أو تجاهلها")
             }
         }
@@ -98,6 +108,12 @@ extension AppQuranService {
         case .discard:
             try await command("quran.discardDraft", ["draftID": .string(draftID.uuidString)]); return .discarded
         case .commit, .commitPartial:
+            if value.method == "readGrade" {
+                guard case .commit = action, draft.page == (try readGradePages(draft, catalog: catalog)).last else {
+                    throw DataError.invalidValue("أكمل قراءة الورد قبل تسجيله")
+                }
+                try await save(value)
+            }
             if case .commitPartial = action, draft.grades.isEmpty, draft.blindPassedAyahs.isEmpty, draft.kind != .drill {
                 let hasMistakes = draft.mistakes.contains { $0.kind == .mistake }
                 guard draft.kind == .free, hasMistakes else {
@@ -125,20 +141,21 @@ extension AppQuranService {
             let wasReadGrade = value.method == "readGrade"
             value.method = method
             if method == "readGrade" {
-                // Owner 22 Nov: read the passage, then one grade. Same recorded shape as «أتممته كاملًا»: every planned ayah counts as
-                // recited and every page of the draft's portions carries the chosen grade (suggested «جيد» until the learner picks).
-                let pages = try readGradePages(draft, catalog: catalog)
-                draft.blindPassedAyahs.formUnion(planned)
-                for page in pages where !draft.grades.contains(where: { $0.page == page }) { draft.grades.append(QuranDraftGrade(page: page, rating: .good)) }
-                if let first = pages.first {
-                    draft.page = first; draft.ayahID = catalog.ayahs(on: first).first(where: { planned.contains($0.id) })?.id ?? draft.ayahID
+                if !wasReadGrade {
+                    value.readGradeRating = .good
+                    if let first = draft.portions.first, let page = catalog.ayah(id: first.first)?.page {
+                        draft.page = page; draft.ayahID = first.first
+                    }
                 }
                 draft.coachStage = .rating; value.revealedAyahs = []
                 if var coach = value.coach { coach.bridgePending = false; coach.repetitions = 0; value.coach = coach }
             } else if wasReadGrade {
-                // Back to the ayah-by-ayah coach exactly as it starts today.
-                draft.grades = []; draft.blindPassedAyahs = []; draft.coachStage = .repetition; value.revealedAyahs = []
-                if let first = draft.portions.first, let page = catalog.ayah(id: first.first)?.page { draft.page = page; draft.ayahID = first.first }
+                value.readGradeRating = nil
+                draft.coachStage = .repetition; value.revealedAyahs = []
+                if let first = planned.sorted().first(where: { !draft.blindPassedAyahs.contains($0) }),
+                   let page = catalog.ayah(id: first)?.page {
+                    draft.page = page; draft.ayahID = first
+                }
                 value.coach = QuranCoachProgress(bridgeAyahs: [], intensity: try snapshot().plan?.plan.intensity ?? .balanced)
             }
             if value.coach != nil, [.repetition, .lineStarts, .promptedRecall].contains(draft.coachStage) {
@@ -174,10 +191,7 @@ extension AppQuranService {
             if try draft.kind == .free && !snapshot().coverage.completedPages.contains(page) { throw DataError.invalidValue("هذا الوجه للقراءة فقط؛ لم يُحفظ بعد") }
             let isTest = value.testPages?.contains(page) == true && draft.kind == .review
             if value.method == "readGrade" {
-                // One grade for the whole passage.
-                for each in try readGradePages(draft, catalog: catalog) {
-                    draft.grades.removeAll { $0.page == each }; draft.grades.append(QuranDraftGrade(page: each, rating: rating))
-                }
+                value.readGradeRating = rating
             } else {
                 draft.grades.removeAll { $0.page == page }; draft.grades.append(QuranDraftGrade(page: page, rating: rating, isTest: isTest))
             }
@@ -317,14 +331,23 @@ extension AppQuranService {
         }
         var displayGrades = draft.grades.filter { $0.page == draft.page }
         let canGrade = draft.kind != .free ? true : try snapshot().coverage.completedPages.contains(draft.page)
-        if displayGrades.isEmpty && draft.kind != .drill && canGrade {
+        if let rating = value.readGradeRating, value.method == "readGrade" {
+            displayGrades = [QuranDraftGrade(page: draft.page, rating: rating)]
+        } else if displayGrades.isEmpty && draft.kind != .drill && canGrade {
             displayGrades = [QuranDraftGrade(page: draft.page, rating: draft.kind == .qiyam ? .good : .mastered)]
         }
         let grades = displayGrades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: (QuranUIGrade(rawValue: $0.rating.storedRaw) ?? .good), explanation: "التقييم المقترح؛ يمكنك تغييره") }
         let hifzComplete = draft.kind == .hifz && ids.isSubset(of: draft.blindPassedAyahs)
         var orderedSeen = Set<Int>()
         let orderedPages = try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }.filter { orderedSeen.insert($0).inserted }
-        let finished = draft.coachStage == .rating && (draft.kind != .hifz || hifzComplete) && (![.review, .free].contains(draft.kind) || draft.page == orderedPages.last) && (value.method != "readGrade" || draft.page == orderedPages.last) || draft.kind == .drill && !draft.mistakes.isEmpty
+        let finished: Bool
+        if value.method == "readGrade" {
+            finished = draft.page == orderedPages.last
+        } else {
+            finished = draft.coachStage == .rating && (draft.kind != .hifz || hifzComplete)
+                && (![.review, .free].contains(draft.kind) || draft.page == orderedPages.last)
+                || draft.kind == .drill && !draft.mistakes.isEmpty
+        }
         let readOnlyFinished = finished && draft.kind == .free && draft.grades.isEmpty
         var state = QuranUISessionState(id: draft.id, title: draft.kind == .hifz ? "الورد" : "المراجعة", segmentTitle: "الوجه " + numerals.string(draft.page), stage: stage,
             progress: ids.isEmpty ? 0 : Double(draft.blindPassedAyahs.count) / Double(ids.count), prompt: "أكمل ثم سجّل ما تمّ", verses: verses,

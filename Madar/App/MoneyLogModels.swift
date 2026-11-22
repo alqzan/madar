@@ -36,6 +36,8 @@ struct MoneyMovementEdit: Sendable {
     var lockReason: String?
     /// A refund takes its purchase's category, so its own sheet shows no category choice.
     var categoryFollowsPurchase = false
+    var deletionReason: String? = nil
+    var timeZoneID: String? = nil
 }
 struct MoneyCategoryChoice: Identifiable, Sendable, Hashable {
     var id: UUID
@@ -200,10 +202,13 @@ enum MoneyLogReadingBuilder {
         var movements: [MoneyLogMovement] = [], kept: [MoneyTransaction] = []
         let owned = Set(accounts.filter { $0.ownership == "mine" && $0.tracked }.map(\.id))
         let effects = try repo.effectContext()
-        let closedCycleIDs = Set(try context.fetch(FetchDescriptor<Cycle>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.closedAt != nil }.map(\.id))
+        let cycles = try context.fetch(FetchDescriptor<Cycle>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let closedCycleIDs = Set(cycles.filter { $0.closedAt != nil }.map(\.id))
         let pointedAt = Set(tx.compactMap(\.relatedTransactionID))
-        let plannedIDs = Set(try context.fetch(FetchDescriptor<EnvelopePlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.map(\.id))
+        let plans = try context.fetch(FetchDescriptor<EnvelopePlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let plannedIDs = Set(plans.map(\.id))
         let reconciliations = try context.fetch(FetchDescriptor<Reconciliation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let deletion = try repo.deletionChecks(transactions: tx, cycles: cycles, plans: plans, reconciliations: reconciliations)
         for (index, row) in tx.enumerated() {
             if index.isMultiple(of: 64) { try Task.checkCancellation() }
             if let card = row.cardID.flatMap({ cardByID[$0] }), let account = card.accountID, !owned.contains(account) { continue }
@@ -254,21 +259,22 @@ enum MoneyLogReadingBuilder {
                     if reconciliations.contains(where: { r in [r.accountID, r.cardID].compactMap { $0 }.contains(where: sides.contains) && row.eventAt <= r.at }) { return "طوبق رصيدها مع البنك بعدها، فمبلغها ووقتها ثابتان." }
                     if row.currency != row.homeCurrency && row.rateAtTime == nil { return "بلا سعر صرف محفوظ، فمبلغها ثابت." }
                     return nil
-                }(), categoryFollowsPurchase: row.kind == "refund" && row.relatedTransactionID != nil)))
+                }(), categoryFollowsPurchase: row.kind == "refund" && row.relatedTransactionID != nil,
+                    deletionReason: deletion.reason(for: row), timeZoneID: row.tzID)))
         }
         let drafted = Set(tx.compactMap(\.messageID))
         for message in messages where ["needsLook", "possibleDuplicate"].contains(message.status) && !drafted.contains(message.id) {
             if let day = try? DiaryLineRenderer.today(context: context, now: message.receivedAt) { pending[day.description, default: 0] += 1 }
         }
         let policies = try context.fetch(FetchDescriptor<CyclePolicy>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        let cycles = try context.fetch(FetchDescriptor<Cycle>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.start <= now }
+        let startedCycles = cycles.filter { $0.start <= now }
         let firstPolicyDayByCycle = policies.reduce(into: [UUID: String]()) { firstDays, policy in
             guard let cycleID = policy.cycleID else { return }
             if let current = firstDays[cycleID], current <= policy.effectiveFromDayKey { return }
             firstDays[cycleID] = policy.effectiveFromDayKey
         }
         var starts: [(Cycle, GregorianDay)] = []
-        for cycle in cycles {
+        for cycle in startedCycles {
             guard let first = firstPolicyDayByCycle[cycle.id], let day = try? GregorianDay(first) else { continue }
             starts.append((cycle, day))
         }

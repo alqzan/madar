@@ -11,6 +11,56 @@ public struct MoneyRepository {
     public let context: ModelContext
     public init(context: ModelContext) { self.context = context }
 
+    /// Confirmed movements can be removed only while other financial records can still stand on their own.
+    public struct DeletionChecks {
+        let referenced: Set<UUID>
+        let salary: Set<UUID>
+        let cashback: Set<UUID>
+        let planned: Set<UUID>
+        let closedCycles: Set<UUID>
+        let reconciledThrough: [UUID: Date]
+        let adjustments: Set<UUID>
+
+        public func reason(for row: MoneyTransaction) -> String? {
+            if referenced.contains(row.id) { return "عليها حركة مرتبطة؛ احذف الحركة المرتبطة أولًا." }
+            guard row.reviewState == "ok" else { return nil }
+            if salary.contains(row.id) { return "فُتحت دورة بهذا الراتب." }
+            if cashback.contains(row.id) { return "هذه الحركة مثبتة في سجل الاسترداد النقدي." }
+            if planned.contains(row.id) { return "لهذه الحركة خطة سداد." }
+            if let cycle = row.cycleID, closedCycles.contains(cycle) { return "هذه الحركة في دورة مقفلة." }
+            let sides = [row.fromAccountID, row.toAccountID, row.cardID, row.obligationID].compactMap { $0 }
+            if adjustments.contains(row.id) || sides.compactMap({ reconciledThrough[$0] }).contains(where: { row.eventAt <= $0 }) {
+                return "هذه الحركة ضمن رصيد طُوبق مع البنك."
+            }
+            return nil
+        }
+    }
+
+    public func deletionChecks(transactions: [MoneyTransaction], cycles: [Cycle], plans: [EnvelopePlan],
+                               reconciliations: [Reconciliation]) throws -> DeletionChecks {
+        let reconciliations = reconciliations.filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        var reconciledThrough: [UUID: Date] = [:]
+        for reconciliation in reconciliations {
+            for id in [reconciliation.accountID, reconciliation.cardID, reconciliation.obligationID].compactMap({ $0 }) {
+                reconciledThrough[id] = max(reconciledThrough[id] ?? .distantPast, reconciliation.at)
+            }
+        }
+        let cashback = try context.fetch(FetchDescriptor<CashbackEntry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let cycles = cycles.filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let livePlans = plans.filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let repaidEnvelopes = Set(livePlans.filter { $0.kind == "repay" }.compactMap(\.envelopeID))
+        let replacedPurchases = plans.filter { plan in
+            plan.deletedAt != nil && plan.kind == "repay" && plan.source == "daily"
+                && plan.envelopeID.map(repaidEnvelopes.contains) == true
+        }
+        return .init(referenced: Set(transactions.filter { $0.deletedAt == nil && $0.mergedInto == nil }.compactMap(\.relatedTransactionID)),
+                     salary: Set(cycles.compactMap(\.salaryTransactionID)),
+                     cashback: Set(cashback.compactMap(\.transactionID)),
+                     planned: Set((livePlans + replacedPurchases).map(\.id)),
+                     closedCycles: Set(cycles.filter { $0.closedAt != nil }.map(\.id)),
+                     reconciledThrough: reconciledThrough, adjustments: Set(reconciliations.compactMap(\.adjustmentTransactionID)))
+    }
+
     /// The tables an effect needs, read once. A list of movements builds one and passes it to every row instead of re-reading five tables per row.
     public struct EffectContext {
         let cashAsSpend: Bool
