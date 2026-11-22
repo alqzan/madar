@@ -245,11 +245,14 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - Queue row 33. Owner: «اكمل متاكد فيه اشياء باقي بالامكان تطويرها», then «أكمل شغل الين مايبقى من اليوزج الا ٥٪» (protocol updated, DECISIONS row).
 - Travel is back (`App/BahwTravel.swift`): since 17 Nov nothing could start a trip, so home-only habits, travel prayer times, diary travel lines and the money trip budget were dead. A pill under the lobby greeting opens «هل أنت مسافر؟» (local method suggested) or the open trip (stops, «أنهِ الرحلة»). Ending a trip far from home counts as «مقيم هنا» for that place.
 - Habits room offers split into «من غرف مدار» (counted) and «عادات جاهزة» (asked). Quran plan forecast: one footnote, preview note only while previewing. Mihbara empty «أبي أقرأها» shelf has «أضف كتابًا». Quran «سجلّك» empty state no longer repeats its summary.
+- 23 Nov (row 33 items 8–15): «فاتك وِرد» names the portion; accounts page and money log lose repeated lines; settings pages of one section no longer repeat their title («اختياراتك»); year page strip no longer repeats the hero, «رأس السنة ١٤٤٨هـ»; money grammar and dot fixes; reader «بقي نحو …».
+- Stale UI tests repaired: FoundationUITests (2 of 3), MoneyGoalUITests, MoneyObligationsUITests, MoneyReconcileUITests (settings home no longer has `money-open`; FB-32 removed save undo; calendar opens on the default first due month). Checklist row 20 (wait for a real ready state before a tap).
 
 ### Verified
 
 - iPhone and MadarMac builds succeeded. UI ad-hoc signed, Madar 15 Pro Max iOS 27.0, synthetic stores: `CLAUDE-travel-20261122-r7.xcresult` 6/6 (two new travel tests ×3); `-r4` BahwLobbyUITests 15/16 (the failure was the new resident test, which found the pill-stays bug, fixed in r7); `CLAUDE-polish-20261122-r1` HabitsUITests 26/26 + QuranPlanUITests 4/4; `-r2` Mihbara want-shelf 2/2 + QuranHistoryUITests 3/3. Travel flow also driven by hand (question, start, trip sheet, resident).
 - Earlier in this session: five stale undo tests repaired + Mihbara in-row undo test, build 63 uploaded.
+- 23 Nov: MoneyLog 4/4, QuranYear 3/3 (new missed-day test), MoneyAccounts 14/14, CustomizeSearch + BahwCustomize 9/9, Foundation 2 of 3 repaired pass, BahwYear 4/4, MoneyGoal 3/3, MoneyObligations 7/7, MoneyReconcile 4/4; verify-smoke passed.
 
 ### Differences left
 
@@ -262,7 +265,10 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Next
 
-- Inspection findings not applied (judgement or low value): habits editor still carries dead «jamaah» linked-source branches (converted at launch); 8 pt hourglass glyph on a habit ring badge; Quran missed-wird card could name the amount.
+- **Open defect:** on a pushed settings page (backup), a focused field near the bottom is covered by the floating tab bar, which rides up with the keyboard strip (`TabShell.phoneBody` overlay on `rooms`). Two keyboard-notification attempts did not change it on the simulator and were reverted; `FoundationUITests.test_M0S2_SecurePasswordTypingTransport` still fails there. Measure the rooms' frame with the keyboard up, or host the bar outside the keyboard-avoiding container.
+- Other UI test classes may still use stale settings paths (`money-open` without the search, «الإشعارات» as a settings button); run a class before relying on it.
+- Not applied: dead «jamaah» branches in the habits editor (converted at launch); year page empty states without a button (filter «المواسم»).
+- Then: build 64 (bump `CURRENT_PROJECT_VERSION`, archive, upload, push).
 
 ### Model/effort
 
@@ -270,7 +276,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Usage
 
-- Start: 5-hour 36% used, weekly 43%. After the travel and polish batches: 5-hour 59%, weekly 46%.
+- Start: 5-hour 36% used, weekly 43%. After the travel and polish batches: 5-hour 59%, weekly 46%. After the window reset (23 Nov, 01:40): 5-hour 16%, weekly 51%.
 
 ## Handover — حركات وإيموشنز من منشور مكتبات الواجهات — 2026-11-22 — Claude
 
