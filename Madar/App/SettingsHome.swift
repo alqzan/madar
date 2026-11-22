@@ -44,7 +44,7 @@ struct SettingsHome: View {
                 // Owner 17 Nov 2026: the prayer room is gone; its times stay because reminders and the wird hang on them.
                 link("المواقيت", "طريقة الحساب والمذهب، وتستعملها التذكيرات", "clock") { sectionsPage("المواقيت", ["المواقيت"]) }
                 if session.roomEnabled(.habits) { link("العادات", "التذكير والسلسلة وما تعرضه الودجة", "checkmark.circle") { sectionsPage("العادات", ["العادات", "الذكاء"]) } }
-                if session.roomEnabled(.year) { link("السنة", "أي سنة تعرض", "calendar") { sectionsPage("السنة", ["السنة"]) } }
+                if session.roomEnabled(.year) { link("السنة", "الهجرية أو الميلادية أو الاثنتان", "calendar") { sectionsPage("السنة", ["السنة"]) } }
                 if session.roomEnabled(.upcoming) { link("الأيام القادمة", "عدد الأيام المعروضة", "hourglass") { sectionsPage("الأيام القادمة", ["الأيام القادمة"]) } }
                 if session.roomEnabled(.quran) { door("القرآن", "مكتبة التفاسير", "book", openTafsir) }
                 if session.roomEnabled(.notes) { link("المذكرات", "الصفحة والتقويم والهامش والنقل", "book.closed") { DiaryCustomizeView(app: session) } }
@@ -94,7 +94,8 @@ struct SettingsHome: View {
                     return true
                 }
                 if !definitions.isEmpty {
-                    SettingsSection(title: section, symbol: "slider.horizontal.3", definitions: definitions, session: session, searching: true, highlightedSettingKey: nil)
+                    // A page of one section already wears its name as the page title; the card says what it holds instead of «المظهر» under «المظهر».
+                    SettingsSection(title: sections.count == 1 && section == title ? "اختياراتك" : section, symbol: "slider.horizontal.3", definitions: definitions, session: session, searching: true, highlightedSettingKey: nil)
                 }
             }
             SettingsPageReset(session: session, keys: AppSession.supportedKeys.filter { sections.contains(sectionFor($0)) })

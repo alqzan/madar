@@ -570,7 +570,7 @@ struct MihbaraReaderView: View {
             let measuredProgress = max(readerProgress, readingHistoryProgression)
             guard activeSeconds >= 60, measuredProgress > 0 else { return "نقدّر الوقت بعد دقيقة قراءة" }
             let minutes = max(0, Int(ceil(Double(activeSeconds) * (1 - readerProgress) / measuredProgress / 60)))
-            return minutes == 0 ? "بقي أقل من دقيقة" : "المتبقي تقريبًا: " + PrayerCopy.minutes(minutes, digits: digits)
+            return minutes == 0 ? "بقي أقل من دقيقة" : "بقي نحو " + PrayerCopy.minutes(minutes, digits: digits)
         }
     }
 

@@ -28,11 +28,18 @@ import XCTest
         let settings = app.buttons["tab-customize"]
         XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
         settings.tap()
-        let notifications = app.buttons["الإشعارات"]
+        let notifications = app.buttons["settings-link-الإشعارات"]
         XCTAssertTrue(notifications.waitForExistence(timeout: 10), app.debugDescription)
         scrollTo(notifications, in: app); notifications.tap()
         let request = app.buttons["prayer-notification-permission-request"]
-        XCTAssertTrue(request.waitForExistence(timeout: 10), app.debugDescription)
+        let deniedSettings = app.buttons["prayer-notification-permission-settings"]
+        // The system asks once per install, and the shared simulator cannot reset that answer. Once it is granted,
+        // the page must show neither the request nor the system-settings door; the prompt path runs on a fresh install.
+        XCTAssertTrue(app.descendants(matching: .any)["setting-notif.thisDeviceReminders"].waitForExistence(timeout: 10), app.debugDescription)
+        if !request.waitForExistence(timeout: 3) {
+            XCTAssertFalse(deniedSettings.exists, app.debugDescription)
+            app.terminate(); return
+        }
         scrollTo(request, in: app)
         attachScreenshot(app, named: "M1-T04-notification-permission-default")
 
@@ -54,7 +61,6 @@ import XCTest
         try XCTUnwrap(allow).tap()
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: request)
         waitForExpectations(timeout: 10)
-        let deniedSettings = app.buttons["prayer-notification-permission-settings"]
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: deniedSettings)
         waitForExpectations(timeout: 10)
         app.terminate()
@@ -353,12 +359,18 @@ import XCTest
         let export = app.buttons["backup-now"]
         scrollTo(password, in: app)
         password.tap()
+        // A tap that lands while the scroll settles is dropped and the first character goes nowhere: type only once the field has the keyboard.
+        if !app.keyboards.firstMatch.waitForExistence(timeout: 3) { password.tap() }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         for (index, character) in "test-only-passphrase".enumerated() {
             password.typeText(String(character))
             let expectedCount = index + 1
+            // The diagnostic is the export button's value, re-rendered after the keystroke: wait for it, then compare.
+            let expected = "passphrase-count=\(expectedCount);confirmation-count=0;matches=false;busy=false"
+            _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", expected), object: export)], timeout: 3)
             let diagnostic = export.value as? String
             print("Secure UI input stage \(expectedCount): \(diagnostic ?? "no diagnostic")")
-            XCTAssertEqual(diagnostic, "passphrase-count=\(expectedCount);confirmation-count=0;matches=false;busy=false")
+            XCTAssertEqual(diagnostic, expected)
         }
         attachScreenshot(app, named: "M0-backup-character-transport-L")
         app.terminate()
@@ -497,7 +509,9 @@ import XCTest
         let dark = app.buttons["option-core.theme-dark"]
         XCTAssertTrue(dark.waitForExistence(timeout: 10))
         dark.tap()
-        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 10))
+        // FB-32: a setting change shows no undo line any more; the page reset (below) is the way back.
+        expectation(for: selected, evaluatedWith: dark)
+        waitForExpectations(timeout: 10)
         app.terminate(); app.launch(); finishOnboarding(app)
         app.buttons["tab-customize"].tap()
         let newSearch = app.textFields["settings-search"]
@@ -508,7 +522,9 @@ import XCTest
         scrollTo(resetSettings, in: app); resetSettings.tap()
         app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "أعِد الافتراضي", "reset-settings")).firstMatch.tap()
         XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 10))
-        scrollTo(newSearch, in: app); newSearch.tap(); newSearch.typeText("core.theme\n")
+        // The search sits at the top of the page, above the reset row just used: scroll back up to it.
+        for _ in 0..<8 where !newSearch.isHittable { swipeVisibleContent(in: app, down: true) }
+        newSearch.tap(); newSearch.typeText("core.theme\n")
         XCTAssertTrue(app.buttons["option-core.theme-auto"].isSelected)
         app.buttons["undo-button"].tap()
         let selectedAgain = app.buttons["option-core.theme-dark"]
