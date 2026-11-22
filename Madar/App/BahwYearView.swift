@@ -52,7 +52,7 @@ extension AppBahwService {
         for (title, month, date, tone) in seasons {
             let rule = MadarUpcomingRule(calendar: .hijri, month: month, day: date, repeats: .yearly)
             guard let ring = rule.ring(today: day, days), !items.contains(where: { $0.title == title && $0.day == ring.next }) else { continue }
-            let name = month == 1 ? title + " " + digits.string(days.hijri(ring.next).year) : title
+            let name = month == 1 ? title + " " + digits.string(days.hijri(ring.next).year) + "هـ" : title
             items.append(.init(id: "season-\(month)-\(date)", title: name, kind: .season, day: ring.next, daysLeft: ring.daysLeft, closed: ring.closed, hijri: true, tone: tone, rowID: nil))
         }
         let end = MadarUpcomingRule(calendar: .gregorian, month: 12, day: 31, repeats: .yearly)
@@ -192,7 +192,7 @@ struct BahwYearView: View {
                     MadarDateLabel(.init(primary: "السنة " + yearName, secondary: otherYearName),
                                    primaryFont: MadarTypography.section(), secondaryFont: MadarTypography.fine())
                     Spacer()
-                    Text("مضى " + percent(period) + "، بقي " + service.daysPhrase(period.remaining)).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
+                    // The hero right above already says how much has passed and how many days are left; the strip draws it.
                 }
                 yearStrip(period: period, month: monthIndex, landmarks: model.landmarks)
             }.accessibilityElement(children: .combine).accessibilityIdentifier("bahw-year-strip")
