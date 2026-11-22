@@ -260,7 +260,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - Next agent: after the owner signs in, build team-signed for the simulator with `MADAR_CLOUDKIT_CONTAINER=iCloud.com.alqzan.madar2 MADAR_APP_ENTITLEMENTS=App/Madar-CloudKit.entitlements`, launch with `MADAR_CLOUDKIT_SCHEMA_INIT=1`, read `madar-cloud-schema.txt` in the app tmp folder, deploy Development → Production in CloudKit Console, then archive with the CloudKit settings and verify the entitlements.
 
 ### Delivery
-- Build 0.1.0 (60): see the delivery line added after the upload.
+- Build 0.1.0 (60), source `bef2b256`: Xcode 27.2 `ARCHIVE SUCCEEDED` (bundle version 60), `EXPORT SUCCEEDED`, upload log «Upload succeeded» 16:41 Riyadh (`Madar/Artifacts/OWNER-TestFlight-60/`). Local-only (no CloudKit entitlement). Apple processing and owner-device install not checked.
 
 ### Model/effort
 - Claude Opus 5.5 (main), helpers: Sonnet (money screens, prayer deletion, Quran), Opus (money review). Effort not exposed.
