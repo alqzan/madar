@@ -54,10 +54,13 @@ import XCTest
         shot(app, "M5-V17-split-L")
         let save = app.buttons["money-expense-save"]; for _ in 0..<3 where !save.isHittable { app.swipeUp(velocity: .slow) }; save.tap()
         XCTAssertTrue(app.buttons["money-expense-open"].waitForExistence(timeout: 10))
-        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
+        // FB-32 (owner, 5 Nov 2026): a save is simply done, with no «تراجع»; it is corrected where it was made.
+        XCTAssertFalse(app.buttons["undo-button"].waitForExistence(timeout: 2), "A save offers no undo")
         app.buttons["money-expense-open"].tap()
         app.buttons["money-expense-key-4"].tap(); app.buttons["money-expense-key-2"].tap(); app.buttons["money-expense-merchant-مقهى الزاوية"].tap()
-        XCTAssertEqual(app.staticTexts["money-expense-after"].label, before)
+        // The first expense was kept, so the same amount now leaves less of the day.
+        XCTAssertTrue(app.staticTexts["money-expense-after"].waitForExistence(timeout: 5))
+        XCTAssertNotEqual(app.staticTexts["money-expense-after"].label, before)
         app.buttons["money-expense-method-كاش"].tap()
         XCTAssertTrue(app.staticTexts["احتُسب عند السحب؛ لن يُخصم من يومك مرة أخرى."].exists)
         shot(app, "M5-V17-cash-L")

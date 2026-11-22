@@ -255,6 +255,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - The 5 failures fail identically without this change (`CLAUDE-motion-baseline-20261122.xcresult`, 5/5 failed on the stashed baseline): their asserts predate FB-32 (undo only after a removal) and the 22 Nov reset-undo decision.
 - Real app (`verify-smoke.sh`, lobbySix): logged three habits from the lobby; frame strip `Madar/Artifacts/verify/motion-sweep-frames.png` (from `motion-sweep.mov`) shows press, fill, travelling light, bloom. Search sheet opened from the lobby.
 - r1 (all 39 failed) was my unsigned test build: the App Group was missing, so the app opened on «تعذّر فتح مدار». Checklist row 19 committed separately.
+- Owner «كل شي اصلحه»: the five stale UI tests now assert today's rules, and a new test covers the Mihbara in-row undo. `CLAUDE-undo-tests-20261122-r1.xcresult` 5/6 passed: DiaryCustomize reset-undo, Mihbara reader reset-undo, new `testDeletedNoteOffersUndoInItsOwnRow`, MoneyExpense (no undo after a save, same figure reopens), QuranPlan (Hijri secondary, no undo for a settings change). `-r3.xcresult` BahwCustomize `testHabitReminderDefaultUndoAndNewHabit` 1/1 passed: linked source is now «ورد الحفظ» (prayer source left on 17 Nov) and a saved habit opens through «التفاصيل».
 
 ### Differences left
 
@@ -262,12 +263,11 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Not verified
 
-- Arabic typing in search on the simulator (the UI test types it). Mihbara note in-row undo was not driven by hand or by a test. iPad, owner device, Apple processing.
+- Arabic typing in search on the simulator (the UI test types it). iPad, owner device, Apple processing.
 
 ### Next
 
-- Repair or delete the five stale undo UI tests listed above (each asserts the old undo rules).
-- Build 0.1.0 (62) logs: `Madar/Artifacts/OWNER-TestFlight-62/`.
+- Owner tries build 0.1.0 (63) (logs `Madar/Artifacts/OWNER-TestFlight-63/`); 62 carried the motion, 63 adds only the test repairs.
 
 ### Model/effort
 

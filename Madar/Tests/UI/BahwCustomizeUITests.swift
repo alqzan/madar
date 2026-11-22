@@ -85,14 +85,14 @@ import XCTest
         for _ in 0..<6 where !reminder.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(reminder.isHittable, app.debugDescription)
         XCTAssertTrue(reminder.label.contains("إشعار لطيف"), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["يصلك الإشعار في بداية وقت العادة، فوقتها مطلوب."].exists)
+        XCTAssertTrue(app.staticTexts["يصلك الإشعار في بداية وقت العادة."].exists, app.debugDescription)
         capture(app, "OR-03-new-habit-reminder-L")
 
         // Linked habits are read from their owning room; the scheduler does not send this custom-habit alert for them.
         let source = app.buttons["habit-source"]
         for _ in 0..<6 where !source.isHittable { app.swipeDown(velocity: .slow) }
         XCTAssertTrue(source.isHittable, app.debugDescription); source.tap()
-        app.buttons["الجماعة من الصلاة"].tap()
+        app.buttons["ورد الحفظ من القرآن"].tap()
         for _ in 0..<6 where !reminder.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(reminder.isHittable, app.debugDescription)
         XCTAssertTrue(reminder.label.contains("نقطة في البهو"), app.debugDescription)
@@ -106,8 +106,13 @@ import XCTest
         for _ in 0..<6 where !reminder.isHittable { app.swipeUp(velocity: .slow) }
         reminder.tap(); let pushItem = app.collectionViews.buttons["إشعار لطيف"]; XCTAssertTrue(pushItem.waitForExistence(timeout: 5), app.debugDescription); pushItem.tap()
         app.buttons["habit-save"].tap()
-        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "عادة جديدة،")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription); row.tap()
+        // A saved habit opens in the room's story first (owner, 16 Nov 2026); its details hold «عدّل».
+        let details = app.buttons["habit-story-details"].firstMatch
+        if !details.exists {
+            let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "عادة جديدة،")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription); row.tap()
+        }
+        XCTAssertTrue(details.waitForExistence(timeout: 5), app.debugDescription); details.tap()
         let edit = app.buttons["habit-edit"]
         for _ in 0..<6 where !edit.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(edit.isHittable, app.debugDescription); edit.tap()

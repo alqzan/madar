@@ -28,7 +28,8 @@ import XCTest
         let value = (search.value as? String) ?? ""; search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: value.count)); search.typeText("\n")
         let reset = app.buttons["diary-customize-reset"]; reveal(reset, app, down: true); reset.tap()
         XCTAssertTrue(app.buttons["diary-customize-reset-confirm"].firstMatch.waitForExistence(timeout: 5)); app.buttons["diary-customize-reset-confirm"].firstMatch.tap()
-        XCTAssertFalse(app.buttons.matching(identifier: "undo-button").firstMatch.waitForExistence(timeout: 2), "A reset shows no undo chip")
+        // Decision 22 Nov 2026: a confirmed reset of every setting offers undo (the protocol keeps a reset undoable).
+        XCTAssertTrue(app.buttons.matching(identifier: "undo-button").firstMatch.waitForExistence(timeout: 5), "A confirmed reset offers undo")
         reveal(back, app, down: true); back.tap()
         XCTAssertTrue(app.descendants(matching: .any)["diary-recent-days"].waitForExistence(timeout: 10), "Reset brings the hidden part back")
     }

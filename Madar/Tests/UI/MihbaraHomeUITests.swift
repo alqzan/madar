@@ -584,6 +584,34 @@ import UIKit
         app.terminate()
     }
 
+    /// Owner 22 Nov 2026 (mockup «ب», approved): a deleted note stays in its place, struck through, with «تراجع» on it;
+    /// undo from the row brings the note back where it was.
+    func testDeletedNoteOffersUndoInItsOwnRow() throws {
+        continueAfterFailure = false
+        let app = app("home"); app.launchEnvironment["MADAR_UI_MIHBARA_MULTIPLE_NOTES"] = "1"; app.launch(); open(app)
+        // The notebook is reached by its link since FB-34; an unknown note id opens the list itself.
+        app.open(URL(string: "madar://mihbara/notebook/\(UUID().uuidString)")!)
+        let notes = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add"))
+        XCTAssertTrue(notes.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
+        let count = notes.count
+        let target = notes.firstMatch, targetID = target.identifier
+        target.tap()
+        let delete = app.buttons["mihbara-note-delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), app.debugDescription); delete.tap()
+        let confirmation = app.alerts["احذف هذه الملاحظة؟"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5)); confirmation.buttons["احذف"].tap()
+        let ghost = app.descendants(matching: .any)["mihbara-undo"]
+        XCTAssertTrue(ghost.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(ghost.staticTexts["حُذفت الملاحظة"].exists, app.debugDescription)
+        XCTAssertFalse(app.buttons[targetID].exists, "The deleted note is shown only as its struck-through row.")
+        XCTAssertEqual(notes.count, count - 1, app.debugDescription)
+        shot(app, "OWNER-22nov-note-undo-in-row-L")
+        ghost.buttons["undo-button"].tap()
+        XCTAssertTrue(app.buttons[targetID].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(notes.count, count, app.debugDescription)
+        XCTAssertFalse(ghost.exists, app.debugDescription)
+    }
+
     func testMihbaraNotebookDeepLinkOpensItsRequestedPrivateNote() throws {
         throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
         continueAfterFailure = false
@@ -1880,7 +1908,8 @@ import UIKit
         XCTAssertTrue(app.switches["mihbara-reader-heavier"].waitForValue("0", timeout: 8), app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-reader-footer-full"].waitForSelection(timeout: 8), app.debugDescription)
         shot(app, "M6-V24-reader-settings-reset-L")
-        XCTAssertFalse(app.descendants(matching: .any)["undo-button"].waitForExistence(timeout: 2), "FB-32: undo is offered only after a deletion.")
+        // Decision 22 Nov 2026: returning every reader setting to the agreed defaults is undoable, like a removal.
+        XCTAssertTrue(app.descendants(matching: .any)["undo-button"].waitForExistence(timeout: 5), "A reset to the agreed defaults offers undo.")
     }
 
     func testReaderWordCardHighlightsParagraphUndoesNotesAndCopies() throws {
