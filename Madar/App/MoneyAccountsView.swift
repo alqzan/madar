@@ -110,7 +110,12 @@ struct MoneyAccountsView: View {
             VStack(spacing: 5) {
                 Text("صافي رصيدك").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 displayFigure(r.basis.flatMap { b in r.rows.contains { $0.side == .cash && $0.amountMinor == nil } && !r.rows.contains { $0.side == .cash && $0.amountMinor != nil } ? nil : amount(b.netMinor) } ?? "—", "thmanyahserifdisplay-Black", size: 42, relativeTo: .largeTitle).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-accounts-net")
-                Text("الجذور تغذّي، والديون تسحب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                // The two real totals behind the net, instead of a metaphor.
+                if let b = r.basis {
+                    Text(b.owedMinor == 0 ? "في حساباتك " + amount(b.inAccountMinor) + "، ولا دين عليك" : "في حساباتك " + amount(b.inAccountMinor) + "، وعليك " + amount(b.owedMinor))
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("money-accounts-net-parts")
+                }
             }.padding(15).frame(maxWidth: 240).background(theme.background).clipShape(.rect(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) }
         }.frame(maxWidth: .infinity).frame(minHeight: dynamicType.isAccessibilitySize ? 150 : 250)
     }
