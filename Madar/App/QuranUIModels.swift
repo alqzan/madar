@@ -117,6 +117,8 @@ struct QuranRoomState: Sendable {
     var draft: QuranUIDraft?
     var missedDayKey: String?
     var missedDayTitle: String?
+    /// The day's habitual hifz portion as the user pictures it («نصف وجه»), so the missed-day choices are concrete.
+    var missedDayAmount: String? = nil
     var summary: [String]
     var history: QuranUIHistory
     var strengthTitle: String

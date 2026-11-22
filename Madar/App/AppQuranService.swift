@@ -246,6 +246,7 @@ import MadarPrayer
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: (QuranUILevel(rawValue: snapshot.hifzLevel.rawValue) ?? .simple),
             reviewLevel: (QuranUILevel(rawValue: snapshot.reviewLevel.rawValue) ?? .simple), steps: steps, recentDays: heat, plan: plan, surahs: surahs, draft: draft,
             missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "فاتك وِرد " + app.dateLabels($0, compact: true, weekday: true).combined },
+            missedDayAmount: missedDay == nil ? nil : plan.map { var habitual = $0.input; habitual.amount *= snapshot.habitualHifzLevel.hifzFactor; return QuranPlanCopy.amount(habitual, digits: numerals) },
             summary: ["في صدرك " + coverageTitle], history: QuranUIHistory(weekSummary: [weeklySummary], yearSummary: [], allSummary: [], days: heat, coverage: [], sessions: historySessions),
             strengthTitle: "مؤشر وصفي من تقييمك ومواعيد المراجعة", strength: strength,
             recovery: QuranUIRecovery(distantLabel: { n in faceCount(n) + (n == 1 ? " بعيد" : n == 2 ? " بعيدان" : " بعيدة") }(snapshot.pages.filter(\.isFar).count), activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),

@@ -65,7 +65,7 @@ struct QuranHomeView: View {
                         // Owner trial: the card said only «لو فاتك يوم» with three plain lines; it now names the day and asks.
                         card { VStack(alignment: .leading, spacing: 10) {
                             Text(state.missedDayTitle ?? "فاتك وِرد").font(bodyFont(16, bold: true)).fixedSize(horizontal: false, vertical: true)
-                            Text("ماذا نفعل بنصيبه؟").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
+                            Text(state.missedDayAmount.map { "نصيبه " + $0 + "، ماذا نفعل به؟" } ?? "ماذا نفعل بنصيبه؟").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
                             HStack(spacing: 8) {
                                 ForEach(QuranUIMissChoice.allCases) { choice in
                                     Button(choice.shortTitle) { run { try await service.perform(.resolveMissed(dayKey: key, choice: choice)); try await refresh() } }.disabled(busy)

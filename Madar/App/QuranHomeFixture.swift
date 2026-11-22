@@ -9,7 +9,7 @@ import MadarQuran
 extension AppSession {
     func prepareQuranHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "malformedDraft", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview", "historyRoute", "reference", "referencePartial", "referenceBoundary", "referenceFatiha", "referenceFatihaOpening", "referenceKursi", "referenceSadi183", "referenceAalImran", "referenceAalImran191195", "referenceAalImran198200", "referenceNisaa36", "referenceBaqara178186", "referenceBaqara189", "referenceBaqara190", "referenceBaqara191", "referenceBaqara192", "referenceBaqara193", "referenceBaqara194", "referenceBaqara195", "referenceBaqara196198", "referenceBaqara199202", "referenceBaqara203206", "referenceBaqara208209", "referenceBaqara211213", "referenceBaqara214215", "referenceBaqara219", "referenceBaqara220"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "missedDay", "malformedDraft", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview", "historyRoute", "reference", "referencePartial", "referenceBoundary", "referenceFatiha", "referenceFatihaOpening", "referenceKursi", "referenceSadi183", "referenceAalImran", "referenceAalImran191195", "referenceAalImran198200", "referenceNisaa36", "referenceBaqara178186", "referenceBaqara189", "referenceBaqara190", "referenceBaqara191", "referenceBaqara192", "referenceBaqara193", "referenceBaqara194", "referenceBaqara195", "referenceBaqara196198", "referenceBaqara199202", "referenceBaqara203206", "referenceBaqara208209", "referenceBaqara211213", "referenceBaqara214215", "referenceBaqara219", "referenceBaqara220"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let context = ModelContext(container)
         selectedTab = "quran"
@@ -131,6 +131,7 @@ extension AppSession {
             append(kind: "hifz", first: 1, last: baseEnd, pages: Array(1...270), offset: -70)
             for offset in [-63, -49, -19, -1] { append(kind: "review", first: 1, last: baseEnd, pages: Array(1...270), offset: offset) }
             for index in 0..<14 {
+                if variant == "missedDay", index == 13 { continue } // yesterday has no hifz: the «فاتك وِرد» card asks
                 let page = 271 + index
                 append(kind: "hifz", first: catalog.ayahs(on: page).first!.id, last: catalog.ayahs(on: page).last!.id, pages: [page], offset: index - 14)
             }

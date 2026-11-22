@@ -18,6 +18,17 @@ import XCTest
         app.buttons["quran-screen-close"].tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 10))
     }
+    func testMissedDayCardNamesThePortionAndSkipClearsIt() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "missedDay"]
+        app.launch()
+        let skip = app.buttons["quran-missed-skip"]
+        XCTAssertTrue(skip.waitForExistence(timeout: 25))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", "نصيبه ", "وجه")).firstMatch.exists)
+        skip.tap()
+        XCTAssertTrue(skip.waitForNonExistence(timeout: 10))
+    }
     func testFailedYearReloadHidesStaleTotalsAndCanRetry() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

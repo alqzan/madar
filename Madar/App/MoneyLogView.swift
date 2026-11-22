@@ -127,7 +127,7 @@ struct MoneyLogView: View {
                     }
                 }
             if visible, shared == nil, let daily = (days.first { $0.day == chosen?.day } ?? days.first)?.dailyMinor { Text(figure: "خط " + amount(daily)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("money-log-limit-label") }
-            Text("الخط الذهبي يومك الفعلي؛ الرسم ليومك كاملًا، والتصفية للحركات أدناه.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            Text("الخط الذهبي يومك الفعلي.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }.padding(.top, 10).padding(.bottom, 6).accessibilityElement(children: .contain).accessibilityIdentifier("money-log-arcade")
     }
     private func monthGrid(_ r: MoneyLogReading) -> some View {

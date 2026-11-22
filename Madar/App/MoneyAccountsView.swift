@@ -50,14 +50,11 @@ struct MoneyAccountsView: View {
                         ledger(r)
                     }
                     if r.rows.contains(where: { $0.side == .cash && $0.amountMinor == nil }) {
-                        Text("لم يُعرف رصيدها بعد؛ الحسابات المجهولة لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Text("الحسابات التي لم يُعرف رصيدها لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         Button { reconcileOpen = true } label: { Text("المطابقة مع البنك").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-accounts-unknown-reconcile")
                     }
-                    if let basis = r.basis {
-                        if !(r.rows.contains { $0.side == .cash && $0.amountMinor == nil } && !r.rows.contains { $0.side == .cash && $0.amountMinor != nil }) {
-                        HStack { Text(figure: "كاش " + amount(basis.inAccountMinor) + "، عليك " + amount(basis.owedMinor)).font(MadarTypography.caption()); Spacer(); Text(figure: amount(basis.netMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")) }.padding(12).background(theme.surface)
-                        }
-                    } else { Text("لا نجمع عملات مختلفة بلا سعر صرف. أرصدة الحسابات أدناه بعملاتها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+                    // The net and its two totals are already the tree's heading; the old «كاش …، عليك …» strip repeated them.
+                    if r.basis == nil { Text("لا نجمع عملات مختلفة بلا سعر صرف. أرصدة الحسابات أدناه بعملاتها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     if r.rows.isEmpty {
                         // Audit 28 Oct: the empty tree offers its first account right where it asks for one.
                         VStack(alignment: .leading, spacing: 10) {
@@ -111,7 +108,7 @@ struct MoneyAccountsView: View {
                 Text("صافي رصيدك").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 displayFigure(r.basis.flatMap { b in r.rows.contains { $0.side == .cash && $0.amountMinor == nil } && !r.rows.contains { $0.side == .cash && $0.amountMinor != nil } ? nil : amount(b.netMinor) } ?? "—", "thmanyahserifdisplay-Black", size: 42, relativeTo: .largeTitle).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-accounts-net")
                 // The two real totals behind the net, instead of a metaphor.
-                if let b = r.basis {
+                if let b = r.basis, r.rows.contains(where: { $0.side == .cash && $0.amountMinor != nil }) || !r.rows.contains(where: { $0.side == .cash }) {
                     Text(b.owedMinor == 0 ? "في حساباتك " + amount(b.inAccountMinor) + "، ولا دين عليك" : "في حساباتك " + amount(b.inAccountMinor) + "، وعليك " + amount(b.owedMinor))
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("money-accounts-net-parts")
