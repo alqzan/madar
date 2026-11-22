@@ -645,7 +645,7 @@ struct MihbaraHomeView: View {
                         else { bookcase(readingBooks, leathers: leathers, maxRows: 2) }
                     }
                     wallShelf("want", "أبي أقرأها") {
-                        if want.isEmpty { emptyWallShelf("ما تنوي قراءته يقف هنا حتى تبدأه.") }
+                        if want.isEmpty { emptyWallShelf("ما تنوي قراءته يقف هنا حتى تبدأه.", add: { showingAddBook = true }) }
                         else { bookcase(want, leathers: leathers, maxRows: 3) }
                     }
                     wallShelf("finished", "أنهيتها") {
@@ -677,10 +677,22 @@ struct MihbaraHomeView: View {
         .accessibilityElement(children: .contain).accessibilityIdentifier("mihbara-wall-" + id)
         .id("shelf-" + id)
     }
-    private func emptyWallShelf(_ text: String) -> some View {
+    /// An empty shelf says what stands on it; the «أبي أقرأها» shelf also offers the way to fill it.
+    private func emptyWallShelf(_ text: String, add: (() -> Void)? = nil) -> some View {
         VStack(spacing: 0) {
-            Text(text).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).padding(.horizontal, 12)
+            HStack(spacing: 10) {
+                Text(text).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let add {
+                    Button(action: add) {
+                        Label("أضف كتابًا", systemImage: "plus").font(MadarTypography.caption().bold())
+                            .padding(.horizontal, 14).frame(minHeight: 44).contentShape(Capsule())
+                            .glassEffect(.regular.interactive(), in: .capsule)
+                    }
+                    .buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-want-add")
+                }
+            }
+            .frame(minHeight: 56).padding(.horizontal, 12)
             MihbaraShelfPlank()
         }
     }

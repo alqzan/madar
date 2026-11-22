@@ -169,40 +169,50 @@ struct HabitsRoomView: View {
         let ramadan = HabitPresets.isRamadan(AppBahwService(session: session).today, days: MadarCalendarDays(zone: session.activePlace.timeZone, source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, offset: Int(session.number("core.hijriOffset"))))
         return Self.roomSources.filter { !kept.contains($0.source) && ($0.source != "walking" || HabitHealthStore.available) && (ramadan || !$0.source.hasPrefix("preset.ramadan")) }
     }
+    /// Two honest groups: habits Madar counts by itself from its rooms, and ready habits it asks about at their time.
     @ViewBuilder private var roomHabits: some View {
         let left = roomHabitsLeft
+        let counted = left.filter { !$0.source.hasPrefix("preset.") }, asked = left.filter { $0.source.hasPrefix("preset.") }
         if !left.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                Text("من غرف مدار").font(HabitType.section()).accessibilityAddTraits(.isHeader)
-                Text("عادات يسجّلها مدار وحده مما تفعله في غرفه؛ أضفها لتظهر هنا مع عاداتك.").font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
-                ForEach(left, id: \.source) { item in
-                    Button { editor = .init(id: UUID(), source: item.source) } label: {
-                        HStack(spacing: 12) {
-                            let roomTheme = RoomTheme(room: item.room, dark: colorScheme == .dark)
-                            Group {
-                                if item.symbol.hasPrefix("Madar") { Image(item.symbol).resizable().scaledToFit() } else { Image(systemName: item.symbol).resizable().scaledToFit() }
-                            }
-                            .frame(width: 20, height: 20).foregroundStyle(roomTheme.accent)
-                            .frame(width: 40, height: 40).background(roomTheme.accent.opacity(0.12), in: .circle)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.title).font(HabitType.section())
-                                Text(item.detail).font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
-                            }
-                            Spacer(minLength: 0)
-                            Image(systemName: "plus").font(.system(size: 14, weight: .semibold)).frame(width: 34, height: 34)
-                                .glassEffect(.regular.interactive(), in: .circle).accessibilityHidden(true)
-                        }
-                        .padding(12).contentShape(.rect)
-                    }
-                    .buttonStyle(.madarPlain)
-                    .background(theme.surface, in: .rect(cornerRadius: 18))
-                    .accessibilityLabel("أضف عادة " + item.title + "، " + item.detail)
-                    .accessibilityIdentifier("habits-room-" + item.source)
+                if !counted.isEmpty {
+                    Text("من غرف مدار").font(HabitType.section()).accessibilityAddTraits(.isHeader)
+                    Text("يحسبها مدار وحده مما تفعله في غرفه.").font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
+                    ForEach(counted, id: \.source) { roomHabitRow($0) }
+                }
+                if !asked.isEmpty {
+                    Text("عادات جاهزة").font(HabitType.section()).accessibilityAddTraits(.isHeader).padding(.top, counted.isEmpty ? 0 : 10)
+                    Text("يسألك مدار عنها في وقتها، وتجيبه بلمسة.").font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
+                    ForEach(asked, id: \.source) { roomHabitRow($0) }
                 }
             }
             .padding(.top, 18)
             .accessibilityElement(children: .contain).accessibilityIdentifier("habits-room-habits")
         }
+    }
+    private func roomHabitRow(_ item: (source: String, title: String, detail: String, symbol: String, room: String)) -> some View {
+        Button { editor = .init(id: UUID(), source: item.source) } label: {
+            HStack(spacing: 12) {
+                let roomTheme = RoomTheme(room: item.room, dark: colorScheme == .dark)
+                Group {
+                    if item.symbol.hasPrefix("Madar") { Image(item.symbol).resizable().scaledToFit() } else { Image(systemName: item.symbol).resizable().scaledToFit() }
+                }
+                .frame(width: 20, height: 20).foregroundStyle(roomTheme.accent)
+                .frame(width: 40, height: 40).background(roomTheme.accent.opacity(0.12), in: .circle)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title).font(HabitType.section())
+                    Text(item.detail).font(HabitType.fine()).foregroundStyle(theme.secondaryInk)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "plus").font(.system(size: 14, weight: .semibold)).frame(width: 34, height: 34)
+                    .glassEffect(.regular.interactive(), in: .circle).accessibilityHidden(true)
+            }
+            .padding(12).contentShape(.rect)
+        }
+        .buttonStyle(.madarPlain)
+        .background(theme.surface, in: .rect(cornerRadius: 18))
+        .accessibilityLabel("أضف عادة " + item.title + "، " + item.detail)
+        .accessibilityIdentifier("habits-room-" + item.source)
     }
 
     private var empty: some View {

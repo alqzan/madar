@@ -495,7 +495,7 @@ struct QuranHomeView: View {
         card {
             VStack(alignment: .leading, spacing: 14) {
                 HStack { Text("سجلّك").font(serif(22)); Spacer(); Button { showWeek = true } label: { Label("السجل كاملًا", systemImage: "chevron.left").labelStyle(.titleAndIcon) }.font(bodyFont(13, bold: true)).foregroundStyle(theme.accent).frame(minHeight: 44).accessibilityIdentifier("quran-week-open") }
-                Text(state.history.weekSummary.first ?? "آخر أربعة عشر يومًا").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
+                if !state.recentDays.isEmpty { Text(state.history.weekSummary.first ?? "آخر أربعة عشر يومًا").font(bodyFont(13)).foregroundStyle(theme.secondaryInk) }
                 if state.recentDays.isEmpty {
                     Text("سجّل جلسة اليوم، فتظهر هنا أيام حفظك ومراجعتك.").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
                 } else if dynamicType.isAccessibilitySize {

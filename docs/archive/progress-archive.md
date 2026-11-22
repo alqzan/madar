@@ -553,3 +553,40 @@ Owner, 22 Oct: a handover may be longer than 7 lines. What matters is that the n
 
 ### Model/effort
 - claude-sonnet-5-5, effort not exposed. Usage not exposed.
+
+## Handover — «سوها كلها»: المال، حذف كود الصلاة، تحديث كل غرفة وحدها — 2026-11-22 — Claude
+
+### Works now
+- Money (owner's three features + manual rate): `money.setCurrencyRate` (history row `CurrencyRate`, schema V19, lightweight V18→V19), `money.editTransaction`, `money.logIncome`, `money.saveCategory`, `money.removeCategory`. Screens: «أسعار الصرف» and «أضف دخلاً» on the accounts page, tap a confirmed movement in the log to edit/delete it (lock reason line when amount/time cannot change), add/rename/remove categories. Written by a Sonnet helper, reviewed here.
+- Focused money review (Opus helper) found 4 High issues; all fixed with tests: a movement dated before the first rate takes the latest rate; no amount/time edit on an excluded movement, a big-expense plan, before the latest reconciliation, or across the opening-balance date; undo of an edit refused after a refund or a closed cycle; undo never restores a movement into a removed category. Also: manual income dedupes against the bank deposit, refunds follow the purchase category, absurd rates refused.
+- Dead prayer code deleted (≈6.6k lines: prayer room, intents, widgets, legacy prayer import, PrayerQuickLog); `PrayerCopy` → `ArabicPluralCopy.swift`.
+- Reload narrowed (`DataDomains`): money/Quran/Mihbara/habits pages listen to their own counter; the reminder re-plan no longer reloads every page.
+- Quran «اقرأ ثم قيّم» is the default (Quran helper), coach stays one tap away.
+- Undo line now shows after «أعِد الإعدادات المتفق عليها» (protocol: reset is undoable).
+- Stale UI tests repaired: RU3, M0T17, LegacyMove (habits room), DiaryToday ×2 (hub opens on الأيام; today-fixture text), DiaryBatchC review (no salah fact), accounts test (no undo after a save), limit test (no prayer-ask switch).
+
+### Verified
+- Packages: MadarCore 263, MadarMoney 309 (+14 XCTest), MadarCommands 342 (incl. 10 new `MoneyOwnerEditsTests`), MadarData 145, MadarPrayer 35, MadarInbox 23, MadarSnapshots 16 — all pass.
+- iOS `build-for-testing` succeeded (DerivedData). Integration: QuranReadGrade 2/2 (after keeping the session alive), BahwPrayer 3, LegacyMoveNativeWins 11, PrayerActivity 10, RoomNotifications 19 — pass.
+- UI run 1 (`Artifacts/OWNER-22nov/ui1.xcresult`): 22 tests, 15 pass; run 2 (`ui2.xcresult`): M0T17, LegacyMove long preview, all 14 MoneyAccounts but one (fixed after), rates and income tests, MoneyLog arcade, QuranCoach 2/2, QuranDayClose 3/3, MoneyCategories new tests pass.
+
+### Not verified / still failing
+- `MoneyLogUITests.testEditingAConfirmedMovementChangesItsLabelAndAmount` and `testDeletingAConfirmedMovementAsksFirst` (new, ui2) FAIL: the edit/delete sheet flow is unverified in the app — fix first. The commit message's "edit … tests pass" is wrong for these two.
+- `MoneyCategoriesUITests.testLimit80AlertIsDeliveredWithPrivacySafeCopy` (no system notification within 180 s) and `testPercentLimitDisplaysHundredths` (shows ٠٫٠١٪). Check first whether the prayer-notification refactor or the categories load change caused them.
+- `FoundationUITests.test_M0S2_BackupPasswordConfirmationAndFixtureIsolation`: no hittable ت/t key (keyboard). The diary, accounts and night-review test fixes made after run 2 were not re-run.
+- No `verify-smoke.sh` run and no screenshots of the new money sheets (usage limit).
+
+### iCloud — waits for the owner (decision 22 Nov: «كمل بدونها»)
+- Owner (via a side chat, 22 Nov): skip the simulator iCloud sign-in for now. Build 60 ships with sync unavailable; schema creation, the Production deploy and the live sync trial wait until the owner tries a development build on his phone or signs in to the simulator. Do not ask again before then.
+- Code ready: `remote-notification` background mode, Mac push entitlement, debug-only `MadarCloudSchemaInitializer` (throwaway store) behind `MADAR_CLOUDKIT_SCHEMA_INIT=1` in both apps.
+- Blockers: the simulator has no iCloud account (owner must sign in on «Madar 15 Pro Max»); the Mac route needs this Mac registered as a development device (account change, ask first); Production deploy needs the owner signed in to CloudKit Console. Build 60 therefore ships local-only (no CloudKit entitlement), the toggle stays hidden.
+- Next agent: after the owner signs in, build team-signed for the simulator with `MADAR_CLOUDKIT_CONTAINER=iCloud.com.alqzan.madar2 MADAR_APP_ENTITLEMENTS=App/Madar-CloudKit.entitlements`, launch with `MADAR_CLOUDKIT_SCHEMA_INIT=1`, read `madar-cloud-schema.txt` in the app tmp folder, deploy Development → Production in CloudKit Console, then archive with the CloudKit settings and verify the entitlements.
+
+### Delivery
+- Build 0.1.0 (60), source `bef2b256`: Xcode 27.2 `ARCHIVE SUCCEEDED` (bundle version 60), `EXPORT SUCCEEDED`, upload log «Upload succeeded» 16:41 Riyadh (`Madar/Artifacts/OWNER-TestFlight-60/`). Local-only (no CloudKit entitlement). Apple processing and owner-device install not checked.
+
+### Model/effort
+- Claude Opus 5.5 (main), helpers: Sonnet (money screens, prayer deletion, Quran), Opus (money review). Effort not exposed.
+
+### Usage
+- 5-hour 92% used at wrap-up; weekly 38%.

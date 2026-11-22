@@ -73,13 +73,12 @@ struct QuranPlanView: View {
                     Button { showSetup = true } label: { Text(overview.input == nil ? "ابدأ خطة الحفظ" : "عدّل خطة الحفظ").font(quranFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-plan-edit")
                     QuranPaperCard {
                         VStack(alignment: .leading, spacing: 16) {
-                            HStack { Text("موعد الختمة").font(quranFont(17, bold: true)); Spacer(); Text("تقدير لكل درجة").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
+                            Text("موعد الختمة").font(quranFont(17, bold: true))
                             if let input = overview.input {
                                 let level = previewLevel?.rawValue ?? app.string("quran.hifzLevel")
                                 forecastTrack
                                 Text(forecasts[level]?.title ?? (overview.day == currentDay ? "—" : "نحسب موعدك")).font(quranSerif(29)).accessibilityIdentifier("quran-plan-forecast")
                                 if let secondary = forecasts[level]?.secondaryDate { Text(secondary).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-plan-forecast-secondary") }
-                                Text(forecasts[level]?.assumptions ?? "").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                                 if let days = forecasts[level]?.estimatedDays { Text("بعد " + span(days)).font(quranFont(13, bold: true)).accessibilityIdentifier("quran-plan-span") }
                                 // Each level as the time it would take, a length the user can picture; the chosen level's date is above in both calendars.
                                 let longest = CGFloat(max(1, forecasts.values.compactMap(\.estimatedDays).max() ?? 1))
@@ -96,7 +95,7 @@ struct QuranPlanView: View {
                                     }.accessibilityElement(children: .combine)
                                 }
                                 if let warning = forecasts[level]?.warning { Text(warning).font(quranFont(13)).foregroundStyle(theme.color("dueText")) }
-                                Text(input.startAyah == 1 ? "ختم القرآن يتطلّب اكتمال الأوجه كلها، والفجوات معها." : "هذا موعد نطاق خطّتك؛ ختم القرآن لا يكون إلا بحفظ الأوجه كلها.").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
+                                Text([forecasts[level]?.assumptions, input.startAyah == 1 ? "ختم القرآن يتطلّب اكتمال الأوجه كلها، والفجوات معها." : "هذا موعد نطاق خطّتك؛ ختم القرآن لا يكون إلا بحفظ الأوجه كلها."].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")).font(quranFont(12)).foregroundStyle(theme.secondaryInk)
                             } else { Text("ابدأ خطة الحفظ ليظهر تقديرك").font(quranFont(15)) }
                         }
                     }
@@ -242,7 +241,7 @@ struct QuranPlanView: View {
                     previewLevel = QuranUILevel.allCases[Int((position * 3).rounded())]
                 })
             }.frame(height: 54)
-            Text("معاينة للموعد؛ درجتك المعتادة لا تتغيّر.").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+            if previewLevel != nil { Text("معاينة للموعد؛ درجتك المعتادة لا تتغيّر.").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
         }
     }
     /// «نحو ١٣ شهرًا»; under two months the days themselves.
