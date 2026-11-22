@@ -144,7 +144,7 @@ struct QuranPlanView: View {
                 }
             }.padding(16)
         }.madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
-            .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app).accessibilityIdentifier("quran-plan-undo") } }
+            .safeAreaInset(edge: .bottom) { if app.undoToastVisible { app.undoToast().hostsUndo(app).accessibilityIdentifier("quran-plan-undo") } }
             .fullScreenCover(isPresented: $showSetup, onDismiss: { reload(at: service.currentTime()) }) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
             .task(id: dayReadKey) { await refreshMadarDay(at: evaluatedAt, key: dayReadKey) }
             .task(id: currentDay) {

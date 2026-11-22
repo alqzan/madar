@@ -18,11 +18,21 @@ struct QuranSessionLogView: View {
     @State private var pendingSessionID: UUID?
     @State private var routeUnavailableID: UUID?
     @State private var reloadAttempt = 0
+    /// Owner 22 Nov 2026 (mockup «ب»): a deleted session stays in its place, struck through, with «تراجع» beside it,
+    /// for as long as the undo pill would have shown; then it folds away. `ghostBefore` is the session it sat above.
+    @State private var ghost: QuranUILogRecord?
+    @State private var ghostBefore: UUID?
 #if DEBUG
     @State private var injectedReadFailure = false
 #endif
     private var app: AppSession { service.app }
-    private var records: [QuranUILogRecord] { value?.records.filter { filter == "all" || (filter == "review" ? [.review,.free,.qiyam].contains($0.kind) : $0.kind.rawValue == filter) } ?? [] }
+    private var records: [QuranUILogRecord] {
+        var list = value?.records ?? []
+        if let ghost, !list.contains(where: { $0.id == ghost.id }) {
+            list.insert(ghost, at: ghostBefore.flatMap { id in list.firstIndex { $0.id == id } } ?? list.endIndex)
+        }
+        return list.filter { filter == "all" || (filter == "review" ? [.review,.free,.qiyam].contains($0.kind) : $0.kind.rawValue == filter) }
+    }
     init(service: AppQuranService, close: @escaping () -> Void, selection: Binding<QuranLogTab>, initialSessionID: UUID? = nil) {
         self.service = service; self.close = close; self._selection = selection; self.initialSessionID = initialSessionID
         _pendingSessionID = State(initialValue: initialSessionID)
@@ -77,7 +87,7 @@ struct QuranSessionLogView: View {
                                 VStack(alignment: .leading, spacing: 0) {
                                     ForEach(Array(group.records.enumerated()), id: \.element.id) { index, record in
                                         if index > 0 { Divider().padding(.vertical, 8) }
-                                        row(record)
+                                        if record.id == ghost?.id { ghostRow(record) } else { row(record) }
                                     }
                                 }
                             }
@@ -110,16 +120,28 @@ struct QuranSessionLogView: View {
                 }
             }
             .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy)
-            .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app).accessibilityIdentifier("quran-history-undo") } }
+            .safeAreaInset(edge: .bottom) { if app.undoToastVisible && ghost == nil { app.undoToast().hostsUndo(app).accessibilityIdentifier("quran-history-undo") } }
+            .onChange(of: app.undoToastVisible) { _, visible in
+                if !visible, ghost != nil { withAnimation(reduceMotion ? nil : .smooth(duration: 0.35)) { ghost = nil } }
+            }
             .task(id: reloadAttempt) { await load() }
             .onChange(of: app.quranRevision) { _, _ in
                 guard error == nil else { return }
                 reloadAttempt &+= 1
             }
             .alert("احذف هذه الجلسة؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { id in
-                Button("احذف", role: .destructive) { deleting = nil; run { try await service.perform(.deleteSession(id)); expanded = nil } }
+                Button("احذف", role: .destructive) {
+                    deleting = nil
+                    let all = value?.records ?? []
+                    let removed = all.first { $0.id == id }
+                    let next = all.firstIndex { $0.id == id }.flatMap { $0 + 1 < all.count ? all[$0 + 1].id : nil }
+                    run {
+                        try await service.perform(.deleteSession(id)); expanded = nil
+                        if app.undoToastVisible { withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { ghost = removed; ghostBefore = next } }
+                    }
+                }
                 Button("أبقِ الجلسة", role: .cancel) { deleting = nil }
-            } message: { _ in Text("ستُزال آثارها من الحفظ والمواعيد والأخطاء. يمكنك التراجع فور الحذف من الشريط أسفل الشاشة.") }
+            } message: { _ in Text("ستُزال آثارها من الحفظ والمواعيد والأخطاء. يمكنك التراجع فور الحذف من مكانها في السجلّ.") }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { app.errorMessage != nil }, set: { if !$0 { app.errorMessage = nil } })) { Button("تمّ") { app.errorMessage = nil } } message: { Text(app.errorMessage ?? "") }
         }
     }
@@ -142,6 +164,31 @@ struct QuranSessionLogView: View {
     }
     private func palette(_ grade: QuranUIGrade) -> (ink: String, tint: String) {
         switch grade { case .mastered: ("reviewText", "reviewTint"); case .good: ("hifzText", "hifzTint"); case .needs: ("dueText", "dueTint") }
+    }
+    /// The deleted session where it was: struck through on dashed paper, «تراجع» at its side.
+    private func ghostRow(_ record: QuranUILogRecord) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(record.title).font(quranFont(15, bold: true)).strikethrough().foregroundStyle(theme.secondaryInk)
+                Text(app.undoMessage).font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+            }
+            Spacer(minLength: 6)
+            Button {
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { ghost = nil }
+                app.undo()
+            } label: {
+                Text("تراجع").font(quranFont(14, bold: true)).foregroundStyle(theme.color("reviewText"))
+                    .frame(minWidth: 56, minHeight: 44).contentShape(Rectangle())
+            }
+            .buttonStyle(.madarPlain).accessibilityIdentifier("undo-button")
+        }
+        .padding(.horizontal, 10).padding(.vertical, 4)
+        .background(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.line, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+        .overlay(alignment: .bottom) { UndoTimeLine(seconds: AppSession.undoToastSeconds, id: app.undoToken?.id, tint: theme.color("review")).padding(.horizontal, 12) }
+        .hostsUndo(app)
+        .transition(reduceMotion ? .opacity : .asymmetric(insertion: .opacity, removal: .scale(scale: 0.96, anchor: .top).combined(with: .opacity)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("quran-history-undo")
     }
     @ViewBuilder private func row(_ record: QuranUILogRecord) -> some View {
         VStack(alignment: .leading, spacing: 12) {

@@ -314,7 +314,7 @@ struct HabitRoomAnalysis: View {
                         Text(monthNames[m.index - 1]).font(HabitType.fine()).foregroundStyle(mark).lineLimit(1).minimumScaleFactor(0.7).frame(width: 62, alignment: .leading)
                         if !dynamicTypeSize.isAccessibilitySize {
                             Capsule().fill(theme.ink.opacity(0.05)).frame(height: 10).overlay(alignment: .leading) {
-                                if let v { Capsule().fill(m.index - 1 == extremes?.best ? theme.accent : m.index - 1 == extremes?.worst ? theme.risk : theme.accentFill.opacity(0.38)).scaleEffect(x: max(0.03, v / top), anchor: .leading) }
+                                if let v { Capsule().fill(m.index - 1 == extremes?.best ? theme.accent : m.index - 1 == extremes?.worst ? theme.risk : theme.accentFill.opacity(0.38)).scaleEffect(x: max(0.03, v / top), anchor: .leading).madarGrowIn(order: m.index - 1) }
                             }
                         } else { Spacer(minLength: 0) }
                         Text(v.map(text) ?? (m.start > today ? "لم يأتِ" : "")).font(HabitType.fine()).foregroundStyle(mark).frame(minWidth: 54, alignment: .trailing)

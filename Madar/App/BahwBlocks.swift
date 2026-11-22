@@ -82,8 +82,8 @@ struct BahwBlockView: View {
     @ViewBuilder private var money: some View {
         if size == .icon {
             let payload = service.session.cachedMoneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now)
-            VStack(spacing: 2) { Text("لك الآن").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)); displayFigure(payload.rows.first?.value ?? "افتح", "thmanyahserifdisplay-Bold", size: 22, relativeTo: .largeTitle).lineLimit(1).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, maxHeight: .infinity).foregroundStyle(MadarToken.colors["widgetIdentity.room.mal.\(dark ? "dark" : "light").ink"] ?? lobby.ink)
-        } else { MoneyWidgetContent(snapshot: service.session.cachedMoneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now), family: size == .icon ? .madarIcon : size == .small ? .systemSmall : size == .wide ? .systemMedium : .systemLarge, template: size == .wide ? "basis" : "now") }
+            VStack(spacing: 2) { Text("لك الآن").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)); displayFigure(payload.rows.first?.value ?? "افتح", "thmanyahserifdisplay-Bold", size: 22, relativeTo: .largeTitle).lineLimit(1).minimumScaleFactor(0.7).contentTransition(.numericText()).animation(reduceMotion ? nil : .snappy(duration: 0.45), value: payload.rows.first?.value) }.frame(maxWidth: .infinity, maxHeight: .infinity).foregroundStyle(MadarToken.colors["widgetIdentity.room.mal.\(dark ? "dark" : "light").ink"] ?? lobby.ink)
+        } else { MoneyWidgetContent(snapshot: service.session.cachedMoneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch") && !moneyRevealed, at: service.now), family: size == .icon ? .madarIcon : size == .small ? .systemSmall : size == .wide ? .systemMedium : .systemLarge, template: size == .wide ? "basis" : "now", animated: true) }
     }
 
     private func periodRing(_ f: HabitFrequency, rows: [HabitReading], selected: Bool) -> some View {
@@ -295,6 +295,7 @@ struct BahwBlockView: View {
                     if !daily.isEmpty {
                         Text(digits.string(met) + "/" + digits.string(daily.count))
                             .font(MadarTypography.fine()).lineLimit(1)
+                            .contentTransition(.numericText(value: Double(met))).animation(reduceMotion ? nil : .snappy, value: met)
                             .frame(maxWidth: 30)
                             .accessibilityLabel(digits.string(met) + " من " + digits.string(daily.count) + " اليوم")
                             .accessibilityIdentifier("bahw-habits-icon-count")
@@ -308,7 +309,7 @@ struct BahwBlockView: View {
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
         VStack(alignment:.leading,spacing:size == .wide ? 4 : 10) {
-            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !daily.isEmpty { if size == .wide { Text(digits.string(met)+" من "+digits.string(daily.count)+" اليوم").font(small).foregroundStyle(room.secondaryInk) } else { Text(digits.string(met)+" من "+digits.string(daily.count)).font(label).foregroundStyle(room.accent)} } }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
+            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !daily.isEmpty { if size == .wide { Text(digits.string(met)+" من "+digits.string(daily.count)+" اليوم").font(small).foregroundStyle(room.secondaryInk).contentTransition(.numericText(value: Double(met))).animation(reduceMotion ? nil : .snappy, value: met) } else { Text(digits.string(met)+" من "+digits.string(daily.count)).font(label).foregroundStyle(room.accent).contentTransition(.numericText(value: Double(met))).animation(reduceMotion ? nil : .snappy, value: met)} } }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
             if rows.isEmpty {
                 // Improvement 16 Oct: no «٠ من ٠»; the four period rings at rest show what a habit becomes, and the action is a real button.
                 Spacer(minLength:0)

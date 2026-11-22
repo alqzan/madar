@@ -73,7 +73,7 @@ struct MihbaraHomeView: View {
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .bottom) {
             if app.undoToastVisible && sheet == nil {
-                UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
+                app.undoToast().hostsUndo(app)
                     .accessibilityIdentifier("mihbara-undo")
             }
         }
@@ -1153,7 +1153,7 @@ private struct MihbaraRahlOpeningView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 if app.undoToastVisible {
-                    UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
+                    app.undoToast().hostsUndo(app)
                         .accessibilityIdentifier("mihbara-undo")
                 }
                 Text("اختر متى ينفتح الرَّحل لوردك اليوم.")

@@ -519,6 +519,7 @@ struct HabitRingGlyph:View {
     let share:Double; let done:Bool; let symbol:String?
     var lineWidth:CGFloat = 3.5
     @Environment(\.roomTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body:some View {
         ZStack {
             Circle().fill(done ? theme.accentFill.opacity(0.16) : .clear)
@@ -527,7 +528,11 @@ struct HabitRingGlyph:View {
             if let symbol { MadarGlyph(symbol,size:14).foregroundStyle(theme.accent) }
             else if done && lineWidth > 2 { PrayerStar().fill(theme.accent).frame(width:11,height:11) }
             else if done { Circle().fill(theme.accentFill).padding(lineWidth*1.5) }
-        }.padding(lineWidth/2).accessibilityHidden(true)
+        }.padding(lineWidth/2)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.5), value: share)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.35), value: done)
+            .orbitCompletionSweep(done: done, lineWidth: lineWidth)
+            .accessibilityHidden(true)
     }
 }
 /// The streak as a flame and its count, no words (owner, 24 Oct: «شعلة وعندها الأيام وبس»).
@@ -567,7 +572,10 @@ func habitRoomColour(_ source:String?,dark:Bool)->Color {
 }
 struct HabitMiniRing:View {
     let share:Double; let theme:RoomTheme
-    var body:some View { ZStack { Circle().stroke(theme.line,lineWidth:3.5); Circle().trim(from:0,to:min(1,max(0,share))).stroke(theme.accentFill,style:.init(lineWidth:3.5,lineCap:.round)).rotationEffect(.degrees(-90)) }.accessibilityHidden(true) }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body:some View { ZStack { Circle().stroke(theme.line,lineWidth:3.5); Circle().trim(from:0,to:min(1,max(0,share))).stroke(theme.accentFill,style:.init(lineWidth:3.5,lineCap:.round)).rotationEffect(.degrees(-90)) }
+        .animation(reduceMotion ? nil : .smooth(duration: 0.5), value: share)
+        .orbitCompletionSweep(done: share >= 1, lineWidth: 3.5).accessibilityHidden(true) }
 }
 /// «٣ من ٨ أكواب»; before anything is logged, the goal alone («الهدف: ٨ أكواب») rather than «٠ من ٨».
 func habitProgressText(_ value:Int,_ target:Int,_ unit:String?,_ digits:MadarNumberFormatter)->String {

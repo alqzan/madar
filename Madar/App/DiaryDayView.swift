@@ -558,7 +558,7 @@ struct DiaryDayView: View {
     @ViewBuilder private var writingArea: some View {
                 VStack(spacing: 8) {
                     if app.undoToastVisible {
-                        UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
+                        app.undoToast().hostsUndo(app)
                             .accessibilityIdentifier("diary-day-undo")
                     }
                     if inlineWriting, let prompt = visiblePrompt, !promptDismissed {

@@ -513,3 +513,43 @@ Owner, 22 Oct: a handover may be longer than 7 lines. What matters is that the n
 - **Next:** (1) the owner's PDF through the same trial (add a PDF path hook like `MADAR_UI_MIHBARA_IMPORT_EPUB_PATH`); (2) the owner's last round with Codex; (3) after the paid Apple Developer account: App Group profiles, device install, step 10.
 - **Owner must do:** subscribe to Apple Developer → App Group `group.com.alqzan.madar2` for app + widget; connect the iPhone; a support/privacy e-mail; send the PDF.
 - **Model/effort:** claude-opus-5-5, effort not exposed; one Sonnet read-only audit. **Usage:** five-hour about 30%, weekly about 78% at handover.
+
+## Handover — إصلاحات تدقيق مدار التقني — 2026-11-18 — Claude
+
+### Works now
+- **High:** (1) Mac target builds (`habitAmountCategoryID`); (2) merge restore keeps `SessionDraft` (`keepSessionDrafts`); (3) Day One import: a failure after a media batch was saved ends as a partial batch with its summary persisted, so undo removes exactly what was saved (`DayOneImportError.partial`); (4) prayer logging is closed at the single adapter for every source (`DurableCommandAdapter.prayerLoggingRetired`, rejected with a reason), the Siri/Shortcut/Control intents throw a retired message, the Capture reply says prayer is retired, the notification jamaah/alone buttons only show that message, (build 59) every prayer and qada row, including ones deleted by earlier builds, is emptied once down to its natural key and a neutral status (marker `system.migration.prayer-content-scrubbed-v1`: heart, times, zone, source, trip/pair ids and `madeUpAt` cleared), and frozen «salah» lines are removed from the stored diary day snapshots; live and frozen «salah» lines are also hidden from display and export, and the diary customise screen no longer lists «الصلاة» / «الفجر جماعة»; (5) book purge also wipes the Goodreads private note, and a restore (replace or merge) never brings back a purged book or its highlights, words, book notes, cover/ink media and file (the book's own general notes stay, as the purge keeps them); (6) ZIP64 sizes use `Int(exactly:)` with overflow-safe bounds; (7) habit reminders fix the day key to the asked window (tomorrow when today's passed) and the amount at planning; (8) goal editor no longer crashes at the limit and refuses a cap the plan cannot reach (`HabitSchedule.reachableCap`); (9) a refresh failure after a successful save no longer reads as a failed save (`AppSession.refreshAfterCommit`); (10) the mirrored iCloud account is stored per generation (`ManagedPointer.mirroredAccountHash`), so sync off then on under another account is still a switch.
+- **Medium/Low:** transfer sheet hides balances when hidden; first run needs an explicit city (coordinates rounded to 2 decimals) and its copy is accurate; recovery finds backups without the catalogue and shows both dates (no middle dot beside digits); Mac reader waits for the position save on «إغلاق», never opens another volume's saved place, has a paper-book form and an «الأصل PDF» button; export years include days with opened letters; habits tab stops polling Health off-screen; watch payload no longer carries prayers; migration safety copies get file protection (also applied to existing folders at every store open; nothing deleted); warning colours in the habits room use the `salah.missedText` token and the watch uses a `WatchGold` colour asset (shipping-source check: STATIC PASS); old welcome copy no longer says the day is arranged around prayer.
+- Focused review for record-deleting changes (restore guard, purge, prayer scrub): done by the advisor model on this diff; its Block finding (general notes were dropped) is fixed and tested.
+
+### Verified
+- `swift test` (executed counts): MadarCommands 332, MadarCore 275, MadarData 142 (incl. PurgedBookRestoreTests, mirrored-account and heart-scrub tests), MadarSync 10, MadarInbox 28, all passing.
+- MadarTests on iOS 27.0 Madar 15 Pro Max: 298 executed, 0 failures (incl. capture, diary export/service, inbox lifecycle, reminder day key).
+- Builds: Madar iOS, MadarMac, MadarWatch succeeded. `verify-smoke.sh` PASSED on iPhone and iPad (launch only).
+- UI (earlier in the request): HabitsUITests + DateLabelsUITests 26/26, RoomGlyphUITests 1/1 after adding the onboarding helper. UI run after the final edits: see the commit's `Verified:` line.
+
+### Delivery
+- Build 0.1.0 (57): archive succeeded, export + upload to App Store Connect succeeded (`Madar/Artifacts/OWNER-TestFlight-57/upload.log`: «Upload succeeded»). Apple processing and owner-device acceptance not checked (not awaited).
+
+### Delivery 58
+- Build 0.1.0 (58): archive succeeded; first export failed with «No Accounts with App Store Connect Access» (Xcode session, attempt log kept as `upload-attempt1.log`), the retry uploaded: «Upload succeeded» in `Madar/Artifacts/OWNER-TestFlight-58/upload.log`. Apple processing and device acceptance not checked.
+
+### Delivery 59
+- Build 0.1.0 (59): archive and export + upload succeeded: «Upload succeeded» in `Madar/Artifacts/OWNER-TestFlight-59/upload.log`. Apple processing and device acceptance not checked.
+
+### Build 59 — prayer content erased (owner: «امسح كل شي»)
+- `PrayerHistoryMaintenance.scrubContent` + one-time pass: tests `PrayerHistoryMaintenanceTests` 3/3, MadarData 144, MadarTests 298/0 failures. iCloud: the account-change path already detaches the mirror after the checkpoint and before waiting for the choice (`SyncCoordinator`), with no unit test for a mirror-bound binding; a signed two-account trial is still needed. The rest of the owner's remaining list (global reload signal, Mac «الأصل» page, window close, iPad/AX5 checks, five known-failing UI tests) is unchanged.
+
+### Build 58 — copy pruning (owner: «احذف عادي»)
+- After the active generation opens, `pruneOldCopies` deletes older `Generations/<uuid>` folders and older `MigrationSafety/<uuid>` copies. It keeps the active generation, the pointer's previous generation and the newest safety copy, skips folders touched in the last 24 hours, non-UUID names and any pending restore journal, and never fails opening. Tests: `PruneOldCopiesTests` (keep/delete rules, journal guard); MadarData 144, MadarCommands 332, MadarSync 10 pass.
+- Focused review (advisor model) checked: every pointer rewrite (restore, legacy migration, cloud-mirror bind) sets previous = the former active, so no path reopens a third generation; `StartupRecovery` lists backup files, not generations; the store is opened only by the app processes (`MadarApp`, `MadarMacApp`), never a widget or intent. Not observed: pruning has never run on the owner's device; it runs there for the first time when build 58 opens.
+
+### Differences left
+- Not done: narrowing `AppSession.reload()`'s global `prayerRevision` (many rooms use it as their data-changed signal; changing it needs its own pass); the Mac window red-close button saves the position through the shared coordinator but cannot wait for it; Mac «الأصل PDF» opens page 1 (the Mac reader has no printed-page list); opened-letter days in `exportYears` have no dedicated test; iPad sidebar / plus-button overlap fixed from source only (smoke reached the welcome screen only, no captured habits header); AX5 cards unverified.
+- Known failing before this request and left: `DiaryTodayUITests` (2 tests), `FoundationUITests` M0T17, M0S2_RU3, M0S2_Backup — see the baseline line in the commit. 31 `FoundationUITests` tests that needed the removed `tab-prayer` were deleted in this request (feature removed 17 Nov); their feature-map rows are unchanged.
+- Old generations and `RecordsV1.json` are kept as they are (deleting data is the owner's call; see the owner row below).
+
+### Next
+- Owner decision (one question): how long to keep previous store generations and migration safety copies.
+
+### Model/effort
+- claude-sonnet-5-5, effort not exposed. Usage not exposed.

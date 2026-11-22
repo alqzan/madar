@@ -72,25 +72,14 @@ extension View {
 struct AnchoredUndo: View {
     let session: AppSession
     @Environment(\.roomTheme) private var theme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicType
     var body: some View {
         VStack {
             Spacer()
             if session.undoToastVisible && session.localUndoHosts == 0 {
-                HStack(spacing: 14) {
-                    Text(session.undoMessage).font(MadarTypography.caption()).foregroundStyle(theme.ink).lineLimit(1)
-                    Button { session.undo() } label: {
-                        Text("تراجع").font(MadarTypography.caption().bold()).foregroundStyle(theme.accent)
-                            .frame(minWidth: 44, minHeight: 40).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.madarPlain)
-                    .accessibilityIdentifier("undo-button")
-                }
-                .padding(.horizontal, 18)
-                .glassEffect(.regular.interactive(), in: .capsule)
+                session.undoToast()
+                .fixedSize(horizontal: dynamicType.isAccessibilitySize ? false : true, vertical: false)
                 .padding(.bottom, session.tabBarHeight + 10)
-                .gesture(DragGesture(minimumDistance: 12).onEnded { if $0.translation.height > 0 { session.hideUndoToast() } })
-                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }
         .frame(maxWidth: .infinity)
@@ -104,3 +93,12 @@ extension View {
     func madarTopClipped() -> some View { scrollEdgeEffectStyle(.soft, for: .top) }
 }
 
+
+extension AppSession {
+    /// The one undo pill every screen shows (mockup «أ», owner 22 Nov 2026): the latest removal with its draining line,
+    /// and the one before it peeking behind.
+    func undoToast(undo customUndo: (() -> Void)? = nil) -> UndoToast {
+        UndoToast(message: undoMessage, undo: customUndo ?? { [weak self] in self?.undo() }, dismiss: { [weak self] in self?.hideUndoToast() },
+                  seconds: Self.undoToastSeconds, tokenID: undoToken?.id, earlier: undoEarlierMessage)
+    }
+}

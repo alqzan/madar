@@ -87,6 +87,9 @@ struct BahwLobbyView: View {
     @State private var attention: BahwAttention?
     @State private var moneyRevealed = false
     @State private var moneyRevealID = 0
+    @State private var searchOpen = false
+    /// The tiles fade up one after another the first time the lobby appears in a launch, never on every return.
+    @State private var entered = BahwEntrance.played
     @Environment(\.scenePhase) private var scenePhase
     private var theme: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var service: AppBahwService { .init(session: session) }
@@ -107,7 +110,14 @@ struct BahwLobbyView: View {
                     let columns = isPadWide(sizeClass) ? 8 : 4
                     let placements = BahwGrid.pack(visible.map { ($0.rawValue, layout.size($0)) }, columns: columns)
                     BahwGridLayout(placements: placements, columns: columns) {
-                        ForEach(visible, id: \.self) { block in tile(block, size: layout.size(block)) }
+                        ForEach(visible, id: \.self) { block in
+                            tile(block, size: layout.size(block)).madarEntrance(order: visible.firstIndex(of: block) ?? 0, shown: entered)
+                        }
+                    }
+                    .onAppear {
+                        guard !entered else { return }
+                        BahwEntrance.played = true
+                        Task { @MainActor in entered = true }
                     }
                     // AU-32: hiding every widget leaves a way back, not a blank lobby.
                     if visible.isEmpty && !arranging {
@@ -149,6 +159,7 @@ struct BahwLobbyView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $session.habitsOpen) { HabitsRoomView(session: session) }
         .navigationDestination(isPresented: $session.yearOpen) { BahwYearView(session: session) }
+        .sheet(isPresented: $searchOpen) { MadarSearchView(session: session).madarSheetErrorAlert(session) }
         .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]).madarSheetErrorAlert(session) }
         .onChange(of: arranging) { _, on in wiggle = on && !reduceMotion }
         .task(id: moneyRevealID) {
@@ -175,7 +186,7 @@ struct BahwLobbyView: View {
 
     private func presentAttention(force: Bool) {
         // Never over the first-run welcome (it opened on top of it and hid the welcome until dismissed).
-        guard session.onboardingComplete, session.pendingIntro == nil, !arranging, !drawerOpen, attention == nil, session.selectedTab == "foundation" else { return }
+        guard session.onboardingComplete, session.pendingIntro == nil, !arranging, !drawerOpen, !searchOpen, attention == nil, session.selectedTab == "foundation" else { return }
         let value = service.attention(includeReconcile: true, ignoringThrottle: force)
         #if DEBUG
         // UI tests drive the lobby behind a fixed clock and a fresh store; the sheet is opened there only on request (`MADAR_UI_ATTENTION=1`).
@@ -192,6 +203,18 @@ struct BahwLobbyView: View {
                 MadarDateLabel(session.dateLabels(service.today, weekday: true)).foregroundStyle(theme.secondaryInk).accessibilityElement(children: .combine).accessibilityIdentifier("bahw-date")
                 Text(greeting).font(MadarTypography.title()).accessibilityAddTraits(.isHeader).accessibilityIdentifier("bahw-greeting")
             }.frame(maxWidth: .infinity, alignment: .leading)
+
+            // Owner 22 Nov 2026 («ابحث في مدار», approved): one search across the rooms. Pulling the lobby down stays the refresh.
+            Button { searchOpen = true } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 17, weight: .regular))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+                    .glassEffect(.regular.interactive(), in: .circle)
+            }
+            .buttonStyle(.madarPlain)
+            .accessibilityLabel("ابحث في مدار")
+            .accessibilityIdentifier("bahw-search")
 
             Button { withAnimation(.snappy) { arranging = true } } label: {
                 Text("رتّب")
@@ -232,7 +255,7 @@ struct BahwLobbyView: View {
             if block == .habits && size == .icon { Button { open(block) } label: { BahwBlockView(service: service, block: block, size: size, interactive: !arranging, moneyRevealed: block == .mal && moneyRevealed).contentShape(.rect(cornerRadius:22)) } }
             else if block == .habits { BahwBlockView(service: service, block: block, size: size, interactive: !arranging, moneyRevealed: block == .mal && moneyRevealed).contentShape(.rect(cornerRadius:22)) }
             else { Button { open(block) } label: { BahwBlockView(service: service, block: block, size: size, interactive: !arranging, moneyRevealed: block == .mal && moneyRevealed).contentShape(.rect(cornerRadius:22)) } }
-        }.buttonStyle(.madarPlain)
+        }.buttonStyle(.madarPressableTile)
             .rotationEffect(.degrees(wiggle ? 0.7 : 0)).animation(wiggle ? .easeInOut(duration: 0.14).repeatForever(autoreverses: true) : .default, value: wiggle)
             .overlay(alignment: .topLeading) {
                 if arranging {
@@ -297,6 +320,8 @@ struct BahwLobbyView: View {
     }
 }
 
+@MainActor enum BahwEntrance { static var played = false }
+
 private struct BahwReturnPlanCard: View {
     let day: Int
     let digits: MadarNumberFormatter
@@ -355,6 +380,7 @@ private struct BahwSuggestionsView: View {
     @Bindable var session: AppSession
     @State private var suggestions: [BahwSuggestion] = []
     @Environment(\.roomTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var refreshKey: String {
         "\(session.prayerRevision)-\(session.habitReadingsVersion)-\(session.string("bahw.smartPresence"))-\(Int(session.prayerNow().timeIntervalSince1970 / 60))-\(session.protectedDataAuthorized)"
     }
@@ -379,11 +405,19 @@ private struct BahwSuggestionsView: View {
                             }.frame(maxWidth: .infinity, minHeight: lead ? 72 : 52, alignment: .leading).padding(12)
                                 .foregroundStyle(lead ? theme.onAccent : theme.ink)
                                 .background(lead ? theme.accentFill : theme.surface, in: .rect(cornerRadius: lead ? 22 : 18))
-                        }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-suggestion-" + suggestion.id)
+                                // A new step taking the lead (the last one done) is greeted by one pass of light.
+                                .madarLightSweep(trigger: lead ? suggestion.id : "", cornerRadius: lead ? 22 : 18)
+                        }.buttonStyle(.madarPressableTile).accessibilityIdentifier("bahw-suggestion-" + suggestion.id)
+                        .transition(reduceMotion ? .opacity : .asymmetric(insertion: .push(from: .bottom).combined(with: .opacity), removal: .scale(scale: 0.92).combined(with: .opacity)))
                     }
                 }.accessibilityElement(children: .contain).accessibilityIdentifier("bahw-suggestions")
             }
-        }.task(id: refreshKey) { suggestions = AppBahwService(session: session).suggestions() }
+        }.task(id: refreshKey) {
+            let next = AppBahwService(session: session).suggestions()
+            guard next.map({ $0.id + $0.title + $0.detail }) != suggestions.map({ $0.id + $0.title + $0.detail }) else { return }
+            // The first reading arrives quietly; later changes (a step done, the next one rising) move in place.
+            if suggestions.isEmpty { suggestions = next } else { withAnimation(reduceMotion ? nil : .smooth(duration: 0.45)) { suggestions = next } }
+        }
     }
     private func open(_ destination: BahwSuggestion.Destination) {
         switch destination {

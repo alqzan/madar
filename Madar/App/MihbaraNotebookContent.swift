@@ -16,6 +16,11 @@ struct MihbaraNotebookContent: View {
     @State private var editor: Editor?
     @State private var failure: String?
     @State private var initialNoteHandled = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Owner 22 Nov 2026 (mockup «ب»): a deleted note stays where it was, struck through, with «تراجع» on it, while the
+    /// undo would have shown; then it folds away. `ghostBefore` is the note it sat above.
+    @State private var ghost: Note?
+    @State private var ghostBefore: UUID?
     #if DEBUG
     @State private var injectedLoadFailure = false
     #endif
@@ -30,8 +35,12 @@ struct MihbaraNotebookContent: View {
 
     private var shown: [Note] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !needle.isEmpty else { return notes }
-        return notes.filter { $0.text.localizedStandardContains(needle) || ($0.bookTitle?.localizedStandardContains(needle) ?? false) }
+        var list = notes
+        if let ghost, !list.contains(where: { $0.id == ghost.id }) {
+            list.insert(ghost, at: ghostBefore.flatMap { id in list.firstIndex { $0.id == id } } ?? list.endIndex)
+        }
+        guard !needle.isEmpty else { return list }
+        return list.filter { $0.text.localizedStandardContains(needle) || ($0.bookTitle?.localizedStandardContains(needle) ?? false) }
     }
 
     /// The first line reads as the note's title; the rest is a short preview.
@@ -79,6 +88,7 @@ struct MihbaraNotebookContent: View {
                 } else {
                     ForEach(shown) { note in
                         let split = parts(note.text)
+                        if note.id == ghost?.id { ghostCard(split.title) } else {
                         Button { editor = .init(id: note.id, text: note.text) } label: {
                             VStack(alignment: .leading, spacing: 8) {
                                 if note.isBookNote {
@@ -92,7 +102,8 @@ struct MihbaraNotebookContent: View {
                                 MadarDateLabel(app.dateLabels(GregorianDay.containing(note.updatedAt, in: app.activePlace.timeZone))).foregroundStyle(theme.secondaryInk)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading).padding(16).background(theme.surface, in: .rect(cornerRadius: 14)).contentShape(Rectangle())
-                        }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-note-" + note.id.uuidString)
+                        }.buttonStyle(.madarPressableTile).accessibilityIdentifier("mihbara-note-" + note.id.uuidString)
+                        }
                     }
                 }
             }.padding(18)
@@ -106,7 +117,10 @@ struct MihbaraNotebookContent: View {
             ToolbarItem(placement: .principal) { Text("الدفتر").font(MadarTypography.section()) }
             ToolbarItem(placement: .topBarTrailing) { Button("تمّ") { dismiss() }.accessibilityIdentifier("mihbara-notebook-close") }
         }
-        .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: { app.undo(); load() }, dismiss: app.hideUndoToast).hostsUndo(app).accessibilityIdentifier("mihbara-undo") } }
+        .safeAreaInset(edge: .bottom) { if app.undoToastVisible && ghost == nil { app.undoToast(undo: { app.undo(); load() }).hostsUndo(app).accessibilityIdentifier("mihbara-undo") } }
+        .onChange(of: app.undoToastVisible) { _, visible in
+            if !visible, ghost != nil { withAnimation(reduceMotion ? nil : .smooth(duration: 0.35)) { ghost = nil } }
+        }
         .task { load() }
         .onChange(of: app.undoToken?.id) { load() }
         .onDisappear { notes.removeAll(); editor = nil }
@@ -155,8 +169,37 @@ struct MihbaraNotebookContent: View {
     }
 
     private func delete(_ note: Editor) async throws {
+        let removed = notes.first { $0.id == note.id }
+        let next = notes.firstIndex { $0.id == note.id }.flatMap { $0 + 1 < notes.count ? notes[$0 + 1].id : nil }
         try await app.executeBookCommand("notebook.deletePrivate", payload: ["id": .string(note.id.uuidString)], undoMessage: "حُذفت الملاحظة")
         load()
+        if app.undoToastVisible, let removed { withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { ghost = removed; ghostBefore = next } }
+    }
+
+    /// The deleted note where it was: struck through on dashed paper, «تراجع» at its side, the seconds draining beneath.
+    private func ghostCard(_ title: String) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(MadarTypography.section()).strikethrough().lineLimit(1).foregroundStyle(theme.secondaryInk)
+                Text(app.undoMessage).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            }
+            Spacer(minLength: 6)
+            Button {
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { ghost = nil }
+                app.undo(); load()
+            } label: {
+                Text("تراجع").font(MadarTypography.body().bold()).foregroundStyle(theme.accent)
+                    .frame(minWidth: 56, minHeight: 44).contentShape(Rectangle())
+            }
+            .buttonStyle(.madarPlain).accessibilityIdentifier("undo-button")
+        }
+        .padding(.horizontal, 16).padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 14).strokeBorder(theme.line, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+        .overlay(alignment: .bottom) { UndoTimeLine(seconds: AppSession.undoToastSeconds, id: app.undoToken?.id, tint: theme.accent).padding(.horizontal, 16) }
+        .hostsUndo(app)
+        .transition(reduceMotion ? .opacity : .asymmetric(insertion: .opacity, removal: .scale(scale: 0.96, anchor: .top).combined(with: .opacity)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("mihbara-undo")
     }
 }
 

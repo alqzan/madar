@@ -7,6 +7,9 @@ struct MoneyWidgetContent: View {
     let snapshot: RoomWidgetSnapshot?
     var family: WidgetFamily = .systemSmall
     var template = "now"
+    /// The lobby passes true (owner 22 Nov 2026, «أرقام حيّة»): figures roll to their new value and the line draws itself in.
+    /// Home-screen widgets keep the still drawing.
+    var animated = false
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var type
     @Environment(\.widgetRenderingMode) private var rendering
@@ -53,13 +56,13 @@ struct MoneyWidgetContent: View {
                             if extraLargePortrait && row.id == rows.first?.id {
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(row.title).font(MadarTypography.caption()).lineLimit(1)
-                                    displayFigure(row.value, "thmanyahserifdisplay-Bold", size: 38, relativeTo: .largeTitle).lineLimit(1).minimumScaleFactor(0.7)
+                                    displayFigure(row.value, "thmanyahserifdisplay-Bold", size: 38, relativeTo: .largeTitle).lineLimit(1).minimumScaleFactor(0.7).rolling(row.value, animated)
                                 }
                             } else {
                                 HStack(alignment: .firstTextBaseline) {
                                     Text(row.title).font(MadarTypography.caption()).lineLimit(1)
                                     Spacer(minLength: 2)
-                                    displayFigure(row.value, "thmanyahserifdisplay-Bold", size: family == .systemSmall && row.id == "now" ? 30 : largeHome ? 18 : 19, relativeTo: .title2).lineLimit(1).minimumScaleFactor(0.85)
+                                    displayFigure(row.value, "thmanyahserifdisplay-Bold", size: family == .systemSmall && row.id == "now" ? 30 : largeHome ? 18 : 19, relativeTo: .title2).lineLimit(1).minimumScaleFactor(0.85).rolling(row.value, animated)
                                 }
                             }
                         }
@@ -75,6 +78,7 @@ struct MoneyWidgetContent: View {
                                     HStack(spacing: 0) {
                                         Capsule().fill(daily.share > 1 ? color("ink") : color("accent"))
                                             .frame(width: max(daily.share > 0 ? 5 : 0, proxy.size.width * min(1, daily.share)))
+                                            .modifier(MoneyGrowIn(animated: animated))
                                         Spacer(minLength: 0)
                                     }.background(color("accent").opacity(0.18), in: .capsule)
                                 }.frame(height: 5).accessibilityHidden(true)
@@ -83,7 +87,7 @@ struct MoneyWidgetContent: View {
                         if !hidden && !type.isAccessibilitySize && template != "basis" && family != .systemSmall, let points = snapshot?.periods, points.count > 1 {
                             GeometryReader { proxy in Path { path in
                                 for (index, point) in points.enumerated() { let p = CGPoint(x: proxy.size.width * Double(index) / Double(max(1, points.count - 1)), y: proxy.size.height * (1 - min(1, max(-1, point.share))) / 2); if index == 0 { path.move(to: p) } else { path.addLine(to: p) } }
-                            }.stroke(color("accent"), lineWidth: 1.5) }.frame(height: family == .systemSmall ? 20 : extraLargePortrait ? 44 : 32).accessibilityHidden(true)
+                            }.stroke(color("accent"), lineWidth: 1.5).modifier(MoneyLineDraw(animated: animated)) }.frame(height: family == .systemSmall ? 20 : extraLargePortrait ? 44 : 32).accessibilityHidden(true)
                         }
                         if todayLine == nil { Spacer(minLength: 0) }
                     }
@@ -155,5 +159,38 @@ extension WidgetFamily {
         #else
         false
         #endif
+    }
+}
+
+private extension View {
+    @ViewBuilder func rolling(_ value: String, _ animated: Bool) -> some View {
+        if animated { self.contentTransition(.numericText()).animation(.snappy(duration: 0.45), value: value) } else { self }
+    }
+}
+
+/// The period line draws itself from its start the first time the lobby shows it; a widget draws it whole.
+private struct MoneyLineDraw: ViewModifier {
+    let animated: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var drawn = false
+    func body(content: Content) -> some View {
+        let whole = !animated || reduceMotion || drawn
+        content
+            .mask(alignment: .leading) { GeometryReader { proxy in Rectangle().frame(width: whole ? proxy.size.width : 0) } }
+            .onAppear {
+                guard animated, !reduceMotion, !drawn else { return }
+                withAnimation(.smooth(duration: 0.9)) { drawn = true }
+            }
+    }
+}
+
+/// Today's spend bar grows from its start the first time the lobby shows it.
+private struct MoneyGrowIn: ViewModifier {
+    let animated: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var grown = false
+    func body(content: Content) -> some View {
+        content.scaleEffect(x: !animated || reduceMotion || grown ? 1 : 0.001, anchor: .leading)
+            .onAppear { guard animated, !reduceMotion, !grown else { return }; withAnimation(.smooth(duration: 0.6).delay(0.15)) { grown = true } }
     }
 }

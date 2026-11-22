@@ -91,7 +91,7 @@ struct QuranStrengthView: View {
             .disabled(busy)
             .safeAreaInset(edge: .bottom) {
                 if app.undoToastVisible {
-                    UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).hostsUndo(app)
+                    app.undoToast().hostsUndo(app)
                         .accessibilityIdentifier("quran-strength-undo")
                 }
             }

@@ -394,6 +394,33 @@ import XCTest
             XCTAssertTrue(app.descendants(matching: .any).matching(identifier: destination).firstMatch.waitForExistence(timeout: 10), room + app.debugDescription)
         }
     }
+    /// Owner 22 Nov 2026 («ابحث في مدار», approved): one search from the lobby finds a habit by name and opens it in its room;
+    /// one letter asks for more, and a word that matches nothing says so.
+    func testLobbySearchFindsAHabitAndOpensIt() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+                                 "MADAR_UI_HABIT_FIXTURE": "lobbySix", "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        let search = app.buttons["bahw-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertGreaterThanOrEqual(search.frame.width, 44)
+        search.tap()
+        let field = app.textFields["madar-search-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8), app.debugDescription)
+        field.tap(); field.typeText("زززز")
+        XCTAssertTrue(app.descendants(matching: .any)["madar-search-empty"].waitForExistence(timeout: 8), app.debugDescription)
+        app.buttons["امسح البحث"].tap()
+        field.tap(); field.typeText("الماء")
+        let hit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "madar-search-hit-habit-")).firstMatch
+        XCTAssertTrue(hit.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(hit.label.contains("الماء"), hit.label)
+        hit.tap()
+        XCTAssertFalse(field.waitForExistence(timeout: 2) && field.isHittable, "The search sheet leaves when a result opens.")
+        // The habit's own page opens in the habits room (its progress line is unique to that page).
+        XCTAssertTrue(app.descendants(matching: .any)["habit-progress"].waitForExistence(timeout: 10), app.debugDescription)
+    }
+
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]

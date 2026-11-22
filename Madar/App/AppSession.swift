@@ -92,6 +92,8 @@ final class AppSession {
     /// Owner, 24 Oct 2026: «التراجع متاح… يتكرر وصاير مزعج مره ويطول». The toast shows for a few seconds; the undo
     /// itself stays valid until its token expires.
     private(set) var undoToastVisible = false
+    /// Owner 22 Nov 2026 (mockup «أ»): a removal made while the pill still shows leaves the earlier one peeking behind it.
+    private(set) var undoEarlierMessage: String?
     /// UI tests reach the toast after several steps, so a UI-test store keeps it two minutes unless
     /// MADAR_UI_UNDO_SECONDS says otherwise (DEBUG only). The app itself shows it for four seconds.
     static var undoToastSeconds: Double {
@@ -106,7 +108,7 @@ final class AppSession {
     /// under it; now it glides in and out with the screen, and stays four seconds instead of six.
     private func setUndoToast(_ visible: Bool) {
         guard undoToastVisible != visible else { return }
-        withAnimation(.smooth(duration: 0.35)) { undoToastVisible = visible }
+        withAnimation(.smooth(duration: 0.35)) { undoToastVisible = visible; if !visible { undoEarlierMessage = nil } }
     }
     /// A swipe down puts the toast away; the undo itself stays valid until its token expires, as before.
     func hideUndoToast() { toastTask?.cancel(); setUndoToast(false) }
@@ -1181,7 +1183,9 @@ final class AppSession {
         ["حُذف", "حذف", "أُزيل", "أزيل", "عادت الإعدادات المتفق عليها"].contains { message.hasPrefix($0) }
     }
     private func showUndo(_ token: AppUndoToken, message: String) {
+        let earlier = undoToastVisible && Self.undoIsWorthShowing(message) ? undoMessage : nil
         undoToken = token; undoMessage = message; expiryTask?.cancel(); toastTask?.cancel()
+        withAnimation(.smooth(duration: 0.3)) { undoEarlierMessage = earlier }
         setUndoToast(Self.undoIsWorthShowing(message))
         toastTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Self.undoToastSeconds))
