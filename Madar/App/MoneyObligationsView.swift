@@ -395,7 +395,7 @@ struct MoneyObligationsView: View {
                     }
                 }
                 HStack(alignment: .center, spacing: 8) {
-                    Text("يتكرر كل شهر · موعده القادم").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    Text("يتكرر كل شهر، وموعده القادم").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     MadarDateLabel(app.dateLabels(.containing(suggestion.nextDue, in: app.activePlace.timeZone), compact: true),
                                    primaryFont: MadarTypography.fine().weight(.semibold), secondaryFont: MadarTypography.fine())
                 }

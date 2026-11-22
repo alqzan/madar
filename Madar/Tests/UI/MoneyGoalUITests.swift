@@ -5,9 +5,9 @@ import XCTest
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE":"L", "MADAR_UI_THEME":"light", "MADAR_UI_NOW":"2026-10-17T12:00:00+03:00"]
         if let writeHoldMS { app.launchEnvironment["MADAR_UI_MONEY_WRITE_HOLD_MS"] = String(writeHoldMS) }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
-        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 10))
-        for _ in 0..<12 where !money.isHittable { app.swipeUp(velocity: .slow) }
-        XCTAssertTrue(money.isHittable); money.tap()
+        // The settings home lists rooms by their doors now; the search still offers the money room itself (as MoneyAccountsUITests).
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 10)); money.tap()
         let door = app.buttons["money-goal-open"]; XCTAssertTrue(door.waitForExistence(timeout: 10)); for _ in 0..<8 where !door.isHittable { app.swipeUp(velocity: .slow) }; door.tap()
         XCTAssertTrue(app.buttons["money-goal-plan-0"].waitForExistence(timeout: 10)); return app
     }
@@ -39,7 +39,9 @@ import XCTest
         let done = app.buttons["money-goal-editor-done"]; if !done.isHittable { app.swipeUp() }; done.tap()
         let create = app.buttons["money-goal-create"]; for _ in 0..<4 where !create.isHittable { app.swipeUp(velocity: .slow) }; create.tap()
         let confirm = app.buttons["money-goal-confirm"]; XCTAssertTrue(confirm.waitForExistence(timeout: 5)); shot(app,"M5-V23-preview-L"); confirm.tap()
-        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 10)); undo.tap(); XCTAssertTrue(app.buttons["money-goal-open"].exists)
+        // FB-32 (owner, 5 Nov 2026): a save is simply done, with no «تراجع»; the goal is corrected where it was made.
+        XCTAssertTrue(app.buttons["money-goal-open"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertFalse(app.buttons["undo-button"].exists, "A goal save offers no undo")
     }
     func testSmallAndLargeYearSuggestionsAndExistingPayments() {
         continueAfterFailure = false

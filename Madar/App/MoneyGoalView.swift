@@ -188,7 +188,7 @@ struct MoneyGoalView: View {
                     ).contentShape(Rectangle()) }.disabled(!visible).accessibilityIdentifier("money-goal-year")
                     Button {
                         paidOpen = true
-                    } label: { Text("دفعت منه شيء قبل؟ " + (paid.isEmpty ? "اختر من مصروفاتك" : shown(already))).font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.disabled(!visible).accessibilityIdentifier(
+                    } label: { Text("دفعت منه شيئًا من قبل؟ " + (paid.isEmpty ? "اختر من مصروفاتك" : shown(already))).font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.disabled(!visible).accessibilityIdentifier(
                         "money-goal-paid")
                     if let failure { Text(failure).font(MadarTypography.caption()) }
                     if failure == nil, let blocked {

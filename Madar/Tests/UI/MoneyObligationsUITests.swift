@@ -111,11 +111,13 @@ import XCTest
         XCTAssertTrue(more.waitForExistence(timeout: 5))
         for _ in 0..<5 { more.tap() }
         XCTAssertEqual(app.staticTexts["money-obligation-rhythm"].label, "كل ٦ أشهر")
-        // The first due day: open the calendar, move four months on, pick the 18th.
+        // The first due day: open the calendar, move on to February, pick the 18th.
         let picker = app.datePickers["money-obligation-first"]; XCTAssertTrue(picker.waitForExistence(timeout: 5)); picker.tap()
         let next = app.buttons["DatePicker.NextMonth"]
         XCTAssertTrue(next.waitForExistence(timeout: 5), app.debugDescription)
-        for _ in 0..<4 { next.tap() }
+        // The calendar opens on the default first due month, which follows the fixture's day; step on until February shows.
+        let month = app.buttons.matching(NSPredicate(format: "label == %@", "الشهر")).firstMatch
+        for _ in 0..<8 where !(String(describing: month.value ?? "").contains("فبراير") || String(describing: month.value ?? "").contains("February")) { next.tap() }
         let day = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ OR label CONTAINS %@", "١٨ فبراير", "18 February")).firstMatch
         XCTAssertTrue(day.waitForExistence(timeout: 5), app.debugDescription); day.tap()
         // Close the calendar by tapping the sheet title above it, and keep the keyboard away for the shots.
