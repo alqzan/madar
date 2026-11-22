@@ -126,7 +126,7 @@ struct MoneyAccountsView: View {
             } }
         } else {
         VStack(spacing: 0) {
-            HStack { Text("الحساب").frame(maxWidth: .infinity, alignment: .leading); Text("المبلغ").frame(width: 90); Text("ملكي؟").frame(width: 38); Text("في المجموع").multilineTextAlignment(.center).lineLimit(2).frame(width: 55) }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.vertical, 8)
+            HStack { Text("الحساب").frame(maxWidth: .infinity, alignment: .leading); Text("المبلغ").frame(width: 90); Text("في المجموع").multilineTextAlignment(.center).lineLimit(2).frame(width: 55) }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.vertical, 8)
             ForEach(r.rows) { row in
                 HStack(spacing: 5) {
                     Circle().fill(tint(row)).frame(width: 7, height: 7)
@@ -134,7 +134,6 @@ struct MoneyAccountsView: View {
                         VStack(alignment: .leading, spacing: 2) { Text(row.name).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)); Text(row.amountMinor == nil ? "لم يُعرف رصيدها بعد" : row.subtitle + (row.currency == app.string("core.currency") ? "" : "، " + row.currency)).font(MadarTypography.fine()).foregroundStyle(tint(row)) }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }.accessibilityIdentifier("money-account-" + row.name)
                     Text(figure: row.amountMinor.map { (row.side == .cash ? "" : "(") + amount($0, currency: row.currency) + (row.side == .cash ? "" : ")") } ?? "—").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(row.counted ? theme.ink : theme.secondaryInk).frame(width: 90).strikethrough(!row.counted)
-                    Image(systemName: row.counted ? "checkmark" : "minus").font(.system(size: 15, weight: .semibold)).foregroundStyle(row.counted ? theme.color("surplusText") : theme.secondaryInk).frame(width: 38).accessibilityLabel(row.counted ? "يُحتسب" : "خارج الحساب")
                     Button { selectedSource = row } label: { VStack(spacing: 2) { Circle().fill(row.counted ? theme.color("surplusText") : theme.color("reserveText")).frame(width: 5, height: 5); Text(row.amountMinor == nil ? "مجهول" : row.counted ? "تُحتسب" : "تُتجاهل").font(MadarTypography.fine()) }.frame(width: 55, height: 44) }.accessibilityLabel("مصدر " + row.name).accessibilityIdentifier("money-account-source-" + row.name)
                 }.padding(.vertical, 8).padding(.horizontal, 8).frame(minHeight: 60)
                 .anchorPreference(key: MoneyAccountRowBounds.self, value: .bounds) { [row.id: $0] }

@@ -450,7 +450,7 @@ struct MoneyHomeView: View {
     private func limitsList(_ reading: MoneyHomeReading) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("حدود الصرف").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText"))
-            if reading.limits.isEmpty { Text("لا حدود مضافة").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+            if reading.limits.isEmpty { Text("اضغط لتضع حدًا لفئة تصرف عليها كثيرًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 10) {
             ForEach(reading.limits.prefix(4)) { limit in
                 HStack(spacing: 8) {
@@ -482,7 +482,7 @@ struct MoneyHomeView: View {
                 Text("الالتزامات").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("bills"))
                 Image(systemName: "chevron.left").font(.caption.bold()).foregroundStyle(theme.color("bills"))
             }
-            if reading.obligations.isEmpty { Text("لا مواعيد مسجّلة").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+            if reading.obligations.isEmpty { Text("اضغط لتسجّل فاتورة أو قسطًا يتكرّر").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
             ForEach(reading.obligations.prefix(3)) { obligation in
                 HStack(alignment: .top, spacing: 7) {
                     DiamondMark().stroke(theme.color("reserveText"), lineWidth: 1).frame(width: 12, height: 14).padding(.top, 3).accessibilityHidden(true)

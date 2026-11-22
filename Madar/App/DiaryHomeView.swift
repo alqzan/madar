@@ -386,7 +386,7 @@ struct DiaryHomeView: View {
             HStack {
                 Spacer(minLength: 0)
                 Button { writeToday(day.day) } label: {
-                    Label(empty ? "اكتب سطرك الأول" : "اكتب", systemImage: "pencil").font(MadarTypography.section())
+                    Label("اكتب", systemImage: "pencil").font(MadarTypography.section())
                         .padding(.horizontal, 20).frame(minHeight: 48).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-write")
             }

@@ -590,3 +590,38 @@ Owner, 22 Oct: a handover may be longer than 7 lines. What matters is that the n
 
 ### Usage
 - 5-hour 92% used at wrap-up; weekly 38%.
+
+
+## Handover — مراجعة البناء ٦٠ واستكماله — 2026-11-22 — Codex
+
+### Works now
+
+- Confirmed movements edit from the log. The stored day and historical time zone guide clock edits. Deletion explains when a movement supports a salary cycle, repayment, reconciliation, cashback entry, refund or closed cycle. Undo protects reconciled balances and categories already in use.
+- Add an exchange rate for a supported currency from Accounts, including currencies without an account. Fixed limits now convert to a two-decimal percentage correctly. The 80% alert was delivered by iOS with the category name and no transaction amount.
+- Quran read-then-grade records completion only from the last face. Existing read-then-grade drafts retain their place and grade. A draft resumed on a later day keeps its original day when recorded.
+
+### Verified
+
+- Eight Swift package suites, 1,241 tests passed. Includes MadarCommands 345 and MadarData 145, with the V18→V19 fixture. iPhone build-for-testing and unsigned Mac build passed.
+- Madar 15 Pro Max on iOS 27.0, synthetic stores. Integration 68/68. Final outcomes for 20 distinct UI tests passed. Evidence in `Madar/Artifacts/OWNER-Codex-22nov/`: `integration-r1.xcresult`, `owner-ui-r2.xcresult` (9/9), `carryover-ui-r1.xcresult` (3 confirmed passes including system delivery), `remaining-ui-r2.xcresult` (6 confirmed passes) and `final-repairs-ui.xcresult` (2/2, supersedes the diary and backup failures). The prior failures remain visible in their own bundles. No tests skipped in these slices.
+- `verify-smoke.sh` passed with an isolated expense fixture. RU1 check and `git diff --check` passed. Default-size money sheet and Quran exit evidence is attached to `owner-ui-r2.xcresult`. These sheet states have no canonical images.
+
+### Differences left
+
+- Money and Quran sheet refinements are built — awaiting owner.
+
+### Not verified
+
+- Owner-device acceptance, physical Watch behavior, iPad layout and Apple processing. iCloud development and Production deployment remain deferred by the owner.
+
+### Next
+
+- Build 0.1.0 (61) distribution evidence: `Madar/Artifacts/OWNER-TestFlight-61/archive.log` and `Madar/Artifacts/OWNER-TestFlight-61/upload.log`. Check each log for its outcome. The delivery is for internal TestFlight.
+
+### Model/effort
+
+- Codex, model and effort not exposed. Two read-only focused reviews covered money and Quran.
+
+### Usage
+
+- Before archiving: five-hour 82% used, weekly 13% used.

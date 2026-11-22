@@ -413,7 +413,8 @@ struct DiaryDayView: View {
                     Menu {
                         Button { readingOpen = true } label: { Label("اقرأ", systemImage: "book") }.accessibilityIdentifier("diary-day-read")
                         if let onCustomize { Button { onCustomize() } label: { Label("خصّص المذكرات", systemImage: "slider.horizontal.3") }.accessibilityIdentifier("diary-customize") }
-                        if shownDay == today, travel == nil {
+                        // After Isha the page shows its own «محاسبة اليوم» link; the menu keeps it only before then.
+                        if shownDay == today, travel == nil, !(afterIsha && canReadDiary) {
                             Button { reviewOpen = true } label: { Label("محاسبة اليوم", systemImage: "moon.stars") }.accessibilityIdentifier("diary-day-review")
                         }
                         if inlineWriting, showsQuestionsAction {
@@ -873,7 +874,7 @@ struct DiaryDayView: View {
                     Button {
                         original = .init(id: line.id, text: first)
                     } label: {
-                        Text("عُدّل · الأصل").font(DiaryType.label).frame(minHeight: 30)
+                        Text("عُدّل، اعرض الأصل").font(DiaryType.label).frame(minHeight: 30)
                     }.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier(
                         "diary-line-edited")
                 }
