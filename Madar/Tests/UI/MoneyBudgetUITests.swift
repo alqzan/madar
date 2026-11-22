@@ -15,7 +15,7 @@ import XCTest
         budget.tap()
         XCTAssertTrue(app.staticTexts["money-budget-excluded-total"].waitForExistence(timeout: 10))
     }
-    func testStampLiftUndoAndRelaunch() throws {
+    func testStampLiftAndRelaunch() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "budget", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
@@ -32,8 +32,11 @@ import XCTest
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 5)); XCTAssertTrue(row.label.contains("داخل الميزانية"))
         row.tap(); XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 10)); XCTAssertTrue(row.label.contains("خارج الميزانية"), row.label)
-        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
-        XCTAssertTrue(NSPredicate(format: "label CONTAINS %@", "داخل الميزانية").evaluate(with: row))
+        // FB-32: a stamp is a save, so no undo toast; lifting it goes through the same sheet.
+        XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout: 2))
+        row.tap(); XCTAssertTrue(confirm.waitForExistence(timeout: 5)); XCTAssertTrue(confirm.label.contains("ارفع الختم"), confirm.label); confirm.tap()
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS %@", "داخل الميزانية").evaluate(with: row), row.label)
         row.tap(); XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 10))
         app.terminate(); open(app)

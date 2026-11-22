@@ -14,7 +14,6 @@ struct MoneyTripRateSheet: View {
     @Environment(\.roomTheme) private var theme
     @State private var currency = ""
     @State private var preview: MoneyTripReprice?
-    @State private var previewOpen = false
     @State private var raw = ""
     @State private var saving = false
     @State private var failure: String?
@@ -39,28 +38,29 @@ struct MoneyTripRateSheet: View {
             if reading.currency != app.string("core.currency"), reading.rate != nil {
                 // The 44 pt height sat outside the label, so only the line of text took a tap (14.8 pt): the whole row does now.
                 Button {
-                    do { preview = try MoneyRepository(context: ModelContext(app.container)).previewTripReprice(id: reading.id, rate: reading.rate!, at: app.prayerNow()); previewOpen = true }
+                    do { preview = try MoneyRepository(context: ModelContext(app.container)).previewTripReprice(id: reading.id, rate: reading.rate!, at: app.prayerNow()) }
                     catch { failure = "تعذّرت المعاينة. افتح الورقة من جديد وحاول مرة أخرى." }
                 } label: { Text("عاين أثر السعر على حركات الرحلة").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle()) }
                     .disabled(!visible || saving).accessibilityIdentifier("money-trip-reprice-preview")
             }
         }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { focused = false }.accessibilityIdentifier("money-trip-keyboard-done") } }
-            .sheet(isPresented: $previewOpen) { if let preview { repricePreview(preview) } }
+            // The sheet hangs on `preview` itself: with a separate flag, `body` never read `preview`, so the sheet opened empty.
+            .sheet(isPresented: Binding(get: { preview != nil }, set: { if !$0 { preview = nil } })) { if let preview { repricePreview(preview) } }
             .task { currency = reading.currency ?? app.string("core.currency"); raw = reading.rate.map(service.localizedRate) ?? "" }
             .madarSheetLock(saving: saving)
         }
     }
     private func repricePreview(_ p: MoneyTripReprice) -> some View {
         ScrollView { VStack(alignment: .leading, spacing: 14) {
-            HStack { Text("قبل تطبيق السعر").font(MadarTypography.cardTitle()); Spacer(); Button("تمّ") { previewOpen = false }.disabled(saving).frame(minHeight: 44).accessibilityIdentifier("money-trip-reprice-close") }
+            HStack { Text("قبل تطبيق السعر").font(MadarTypography.cardTitle()); Spacer(); Button("تمّ") { preview = nil }.disabled(saving).frame(minHeight: 44).accessibilityIdentifier("money-trip-reprice-close") }
             Text("هذه القيم بعملة البيت. المبلغ الأصلي ويوم الحركة لا يتغيّران.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             ForEach(p.lines) { row in HStack { Text(row.title); Spacer(); Text(figure: service.amount(row.beforeMinor) + " ← " + service.amount(row.afterMinor)) }.font(MadarTypography.body()) }
             if p.excludedCount > 0 { Text("تبقى الحركات ذات سعر البنك وتقارير الدورات المغلقة وخطط السداد المعتمدة على أرقامها المحفوظة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
             if p.lines.isEmpty { Text("لا توجد حركات مؤهلة لإعادة التحويل.").font(MadarTypography.body()) }
             Button {
                 saving = true
-                Task { do { try await app.executeMoneyCommand("money.repriceTrip", payload: ["id": .string(reading.id.uuidString), "rate": .string(reading.rate!), "signature": .string(p.signature)]); previewOpen = false; dismiss() } catch { failure = "تغيّرت الحركات منذ المعاينة؛ أعد فتحها قبل التطبيق."; previewOpen = false; saving = false } }
+                Task { do { try await app.executeMoneyCommand("money.repriceTrip", payload: ["id": .string(reading.id.uuidString), "rate": .string(reading.rate!), "signature": .string(p.signature)]); preview = nil; dismiss() } catch { failure = "تغيّرت الحركات منذ المعاينة؛ أعد فتحها قبل التطبيق."; preview = nil; saving = false } }
             } label: { Text(saving ? "جارٍ التطبيق…" : "طبّق على الحركات المعروضة").frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || p.lines.isEmpty).accessibilityIdentifier("money-trip-reprice-apply")
         }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).madarSheetLock(saving: saving)
     }
