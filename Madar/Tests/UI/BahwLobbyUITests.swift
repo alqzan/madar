@@ -242,6 +242,11 @@ import XCTest
         let large = app.buttons["كبيرة"]
         if !large.waitForExistence(timeout: 3) { sizeButton.tap() }
         XCTAssertTrue(large.waitForExistence(timeout: 5), app.debugDescription); large.tap(); app.buttons["bahw-arrange"].tap()
+        // Period choices stay disabled while arranging: tap only once arrange mode has really ended (checklist row 20).
+        XCTAssertTrue(app.buttons["bahw-arrange"].waitForNonExistence(timeout: 5))
+        let yearly = app.buttons["bahw-habits-period-yearly"]
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true AND hittable == true"), object: yearly)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed, app.debugDescription)
         // The period change animates: wait for the ring count instead of reading it mid-transition.
         func waitForRings(_ count: Int) {
             let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == %d", count), object: rings)
@@ -433,7 +438,7 @@ import XCTest
         XCTAssertTrue(pill.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertTrue(pill.label.contains("خارج مدينتك"), pill.label)
         // The store has loaded (the lobby counts the fixture's six habits) before the first sheet is asked for.
-        let loaded = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "bahw-habits-open", "من ٦")).firstMatch
+        let loaded = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "bahw-habits-open", "٦")).firstMatch
         XCTAssertTrue(loaded.waitForExistence(timeout: 15), app.debugDescription)
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: pill)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed, app.debugDescription)
@@ -465,7 +470,7 @@ import XCTest
         let pill = app.buttons["bahw-travel-pill"]
         XCTAssertTrue(pill.waitForExistence(timeout: 15), app.debugDescription)
         // The store has loaded (the lobby counts the fixture's six habits) before the first sheet is asked for.
-        let loaded = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "bahw-habits-open", "من ٦")).firstMatch
+        let loaded = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "bahw-habits-open", "٦")).firstMatch
         XCTAssertTrue(loaded.waitForExistence(timeout: 15), app.debugDescription)
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: pill)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed, app.debugDescription)

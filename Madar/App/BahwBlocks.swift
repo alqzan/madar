@@ -217,6 +217,8 @@ struct BahwBlockView: View {
         let amount: String = {
             guard let current, !row.paused else { return progress }
             if current.rule.measure == .once || current.target <= 1 { return done ? "تمّت" : current.rule.frequency == .daily ? "باقية" : current.rule.frequency.arabic }
+            // Nothing yet: the target itself («٨ أكواب»), never «٠ من ٨».
+            if current.value == 0 { return current.rule.unit.map { habitUnitCount(current.target, $0, digits) } ?? arabicCount(current.target, ["مرة واحدة", "مرتان", "مرات", "مرة"], digits) }
             return digits.string(current.value) + " من " + digits.string(current.target)
         }()
         let ringTheme: RoomTheme = switch row.source {
@@ -309,7 +311,7 @@ struct BahwBlockView: View {
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
         VStack(alignment:.leading,spacing:size == .wide ? 4 : 10) {
-            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !daily.isEmpty { if size == .wide { Text(digits.string(met)+" من "+digits.string(daily.count)+" اليوم").font(small).foregroundStyle(room.secondaryInk).contentTransition(.numericText(value: Double(met))).animation(reduceMotion ? nil : .snappy, value: met) } else { Text(digits.string(met)+" من "+digits.string(daily.count)).font(label).foregroundStyle(room.accent).contentTransition(.numericText(value: Double(met))).animation(reduceMotion ? nil : .snappy, value: met)} } }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
+            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !daily.isEmpty { if size == .wide { Text(lobbyDailyTally(met: met, total: daily.count, digits: digits) + " اليوم").font(small).foregroundStyle(room.secondaryInk).contentTransition(.numericText(value: Double(met))).animation(reduceMotion ? nil : .snappy, value: met) } else { Text(lobbyDailyTally(met: met, total: daily.count, digits: digits)).font(label).foregroundStyle(room.accent).contentTransition(.numericText(value: Double(met))).animation(reduceMotion ? nil : .snappy, value: met)} } }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
             if rows.isEmpty {
                 // Improvement 16 Oct: no «٠ من ٠»; the four period rings at rest show what a habit becomes, and the action is a real button.
                 Spacer(minLength:0)
@@ -653,4 +655,11 @@ private struct BahwHabitPeriod: View {
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
     }
+}
+
+/// The lobby's daily habits tally: what waits when nothing is done yet, «كلها» when all are, otherwise «٢ من ٦».
+func lobbyDailyTally(met: Int, total: Int, digits: MadarNumberFormatter) -> String {
+    if met == 0 { return arabicCount(total, ["عادة تنتظرك", "عادتان تنتظرانك", "عادات تنتظرك", "عادة تنتظرك"], digits) }
+    if met >= total { return "أتممتها كلها" }
+    return digits.string(met) + " من " + digits.string(total)
 }
