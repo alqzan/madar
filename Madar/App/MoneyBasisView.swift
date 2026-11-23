@@ -194,7 +194,7 @@ struct MoneySourceView: View {
                 if detail.estimated { Text("تقريبًا، تاريخ القفل مقدّر").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                 Text(detail.explanation).font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
                 if let date = detail.date { MadarDateLabel(app.dateLabels(date)).foregroundStyle(theme.secondaryInk) }
-                if let charges { chargeLines(charges) }
+                if let charges { MoneyChargeLinesView(app: app, charges: charges) }
                 if let message = detail.message, visible {
                     Divider().overlay(theme.line)
                     Text("الرسالة المصدر").font(MadarTypography.section())
@@ -208,8 +208,16 @@ struct MoneySourceView: View {
                 charges = await AppMoneyService(app: app).loadChargeLines(transactionID: id)
             }
     }
+}
+
+/// Phase 3: what the bank printed beside the movement, shared by the source page and the movement editor.
+struct MoneyChargeLinesView: View {
+    let app: AppSession
+    let charges: MoneyChargeLines
+    @Environment(\.roomTheme) private var theme
     /// Phase 3: what the bank printed beside the movement. A foreign purchase shows its own currency amount and the rate; lines that were not printed are absent.
-    private func chargeLines(_ c: MoneyChargeLines) -> some View {
+    var body: some View {
+        let c = charges
         let service = AppMoneyService(app: app)
         func row(_ title: String, _ value: String, _ id: String) -> some View {
             HStack(alignment: .firstTextBaseline) {

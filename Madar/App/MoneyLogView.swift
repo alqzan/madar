@@ -391,6 +391,7 @@ private struct MoneyMovementEditSheet: View {
     @State private var saving = false
     @State private var failure: String?
     @State private var confirmDelete = false
+    @State private var charges: MoneyChargeLines?
     @FocusState private var focused: Bool
     private var service: AppMoneyService { .init(app: app) }
     private var edit: MoneyMovementEdit { movement.edit ?? .init(merchant: nil, categoryID: nil, currency: app.string("core.currency"), amountMinor: movement.amountMinor, lockReason: nil) }
@@ -435,6 +436,8 @@ private struct MoneyMovementEditSheet: View {
                         .frame(minHeight: 44).accessibilityIdentifier("money-edit-time")
                     MadarDateLabel(app.dateLabels(movement.day), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
                 }
+                // Editing replaced the source page for confirmed rows; the bank's own lines (original amount, rate, fees) stay here.
+                if visible, let charges { MoneyChargeLinesView(app: app, charges: charges) }
                 if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-edit-error") }
                 Button(saving ? "جارٍ الحفظ…" : "احفظ التعديل", action: save).buttonStyle(MadarPrimaryButton()).disabled(!canSave).opacity(canSave ? 1 : 0.5).accessibilityIdentifier("money-edit-save")
                 if let reason = edit.deletionReason {
@@ -464,6 +467,7 @@ private struct MoneyMovementEditSheet: View {
                 label = edit.merchant ?? ""; categoryID = edit.categoryID; date = movement.at
                 if visible, edit.lockReason == nil { rawAmount = MoneyEditNameSheet.decimal(edit.amountMinor, exponent: exponent) }
                 loaded = true
+                if visible, let id = UUID(uuidString: movement.detail.id) { charges = await service.loadChargeLines(transactionID: id) }
             }
             .accessibilityIdentifier("money-edit-sheet")
     }
