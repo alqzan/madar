@@ -20,7 +20,8 @@ import XCTest
         let hit = app.buttons["city-hit-أبها"]
         XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription)
         hit.tap()
-        // The city is saved at once and the first-run card names it.
-        XCTAssertTrue(app.staticTexts["أبها"].waitForExistence(timeout: 8), app.debugDescription)
+        // Choosing the city saves it and finishes the first run: the lobby opens at once.
+        XCTAssertTrue(app.descendants(matching: .any)["bahw-greeting"].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(app.buttons["first-run-city"].exists, app.debugDescription)
     }
 }
