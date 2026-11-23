@@ -55,7 +55,7 @@ struct MihbaraReadingNow: View {
                     .foregroundStyle(ink).lineLimit(2)
                 if let p = b.progress {
                     Capsule().fill(ink.opacity(0.16)).frame(height: 5)
-                        .overlay(alignment: .leading) { GeometryReader { g in Capsule().fill(theme.color("goldUnderstand")).frame(width: max(5, g.size.width * min(1, p))) } }
+                        .overlay(alignment: .leading) { MihbaraProgressFill(progress: p, tint: theme.color("goldUnderstand")) }
                         .accessibilityHidden(true)
                 }
                 Text(stats.position).font(MadarTypography.caption()).foregroundStyle(ink)
@@ -102,8 +102,7 @@ struct MihbaraReadingNow: View {
         let year = calendar.component(.year, from: .now)
         let count = books.filter { $0.shelf == "finished" && $0.finished.map { calendar.component(.year, from: $0) == year } == true }.count
         guard count > 0 else { return nil }
-        let unit = hijriFirst ? " هـ" : " م"
-        return "أنهيت في " + digits.string(year) + unit + " " + (count == 1 ? "كتابًا واحدًا" : count == 2 ? "كتابين" : MihbaraCopy.books(count, digits))
+        return "أنهيت هذه السنة " + (count == 1 ? "كتابًا واحدًا" : count == 2 ? "كتابين" : MihbaraCopy.books(count, digits))
     }
 
     /// The smart margin: the note at or just ahead of where you stand («حاشيتك في صفحة ٥٢»); with none ahead, the latest.
@@ -131,5 +130,21 @@ struct MihbaraReadingNow: View {
             }
         }
         margins = next
+    }
+}
+
+/// Micro-interactions (owner, 23 Nov): the gold reading line fills to where the reader stopped when the desk opens,
+/// and follows a new page with a short glide; it simply sits there under Reduce Motion.
+private struct MihbaraProgressFill: View {
+    let progress: Double; let tint: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
+    var body: some View {
+        GeometryReader { g in
+            Capsule().fill(tint).frame(width: max(5, g.size.width * min(1, progress) * (shown || reduceMotion ? 1 : 0)))
+        }
+        .animation(reduceMotion ? nil : .smooth(duration: 0.8), value: shown)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.5), value: progress)
+        .onAppear { shown = true }
     }
 }

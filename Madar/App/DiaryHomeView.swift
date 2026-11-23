@@ -46,6 +46,9 @@ struct DiaryHomeView: View {
     @State private var roomWidth: CGFloat = 0
     /// False once today's card has scrolled out of sight: the bottom bar then offers the same write control.
     @State private var todayCardVisible = true
+    /// «Card Fan» (owner, 23 Nov): the memories open like a fanned hand of cards once per visit.
+    @State private var memoriesFanned = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var todayIntention: String?
     private var wide: Bool { isPadWide(sizeClass) && roomWidth >= 960 }
     private var roomWidthReady: Bool { !isPadWide(sizeClass) || roomWidth > 0 }
@@ -422,9 +425,16 @@ struct DiaryHomeView: View {
             } else {
                 ScrollView(.horizontal) {
                     HStack(alignment: .top, spacing: 10) {
-                        ForEach(pages) { page in yearCard(page, snapshot: snapshot) }
+                        ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
+                            yearCard(page, snapshot: snapshot)
+                                .rotationEffect(.degrees(memoriesFanned || reduceMotion ? 0 : -5 - Double(index) * 3), anchor: .bottom)
+                                .offset(y: memoriesFanned || reduceMotion ? 0 : 14)
+                                .opacity(memoriesFanned || reduceMotion ? 1 : 0)
+                                .animation(reduceMotion ? nil : .spring(duration: 0.55, bounce: 0.28).delay(0.05 + Double(min(index, 5)) * 0.07), value: memoriesFanned)
+                        }
                     }.padding(.vertical, 2)
                 }.scrollIndicators(.hidden).accessibilityIdentifier("diary-years")
+                .onAppear { memoriesFanned = true }
             }
         }
     }

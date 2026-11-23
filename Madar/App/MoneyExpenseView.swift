@@ -246,7 +246,7 @@ struct MoneyExpenseView: View {
     }
     }
     private func shareTitle(_ share: ExpenseEntry.Share) -> String {
-        switch share { case .daily: "كله من يومي"; case .quarter: "٢٥٪ مظروف"; case .half: "٥٠٪ مظروف"; case .envelope: "كله من مظروف" }
+        switch share { case .daily: "كله من يومي"; case .quarter: service.digits.percent(25) + " مظروف"; case .half: service.digits.percent(50) + " مظروف"; case .envelope: "كله من مظروف" }
     }
     private var keypad: some View {
         VStack(spacing: 6) {

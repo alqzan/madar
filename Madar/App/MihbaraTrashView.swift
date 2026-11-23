@@ -41,10 +41,10 @@ struct MihbaraTrashView: View {
         .navigationTitle("سلة المحذوفات").navigationBarTitleDisplayMode(.inline)
         .task { load() }
         // Owner, 10 Nov 2026: a trashed book can be erased for good. The sheet names the book and says it cannot be undone.
-        .confirmationDialog(purging.map { "احذف «" + $0.title + "» نهائيًا؟" } ?? "", isPresented: Binding(get: { purging != nil }, set: { if !$0 { purging = nil } }), titleVisibility: .visible) {
-            Button("احذف نهائيًا", role: .destructive) { if let item = purging { purge(item) } }
-            Button("أبقِه في السلة", role: .cancel) { purging = nil }
-        } message: { Text("يُمحى الكتاب وملفه وغلافه وتظليلاته وملاحظاته وكلماته المحفوظة. لا يمكن التراجع.") }
+        .madarSwipeConfirm(isPresented: Binding(get: { purging != nil }, set: { if !$0 { purging = nil } }), title: purging.map { "احذف «" + $0.title + "» نهائيًا؟" } ?? "",
+                           message: "يُمحى الكتاب وملفه وغلافه وتظليلاته وملاحظاته وكلماته المحفوظة. لا يمكن التراجع.", action: "احذف نهائيًا", cancel: "أبقِه في السلة") {
+            if let item = purging { purge(item) }
+        }
     }
 
     private func row(_ item: Item) -> some View {

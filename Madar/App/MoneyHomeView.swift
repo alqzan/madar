@@ -261,7 +261,7 @@ struct MoneyHomeView: View {
             case "curve":
                 if let cycle = reading.cycle {
                     if dynamicType.isAccessibilitySize { cycleSummary(cycle) }
-                    else { MoneyScrollChart(cycle: cycle, app: app, visible: amountsVisible, obligations: reading.obligations).frame(height: wide ? 300 : 224) }
+                    else { MoneyGrowingScrollChart(cycle: cycle, app: app, visible: amountsVisible, obligations: reading.obligations).frame(height: wide ? 300 : 224) }
                 }
             case "now":
                 if let cycle = reading.cycle { headline(reading, cycle: cycle) }

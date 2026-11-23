@@ -62,6 +62,8 @@ extension AppQuranService {
     func notificationCandidates(prayerDays: [PrayerDay], now: Date) throws -> [NotificationCandidate] {
         let repository = try repository(), guarder = SanctityGuard(prayerDays: prayerDays)
         var result: [NotificationCandidate] = []
+        // A fresh plan forgets the words of the last one.
+        Self.plannedDetails = Self.plannedDetails.filter { !$0.key.hasPrefix(Self.detailPrefix(app)) }
         for day in prayerDays {
             // Owner, 17 Nov 2026: the wird is asked after Fajr, and if it is still not done, asked once more after Isha («again»).
             for kind in ["wird", "again", "late"] {
@@ -76,10 +78,38 @@ extension AppQuranService {
                 guard fire > now, fire <= now.addingTimeInterval(48 * 3600) else { continue }
                 let value = try repository.snapshot(at: fire, sessionsThrough: now)
                 let needed = late ? value.pages.contains { $0.isDue && !$0.isFar } : Self.needsWird(value)
-                if needed { result.append(.init(id: "quran.\(value.day.dayKey).\(kind)", room: .quran, dueAt: fire, dayKey: value.day.dayKey)) }
+                if needed {
+                    let id = "quran.\(value.day.dayKey).\(kind)"
+                    result.append(.init(id: id, room: .quran, dueAt: fire, dayKey: value.day.dayKey))
+                    // The words the reminder will say come from the snapshot already read here, not from a second read per request.
+                    Self.plannedDetails[Self.detailPrefix(app) + id] = reminderDetail(value, late: late)
+                }
             }
         }
         return result
+    }
+    /// What a Quran reminder names at the moment it fires (notifications audit, 23 Nov): the day's hifz portion, else the faces
+    /// waiting for review; the late reminder names the faces due before they drift. Nil keeps the gentle wording alone.
+    /// Keyed by the session too, so one store's words never reach another's reminders.
+    static var plannedDetails: [String: String] = [:]
+    static func detailPrefix(_ session: AppSession) -> String { String(describing: ObjectIdentifier(session)) + "|" }
+    func reminderDetail(at fire: Date, late: Bool) -> String? {
+        guard let value = try? repository().snapshot(at: fire, sessionsThrough: clock()) else { return nil }
+        return reminderDetail(value, late: late)
+    }
+    func reminderDetail(_ value: QuranDataSnapshot, late: Bool) -> String? {
+        if late {
+            let due = value.pages.filter { $0.isDue && !$0.isFar }.count
+            let drift = due == 1 ? " قبل أن يبعد عنك" : due == 2 ? " قبل أن يبعدا عنك" : " قبل أن تبعد عنك"
+            return due > 0 ? QuranDayCloseCopy.faces(due, digits: numerals) + " في مراجعتك" + drift : nil
+        }
+        let saved = value.sessions.contains { $0.kind == .hifz && $0.dayKey == value.day.date }
+        if let portion = value.hifz?.portion, !saved, let catalog = try? QuranResources.catalog() {
+            let title = portionTitle(portion, catalog: catalog)
+            if !title.isEmpty { return (value.hifz?.balance == .consolidation ? "تثبيت اليوم: " : "ورد اليوم: ") + title }
+        }
+        let review = Set(value.review.allPages + value.partialRecent.map(\.page)).count
+        return review > 0 ? "مراجعة اليوم: " + QuranDayCloseCopy.faces(review, digits: numerals) : nil
     }
     static func needsWird(_ value: QuranDataSnapshot) -> Bool {
         let saved = value.sessions.contains { $0.kind == .hifz && $0.dayKey == value.day.date }

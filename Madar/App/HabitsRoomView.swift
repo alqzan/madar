@@ -23,10 +23,10 @@ extension HabitReading {
         }
         return forms.verb + " " + WidgetCopy.agree(n, digits, one: forms.one, two: forms.two, few: forms.few, many: forms.many)
     }
-    var statusTitle: String {
+    func statusTitle(_ digits: MadarNumberFormatter) -> String {
         if paused { return "مجمّدة" }
         if quitting { return summary.current?.outcome == .missed ? "زلّة اليوم" : "تركتها" }
-        if summary.atRisk { return missedPhrase(MadarNumberFormatter(style: .hindi)) + "؛ الحالية تحفظها" }
+        if summary.atRisk { return missedPhrase(digits) + "؛ الحالية تحفظها" }
         switch summary.current?.outcome { case .complete: return "تمّت"; case .minimum: return "أقلّ القليل"; case .excluded: return "إجازتها اليوم"; case .missed: return "فترة بلا تسجيل"; default: return isNow ? "وقتها الآن" : "تنتظر" }
     }
     var sourceTitle: String? { switch source { case "jamaah": "الصلاة"; case "review", "wird": "القرآن"; case "diaryLine": "المذكرات"; case "reading", "hadith": "المحبرة"; case "walking": "الصحة"; default: nil } }
@@ -34,6 +34,13 @@ extension HabitReading {
     /// DA-05: a hand-made habit has no stored icon; its own words choose one for display only (nil when none fits).
     var nameGlyph: String? {
         HabitNameGlyph.symbol(for: name)
+    }
+    /// A habit counted in cups or litres, or named for water: its ring fills like water (owner, 23 Nov: «Tide Progress»).
+    var isWater: Bool {
+        let unit = (summary.current?.rule.unit ?? latestRule?.unit ?? "").lowercased()
+        return ["كوب", "أكواب", "كأس", "لتر", "مل", "ml", "l", "cup", "cups", "glass", "glasses"].contains(unit)
+            // Whole words only: «أسماء الله» or «السماء» are not water.
+            || name.components(separatedBy: CharacterSet.letters.inverted).contains { ["ماء", "الماء", "موية", "مويه", "المويه", "الموية"].contains($0) }
     }
 }
 struct HabitEditorIdentity: Identifiable { let id: UUID; var reading: HabitReading? = nil; var source = "custom" }
@@ -59,6 +66,7 @@ struct HabitsRoomView: View {
     @State private var completionInFlight: Set<UUID> = []
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage("Madar.pad.sidebarHidden") private var sidebarHidden = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -335,7 +343,7 @@ struct HabitsRoomView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("يومية").font(HabitType.cardTitle()).accessibilityAddTraits(.isHeader)
                 Spacer()
-                Text(due.isEmpty ? "لا شيء مستحقّ اليوم" : digits.string(done) + " من " + digits.string(due.count) + "، اضغط الحلقة إذا سويتها").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
+                Text(habitsDailyHeader(done: done, due: due.count, digits: digits)).font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
             }.padding(.horizontal, 4).accessibilityIdentifier("habits-daily-header")
             rowsBlock(rows)
         }
@@ -368,7 +376,7 @@ struct HabitsRoomView: View {
     private func ruleLine(_ row: HabitReading) -> String {
         guard let rule = row.summary.current?.rule ?? row.latestRule else { return "" }
         if rule.measure == .abstain { return "عادة تركتها؛ يُحسب كل يوم بلا زلّة" }
-        let every: String = switch rule.frequency { case .daily: "كل يوم"; case .weekly: "كل أسبوع"; case .monthly: "كل شهر"; case .yearly: "كل سنة"; case .interval: "كل " + habitPeriodCount(rule.intervalDays ?? 1, .daily, digits) }
+        let every: String = switch rule.frequency { case .daily: "كل يوم"; case .weekly: "كل أسبوع"; case .monthly: "كل شهر"; case .yearly: "كل سنة"; case .interval: "كل " + WidgetCopy.agree(rule.intervalDays ?? 1, digits, one: "يوم", two: "يومين", few: "أيام", many: "يومًا") }
         if row.source != nil { return "تُقرأ من " + (row.sourceTitle ?? "غرفتها") }
         let amount = rule.measure == .once || rule.target == 1 && rule.unit == nil ? "مرة" : rule.unit != nil ? habitUnitCount(rule.target, rule.unit, digits) : arabicCount(rule.target, ["مرة واحدة", "مرتان", "مرات", "مرة"], digits)
         return amount + " " + every
@@ -403,6 +411,9 @@ struct HabitsRoomView: View {
                     VStack(alignment:.leading,spacing:3) {
                         HStack(spacing:8) {
                             Text(row.name).font(HabitType.section()).fixedSize(horizontal:false,vertical:true)
+                                .foregroundStyle(met ? theme.secondaryInk : theme.ink)
+                                // «Checklist»: a light ink line crosses the name once it is done, drawn from where the name begins.
+                                .overlay { Capsule().fill(colour.opacity(0.55)).frame(height:1.5).scaleEffect(x:met ? 1 : 0,anchor:layoutDirection == .rightToLeft ? .trailing : .leading).animation(reduceMotion ? nil : .easeOut(duration:0.4).delay(0.25),value:met) }
                             if let tag = row.sourceTitle { Text(tag).font(HabitType.fine()).foregroundStyle(colour).padding(.horizontal,8).padding(.vertical,1).background(colour.opacity(0.1),in:.rect(cornerRadius:8)) }
                         }
                         Text(rowLine(row)).font(HabitType.caption()).foregroundStyle(risky ? theme.risk : theme.secondaryInk).fixedSize(horizontal:false,vertical:true)
@@ -428,8 +439,8 @@ struct HabitsRoomView: View {
     }
     /// «٣ من ٥ كم»; a frozen habit says so, a habit that lost a period says what saves it, a quit habit counts its clean days.
     private func rowLine(_ row:HabitReading)->String {
-        if row.paused { return row.statusTitle }
-        if row.summary.atRisk && row.summary.current?.met != true { return row.statusTitle }
+        if row.paused { return row.statusTitle(digits) }
+        if row.summary.atRisk && row.summary.current?.met != true { return row.statusTitle(digits) }
         var line = progress(row)
         if line.isEmpty { line = row.summary.current?.met == true ? "تمّت" : row.summary.current?.rule.band == .daily ? "لم تتمّها بعد" : "تنتظر في فترتها" }
         if row.isNow { line += line.isEmpty ? "وقتها الآن" : "، وقتها الآن" }
@@ -437,7 +448,7 @@ struct HabitsRoomView: View {
     }
     /// A once-habit's ring is its own checkbox: one circle per row, tapped to finish. Count habits keep the ring as progress and a «+».
     @ViewBuilder private func leading(_ row:HabitReading,share:Double,met:Bool,colour:Color)->some View {
-        let ring = HabitRowRing(share:share,done:met,colour:colour,symbol:row.source == nil ? nil : row.symbol,glyph:row.source == nil ? row.nameGlyph : nil)
+        let ring = HabitRowRing(share:share,done:met,colour:colour,symbol:row.source == nil ? nil : row.symbol,glyph:row.source == nil ? row.nameGlyph : nil,water:row.isWater)
         if let p=row.summary.current, row.source == nil, !row.paused, p.target > 0, p.rule.measure == .once, !met {
             Button { complete(row, delta: 1) } label: { ring.contentShape(.circle) }
                 .buttonStyle(.madarPlain).disabled(completionInFlight.contains(row.id))
@@ -556,13 +567,19 @@ struct HabitFlame:View {
     var atRisk:Bool = false
     var tint:Color? = nil
     @Environment(\.roomTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var ink:Color { atRisk ? theme.risk : met ? (tint ?? theme.accent) : theme.secondaryInk }
     private var fill:Color { atRisk ? theme.risk.opacity(0.12) : met ? (tint ?? theme.accent).opacity(0.14) : theme.ink.opacity(0.06) }
     var body:some View {
         HStack(spacing:3) {
+            // The flame lights with a small jump and the count rolls on, the moment today's period is kept.
             Image(systemName: met && !atRisk ? "flame.fill" : "flame").font(.system(size:11,weight:.semibold))
+                .contentTransition(.symbolEffect(.replace)).symbolEffect(.bounce,value:met).symbolEffectsRemoved(reduceMotion)
             Text(habitPeriodCount(count,frequency,digits)).font(.custom("thmanyahseriftext-Bold",size:12,relativeTo:.caption)).monospacedDigit()
+                .contentTransition(.numericText(value:Double(count)))
         }
+        .animation(reduceMotion ? nil : .snappy,value:count)
+        .animation(reduceMotion ? nil : .smooth(duration:0.3),value:met)
         .foregroundStyle(ink).padding(.horizontal,8).frame(minHeight:22).background(fill,in:.capsule)
         .overlay(alignment:.topLeading) {
             if atRisk {
@@ -650,4 +667,11 @@ enum HabitType {
     static func caption()->Font { .custom("thmanyahseriftext-Regular",size:size("typeScale.caption.size"),relativeTo:.subheadline) }
     static func section()->Font { .custom("thmanyahseriftext-Bold",size:size("typeScale.sectionHead.size"),relativeTo:.headline) }
     static func fine()->Font { .custom("thmanyahseriftext-Bold",size:size("typeScale.fine.size"),relativeTo:.caption2) }
+}
+
+/// The daily list's header: the hint to tap a ring only while nothing is done yet, the count while some are, and a plain «أتممتها كلها» at the end.
+func habitsDailyHeader(done: Int, due: Int, digits: MadarNumberFormatter) -> String {
+    if due == 0 { return "لا شيء مستحقّ اليوم" }
+    if done == 0 { return lobbyDailyTally(met: 0, total: due, digits: digits) + "، اضغط الحلقة إذا سويتها" }
+    return lobbyDailyTally(met: done, total: due, digits: digits)
 }

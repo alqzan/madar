@@ -165,8 +165,8 @@ struct DiaryMediaCard: View {
     private var missingText: String {
         let digits = AppDiaryService(app: app).digits
         guard missingCount > 1 else { return "مرفق ناقص: " + (["photo": "صورة", "audio": "تسجيل صوتي", "video": "مقطع"][media.contentType] ?? "ملف") + " لم يكن في ملف داي ون" }
-        let noun = media.contentType == "photo" ? (missingCount == 2 ? "صورتان" : missingCount <= 10 ? digits.string(missingCount) + " صور" : digits.string(missingCount) + " صورةً")
-            : (missingCount == 2 ? "مرفقان" : missingCount <= 10 ? digits.string(missingCount) + " مرفقات" : digits.string(missingCount) + " مرفقًا")
+        let noun = media.contentType == "photo" ? arabicCount(missingCount, ["صورة واحدة", "صورتان", "صور", "صورة"], digits)
+            : arabicCount(missingCount, ["مرفق واحد", "مرفقان", "مرفقات", "مرفقًا"], digits)
         return "مرفقات ناقصة: " + noun + " لم تكن في ملف داي ون"
     }
     private func togglePlayback() {

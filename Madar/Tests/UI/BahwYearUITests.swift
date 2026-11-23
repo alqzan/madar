@@ -29,7 +29,7 @@ import XCTest
         capture(app, "M4-V03-mine-L")
         element("bahw-matter-هدية أمي").tap()
         let delete = app.buttons["bahw-day-delete"]; XCTAssertTrue(delete.waitForExistence(timeout: 5)); delete.tap()
-        let confirm = app.buttons["bahw-day-delete-confirm"].firstMatch; XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription); confirm.tap()
+        app.slideToConfirm()
         XCTAssertTrue(element("bahw-matter-هدية أمي").waitForNonExistence(timeout: 8))
         element("bahw-year-back").tap()
         XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 5))
@@ -152,4 +152,14 @@ import XCTest
         if later.waitForExistence(timeout: 3) { later.tap(); XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription) }
     }
     private func capture(_ app: XCUIApplication, _ name: String) { guard ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] != nil else { return }; let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
+}
+
+extension XCUIApplication {
+    /// The swipe-to-confirm sheet (owner, 23 Nov): drag its knob across the track.
+    var madarSwipeConfirm: XCUIElement { descendants(matching: .any)["madar-swipe-confirm"].firstMatch }
+    func slideToConfirm(file: StaticString = #filePath, line: UInt = #line) {
+        let track = madarSwipeConfirm
+        XCTAssertTrue(track.waitForExistence(timeout: 5), debugDescription, file: file, line: line)
+        track.coordinate(withNormalizedOffset: CGVector(dx: 0.925, dy: 0.5)).press(forDuration: 0.1, thenDragTo: track.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5)))
+    }
 }

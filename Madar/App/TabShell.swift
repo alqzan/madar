@@ -359,6 +359,10 @@ struct MadarRootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in
             session.requestPrayerNotificationRefresh()
         }
+        // A new day while the app stays open plans the new day's reminders too (notifications audit, 23 Nov).
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in
+            session.requestPrayerNotificationRefresh()
+        }
         .onChange(of: scenePhase) { _, phase in
             // The crash log from the owner's iPhone (3 Nov, termination 0xDEAD10CC) shows the app suspended while a SwiftData read
             // held the store's file lock. Asking the system for a few seconds when the app leaves the screen lets that work finish first.

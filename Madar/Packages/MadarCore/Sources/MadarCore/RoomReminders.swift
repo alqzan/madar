@@ -15,10 +15,19 @@ public enum RoomReminders {
 
     /// V12 diary kinds (§8 item 8 ids `notes.<dayKey>.<kind>`). Each falls when the anchor prayer's
     /// sanctity ends; the arbiter applies the shared budget and `notes.dailyCap`. The copy never carries diary text.
-    public enum DiaryKind: String, Sendable { case niyya, onThisDay, letter, line }
+    public enum DiaryKind: String, Sendable {
+        case niyya, onThisDay, letter, line
+        /// Notifications audit (23 Nov): the wird, the intention and a letter all used to land at Fajr + 30 (the wird again, the
+        /// line and a memory at Isha + 30) as one pile. Each diary kind keeps a fixed place after the Quran reminder instead.
+        /// The offset depends on the kind alone, so a re-plan never moves (or cancels) a reminder because a sibling came or went.
+        public var spacing: TimeInterval {
+            switch self { case .niyya, .line: 3 * 60; case .letter, .onThisDay: 6 * 60 }
+        }
+    }
     public static func diary(_ kind: DiaryKind, day: PrayerDay, time: PrayerReminderTime, prayerDays: [PrayerDay], now: Date) -> NotificationCandidate? {
         guard time != .off else { return nil }
-        let due = SanctityGuard(prayerDays: prayerDays).clamp(time == .afterIsha ? day.isha : day.fajr)
+        let guarder = SanctityGuard(prayerDays: prayerDays)
+        let due = guarder.clamp(guarder.clamp(time == .afterIsha ? day.isha : day.fajr).addingTimeInterval(kind.spacing))
         guard due > now, due <= now.addingTimeInterval(48 * 3600) else { return nil }
         return .init(id: "notes.\(day.day).\(kind.rawValue)", room: .notes, dueAt: due, dayKey: day.day.description)
     }

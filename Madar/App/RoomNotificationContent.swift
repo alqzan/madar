@@ -237,7 +237,10 @@ import MadarPrayer
         if id.hasPrefix("quran.") {
             let late = id.hasSuffix(".late")
             content.title = late ? QuranReminderCopy.lateTitle : QuranReminderCopy.title
-            content.body = late ? NudgeWording.body(.quranReview, dayKey: candidate.dayKey) : NudgeWording.body(.quranWird, dayKey: candidate.dayKey)
+            let gentle = late ? NudgeWording.body(.quranReview, dayKey: candidate.dayKey) : NudgeWording.body(.quranWird, dayKey: candidate.dayKey)
+            // Notifications audit (23 Nov): name what is waiting («ورد اليوم: البقرة ١٤٢–١٥٧»), with the gentle line beneath.
+            let detail = AppQuranService.plannedDetails[AppQuranService.detailPrefix(session) + id] ?? AppQuranService(session: session, clock: { Date() }).reminderDetail(at: candidate.dueAt, late: late)
+            content.body = detail.map { late ? $0 : $0 + "\n" + gentle } ?? gentle
             content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
             if !late { content.categoryIdentifier = PrayerNotificationCoordinator.wirdCategoryID }
         } else if id.hasPrefix("digest.") {
@@ -288,7 +291,9 @@ import MadarPrayer
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.billDue.") {
             content.title = "موعد فاتورة"
-            content.body = id.hasSuffix(".0") ? "عندك فاتورة أو اشتراك يستحق اليوم" : "عندك فاتورة أو اشتراك يستحق قريبًا"
+            // Notifications audit (23 Nov): say when in words instead of «قريبًا»; like the card, no name or amount on the lock screen.
+            let when = id.hasSuffix(".0") ? "اليوم" : id.hasSuffix(".1") ? "غدًا" : id.hasSuffix(".3") ? "بعد ثلاثة أيام" : "قريبًا"
+            content.body = "عندك فاتورة أو اشتراك يستحق " + when
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.alert80.") {
             // RU2: notifications stay amount-free even when amounts are visible inside the app.

@@ -138,7 +138,7 @@ struct BahwBlockView: View {
             if current.outcome == .minimum { return "أقلّ القليل" }
             return current.met ? "تمّت" : "لم تتمّها بعد"
         }
-        guard current.target > 0 else { return row.statusTitle }
+        guard current.target > 0 else { return row.statusTitle(digits) }
         return habitProgressText(current.value, current.target, current.rule.unit, digits)
     }
     private func activateHabit(_ row: HabitReading) {
@@ -204,7 +204,7 @@ struct BahwBlockView: View {
         }
         .buttonStyle(.madarPlain)
         .disabled(!interactive || row.paused || completionInFlight.contains(row.id))
-        .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
+        .accessibilityLabel(row.name + "، " + progress + (row.statusTitle(digits) == progress ? "" : "، " + row.statusTitle(digits)))
         .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
         .accessibilityIdentifier("bahw-habit-ring-" + row.id.uuidString)
     }
@@ -249,7 +249,7 @@ struct BahwBlockView: View {
         }
         .buttonStyle(.madarPlain)
         .disabled(!interactive || row.paused || completionInFlight.contains(row.id))
-        .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
+        .accessibilityLabel(row.name + "، " + progress + (row.statusTitle(digits) == progress ? "" : "، " + row.statusTitle(digits)))
         .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
         .accessibilityIdentifier("bahw-habit-ring-" + row.id.uuidString)
     }
@@ -272,7 +272,7 @@ struct BahwBlockView: View {
         }
         .buttonStyle(.madarPlain)
         .disabled(!interactive || row.paused || completionInFlight.contains(row.id))
-        .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
+        .accessibilityLabel(row.name + "، " + progress + (row.statusTitle(digits) == progress ? "" : "، " + row.statusTitle(digits)))
         .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
         .accessibilityIdentifier("bahw-habit-item-" + row.id.uuidString)
     }

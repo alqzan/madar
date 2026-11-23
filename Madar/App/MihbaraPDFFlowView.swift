@@ -183,7 +183,7 @@ struct MihbaraConversionCard: View {
 
     private func readyLine(_ s: PDFBookEPUB.Summary) -> String {
         var parts = [MihbaraCopy.pages(s.pages, digits)]
-        if s.opticalPages > 0 { parts.append("\(digits.string(s.opticalPages)) منها قُرئت من صورها") }
+        if s.opticalPages > 0 { parts.append(s.opticalPages >= s.pages ? "قُرئت كلها من صورها" : s.opticalPages == 1 ? "إحداها قُرئت من صورتها" : "\(digits.string(s.opticalPages)) منها قُرئت من صورها") }
         if s.picturedPages > 0 { parts.append("وبقيت بصورتها " + MihbaraCopy.pages(s.picturedPages, digits) + " بلا نص كالغلاف والزخارف") }
         if !s.skippedPages.isEmpty { parts.append("وتعذّر استخراج نص " + MihbaraCopy.pages(s.skippedPages.count, digits) + "، وتركنا مكانه ملاحظة بالرقم") }
         return parts.joined(separator: "، ") + ". والـPDF أصله تفتحه من «الأصل»."

@@ -33,6 +33,9 @@ struct HabitDetailView:View {
     private func measured(_ f:HabitFrequency)->String { switch f {case .daily:"يوميًا";case .interval:"في كل مدة";case .weekly:"أسبوعيًا";case .monthly:"شهريًا";case .yearly:"سنويًا"} }
     private var digits:MadarNumberFormatter{.init(style:session.string("core.numerals") == "western" ? .western : .hindi)}
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Micro-interactions (owner, 23 Nov): the fourteen-period footprint lays its rings down one by one when the page opens.
+    @State private var footprintShown = false
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:18) {
@@ -104,7 +107,7 @@ struct HabitDetailView:View {
         }
     }
     private func stateLine(_ p:HabitPeriodResult)->String? {
-        if reading.paused || reading.summary.atRisk || p.met || p.target == 0 { return reading.statusTitle }
+        if reading.paused || reading.summary.atRisk || p.met || p.target == 0 { return reading.statusTitle(digits) }
         if reading.isNow { return "وقتها الآن" }
         guard p.rule.measure != .once, p.value > 0, p.target > p.value else { return nil }
         return "بقي "+habitUnitCount(p.target-p.value,p.rule.unit,digits)
@@ -160,14 +163,17 @@ struct HabitDetailView:View {
             if dynamicTypeSize.isAccessibilitySize {
                 ForEach(Array(periods.enumerated()),id:\.offset) { _,p in HStack { MadarDateLabel(session.dateLabels(p.start,compact:true)); Spacer(); Text(outcome(p)).font(HabitType.caption()) } }
             } else {
-                HStack(alignment:.bottom,spacing:4) { ForEach(Array(periods.enumerated()),id:\.offset) { _,p in
+                HStack(alignment:.bottom,spacing:4) { ForEach(Array(periods.enumerated()),id:\.offset) { index,p in
                     Group {
                         if p.outcome == .waiting { Circle().stroke(theme.accent,style:.init(lineWidth:1.5,dash:[2.5,2.5])).padding(1) }
                         else if p.outcome == .excluded { Circle().stroke(theme.line,lineWidth:2).overlay { Capsule().fill(theme.line).frame(width:8,height:2) }.padding(1) }
                         else { HabitRingGlyph(share:p.outcome == .minimum ? 0.5 : 0,done:p.outcome == .complete,symbol:nil,lineWidth:2) }
                     }.frame(width:18,height:18)
+                        .scaleEffect(footprintShown || reduceMotion ? 1 : 0.3).opacity(footprintShown || reduceMotion ? 1 : 0)
+                        .animation(reduceMotion ? nil : .spring(duration: 0.45, bounce: 0.4).delay(Double(index) * 0.035), value: footprintShown)
                         .frame(maxWidth:22).accessibilityElement().accessibilityLabel(session.dateLabels(p.start).combined+"، "+outcome(p))
                 } }.frame(maxWidth:.infinity,alignment:.leading)
+                .onAppear { footprintShown = true }
                 if let first=periods.first, let last=periods.last {
                     HStack(alignment:.top) { MadarDateLabel(session.dateLabels(first.start,compact:true)); Spacer(); if periods.count > 1 { MadarDateLabel(session.dateLabels(last.start,compact:true)) } }.foregroundStyle(theme.secondaryInk)
                 }

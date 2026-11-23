@@ -133,7 +133,7 @@ extension AppQuranService {
         let span = Double(max(1, oldestDay?.quranDistance(to: today) ?? 1))
         let pageDates = completedDays.mapValues { displayDate($0) }
         let shades = completedDays.mapValues { 0.4 + 0.6 * Double(max(0, $0.quranDistance(to: today))) / span }
-        let explanation = "تقدير الوتيرة الفعلية لكل القرآن من آخر ٢٨ يومًا؛ نفترض إتمام أيام الحفظ بالدرجة المعتادة بلا فوت أو تثبيت. حُسب في " + displayDate(today)
+        let explanation = "تقدير الوتيرة الفعلية لكل القرآن من آخر " + numerals.string(28) + " يومًا؛ نفترض إتمام أيام الحفظ بالدرجة المعتادة بلا فوت أو تثبيت. حُسب في " + displayDate(today)
         return QuranUIJourney(points: points, stats: stats, pages: pages, mapRows: mapRows,
             pageDates: pageDates, shades: shades, oldestPageDate: oldestDay.map { displayDate($0) }, newestPageDate: newestDay.map { displayDate($0) },
             planned: planned, actual: actual, explanation: explanation,

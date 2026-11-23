@@ -12,6 +12,9 @@ struct QuranJourneyView: View {
     @State private var reader: Int?
     @State private var error: String?
     @State private var attempt = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Micro-interactions (owner, 23 Nov): the memorized timeline draws from the oldest page to the newest when the journey opens.
+    @State private var scaleDrawn = false
 
     var body: some View {
         ScrollView {
@@ -111,7 +114,7 @@ struct QuranJourneyView: View {
 
     private func forecastHeadline(_ value: QuranUIJourney) -> String {
         if value.forecastDay != nil {
-            return "بوتيرتك في آخر ٢٨ يومًا، تختم بإذن الله نحو " + value.actual
+            return "بوتيرتك في آخر " + service.numerals.string(28) + " يومًا، تختم بإذن الله نحو " + value.actual
         }
         if value.actual == "ختمت القرآن" { return "حفظت صفحات القرآن كلها" }
         return value.actual
@@ -133,6 +136,9 @@ struct QuranJourneyView: View {
                     startPoint: UnitPoint(x: 0, y: 0.5), endPoint: UnitPoint(x: 1, y: 0.5)
                 ))
                 .frame(height: 7)
+                .scaleEffect(x: scaleDrawn || reduceMotion ? 1 : 0.02, anchor: .leading)
+                .animation(reduceMotion ? nil : .smooth(duration: 0.9), value: scaleDrawn)
+                .onAppear { scaleDrawn = true }
             HStack(alignment: .top, spacing: 8) {
                 Text(value.oldestPageDate.map { "الأقدم: " + $0 } ?? "لا حفظ مؤرخ بعد")
                     .frame(maxWidth: .infinity, alignment: .leading)

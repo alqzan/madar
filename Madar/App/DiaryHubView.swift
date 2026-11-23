@@ -566,7 +566,7 @@ struct DiaryHubView: View {
         if count == 2 { return "يومان محفوظان" }
         let remainder = count % 100
         if (3...10).contains(remainder) { return service.digits.string(count) + " أيام محفوظة" }
-        if count >= 100 && remainder == 0 { return service.digits.string(count) + " يوم محفوظ" }
+        if count >= 100 && remainder <= 2 { return service.digits.string(count) + " يوم محفوظ" }
         return service.digits.string(count) + " يومًا محفوظًا"
     }
     private func indexYearLabels(_ year: Int) -> MadarDateLabels {

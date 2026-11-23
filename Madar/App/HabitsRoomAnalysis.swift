@@ -13,18 +13,76 @@ private let habitWeekdayLetters = ["ح", "ن", "ث", "ر", "خ", "ج", "س"]
 /// A row's ring (canvas: a 46 pt disc that fills with the habit's room colour when done, its own glyph inside).
 struct HabitRowRing: View {
     let share: Double; let done: Bool; let colour: Color; let symbol: String?; let glyph: String?
+    var water = false
     @Environment(\.roomTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         ZStack {
             Circle().fill(done ? colour : theme.surface)
+            if water && !done && share > 0 { HabitTide(level: min(1, share), colour: colour, still: reduceMotion).clipShape(.circle) }
             Circle().stroke(colour.opacity(0.18), lineWidth: 3)
             Circle().trim(from: 0, to: done ? 1 : min(1, max(0, share))).stroke(colour, style: .init(lineWidth: 3, lineCap: .round))
                 .rotationEffect(.degrees(-90)).scaleEffect(x: -1)
             if let symbol { MadarGlyph(symbol, size: 18).foregroundStyle(done ? theme.surface : colour) }
             else if let glyph { Image(systemName: glyph).font(.system(size: 17, weight: .medium)).foregroundStyle(done ? theme.surface : colour) }
-            else if done { Image(systemName: "checkmark").font(.system(size: 16, weight: .bold)).foregroundStyle(theme.surface) }
-            else { Circle().fill(colour.opacity(0.5)).frame(width: 7, height: 7) }
-        }.padding(1.5).frame(width: 46, height: 46).accessibilityHidden(true)
+            else {
+                // «Checklist»: the tick draws itself in one stroke when the habit is done.
+                HabitTick().trim(from: 0, to: done ? 1 : 0).stroke(theme.surface, style: .init(lineWidth: 2.6, lineCap: .round, lineJoin: .round))
+                    .frame(width: 17, height: 14).animation(reduceMotion ? nil : .easeOut(duration: 0.35).delay(0.08), value: done)
+                if !done { Circle().fill(colour.opacity(0.5)).frame(width: 7, height: 7) }
+            }
+        }.padding(1.5).frame(width: 46, height: 46).animation(reduceMotion ? nil : .smooth(duration: 0.3), value: done).accessibilityHidden(true)
+    }
+}
+
+/// The tick of a done habit, drawn left to right so a trim reads as a pen stroke.
+struct HabitTick: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.midY + rect.height * 0.05))
+        p.addLine(to: CGPoint(x: rect.minX + rect.width * 0.36, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        return p
+    }
+}
+
+/// Water standing in a ring at the day's share, its surface a slow wave; still when Reduce Motion is on.
+struct HabitTide: View {
+    let level: Double; let colour: Color; let still: Bool
+    /// The waves only move while the row is on screen and the app is in front; a pushed page or the background pauses them.
+    @State private var onScreen = false
+    @Environment(\.scenePhase) private var scenePhase
+    var body: some View {
+        Group {
+            if still { waves(phase: 0) }
+            else {
+                TimelineView(.animation(minimumInterval: 1 / 24, paused: !onScreen || scenePhase != .active)) { context in
+                    waves(phase: context.date.timeIntervalSinceReferenceDate)
+                }
+            }
+        }
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false }
+    }
+    private func waves(phase: Double) -> some View {
+        ZStack {
+            HabitWave(level: level, phase: phase * 1.6, amplitude: 2.2).fill(colour.opacity(0.22))
+            HabitWave(level: level, phase: phase * 2.3 + 1.2, amplitude: 1.6).fill(colour.opacity(0.32))
+        }.animation(still ? nil : .smooth(duration: 0.8), value: level)
+    }
+}
+
+struct HabitWave: Shape {
+    var level: Double; var phase: Double; var amplitude: CGFloat
+    var animatableData: Double { get { level } set { level = newValue } }
+    func path(in rect: CGRect) -> Path {
+        let top = rect.maxY - rect.height * level
+        var p = Path(); p.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        for x in stride(from: rect.minX, through: rect.maxX, by: 2) {
+            p.addLine(to: CGPoint(x: x, y: top + sin(Double(x / rect.width) * .pi * 2 + phase) * amplitude))
+        }
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY)); p.closeSubpath()
+        return p
     }
 }
 

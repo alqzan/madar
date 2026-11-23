@@ -122,6 +122,9 @@ struct MihbaraTurathView: View {
     @State private var query = ""
     @State private var results: [TurathCatalogueBook] = []
     @State private var downloading: Int?
+    /// «Download Ring» (owner, 23 Nov): the ring closes and a book stands up in its place before the preview opens.
+    @State private var landed: Int?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var error: String?
     @State private var downloaded: URL?
     @State private var downloadedTurathID: Int?
@@ -265,9 +268,13 @@ struct MihbaraTurathView: View {
                 }
                 Spacer(minLength: 0)
                 Group {
-                    if downloading == book.id { ProgressView().tint(theme.ink) }
-                    else { Image(systemName: "arrow.down.circle").font(.title2).foregroundStyle(theme.color("sunnah")) }
-                }.frame(width: 44, height: 44)
+                    if landed == book.id {
+                        Image(systemName: "book.closed.fill").font(.title2).foregroundStyle(theme.color("sunnah"))
+                            .transition(.scale(scale: 0.3, anchor: .bottom).combined(with: .opacity))
+                    } else if downloading == book.id {
+                        if reduceMotion { ProgressView().tint(theme.ink) } else { MihbaraDownloadRing(tint: theme.color("sunnah")) }
+                    } else { Image(systemName: "arrow.down.circle").font(.title2).foregroundStyle(theme.color("sunnah")) }
+                }.frame(width: 44, height: 44).animation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.45), value: landed)
             }
             .padding(.horizontal, 16).padding(.vertical, 12).contentShape(.rect)
         }
@@ -288,7 +295,7 @@ struct MihbaraTurathView: View {
     private func size(_ bytes: Int) -> String {
         guard bytes > 0 else { return "" }
         let mb = Double(bytes) / 1_048_576
-        if mb < 1 { return "أقل من \(digits.string(1)) م.ب" }
+        if mb < 1 { return "أقل من ميغابايت" }
         return "\(digits.string(Int(mb.rounded()))) م.ب"
     }
 
@@ -324,11 +331,17 @@ struct MihbaraTurathView: View {
                 let file = try await MihbaraTurathSource.download(book, into: folder)
                 // Left the page while it downloaded: keep nothing behind and open nothing.
                 guard !Task.isCancelled else { try? FileManager.default.removeItem(at: file); downloading = nil; return }
+                if !reduceMotion {
+                    // The spine lands for a moment; the row stays busy meanwhile so no second download starts.
+                    landed = book.id; try? await Task.sleep(for: .milliseconds(550)); landed = nil
+                    guard !Task.isCancelled else { try? FileManager.default.removeItem(at: file); downloading = nil; return }
+                }
                 downloaded = file
                 downloadedTurathID = book.id
-                downloading = nil; reviewing = true
+                downloading = nil
+                reviewing = true
             } catch TurathError.tooLarge {
-                downloading = nil; error = "هذا الكتاب أكبر من ١٥٠ م.ب؛ لا يُنزّل إلى الجهاز."
+                downloading = nil; error = "هذا الكتاب أكبر من " + digits.string(150) + " م.ب؛ لا يُنزّل إلى الجهاز."
             } catch is CancellationError { downloading = nil
             } catch {
                 downloading = nil; if !Task.isCancelled { self.error = "تعذّر تنزيل «\(book.title)». تحقق من الاتصال وحاول مرة أخرى." }
@@ -374,5 +387,20 @@ private struct FlowLayout: Layout {
             s.place(at: CGPoint(x: bounds.minX + x, y: bounds.minY + y), proposal: .init(size))
             x += size.width + spacing; line = max(line, size.height)
         }
+    }
+}
+
+/// An open ring that turns while a Turath book downloads (the source gives no fraction, so it turns rather than fills).
+struct MihbaraDownloadRing: View {
+    let tint: Color
+    @State private var turning = false
+    var body: some View {
+        ZStack {
+            Circle().stroke(tint.opacity(0.18), lineWidth: 3)
+            Circle().trim(from: 0, to: 0.28).stroke(tint, style: .init(lineWidth: 3, lineCap: .round))
+                .rotationEffect(.degrees(turning ? 360 : 0))
+                .animation(.linear(duration: 0.9).repeatForever(autoreverses: false), value: turning)
+            Image(systemName: "arrow.down").font(.system(size: 12, weight: .semibold)).foregroundStyle(tint)
+        }.frame(width: 26, height: 26).onAppear { turning = true }
     }
 }

@@ -38,6 +38,19 @@ import MadarSnapshots
         try await app.applySettingsAndWait(["quran.wirdReminder": .string("off"), "quran.lateReminder": .bool(false)])
         XCTAssertTrue(try service.notificationCandidates(prayerDays: [day], now: now).isEmpty)
     }
+    func testWirdReminderNamesTheDaysPortionAboveTheGentleLine() throws {
+        // Notifications audit (23 Nov): the reminder names what is waiting, not only «وردك ينتظرك».
+        let (app, service, root, now) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let day = try XCTUnwrap(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-15"), place: .riyadh))
+        let wird = try XCTUnwrap(try service.notificationCandidates(prayerDays: [day], now: now).first { $0.id.hasSuffix(".wird") })
+        let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now, timeZone: day.place.timeZone, policy: .init(staleNudgeEnabled: false))
+        let lines = RoomNotificationContent.content(for: wird, plan: plan, session: app, habitNames: [:]).body.components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 2, lines.joined(separator: " | "))
+        // After al-Fatiha 1–7 the next portion opens al-Baqara (the catalogue writes the surah name with its diacritics).
+        XCTAssertTrue(lines[0].hasPrefix("ورد اليوم: ") || lines[0].hasPrefix("تثبيت اليوم: "), lines[0])
+        XCTAssertTrue(lines[0].contains("البَقَرَة") && lines[0].contains("١–"), lines[0])
+        XCTAssertEqual(lines[1], NudgeWording.body(.quranWird, dayKey: wird.dayKey))
+    }
     func testWidgetJSONExpiresAtMadarBoundaryAndRoutesOnlyBuiltScreens() throws {
         let (app, service, root, now) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let envelope = try service.widgetSnapshot(), store = SnapshotStore(directory: root.appending(path: "QuranSnapshots"))

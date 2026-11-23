@@ -10,6 +10,7 @@ struct QuranHomeView: View {
     let service: AppQuranService
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.roomVisit) private var roomVisit
     @Environment(\.isFrontRoom) private var isFrontRoom
@@ -341,6 +342,7 @@ struct QuranHomeView: View {
                     .accessibilityIdentifier("quran-coverage-label")
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text(state.coverageTitle).font(serif(34)).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("quran-coverage-title")
+                        .contentTransition(.numericText()).animation(reduceMotion ? nil : .snappy, value: state.coverageTitle)
                     Spacer(minLength: 0)
                     // Improvement 16 Oct: «أول الطريق» already says nothing is memorized yet; «٪٠» beside it only repeated it as a zero.
                     if state.coverageFraction > 0 { Text(state.percentageLabel + " من القرآن").font(bodyFont(12)).foregroundStyle(theme.secondaryInk) }
@@ -349,6 +351,7 @@ struct QuranHomeView: View {
             GeometryReader { proxy in
                 Capsule().fill(theme.color("track"))
                     .overlay(alignment: .leading) { Capsule().fill(theme.color("review")).frame(width: proxy.size.width * state.coverageFraction) }
+                    .animation(reduceMotion ? nil : .smooth(duration: 0.6), value: state.coverageFraction)
             }.frame(height: 6).accessibilityLabel("في صدرك").accessibilityValue(state.percentageLabel)
         }.padding(.horizontal, 8)
     }

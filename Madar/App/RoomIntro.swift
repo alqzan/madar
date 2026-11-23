@@ -99,7 +99,7 @@ extension BahwBlock {
     /// One sentence a person can understand, the three things done there, and the few settings worth choosing on day one.
     var intro: (sentence: String, steps: [String], toggles: [(key: String, title: String)]) {
         switch self {
-        case .salah: ("سجّل ما صلّيت وشاهد الصلاة القادمة.", ["اضغط على الصلاة لتسجّلها", "اطّلع على المواقيت", "تابع التزامك"], [("salah.askReminder", "اسألني عن الصلاة بعد الأذان")])
+        case .salah: ("سجّل ما صلّيت وشاهد الصلاة القادمة.", ["اضغط على الصلاة لتسجّلها", "اطّلع على المواقيت", "تابع التزامك"], [])
         case .quran: ("ورد يومي من القرآن بمقدار يناسبك.", ["اختر ورد اليوم", "سجّل ما قرأت", "تابع تقدّمك"], [("quran.lateReminder", "ذكّرني بالورد المتأخر")])
         case .habits: ("عادات صغيرة تتابعها كل يوم.", ["أضف عادة", "علّمها حين تنجزها", "شاهد سلسلتك"], [])
         case .notes: ("صفحة تكتب فيها يومك بصوتك أو بقلمك.", ["اكتب أو سجّل صوتك", "أضف صورة من يومك", "ارجع لذكرياتك"], [("notes.morningNiyya", "نيّة الصباح")])

@@ -129,7 +129,7 @@ extension AppSession {
                 result.append(.init(id: item, title: "الآن", value: clock, detail: dates.primary, secondDate: dates.secondary, glyph: "clock", route: "madar://bahw"))
             default:
                 if item.hasPrefix("habit:"), let id = UUID(uuidString: String(item.dropFirst(6))), let habit = readings.first(where: { $0.id == id }), let period = habit.summary.current {
-                    result.append(.init(id: item, title: habit.name, value: habit.statusTitle,
+                    result.append(.init(id: item, title: habit.name, value: habit.statusTitle(digits),
                                         detail: WidgetCopy.habitProgress(value: period.value, target: period.target, measure: period.rule.measure, unit: period.rule.unit, digits: digits),
                                         glyph: habit.symbol, route: "madar://bahw/habits/" + id.uuidString, share: Double(period.value) / Double(max(1, period.target)),
                                         habitID: habit.source == nil && !habit.paused && !period.met && period.target > 0 ? id : nil))

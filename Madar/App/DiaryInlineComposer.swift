@@ -73,6 +73,8 @@ struct DiaryInlineComposer: View {
     @State private var draftDay = "today"
     @State private var draftWritingDay: GregorianDay?
     @State private var saving = false
+    /// «Paper Plane» (owner, 23 Nov): each line that lands on the day's page sends a small paper plane up to it.
+    @State private var flights = 0
     @State private var failure: String?
     /// A quiet, non-error line (for example where a photo went).
     @State private var notice: String?
@@ -247,6 +249,7 @@ struct DiaryInlineComposer: View {
         }
         .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.data]) { result in Task { await addFile(result) } }
         .modifier(InlineVoiceEvents(voice: voice, saved: saved, notice: $notice))
+        .overlay(alignment: .bottom) { DiaryPaperPlane(trigger: flights, tint: theme.accent).allowsHitTesting(false) }
     }
 
     private func focusRich() {
@@ -633,6 +636,7 @@ struct DiaryInlineComposer: View {
                 rich = remainder.isEmpty ? AttributedString() : DiaryRichText.attributed(fromMarkdown: remainder)
                 richBaseline = remainder.isEmpty ? "" : DiaryRichText.markdown(from: rich)
                 if expanded { toggle(false) }
+                flights += 1
             }
             saved()
         } catch { failure = madarUserMessage(error) }
@@ -680,6 +684,28 @@ struct DiaryInlineComposer: View {
         Task {
             do { try await service.appendMedia(data: data, kind: "photo", contentType: "image/jpeg", day: "today", writingDay: try service.currentDay()); failure = nil; saved() }
             catch { failure = madarUserMessage(error) }
+        }
+    }
+}
+
+/// A paper plane that rises from the field to the page above and fades, once per saved line; nothing under Reduce Motion.
+struct DiaryPaperPlane: View {
+    let trigger: Int; let tint: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private struct Flight { var x: CGFloat = 0; var y: CGFloat = 0; var angle: Double = 0; var scale: CGFloat = 0.6; var opacity: Double = 0 }
+    var body: some View {
+        if reduceMotion { EmptyView() } else {
+            KeyframeAnimator(initialValue: Flight(), trigger: trigger) { f in
+                Image(systemName: "paperplane.fill").font(.system(size: 20, weight: .medium)).foregroundStyle(tint)
+                    .scaleEffect(f.scale).rotationEffect(.degrees(f.angle)).offset(x: f.x, y: f.y).opacity(f.opacity)
+            } keyframes: { _ in
+                KeyframeTrack(\.opacity) { LinearKeyframe(1, duration: 0.12); LinearKeyframe(1, duration: 0.6); LinearKeyframe(0, duration: 0.3) }
+                KeyframeTrack(\.scale) { SpringKeyframe(1, duration: 0.25); LinearKeyframe(0.7, duration: 0.77) }
+                KeyframeTrack(\.x) { LinearKeyframe(0, duration: 0.15); CubicKeyframe(-60, duration: 0.45); CubicKeyframe(-130, duration: 0.42) }
+                KeyframeTrack(\.y) { LinearKeyframe(-6, duration: 0.15); CubicKeyframe(-70, duration: 0.45); CubicKeyframe(-170, duration: 0.42) }
+                KeyframeTrack(\.angle) { LinearKeyframe(-10, duration: 0.3); LinearKeyframe(-25, duration: 0.72) }
+            }
+            .padding(.bottom, 30)
         }
     }
 }

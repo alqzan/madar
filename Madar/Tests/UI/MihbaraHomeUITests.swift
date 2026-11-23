@@ -146,14 +146,14 @@ import UIKit
         XCTAssertTrue(purge.waitForExistence(timeout: 8), app.debugDescription)
         shot(app, "MIH-TRASH-purge-button-L")
         purge.tap()
-        // Tapping outside the confirmation keeps the book in the trash.
-        let erase = app.sheets.buttons["احذف نهائيًا"].firstMatch
+        // «أبقِه في السلة» keeps the book in the trash; erasing it takes a deliberate slide.
+        let erase = app.madarSwipeConfirm
         XCTAssertTrue(erase.waitForExistence(timeout: 5), app.debugDescription)
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.92)).tap()
+        app.buttons["madar-swipe-cancel"].firstMatch.tap()
         XCTAssertTrue(erase.waitForNonExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(purge.waitForExistence(timeout: 5), app.debugDescription)
         purge.tap()
-        XCTAssertTrue(erase.waitForExistence(timeout: 5), app.debugDescription); erase.tap()
+        app.slideToConfirm()
         Thread.sleep(forTimeInterval: 1.5); shot(app, "MIH-TRASH-after-purge-L")
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-trash-empty"].waitForExistence(timeout: 8), app.debugDescription)
         app.terminate()

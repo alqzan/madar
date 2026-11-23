@@ -10,6 +10,9 @@ struct QuranDayCloseView: View {
     @State private var summary: QuranUIDayClose?
     @State private var error: String?
     @State private var explainStrength = false
+    /// The day's gold seal is stamped in, its tick jumps, and a light passes over the gold once (owner, 23 Nov: crafted motion).
+    @State private var sealed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScrollView {
@@ -54,9 +57,21 @@ struct QuranDayCloseView: View {
         VStack(spacing: 10) {
             ZStack {
                 QuranCompletionSeal().fill(theme.color("gold"))
+                    .overlay {
+                        LinearGradient(colors: [.clear, .white.opacity(0.55), .clear], startPoint: .leading, endPoint: .trailing)
+                            .frame(width: 30).rotationEffect(.degrees(20)).offset(x: sealed ? 60 : -60)
+                            .animation(reduceMotion ? nil : .easeInOut(duration: 0.9).delay(0.45), value: sealed)
+                            .mask(QuranCompletionSeal())
+                            .opacity(reduceMotion ? 0 : 1)
+                    }
                 Image(systemName: value.title == "أتممت يومك" ? "checkmark" : "leaf")
                     .font(.system(size: 30, weight: .bold)).foregroundStyle(theme.color("onGold"))
-            }.frame(width: 66, height: 66).padding(.top, 4).padding(.bottom, 8).accessibilityHidden(true)
+                    .symbolEffect(.bounce, value: sealed).symbolEffectsRemoved(reduceMotion)
+            }.frame(width: 66, height: 66)
+            .scaleEffect(sealed || reduceMotion ? 1 : 0.45).rotationEffect(.degrees(sealed || reduceMotion ? 0 : -35)).opacity(sealed || reduceMotion ? 1 : 0)
+            .animation(reduceMotion ? nil : .spring(duration: 0.55, bounce: 0.4), value: sealed)
+            .onAppear { sealed = true }
+            .padding(.top, 4).padding(.bottom, 8).accessibilityHidden(true)
             Text(value.title).font(quranSerif(30)).accessibilityIdentifier("quran-day-close-title")
             // Both calendars: the primary date as the main line, the other smaller beneath it;
             // the streak stands apart in the same mark as the Quran home instead of trailing the date.

@@ -99,6 +99,9 @@ struct MoneyGoalOverview: View {
     let visible: Bool
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The goal's fill rises to where it stands when the envelope comes into view (owner, 23 Nov: crafted motion).
+    @State private var filled = false
     private var service: AppMoneyService { .init(app: app) }
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -112,7 +115,8 @@ struct MoneyGoalOverview: View {
                     let progress = envelope.targetMinor.map { $0 > 0 ? min(1, Double(max(0, envelope.balanceMinor)) / Double($0)) : 0 } ?? 0
                     ZStack(alignment: .leading) {
                         Rectangle().stroke(theme.color("accent"), style: .init(lineWidth: 0.9, dash: [3, 2])).frame(height: 12)
-                        if progress > 0 { Rectangle().fill(theme.color("accent")).frame(width: proxy.size.width * progress, height: 8) }
+                        if progress > 0 { Rectangle().fill(theme.color("accent")).frame(width: proxy.size.width * (filled || reduceMotion ? progress : 0), height: 8)
+                            .animation(reduceMotion ? nil : .spring(duration: 0.8, bounce: 0.15).delay(0.1), value: filled).onAppear { filled = true } }
                         if envelope.balanceMinor < 0 {
                             Rectangle().stroke(theme.color("debt"), style: .init(lineWidth: 1.4, dash: [4, 2])).frame(width: min(48, proxy.size.width / 4), height: 16)
                         }

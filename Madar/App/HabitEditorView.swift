@@ -93,7 +93,7 @@ struct HabitEditorView:View {
             ScrollView {
                 VStack(alignment:.leading,spacing:18) {
                     if reading == nil, let settling=settlingHabit {
-                        Label("بدأت «"+settling.name+"» "+(settling.days == 0 ? "اليوم" : "قبل "+habitPeriodCount(settling.days,.daily,digits))+"؛ العادة الجديدة تثبت أسرع إذا بدأتها وحدها أسبوعين.",systemImage:"leaf")
+                        Label("بدأت «"+settling.name+"» "+(settling.days == 0 ? "اليوم" : "قبل "+WidgetCopy.agree(settling.days,digits,one:"يوم",two:"يومين",few:"أيام",many:"يومًا"))+"؛ العادة الجديدة تثبت أسرع إذا بدأتها وحدها أسبوعين.",systemImage:"leaf")
                             .font(HabitType.caption()).foregroundStyle(theme.secondaryInk).frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,4)
                             .accessibilityIdentifier("habit-one-at-a-time")
                     }
@@ -127,7 +127,7 @@ struct HabitEditorView:View {
                         if rule.frequency == .weekly { Text("أيام محددة، أو اتركها لِأي يوم").font(MadarTypography.caption());dayButtons($rule.weekdays) }
                         if rule.frequency == .monthly || rule.frequency == .yearly {
                             Picker("التقويم",selection:$rule.hijri){Text("هجري").tag(true);Text("ميلادي").tag(false)}.pickerStyle(.segmented)
-                            if rule.frequency == .monthly { TextField("أيام الشهر، مثل ١٣، ١٤، ١٥",text:$monthDays).keyboardType(.numbersAndPunctuation).frame(minHeight:44).accessibilityIdentifier("habit-month-days") }
+                            if rule.frequency == .monthly { TextField("أيام الشهر، مثل "+[13,14,15].map{digits.string($0)}.joined(separator:"، "),text:$monthDays).keyboardType(.numbersAndPunctuation).frame(minHeight:44).accessibilityIdentifier("habit-month-days") }
                             else { Stepper("الشهر: "+digits.string(rule.yearMonth),value:$rule.yearMonth,in:1...12).frame(minHeight:44);Stepper("اليوم: "+digits.string(rule.yearDay),value:$rule.yearDay,in:1...(rule.hijri ? 30 : 31)).frame(minHeight:44) }
                             Text("إذا كان الشهر أقصر، تُستحق في آخر يوم منه.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
@@ -212,7 +212,7 @@ struct HabitEditorView:View {
                             Text("بلا تذكير").tag("none")
                         }.pickerStyle(.menu).accessibilityIdentifier("habit-reminder") }
                         if reminder == "push" {
-                            Text(source == "custom" ? (windowOn ? "يصلك الإشعار في بداية وقت العادة." : "بلا وقت محدد يتعلّم مدار وقتك من آخر تسجيلاتك، ويبدأ بعد ٣ مرات.") : "الإشعار غير متاح للعادة المرتبطة؛ يمكنك اختيار نقطة البهو.")
+                            Text(source == "custom" ? (windowOn ? "يصلك الإشعار في بداية وقت العادة." : "بلا وقت محدد يتعلّم مدار وقتك من آخر تسجيلاتك، ويبدأ بعد "+digits.string(3)+" مرات.") : "الإشعار غير متاح للعادة المرتبطة؛ يمكنك اختيار نقطة البهو.")
                                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         Toggle("للبيت فقط، تتوقف في السفر",isOn:$homeOnly).frame(minHeight:44)
@@ -319,13 +319,13 @@ struct HabitEditorView:View {
             let parts=english.split(whereSeparator:{!$0.isNumber});let parsed=parts.compactMap{Int($0)}
             // Days of the month count only for a monthly habit; a hidden field never blocks another rhythm.
             if saved.frequency != .monthly { saved.monthDays=[] }
-            else { guard parsed.count==parts.count,parsed.allSatisfy({(1...(saved.hijri ? 30 : 31)).contains($0)}) else{issue=saved.hijri ? "أيام الشهر الهجري من ١ إلى ٣٠، تفصلها فاصلة." : "أيام الشهر من ١ إلى ٣١، تفصلها فاصلة.";busy=false;return}
+            else { guard parsed.count==parts.count,parsed.allSatisfy({(1...(saved.hijri ? 30 : 31)).contains($0)}) else{issue=saved.hijri ? "أيام الشهر الهجري من "+digits.string(1)+" إلى "+digits.string(30)+"، تفصلها فاصلة." : "أيام الشهر من "+digits.string(1)+" إلى "+digits.string(31)+"، تفصلها فاصلة.";busy=false;return}
             saved.monthDays=Array(Set(parsed)).sorted() }
             saved.minimum=minimumOn ? min(saved.target,saved.minimum ?? 1) : nil
             if !windowOn{saved.windowStart=nil;saved.windowEnd=nil;saved.windowAnchor=nil}else{saved.windowStart=saved.windowStart ?? 1020;saved.windowEnd=saved.windowEnd ?? 1200}
             // Name the one thing to fix instead of one sentence for every refusal.
             if saved.target <= 0 {issue="اجعل الهدف أكبر من صفر.";busy=false;return}
-            if let low=saved.minimum, low <= 0 || low > saved.target {issue="الحد الأدنى بين ١ والهدف.";busy=false;return}
+            if let low=saved.minimum, low <= 0 || low > saved.target {issue="الحد الأدنى بين "+digits.string(1)+" والهدف.";busy=false;return}
             if let a=saved.windowStart, let b=saved.windowEnd, a == b {issue="وقت البداية والنهاية يجب أن يختلفا.";busy=false;return}
             // FB-39: a «إشعار لطيف» without a time never fires (RoomReminders.habit needs the window), so it is not saved silently.
 

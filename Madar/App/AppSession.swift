@@ -1083,6 +1083,9 @@ final class AppSession {
         }
         // F02/V12: a habit change, an intention or a letter reschedules its reminder (a met habit or written intention stops reminding).
         let reschedules = name.hasPrefix("habit.") || ["diary.setIntention", "diary.deleteIntention", "diary.sealLetter", "diary.openLetter", "diary.rescheduleLetter", "diary.refreshLetters"].contains(name)
+        // A line written (or removed) today re-plans the evening «كيف كان يومك؟» right away instead of at the next return to the app,
+        // through the debounced refresh so the save itself never waits for the plan (notifications audit, 23 Nov).
+        let replansLine = ["diary.appendLine", "diary.commitDraft", "diary.editEntry", "diary.appendMedia", "diary.deleteEntry"].contains(name)
         let result: CommandOutcome
         if name == "habit.complete" {
             // FB-32 (owner: «تعليق… لما اضغط على العادة»): the tap returns as soon as the record is saved; the
@@ -1098,6 +1101,7 @@ final class AppSession {
         } else {
             result = reschedules ? try await withSerializedPrayerNotificationMutation { try await run() } : try await run()
         }
+        if replansLine { requestPrayerNotificationRefresh() }
         if let id = result.undoToken {
             let token = AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600))
             showUndo(token, message: name == "habit.archive" ? "حُذفت العادة" : name == "habit.deleteArchived" ? "حُذفت العادة نهائيًا" : name == "habit.pause" ? "جُمّدت العادة" : name == "habit.resume" ? "عادت العادة" : name == "habit.complete" ? "سُجّلت" : name.hasPrefix("habit.") ? "حُفظت العادة" : name == "widget.save" ? "حُفظت الودجة" : name == "widget.delete" ? "حُذفت الودجة" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم" : name == "diary.deleteEntry" ? "حُذف السطر" : name == "diary.deleteIntention" ? "حُذفت النيّة" : name == "diary.setAudioInsights" ? "حُفظ عنوان التسجيل" : name == "diary.setIntentionReview" ? "حُفظت مراجعة النيّة" : name == "diary.setIntentionResult" ? (payload["result"] == .null ? "مُسحت النتيجة" : "حُفظت النتيجة") : name.contains("Intention") ? "حُفظت النيّة" : "حُفظ السطر")

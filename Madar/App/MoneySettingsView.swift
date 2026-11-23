@@ -492,7 +492,7 @@ struct MoneySettingsView: View {
             Text("ذكّرني بمطابقة الرصيد كل").font(MadarTypography.body())
             if visible {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    TextField("٩٠", text: $rawReconcileDays).keyboardType(.numberPad).focused($editing)
+                    TextField(service.digits.string(90), text: $rawReconcileDays).keyboardType(.numberPad).focused($editing)
                         .multilineTextAlignment(.center).font(MadarTypography.cardTitle()).frame(width: 88)
                         .accessibilityIdentifier("money-settings-reconcile-days")
                     // Audit 28 Oct: «كل ٥ أيام»، not «كل ٥ يومًا».

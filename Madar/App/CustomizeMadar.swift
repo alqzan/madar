@@ -486,7 +486,7 @@ extension AppSession {
 struct NotificationPermissionCard: View {
     @Bindable var session: AppSession
     var body: some View {
-        if MadarPlatform.hasNotifications, (session.bool("salah.askReminder") || session.bool("salah.beforeReminder") || session.bool("notif.thisDeviceReminders")) && !session.notificationsAuthorized {
+        if MadarPlatform.hasNotifications, session.bool("notif.thisDeviceReminders") && !session.notificationsAuthorized {
             MadarCard {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(session.notificationPermissionTitle).font(MadarTypography.body())

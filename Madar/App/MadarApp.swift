@@ -42,6 +42,7 @@ private struct MadarSceneContent: View {
             }
             .environment(\.layoutDirection, .rightToLeft)
             .environment(\.locale, Locale(identifier: "ar_SA"))
+            .toggleStyle(MadarInkToggleStyle())
             .task { if session == nil && startupError == nil && ProcessInfo.processInfo.environment["MADAR_UI_GALLERY"] != "1" { await runtime.load() } }
             .onChange(of: scenePhase) { _, phase in
                 guard let session else { return }

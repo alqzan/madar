@@ -245,7 +245,7 @@ struct DiaryDayOneImportView: View {
         return lead + parts.joined(separator: "، ")
     }
     private func journalsLabel(_ draft: DayOneImportDraft) -> String {
-        draft.plan.journals.count == 1 ? "دفتر واحد" : "الدفاتر: " + digits.string(draft.plan.journals.count)
+        arabicCount(draft.plan.journals.count, ["دفتر واحد", "دفتران", "دفاتر", "دفترًا"], digits)
     }
     private func skipped(_ p: DayOnePreview) -> [(String, Int)] {
         let count = { (reason: DayOneSkip.Reason) in p.skipped.filter { $0.reason == reason }.count }

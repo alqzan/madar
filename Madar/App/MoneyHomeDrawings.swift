@@ -4,11 +4,27 @@ import MadarDesign
 import MadarMoney
 import MadarCommands
 
-struct MoneyScrollChart: View {
+/// «Load Bars» (owner, 23 Nov): the day bars rise from the baseline once each time the room opens; still under Reduce Motion.
+struct MoneyGrowingScrollChart: View {
     let cycle: MoneyCycleReading
     let app: AppSession
     let visible: Bool
     var obligations: [MoneyHomeObligation] = []
+    @State private var grown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        MoneyScrollChart(cycle: cycle, app: app, visible: visible, obligations: obligations, growth: grown || reduceMotion ? 1 : 0)
+            .onAppear { withAnimation(reduceMotion ? nil : .spring(duration: 0.7, bounce: 0.2).delay(0.15)) { grown = true } }
+    }
+}
+
+struct MoneyScrollChart: View, @preconcurrency Animatable {
+    let cycle: MoneyCycleReading
+    let app: AppSession
+    let visible: Bool
+    var obligations: [MoneyHomeObligation] = []
+    var growth: Double = 1
+    var animatableData: Double { get { growth } set { growth = newValue } }
     @Environment(\.roomTheme) private var theme
     private var service: AppMoneyService { .init(app: app) }
     var body: some View {
@@ -52,7 +68,7 @@ struct MoneyScrollChart: View {
                                 let width = max(2, min(6, chart.width / CGFloat(last) * 0.6))
                                 let spent = max(0, cycle.spent[point.day] ?? 0)
                                 if spent > 0 {
-                                    let height = CGFloat(spent) / CGFloat(dailyPeak) * 18
+                                    let height = CGFloat(spent) / CGFloat(dailyPeak) * 18 * CGFloat(growth)
                                     context.fill(Path(CGRect(x: x(point.day) - width / 2, y: barBaseline - height, width: width, height: height)), with: .color(theme.secondaryInk))
                                 }
                             }

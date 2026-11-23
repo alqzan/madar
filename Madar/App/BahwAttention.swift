@@ -107,7 +107,7 @@ struct BahwAttentionSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(WidgetCopy.agree(attention.moneyCount, digits, one: "رسالة بنكية تنتظر فرزك", two: "رسالتان بنكيتان تنتظران فرزك", few: "رسائل بنكية تنتظر فرزك", many: "رسالة بنكية تنتظر فرزك"))
                     .font(MadarTypography.section())
-                Text("لا تدخل أرقامك إلا بعد قرارك.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                Text("لا تُحسب في رصيدك حتى تفرزها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }
             Spacer(minLength: 8)
             Button { moneyOpen = true } label: { Text("افرزها").font(MadarTypography.caption().bold()).foregroundStyle(theme.onAccent)

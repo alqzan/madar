@@ -18,7 +18,7 @@ import XCTest
         let save = app.buttons["money-settings-daily-save"]; reach(save, app: app); save.tap()
         XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout: 2)); XCTAssertTrue(preview.label.contains("٤١٠"))
         let cycle = app.buttons["money-settings-page-2"]; reach(cycle, app: app, up: false); cycle.tap(); shot(app, "M5-V20-cycle-L")
-        let flexible = app.switches["money-settings-flexible"]; reach(flexible, app: app); flexible.switches.firstMatch.tap()
+        let flexible = app.switches["money-settings-flexible"]; reach(flexible, app: app); flexible.switches.firstMatch.exists ? flexible.switches.firstMatch.tap() : flexible.tap()
         XCTAssertTrue(app.datePickers["money-settings-first-date"].waitForExistence(timeout: 5)); shot(app, "M5-V20-flexible-L")
         let cycleSave = app.buttons["money-settings-cycle-save"]; reach(cycleSave, app: app); cycleSave.tap()
         XCTAssertEqual(flexible.value as? String, "1")

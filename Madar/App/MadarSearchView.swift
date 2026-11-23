@@ -48,7 +48,7 @@ struct MadarSearchHit: Identifiable, Equatable {
             .prefix(Self.limitPerRoom)
             .map { row in
                 MadarSearchHit(id: "habit-" + row.id.uuidString, room: .habits, title: row.name,
-                               detail: row.paused ? "مجمّدة" : row.statusTitle,
+                               detail: row.paused ? "مجمّدة" : row.statusTitle(AppBahwService(session: session).digits),
                                url: URL(string: "madar://habits/habit/" + row.id.uuidString)!)
             }
     }

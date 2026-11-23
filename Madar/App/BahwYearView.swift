@@ -439,7 +439,7 @@ struct BahwDaySheet: View {
                         Button(role: .destructive) { confirmingDelete = true } label: { Text("احذف اليوم").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 46) }
                             .buttonStyle(.madarPlain).accessibilityIdentifier("bahw-day-delete")
                             // Audit 28 Oct: a one-tap delete now asks first, like the other deletes in Madar.
-                            .confirmationDialog("تحذف «" + draft.title + "»؟", isPresented: $confirmingDelete, titleVisibility: .visible) { Button("احذف اليوم", role: .destructive) { remove() }.accessibilityIdentifier("bahw-day-delete-confirm") }
+                            .madarSwipeConfirm(isPresented: $confirmingDelete, title: "تحذف «" + draft.title + "»؟", message: "يختفي من صفحة السنة.", action: "احذف اليوم") { remove() }
                     }
                 }.padding(18)
             }

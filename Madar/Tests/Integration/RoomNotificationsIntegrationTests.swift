@@ -364,6 +364,16 @@ import MadarCore
         }
     }
 
+    func testBillReminderSaysWhenInWordsWithoutNameOrAmount() throws {
+        let (app, _, _, day) = try fixture([:])
+        let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
+        let bill = UUID().uuidString
+        for (lead, expected) in [("0", "عندك فاتورة أو اشتراك يستحق اليوم"), ("1", "عندك فاتورة أو اشتراك يستحق غدًا"), ("3", "عندك فاتورة أو اشتراك يستحق بعد ثلاثة أيام")] {
+            let candidate = NotificationCandidate(id: "mal.billDue.\(bill).2026-10-18.\(lead)", room: .mal, dueAt: day.dhuhr.addingTimeInterval(3600), dayKey: "2026-10-15")
+            XCTAssertEqual(RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:]).body, expected)
+        }
+    }
+
     func testHabitDigestCopyAndTapsOpenTheRoom() throws {
         let (app, _, _, day) = try fixture([:])
         let habit = UUID()
@@ -412,8 +422,8 @@ import MadarCore
             try context.save(); try app.reload()
             let candidates = try await RoomNotificationContent.candidates(session: app, prayerDays: [day], now: now).filter { $0.id.hasPrefix("notes.") }
             XCTAssertEqual(Set(candidates.map(\.id)), ["notes.2026-10-15.niyya", "notes.2026-10-15.letter", "notes.2026-10-15.onThisDay", "notes.2026-10-15.line"])
-            XCTAssertEqual(candidates.first { $0.id.hasSuffix(".niyya") }?.dueAt, day.fajr.addingTimeInterval(1800))
-            XCTAssertEqual(candidates.first { $0.id.hasSuffix(".onThisDay") }?.dueAt, day.isha.addingTimeInterval(1800))
+            XCTAssertEqual(candidates.first { $0.id.hasSuffix(".niyya") }?.dueAt, day.fajr.addingTimeInterval(1800 + 180))
+            XCTAssertEqual(candidates.first { $0.id.hasSuffix(".onThisDay") }?.dueAt, day.isha.addingTimeInterval(1800 + 360))
             let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
             for candidate in candidates {
                 let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
@@ -431,7 +441,7 @@ import MadarCore
         let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight")])
         let before = try await RoomNotificationContent.candidates(session: app, prayerDays: [day], now: now)
         let line = try XCTUnwrap(before.first { $0.id == "notes.2026-10-15.line" }, "nothing is written for today")
-        XCTAssertEqual(line.dueAt, day.isha.addingTimeInterval(1800), "after Isha's sanctity window ends")
+        XCTAssertEqual(line.dueAt, day.isha.addingTimeInterval(1800 + 180), "three minutes after Isha's sanctity window ends, behind the Quran reminder")
         XCTAssertTrue(try RoomNotificationContent.stillRelevant(line.id, session: app, now: now))
         let context = ModelContext(app.container)
         let entry = Entry(); entry.dayKey = "2026-10-15"; entry.text = "سطر"; entry.eventAt = now; context.insert(entry)

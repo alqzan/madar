@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import MadarCore
 import MadarDesign
 
 struct QuranWeekView: View {
@@ -10,6 +11,9 @@ struct QuranWeekView: View {
     @Environment(\.dynamicTypeSize) private var type
     @State private var week: QuranUIWeek?
     @State private var selected: QuranUIWeekDay?
+    /// The week's rings draw themselves one day after another when the page opens (owner, 23 Nov: crafted motion everywhere).
+    @State private var ringsDrawn = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var error: String?
     @State private var loadRequestID = UUID()
     @State private var reloadTask: Task<Void, Never>?
@@ -71,26 +75,28 @@ struct QuranWeekView: View {
         card {
             VStack(alignment: .leading, spacing: 14) {
                 Text("حلقات آخر سبعة أيام").font(font(17, bold: true))
-                Text((value.closedDays == 0 ? "لم تُغلق الحلقتين في أي يوم من " : "أغلقت الحلقتين في " + service.numerals.string(value.closedDays) + " من ") + service.numerals.string(value.eligibleDays) + (value.eligibleDays == 1 ? " يوم الحفظ" : value.eligibleDays == 2 ? " يومَي الحفظ" : " أيام الحفظ"))
+                Text(quranWeekClosedLine(closed: value.closedDays, eligible: value.eligibleDays, digits: service.numerals))
                     .font(font(14)).accessibilityIdentifier("quran-week-closed")
                 if type.isAccessibilitySize {
                     ForEach(value.days) { day in Button { selected = day } label: { Text(day.label + "، حفظ " + faces(day.hifz) + "، مراجعة " + faces(day.review)).font(font(15)).frame(minHeight: 44) }.buttonStyle(.madarPlain) }
                 } else {
                     HStack(spacing: 3) {
-                        ForEach(value.days) { day in
+                        ForEach(Array(value.days.enumerated()), id: \.element.id) { index, day in
+                            let drawn = ringsDrawn || reduceMotion
                             Button { selected = day } label: {
                                 VStack(spacing: 9) {
                                     ZStack {
                                         Circle().stroke(theme.color("track"), lineWidth: 4)
-                                        Circle().trim(from: 0, to: min(1, Double(day.hifz))).stroke(theme.color("gold"), lineWidth: 4).rotationEffect(.degrees(-90)).scaleEffect(x: -1, y: 1)
+                                        Circle().trim(from: 0, to: drawn ? min(1, Double(day.hifz)) : 0).stroke(theme.color("gold"), style: .init(lineWidth: 4, lineCap: .round)).rotationEffect(.degrees(-90)).scaleEffect(x: -1, y: 1)
                                         Circle().stroke(theme.color("track"), lineWidth: 3).padding(7)
-                                        Circle().trim(from: 0, to: min(1, Double(day.review) / 8)).stroke(theme.color("review"), lineWidth: 3).padding(7).rotationEffect(.degrees(-90)).scaleEffect(x: -1, y: 1)
-                                        if day.closed { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(theme.color("reviewText")) }
+                                        Circle().trim(from: 0, to: drawn ? min(1, Double(day.review) / 8) : 0).stroke(theme.color("review"), style: .init(lineWidth: 3, lineCap: .round)).padding(7).rotationEffect(.degrees(-90)).scaleEffect(x: -1, y: 1)
+                                        if day.closed { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(theme.color("reviewText")).opacity(drawn ? 1 : 0).scaleEffect(drawn ? 1 : 0.4) }
                                     }.frame(width: 38, height: 38)
+                                    .animation(reduceMotion ? nil : .smooth(duration: 0.7).delay(0.1 + Double(index) * 0.07), value: ringsDrawn)
                                     Text(day.label).font(font(11, bold: day.today)).foregroundStyle(theme.secondaryInk)
                                 }.frame(maxWidth: .infinity, minHeight: 62)
                             }.buttonStyle(.madarPlain).accessibilityLabel(day.label + "، حفظ " + faces(day.hifz) + "، مراجعة " + faces(day.review))
-                                .accessibilityIdentifier("quran-week-day-" + day.id)
+                                .accessibilityIdentifier("quran-week-day-" + day.id).onAppear { ringsDrawn = true }
                         }
                     }
                 }
@@ -164,5 +170,18 @@ struct QuranWeekView: View {
             week = nil
             self.error = quranUserMessage(error)
         }
+    }
+}
+
+/// The week's ring line in words: no bare «١ من ١ يوم», and one or two days of hifz are named, not counted.
+func quranWeekClosedLine(closed: Int, eligible: Int, digits: MadarNumberFormatter) -> String {
+    switch eligible {
+    case 0: return "لا يوم حفظ في آخر سبعة أيام"
+    case 1: return closed >= 1 ? "أغلقت الحلقتين في يوم الحفظ الوحيد" : "لم تُغلق الحلقتين في يوم الحفظ الوحيد"
+    case 2: return closed >= 2 ? "أغلقت الحلقتين في يومَي الحفظ كليهما" : closed == 1 ? "أغلقت الحلقتين في أحد يومَي الحفظ" : "لم تُغلق الحلقتين في أيٍّ من يومَي الحفظ"
+    default:
+        if closed == 0 { return "لم تُغلق الحلقتين في أي يوم من " + digits.string(eligible) + " أيام الحفظ" }
+        if closed >= eligible { return "أغلقت الحلقتين في أيام الحفظ كلها" }
+        return "أغلقت الحلقتين في " + digits.string(closed) + " من " + digits.string(eligible) + " أيام الحفظ"
     }
 }

@@ -14,6 +14,7 @@ struct HabitOrbitView:View {
     /// What the centre says: «٣ من ٦» and its caption, or the chosen habit's own state.
     var centre:(title:String,caption:String) = ("","")
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let frequencies:[HabitFrequency] = [.daily,.weekly,.monthly,.yearly]
     private static let radii:[Double] = [78,112,144,162]
     private static let single:[Double] = [0.5,0.28,0.72,0.4]
@@ -57,7 +58,7 @@ struct HabitOrbitView:View {
                                         .shadow(color:on ? theme.accentFill.opacity(0.55) : .clear,radius:on ? 9 : 0)
                                         .frame(width:44,height:44).contentShape(.circle)
                                 }.buttonStyle(.madarPlain).opacity(selected == nil || on ? 1 : 0.32)
-                                .accessibilityLabel(row.name+"، "+row.statusTitle).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("habit-orbit-"+row.id.uuidString)
+                                .accessibilityLabel(row.name+"، "+row.statusTitle(digits)).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("habit-orbit-"+row.id.uuidString)
                                 .position(x:x,y:y)
                                 if on {
                                     Text(row.name).font(HabitType.fine()).foregroundStyle(theme.surface).padding(.horizontal,8).padding(.vertical,2).background(theme.accent,in:.rect(cornerRadius:10))
@@ -67,6 +68,7 @@ struct HabitOrbitView:View {
                         }
                         VStack(spacing:2) {
                             Text(centre.title).font(HabitType.cardTitle()).lineLimit(1).minimumScaleFactor(0.6)
+                                .contentTransition(.numericText()).animation(reduceMotion ? nil : .snappy, value: centre.title)
                             Text(centre.caption).font(HabitType.fine()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
                         }.padding(8).frame(width:100*k,height:100*k).background(theme.surface,in:.circle).position(x:c,y:c)
                     }.frame(width:size,height:size).frame(maxWidth:.infinity)

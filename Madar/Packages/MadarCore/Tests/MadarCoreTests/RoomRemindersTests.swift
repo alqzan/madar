@@ -143,6 +143,17 @@ import Testing
         #expect(RoomReminders.digestKinds(memberIDs: (0..<11).map { "habits.d.\($0)" }) == ["عادة"])
     }
 
+    @Test func diaryRemindersKeepAFixedPlaceAfterTheQuranReminder() {
+        // Notifications audit (23 Nov): wird at Fajr + 30, intention + 3 minutes, letter + 6; line + 3 and memory + 6 after Isha.
+        let fajrEnd = day.fajr.addingTimeInterval(1800), ishaEnd = day.isha.addingTimeInterval(1800)
+        #expect(RoomReminders.diary(.niyya, day: day, time: .afterFajr, prayerDays: [day], now: dawn)?.dueAt == fajrEnd.addingTimeInterval(180))
+        #expect(RoomReminders.diary(.letter, day: day, time: .afterFajr, prayerDays: [day], now: dawn)?.dueAt == fajrEnd.addingTimeInterval(360))
+        #expect(RoomReminders.diary(.line, day: day, time: .afterIsha, prayerDays: [day], now: dawn)?.dueAt == ishaEnd.addingTimeInterval(180))
+        #expect(RoomReminders.diary(.onThisDay, day: day, time: .afterIsha, prayerDays: [day], now: dawn)?.dueAt == ishaEnd.addingTimeInterval(360))
+        // A re-plan a minute after the Quran reminder still keeps the letter in its place: nothing depends on a sibling.
+        #expect(RoomReminders.diary(.letter, day: day, time: .afterFajr, prayerDays: [day], now: fajrEnd.addingTimeInterval(60))?.dueAt == fajrEnd.addingTimeInterval(360))
+    }
+
     @Test func budgetOfFourSendsThreeAndOneDigestThatKnowsItsMembers() {
         // Five room requests on one Madar day, B = 4 (§8 item 8: more than B → the first B − 1 by priority then time, the rest in one digest; B or fewer all go out).
         let at = { (minutes: Double) in day.dhuhr.addingTimeInterval(3600 + minutes * 60) }
@@ -166,9 +177,9 @@ import Testing
     // §7.3: the intention card after Fajr, «في مثل هذا اليوم» after Isha by default; §8 item 8 ids and the notes cap of 2.
     @Test func diaryKindsFallAfterTheirPrayerAndRespectTheNotesCap() {
         let niyya = RoomReminders.diary(.niyya, day: day, time: .afterFajr, prayerDays: [day], now: dawn)
-        #expect(niyya == .init(id: "notes.2026-10-09.niyya", room: .notes, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-09"))
+        #expect(niyya == .init(id: "notes.2026-10-09.niyya", room: .notes, dueAt: day.fajr.addingTimeInterval(1800 + 180), dayKey: "2026-10-09"))
         let memory = RoomReminders.diary(.onThisDay, day: day, time: .afterIsha, prayerDays: [day], now: dawn)
-        #expect(memory?.dueAt == day.isha.addingTimeInterval(1800))
+        #expect(memory?.dueAt == day.isha.addingTimeInterval(1800 + 360))
         #expect(RoomReminders.diary(.onThisDay, day: day, time: .off, prayerDays: [day], now: dawn) == nil)
         let letter = RoomReminders.diary(.letter, day: day, time: .afterFajr, prayerDays: [day], now: dawn)!
         #expect(RoomReminders.digestKinds(memberIDs: [niyya!.id, memory!.id, letter.id]) == ["النيّة", "ذكرى", "رسالة"])
