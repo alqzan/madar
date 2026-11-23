@@ -155,8 +155,8 @@ import UIKit
         XCTAssertTrue(purge.waitForExistence(timeout: 5), app.debugDescription)
         purge.tap()
         app.slideToConfirm()
-        Thread.sleep(forTimeInterval: 1.5); shot(app, "MIH-TRASH-after-purge-L")
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-trash-empty"].waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "MIH-TRASH-after-purge-L")
         app.terminate()
     }
 

@@ -10,6 +10,7 @@ struct QuranMushafView: View {
     var initialAyah: Int? = nil
     let close: () -> Void
     @Environment(\.roomTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var number = 1
     @State private var page: QuranUIPage?
     @State private var error: String?
@@ -147,7 +148,14 @@ struct QuranMushafView: View {
                     }
                 }
             }
-        } label: { Image(systemName: marked.isEmpty ? "bookmark" : "bookmark.fill").font(.system(size: 17, weight: .medium)).contentTransition(.symbolEffect(.replace)).symbolEffect(.bounce, value: marked.isEmpty).symbolEffectsRemoved(UIAccessibility.isReduceMotionEnabled).frame(width: 44, height: 44) }
+        } label: {
+            Image(systemName: marked.isEmpty ? "bookmark" : "bookmark.fill")
+                .font(.system(size: 17, weight: .medium))
+                .contentTransition(.symbolEffect(.replace))
+                .symbolEffect(.bounce, value: marked.isEmpty)
+                .symbolEffectsRemoved(reduceMotion)
+                .frame(width: 44, height: 44)
+        }
             .buttonStyle(.madarPlain).accessibilityLabel("العلامات").accessibilityIdentifier("quran-mushaf-bookmarks")
             .alert("اسم العلامة", isPresented: $naming) {
                 TextField("مثل: موضع المراجعة", text: $bookmarkName).accessibilityIdentifier("quran-mushaf-bookmark-name")

@@ -251,7 +251,9 @@ struct BackupSettingsView: View {
     /// Essentials mode (core.essentials) folds the unencrypted export away; it stays open once a file is ready.
     private let hidesAdvanced: Bool
     @FocusState private var focusedPassword: Int?
+    @Environment(AppSession.self) private var session: AppSession?
     @Environment(\.roomTheme) private var theme
+    @State private var passwordAccessoryHider = "backup-password-" + UUID().uuidString
     init(service: any BackupUIService, numerals: NumeralStyle = .hindi,
          dates: @escaping (Date) -> MadarDateLabels,
          time: @escaping (Date) -> String = { $0.formatted(date: .omitted, time: .shortened) },
@@ -297,7 +299,15 @@ struct BackupSettingsView: View {
         .navigationTitle("النسخ والاستعادة").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); keyboardDoneButton } }
             .task { await model.refresh() }
-            .onDisappear { model.close() }
+            .onChange(of: focusedPassword != nil) { _, isEditing in
+                // Keep the floating room bar off the keyboard accessory and restore it on Done.
+                if isEditing { session?.accessoryHiders.insert(passwordAccessoryHider) }
+                else { session?.accessoryHiders.remove(passwordAccessoryHider) }
+            }
+            .onDisappear {
+                session?.accessoryHiders.remove(passwordAccessoryHider)
+                model.close()
+            }
             .fileImporter(isPresented: $choosingFile, allowedContentTypes: filePurpose == .folder ? [.folder] : [UTType(filenameExtension: "madarbackup") ?? .data, UTType(exportedAs: "com.alqzan.madar2.backupset", conformingTo: .package)], allowsMultipleSelection: false) { result in
                 switch result {
                 case .success(let urls):

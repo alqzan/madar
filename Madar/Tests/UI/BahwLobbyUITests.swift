@@ -483,6 +483,109 @@ import XCTest
         XCTAssertFalse(pill.waitForExistence(timeout: 3), "«لا، أنا مقيم هنا» is remembered for this place.")
     }
 
+    func testTravelContinuesToSameNamedCityInAnotherCountry() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let base = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_HABIT_FIXTURE": "lobbySix", "MADAR_UI_THEME": "light"]
+        func launch(fix: String, now: String) {
+            app.launchEnvironment = base.merging(["MADAR_UI_TRAVEL_FIX": fix, "MADAR_UI_NOW": now]) { _, value in value }
+            app.launch()
+        }
+        func pill(containing label: String) -> XCUIElement {
+            app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "bahw-travel-pill", label)).firstMatch
+        }
+        func open(_ button: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+            XCTAssertTrue(button.waitForExistence(timeout: 20), app.debugDescription, file: file, line: line)
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: button)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 8), .completed, app.debugDescription, file: file, line: line)
+            button.tap()
+        }
+
+        launch(fix: "51.5074,-0.1278,لندن,GB,Europe/London", now: "2026-10-15T20:00:00+03:00")
+        let loaded = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "bahw-habits-open", "٦")).firstMatch
+        XCTAssertTrue(loaded.waitForExistence(timeout: 20), app.debugDescription)
+        open(pill(containing: "خارج مدينتك"))
+        open(app.buttons["bahw-travel-yes"])
+        XCTAssertTrue(pill(containing: "مسافر في لندن").waitForExistence(timeout: 15), app.debugDescription)
+        app.terminate()
+
+        launch(fix: "42.9849,-81.2453,لندن,CA,America/Toronto", now: "2026-10-16T20:00:00+03:00")
+        let arabic = Locale(identifier: "ar")
+        let canada = arabic.localizedString(forRegionCode: "CA") ?? "CA"
+        let unitedKingdom = arabic.localizedString(forRegionCode: "GB") ?? "GB"
+        let firstStop = "لندن، " + unitedKingdom
+        let secondStop = "لندن، " + canada
+        open(pill(containing: "وصلت إلى " + secondStop))
+        let add = app.buttons["bahw-trip-continue"]
+        XCTAssertTrue(add.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(add.label.contains(secondStop), add.label)
+        let itinerary = firstStop + " ← " + secondStop
+        add.tap()
+        open(pill(containing: itinerary))
+        let legs = app.staticTexts["bahw-trip-legs"]
+        XCTAssertTrue(legs.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(legs.label, itinerary)
+        XCTAssertFalse(add.exists, "The new stop is already the active leg.")
+    }
+
+    func testManualTravelStartsContinuesAndEndsWithoutUsingTheLocationFix() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_HABIT_FIXTURE": "lobbySix",
+            "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_TRAVEL_FIX": "21.4858,39.1925,جدة,SA,Asia/Riyadh",
+        ]
+        func pill(containing label: String) -> XCUIElement {
+            app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "bahw-travel-pill", label)).firstMatch
+        }
+        func tap(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+            XCTAssertTrue(element.waitForExistence(timeout: 20), app.debugDescription, file: file, line: line)
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: element)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 8), .completed, app.debugDescription, file: file, line: line)
+            element.tap()
+        }
+        func selectCity(_ name: String, country: String) {
+            let search = app.textFields["bahw-travel-city-search"]
+            tap(search)
+            search.typeText(name)
+            tap(app.buttons["bahw-travel-city-" + name + country])
+            XCTAssertEqual(app.staticTexts["bahw-travel-selected-city"].label, name)
+        }
+
+        app.launch()
+        XCTAssertTrue(pill(containing: "خارج مدينتك").waitForExistence(timeout: 20), app.debugDescription)
+        tap(app.buttons["tab-customize"])
+        let settingsSearch = app.textFields["settings-search"]
+        tap(settingsSearch)
+        settingsSearch.typeText("وضع السفر\n")
+        let manual = app.buttons["option-core.travelMode-manual"]
+        tap(manual)
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: manual)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, app.debugDescription)
+        tap(app.buttons["tab-foundation"])
+
+        tap(pill(containing: "ابدأ رحلة"))
+        capture(app, "BAHW-manual-travel-search-L", window: true)
+        selectCity("دبي", country: "AE")
+        XCTAssertFalse(app.buttons["bahw-travel-yes"].exists, "Manual travel confirms the selected city instead of asking about the location fix.")
+        capture(app, "BAHW-manual-travel-confirm-L", window: true)
+        tap(app.buttons["bahw-travel-city-confirm"])
+        XCTAssertTrue(pill(containing: "مسافر في دبي").waitForExistence(timeout: 15), app.debugDescription)
+        app.terminate()
+
+        app.launchEnvironment["MADAR_UI_NOW"] = "2026-10-16T20:00:00+03:00"
+        app.launch()
+        tap(pill(containing: "مسافر في دبي"))
+        XCTAssertFalse(app.buttons["bahw-trip-continue"].exists, "The conflicting Jeddah fix must not be offered in manual mode.")
+        tap(app.buttons["bahw-trip-add-city"])
+        selectCity("القاهرة", country: "EG")
+        tap(app.buttons["bahw-travel-city-confirm"])
+        tap(pill(containing: "دبي ← القاهرة"))
+        XCTAssertEqual(app.staticTexts["bahw-trip-legs"].label, "دبي ← القاهرة")
+        tap(app.buttons["bahw-trip-end"])
+        XCTAssertTrue(pill(containing: "ابدأ رحلة").waitForExistence(timeout: 15), app.debugDescription)
+    }
+
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
@@ -499,8 +602,9 @@ import XCTest
         // Choosing the city finishes first run; there is no photos step any more (B2-12).
         XCTAssertTrue(app.buttons["first-run-city"].waitForNonExistence(timeout: 8), app.debugDescription)
     }
-    private func capture(_ app: XCUIApplication, _ name: String) {
-        let s = app.screenshot(), a = XCTAttachment(screenshot: s); a.name = name; a.lifetime = .keepAlways; add(a)
+    private func capture(_ app: XCUIApplication, _ name: String, window: Bool = false) {
+        let s = window ? app.windows.firstMatch.screenshot() : app.screenshot()
+        let a = XCTAttachment(screenshot: s); a.name = name; a.lifetime = .keepAlways; add(a)
         // xcodebuild can hang after the run and lose attachments; a shot folder keeps them on disk.
         if let dir = ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png")) }
     }

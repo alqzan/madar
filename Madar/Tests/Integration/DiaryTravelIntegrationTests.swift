@@ -139,4 +139,50 @@ import MadarData
         XCTAssertEqual(summary.lastTZID, latest?.tzID)
         XCTAssertEqual(summary.photo, photoBytes)
     }
+
+    func testLobbyReadCachesAreIsolatedAndDiaryHonorsProtectedReads() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "LobbyDiaryCache-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let instant = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-11-07T10:00:00Z"))
+        let day = try GregorianDay("2026-11-07")
+
+        func store(_ name: String, text: String, city: String) throws -> AppSession {
+            let directory = root.appending(path: name)
+            let container = try MadarContainerFactory.makeLocal(at: directory)
+            let context = ModelContext(container)
+            let row = Entry()
+            row.dayKey = day.description
+            row.text = text
+            row.ink = "normal"
+            row.source = "native"
+            row.eventAt = instant
+            context.insert(row)
+            let trip = Trip()
+            trip.city = city
+            trip.tzID = "Asia/Riyadh"
+            trip.lat = 21.5
+            trip.lon = 39.2
+            trip.start = instant.addingTimeInterval(-3_600)
+            context.insert(trip)
+            try context.save()
+            return try AppSession(container: container, groupDirectory: directory)
+        }
+
+        let first = try store("first", text: "السطر الأول", city: "جدة")
+        let second = try store("second", text: "السطر الثاني", city: "مكة المكرمة")
+        let firstLobby = AppBahwService(session: first, evaluationDate: instant)
+        let secondLobby = AppBahwService(session: second, evaluationDate: instant)
+        XCTAssertEqual(firstLobby.today, secondLobby.today)
+        XCTAssertEqual(first.storeGeneration, second.storeGeneration)
+        first.authorizeProtectedData()
+        XCTAssertEqual(firstLobby.diary()?.lastText, "السطر الأول")
+        XCTAssertNil(secondLobby.diary())
+        second.authorizeProtectedData()
+        XCTAssertEqual(secondLobby.diary()?.lastText, "السطر الثاني")
+        XCTAssertEqual(firstLobby.automaticUpcoming().first { $0.id.hasPrefix("auto-trip-") }?.title, "في جدة")
+        XCTAssertEqual(secondLobby.automaticUpcoming().first { $0.id.hasPrefix("auto-trip-") }?.title, "في مكة المكرمة")
+        first.redactProtectedData()
+        XCTAssertNil(firstLobby.diary())
+        XCTAssertEqual(secondLobby.diary()?.lastText, "السطر الثاني")
+    }
 }

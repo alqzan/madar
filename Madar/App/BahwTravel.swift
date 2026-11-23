@@ -15,6 +15,8 @@ struct TravelFix: Equatable {
     let country: String
 }
 
+typealias TravelLeg = (city: String, country: String, start: Date, end: Date?)
+
 enum TravelRule {
     /// Owner decision, 13 Oct 2026: the distance is counted from the city's edge, approximated as this radius.
     static let homeRadiusKm = 25.0
@@ -27,6 +29,21 @@ enum TravelRule {
     /// `thresholdKm` is `core.travelKm` (default 80), measured beyond the home city's edge.
     static func isAway(home: ActivePlace, current: ActivePlace, thresholdKm: Double) -> Bool {
         distanceKm(from: home, to: current) - homeRadiusKm > thresholdKm
+    }
+    static func nextStop(_ fix: TravelFix?, from trip: PrayerTrip, country: String, home: ActivePlace, thresholdKm: Double) -> TravelFix? {
+        guard let fix, fix.city != trip.city || fix.country != country,
+              distanceKm(from: trip.place, to: fix.place) > thresholdKm,
+              isAway(home: home, current: fix.place, thresholdKm: thresholdKm) else { return nil }
+        return fix
+    }
+    /// AU-89: only cities whose name is shared across countries need a country label.
+    static func locationLabel(_ city: String, country: String, among legs: [TravelLeg]) -> String {
+        guard !country.isEmpty, legs.contains(where: { $0.city == city && !$0.country.isEmpty && $0.country != country }) else { return city }
+        let name = Locale(identifier: "ar").localizedString(forRegionCode: country) ?? country
+        return "\(city)، \(name)"
+    }
+    static func itineraryLabel(_ legs: [TravelLeg]) -> String {
+        legs.map { locationLabel($0.city, country: $0.country, among: legs) }.joined(separator: " ← ")
     }
     /// RP4: the local method suggested when the trip starts.
     static func suggestedMethod(country: String) -> PrayerCalculationMethod {
@@ -122,7 +139,7 @@ final class TravelLocator: NSObject, CLLocationManagerDelegate {
 final class BahwTravelModel {
     let locator = TravelLocator()
     private(set) var trip: PrayerTrip?
-    private(set) var legs: [(city: String, country: String, start: Date, end: Date?)] = []
+    private(set) var legs: [TravelLeg] = []
     /// The «مقيم هنا» answer lives in device defaults, which SwiftUI does not observe; each refresh re-reads it.
     private var answerVersion = 0
 
@@ -131,41 +148,47 @@ final class BahwTravelModel {
         let repository = try? PrayerRepository(context: ModelContext(session.container))
         trip = repository?.activeTrip(at: session.prayerNow())
         legs = trip.flatMap { repository?.journeyLegs(of: $0.id) } ?? []
-        if detects(session) { locator.refresh() }
+        if !isManual(session) { locator.refresh() }
     }
-    private func detects(_ session: AppSession) -> Bool { session.string("core.travelMode") != "manual" }
+    func isManual(_ session: AppSession) -> Bool { session.string("core.travelMode") == "manual" }
+    func detectedFix(_ session: AppSession) -> TravelFix? { isManual(session) ? nil : locator.fix }
     func thresholdKm(_ session: AppSession) -> Double {
         if case .number(let km) = session.values["core.travelKm"] { km } else { 80 }
     }
     /// Away from home, not on a trip and not already answered «لا، أنا مقيم هنا» for this place.
     func awayFix(_ session: AppSession) -> TravelFix? {
         _ = answerVersion
-        guard detects(session), trip == nil, let fix = locator.fix,
+        guard trip == nil, let fix = detectedFix(session),
               TravelRule.isAway(home: session.activePlace, current: fix.place, thresholdKm: thresholdKm(session)),
               !TravelRule.declined(near: fix.place, thresholdKm: thresholdKm(session)) else { return nil }
         return fix
     }
-    /// The line under the lobby header: «خارج مدينتك؟» until answered, «مسافر في جدة» on a trip, nothing at home.
+    /// The lobby opens the detected question, the current trip, or manual city selection.
     func pillText(_ session: AppSession) -> String? {
         if let trip {
             let km = thresholdKm(session)
-            if let fix = locator.fix, !TravelRule.isAway(home: session.activePlace, current: fix.place, thresholdKm: km) { return "عدتَ إلى مدينتك؟" }
-            if let fix = locator.fix, fix.city != trip.city, TravelRule.distanceKm(from: trip.place, to: fix.place) > km { return "وصلت إلى " + fix.city + "؟" }
-            return "مسافر في " + (legs.count > 1 ? legs.map(\.city).joined(separator: " ← ") : trip.city)
+            let home = session.activePlace
+            let fix = detectedFix(session)
+            if let fix, !TravelRule.isAway(home: home, current: fix.place, thresholdKm: km) { return "عدتَ إلى مدينتك؟" }
+            if let stop = TravelRule.nextStop(fix, from: trip, country: legs.last?.country ?? "", home: home, thresholdKm: km) {
+                return "وصلت إلى " + TravelRule.locationLabel(stop.city, country: stop.country, among: legs) + "؟"
+            }
+            return "مسافر في " + (legs.count > 1 ? TravelRule.itineraryLabel(legs) : trip.city)
         }
+        if isManual(session) { return "ابدأ رحلة" }
         return awayFix(session) != nil ? "خارج مدينتك؟" : nil
     }
 }
 
 struct BahwTravelPill: View {
     let text: String
-    let onTrip: Bool
+    let showsPlane: Bool
     let action: () -> Void
     @Environment(\.roomTheme) private var theme
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: onTrip ? "airplane" : "location").font(.system(size: 13, weight: .semibold))
+                Image(systemName: showsPlane ? "airplane" : "location").font(.system(size: 13, weight: .semibold))
                 Text(text).font(MadarTypography.caption().bold())
                 Image(systemName: "chevron.backward").font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.secondaryInk)
             }
@@ -198,6 +221,26 @@ private struct TravelButton: View {
     }
 }
 
+private struct TravelMethodPicker: View {
+    let city: String
+    @Binding var method: PrayerCalculationMethod
+    @Environment(\.roomTheme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("طريقة حساب المواقيت في \(city)").font(MadarTypography.section())
+            Text("اقترحنا طريقة البلد، وتعود مدينتك إلى طريقتها بعد الرحلة.")
+                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+            Picker("الطريقة", selection: $method) {
+                ForEach(PrayerCalculationMethod.allCases, id: \.self) { Text(TravelRule.methodName($0)).tag($0) }
+            }
+            .pickerStyle(.menu).accessibilityIdentifier("bahw-travel-method")
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.surface, in: .rect(cornerRadius: 20))
+    }
+}
+
 /// The one question at the start of a trip (RP7), with the local method suggested (RP4).
 struct BahwTravelQuestionSheet: View {
     let session: AppSession
@@ -225,17 +268,7 @@ struct BahwTravelQuestionSheet: View {
                 Text("هل أنت مسافر؟").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
                 Text("أنت الآن في \(fix.city)، على بعد \(AppBahwService(session: session).digits.string(Int(homeKm.rounded()))) كم من مدينتك. " + effects)
                     .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("طريقة حساب المواقيت في \(fix.city)").font(MadarTypography.section())
-                    Text("اقترحنا طريقة البلد، وتعود مدينتك إلى طريقتها بعد الرحلة.")
-                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
-                    Picker("الطريقة", selection: $method) {
-                        ForEach(PrayerCalculationMethod.allCases, id: \.self) { Text(TravelRule.methodName($0)).tag($0) }
-                    }
-                    .pickerStyle(.menu).disabled(starting).accessibilityIdentifier("bahw-travel-method")
-                }
-                .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                .background(theme.surface, in: .rect(cornerRadius: 20))
+                TravelMethodPicker(city: fix.city, method: $method).disabled(starting)
                 TravelButton(title: "نعم، أنا مسافر", id: "bahw-travel-yes", busy: starting || session.tripWriteInProgress) {
                     guard !starting else { return }
                     starting = true
@@ -256,22 +289,96 @@ struct BahwTravelQuestionSheet: View {
     }
 }
 
+/// Manual travel uses the offline city catalogue without changing the home city or asking for location.
+struct BahwTravelCitySheet: View {
+    let session: AppSession
+    var trip: PrayerTrip? = nil
+    var legs: [TravelLeg] = []
+    let finished: () -> Void
+    let cancel: () -> Void
+    @Environment(\.roomTheme) private var theme
+    @FocusState private var searchFocused: Bool
+    @State private var query = ""
+    @State private var selection: CatalogCity?
+    @State private var method: PrayerCalculationMethod = .ummAlQura
+    @State private var saving = false
+
+    private var savingTrip: Bool { saving || session.tripWriteInProgress }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(trip == nil ? "ابدأ رحلة" : "أضف محطة").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
+                if let city = selection {
+                    let name = TravelRule.locationLabel(city.name, country: city.country, among: legs)
+                    Text(name).font(MadarTypography.section()).accessibilityIdentifier("bahw-travel-selected-city")
+                    if trip == nil { TravelMethodPicker(city: city.name, method: $method).disabled(savingTrip) }
+                    TravelButton(title: trip == nil ? "ابدأ الرحلة" : "أضف المحطة", id: "bahw-travel-city-confirm", busy: savingTrip) {
+                        confirm(city)
+                    }
+                    TravelButton(title: "غيّر المدينة", id: "bahw-travel-city-change", primary: false, busy: savingTrip) { selection = nil }
+                } else {
+                    TextField("ابحث عن مدينة", text: $query).textFieldStyle(.roundedBorder)
+                        .focused($searchFocused).accessibilityIdentifier("bahw-travel-city-search")
+                    let results = CityCatalog.search(query).filter { city in
+                        city.name != trip?.city || city.country != legs.last?.country
+                    }
+                    ForEach(results) { city in
+                        let name = TravelRule.locationLabel(city.name, country: city.country, among: legs)
+                        Button {
+                            searchFocused = false
+                            method = TravelRule.suggestedMethod(country: city.country)
+                            selection = city
+                        } label: {
+                            Text(name).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        }
+                        .buttonStyle(.madarPlain).accessibilityIdentifier("bahw-travel-city-" + city.id)
+                    }
+                    if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && results.isEmpty {
+                        Text("لا توجد وجهة مطابقة في قائمة المدن.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    }
+                }
+                TravelButton(title: "إلغاء", id: "bahw-travel-city-cancel", primary: false, busy: savingTrip, action: cancel)
+            }
+            .padding(24)
+        }
+        .background(theme.background).foregroundStyle(theme.ink)
+        .madarSheetLock(saving: savingTrip)
+    }
+
+    private func confirm(_ city: CatalogCity) {
+        guard !savingTrip else { return }
+        guard let place = try? ActivePlace(latitude: city.lat, longitude: city.lon, timeZoneID: city.tz) else {
+            session.errorMessage = "تعذّر استخدام هذه المدينة."
+            return
+        }
+        let km = max(0, TravelRule.distanceKm(from: session.activePlace, to: place) - TravelRule.homeRadiusKm)
+        if trip != nil {
+            session.continueTrip(city: city.name, country: city.country, place: place, homeKm: km) { if $0 { finished() } }
+        } else {
+            saving = true
+            session.startTrip(city: city.name, country: city.country, place: place, homeKm: km, method: method) { succeeded in
+                saving = false
+                if succeeded { finished() }
+            }
+        }
+    }
+}
+
 /// The open trip: where it goes, the next stop when the phone is elsewhere, and the way to end it.
 struct BahwTripSheet: View {
     let session: AppSession
     let trip: PrayerTrip
-    let legs: [(city: String, country: String, start: Date, end: Date?)]
+    let legs: [TravelLeg]
     var fix: TravelFix?
     var thresholdKm: Double = 80
+    let manual: Bool
     let finished: () -> Void
     @Environment(\.roomTheme) private var theme
+    @State private var choosingStop = false
 
     private var nextStop: TravelFix? {
-        guard let fix, let current = legs.last ?? .some((trip.city, "", trip.start, nil)),
-              fix.city != current.city || fix.country != current.country,
-              TravelRule.distanceKm(from: trip.place, to: fix.place) > thresholdKm,
-              TravelRule.isAway(home: session.activePlace, current: fix.place, thresholdKm: thresholdKm) else { return nil }
-        return fix
+        TravelRule.nextStop(fix, from: trip, country: legs.last?.country ?? "", home: session.activePlace, thresholdKm: thresholdKm)
     }
     private var backHome: Bool {
         guard let fix else { return false }
@@ -280,11 +387,23 @@ struct BahwTripSheet: View {
     private var since: GregorianDay { GregorianDay.containing(legs.first?.start ?? trip.start, in: trip.place.timeZone) }
 
     var body: some View {
+        Group {
+            if choosingStop {
+                BahwTravelCitySheet(session: session, trip: trip, legs: legs, finished: finished) { choosingStop = false }
+            } else {
+                tripContent
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .madarSheetLock(saving: session.tripWriteInProgress)
+    }
+
+    private var tripContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 Text(legs.count > 1 ? "رحلتك" : "رحلتك إلى \(trip.city)").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
                 if legs.count > 1 {
-                    Text(legs.map(\.city).joined(separator: " ← ")).font(MadarTypography.section()).foregroundStyle(theme.accent)
+                    Text(TravelRule.itineraryLabel(legs)).font(MadarTypography.section()).foregroundStyle(theme.accent)
                         .accessibilityIdentifier("bahw-trip-legs")
                 }
                 HStack(spacing: 6) {
@@ -292,11 +411,12 @@ struct BahwTripSheet: View {
                     MadarDateLabel(session.dateLabels(since)).foregroundStyle(theme.secondaryInk)
                 }
                 if let stop = nextStop {
+                    let stopName = TravelRule.locationLabel(stop.city, country: stop.country, among: legs)
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("أنت الآن في \(stop.city)").font(MadarTypography.section())
+                        Text("أنت الآن في \(stopName)").font(MadarTypography.section())
                         Text("أضفها محطةً في رحلتك نفسها: تُحسب المواقيت هنا، وتجمع ميزانية الرحلة مصروف المدينتين.")
                             .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
-                        TravelButton(title: "أضف \(stop.city) إلى رحلتك", id: "bahw-trip-continue", busy: session.tripWriteInProgress) {
+                        TravelButton(title: "أضف \(stopName) إلى رحلتك", id: "bahw-trip-continue", busy: session.tripWriteInProgress) {
                             session.continueTrip(city: stop.city, country: stop.country, place: stop.place,
                                                  homeKm: max(0, TravelRule.distanceKm(from: session.activePlace, to: stop.place) - TravelRule.homeRadiusKm)) { if $0 { finished() } }
                         }
@@ -304,13 +424,20 @@ struct BahwTripSheet: View {
                     .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                     .background(theme.surface, in: .rect(cornerRadius: 20))
                 }
+                if manual {
+                    TravelButton(title: "أضف محطة", id: "bahw-trip-add-city", primary: false, busy: session.tripWriteInProgress) {
+                        choosingStop = true
+                    }
+                }
                 Text("المواقيت محسوبة بطريقة \(TravelRule.methodName(PrayerCalculationMethod(rawValue: session.string("salah.tripMethod")) ?? .ummAlQura))، ويعود الحساب لمدينتك حين تنهي الرحلة.")
                     .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 TravelButton(title: backHome ? "عدتُ، أنهِ الرحلة" : "أنهِ الرحلة", id: "bahw-trip-end", busy: session.tripWriteInProgress) {
                     // Ending the trip while still far away means «I live here now»: the question does not come straight back.
                     session.endTrip(trip.id) { ended in
                         guard ended else { return }
-                        if let fix, !backHome { TravelRule.decline(fix.place) } else { TravelRule.clearDecline() }
+                        if !manual {
+                            if let fix, !backHome { TravelRule.decline(fix.place) } else { TravelRule.clearDecline() }
+                        }
                         finished()
                     }
                 }
@@ -319,7 +446,5 @@ struct BahwTripSheet: View {
             .padding(24)
         }
         .background(theme.background).foregroundStyle(theme.ink)
-        .presentationDetents([.medium, .large])
-        .madarSheetLock(saving: session.tripWriteInProgress)
     }
 }

@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import UserNotifications
 import MadarData
 import MadarCore
 @testable import Madar
@@ -162,6 +163,36 @@ import MadarCore
         XCTAssertFalse(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now), "A saved reconciliation makes the old request stale")
     }
 
+    func testMoneyReminderPlanningCacheBelongsToItsSessionAndLiveCheckBypassesIt() throws {
+        let (first, root, now, day) = try fixture(["core.dayStart": .string("midnight"), "mal.reconcileEveryDays": .number(90)])
+        first.authorizeProtectedData()
+        let context = ModelContext(first.container)
+        let account = Account()
+        account.name = "حساب اختبار"
+        account.balanceMinor = 1_234
+        account.balanceAt = now.addingTimeInterval(-100 * 86_400)
+        context.insert(account)
+        try context.save()
+
+        // Sharing the container makes the complete planning fingerprint identical for both sessions.
+        let second = try AppSession(container: first.container, groupDirectory: root.appending(path: "Second"))
+        second.authorizeProtectedData()
+        let reminder = try XCTUnwrap(RoomNotificationContent.reconciliationCandidates(session: first, prayerDays: [day], now: now).first)
+        var emptyReading = try AppMoneyService(app: second).loadReconcile(at: now)
+        emptyReading.rows = []
+        let secondPlan = MoneyReadingCache.read(second, now, \.reconcile) { emptyReading }
+        XCTAssertEqual(secondPlan?.rows.count, 0)
+        XCTAssertTrue(RoomNotificationContent.reconciliationCandidates(session: second, prayerDays: [day], now: now).isEmpty)
+        XCTAssertEqual(RoomNotificationContent.reconciliationCandidates(session: first, prayerDays: [day], now: now).map(\.id), [reminder.id])
+
+        XCTAssertTrue(try RoomNotificationContent.stillRelevant(reminder.id, session: second, now: now))
+        XCTAssertTrue(RoomNotificationContent.reconciliationCandidates(session: second, prayerDays: [day], now: now).isEmpty,
+                      "A foreground check reads live rows without replacing the planning snapshot.")
+        second.bindContainer(first.container)
+        XCTAssertEqual(RoomNotificationContent.reconciliationCandidates(session: second, prayerDays: [day], now: now).map(\.id), [reminder.id],
+                       "A rebind discards the previous planning snapshot.")
+    }
+
     func testZakatReminderSchedulesAmountFreeWhileProtectedDataIsClosedAndStopsWhenOff() throws {
         let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight"), "mal.zakatReminder": .string("1week")])
         app.authorizeProtectedData()
@@ -256,6 +287,77 @@ import MadarCore
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = place.timeZone
         XCTAssertEqual(calendar.component(.hour, from: candidate.dueAt), 8)
         XCTAssertEqual(calendar.component(.day, from: candidate.dueAt), 16)
+    }
+
+    func testHabitNotificationActionsDrainInboxAndReplayOnce() async throws {
+        let (app, _, _, _) = try fixture(["core.dayStart": .string("midnight"), "notif.thisDeviceReminders": .bool(false)])
+        app.authorizeProtectedData()
+        let now = app.prayerNow()
+        let day = GregorianDay.containing(now, in: ActivePlace.riyadh.timeZone).adding(days: -1)
+        let context = ModelContext(app.container)
+
+        func makeRequest(name: String, measure: String, goal: Int) -> (UUID, UNNotificationRequest) {
+            let habit = Habit()
+            habit.name = name
+            habit.kind = "custom"
+            habit.startDate = day.adding(days: -7).date(in: ActivePlace.riyadh.timeZone)
+            context.insert(habit)
+            let policy = HabitPolicy()
+            policy.habitID = habit.id
+            policy.effectiveFrom = day.adding(days: -7).description
+            policy.frequency = "daily"
+            policy.measure = measure
+            policy.target = goal
+            if measure == "count" { policy.unit = "cups" }
+            context.insert(policy)
+
+            let requestID = "habits.\(day).\(habit.id.uuidString)"
+            let ledger = NotificationLedger()
+            ledger.dayKey = day.description
+            ledger.requestID = requestID
+            ledger.room = "habits"
+            ledger.requestClass = "room"
+            ledger.state = "submitted"
+            ledger.scheduledFor = now
+            context.insert(ledger)
+            let content = UNMutableNotificationContent()
+            content.userInfo = ["dayKey": day.description, "habit": habit.id.uuidString, "amount": goal]
+            return (habit.id, UNNotificationRequest(identifier: requestID, content: content, trigger: nil))
+        }
+
+        let (walkID, walkRequest) = makeRequest(name: "مشي", measure: "once", goal: 1)
+        let (waterID, waterRequest) = makeRequest(name: "ماء", measure: "count", goal: 8)
+        try context.save()
+        let coordinator = PrayerNotificationCoordinator()
+
+        let finished = expectation(description: "Habit notification actions return after committing their inbox commands")
+        let handler = Task { @MainActor in
+            let amount = PrayerNotificationCoordinator.ActionResponse(request: waterRequest,
+                actionIdentifier: PrayerNotificationCoordinator.habitAmountPrefix + "other", userText: "٢٫٥")
+            await coordinator.handle(amount) // The response arrives before the app's store session attaches.
+            await app.attachPrayerNotifications(coordinator)
+            await coordinator.handle(amount)
+            await coordinator.handle(.init(request: walkRequest, actionIdentifier: PrayerNotificationCoordinator.habitDoneActionID, userText: nil))
+            finished.fulfill()
+        }
+        guard await XCTWaiter.fulfillment(of: [finished], timeout: 20) == .completed else {
+            handler.cancel()
+            XCTFail("The notification handler never returned from its inbox drain")
+            return
+        }
+
+        let result = ModelContext(app.container)
+        let events = try result.fetch(FetchDescriptor<HabitEvent>()).filter { $0.delta != 0 && $0.deletedAt == nil }
+        XCTAssertEqual(events.filter { $0.habitID == walkID }.map(\.delta), [1])
+        XCTAssertEqual(events.filter { $0.habitID == waterID }.map(\.delta), [3])
+        XCTAssertEqual(Set(events.map(\.dayKey)), [day.description])
+        let ledger = try result.fetch(FetchDescriptor<NotificationLedger>())
+        for (request, action) in [(walkRequest, "done"), (waterRequest, "other")] {
+            XCTAssertEqual(ledger.first { $0.requestID == request.identifier }?.state, "observed")
+            let commandID = StableIdentity.uuid(for: "notification.\(request.identifier).habit.\(action)")
+            XCTAssertTrue(try app.pendingInbox.wasCommitted(commandID: commandID))
+        }
+        XCTAssertNil(app.errorMessage)
     }
 
     /// Audit High 7: a daily habit whose window already passed today is asked for tomorrow's window, and the tap is keyed to tomorrow, never today.

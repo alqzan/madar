@@ -83,6 +83,8 @@ final class AppSession {
     /// Bumped when a library photo is linked to a page: every day-photo strip on screen (page and grown composer) drops it at once.
     var diaryPhotoEpoch = 0
     @ObservationIgnored weak var prayerNotifications: PrayerNotificationCoordinator?
+    @ObservationIgnored var plannedQuranReminderDetails: [String: PlannedQuranReminderDetail] = [:]
+    @ObservationIgnored let moneyReadingCache = MoneyReadingCache()
     @ObservationIgnored private var widgetHabitRefreshPending = false
     let schema: SettingsSchema
     var store: SettingsStore
@@ -307,6 +309,10 @@ final class AppSession {
         if !domains.isEmpty { storeGeneration &+= 1 }
         let previousContainer = container
         if let managedStore { try managedStore.refreshIfNeeded(); container = managedStore.container }
+        let containerChanged = container !== previousContainer
+        let changed = containerChanged ? .all : domains
+        if containerChanged { moneyReadingCache.invalidate() }
+        if changed.contains(.quran) { plannedQuranReminderDetails.removeAll() }
         store = SettingsStore(context: ModelContext(container), schema: schema)
         // One read per table, not one per setting: this runs after every write and every return to the app.
         values = try store.allValues()
@@ -314,7 +320,6 @@ final class AppSession {
         if case .string(let currency) = values["core.currency"], let defaults = UserDefaults(suiteName: "group.com.alqzan.madar2"), defaults.string(forKey: "core.currency") != currency {
             defaults.set(currency, forKey: "core.currency")
         }
-        let changed = container === previousContainer ? domains : .all
         guard !changed.isEmpty else { return }
         if domains.isEmpty { storeGeneration &+= 1 }
         prayerRevision &+= 1
@@ -1221,6 +1226,8 @@ final class AppSession {
     }
     func bindContainer(_ replacement: ModelContainer) {
         container = replacement
+        plannedQuranReminderDetails.removeAll()
+        moneyReadingCache.invalidate()
         let context = ModelContext(replacement)
         store = SettingsStore(context: context, schema: schema)
         do { _ = try PrayerHistoryMaintenance.removeUnperformedPrayerHistory(in: context, now: prayerNow()); _ = try PrayerHistoryMaintenance.removeAllPrayerRecords(in: context, now: prayerNow()); _ = try? HabitJamaahConversion.convert(in: context, today: GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone), now: prayerNow()) }

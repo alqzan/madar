@@ -93,9 +93,15 @@ final class PrayerNotificationCoordinator {
     static let wirdDoneActionID = "quran.wirdDone"
     private static let requestPrefix = "salah."
 
+    struct ActionResponse {
+        let request: UNNotificationRequest
+        let actionIdentifier: String
+        let userText: String?
+    }
+
     private let center: UNUserNotificationCenter
     private weak var session: AppSession?
-    private var pendingResponses: [UNNotificationResponse] = []
+    private var pendingResponses: [ActionResponse] = []
     private var lifecycleOperationInProgress = false
     private var lifecycleOperationWaiters: [CheckedContinuation<Void, Never>] = []
 
@@ -302,19 +308,25 @@ final class PrayerNotificationCoordinator {
     }
 
     func handle(_ response: UNNotificationResponse) async {
+        await handle(ActionResponse(request: response.notification.request,
+                                    actionIdentifier: response.actionIdentifier,
+                                    userText: (response as? UNTextInputNotificationResponse)?.userText))
+    }
+
+    func handle(_ response: ActionResponse) async {
         guard let session else { pendingResponses.append(response); return }
         guard session.beginNotificationStoreAccess() else { pendingResponses.append(response); return }
         defer { session.endNotificationStoreAccess() }
-        await acquireLifecycleLock()
-        defer { releaseLifecycleLock() }
+        let request = response.request
         do {
-            try updateLedger(requestID: response.notification.request.identifier, state: "observed")
+            // Habit completion drains the inbox under this same lock. Release it after recording the response.
+            try await withSerializedMutation { try updateLedger(requestID: request.identifier, state: "observed") }
             if response.actionIdentifier == Self.habitDoneActionID {
-                let info = response.notification.request.content.userInfo
+                let info = request.content.userInfo
                 guard let dayKey = info["dayKey"] as? String, let habit = (info["habit"] as? String).flatMap(UUID.init(uuidString:)) else { return }
-                try await session.completeHabitFromNotification(habitID: habit, dayKey: dayKey, requestID: response.notification.request.identifier)
+                try await session.completeHabitFromNotification(habitID: habit, dayKey: dayKey, requestID: request.identifier)
             } else if response.actionIdentifier.hasPrefix(Self.habitAmountPrefix) {
-                let info = response.notification.request.content.userInfo
+                let info = request.content.userInfo
                 guard let dayKey = info["dayKey"] as? String, let habit = (info["habit"] as? String).flatMap(UUID.init(uuidString:)) else { return }
                 let reading = try HabitRepository(context: ModelContext(session.container)).readings(at: Date()).first { $0.id == habit }
                 let target = (info["amount"] as? Int) ?? reading?.summary.current?.target ?? 1
@@ -323,17 +335,16 @@ final class PrayerNotificationCoordinator {
                 switch action {
                 case "full": amount = target
                 case "half": amount = target / 2
-                default: amount = (response as? UNTextInputNotificationResponse).flatMap { Self.typedAmount($0.userText) }
+                default: amount = response.userText.flatMap(Self.typedAmount)
                 }
                 guard let amount, amount > 0 else { session.errorMessage = "لم أفهم الكمية؛ اكتبها رقمًا."; return }
-                try await session.completeHabitFromNotification(habitID: habit, dayKey: dayKey, requestID: response.notification.request.identifier, delta: amount, action: action)
+                try await session.completeHabitFromNotification(habitID: habit, dayKey: dayKey, requestID: request.identifier, delta: amount, action: action)
             } else if response.actionIdentifier == Self.wirdDoneActionID {
                 // A reminder left in the centre from an earlier day never finishes today's wird: it only opens the room.
-                let sent = response.notification.request.content.userInfo["dayKey"] as? String
+                let sent = request.content.userInfo["dayKey"] as? String
                 let today = try? AppDiaryService(app: session).currentDay().description
                 session.open(URL(string: sent != nil && sent == today ? "madar://quran/finish-whole" : "madar://quran")!)
             } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
-                let request = response.notification.request
                 if RoomNotificationContent.isRoomRequest(request.identifier) { RoomNotificationContent.open(request.identifier, userInfo: request.content.userInfo, session: session) }
                 else { session.selectedTab = "habits" }
             }

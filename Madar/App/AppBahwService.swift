@@ -56,9 +56,19 @@ struct BahwUpcomingItem: Identifiable, Equatable {
 
 /// Lobby reads that the view body asks for on every render; kept on the session so stores never share them.
 @MainActor final class BahwReadCache {
-    var key = ""
+    struct Key: Equatable {
+        let container: ObjectIdentifier
+        let generation: Int
+        let day: GregorianDay
+        let minute: Int
+    }
+
+    var key: Key?
     var upcoming: [String: [BahwUpcomingItem]] = [:]
     var year: BahwYearModel?
+    var quran: (key: Key, value: BahwQuranModel?)?
+    var diary: (key: Key, value: BahwDiaryModel?)?
+    var automatic: (container: ObjectIdentifier, key: String, value: [BahwUpcomingItem])?
 }
 
 @MainActor struct AppBahwService {
@@ -136,14 +146,17 @@ struct BahwUpcomingItem: Identifiable, Equatable {
 
     /// FB-32 (owner: no freezes): the lobby body asks for these on every render; the Quran snapshot and the diary day
     /// are read once per store generation, day and minute, not on each frame.
-    private static var quranCache: (key: String, value: BahwQuranModel?)?
-    private static var diaryCache: (key: String, value: BahwDiaryModel?)?
-    private var cacheKey: String { "\(session.storeGeneration):\(today):\(Int(session.prayerNow().timeIntervalSince1970 / 60))" }
+    private var cacheKey: BahwReadCache.Key {
+        .init(container: ObjectIdentifier(session.container), generation: session.storeGeneration,
+              day: today, minute: Int(now.timeIntervalSince1970 / 60))
+    }
     func quran() -> BahwQuranModel? {
-        let key = cacheKey
-        if let cached = Self.quranCache, cached.key == key { return cached.value }
+        guard !session.maintenanceInProgress else { return nil }
+        let cache = session.bahwReads, key = cacheKey
+        if let cached = cache.quran, cached.key == key { return cached.value }
         let value = (try? AppQuranService(session: session).widgetSnapshot().payload).map { BahwQuranModel(coverage: $0.coverage, next: Self.quranNextLine($0.nextTitle, $0.nextDetail), days: $0.days) }
-        Self.quranCache = (key, value); return value
+        cache.quran = (key, value)
+        return value
     }
     /// «الورد: الإسراء ٢٨–٣٨» names the passage; «التالي: الورد» alone said nothing the card could not.
     static func quranNextLine(_ title: String, _ detail: String) -> String {
@@ -151,9 +164,12 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         return String(title.dropFirst("التالي: ".count)) + ": " + detail
     }
     func diary() -> BahwDiaryModel? {
-        let key = cacheKey
-        if let cached = Self.diaryCache, cached.key == key { return cached.value }
-        let value = readDiary(); Self.diaryCache = (key, value); return value
+        guard session.protectedDataAuthorized, !session.maintenanceInProgress else { return nil }
+        let cache = session.bahwReads, key = cacheKey
+        if let cached = cache.diary, cached.key == key { return cached.value }
+        let value = readDiary()
+        cache.diary = (key, value)
+        return value
     }
     private func readDiary() -> BahwDiaryModel? {
         let service = AppDiaryService(app: session)

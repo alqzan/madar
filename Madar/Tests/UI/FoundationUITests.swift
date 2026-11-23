@@ -356,23 +356,25 @@ import XCTest
         app.launchEnvironment["MADAR_UI_SIZE"] = "L"
         app.launch(); openBackupSettings(app)
         let password = app.secureTextFields["backup-password"]
-        let export = app.buttons["backup-now"]
-        scrollTo(password, in: app)
+        let keyboardDone = app.buttons["backup-keyboard-done"]
+        let roomBar = app.tabBars["fixed-tab-bar"]
+        let checksRoomBar = UIDevice.current.userInterfaceIdiom == .phone
+        if checksRoomBar { XCTAssertTrue(roomBar.exists) }
+        scrollBackupForm(to: password, in: app)
         password.tap()
-        // A tap that lands while the scroll settles is dropped and the first character goes nowhere: type only once the field has the keyboard.
-        if !app.keyboards.firstMatch.waitForExistence(timeout: 3) { password.tap() }
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
-        for (index, character) in "test-only-passphrase".enumerated() {
+        if !keyboardDone.waitForExistence(timeout: 3) { password.tap() }
+        XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5), app.debugDescription)
+        if checksRoomBar { XCTAssertTrue(roomBar.waitForNonExistence(timeout: 5)) }
+        // XCTest's secure input is limited to characters in the active Arabic keyboard layout.
+        for (index, character) in "تجربةنسخةمدار".enumerated() {
             password.typeText(String(character))
-            let expectedCount = index + 1
-            // The diagnostic is the export button's value, re-rendered after the keystroke: wait for it, then compare.
-            let expected = "passphrase-count=\(expectedCount);confirmation-count=0;matches=false;busy=false"
-            _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", expected), object: export)], timeout: 3)
-            let diagnostic = export.value as? String
-            print("Secure UI input stage \(expectedCount): \(diagnostic ?? "no diagnostic")")
-            XCTAssertEqual(diagnostic, expected)
+            let expected = "passphrase-count=\(index + 1);confirmation-count=0;matches=false;busy=false;can-export=false"
+            let update = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", expected), object: keyboardDone)
+            XCTAssertEqual(XCTWaiter.wait(for: [update], timeout: 3), .completed, "Keyboard state: \(keyboardDone.value ?? "unavailable")")
         }
         attachScreenshot(app, named: "M0-backup-character-transport-L")
+        keyboardDone.tap()
+        if checksRoomBar { XCTAssertTrue(roomBar.waitForExistence(timeout: 5)) }
         app.terminate()
     }
     func test_M0S2_BackupPasswordConfirmationAndFixtureIsolation() throws {

@@ -239,7 +239,12 @@ import MadarPrayer
             content.title = late ? QuranReminderCopy.lateTitle : QuranReminderCopy.title
             let gentle = late ? NudgeWording.body(.quranReview, dayKey: candidate.dayKey) : NudgeWording.body(.quranWird, dayKey: candidate.dayKey)
             // Notifications audit (23 Nov): name what is waiting («ورد اليوم: البقرة ١٤٢–١٥٧»), with the gentle line beneath.
-            let detail = AppQuranService.plannedDetails[AppQuranService.detailPrefix(session) + id] ?? AppQuranService(session: session, clock: { Date() }).reminderDetail(at: candidate.dueAt, late: late)
+            let detail: String?
+            if let planned = session.plannedQuranReminderDetails[id] {
+                detail = planned.line
+            } else {
+                detail = AppQuranService(session: session, clock: { Date() }).reminderDetail(at: candidate.dueAt, late: late)
+            }
             content.body = detail.map { late ? $0 : $0 + "\n" + gentle } ?? gentle
             content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
             if !late { content.categoryIdentifier = PrayerNotificationCoordinator.wirdCategoryID }
@@ -341,7 +346,9 @@ import MadarPrayer
     /// Whether a room reminder still matters when it arrives in the foreground; a stale one stays silent.
     static func stillRelevant(_ id: String, session: AppSession, now: Date) throws -> Bool {
         // Decides whether a reminder about to show is still true: always from live rows, never from the planning cache.
-        MoneyReadingCache.liveReads += 1; defer { MoneyReadingCache.liveReads -= 1 }
+        let cache = session.moneyReadingCache
+        cache.liveReads += 1
+        defer { cache.liveReads -= 1 }
         if id.hasPrefix("quran.") || id.hasPrefix("digest.") {
             let value = try AppQuranService(session: session, clock: { now }).snapshot()
             guard id.hasPrefix("quran.") else { return true }
@@ -473,23 +480,30 @@ enum QuranReminderCopy {
 /// two seconds with real data, after each habit tap, Quran save and return to the app. The key is a cheap fingerprint (row count and newest
 /// `updatedAt` of each money table, one row fetched per table), so any write, through a command or not, is seen. Ledger rows stay live,
 /// and the foreground «still relevant» checks keep reading live.
-@MainActor enum MoneyReadingCache {
+@MainActor final class MoneyReadingCache {
     struct Key: Equatable { let container: ObjectIdentifier; let day: String; let unlocked: Bool; let settings: String; let tables: [Double] }
     struct Slots {
         var cards: MoneyCardsReading??; var obligations: MoneyObligationsReading??
         var categories: MoneyCategoriesReading??; var reconcile: MoneyReconcileReading??
     }
-    private static var key: Key?
-    private static var slots = Slots()
-    static var liveReads = 0
+    private var key: Key?
+    private var slots = Slots()
+    var liveReads = 0
+
+    func invalidate() {
+        key = nil
+        slots = Slots()
+    }
+
     static func read<T>(_ session: AppSession, _ now: Date, _ slot: WritableKeyPath<Slots, T??>, _ load: () throws -> T) -> T? {
-        if liveReads > 0 { return try? load() }
+        let cache = session.moneyReadingCache
+        if cache.liveReads > 0 { return try? load() }
         guard let current = try? currentKey(session, now) else { return try? load() }
-        if key != current { key = current; slots = Slots() }
-        if let cached = slots[keyPath: slot] { return cached }
+        if cache.key != current { cache.key = current; cache.slots = Slots() }
+        if let cached = cache.slots[keyPath: slot] { return cached }
         // A failed read (busy store, locked data) is not kept: the next refresh tries again.
         guard let value = try? load() else { return nil }
-        slots[keyPath: slot] = .some(value)
+        cache.slots[keyPath: slot] = .some(value)
         return value
     }
     private static func currentKey(_ session: AppSession, _ now: Date) throws -> Key {

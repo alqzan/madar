@@ -77,8 +77,15 @@ private struct BahwMinuteTimelineSchedule: TimelineSchedule, Equatable, Sendable
 
 enum BahwTravelSheet: Identifiable {
     case question(TravelFix, Double)
+    case manual
     case trip(PrayerTrip)
-    var id: String { switch self { case .question(let fix, _): "q-" + fix.city; case .trip(let trip): "t-" + trip.id.uuidString } }
+    var id: String {
+        switch self {
+        case .question(let fix, _): "q-" + fix.city
+        case .manual: "manual"
+        case .trip(let trip): "t-" + trip.id.uuidString
+        }
+    }
 }
 
 struct BahwLobbyView: View {
@@ -108,7 +115,7 @@ struct BahwLobbyView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     header.padding(.top, 8).padding(.bottom, 4)
                     if !arranging, let text = travel.pillText(session) {
-                        BahwTravelPill(text: text, onTrip: travel.trip != nil) { openTravel() }
+                        BahwTravelPill(text: text, showsPlane: travel.trip != nil || travel.isManual(session)) { openTravel() }
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     if !arranging, let day = session.bahwReturnPlanDay {
@@ -175,11 +182,17 @@ struct BahwLobbyView: View {
             Group {
                 switch sheet {
                 case .question(let fix, let km): BahwTravelQuestionSheet(session: session, fix: fix, homeKm: km) { travelSheet = nil }
-                case .trip(let trip): BahwTripSheet(session: session, trip: trip, legs: travel.legs, fix: travel.locator.fix, thresholdKm: travel.thresholdKm(session)) { travelSheet = nil }
+                case .manual:
+                    BahwTravelCitySheet(session: session, finished: { travelSheet = nil }) { travelSheet = nil }
+                        .presentationDetents([.medium, .large])
+                case .trip(let trip):
+                    BahwTripSheet(session: session, trip: trip, legs: travel.legs, fix: travel.detectedFix(session),
+                                  thresholdKm: travel.thresholdKm(session), manual: travel.isManual(session)) { travelSheet = nil }
                 }
             }.madarSheetErrorAlert(session)
         }
         .task { travel.refresh(session) }
+        .onChange(of: session.string("core.travelMode")) { _, _ in travel.refresh(session) }
         .sheet(isPresented: $searchOpen) { MadarSearchView(session: session).madarSheetErrorAlert(session) }
         .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]).madarSheetErrorAlert(session) }
         .onChange(of: arranging) { _, on in wiggle = on && !reduceMotion }
@@ -207,6 +220,7 @@ struct BahwLobbyView: View {
 
     private func openTravel() {
         if let trip = travel.trip { travelSheet = .trip(trip); return }
+        if travel.isManual(session) { travelSheet = .manual; return }
         guard let fix = travel.awayFix(session) else { return }
         travelSheet = .question(fix, max(0, TravelRule.distanceKm(from: session.activePlace, to: fix.place) - TravelRule.homeRadiusKm))
     }

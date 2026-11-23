@@ -9,16 +9,16 @@ import MadarCommands
 /// under way (travel), and the seasons. Each room owns its date; the lobby only reads it. Read once per store write and
 /// Madar day, never on each frame (FB-31: no freezes).
 extension AppBahwService {
-    private static var automaticCache: (key: String, value: [BahwUpcomingItem])?
-
     func automaticUpcoming() -> [BahwUpcomingItem] {
+        let container = ObjectIdentifier(session.container)
         let key = "\(session.storeGeneration):\(today):\(session.prayerRevision)"
-        if let cached = Self.automaticCache, cached.key == key { return cached.value }
+        let reads = session.bahwReads
+        if let cached = reads.automatic, cached.container == container, cached.key == key { return cached.value }
         var items: [BahwUpcomingItem] = []
         if session.roomEnabled(.mal), let salary = salaryItem() { items.append(salary) }
         if session.roomEnabled(.quran), let juz = juzItem() { items.append(juz) }
         if let trip = tripItem() { items.append(trip) }
-        Self.automaticCache = (key, items)
+        reads.automatic = (container, key, items)
         return items
     }
 

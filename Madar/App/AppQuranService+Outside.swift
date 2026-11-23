@@ -5,6 +5,10 @@ import MadarQuran
 import MadarPrayer
 import MadarSnapshots
 
+struct PlannedQuranReminderDetail {
+    let line: String?
+}
+
 extension AppQuranService {
     func widgetSnapshot() throws -> SnapshotEnvelope<QuranWidgetSnapshot> {
         let value = try snapshot(), today = value.day.date, catalog = try QuranResources.catalog()
@@ -60,10 +64,11 @@ extension AppQuranService {
         return SnapshotEnvelope(name: "quran", generatedAt: now, validUntil: until, dayKey: value.day.dayKey, tzID: value.day.timeZoneID, privacy: SnapshotPrivacy(), payload: payload)
     }
     func notificationCandidates(prayerDays: [PrayerDay], now: Date) throws -> [NotificationCandidate] {
+        // Keep only the details prepared by this session's latest plan.
+        app.plannedQuranReminderDetails.removeAll()
         let repository = try repository(), guarder = SanctityGuard(prayerDays: prayerDays)
         var result: [NotificationCandidate] = []
-        // A fresh plan forgets the words of the last one.
-        Self.plannedDetails = Self.plannedDetails.filter { !$0.key.hasPrefix(Self.detailPrefix(app)) }
+        var details: [String: PlannedQuranReminderDetail] = [:]
         for day in prayerDays {
             // Owner, 17 Nov 2026: the wird is asked after Fajr, and if it is still not done, asked once more after Isha («again»).
             for kind in ["wird", "again", "late"] {
@@ -82,17 +87,15 @@ extension AppQuranService {
                     let id = "quran.\(value.day.dayKey).\(kind)"
                     result.append(.init(id: id, room: .quran, dueAt: fire, dayKey: value.day.dayKey))
                     // The words the reminder will say come from the snapshot already read here, not from a second read per request.
-                    Self.plannedDetails[Self.detailPrefix(app) + id] = reminderDetail(value, late: late)
+                    details[id] = PlannedQuranReminderDetail(line: reminderDetail(value, late: late))
                 }
             }
         }
+        app.plannedQuranReminderDetails = details
         return result
     }
     /// What a Quran reminder names at the moment it fires (notifications audit, 23 Nov): the day's hifz portion, else the faces
     /// waiting for review; the late reminder names the faces due before they drift. Nil keeps the gentle wording alone.
-    /// Keyed by the session too, so one store's words never reach another's reminders.
-    static var plannedDetails: [String: String] = [:]
-    static func detailPrefix(_ session: AppSession) -> String { String(describing: ObjectIdentifier(session)) + "|" }
     func reminderDetail(at fire: Date, late: Bool) -> String? {
         guard let value = try? repository().snapshot(at: fire, sessionsThrough: clock()) else { return nil }
         return reminderDetail(value, late: late)

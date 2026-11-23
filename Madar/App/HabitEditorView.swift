@@ -274,7 +274,8 @@ struct HabitEditorView:View {
             minimumOn=false;windowOn=false;ramadanOn=false;rampOn=false;reminder="none";return
         }
         if old == .abstain, reminder == "none" { reminder="dot" }
-        if source == "reading" { return } // the minutes/pages picker sets measure, unit and target together
+        // Each linked source sets its own measure, unit and target together.
+        guard source == "custom" else { return }
         if value == .duration {rule.unit="minutes";rule.target=15}
         else if value == .once {rule.target=1;rule.minimum=nil;minimumOn=false}
         else if value == .count, old == .duration {rule.unit=nil}

@@ -142,3 +142,44 @@
 
 ### Usage
 - Five-hour window 63% used at commit time (37% left); weekly 10% used.
+
+
+## Handover — حركات وإيموشنز من منشور مكتبات الواجهات — 2026-11-22 — Claude
+
+### Works now
+
+- Owner sent an X post (15 web UI repos and a video) with «مليان ايموشنز وتحريكات… خذ منها», then approved all three mockups («تم اعتمدها كلها»). Native SwiftUI, each motion runs once on an event; Reduce Motion gives the end state. Queue row 32 lists all ten pieces.
+- Habit ring (`HabitRingGlyph`, `HabitMiniRing`): fills smoothly; on completion one light circles the ring, a small bloom and a success tap (`App/MadarMotion.swift`).
+- Lobby: tiles press and spring back, enter one after another on the first lobby view of a launch, habit counts roll, the lead «الآن» card gets one pass of light when a new step leads and the steps slide into order. Habits room month bars grow from the right.
+- Undo: one pill everywhere (`AppSession.undoToast()`): sized to its words, a hairline drains over its seconds, the removal before it peeks behind dimmed. In the Quran session log and the Mihbara notebook the deleted item stays in place struck through with «تراجع», then folds away.
+- «ابحث في مدار» (`App/MadarSearchView.swift`): magnifier beside «رتّب» (pull-down stays the refresh). Finds habits, surahs, books, diary lines and money movements (names only, no amounts), opens each in its room. Read-only.
+- Lobby money tile: figures roll, the period line draws from the right, today's spend bar grows in. Home-screen widgets unchanged (`MoneyWidgetContent.animated` defaults to false).
+
+### Verified
+
+- iPhone build and Mac build passed. RU1 separator check passed. `git diff --check` clean.
+- UI, ad-hoc signed, Madar 15 Pro Max iOS 27.0, synthetic stores: `CLAUDE-motion-20261122-r2.xcresult` BahwLobbyUITests 13/13 + HabitsUITests 26/26; `-r4.xcresult` BahwLobbyUITests 14/14 (new `testLobbySearchFindsAHabitAndOpensIt`), QuranHistoryUITests 3/3 (in-row undo), BahwCustomize 7/8, DiaryCustomize 1/2, QuranPlan 3/4, MoneyExpense 6/7, Mihbara undo slice 4/8 run (3 skipped, 1 failed).
+- The 5 failures fail identically without this change (`CLAUDE-motion-baseline-20261122.xcresult`, 5/5 failed on the stashed baseline): their asserts predate FB-32 (undo only after a removal) and the 22 Nov reset-undo decision.
+- Real app (`verify-smoke.sh`, lobbySix): logged three habits from the lobby; frame strip `Madar/Artifacts/verify/motion-sweep-frames.png` (from `motion-sweep.mov`) shows press, fill, travelling light, bloom. Search sheet opened from the lobby.
+- r1 (all 39 failed) was my unsigned test build: the App Group was missing, so the app opened on «تعذّر فتح مدار». Checklist row 19 committed separately.
+- Owner «كل شي اصلحه»: the five stale UI tests now assert today's rules, and a new test covers the Mihbara in-row undo. `CLAUDE-undo-tests-20261122-r1.xcresult` 5/6 passed: DiaryCustomize reset-undo, Mihbara reader reset-undo, new `testDeletedNoteOffersUndoInItsOwnRow`, MoneyExpense (no undo after a save, same figure reopens), QuranPlan (Hijri secondary, no undo for a settings change). `-r3.xcresult` BahwCustomize `testHabitReminderDefaultUndoAndNewHabit` 1/1 passed: linked source is now «ورد الحفظ» (prayer source left on 17 Nov) and a saved habit opens through «التفاصيل».
+
+### Differences left
+
+- All built — awaiting owner. No canonical images for these motion states.
+
+### Not verified
+
+- Arabic typing in search on the simulator (the UI test types it). iPad, owner device, Apple processing.
+
+### Next
+
+- Owner tries build 0.1.0 (63) (logs `Madar/Artifacts/OWNER-TestFlight-63/`); 62 carried the motion, 63 adds only the test repairs.
+
+### Model/effort
+
+- Claude, claude-opus-5-5, effort not exposed. No helpers.
+
+### Usage
+
+- Start: five-hour 2% used, weekly 39% used. Mid-run: five-hour 17%, weekly 41%.

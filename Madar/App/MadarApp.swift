@@ -34,8 +34,9 @@ private struct MadarSceneContent: View {
     var body: some View {
             Group {
                 #if DEBUG
-                if ProcessInfo.processInfo.environment["MADAR_UI_GALLERY"] == "1" { MadarComponentGallery() }
-                else { mainContent }
+                if ProcessInfo.processInfo.environment["MADAR_UI_GALLERY"] == "1" {
+                    MadarComponentGallery().onAppear { MadarSmokeReadiness.markVisible("gallery") }
+                } else { mainContent }
                 #else
                 mainContent
                 #endif
@@ -92,6 +93,7 @@ private struct MadarSceneContent: View {
         #if DEBUG
         if ProcessInfo.processInfo.environment["MADAR_NOTIFICATION_TEST_FLOW"] == "1", let session {
             PrayerNotificationAcceptanceHarness(session: session)
+                .onAppear { MadarSmokeReadiness.markVisible("notification-test") }
         } else {
             roomContent
         }
@@ -104,6 +106,11 @@ private struct MadarSceneContent: View {
         Group {
                 if let session {
                     MadarRootView(session: session).modelContainer(session.container).environment(session)
+                    #if DEBUG
+                    .onAppear {
+                        if session.onboardingComplete { MadarSmokeReadiness.markVisible("main") }
+                    }
+                    #endif
                 }
                 else if let startupError {
                     StartupRecoveryView(error: startupError,
@@ -117,3 +124,20 @@ private struct MadarSceneContent: View {
     }
     @Environment(\.scenePhase) private var scenePhase
 }
+
+#if DEBUG
+/// Opt-in signal for verify-smoke.sh, emitted by the screen that appears after the launch placeholder.
+enum MadarSmokeReadiness {
+    static func markVisible(_ screen: String) {
+        let environment = ProcessInfo.processInfo.environment
+        guard let rawToken = environment["MADAR_SMOKE_READY_TOKEN"],
+              environment["MADAR_UI_STORE_ID"] == rawToken,
+              let token = UUID(uuidString: rawToken), token.uuidString == rawToken else { return }
+        let marker = FileManager.default.temporaryDirectory.appending(path: "madar-smoke-ready-\(token.uuidString)")
+        // Only the script creates this file. A screen that appears after timeout cannot leave a stale marker.
+        guard let handle = try? FileHandle(forWritingTo: marker) else { return }
+        defer { try? handle.close() }
+        try? handle.write(contentsOf: Data(screen.utf8))
+    }
+}
+#endif

@@ -184,6 +184,15 @@ import UIKit
         let name=app.textFields["habit-name"];XCTAssertTrue(name.waitForExistence(timeout:5))
         XCTAssertEqual(name.value as? String,"سطر اليوم")
         shot(app,"FB35-room-habit-editor-L")
+        let source = app.buttons["habit-source"]
+        XCTAssertTrue(source.isHittable, app.debugDescription)
+        source.tap(); app.buttons["القراءة من المحبرة"].tap()
+        let target = app.descendants(matching: .any)["habit-target"]
+        let minutes = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "دقيقة"), object: target)
+        XCTAssertEqual(XCTWaiter.wait(for: [minutes], timeout: 5), .completed, target.label)
+        source.tap(); app.buttons["سطر اليوم من المذكرات"].tap()
+        let line = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "سطر"), object: target)
+        XCTAssertEqual(XCTWaiter.wait(for: [line], timeout: 5), .completed, target.label)
         app.buttons["habit-save"].tap();XCTAssertTrue(name.waitForNonExistence(timeout:10))
         XCTAssertTrue(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","habit-row-")).firstMatch.waitForExistence(timeout:10))
         XCTAssertFalse(app.buttons["habits-room-diaryLine"].exists,"A habit already kept is not offered again.")

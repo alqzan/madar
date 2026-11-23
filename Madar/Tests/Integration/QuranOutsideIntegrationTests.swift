@@ -51,6 +51,22 @@ import MadarSnapshots
         XCTAssertTrue(lines[0].contains("البَقَرَة") && lines[0].contains("١–"), lines[0])
         XCTAssertEqual(lines[1], NudgeWording.body(.quranWird, dayKey: wird.dayKey))
     }
+    func testWirdReminderKeepsItsPlannedPortionInTheCurrentStore() throws {
+        let (app, service, root, now) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let day = try XCTUnwrap(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-15"), place: .riyadh))
+        let wird = try XCTUnwrap(try service.notificationCandidates(prayerDays: [day], now: now).first { $0.id.hasSuffix(".wird") })
+        let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now, timeZone: day.place.timeZone, policy: .init(staleNudgeEnabled: false))
+        let gentle = NudgeWording.body(.quranWird, dayKey: wird.dayKey)
+        XCTAssertNotEqual(RoomNotificationContent.content(for: wird, plan: plan, session: app, habitNames: [:]).body, gentle)
+
+        let emptyContainer = try MadarContainerFactory.makeInMemory()
+        let empty = try AppSession(container: emptyContainer, groupDirectory: root.appending(path: "Empty"))
+        XCTAssertEqual(RoomNotificationContent.content(for: wird, plan: plan, session: empty, habitNames: [:]).body, gentle)
+
+        app.bindContainer(emptyContainer)
+        XCTAssertEqual(RoomNotificationContent.content(for: wird, plan: plan, session: app, habitNames: [:]).body, gentle,
+                       "Rebinding an existing session drops the planned copy from the previous store.")
+    }
     func testWidgetJSONExpiresAtMadarBoundaryAndRoutesOnlyBuiltScreens() throws {
         let (app, service, root, now) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let envelope = try service.widgetSnapshot(), store = SnapshotStore(directory: root.appending(path: "QuranSnapshots"))

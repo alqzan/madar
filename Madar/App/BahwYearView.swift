@@ -123,7 +123,11 @@ struct BahwYearView: View {
         .background(lobby.background.ignoresSafeArea()).foregroundStyle(lobby.ink)
         .environment(\.roomTheme, lobby)
         .toolbarVisibility(.hidden, for: .navigationBar).toolbarVisibility(.hidden, for: .tabBar).hidesRoomAccessory(session, id: "bahw-year")
-        .sheet(item: $editing) { draft in BahwDaySheet(session: session, draft: draft).presentationDetents([.large]) }
+        .sheet(item: $editing) { draft in
+            BahwDaySheet(session: session, draft: draft) {
+                if !draft.existing && filter == 1 { filter = 2 }
+            }.presentationDetents([.large])
+        }
         .onChange(of: session.yearDayID, initial: true) { _, id in if let id { openRoutedDay(id) } }
         .onChange(of: editing?.id) { _, id in if id == nil, let routed = session.yearDayID { openRoutedDay(routed) } }
     }
@@ -267,7 +271,7 @@ struct BahwYearView: View {
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("ما يهمّك").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
-                if !all.isEmpty { Text(service.daysPhrase(all.count) + "، الأقرب أولًا").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk) }
+                if !shown.isEmpty { Text(service.daysPhrase(shown.count) + "، الأقرب أولًا").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk) }
                 Spacer()
                 Button { editing = .init(service: service) } label: {
                     Label("يوم يهمّك", systemImage: "plus").font(MadarTypography.section()).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(minHeight: 46).glassEffect(.regular.interactive(), in: .capsule)
@@ -370,16 +374,18 @@ struct BahwDaySheet: View {
     @State var draft: BahwDayDraft
     /// What the sheet opened with: the swipe-down is held back once the draft differs, so typed edits are never lost by a stray swipe.
     private let original: BahwDayDraft
+    private let didSave: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var failure: String?
     @State private var saving = false
     @State private var confirmingDelete = false
     private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var digits: MadarNumberFormatter { .init(style: session.string("core.numerals") == "western" ? .western : .hindi) }
-    init(session: AppSession, draft: BahwDayDraft) {
+    init(session: AppSession, draft: BahwDayDraft, didSave: @escaping () -> Void) {
         _session = Bindable(session)
         _draft = State(initialValue: draft)
         original = draft
+        self.didSave = didSave
     }
     var body: some View {
         NavigationStack {
@@ -467,7 +473,11 @@ struct BahwDaySheet: View {
         saving = true
         Task {
             defer { saving = false }
-            do { try await session.executeDiaryCommand("bahw.saveUpcomingDay", payload: payload); dismiss() }
+            do {
+                try await session.executeDiaryCommand("bahw.saveUpcomingDay", payload: payload)
+                didSave()
+                dismiss()
+            }
             catch { failure = "لم يُحفظ اليوم. " + madarUserDetail(error) }
         }
     }

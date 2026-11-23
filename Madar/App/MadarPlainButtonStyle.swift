@@ -71,7 +71,7 @@ private struct MadarSwipeConfirmSheet: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var drag: CGFloat = 0
-    @State private var done = false
+    @State private var confirmed: Bool?
     var body: some View {
         VStack(spacing: 14) {
             Text(title).font(MadarTypography.cardTitle()).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
@@ -79,32 +79,33 @@ private struct MadarSwipeConfirmSheet: View {
             GeometryReader { proxy in
                 let knob: CGFloat = 50, travel = max(1, proxy.size.width - knob - 8)
                 let progress = min(1, max(0, drag / travel))
+                let reachedConfirmation = progress >= 0.78
                 ZStack(alignment: .trailing) {
                     Capsule().fill(theme.risk.opacity(0.12))
                     Capsule().fill(theme.risk.opacity(0.22)).frame(width: knob + 8 + drag)
                     Text("اسحب: " + action).font(MadarTypography.caption().bold()).foregroundStyle(theme.risk)
                         .frame(maxWidth: .infinity).opacity(1 - progress)
                     Circle().fill(theme.risk).frame(width: knob, height: knob)
-                        .overlay { Image(systemName: done ? "checkmark" : "arrow.left").font(.system(size: 18, weight: .bold)).foregroundStyle(.white).contentTransition(.symbolEffect(.replace)) }
+                        .overlay { Image(systemName: reachedConfirmation ? "checkmark" : "arrow.left").font(.system(size: 18, weight: .bold)).foregroundStyle(.white).contentTransition(.symbolEffect(.replace)) }
                         .padding(4).offset(x: -drag)
                         .gesture(DragGesture(minimumDistance: 2)
-                            .onChanged { value in guard !done else { return }; drag = min(travel, max(0, -value.translation.width)) }
+                            .onChanged { value in guard confirmed == nil else { return }; drag = min(travel, max(0, -value.translation.width)) }
                             .onEnded { _ in
-                                guard !done else { return }
+                                guard confirmed == nil else { return }
                                 if drag >= travel * 0.78 {
-                                    done = true; withAnimation(reduceMotion ? nil : .spring(duration: 0.25)) { drag = travel }
-                                    Task { try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 280)); perform() }
+                                    finish(confirmed: true)
                                 } else { withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.35)) { drag = 0 } }
                             })
                 }
                 .environment(\.layoutDirection, .leftToRight)
-                .sensoryFeedback(.warning, trigger: done)
+                .sensoryFeedback(.warning, trigger: confirmed == true)
             }
             .frame(height: 58)
             .accessibilityElement(children: .ignore).accessibilityLabel(action).accessibilityAddTraits(.isButton)
-            .accessibilityAction { perform() }
+            .accessibilityAction { finish(confirmed: true) }
             .accessibilityIdentifier("madar-swipe-confirm")
-            Button(cancel) { dismiss() }.font(MadarTypography.body()).foregroundStyle(theme.ink).frame(minHeight: 44).buttonStyle(.madarPlain)
+            Button(cancel) { finish(confirmed: false) }
+                .font(MadarTypography.body()).foregroundStyle(theme.ink).frame(minHeight: 44).buttonStyle(.madarPlain)
                 .accessibilityIdentifier("madar-swipe-cancel")
         }
         .padding(.horizontal, 22).padding(.top, 22).padding(.bottom, 12)
@@ -112,5 +113,11 @@ private struct MadarSwipeConfirmSheet: View {
         .background(theme.background)
         // Large text needs the whole height so the slide and «إلغاء» never fall below the sheet's edge.
         .presentationDetents(dynamicTypeSize >= .xxxLarge ? [.large] : [.height(290)])
+    }
+
+    private func finish(confirmed: Bool) {
+        guard self.confirmed == nil else { return }
+        self.confirmed = confirmed
+        if confirmed { perform() } else { dismiss() }
     }
 }

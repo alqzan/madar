@@ -20,15 +20,28 @@ import XCTest
         app.swipeUp(); XCTAssertTrue(element("bahw-matter-رمضان").waitForExistence(timeout: 5)); capture(app, "M4-V03-year-s1-L")
         app.swipeUp(); capture(app, "M4-V03-year-s2-L"); app.swipeDown()
 
+        let mattersCount = app.staticTexts.containing(NSPredicate(format: "label ENDSWITH %@", "الأقرب أولًا")).firstMatch
+        app.buttons["أيامي"].tap()
+        XCTAssertTrue(app.staticTexts["لم تضف يومًا بعد. أضف يومًا يهمّك ليظهر هنا."].waitForExistence(timeout: 5))
+        XCTAssertFalse(mattersCount.exists)
+        app.buttons["المواسم"].tap()
+        XCTAssertTrue(mattersCount.waitForExistence(timeout: 5))
         element("bahw-add-day").tap()
         let title = element("bahw-day-title"); XCTAssertTrue(title.waitForExistence(timeout: 5)); title.tap(); title.typeText("هدية أمي")
         app.buttons["bahw-day-save"].tap()
         XCTAssertTrue(element("bahw-matter-هدية أمي").waitForExistence(timeout: 8), app.debugDescription)
-        app.buttons["أيامي"].tap()
-        XCTAssertTrue(element("bahw-matter-هدية أمي").waitForExistence(timeout: 5)); XCTAssertFalse(element("bahw-matter-رمضان").exists)
+        XCTAssertTrue(app.buttons["أيامي"].isSelected)
+        XCTAssertFalse(element("bahw-matter-رمضان").exists)
         capture(app, "M4-V03-mine-L")
         element("bahw-matter-هدية أمي").tap()
         let delete = app.buttons["bahw-day-delete"]; XCTAssertTrue(delete.waitForExistence(timeout: 5)); delete.tap()
+        app.slideToConfirm(fraction: 0.4)
+        let cancel = app.buttons["madar-swipe-cancel"]
+        XCTAssertTrue(cancel.isHittable)
+        cancel.tap()
+        XCTAssertTrue(app.madarSwipeConfirm.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(delete.isHittable)
+        delete.tap()
         app.slideToConfirm()
         XCTAssertTrue(element("bahw-matter-هدية أمي").waitForNonExistence(timeout: 8))
         element("bahw-year-back").tap()
@@ -157,9 +170,12 @@ import XCTest
 extension XCUIApplication {
     /// The swipe-to-confirm sheet (owner, 23 Nov): drag its knob across the track.
     var madarSwipeConfirm: XCUIElement { descendants(matching: .any)["madar-swipe-confirm"].firstMatch }
-    func slideToConfirm(file: StaticString = #filePath, line: UInt = #line) {
+    func slideToConfirm(fraction: CGFloat = 1, file: StaticString = #filePath, line: UInt = #line) {
         let track = madarSwipeConfirm
         XCTAssertTrue(track.waitForExistence(timeout: 5), debugDescription, file: file, line: line)
-        track.coordinate(withNormalizedOffset: CGVector(dx: 0.925, dy: 0.5)).press(forDuration: 0.1, thenDragTo: track.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5)))
+        let center = track.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+            .withOffset(CGVector(dx: -29, dy: 0))
+        let destination = center.withOffset(CGVector(dx: -fraction * (track.frame.width - 40), dy: 0))
+        center.press(forDuration: 0.1, thenDragTo: destination)
     }
 }

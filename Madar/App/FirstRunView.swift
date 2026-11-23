@@ -49,6 +49,9 @@ struct FirstRunView: View {
             }.background(theme.background).foregroundStyle(theme.ink).font(MadarTypography.body())
         }
         .interactiveDismissDisabled()
+        #if DEBUG && os(iOS)
+        .onAppear { MadarSmokeReadiness.markVisible("first-run") }
+        #endif
     }
 
     @ViewBuilder private var actions: some View {
