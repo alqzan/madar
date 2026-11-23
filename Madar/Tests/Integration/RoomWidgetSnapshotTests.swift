@@ -20,6 +20,13 @@ import MadarPrayer
         XCTAssertEqual(habitUnitCount(15,"minutes",digits,genitive:true),"١٥ دقيقة")
         XCTAssertFalse(habitUnitCount(6000,"steps",digits,genitive:true).contains("steps"))
     }
+    func testFridayHarvestSaysTimesAndNeverABareZero() {
+        let digits=MadarNumberFormatter(style:.hindi)
+        XCTAssertEqual(fridayHarvestText(kept:0,total:14,digits:digits),"لم تُتمّ أيًّا من عاداتك اليومية في الأيام السبعة الماضية")
+        XCTAssertEqual(fridayHarvestText(kept:14,total:14,digits:digits),"أتممت عاداتك اليومية كلها في سبعة أيام")
+        XCTAssertEqual(fridayHarvestText(kept:2,total:14,digits:digits),"أتممت عاداتك اليومية مرتين من ١٤ في سبعة أيام")
+        XCTAssertEqual(fridayHarvestText(kept:12,total:14,digits:digits),"أتممت عاداتك اليومية ١٢ مرة من ١٤ في سبعة أيام")
+    }
     func testCountedNounsTakeTheSingularGenitiveAtExactHundreds() {
         let digits=MadarNumberFormatter(style:.hindi)
         func books(_ n:Int)->String { WidgetCopy.agree(n,digits,one:"كتاب واحد",two:"كتابان",few:"كتب",many:"كتابًا") }

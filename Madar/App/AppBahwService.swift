@@ -295,7 +295,7 @@ extension AppBahwService {
             let week = readings.filter { !$0.archived }.flatMap { $0.summary.periods.filter { $0.rule.frequency == .daily && $0.target > 0 && $0.start > today.adding(days: -7) && $0.start <= today } }
             if !week.isEmpty {
                 let kept = week.filter(\.met).count
-                result.append(.init(id: "friday", title: "حصاد أسبوعك", detail: "أتممت " + digits.string(kept) + " من " + digits.string(week.count) + " من عاداتك اليومية في سبعة أيام", symbol: "MadarHabits", destination: .habits))
+                result.append(.init(id: "friday", title: "حصاد أسبوعك", detail: fridayHarvestText(kept: kept, total: week.count, digits: digits), symbol: "MadarHabits", destination: .habits))
             }
         }
         // Idea 2 (owner, 17 Nov 2026): on Saturday, the new week, the lobby names the daily habit that met fewer than three of the
@@ -355,4 +355,11 @@ extension AppBahwService {
         if period.rule.measure == .once || period.target <= 1 { return "باقية اليوم" }
         return "بقي " + habitUnitCount(max(0, period.target - period.value), period.rule.unit, digits) + " اليوم"
     }
+}
+
+/// The Friday harvest note: daily habit-days kept out of those due in the last seven days, said as times, never a bare zero.
+func fridayHarvestText(kept: Int, total: Int, digits: MadarNumberFormatter) -> String {
+    if kept == 0 { return "لم تُتمّ أيًّا من عاداتك اليومية في الأيام السبعة الماضية" }
+    if kept >= total { return "أتممت عاداتك اليومية كلها في سبعة أيام" }
+    return "أتممت عاداتك اليومية " + arabicCount(kept, ["مرة واحدة", "مرتين", "مرات", "مرة"], digits) + " من " + digits.string(total) + " في سبعة أيام"
 }
