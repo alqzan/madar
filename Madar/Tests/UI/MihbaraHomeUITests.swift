@@ -1349,7 +1349,7 @@ import UIKit
         shot(app, "AU-87-file-near-end-L")
         let library = app.buttons["mihbara-library"]
         // The Mihbara is a full-screen cover, so the room bar is usually not on screen; then the screen's edge is the limit.
-        let bottomBar = app.otherElements["fixed-tab-bar"]
+        let bottomBar = app.descendants(matching: .any)["fixed-tab-bar"].firstMatch
         let clearOfBottomBar = (bottomBar.exists ? bottomBar.frame.minY : app.frame.maxY) - 16
         for _ in 0..<5 where library.frame.maxY > clearOfBottomBar { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(library.isHittable, app.debugDescription)
@@ -2042,8 +2042,9 @@ import UIKit
         let book = app.buttons["mihbara-book-continue"]
         XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         useReaderMode(app, "scroll")
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "اقْرَأْ")).firstMatch.waitForExistence(timeout: 20), app.debugDescription)
-        sleep(1); shot(app, "M6-V09-verse-L")
+        // The verse is set in the Mushaf script (its own letter forms), so the paragraph is found by its reference.
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "[العلق")).firstMatch.waitForExistence(timeout: 20), app.debugDescription)
+        shot(app, "M6-V09-verse-L")
         let marker = app.links["١"].firstMatch
         XCTAssertTrue(marker.waitForExistence(timeout: 5), app.debugDescription)
         let closeReader = app.buttons["mihbara-reader-close"]
@@ -2069,7 +2070,8 @@ import UIKit
         XCTAssertTrue(card.waitForNonExistence(timeout: 5))
         XCTAssertTrue(closeReader.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(readerFooter.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(readerFooter.label.contains("٤٥٣"), readerFooter.label)
+        // The swipe behind the card reads on, so the footer follows the page now on screen.
+        XCTAssertTrue(readerFooter.label.contains("٤٥٣") || readerFooter.label.contains("٤٥٤"), readerFooter.label)
     }
 
     func testReaderNightThemeScrollKeepsPlaceAndResets() throws {

@@ -189,7 +189,7 @@ import XCTest
         if bahw.exists { bahw.tap(); Thread.sleep(forTimeInterval: 2); shot(app, "TRIAL-bahw-L"); for i in 1...3 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-bahw-s\(i)-L") } }
         // The Quran home, then the habits room from the lobby (Claude, 24 Oct tour).
         for (tab, name) in [("القرآن", "quran")] {
-            let button = app.otherElements["fixed-tab-bar"].buttons[tab].firstMatch
+            let button = app.descendants(matching: .any)["fixed-tab-bar"].buttons[tab].firstMatch
             guard button.waitForExistence(timeout: 10) else { XCTFail("Required room tab missing: " + tab); continue }
             button.tap(); Thread.sleep(forTimeInterval: 2); clearAlert(app, name)
             let marker = app.descendants(matching: .any).matching(identifier: "quran-coverage-title").firstMatch
