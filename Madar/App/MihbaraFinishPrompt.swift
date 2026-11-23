@@ -21,7 +21,7 @@ struct MihbaraFinishPrompt: View {
             Task { @MainActor in
                 guard await prepareToFinish() else { resumeReading(); working = false; return }
                 do {
-                    try await app.executeBookCommand("book.moveShelf", payload: ["id": .string(book.id.uuidString), "shelf": .string("finished")])
+                    try await Self.moveToFinished(app: app, book: book)
                     close()
                 } catch { resumeReading(); app.errorMessage = madarUserMessage(error); working = false }
             }
@@ -35,5 +35,10 @@ struct MihbaraFinishPrompt: View {
         .disabled(working)
         .accessibilityIdentifier("mihbara-reader-finish")
         .transition(.opacity.combined(with: .scale(scale: 0.96)))
+    }
+
+    /// The one write behind «أنهيته؟»; the readers call it too when a retried save completes a finish the user already asked for.
+    @MainActor static func moveToFinished(app: AppSession, book: MihbaraBook) async throws {
+        try await app.executeBookCommand("book.moveShelf", payload: ["id": .string(book.id.uuidString), "shelf": .string("finished")])
     }
 }

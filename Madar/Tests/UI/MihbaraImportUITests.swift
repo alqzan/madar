@@ -245,14 +245,9 @@ import UIKit
         let pending = app.alerts["قارئ PDF"]
         XCTAssertTrue(pending.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(next.exists, "A failed position save must keep the reader open")
+        // The user already said «أنهيته؟»: a successful retry saves the position, finishes the book and closes the reader.
         pending.buttons["mihbara-reading-save-retry"].firstMatch.tap()
-        XCTAssertTrue(next.waitForNonExistence(timeout: 15), app.debugDescription)
-        XCTAssertTrue(want.waitForExistence(timeout: 8)); want.tap()
-        XCTAssertTrue(imported.waitForExistence(timeout: 8), "The book must remain on its original shelf after a failed save")
-        imported.tap()
-        XCTAssertTrue(finish.waitForExistence(timeout: 12), app.debugDescription)
-        finish.tap()
-        XCTAssertTrue(next.waitForNonExistence(timeout: 10), "The reader closes after «أنهيته؟»")
+        XCTAssertTrue(next.waitForNonExistence(timeout: 15), "The reader closes once the retried save completes the finish")
         let finished = app.buttons["mihbara-shelf-finished"]; XCTAssertTrue(finished.waitForExistence(timeout: 8), app.debugDescription); finished.tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "كتاب يُختم")).firstMatch.waitForExistence(timeout: 8), app.debugDescription)
     }

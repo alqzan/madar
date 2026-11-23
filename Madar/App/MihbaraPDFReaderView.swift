@@ -35,6 +35,8 @@ struct MihbaraPDFReaderView: View {
     @State private var pendingSaveAlert: String?
     @State private var isPendingSaveAlert = false
     @State private var closeAfterPendingSave = true
+    /// «أنهيته؟» was asked while a save was pending: a successful retry finishes the book instead of only resuming.
+    @State private var finishAfterPendingSave = false
     @State private var searching = false
     @State private var flowing = false
     @State private var inkLayer: MihbaraInkOverlay?
@@ -150,7 +152,7 @@ struct MihbaraPDFReaderView: View {
                     .accessibilityIdentifier("mihbara-reading-save-retry")
             }
             Button(isPendingSaveAlert ? "أكمل القراءة" : "حسنًا", role: .cancel) {
-                pendingSaveAlert = nil; isPendingSaveAlert = false
+                pendingSaveAlert = nil; isPendingSaveAlert = false; finishAfterPendingSave = false
                 if canRead, scenePhase == .active { resume(at: Date()) }
             }
         } message: { Text(pendingSaveAlert ?? "") }
@@ -415,12 +417,14 @@ struct MihbaraPDFReaderView: View {
 
     @MainActor private func prepareToFinish() async -> Bool {
         closeAfterPendingSave = false
+        finishAfterPendingSave = false
         defer { inkLayer?.drawing = inking }
         app.armMihbaraLocatorFailureOnReaderCloseForUITest()
         inkLayer?.drawing = false
         pause(at: Date())
         if let inkLayer, !(await inkLayer.flushAllAndWait()) {
             inkLayer.drawing = inking
+            finishAfterPendingSave = true
             isPendingSaveAlert = true
             pendingSaveAlert = pendingSaveMessage
             return false
@@ -428,6 +432,7 @@ struct MihbaraPDFReaderView: View {
         await saveCoordinator.waitForCurrentAttempt()
         guard !saveCoordinator.hasPending else {
             saveCoordinator.dismissPendingWriteError()
+            finishAfterPendingSave = true
             isPendingSaveAlert = true
             pendingSaveAlert = pendingSaveMessage
             return false
@@ -508,7 +513,11 @@ struct MihbaraPDFReaderView: View {
                 pendingSaveAlert = pendingSaveMessage
                 return
             }
-            if closeAfterPendingSave { closeReader() }
+            if finishAfterPendingSave {
+                finishAfterPendingSave = false
+                do { try await MihbaraFinishPrompt.moveToFinished(app: app, book: book); closeReader() }
+                catch { closing = false; inkLayer?.drawing = inking; resume(at: Date()); app.errorMessage = madarUserMessage(error) }
+            } else if closeAfterPendingSave { closeReader() }
             else {
                 closing = false
                 inkLayer?.drawing = inking

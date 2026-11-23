@@ -76,6 +76,8 @@ struct MihbaraReaderView: View {
     @State private var isPendingSaveAlert = false
     @State private var message: String?
     @State private var readerAlert: String?
+    /// «أنهيته؟» was asked while a save was pending: a successful retry also puts the book on «أنهيتها».
+    @State private var finishAfterPendingSave = false
     @State private var narrationStarting = false
     @State private var highlights: [MihbaraHighlight] = []
     @State private var wordCard: MihbaraWordCardState?
@@ -371,7 +373,7 @@ struct MihbaraReaderView: View {
                 Button("إعادة المحاولة") { retryPendingSaveAndClose() }
                     .accessibilityIdentifier("mihbara-reading-save-retry")
             }
-            Button("حسنًا", role: .cancel) { readerAlert = nil; isPendingSaveAlert = false }
+            Button("حسنًا", role: .cancel) { readerAlert = nil; isPendingSaveAlert = false; finishAfterPendingSave = false }
         } message: { Text(readerAlert ?? "") }
     }
 
@@ -1458,9 +1460,11 @@ struct MihbaraReaderView: View {
     @MainActor private func prepareToFinish() async -> Bool {
         app.armMihbaraLocatorFailureOnReaderCloseForUITest()
         pauseReader(at: Date())
+        finishAfterPendingSave = false
         await saveCoordinator.waitForCurrentAttempt()
         guard !saveCoordinator.hasPending else {
             saveCoordinator.dismissPendingWriteError()
+            finishAfterPendingSave = true
             isPendingSaveAlert = true
             readerAlert = pendingSaveMessage
             return false
@@ -1503,6 +1507,10 @@ struct MihbaraReaderView: View {
                 saveCoordinator.dismissPendingWriteError()
                 isPendingSaveAlert = true
                 readerAlert = pendingSaveMessage
+            } else if finishAfterPendingSave {
+                finishAfterPendingSave = false
+                do { try await MihbaraFinishPrompt.moveToFinished(app: app, book: book); close() }
+                catch { isClosing = false; resumeReader(at: Date()); app.errorMessage = madarUserMessage(error) }
             } else { close() }
         }
     }
