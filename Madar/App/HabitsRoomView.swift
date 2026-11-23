@@ -378,7 +378,8 @@ struct HabitsRoomView: View {
         var centre = (title: "", caption: "عادات اليوم")
         if let r = selectedReading, let p = r.summary.current {
             centre.title = p.rule.measure == .once && p.target == 1 ? (p.met ? "تمّت" : "لم تتم") : digits.string(p.value)
-            centre.caption = p.target > 1 ? "من " + digits.string(p.target) + (p.rule.unit.map { " " + $0 } ?? "") : (p.rule.band == .daily ? "اليوم" : "في فترتها")
+            // The unit in Arabic agreement («من ١٥ دقيقة»); the raw key showed «من ١٥ minutes».
+            centre.caption = p.target > 1 ? "من " + (p.rule.unit.map { habitUnitCount(p.target, $0, digits, genitive: true) } ?? digits.string(p.target)) : (p.rule.band == .daily ? "اليوم" : "في فترتها")
         } else {
             let due = dailyRows.filter(dueToday)
             centre.title = due.isEmpty ? "راحة" : digits.string(due.filter { $0.summary.current?.met == true }.count) + " من " + digits.string(due.count)
@@ -590,7 +591,8 @@ struct HabitMiniRing:View {
 /// «٣ من ٨ أكواب»; before anything is logged, the goal alone («الهدف: ٨ أكواب») rather than «٠ من ٨».
 func habitProgressText(_ value:Int,_ target:Int,_ unit:String?,_ digits:MadarNumberFormatter)->String {
     guard let unit, !unit.isEmpty else {
-        if value > 0 { return digits.string(value)+" من "+(target == 2 ? "مرتين" : digits.string(target)) }
+        if target == 1 { return value > 0 ? "تمّت" : "لم تتمّها بعد" }
+        if value > 0 { return arabicCount(value,["مرة واحدة","مرتان","مرات","مرة"],digits)+" من "+(target == 2 ? "مرتين" : digits.string(target)) }
         return target == 1 ? "لم تتمّها بعد" : "الهدف: "+arabicCount(target,["مرة واحدة","مرتان","مرات","مرة"],digits)
     }
     return value == 0 ? "الهدف: "+habitUnitCount(target,unit,digits) : digits.string(value)+" من "+habitUnitCount(target,unit,digits,genitive:true)

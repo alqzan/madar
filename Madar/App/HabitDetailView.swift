@@ -20,7 +20,7 @@ struct HabitDetailView:View {
         let periods=reading.summary.periods.filter{$0.target > 0 && $0.end <= AppBahwService(session:session).today.adding(days:1)}
         let kept=periods.filter(\.met).count
         let days=max(1,MadarCalendarDays.distance(from:reading.firstEffectiveFrom,to:AppBahwService(session:session).today)+1)
-        return "«"+reading.name+"» معك منذ "+habitPeriodCount(days,.daily,digits)+(kept == 0 ? "، ولم تتمّها بعد" : "، أتممتها "+arabicCount(kept,["مرة واحدة","مرتين","مرات","مرة"],digits)+" من "+digits.string(periods.count))+". تبقى في سجلّك وتستطيع إرجاعها."
+        return "«"+reading.name+"» معك منذ "+habitPeriodCount(days,.daily,digits)+(kept == 0 ? "، ولم تتمّها بعد" : "، أتممتها في "+habitPeriodCount(kept,reading.summary.current?.rule.frequency ?? .daily,digits)+" من "+digits.string(periods.count))+". تبقى في سجلّك وتستطيع إرجاعها."
     }
     @State private var pastDay=false
     /// Read once when the page opens; it was rebuilt from every prayer log on each redraw of the «جمّد» menu.

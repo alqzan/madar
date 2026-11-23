@@ -8,6 +8,18 @@ import MadarPrayer
 
 @MainActor final class RoomWidgetSnapshotTests:XCTestCase {
     /// Arabic counted nouns: ٣–١٠ plural genitive, ١١–٩٩ singular accusative, exact hundreds singular genitive, ١٠١ onwards by its last two digits.
+    /// A count habit without a unit names its times («مرة واحدة من ٣»), never a bare «١ من ٣»; a unit is said in Arabic, never its key.
+    func testHabitProgressSaysTimesAndUnitsInArabic() {
+        let digits=MadarNumberFormatter(style:.hindi)
+        XCTAssertEqual(habitProgressText(1,3,nil,digits),"مرة واحدة من ٣")
+        XCTAssertEqual(habitProgressText(2,5,nil,digits),"مرتان من ٥")
+        XCTAssertEqual(habitProgressText(4,5,nil,digits),"٤ مرات من ٥")
+        XCTAssertEqual(habitProgressText(1,2,nil,digits),"مرة واحدة من مرتين")
+        XCTAssertEqual(habitProgressText(0,3,nil,digits),"الهدف: ٣ مرات")
+        XCTAssertEqual(habitProgressText(1,1,nil,digits),"تمّت")
+        XCTAssertEqual(habitUnitCount(15,"minutes",digits,genitive:true),"١٥ دقيقة")
+        XCTAssertFalse(habitUnitCount(6000,"steps",digits,genitive:true).contains("steps"))
+    }
     func testCountedNounsTakeTheSingularGenitiveAtExactHundreds() {
         let digits=MadarNumberFormatter(style:.hindi)
         func books(_ n:Int)->String { WidgetCopy.agree(n,digits,one:"كتاب واحد",two:"كتابان",few:"كتب",many:"كتابًا") }
