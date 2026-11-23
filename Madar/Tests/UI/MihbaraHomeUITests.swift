@@ -1348,8 +1348,9 @@ import UIKit
         XCTAssertTrue(continueBook.waitForExistence(timeout: 8), app.debugDescription)
         shot(app, "AU-87-file-near-end-L")
         let library = app.buttons["mihbara-library"]
+        // The Mihbara is a full-screen cover, so the room bar is usually not on screen; then the screen's edge is the limit.
         let bottomBar = app.otherElements["fixed-tab-bar"]
-        let clearOfBottomBar = bottomBar.frame.minY - 16
+        let clearOfBottomBar = (bottomBar.exists ? bottomBar.frame.minY : app.frame.maxY) - 16
         for _ in 0..<5 where library.frame.maxY > clearOfBottomBar { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(library.isHittable, app.debugDescription)
         XCTAssertLessThan(library.frame.maxY, clearOfBottomBar, app.debugDescription)

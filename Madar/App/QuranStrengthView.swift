@@ -331,8 +331,5 @@ struct QuranStrengthView: View {
 
 extension QuranStrengthView {
     /// Audit 28 Oct: the adjective agrees with its count («وجه واحد بعيد»، «وجهان بعيدان»، «٣ أوجه بعيدة»، «١٢ وجهًا بعيدًا»).
-    func farFaces(_ n: Int) -> String {
-        service.faceCount(n)
-            + (n == 1 ? " بعيد" : n == 2 ? " بعيدان" : n % 100 >= 11 || n % 100 == 0 ? " بعيدًا" : " بعيدة")
-    }
+    func farFaces(_ n: Int) -> String { service.farFaceCount(n) }
 }

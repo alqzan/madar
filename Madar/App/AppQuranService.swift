@@ -106,6 +106,10 @@ import MadarPrayer
     func faceCount(_ value: Int, accusative: Bool = false) -> String {
         count(value, singular: accusative ? "وجهًا واحدًا" : "وجه واحد", dual: accusative ? "وجهين" : "وجهان", plural: "أوجه")
     }
+    /// The adjective agrees with its count («وجه واحد بعيد»، «وجهان بعيدان»، «٣ أوجه بعيدة»، «١٢ وجهًا بعيدًا»); zero reads «لا أوجه بعيدة».
+    func farFaceCount(_ n: Int) -> String {
+        n == 0 ? "لا أوجه بعيدة" : faceCount(n) + (n == 1 ? " بعيد" : n == 2 ? " بعيدان" : n % 100 >= 11 || n % 100 == 0 ? " بعيدًا" : " بعيدة")
+    }
     func dayCount(_ value: Int) -> String { count(value, singular: "يوم واحد", dual: "يومان", plural: "أيام") }
     func range(_ portion: QuranAyahRange, catalog: QuranResourceCatalog) throws -> QuranUIRange {
         let pages = try QuranPortionEngine.pages(for: portion, catalog: catalog)
@@ -249,7 +253,7 @@ import MadarPrayer
             missedDayAmount: missedDay == nil ? nil : plan.map { var habitual = $0.input; habitual.amount *= snapshot.habitualHifzLevel.hifzFactor; return QuranPlanCopy.amount(habitual, digits: numerals) },
             summary: ["في صدرك " + coverageTitle], history: QuranUIHistory(weekSummary: [weeklySummary], yearSummary: [], allSummary: [], days: heat, coverage: [], sessions: historySessions),
             strengthTitle: "مؤشر وصفي من تقييمك ومواعيد المراجعة", strength: strength,
-            recovery: QuranUIRecovery(distantLabel: { n in faceCount(n) + (n == 1 ? " بعيد" : n == 2 ? " بعيدان" : " بعيدة") }(snapshot.pages.filter(\.isFar).count), activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
+            recovery: QuranUIRecovery(distantLabel: farFaceCount(snapshot.pages.filter(\.isFar).count), activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
             errors: errors, toolsOrder: [], availableTools: [], blockOrder: ["sadr", "path", "log14", "tools"], hiddenBlocks: [],
             sessionUnavailableReason: nil, readerUnavailableReason: nil, numeralLocale: app.values["core.numerals"]?.string == "western" ? "en" : "ar",
             dayCloseAvailable: snapshot.sessions.contains { $0.dayKey == today }, unreadableDraftCount: snapshot.unreadableDraftCount, unreadableRowCount: snapshot.unreadableRowCount)

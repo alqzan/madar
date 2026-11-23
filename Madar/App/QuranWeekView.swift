@@ -71,7 +71,7 @@ struct QuranWeekView: View {
         card {
             VStack(alignment: .leading, spacing: 14) {
                 Text("حلقات آخر سبعة أيام").font(font(17, bold: true))
-                Text("أغلقت الحلقتين في " + service.numerals.string(value.closedDays) + " من " + service.numerals.string(value.eligibleDays) + (value.eligibleDays == 1 ? " يوم الحفظ" : value.eligibleDays == 2 ? " يومَي الحفظ" : " أيام الحفظ"))
+                Text((value.closedDays == 0 ? "لم تُغلق الحلقتين في أي يوم من " : "أغلقت الحلقتين في " + service.numerals.string(value.closedDays) + " من ") + service.numerals.string(value.eligibleDays) + (value.eligibleDays == 1 ? " يوم الحفظ" : value.eligibleDays == 2 ? " يومَي الحفظ" : " أيام الحفظ"))
                     .font(font(14)).accessibilityIdentifier("quran-week-closed")
                 if type.isAccessibilitySize {
                     ForEach(value.days) { day in Button { selected = day } label: { Text(day.label + "، حفظ " + faces(day.hifz) + "، مراجعة " + faces(day.review)).font(font(15)).frame(minHeight: 44) }.buttonStyle(.madarPlain) }
