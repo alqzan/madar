@@ -70,10 +70,11 @@ import XCTest
     func testCalendarMonthShowsPhotoDaysWithThumbnail() throws {
         continueAfterFailure = false
         let app = launch("periods")
-        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 25))
-        app.buttons["diary-today"].tap()
-        let archive = app.buttons["diary-day-archive"]
-        XCTAssertTrue(archive.waitForExistence(timeout: 10)); archive.tap()
+        // «أيامك» sits on the diary home itself since 14 Nov.
+        let archive = app.buttons["diary-days"]
+        XCTAssertTrue(archive.waitForExistence(timeout: 25), app.debugDescription); archive.tap()
+        let menu = app.buttons["diary-hub-view-menu"]; XCTAssertTrue(menu.waitForExistence(timeout: 15), app.debugDescription); menu.tap()
+        let calendar = app.buttons["diary-hub-view-calendar"]; XCTAssertTrue(calendar.waitForExistence(timeout: 5), app.debugDescription); calendar.tap()
         XCTAssertTrue(app.buttons["diary-calendar-scale"].waitForExistence(timeout: 15), app.debugDescription)
         app.buttons["diary-calendar-scale"].tap()
         let photoDay = app.buttons["diary-calendar-day-2026-10-14"]

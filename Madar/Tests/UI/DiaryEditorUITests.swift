@@ -74,9 +74,8 @@ import XCTest
         XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 15), "Today (\(syntheticPhotoDay(offset: 1))) shows its own photo")
         XCTAssertEqual(photos.count, 1, "The later day should show exactly its own synthetic photo")
         app.buttons["diary-editor-save"].tap()
-        let yesterday = app.buttons["diary-day-yesterday"]
-        XCTAssertTrue(yesterday.waitForExistence(timeout: 10), app.debugDescription)
-        yesterday.tap()
+        // The «أمس» tab left on 14 Nov; the past day opens by its link.
+        app.open(URL(string: "madar://notes/day/\(fixtureDay)")!)
         XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 10), "A past day shows its photo too: " + app.debugDescription)
         XCTAssertEqual(photos.count, 1, "The earlier day should show exactly its own synthetic photo (\(fixtureDay))")
     }

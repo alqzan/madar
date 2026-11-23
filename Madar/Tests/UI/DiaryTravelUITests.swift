@@ -49,6 +49,9 @@ import XCTest
         continueAfterFailure=false
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"travel","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-09-30T16:40:00+03:00"];app.launch()
         let days=app.buttons.matching(identifier:"diary-days").firstMatch;XCTAssertTrue(days.waitForExistence(timeout:25));days.tap()
+        // The archive opens on «الأيام» (14 Nov); the calendar is chosen from «طريقة العرض».
+        let menu=app.buttons["diary-hub-view-menu"];XCTAssertTrue(menu.waitForExistence(timeout:15),app.debugDescription);menu.tap()
+        let calendar=app.buttons["diary-hub-view-calendar"];XCTAssertTrue(calendar.waitForExistence(timeout:5),app.debugDescription);calendar.tap()
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-calendar-travel-legend").firstMatch.waitForExistence(timeout:10));capture(app,"M3-V15-year-travel-L")
         app.buttons["diary-calendar-scale"].tap()
         let travelled=app.buttons["diary-calendar-day-2026-09-12"];XCTAssertTrue(travelled.waitForExistence(timeout:10));XCTAssertTrue(travelled.label.hasSuffix("يوم سفر"))

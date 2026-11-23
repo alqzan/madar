@@ -25,7 +25,9 @@ import XCTest
         XCTAssertTrue(night.staticTexts["diary-day-title"].label.contains("١٥ أكتوبر ٢٠٢٦"))
         XCTAssertTrue(night.staticTexts["diary-day-secondary-date"].label.contains("ليلة ٥ جمادى الأولى ١٤٤٨"), night.staticTexts["diary-day-secondary-date"].label)
         capture(night,"M3-V14-dark-L");night.terminate()
-        let back=launch("return","2026-10-15T15:00:00+03:00");XCTAssertTrue(back.buttons["diary-return-days"].waitForExistence(timeout:10));capture(back,"M3-V14-return-L");back.buttons["diary-return-days"].tap();XCTAssertTrue(back.buttons["diary-month-10"].waitForExistence(timeout:10))
+        // 14 Nov: the return card only names the last written page and says nothing needs making up; the archive is «كل الذكريات».
+        let back=launch("return","2026-10-15T15:00:00+03:00");let card=back.descendants(matching:.any)["diary-return"].firstMatch;XCTAssertTrue(card.waitForExistence(timeout:10),back.debugDescription);capture(back,"M3-V14-return-L")
+        XCTAssertTrue(back.staticTexts.containing(NSPredicate(format:"label BEGINSWITH %@","آخر صفحة كتبتها")).firstMatch.exists,back.debugDescription)
     }
     private func capture(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
 }

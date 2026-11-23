@@ -16,7 +16,9 @@ import XCTest
         XCTAssertEqual(error.label, "تعذّر فتح سجل اليوميات.")
         shot(app, "AU-74-hub-read-error-L")
         app.buttons["diary-hub-retry"].tap()
-        XCTAssertTrue(app.staticTexts["diary-hub-year"].waitForExistence(timeout: 10), app.debugDescription)
+        // The archive opens on «الأيام» (14 Nov); its view menu shows only once the read succeeded.
+        XCTAssertTrue(app.buttons["diary-hub-view-menu"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["diary-hub-error"].exists, app.debugDescription)
         shot(app, "AU-74-hub-retried-L")
     }
     func testDayPageKeepsItsContentAndRetriesWhenLetterReadFails() {
@@ -50,7 +52,7 @@ import XCTest
         XCTAssertTrue(text.label.hasPrefix("أرجو أن تكون"));capture(app,"F01-letter-open-L")
         app.buttons["diary-letter-done"].tap()
         XCTAssertTrue(app.buttons["diary-letter-waiting"].waitForNonExistence(timeout:10))
-        app.buttons["diary-day-archive"].tap();XCTAssertTrue(app.buttons["diary-hub-letters"].waitForExistence(timeout:10));app.buttons["diary-hub-letters"].tap()
+        app.closeDiaryDay();let days=app.buttons["diary-days"];XCTAssertTrue(days.waitForExistence(timeout:10),app.debugDescription);days.tap();XCTAssertTrue(app.buttons["diary-hub-letters"].waitForExistence(timeout:10));app.buttons["diary-hub-letters"].tap()
         XCTAssertTrue(app.buttons["diary-letter-opened"].waitForExistence(timeout:10));XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-letter-sealed").firstMatch.exists)
         capture(app,"F01-mailbox-L")
     }

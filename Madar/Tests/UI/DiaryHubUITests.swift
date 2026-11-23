@@ -4,6 +4,7 @@ import XCTest
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "editor", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
         app.launch(); XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
+        showDayView("calendar", app)
         let yearScale = app.buttons["diary-calendar-scale-year"]
         let monthScale = app.buttons["diary-calendar-scale"]
         XCTAssertTrue(yearScale.waitForExistence(timeout: 10)); XCTAssertTrue(yearScale.isSelected); XCTAssertFalse(monthScale.isSelected)
@@ -16,26 +17,27 @@ import XCTest
         capture(app, "M3-V07-year-october-L")
         october.tap(); let day = app.buttons["diary-calendar-day-2026-10-15"]; XCTAssertTrue(day.waitForExistence(timeout: 5)); capture(app,"M3-V07-month-L"); day.tap()
         XCTAssertTrue(app.buttons["diary-day-write"].waitForExistence(timeout: 10)); app.closeDiaryDay()
-        app.buttons["diary-hub-view-timeline"].tap(); XCTAssertTrue(app.buttons["diary-hub-day-2026-10-15"].waitForExistence(timeout: 10)); capture(app,"M3-V07-timeline-L")
-        app.buttons["diary-hub-view-photos"].tap(); XCTAssertTrue(app.images.count > 0); capture(app,"M3-V07-photos-L")
-        app.buttons["diary-hub-calendar"].tap(); yearScale.tap()
+        showDayView("timeline", app); XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'diary-hub-day-'")).firstMatch.waitForExistence(timeout: 10), "«الأيام» lists the past days: \(app.debugDescription)"); XCTAssertFalse(app.buttons["diary-hub-day-2026-10-15"].exists, "Today is not a past day"); capture(app,"M3-V07-timeline-L")
+        showDayView("photos", app); XCTAssertTrue(app.images.count > 0); capture(app,"M3-V07-photos-L")
+        showDayView("calendar", app); yearScale.tap()
         let hijri = app.buttons["diary-calendar-hijri"]; for _ in 0..<4 where !hijri.isHittable { app.swipeUp() }; hijri.tap()
         XCTAssertTrue(app.staticTexts["diary-hub-year"].waitForExistence(timeout: 10)); XCTAssertEqual(app.staticTexts["diary-hub-year"].label,"١٤٤٨")
         app.terminate(); app.launch(); XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
+        showDayView("calendar", app)
         XCTAssertTrue(app.staticTexts["diary-hub-year"].waitForExistence(timeout: 10)); XCTAssertEqual(app.staticTexts["diary-hub-year"].label,"١٤٤٨")
     }
     func testIndexYearsShowBothCalendars() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "editor", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
         app.launch(); XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
-        XCTAssertTrue(app.buttons["diary-calendar-scale-year"].waitForExistence(timeout: 10)); capture(app, "M3-V07-index-calendar-L")
+        XCTAssertTrue(app.buttons["diary-hub-view-menu"].waitForExistence(timeout: 10)); capture(app, "M3-V07-index-calendar-L")
         selectHubTab("index", app)
         let gregorianYear = app.descendants(matching: .any)["diary-hub-index-year-2026"]
         XCTAssertTrue(gregorianYear.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(gregorianYear.label.contains(" م") && gregorianYear.label.contains(" هـ"), gregorianYear.label)
         capture(app, "M3-V07-index-gregorian-L")
 
-        selectHubTab("calendar", app)
+        selectHubTab("timeline", app); showDayView("calendar", app)
         let hijri = app.buttons["diary-calendar-hijri"]
         for _ in 0..<5 where !hijri.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(hijri.isHittable, app.debugDescription); hijri.tap()
@@ -96,12 +98,19 @@ import XCTest
         XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 20), app.debugDescription); capture(app, "TRIAL-diary-home-L")
         app.swipeUp(velocity: .slow); capture(app, "TRIAL-diary-home-s1-L"); app.swipeDown(velocity: .slow); app.swipeDown(velocity: .slow)
         let opened = Date(); app.buttons["diary-days"].tap()
-        XCTAssertTrue(app.buttons["diary-calendar-scale-year"].waitForExistence(timeout: 30)); capture(app, "TRIAL-diary-hub-L")
+        XCTAssertTrue(app.buttons["diary-hub-view-menu"].waitForExistence(timeout: 30)); capture(app, "TRIAL-diary-hub-L")
         add(XCTAttachment(string: "hub opened in \(Date().timeIntervalSince(opened)) s"))
-        app.buttons["diary-hub-view-timeline"].tap(); _ = app.buttons.firstMatch.waitForExistence(timeout: 10); capture(app, "TRIAL-diary-timeline-L")
-        app.buttons["diary-hub-view-photos"].tap(); capture(app, "TRIAL-diary-photos-L")
+        capture(app, "TRIAL-diary-timeline-L")
+        showDayView("photos", app); capture(app, "TRIAL-diary-photos-L")
     }
     private func capture(_ app: XCUIApplication,_ name:String) { let shot = XCTAttachment(screenshot:app.screenshot()); shot.name=name; shot.lifetime = .keepAlways; add(shot) }
+    /// Since 14 Nov the archive opens on «الأيام»; the calendar and photos are views chosen from «طريقة العرض».
+    private func showDayView(_ id: String, _ app: XCUIApplication) {
+        let menu = app.buttons["diary-hub-view-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 15), app.debugDescription); menu.tap()
+        let option = app.buttons["diary-hub-view-" + id]
+        XCTAssertTrue(option.waitForExistence(timeout: 5), app.debugDescription); option.tap()
+    }
     private func selectHubTab(_ name: String, _ app: XCUIApplication) {
         let tab = app.buttons["diary-hub-" + name]
         for _ in 0..<6 where !tab.isHittable { app.swipeLeft() }

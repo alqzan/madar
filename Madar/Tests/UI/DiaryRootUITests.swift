@@ -71,12 +71,13 @@ import XCTest
     func testYearStripSitsOverTodayAndOpensThatDay() throws {
         continueAfterFailure = false
         let app = launch("home")
-        let strip = app.descendants(matching: .any)["diary-year-strip"]
+        // 14 Nov: the memories strip under today's date holds one card per past year on this day.
+        let strip = app.buttons["diary-year-2025-10-15"]
         XCTAssertTrue(strip.waitForExistence(timeout: 25), app.debugDescription)
         XCTAssertTrue(app.buttons["diary-day-more"].exists, "The strip is over today's page, not instead of it")
         capture(app, "T10-root-year-strip-L")
         strip.tap()
-        XCTAssertTrue(app.staticTexts["diary-day-title"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["١٥ أكتوبر ٢٠٢٥"].waitForExistence(timeout: 10), app.debugDescription)
         let todayQuery = app.buttons.matching(identifier: "diary-day-today")
         XCTAssertGreaterThan(todayQuery.count, 0, app.debugDescription)
         let today = todayQuery.element(boundBy: todayQuery.count - 1)
@@ -87,11 +88,15 @@ import XCTest
     func testDaysEntryOpensCalendarAndPastDayReturnsToToday() throws {
         continueAfterFailure = false
         let app = launch("home")
-        let days = app.buttons["diary-day-archive"]
+        // 14 Nov: on today's page the archive is «كل الذكريات», beside the memories of this day.
+        let days = app.buttons["diary-all-memories"]
         XCTAssertTrue(days.waitForExistence(timeout: 25), app.debugDescription)
-        XCTAssertEqual(days.label, "أيامك", "Past-day browsing is named on the page: \(days.label)")
+        XCTAssertEqual(days.label, "كل الذكريات", "Past-day browsing is named on the page: \(days.label)")
         capture(app, "OWNER-notes-days-entry-L")
         days.tap()
+        // The archive opens on «الأيام»; the calendar is a view chosen from «طريقة العرض».
+        let menu = app.buttons["diary-hub-view-menu"]; XCTAssertTrue(menu.waitForExistence(timeout: 15), app.debugDescription); menu.tap()
+        let calendar = app.buttons["diary-hub-view-calendar"]; XCTAssertTrue(calendar.waitForExistence(timeout: 5), app.debugDescription); calendar.tap()
         XCTAssertTrue(app.staticTexts["diary-hub-year"].waitForExistence(timeout: 15), app.debugDescription)
         app.buttons["diary-calendar-scale"].tap()
         let past = app.buttons["diary-calendar-day-2026-10-14"]
@@ -118,14 +123,14 @@ import XCTest
         capture(app, "OWNER-notes-historical-friday-return-before-L")
         today.tap()
         XCTAssertTrue(app.staticTexts["١٧ أكتوبر ٢٠٢٦"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(today.isSelected, "The current day is selected after returning")
+        XCTAssertTrue(today.waitForNonExistence(timeout: 5), "Back on today, «العودة إلى اليوم» has nowhere to go and leaves")
         capture(app, "OWNER-notes-historical-friday-return-after-L")
     }
     func testRootRouteReturnsFromAnOlderDayToToday() throws {
         continueAfterFailure = false
         let app = launch("entryRoute")
         XCTAssertTrue(app.buttons["diary-day-more"].waitForExistence(timeout: 25), app.debugDescription)
-        app.buttons["diary-day-yesterday"].tap()
+        app.open(URL(string: "madar://notes/day/2026-10-14")!)
         XCTAssertTrue(app.staticTexts["١٤ أكتوبر ٢٠٢٦"].waitForExistence(timeout: 10), app.debugDescription)
         app.open(URL(string: "madar://notes")!)
         XCTAssertTrue(app.staticTexts["١٥ أكتوبر ٢٠٢٦"].waitForExistence(timeout: 15), app.debugDescription)
@@ -145,7 +150,7 @@ import XCTest
         }
         var app = start()
         XCTAssertTrue(app.buttons["diary-day-more"].waitForExistence(timeout: 25), app.debugDescription)
-        app.buttons["diary-day-yesterday"].tap()
+        app.open(URL(string: "madar://notes/day/2026-10-14")!)
         XCTAssertTrue(app.staticTexts["١٤ أكتوبر ٢٠٢٦"].waitForExistence(timeout: 10), app.debugDescription)
         openWriter(app)
         let pastField = app.textViews["diary-editor-text"]
@@ -160,9 +165,7 @@ import XCTest
         XCTAssertEqual(todayField.value as? String, "", "A past-day margin draft must never appear in today's writer")
         todayField.typeText("مسودة اليوم")
         waitForSavedDraft(app)
-        let yesterday = app.buttons["diary-day-yesterday"]
-        XCTAssertTrue(yesterday.waitForExistence(timeout: 10), app.debugDescription)
-        yesterday.tap()
+        app.open(URL(string: "madar://notes/day/2026-10-14")!)
         XCTAssertTrue(app.staticTexts["١٤ أكتوبر ٢٠٢٦"].waitForExistence(timeout: 10), app.debugDescription)
         openWriter(app)
         let restoredPast = app.textViews["diary-editor-text"]
@@ -184,9 +187,7 @@ import XCTest
         let afterRelaunchToday = app.textViews["diary-editor-text"]
         XCTAssertTrue(afterRelaunchToday.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertEqual(afterRelaunchToday.value as? String, "مسودة اليوم", app.debugDescription)
-        let pastTab = app.buttons["diary-day-yesterday"]
-        XCTAssertTrue(pastTab.waitForExistence(timeout: 10), app.debugDescription)
-        pastTab.tap()
+        app.open(URL(string: "madar://notes/day/2026-10-14")!)
         XCTAssertTrue(app.staticTexts["١٤ أكتوبر ٢٠٢٦"].waitForExistence(timeout: 10), app.debugDescription)
         openWriter(app)
         let afterRelaunchPast = app.textViews["diary-editor-text"]

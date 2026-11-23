@@ -4,8 +4,8 @@ import XCTest
     func testEditFrozenLineKeepsTheOriginal() throws {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"today","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00"];app.launch()
-        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout:25));app.buttons["diary-today"].tap()
-        XCTAssertTrue(app.buttons["diary-day-year"].waitForExistence(timeout:10));app.buttons["diary-day-year"].tap()
+        // The memories strip on the diary home holds the year-ago card (14 Nov).
+        XCTAssertTrue(app.buttons["diary-year-2025-10-15"].waitForExistence(timeout:25),app.debugDescription);app.buttons["diary-year-2025-10-15"].tap()
         let line=app.staticTexts.containing(NSPredicate(format:"label BEGINSWITH %@","عشاء عند أهلي")).firstMatch
         XCTAssertTrue(line.waitForExistence(timeout:10));line.press(forDuration:1.0)
         XCTAssertTrue(app.buttons["عدّل السطر"].waitForExistence(timeout:5));app.buttons["عدّل السطر"].tap()
@@ -22,8 +22,8 @@ import XCTest
     func testCancelAsksBeforeDiscardingAnEdit() throws {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"today","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00"];app.launch()
-        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout:25));app.buttons["diary-today"].tap()
-        XCTAssertTrue(app.buttons["diary-day-year"].waitForExistence(timeout:10));app.buttons["diary-day-year"].tap()
+        // The memories strip on the diary home holds the year-ago card (14 Nov).
+        XCTAssertTrue(app.buttons["diary-year-2025-10-15"].waitForExistence(timeout:25),app.debugDescription);app.buttons["diary-year-2025-10-15"].tap()
         let line=app.staticTexts.containing(NSPredicate(format:"label BEGINSWITH %@","عشاء عند أهلي")).firstMatch
         XCTAssertTrue(line.waitForExistence(timeout:10));line.press(forDuration:1.0)
         XCTAssertTrue(app.buttons["عدّل السطر"].waitForExistence(timeout:5));app.buttons["عدّل السطر"].tap()
