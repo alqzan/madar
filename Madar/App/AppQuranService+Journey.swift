@@ -100,7 +100,7 @@ extension AppQuranService {
             case (0, _): equivalent = "ثلاثة أرباع المصحف"
             case (1, _): equivalent = "المصحف كاملًا مرة" + rest
             case (2, _): equivalent = "المصحف كاملًا مرتين" + rest
-            default: equivalent = "المصحف كاملًا " + numerals.string(whole) + " مرات" + rest
+            default: equivalent = "المصحف كاملًا " + numerals.string(whole) + ((3...10).contains(whole % 100) ? " مرات" : " مرة") + rest
             }
             recitedDetail = "أوجه سُجّل لها تقييم؛ ما يعادل " + equivalent
         }

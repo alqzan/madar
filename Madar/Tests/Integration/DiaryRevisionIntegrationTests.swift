@@ -4,6 +4,15 @@ import MadarCore
 import MadarData
 @testable import Madar
 @MainActor final class DiaryRevisionIntegrationTests:XCTestCase {
+    func testAttachmentSummaryAgreesItsCounts() throws {
+        let root=FileManager.default.temporaryDirectory.appending(path:"DiaryAttach-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
+        let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),app=try AppSession(container:container,groupDirectory:root)
+        let service=AppDiaryService(app:app,clock:{Date()})
+        func media(_ kind:String,_ n:Int)->[DiaryDisplayMedia]{(0..<n).map{_ in DiaryDisplayMedia(id:UUID(),entryID:"e",kind:kind,contentType:kind,data:Data(),duration:nil)}}
+        XCTAssertEqual(service.attachmentSummary(media("file",2)),"مرفقان في هذه الصفحة")
+        XCTAssertEqual(service.attachmentSummary(media("file",12)),"١٢ مرفقًا في هذه الصفحة")
+        XCTAssertEqual(service.attachmentSummary(media("audio",2)+media("photo",3)),"تسجيلان، ٣ صور في هذه الصفحة")
+    }
     // RD1 [DEFAULT]: an edit of a frozen day shows one line everywhere, keeps the original readable, and undo restores it.
     func testFrozenEditShowsOnceEverywhereAndUndoRestores() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"DiaryRevision-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}

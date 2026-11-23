@@ -146,7 +146,7 @@ struct MoneyCategoriesView: View {
             Text("حدودك" + (r.incomeMinor > 0 && visible ? "، " + service.percent(r.totalLimitsMinor, of: r.incomeMinor) + " من الراتب" : "")).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             Spacer(minLength: 6)
             if r.autoCategorized > 0 {
-                Label(service.digits.string(r.autoCategorized) + " تصنّفت وحدها", systemImage: "checkmark").font(MadarTypography.fine()).foregroundStyle(theme.color("surplusText"))
+                Label(arabicCount(r.autoCategorized, ["حركة تصنّفت وحدها", "حركتان تصنّفتا وحدهما", "حركات تصنّفت وحدها", "حركة تصنّفت وحدها"], service.digits), systemImage: "checkmark").font(MadarTypography.fine()).foregroundStyle(theme.color("surplusText"))
                     .padding(.horizontal, 10).padding(.vertical, 6).glassEffect(.regular.interactive(), in: .capsule).accessibilityIdentifier("money-categories-auto")
             }
         }

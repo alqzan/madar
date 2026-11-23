@@ -101,7 +101,7 @@ private struct DiaryDayReadConfiguration: Sendable {
         var parts: [String] = []
         if audio > 0 { parts.append(audio == 1 ? "تسجيل واحد" : audio == 2 ? "تسجيلان" : digitsFormatter.string(audio) + (audio <= 10 ? " تسجيلات" : " تسجيلًا")) }
         if photos > 0 { parts.append(photos == 1 ? "صورة واحدة" : photos == 2 ? "صورتان" : digitsFormatter.string(photos) + (photos <= 10 ? " صور" : " صورة")) }
-        if other > 0 { parts.append(other == 1 ? "مرفق واحد" : digitsFormatter.string(other) + " مرفقات") }
+        if other > 0 { parts.append(other == 1 ? "مرفق واحد" : other == 2 ? "مرفقان" : digitsFormatter.string(other) + (other <= 10 ? " مرفقات" : " مرفقًا")) }
         return parts.joined(separator: "، ") + " في هذه الصفحة"
     }
     private var digitsFormatter: MadarNumberFormatter { .init(style: app.string("core.numerals") == "western" ? .western : .hindi) }
