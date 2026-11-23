@@ -8,6 +8,7 @@
 
 ## Verified baseline and delivery
 
+- Build 0.1.0 (66) was archived and uploaded to internal TestFlight on 23 November at 23:24 Riyadh. The archive contains one installed app with the widget and Watch app embedded, all at build 66. The upload log confirms success and receipt for Apple processing. See `Madar/Artifacts/OWNER-TestFlight-66/`.
 - M0–M6 software is on main; M7 owner-device/system acceptance remains open. Build 0.1.0 (60), source `bef2b256`, was uploaded internally on 22 November at 16:41 Riyadh. The archive contains one installed app, with the widget and Watch app embedded at build 60. The upload log reports success. Apple processing and owner-device acceptance remain open. See `Madar/Artifacts/OWNER-TestFlight-60/` and Claude’s 22 November handover for the prior evidence and failures.
 - Simulators: `Madar 15 Pro Max` and `Madar iPad Pro 13`, both iOS 27.0, no others. Storage remains local-only (RA1); this request used synthetic stores only and did not open or migrate owner data. Owner-device installation and acceptance are separate.
 - Package baseline passes (rows 16–17). Current continuation: prayer history read failures propagate and remain retryable (42/42 prayer, 26/26 command/replay tests). Polar manual logging, habit delete/undo/relaunch and both year-calendar settings paths now pass on iOS 27.0; details in row 18. General no-trip FX rates still need an owner rule/data-model decision. The 9 handwritten-colour findings are resolved in row 19: static shipping-source scan passes (464 sources, 4 catalogs, 38 independently measured token pairs); its manual trace requirement remains separate.
@@ -270,7 +271,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Next
 
-- تسليم بناء TestFlight الداخلي التالي يُسجّل بعد الأرشفة والرفع.
+- رُفع بناء `0.1.0 (66)` إلى TestFlight الداخلي الساعة ٢٣:٢٤ بتوقيت الرياض. مصدر الكود `32b4d526`. نجحت الأرشفة والتوقيع والتحقق من الإصدارات الثلاثة. استلمت Apple الحزمة للمعالجة. حالة ظهور البناء واختباره على جهاز المالك تنتظر التحقق.
 
 ### Model/effort
 
@@ -278,7 +279,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Usage
 
-- المتبقي في البداية ٩٨٪ لخمس ساعات و٥٥٪ للأسبوع. قبل الأرشفة ١٩٪ لخمس ساعات و٤٢٪ للأسبوع.
+- المتبقي في البداية ٩٨٪ لخمس ساعات و٥٥٪ للأسبوع. قبل الأرشفة ١٩٪ لخمس ساعات و٤٢٪ للأسبوع. بعد تأكيد الرفع ٨٪ لخمس ساعات و٤١٪ للأسبوع.
 
 ## Handover — حركات في كل زاوية، إشعارات أذكى، مراجعة أخيرة — 2026-11-23 — Claude
 
