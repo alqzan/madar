@@ -121,6 +121,9 @@ final class AppSession {
     var pendingIntro: BahwBlock?
     /// Focused full-screen flows (the expense keypad, the year) that hide the tab bar also hide the glass accessory.
     var accessoryHiders: Set<String> = []
+    /// Sheets and covers on screen that carry their own error alert, oldest first. Only the newest shows the error: an outer one (or the
+    /// root) presenting the same alert pushed the inner sheet away, which closed the Mihbara reader on a save error.
+    var sheetErrorHosts: [UUID] = []
     /// Height of the floating bottom bar, measured by `TabShell`; each room's navigation root adds it to its own bottom safe area.
     var tabBarHeight: CGFloat = 0
     /// Raised by a lobby suggestion to open the «شيء ينتظرك» sheet instead of a room.

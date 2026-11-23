@@ -51,9 +51,18 @@ private struct RoomAccessoryHider: ViewModifier {
 
 extension View {
     /// AU-36/37: the root alert cannot show over a sheet, so a sheet carries its own for `session.errorMessage`.
-    func madarSheetErrorAlert(_ session: AppSession) -> some View {
+    func madarSheetErrorAlert(_ session: AppSession) -> some View { modifier(SheetErrorAlert(session: session)) }
+}
+
+private struct SheetErrorAlert: ViewModifier {
+    let session: AppSession
+    @State private var id = UUID()
+    func body(content: Content) -> some View {
         let readingSaveCoordinator = MihbaraReadingSaveCoordinator.forSession(session)
-        return alert("لم تكتمل العملية", isPresented: Binding(get: { session.errorMessage != nil }, set: { if !$0 { session.errorMessage = nil } })) {
+        content
+        .onAppear { session.sheetErrorHosts.removeAll { $0 == id }; session.sheetErrorHosts.append(id) }
+        .onDisappear { session.sheetErrorHosts.removeAll { $0 == id } }
+        .alert("لم تكتمل العملية", isPresented: Binding(get: { session.errorMessage != nil && session.sheetErrorHosts.last == id }, set: { if !$0 { session.errorMessage = nil } })) {
             if readingSaveCoordinator.canRetryPendingWriteErrorNow {
                 Button("إعادة المحاولة") {
                     readingSaveCoordinator.dismissPendingWriteError()

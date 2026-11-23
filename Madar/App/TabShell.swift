@@ -306,7 +306,7 @@ struct MadarRootView: View {
         }
         // Owner, 30 Oct 2026: the «افتح المحبرة» door in «خصّص» used to hang this cover on the settings page, which is rebuilt after every write,
         // so saving a note closed the whole room. Hosted here at the root it stays up until the reader leaves.
-        .fullScreenCover(isPresented: $session.mihbaraOpen) { MihbaraHomeView(app: session).environment(\.roomTheme, theme) }
+        .fullScreenCover(isPresented: $session.mihbaraOpen) { MihbaraHomeView(app: session).environment(\.roomTheme, theme).madarSheetErrorAlert(session) }
         .fullScreenCover(item: $session.moneyExpenseSeed, onDismiss: { session.presentNextMoneyExpenseSeed() }) { seed in MoneyQuickExpense(app: session, seed: seed) }
         .sheet(item: $session.pendingIntro) { block in RoomIntroSheet(session: session, block: block).environment(\.roomTheme, RoomTheme(room: block.themeRoom, dark: dark)) }
         .onChange(of: session.selectedTab) { _, tab in
@@ -340,7 +340,8 @@ struct MadarRootView: View {
         .overlay(alignment: .top) { RecordingBadge(session: session) }
         .fullScreenCover(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in })) { FirstRunView(session: session).environment(\.roomTheme, theme).madarSheetErrorAlert(session) }
         .alert("لم تكتمل العملية", isPresented: Binding(get: {
-            session.errorMessage != nil && !(session.mihbaraOpen && readingSaveCoordinator.canRetryPendingWriteErrorNow)
+            // A sheet or cover with its own alert shows the error itself; raising this one as well dismissed it (the reader closed on a save error).
+            session.errorMessage != nil && session.sheetErrorHosts.isEmpty && !(session.mihbaraOpen && readingSaveCoordinator.canRetryPendingWriteErrorNow)
         }, set: { if !$0 { session.errorMessage = nil } })) {
             if readingSaveCoordinator.canRetryPendingWriteErrorNow {
                 Button("إعادة المحاولة") {
