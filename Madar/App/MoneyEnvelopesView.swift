@@ -14,6 +14,7 @@ struct MoneyEnvelopesView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reading: MoneyEnvelopesReading?
     @State private var previewMinor = 0
     @State private var targetOpen = false
@@ -140,7 +141,9 @@ struct MoneyEnvelopesView: View {
             }
             if let target = reading.reserveTargetMinor {
                 HStack { Text("هدف الاحتياطي"); Spacer(); Text(figure: amount(target)) }.font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText")).accessibilityElement(children: .combine).accessibilityIdentifier("money-reserve-target")
-                if visible { ProgressView(value: min(1, Double(max(0, reading.home.reserveMinor)) / Double(target))).tint(theme.color("reserveText")) }
+                if visible { ProgressView(value: min(1, Double(max(0, reading.home.reserveMinor)) / Double(target))).tint(theme.color("reserveText"))
+                    // Micro-interactions (owner, 23 Nov): the reserve bar glides to its new level.
+                    .animation(reduceMotion ? nil : .smooth(duration: 0.6), value: reading.home.reserveMinor) }
             }
             if visible {
             HStack {
@@ -154,6 +157,8 @@ struct MoneyEnvelopesView: View {
                             .background(value == previewMinor ? theme.ink : .clear, in: .capsule)
                             .glassEffect(.regular.interactive(), in: .capsule)
                             .frame(minHeight: 44)
+                            // Micro-interactions (owner, 23 Nov): the chosen preview chip fills smoothly.
+                            .animation(reduceMotion ? nil : .snappy, value: previewMinor)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("money-reserve-preview-" + String(value))
                 }
             }

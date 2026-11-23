@@ -8,6 +8,8 @@ struct QuranYearView: View {
     @Binding var selection: QuranLogTab
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var type
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var barsRise = false
     @State private var value: QuranUIYear?
     @State private var review = true
     @State private var month: QuranUIYearMonth?
@@ -130,12 +132,16 @@ struct QuranYearView: View {
                     ForEach(months) { m in
                         Button { month = m } label: {
                             VStack(spacing: 5) {
-                                RoundedRectangle(cornerRadius: 4).fill(theme.color(review ? "review" : "hifz")).frame(height: max(3, CGFloat(review ? m.review : m.hifz) / CGFloat(maxValue) * 70))
+                                RoundedRectangle(cornerRadius: 4).fill(theme.color(review ? "review" : "hifz")).frame(height: max(3, CGFloat(review ? m.review : m.hifz) / CGFloat(maxValue) * 70 * (barsRise || reduceMotion ? 1 : 0)))
                                 Text(shortMonth(m.title)).font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                             }.frame(maxWidth: .infinity, minHeight: 100, alignment: .bottom)
                         }.buttonStyle(.madarPlain).accessibilityLabel(m.title + "، " + service.faceCount(review ? m.review : m.hifz)).accessibilityIdentifier("quran-year-month-" + m.id + (review ? "-review" : "-hifz"))
                     }
                 }
+                // Micro-interactions (owner, 23 Nov): month bars rise from the baseline once, then follow hifz/review switches smoothly.
+                .animation(reduceMotion ? nil : .smooth(duration: 0.8), value: barsRise)
+                .animation(reduceMotion ? nil : .smooth(duration: 0.5), value: review)
+                .onAppear { barsRise = true }
             }
         }
     }

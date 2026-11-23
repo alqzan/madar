@@ -12,6 +12,7 @@ struct MoneyGoalView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var size
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reading: MoneyGoalReading?
     @State private var name = ""
     @State private var amount = ""
@@ -168,6 +169,8 @@ struct MoneyGoalView: View {
                                 Rectangle().fill(theme.color("surplusText"))
                             }
                         }.frame(height: 9).clipShape(Capsule())
+                        // Micro-interactions (owner, 23 Nov): the upfront share glides as the amount changes.
+                        .animation(reduceMotion ? nil : .smooth(duration: 0.4), value: minor(upfront))
                         HStack {
                             Text("من " + (source == "surplus" ? "الفائض " : "الاحتياطي ") + shown(minor(upfront)));
                             Spacer(); Text("من يومك " + shown(rest))

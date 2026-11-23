@@ -2,6 +2,7 @@ import XCTest
 import UIKit
 
 @MainActor final class MihbaraHomeUITests: XCTestCase {
+    // FB-34 (owner): the desk, private notebook and Sunnah wird tests were deleted on 23 Nov 2026; those features left the Mihbara.
     /// Owner, 30 Oct: the daily reading goal is the «القراءة» habit, read from the Mihbara's own sessions.
     func testReadingGoalCreatesTheLinkedHabitAndShowsTheWeek() throws {
         continueAfterFailure = false
@@ -341,27 +342,6 @@ import UIKit
         app.terminate()
     }
 
-    func testMihbaraDeskRouteClosesReaderAndReturnsToTable() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false
-        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
-        let app = app("reader", epub: try Data(contentsOf: fixtureURL))
-        app.launch(); open(app)
-        let continueBook = app.buttons["mihbara-book-continue"]
-        XCTAssertTrue(continueBook.waitForExistence(timeout: 10), app.debugDescription)
-        reach(app, continueBook); continueBook.tap()
-        let closeReader = app.buttons["mihbara-reader-close"]
-        XCTAssertTrue(closeReader.waitForExistence(timeout: 20), app.debugDescription)
-
-        app.open(URL(string: "madar://mihbara/desk")!)
-
-        XCTAssertTrue(closeReader.waitForNonExistence(timeout: 10), app.debugDescription)
-        let desk = app.buttons["mihbara-book-continue"]
-        XCTAssertTrue(desk.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(desk.isHittable, app.debugDescription)
-        app.terminate()
-    }
-
     func testMihbaraRootRouteClosesLibraryAndReturnsToShelf() throws {
         continueAfterFailure = false
         let app = app("home")
@@ -377,22 +357,6 @@ import UIKit
         XCTAssertTrue(library.waitForExistence(timeout: 10), app.debugDescription)
         reach(app, library)
         XCTAssertTrue(library.isHittable, app.debugDescription)
-        app.terminate()
-    }
-
-    func testMihbaraDeskRouteClosesLibraryAndReturnsToTable() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false
-        let app = app("home")
-        app.launch(); open(app)
-        let library = app.buttons["mihbara-library"]
-        reach(app, library); library.tap()
-        let search = app.textFields["mihbara-library-search"]
-        XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription)
-        let deskRoute = app.buttons["mihbara-desk-test-route"]
-        XCTAssertTrue(deskRoute.waitForExistence(timeout: 5), app.debugDescription); deskRoute.tap()
-        XCTAssertTrue(search.waitForNonExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(app.buttons["mihbara-book-continue"].waitForExistence(timeout: 8), app.debugDescription)
         app.terminate()
     }
 
@@ -612,29 +576,6 @@ import UIKit
         XCTAssertFalse(ghost.exists, app.debugDescription)
     }
 
-    func testMihbaraNotebookDeepLinkOpensItsRequestedPrivateNote() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false
-        let app = app("home"); app.launchEnvironment["MADAR_UI_MIHBARA_MULTIPLE_NOTES"] = "1"; app.launch(); open(app)
-        let notebook = app.buttons["mihbara-notebook"]
-        reach(app, notebook); notebook.tap()
-        let notes = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add"))
-        XCTAssertEqual(notes.count, 2, app.debugDescription)
-        let selectedText = "ملاحظة ثانية لاختبار اختيارها"
-        let note = notes.matching(NSPredicate(format: "label CONTAINS %@", selectedText)).firstMatch
-        XCTAssertTrue(note.waitForExistence(timeout: 10), app.debugDescription)
-        let prefix = "mihbara-note-"
-        let noteID = String(note.identifier.dropFirst(prefix.count))
-        XCTAssertNotNil(UUID(uuidString: noteID), "The deep link must use the selected note's UUID.")
-        app.buttons["mihbara-notebook-close"].tap()
-        XCTAssertTrue(notebook.waitForExistence(timeout: 8), app.debugDescription)
-        app.open(URL(string: "madar://mihbara/notebook/\(noteID)")!)
-        let editor = app.textViews["mihbara-note-text"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 15), app.debugDescription)
-        XCTAssertTrue((editor.value as? String)?.contains(selectedText) == true, app.debugDescription)
-        app.terminate()
-    }
-
     /// Handwritten legacy Turath EPUB: one chapter, no noteref link, two complete note paragraphs.
     /// Its immutable content is enriched only in the reader DOM; no converter or owner file is used.
     func testLegacyTurathPageNotesOpenWithoutReimportingTheBook() throws {
@@ -756,139 +697,6 @@ import UIKit
         XCTAssertTrue(rows.firstMatch.label.contains("كتاب بلا ملف"), rows.firstMatch.label)
     }
 
-    func testGoodreadsCSVPreviewImportsBookAndLinkedPrivateNote() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false
-        let csv = "Book Id,Title,Author,Additional Authors,ISBN,ISBN13,My Rating,Exclusive Shelf,Date Read,Read Count,My Review,Private Notes,Number of Pages,Year Published,Date Added,Bookshelves\r\n"
-            + "9001,رحلة Goodreads,أحمد,,,9780306406157,4,currently-reading,,1,\"مراجعة متعددة\r\nالسطور\",ملاحظة من Goodreads,120,2020,2020/02/01,favorites\r\n"
-            + "9002,كتاب مؤرخ,أحمد,,,,5,read,2020/02/01,1,,,,2020,2020/02/01,\r\n"
-            + "9003,كتاب ينتظرني,سارة,,,,0,to-read,,0,,,,2020,2020/02/01,"
-        let app = app("empty")
-        app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_GOODREADS"] = Data(csv.utf8).base64EncodedString()
-        app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_GOODREADS_FAIL_ONCE"] = "1"
-        app.launch(); open(app)
-        let addBook = app.buttons["mihbara-add-paper"]
-        reach(app, addBook); addBook.tap()
-
-        let importButton = app.buttons["mihbara-goodreads-import"]
-        XCTAssertTrue(importButton.waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["رحلة Goodreads"].firstMatch.exists, app.debugDescription)
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "مراجعة متعددة")).firstMatch.exists, app.debugDescription)
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "ملاحظة من Goodreads")).firstMatch.exists, app.debugDescription)
-        let cutoff = app.descendants(matching: .any)["mihbara-goodreads-cutoff-year"]
-        XCTAssertTrue(cutoff.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(cutoff.label.contains("هـ") && cutoff.label.contains(" م"), cutoff.label)
-        shot(app, "M6-V17-goodreads-preview-L")
-        let wantShelf = app.staticTexts["أبي أقرأها"]
-        for _ in 0..<3 where !wantShelf.exists { app.swipeUp(velocity: .slow) }
-        XCTAssertTrue(wantShelf.waitForExistence(timeout: 5), app.debugDescription)
-        importButton.tap()
-
-        let importFailure = app.staticTexts["mihbara-goodreads-import-error"]
-        XCTAssertTrue(importFailure.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertEqual(importFailure.label, "تعذّرت إضافة كتب Goodreads إلى المحبرة. حاول مرة أخرى.")
-        XCTAssertTrue(app.staticTexts["رحلة Goodreads"].exists, "A failed import must preserve the preview.")
-        XCTAssertTrue(importButton.isEnabled && importButton.isHittable, app.debugDescription)
-        shot(app, "AU-76-goodreads-import-retry-L")
-        importButton.tap()
-
-        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 20), app.debugDescription)
-        let notebook = app.buttons["mihbara-notebook"]
-        reach(app, notebook); notebook.tap()
-        shot(app, "M6-V17-goodreads-private-note-L")
-        let note = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add")).firstMatch
-        XCTAssertTrue(note.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(note.label.contains("ملاحظة من Goodreads"), note.label)
-        XCTAssertTrue(note.label.contains("رحلة Goodreads"), note.label)
-
-        note.tap()
-        let editor = app.textViews["mihbara-note-text"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 8), app.debugDescription)
-        editor.tap(); editor.typeText(" — تم التعديل")
-        app.buttons["mihbara-note-save"].tap()
-        XCTAssertTrue(editor.waitForNonExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(note.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(note.label.contains("تم التعديل"), note.label)
-        XCTAssertTrue(note.label.contains("رحلة Goodreads"), note.label)
-
-        note.tap()
-        let delete = app.buttons["mihbara-note-delete"]
-        XCTAssertTrue(delete.waitForExistence(timeout: 5), app.debugDescription)
-        delete.tap()
-        let confirmation = app.alerts["احذف هذه الملاحظة؟"]
-        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
-        shot(app, "M6-private-note-delete-confirm-L")
-        confirmation.buttons["أبقها"].tap()
-        XCTAssertTrue(editor.exists)
-        XCTAssertTrue((editor.value as? String)?.contains("تم التعديل") == true)
-        delete.tap(); confirmation.buttons["احذف"].tap()
-        XCTAssertTrue(note.waitForNonExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["حُذفت الملاحظة"].exists)
-        undo(app)
-        let restoredNote = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add")).firstMatch
-        XCTAssertTrue(restoredNote.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(restoredNote.label.contains("تم التعديل"), restoredNote.label)
-        XCTAssertTrue(restoredNote.label.contains("رحلة Goodreads"), restoredNote.label)
-    }
-
-    func testMihbaraLinkWaitsForAnUnsavedNotebookDraft() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false
-        let app = app("home")
-        app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
-        app.launch()
-        app.buttons["tab-mihbara"].tap()
-        let notebook = app.buttons["mihbara-notebook"]
-        XCTAssertTrue(notebook.waitForExistence(timeout: 15), app.debugDescription)
-        reach(app, notebook); notebook.tap()
-        let add = app.buttons["mihbara-note-add"]
-        XCTAssertTrue(add.waitForExistence(timeout: 10)); add.tap()
-        let editor = app.textViews["mihbara-note-text"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 8))
-        let draft = "ملاحظة لم تُحفظ بعد"
-        editor.tap(); editor.typeText(draft)
-        app.buttons["ui-test-open-mihbara-link"].tap()
-        XCTAssertFalse(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 4), "A link must not replace a note being written.")
-        XCTAssertTrue(editor.exists, app.debugDescription)
-        XCTAssertEqual(editor.value as? String, draft)
-        app.buttons["mihbara-note-save"].tap()
-        XCTAssertTrue(editor.waitForNonExistence(timeout: 8), app.debugDescription)
-        app.buttons["mihbara-notebook-close"].tap()
-        XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 15), app.debugDescription)
-        app.terminate()
-    }
-
-    func testMihbaraNotebookTargetLinkWaitsForDraftThenOpensRequestedNote() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false
-        let app = app("home")
-        app.launchEnvironment["MADAR_UI_MIHBARA_MULTIPLE_NOTES"] = "1"
-        app.launchEnvironment["MADAR_UI_MIHBARA_ROOT_ROUTE_HARNESS"] = "1"
-        app.launch()
-        app.buttons["tab-mihbara"].tap()
-        let notebook = app.buttons["mihbara-notebook"]
-        XCTAssertTrue(notebook.waitForExistence(timeout: 15), app.debugDescription); reach(app, notebook); notebook.tap()
-        let note = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "mihbara-note-", "سر لا يظهر قبل المصادقة")).firstMatch
-        XCTAssertTrue(note.waitForExistence(timeout: 10), app.debugDescription); note.tap()
-        let editor = app.textViews["mihbara-note-text"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
-        let draft = "\nمسودة قبل رابط الملاحظة الثانية"
-        editor.tap(); editor.typeText(draft)
-        let secondNoteRoute = app.buttons["ui-test-open-mihbara-second-note"]
-        XCTAssertTrue(secondNoteRoute.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(secondNoteRoute.isHittable, app.debugDescription); secondNoteRoute.tap()
-        XCTAssertTrue((editor.value as? String)?.contains(draft) == true, app.debugDescription)
-        XCTAssertFalse(app.textViews["mihbara-hadith-text"].exists, app.debugDescription)
-
-        app.buttons["mihbara-note-save"].tap()
-        XCTAssertTrue(editor.waitForNonExistence(timeout: 10), app.debugDescription)
-        app.buttons["mihbara-notebook-close"].tap()
-        XCTAssertTrue(editor.waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertTrue((editor.value as? String)?.contains("ملاحظة ثانية لاختبار اختيارها") == true, app.debugDescription)
-        XCTAssertFalse((editor.value as? String)?.contains("سر لا يظهر قبل المصادقة") == true, app.debugDescription)
-        app.terminate()
-    }
-
     func testMihbaraPendingLibraryRenameRouteOpensAfterAlertCloses() {
         continueAfterFailure = false
         let app = app("home")
@@ -907,66 +715,6 @@ import UIKit
         rename.buttons["إلغاء"].tap()
         XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 15), app.debugDescription)
         app.terminate()
-    }
-
-    func testPrivateNoteFailedSaveKeepsDraftAndRetryPersistsIt() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false
-        let app = app("empty")
-        app.launchEnvironment["MADAR_UI_NOTE_FAIL_FIRST_SAVE"] = "1"
-        app.launch(); open(app)
-        let notebook = app.buttons["mihbara-notebook"]
-        reach(app, notebook); notebook.tap()
-        let add = app.buttons["mihbara-note-add"]
-        XCTAssertTrue(add.waitForExistence(timeout: 10)); add.tap()
-        let editor = app.textViews["mihbara-note-text"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 8))
-        let draft = "نص محفوظ بعد إعادة المحاولة"
-        editor.tap(); editor.typeText(draft)
-        app.buttons["mihbara-note-save"].tap()
-        let failure = app.alerts["لم تُحفظ الملاحظة"]
-        XCTAssertTrue(failure.waitForExistence(timeout: 8), app.debugDescription)
-        shot(app, "M6-private-note-save-failed-L")
-        failure.buttons["أكمل الكتابة"].tap()
-        XCTAssertTrue(editor.exists)
-        XCTAssertEqual(editor.value as? String, draft)
-        app.buttons["mihbara-note-cancel"].tap()
-        let discard = app.alerts["اترك التعديلات؟"]
-        XCTAssertTrue(discard.waitForExistence(timeout: 5))
-        discard.buttons["أكمل الكتابة"].tap()
-        XCTAssertEqual(editor.value as? String, draft)
-        app.buttons["mihbara-note-save"].tap()
-        XCTAssertTrue(editor.waitForNonExistence(timeout: 8))
-        let notes = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add"))
-        XCTAssertEqual(notes.count, 1)
-        XCTAssertTrue(notes.firstMatch.label.contains(draft))
-        shot(app, "M6-private-note-saved-after-retry-L")
-        app.terminate(); app.launch(); open(app)
-        reach(app, notebook); notebook.tap()
-        XCTAssertTrue(notes.firstMatch.waitForExistence(timeout: 10))
-        XCTAssertEqual(notes.count, 1)
-        XCTAssertTrue(notes.firstMatch.label.contains(draft))
-    }
-
-    func testPrivateNoteExplainsLengthLimitAndCanDiscardWithoutSaving() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false
-        let app = app("empty"); app.launch(); open(app)
-        let notebook = app.buttons["mihbara-notebook"]
-        reach(app, notebook); notebook.tap()
-        let add = app.buttons["mihbara-note-add"]
-        XCTAssertTrue(add.waitForExistence(timeout: 10)); add.tap()
-        let editor = app.textViews["mihbara-note-text"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 8)); editor.tap()
-        editor.typeText(String(repeating: "x", count: 2001))
-        XCTAssertFalse(app.buttons["mihbara-note-save"].isEnabled)
-        XCTAssertTrue(app.staticTexts["mihbara-note-length-hint"].exists)
-        shot(app, "M6-private-note-length-hint-L")
-        app.buttons["mihbara-note-cancel"].tap()
-        let discard = app.alerts["اترك التعديلات؟"]
-        XCTAssertTrue(discard.waitForExistence(timeout: 5)); discard.buttons["اتركها"].tap()
-        XCTAssertTrue(editor.waitForNonExistence(timeout: 8))
-        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add")).count, 0)
     }
 
     func testCancellingGoodreadsPickerReturnsWithoutAnError() {
@@ -1199,44 +947,6 @@ import UIKit
         }
         XCTAssertTrue(button.isHittable)
     }
-    func testHomeWirdExplicitUnderstandingUndoAndRelaunch() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
-        XCTAssertFalse(app.buttons["tab-customize"].isHittable)
-        XCTAssertTrue(app.buttons["mihbara-shelf-finished"].waitForExistence(timeout:8))
-        shot(app,"M6-V01-home-L")
-        var wird = app.buttons["mihbara-wird-open"]; reach(app,wird)
-        // Owner, 22 Oct 2026 («٢»): the wird is one strip under the stand: hadith, opening words, progress.
-        XCTAssertTrue(wird.label.contains("١٢ من ٤٢، بقي ٣٠ حديثًا"), wird.label)
-        XCTAssertTrue(wird.label.contains("لا يؤمن أحدكم"), wird.label)
-        XCTAssertTrue(wird.isHittable)
-        shot(app,"M6-V01-desk-L"); wird.tap()
-        XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout:8)); XCTAssertTrue(String(describing: app.textViews["mihbara-hadith-text"].value).contains("لا يؤمن أحدكم")); shot(app,"M6-V01-hadith-L")
-        let returnTo = app.buttons["mihbara-hadith-return"]; reach(app,returnTo); returnTo.tap()
-        undo(app)
-        shot(app,"M6-V01-return-undone-L")
-        wird = app.buttons["mihbara-wird-open"]; XCTAssertTrue(wird.waitForExistence(timeout:8)); wird.tap()
-        let understood = app.buttons["mihbara-hadith-understood"]; reach(app,understood); understood.tap()
-        XCTAssertTrue(app.buttons["mihbara-wird-closed"].waitForExistence(timeout:8)); shot(app,"M6-V01-understood-L"); undo(app)
-        XCTAssertTrue(app.buttons["mihbara-wird-open"].waitForExistence(timeout:8)); app.terminate(); app.launch(); open(app)
-        reach(app,app.buttons["mihbara-book-continue"])
-        // M6 audit: the open book says what is left in real pages and time, not a bare number.
-        XCTAssertTrue(app.staticTexts["بقيت ١٠٣ صفحات، نحو ساعتين"].exists, app.debugDescription)
-        app.buttons["mihbara-book-continue"].tap()
-        openPaperDetails(app)
-        let page = app.textFields["mihbara-paper-position"]; XCTAssertTrue(page.waitForExistence(timeout:8)); page.tap(); page.press(forDuration:1.1)
-        if app.menuItems["تحديد الكل"].waitForExistence(timeout:2) { app.menuItems["تحديد الكل"].tap() }
-        else { page.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8)) }
-        page.typeText("١٤٨"); let done = app.toolbars.buttons["تمّ"]; if done.exists { done.tap() }; let save = app.buttons["mihbara-paper-save"]; reach(app, save); save.tap()
-        app.terminate(); app.launch(); open(app); reach(app,app.buttons["mihbara-book-continue"]); app.buttons["mihbara-book-continue"].tap(); openPaperDetails(app); XCTAssertTrue(app.textFields["mihbara-paper-position"].waitForExistence(timeout:8)); XCTAssertTrue(String(describing: app.textFields["mihbara-paper-position"].value).contains("١٤٨")); shot(app,"M6-V01-position-L")
-    }
-    /// Since M6-V23 the paper-book card opens first; the position field lives in «الفهرس والتفاصيل».
-    private func openPaperDetails(_ app: XCUIApplication) {
-        let details = app.buttons["mihbara-paper-index-details"]
-        XCTAssertTrue(details.waitForExistence(timeout: 8), app.debugDescription)
-        reach(app, details); details.tap()
-    }
-
     func testSpotlightBookIndexIsVisibleOptInAndCanBeTurnedOff() {
         continueAfterFailure = false
         let storeID = UUID().uuidString
@@ -1576,109 +1286,6 @@ import UIKit
         app.descendants(matching: .any)["mihbara-add-source-paper"].tap()
         XCTAssertTrue(app.textFields["mihbara-paper-title"].waitForExistence(timeout:8), app.debugDescription)
     }
-    func testPrivateNotebookOpensWithTheAlreadyUnlockedApp() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
-        let notebook = app.buttons["mihbara-notebook"]; reach(app, notebook); notebook.tap()
-        XCTAssertTrue(app.staticTexts["سر لا يظهر قبل المصادقة"].waitForExistence(timeout:8), app.debugDescription)
-        XCTAssertFalse(app.buttons["mihbara-notebook-unlock"].exists)
-        shot(app, "UX-01-private-notebook-L")
-        app.buttons["mihbara-notebook-close"].tap()
-    }
-    func testNotebookReadFailureDoesNotPretendToBeEmptyAndCanRetry() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false
-        let app = app("home")
-        app.launchEnvironment["MADAR_UI_NOTE_READ_FAILURE_ONCE"] = "1"
-        app.launch(); open(app)
-        let notebook = app.buttons["mihbara-notebook"]; reach(app, notebook); notebook.tap()
-        let failure = app.staticTexts["mihbara-notebook-read-error"]
-        XCTAssertTrue(failure.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertFalse(app.staticTexts["ابدأ بملاحظة صغيرة؛ ستجدها هنا حين تعود."].exists)
-        shot(app, "AU-46-notebook-read-error-L")
-        app.buttons["mihbara-notebook-retry"].tap()
-        XCTAssertTrue(app.staticTexts["سر لا يظهر قبل المصادقة"].waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertFalse(failure.exists)
-        XCTAssertFalse(app.buttons["mihbara-notebook-retry"].exists)
-        shot(app, "AU-46-notebook-read-recovered-L")
-        app.buttons["mihbara-notebook-close"].tap()
-    }
-    func testRahlOpeningChoiceResetUndoAndRelaunch() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the reading desk and its opening choice left the Mihbara.")
-        continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
-        let preferences = app.buttons["mihbara-opening-preference"]; reach(app, preferences); preferences.tap()
-        let afterFajr = app.buttons["mihbara-rahlOpens-afterFajr"]
-        let untilDone = app.buttons["mihbara-rahlOpens-untilDone"]
-        let manual = app.buttons["mihbara-rahlOpens-manual"]
-        XCTAssertTrue(afterFajr.waitForExistence(timeout:8)); shot(app,"M6-V02-opening-L")
-        XCTAssertEqual(afterFajr.value as? String, "محدد")
-        untilDone.tap(); XCTAssertEqual(untilDone.value as? String, "محدد")
-        // The undo runs a command first, so wait for the restored choice rather than reading it at once.
-        undo(app); XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == 'محدد'"), object: afterFajr)], timeout: 5), .completed)
-        manual.tap(); XCTAssertEqual(manual.value as? String, "محدد")
-        // Poll with a fresh query: the reset and the undo each run a command and re-draw the list under the toast.
-        func selected(_ element: XCUIElement) -> XCTWaiter.Result {
-            let id = element.identifier, deadline = Date().addingTimeInterval(10)
-            while Date() < deadline {
-                if app.buttons[id].value as? String == "محدد" { return .completed }
-                usleep(250_000)
-            }
-            return .timedOut
-        }
-        // The toast of the last choice slides in above the list; a tap during that slide lands on the old position.
-        XCTAssertTrue(app.descendants(matching: .any)["mihbara-undo"].waitForExistence(timeout: 8), app.debugDescription)
-        usleep(800_000)
-        app.buttons["mihbara-rahlOpens-reset"].tap()
-        XCTAssertEqual(selected(afterFajr), .completed)
-        // The reset's toast replaces the previous one a moment after the list changes; undoing the old toast would undo the wrong write.
-        XCTAssertTrue(app.descendants(matching: .any)["mihbara-undo"].staticTexts["عادت الإعدادات المتفق عليها"].waitForExistence(timeout: 8), app.debugDescription)
-        undo(app); XCTAssertEqual(selected(manual), .completed)
-        app.buttons["mihbara-rahlOpens-close"].tap(); app.terminate(); app.launch(); open(app)
-        reach(app, preferences); preferences.tap()
-        XCTAssertEqual(app.buttons["mihbara-rahlOpens-manual"].value as? String, "محدد")
-    }
-
-    /// OR-32 (owner mockup A): the drawer gave way to «أكمل من حيث وقفت» for the other book in hand, and the
-    /// library became a wall of covers.
-    func testContinueCardOpensTheOtherBookAndLibraryShowsCovers() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false
-        let app = app("home"); app.launchEnvironment["MADAR_UI_MIHBARA_SECOND_READING"] = "1"; app.launch(); open(app)
-        XCTAssertFalse(app.buttons["mihbara-sunnah-drawer"].exists)
-        let card = app.descendants(matching: .any)["mihbara-continue-card"]
-        reach(app, card)
-        XCTAssertTrue(card.exists, app.debugDescription)
-        XCTAssertTrue(app.staticTexts["الأدب الصغير"].exists, app.debugDescription)
-        XCTAssertTrue(app.staticTexts["صفحة ٦٠ من ٢٠٠"].exists, app.debugDescription)
-        XCTAssertTrue(app.staticTexts["٣٠٪"].exists, app.debugDescription)
-        shot(app, "M6-V15-continue-L")
-        let go = app.buttons["mihbara-continue-reading"]; reach(app, go); go.tap()
-        // A paper book opens its card, where its page is kept.
-        let position = app.staticTexts["mihbara-paper-position-summary"]
-        XCTAssertTrue(position.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertEqual(position.label, "وصلت إلى الصفحة ٦٠ من ٢٠٠")
-        shot(app, "M6-V15-continue-opened-L")
-        let sheetTop = position.frame.minY - 30
-        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.midX, dy: sheetTop))
-            .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.99)))
-        XCTAssertTrue(position.waitForNonExistence(timeout: 5), app.debugDescription)
-        let library = app.buttons["mihbara-library"]
-        for _ in 0..<8 where !library.isHittable { app.swipeDown(velocity: .slow) }
-        library.tap()
-        let covers = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-library-book-"))
-        XCTAssertTrue(covers.firstMatch.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertGreaterThanOrEqual(covers.count, 3, app.debugDescription) // the grid is lazy; «قديمًا» sits below the fold
-        shot(app, "M6-V15-library-covers-L")
-    }
-
-    func testOnlyBookInHandShowsNoContinueCard() throws {
-        throw XCTSkip("FB-34 (owner, 5 Nov 2026): the desk, the private notebook and the Sunnah wird left the Mihbara.")
-        continueAfterFailure = false
-        let app = app("home"); app.launch(); open(app)
-        for _ in 0..<4 { app.swipeUp(velocity: .slow) }
-        XCTAssertFalse(app.descendants(matching: .any)["mihbara-continue-card"].exists, "The stand already continues the only book in hand.")
-    }
-
     func testLocalEPUBOpensInArabicReaderAndClosesBackToItsShelf() throws {
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))

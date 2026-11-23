@@ -115,7 +115,7 @@ Do not load the whole handoff into context. Each task card in `docs/PROGRESS.md`
 
 ## Helpers and review
 
-- Use cheaper read-only helpers for bug hunts, copy/UX inspection, searches and log reading. The main agent verifies findings and owns all source edits, builds, tests, simulator operations and commits. Give helpers bounded areas and avoid duplicate coverage.
+- **Sub-agents help with execution and follow-up (owner, 23 Nov 2026: «خل معاك سب ايجنتس يساعدونك بالتنفيذ والمتابعه»).** Implementing sub-agents take bounded tasks in their own files (no two on the same file, never owner data), and cheaper helpers take bug hunts, copy/UX inspection, searches, test runs and log reading. Only one agent builds or uses the simulator at a time. The main agent splits the work, reviews every diff, re-runs the verification and owns the commit, upload and push. Give helpers bounded areas and avoid duplicate coverage.
 - Use available helper slots for independent useful work during long runs; do not launch work merely to fill time, and do not change files an active build/test depends on. The actual runtime concurrency limit applies; there is no requirement to create unlimited agents.
 - The current whole-app inspection is authorized. Avoid repeated general reviews and separate review reports. Record actionable findings in the current board section and apply the high-value ones.
 - One focused review is required for changes that migrate/could delete stored records and for money engine/data changes. Fix Critical/High findings with tests before building screens on them. Room completion gets one focused UX pass, with useful findings applied.

@@ -9,6 +9,8 @@ struct MoneyBudgetView: View {
     @Binding var revealed: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var barDrawn = false
     @State private var reading: MoneyBudgetReading?
     @State private var selected: MoneyBudgetRow?
     @State private var failure: String?
@@ -63,13 +65,17 @@ struct MoneyBudgetView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("مشطوب، خارج ميزانيتك").font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText"))
                     Text(figure: amount(r.excludedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 42, relativeTo: .largeTitle))
+                        .contentTransition(.numericText(value: Double(r.excludedMinor))) // Micro-interactions (owner, 23 Nov): totals roll when a stamp changes them.
+                        .animation(reduceMotion ? nil : .snappy, value: r.excludedMinor)
                         .foregroundStyle(theme.color("reserveText")).overlay { MoneyStrike().stroke(theme.color("reserveText"), lineWidth: 1.5).frame(height: 9) }
                         .accessibilityIdentifier("money-budget-excluded-total")
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 3) {
                     Text("احتُسب من يومك").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    Text(figure: amount(r.dailyMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).accessibilityIdentifier("money-budget-daily-total")
+                    Text(figure: amount(r.dailyMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2))
+                        .contentTransition(.numericText(value: Double(r.dailyMinor))).animation(reduceMotion ? nil : .snappy, value: r.dailyMinor)
+                        .accessibilityIdentifier("money-budget-daily-total")
                 }
             }
             GeometryReader { proxy in
@@ -77,9 +83,13 @@ struct MoneyBudgetView: View {
                 // The struck share sits under the struck total (leading); the daily share under «احتُسب من يومك».
                 HStack(spacing: 0) {
                     BudgetHatching().stroke(theme.color("reserveText"), lineWidth: 1.5).clipped()
-                    Rectangle().fill(theme.ink).frame(width: visible ? proxy.size.width * CGFloat(r.dailyMinor) / CGFloat(total) : proxy.size.width / 2)
+                    Rectangle().fill(theme.ink).frame(width: visible ? proxy.size.width * CGFloat(r.dailyMinor) / CGFloat(total) * (barDrawn || reduceMotion ? 1 : 0.5) + (barDrawn || reduceMotion ? 0 : proxy.size.width * 0.25) : proxy.size.width / 2)
                 }.clipShape(.capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
             }.frame(height: 12).accessibilityHidden(true)
+            // Micro-interactions (owner, 23 Nov): the struck/daily split settles into place when the screen opens and when a stamp moves it.
+            .animation(reduceMotion ? nil : .smooth(duration: 0.7), value: barDrawn)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.5), value: r.dailyMinor)
+            .onAppear { barDrawn = true }
             HStack {
                 Label { Text("في السجل، لا يُخصم") } icon: { MoneyStrike().stroke(theme.color("reserveText"), lineWidth: 1.2).frame(width: 22, height: 5) }.foregroundStyle(theme.secondaryInk)
                 Spacer()
