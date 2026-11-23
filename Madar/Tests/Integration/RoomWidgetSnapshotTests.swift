@@ -26,6 +26,9 @@ import MadarPrayer
         XCTAssertEqual(fridayHarvestText(kept:14,total:14,digits:digits),"أتممت عاداتك اليومية كلها في سبعة أيام")
         XCTAssertEqual(fridayHarvestText(kept:2,total:14,digits:digits),"أتممت عاداتك اليومية مرتين من ١٤ في سبعة أيام")
         XCTAssertEqual(fridayHarvestText(kept:12,total:14,digits:digits),"أتممت عاداتك اليومية ١٢ مرة من ١٤ في سبعة أيام")
+        XCTAssertEqual(habitHelpText(met:0,total:7,digits:digits),"لم تُتمّها هذا الأسبوع. خفّف هدفها أو غيّر وقتها")
+        XCTAssertEqual(habitHelpText(met:1,total:7,digits:digits),"أتممتها يومًا واحدًا من ٧. خفّف هدفها أو غيّر وقتها")
+        XCTAssertEqual(habitHelpText(met:2,total:7,digits:digits),"أتممتها يومين من ٧. خفّف هدفها أو غيّر وقتها")
     }
     func testCountedNounsTakeTheSingularGenitiveAtExactHundreds() {
         let digits=MadarNumberFormatter(style:.hindi)

@@ -38,7 +38,7 @@ import MadarCore
         let suggestions = AppBahwService(session: app, evaluationDate: saturday).suggestions()
         let help = try XCTUnwrap(suggestions.first { $0.id == "habitHelp" })
         XCTAssertEqual(help.title, "«الرياضة» تتعثّر")
-        XCTAssertTrue(help.detail.contains("٢ من ٧"))
+        XCTAssertTrue(help.detail.contains("أتممتها يومين من ٧"), help.detail)
         guard case .habit(let id) = help.destination else { return XCTFail("opens the habit") }
         XCTAssertEqual(id, habits["الرياضة"]?.id)
         // Nothing is written: the policy is still the one saved, and no extra policy rows exist.

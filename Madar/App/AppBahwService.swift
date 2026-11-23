@@ -302,7 +302,7 @@ extension AppBahwService {
         // last seven days and offers to ease it. It opens the habit; nothing changes until the user edits and saves it there.
         if session.roomEnabled(.habits), Calendar(identifier: .gregorian).component(.weekday, from: today.date(in: session.activePlace.timeZone).addingTimeInterval(43200)) == 7,
            let (habit, week) = strugglingHabit(readings) {
-            result.append(.init(id: "habitHelp", title: "«" + habit.name + "» تتعثّر", detail: "أتممتها " + digits.string(week.met) + " من " + digits.string(week.total) + " أيام. خفّف هدفها أو غيّر وقتها", symbol: "MadarHabits", destination: .habit(habit.id)))
+            result.append(.init(id: "habitHelp", title: "«" + habit.name + "» تتعثّر", detail: habitHelpText(met: week.met, total: week.total, digits: digits), symbol: "MadarHabits", destination: .habit(habit.id)))
         }
         // T13: a bill, instalment, subscription or card statement due within two days enters the order (never an amount).
         if session.roomEnabled(.mal), let reading = try? AppMoneyService(app: session).loadObligations() {
@@ -362,4 +362,10 @@ func fridayHarvestText(kept: Int, total: Int, digits: MadarNumberFormatter) -> S
     if kept == 0 { return "لم تُتمّ أيًّا من عاداتك اليومية في الأيام السبعة الماضية" }
     if kept >= total { return "أتممت عاداتك اليومية كلها في سبعة أيام" }
     return "أتممت عاداتك اليومية " + arabicCount(kept, ["مرة واحدة", "مرتين", "مرات", "مرة"], digits) + " من " + digits.string(total) + " في سبعة أيام"
+}
+
+/// The Saturday «تتعثّر» note: days kept out of the last week's due days, never «٠ من ٧ أيام» or «١ من ٧ أيام».
+func habitHelpText(met: Int, total: Int, digits: MadarNumberFormatter) -> String {
+    let kept = met == 0 ? "لم تُتمّها هذا الأسبوع" : "أتممتها " + arabicCount(met, ["يومًا واحدًا", "يومين", "أيام", "يومًا"], digits) + " من " + digits.string(total)
+    return kept + ". خفّف هدفها أو غيّر وقتها"
 }
