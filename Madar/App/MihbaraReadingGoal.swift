@@ -212,7 +212,8 @@ struct MihbaraReadingGoalCard: View {
 
     private func dayLine(_ day: MihbaraReadingGoal.Day) -> String {
         guard day.minutes > 0 || day.pages > 0 else { return "لم تقرأ في هذا اليوم" }
-        var parts = [habitUnitCount(day.minutes, "minutes", digits, genitive: true)]
+        // Under a minute with a page read: «قرأت ٥ صفحات», never «٠ دقيقة».
+        var parts = day.minutes > 0 ? [habitUnitCount(day.minutes, "minutes", digits, genitive: true)] : []
         if day.pages > 0 { parts.append(habitUnitCount(day.pages, "pages", digits, genitive: true)) }
         if goal.unit == "chapters", day.chapters > 0 { parts.append(habitUnitCount(day.chapters, "chapters", digits, genitive: true)) }
         return "قرأت " + parts.joined(separator: " و")

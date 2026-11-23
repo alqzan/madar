@@ -13,7 +13,8 @@ import XCTest
         let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
         let tray = app.descendants(matching: .any)["money-pending"]; XCTAssertTrue(tray.waitForExistence(timeout: 10)); tray.tap()
         XCTAssertFalse(app.buttons["money-rules-open"].exists)
-        let perPurchase = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لكل عملية تصنيفها")).firstMatch
+        // UX sweep 1 shortened the explanation; the tray still says each purchase gets its own suggested category.
+        let perPurchase = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "يقترح الفئة")).firstMatch
         for _ in 0..<8 where !perPurchase.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(perPurchase.waitForExistence(timeout: 8), app.debugDescription)
         shot(app, "M5-per-purchase-category-copy-L")

@@ -607,12 +607,12 @@ func habitUnitCount(_ count:Int,_ unit:String?,_ digits:MadarNumberFormatter,gen
 }
 /// Arabic number agreement from four forms: one, two, plural (٣–١٠), and the singular after ١١ and above.
 func arabicCount(_ count:Int,_ forms:[String],_ digits:MadarNumberFormatter)->String {
-    count == 1 ? forms[0] : count == 2 ? forms[1] : digits.string(count)+" "+((3...10).contains(count%100) ? forms[2] : forms[3])
+    count == 1 ? forms[0] : count == 2 ? forms[1] : digits.string(count)+" "+((3...10).contains(count%100) ? forms[2] : WidgetCopy.hundredForm(count,forms[3]))
 }
 func habitPeriodCount(_ count:Int,_ frequency:HabitFrequency,_ digits:MadarNumberFormatter)->String {
     let forms:[String]
     switch frequency {case .daily:forms=["يوم واحد","يومان","أيام","يومًا"];case .interval:forms=["مدة واحدة","مدتان","مُدد","مدة"];case .weekly:forms=["أسبوع واحد","أسبوعان","أسابيع","أسبوعًا"];case .monthly:forms=["شهر واحد","شهران","أشهر","شهرًا"];case .yearly:forms=["سنة واحدة","سنتان","سنوات","سنة"]}
-    return count == 1 ? forms[0] : count == 2 ? forms[1] : digits.string(count)+" "+(count == 0 || (3...10).contains(count%100) ? forms[2] : forms[3])
+    return count == 1 ? forms[0] : count == 2 ? forms[1] : digits.string(count)+" "+(count == 0 || (3...10).contains(count%100) ? forms[2] : WidgetCopy.hundredForm(count,forms[3]))
 }
 /// Named in the habit's own period when known: «تنكسر السلسلة بفوت يومين متتاليين. الأيام المجمدة مستثناة.»
 func habitBreakExplanation(_ periods:Int,_ frequency:HabitFrequency?=nil)->String {

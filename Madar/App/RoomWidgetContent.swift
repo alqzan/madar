@@ -286,9 +286,18 @@ private extension String {
 
 /// Arabic number agreement for widget copy: «مرة واحدة»، «مرتان»، «٣ مرات»، «١١ مرة». Real amounts, never a bare «٠ من ١».
 enum WidgetCopy {
+    /// Exact hundreds take the singular genitive («١٠٠ كتاب»، «٢٠٠ يوم»), not the accusative of ١١–٩٩ («كتابًا»).
+    static func hundredForm(_ n:Int,_ many:String)->String {
+        guard n >= 100, n % 100 == 0 else { return many }
+        // Scalars, not characters: the tanwin joins its letter into one grapheme («بً»).
+        var scalars=Array(many.unicodeScalars); let tanwin=Unicode.Scalar(0x064B)!, alif=Unicode.Scalar(0x0627)!
+        if scalars.last == tanwin { scalars.removeLast(); if scalars.last == alif { scalars.removeLast() } }
+        else if scalars.last == alif, scalars.dropLast().last == tanwin { scalars.removeLast(2) }
+        var out=String.UnicodeScalarView(); out.append(contentsOf:scalars); return String(out)
+    }
     static func agree(_ n:Int,_ digits:MadarNumberFormatter,one:String,two:String,few:String,many:String,withDigits:Bool=true)->String {
         if n==1{return one};if n==2{return two}
-        let word=(3...10).contains(n%100) ? few : many
+        let word=(3...10).contains(n%100) ? few : hundredForm(n,many)
         return withDigits ? digits.string(n)+" "+word : word
     }
     /// Unit names in Arabic number agreement: one, two, 3–10, 11 and up. Built-in units plus the units people commonly

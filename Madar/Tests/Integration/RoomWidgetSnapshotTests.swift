@@ -7,6 +7,16 @@ import MadarPrayer
 @testable import Madar
 
 @MainActor final class RoomWidgetSnapshotTests:XCTestCase {
+    /// Arabic counted nouns: ٣–١٠ plural genitive, ١١–٩٩ singular accusative, exact hundreds singular genitive, ١٠١ onwards by its last two digits.
+    func testCountedNounsTakeTheSingularGenitiveAtExactHundreds() {
+        let digits=MadarNumberFormatter(style:.hindi)
+        func books(_ n:Int)->String { WidgetCopy.agree(n,digits,one:"كتاب واحد",two:"كتابان",few:"كتب",many:"كتابًا") }
+        XCTAssertEqual(books(5),"٥ كتب"); XCTAssertEqual(books(12),"١٢ كتابًا"); XCTAssertEqual(books(100),"١٠٠ كتاب")
+        XCTAssertEqual(books(200),"٢٠٠ كتاب"); XCTAssertEqual(books(103),"١٠٣ كتب"); XCTAssertEqual(books(150),"١٥٠ كتابًا")
+        XCTAssertEqual(arabicCount(300,["يوم واحد","يومان","أيام","يومًا"],digits),"٣٠٠ يوم")
+        XCTAssertEqual(arabicCount(100,["سنة واحدة","سنتان","سنوات","سنة"],digits),"١٠٠ سنة")
+        XCTAssertEqual(WidgetCopy.hundredForm(100,"آيةً"),"آية")
+    }
     func testSnapshotsUseActualQuantitiesAndExpireWithoutReadingTheStoreOutsideApp() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidget-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let app=try AppSession(container:MadarContainerFactory.makeLocal(at:root),groupDirectory:root),id=UUID()
