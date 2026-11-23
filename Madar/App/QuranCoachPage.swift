@@ -384,7 +384,9 @@ private final class QuranCoachTextView: UIView {
         let move = gesture.translation(in: self)
         if gesture.state == .ended {
             guard dragRevealed.isEmpty, abs(move.x) > 50, abs(move.x) > abs(move.y) * 1.5,
-                let next = coach.plannedAyahs.subtracting(coach.revealedAyahs).min()
+                // Only ayahs drawn on this page: a multi-face review plans the whole segment, and revealing an ayah on
+                // another face would change nothing the reader can see.
+                let next = coach.plannedAyahs.intersection(hits.map(\.1)).subtracting(coach.revealedAyahs).min()
             else { return }
             UISelectionFeedbackGenerator().selectionChanged()
             reveal?(next)
