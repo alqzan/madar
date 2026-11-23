@@ -45,6 +45,8 @@ struct MoneyHomeView: View {
     @State private var goalOpen = false
     @State private var guideOpen = false
     @State private var visitChecked = false
+    /// The visit check found no reading yet (a newer load superseded the awaited one); it runs once the reading arrives.
+    @State private var visitWaitsForReading = false
     @State private var routedCardID: UUID?
     @State private var routedCardTab: String?
     @State private var routedCardRequestID: UUID?
@@ -182,10 +184,16 @@ struct MoneyHomeView: View {
             if app.moneyOpensMessages { app.moneyOpensMessages = false; messagesOpen = true; return }
             if app.moneyOpensSettings { app.moneyOpensSettings = false; settingsOpen = true; return }
             // §7.5 «بعد غياب»: «منذ آخر زيارة» opens first; otherwise this visit is the new mark.
-            guard !visitChecked, let reading else { return }
-            visitChecked = true
-            if service.sinceDue(today: reading.cycle?.today ?? GregorianDay.containing(app.prayerNow(), in: app.activePlace.timeZone)) { sinceOpen = true }
-            else { try? await app.executeMoneyCommand("money.markVisit") }
+            guard !visitChecked else { return }
+            guard reading != nil else { visitWaitsForReading = true; return }
+            await checkVisit()
+        }
+        // A revision bump during opening (defaults, accrual) restarts the load and drops the awaited one, so the check above
+        // could find no reading and «منذ آخر زيارة» never opened; it now waits for the reading.
+        .onChange(of: reading == nil) { _, missing in
+            guard !missing, visitWaitsForReading else { return }
+            visitWaitsForReading = false
+            Task { await checkVisit() }
         }.onChange(of: app.moneyRevision) { if isFrontRoom { load() } }
         .onChange(of: app.moneyRoute, initial: true) { _, route in if let route { openMoneyRoute(route) } }
         .onChange(of: app.moneyRootRequestID) { _, requestID in
@@ -551,6 +559,13 @@ struct MoneyHomeView: View {
         readingLoadID = UUID()
         readingLoadTask?.cancel()
         readingLoadTask = nil
+    }
+    /// §7.5 «بعد غياب»: «منذ آخر زيارة» opens first; otherwise this visit is the new mark.
+    private func checkVisit() async {
+        guard !visitChecked, let reading else { return }
+        visitChecked = true
+        if service.sinceDue(today: reading.cycle?.today ?? GregorianDay.containing(app.prayerNow(), in: app.activePlace.timeZone)) { sinceOpen = true }
+        else { try? await app.executeMoneyCommand("money.markVisit") }
     }
     private func closeForMoneyRootIfSafe() {
         guard pendingRootRequest, app.moneyRootDraftBlockers.isEmpty else { return }
