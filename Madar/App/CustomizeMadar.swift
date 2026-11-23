@@ -8,6 +8,7 @@ struct CustomizeMadar: View {
     private var query: String { session.settingsQuery }
     @State private var confirmReset = false
     @State private var widgetGallery = false
+    @State private var galleryURL: URL?
     @State private var widgetMaker = false
     @State private var quranTafsirLibrary = false
     @State private var diarySettings = false
@@ -120,7 +121,9 @@ struct CustomizeMadar: View {
             WidgetMakerView(session: session)
                 .presentationDetents([.large]).madarSheetErrorAlert(session)
         }
-        .sheet(isPresented:$widgetGallery){NavigationStack{RoomWidgetsGallery(session:session)}.madarSheetErrorAlert(session)}
+        // A tapped preview opens its room once the sheet is gone: a cover asked for while the sheet was still up (the quick expense)
+        // was dropped. The action sits on the stack, because a pushed page (the lock gallery) takes the stack's environment, not its parent's.
+        .sheet(isPresented:$widgetGallery,onDismiss:{if let url=galleryURL {galleryURL=nil;session.open(url)}}){NavigationStack{RoomWidgetsGallery(session:session)}.environment(\.openURL,OpenURLAction{url in galleryURL=url;widgetGallery=false;return .handled}).madarSheetErrorAlert(session)}
         #endif
         .toolbarVisibility(.hidden, for: .navigationBar)
         .onChange(of: session.widgetMakerRouteID, initial: true) { _, requestID in if requestID != nil { widgetMaker = true } }

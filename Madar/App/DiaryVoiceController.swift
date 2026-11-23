@@ -318,7 +318,7 @@ import MadarCore
         let timeoutSeconds = max(60, (media.duration ?? 0) * 2 + 60)
         timeout = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(timeoutSeconds)) } catch { return }
-            guard let self, self.job == token else { return }; self.cancelConversion(); self.message = "لم يتحوّل؛ الصوت محفوظ · أعد المحاولة"
+            guard let self, self.job == token else { return }; self.cancelConversion(); self.message = "لم يتحوّل الصوت إلى نص، وهو محفوظ؛ أعد المحاولة."
         }
         let locale = installedLocale, language = language, dictation = dictationEngine
         analysis = Task { [weak self] in
@@ -382,7 +382,7 @@ import MadarCore
     }
     func setInsightStatus(_ value: String) { insightStatus = value }
     private func fail(_ error: String, token: UUID) {
-        guard job == token else { return }; cancelConversion(); message = "لم يتحوّل؛ الصوت محفوظ · أعد المحاولة. " + error
+        guard job == token else { return }; cancelConversion(); message = "لم يتحوّل الصوت إلى نص، وهو محفوظ؛ أعد المحاولة. " + error
     }
     func cancelConversion() {
         job = nil; converting = false; timeout?.cancel(); timeout = nil; recognition?.cancel(); recognition = nil; analysis?.cancel(); analysis = nil; partialText = ""

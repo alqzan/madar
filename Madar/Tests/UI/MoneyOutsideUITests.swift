@@ -13,9 +13,11 @@ import XCTest
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout:5)); search.tap(); search.typeText("خارج التطبيق"); app.buttons["room-widgets-gallery"].tap()
         let widget = app.descendants(matching: .any).matching(identifier: "room-widget-money").firstMatch; XCTAssertTrue(widget.waitForExistence(timeout:5)); for _ in 0..<5 where !widget.isHittable { app.swipeUp(velocity:.slow) }; XCTAssertTrue((widget.label + widget.staticTexts.allElementsBoundByIndex.map(\.label).joined()).contains("•••"), widget.debugDescription); for _ in 0..<3 where widget.frame.maxY > app.frame.height - 60 { app.swipeUp(velocity: .slow) }; shot(app,"M5-X01-widget-L")
         let lock = app.buttons["room-widgets-lock"]; for _ in 0..<6 where !lock.isHittable { app.swipeDown(velocity:.slow) }; lock.tap(); XCTAssertTrue(app.staticTexts["lock-widgets-title"].waitForExistence(timeout:5)); shot(app,"M5-X01-lock-L")
-        let control = app.buttons["control-preview-money"]; for _ in 0..<5 where !control.isHittable { app.swipeUp(velocity:.slow) }; shot(app,"M5-X01-control-L"); control.tap()
+        let control = app.descendants(matching: .any).matching(identifier: "control-preview-money").firstMatch; XCTAssertTrue(control.waitForExistence(timeout: 5)); for _ in 0..<5 where !control.isHittable { app.swipeUp(velocity:.slow) }; shot(app,"M5-X01-control-L"); control.tap()
         let key = app.buttons["money-expense-key-4"]; XCTAssertTrue(key.waitForExistence(timeout:10)); key.tap(); app.buttons["money-expense-key-2"].tap(); app.buttons["money-expense-merchant-مقهى الزاوية"].tap(); shot(app,"M5-X01-expense-L")
-        let save = app.buttons["money-expense-save"]; for _ in 0..<4 where !save.isHittable { app.swipeUp(velocity:.slow) }; save.tap(); let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout:10)); undo.tap()
+        let save = app.buttons["money-expense-save"]; for _ in 0..<4 where !save.isHittable { app.swipeUp(velocity:.slow) }; save.tap()
+        // FB-32: a save is simply done, with no «تراجع»; the cover closes.
+        XCTAssertTrue(save.waitForNonExistence(timeout:10)); XCTAssertFalse(app.buttons["undo-button"].waitForExistence(timeout:2))
     }
     func testLargeMoneyBlockShowsOwnedEnvelopesLimitsAndReserve() {
         continueAfterFailure = false

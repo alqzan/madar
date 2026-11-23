@@ -2,7 +2,7 @@ import XCTest
 
 @MainActor final class MoneyBigExpenseUITests: XCTestCase {
     private func shot(_ app: XCUIApplication, _ name: String) { Thread.sleep(forTimeInterval: 0.6); let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
-    func testMixedInstallmentsReserveAndAtomicUndo() {
+    func testMixedInstallmentsReserveAndSave() {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
@@ -23,7 +23,8 @@ import XCTest
         app.buttons["money-big-mode-mixed"].tap()
         let adopt = app.buttons["money-big-save"]; for _ in 0..<4 where !adopt.isHittable { app.swipeUp(velocity: .slow) }; adopt.tap()
         XCTAssertTrue(app.buttons["money-expense-open"].waitForExistence(timeout: 10))
-        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
+        // FB-32: adopting the plan is a save, so no undo line; the cover has closed.
+        XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout: 2))
         XCTAssertFalse(app.buttons["money-big-save"].exists)
     }
 

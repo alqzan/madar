@@ -60,10 +60,10 @@ import XCTest
         XCTAssertTrue(debit.waitForExistence(timeout: 5))
         let entered = NSPredicate(format: "label CONTAINS %@", "٠٫٥")
         expectation(for: entered, evaluatedWith: debit); waitForExpectations(timeout: 5)
-        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
-        expectation(for: NSPredicate(format: "label CONTAINS %@", "غير معروفة"), evaluatedWith: debit); waitForExpectations(timeout: 5)
+        // FB-32: a saved rate is a setting, so no undo line.
+        XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout: 2))
 
-        // A chosen destination is a persistent setting with one glass undo toast.
+        // A chosen destination is a persistent setting; since FB-32 it shows no undo line, and choosing again moves it back.
         let destinations = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-cashback-destination-"))
         for _ in 0..<12 where destinations.count < 2 || !destinations.element(boundBy: 1).isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertEqual(destinations.count, 7, "Surplus appears once alongside the reserve and five goal envelopes")
@@ -73,23 +73,17 @@ import XCTest
         XCTAssertTrue(surplus.isEnabled); XCTAssertTrue(envelope.isEnabled)
         XCTAssertTrue(surplus.label.contains("الوجهة المختارة")); XCTAssertFalse(envelope.label.contains("الوجهة المختارة"))
         envelope.tap()
-        let destinationUndo = app.buttons["تراجع"]; XCTAssertTrue(destinationUndo.waitForExistence(timeout: 5)); destinationUndo.tap()
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "الوجهة المختارة"), evaluatedWith: envelope)
+        waitForExpectations(timeout: 5)
+        XCTAssertFalse(app.buttons["تراجع"].exists)
+        surplus.tap()
         expectation(for: NSPredicate(format: "label CONTAINS %@", "الوجهة المختارة"), evaluatedWith: surplus)
         waitForExpectations(timeout: 5)
         XCTAssertFalse(envelope.label.contains("الوجهة المختارة"))
         envelope.tap()
-        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5))
         expectation(for: NSPredicate(format: "label CONTAINS %@", "الوجهة المختارة"), evaluatedWith: envelope)
         waitForExpectations(timeout: 5)
-        surplus.tap()
-        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5))
-        expectation(for: NSPredicate(format: "label CONTAINS %@", "الوجهة المختارة"), evaluatedWith: surplus)
-        waitForExpectations(timeout: 5)
-        envelope.tap()
-        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5))
-        expectation(for: NSPredicate(format: "label CONTAINS %@", "الوجهة المختارة"), evaluatedWith: envelope)
-        waitForExpectations(timeout: 5)
-        sleep(1); shot(app, "M5-V16-cashback-destination-glass-L")
+        shot(app, "M5-V16-cashback-destination-L")
     }
 
     func testCashbackRateSheetStaysOpenWhileSaving() throws {
@@ -125,13 +119,14 @@ import XCTest
         let preference = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-cashback-preferred-card-")).firstMatch
         XCTAssertTrue(preference.waitForExistence(timeout: 8))
         XCTAssertTrue(preference.label.contains("بطاقة السفر"))
+        // FB-32: the preferred card is a setting, so no undo line; the same button takes it back.
         preference.tap()
-        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
-        XCTAssertTrue(preference.waitForExistence(timeout: 5))
-        XCTAssertTrue(preference.label.contains("اجعل"), preference.label)
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "أزل"), evaluatedWith: preference); waitForExpectations(timeout: 5)
+        XCTAssertFalse(app.buttons["تراجع"].exists)
         preference.tap()
-        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5))
-        XCTAssertTrue(preference.label.contains("أزل"), preference.label)
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "اجعل"), evaluatedWith: preference); waitForExpectations(timeout: 5)
+        preference.tap()
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "أزل"), evaluatedWith: preference); waitForExpectations(timeout: 5)
 
         app.buttons["money-cashback-close"].tap()
         let expense = app.buttons["money-expense-open"]

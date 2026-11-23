@@ -64,7 +64,6 @@ struct RoomWidgetsGallery:View {
                 }.padding(16)
             }.clipped()
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).toolbarVisibility(.hidden,for:.navigationBar)
-        .environment(\.openURL,OpenURLAction{url in session.open(url);dismiss();return .handled})
         .onAppear{do{try session.publishSnapshot()}catch{session.errorMessage=madarUserMessage(error)}}
     }
     private func preview(_ room:BuiltRoomWidget,family:WidgetFamily,template:String)->some View {previewContent(room,family:family,template:template).accessibilityIdentifier("room-widget-"+room.rawValue)}

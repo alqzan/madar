@@ -118,16 +118,16 @@ import XCTest
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "من الراتب القادم")).firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["money-detail-balance"].label.contains("٩٠٠"), "Adopting a plan moves no money now")
         shot(app, "M5-V04-adopted-L")
-        let undoPlan = app.buttons["تراجع"]; XCTAssertTrue(undoPlan.waitForExistence(timeout: 5)); undoPlan.tap()
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "بلا خطة سداد")).firstMatch.waitForExistence(timeout: 10))
+        // FB-32: adopting a plan is a save, so no undo line.
+        XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout: 2))
         app.buttons["money-repay-open"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-repayment-preview"].waitForExistence(timeout: 5))
         app.buttons["money-repay-from-surplus"].tap()
         XCTAssertTrue(app.staticTexts["money-detail-balance"].waitForExistence(timeout: 10))
         XCTAssertEqual(clean(app.staticTexts["money-detail-balance"].label), "٠")
-        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
-        XCTAssertTrue(app.buttons["money-repay-open"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["money-detail-balance"].label.contains("٩٠٠"))
+        // FB-32: the repayment is a save, so no undo line; the debt stays paid.
+        XCTAssertFalse(app.buttons["تراجع"].waitForExistence(timeout: 2))
+        XCTAssertEqual(clean(app.staticTexts["money-detail-balance"].label), "٠")
     }
     private func clean(_ label: String) -> String { label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "") }
     private func shot(_ app: XCUIApplication, _ name: String) { let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }

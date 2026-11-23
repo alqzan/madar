@@ -69,6 +69,13 @@ struct HabitEditorView:View {
     @State private var initialSnapshot: HabitEditorSnapshot?
     private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
     private var digits:MadarNumberFormatter{.init(style:session.string("core.numerals") == "western" ? .western : .hindi)}
+    /// «عند الأذان»، «ساعة ونصف… بعد الأذان»: the real span, never «٠ دقيقة» or «٩٠ دقيقة» or a minus sign.
+    private func adhanOffset(_ minutes:Int)->String{
+        if minutes == 0 { return "عند الأذان" }
+        let span=abs(minutes),h=span/60,m=span%60
+        let text=h == 0 ? PrayerCopy.minutes(m,digits:digits) : m == 0 ? PrayerCopy.hours(h,digits:digits) : PrayerCopy.hours(h,digits:digits)+" و"+PrayerCopy.minutes(m,digits:digits)
+        return text+(minutes < 0 ? " قبل الأذان" : " بعد الأذان")
+    }
     var body:some View {
         VStack(spacing:0) {
             HStack {
@@ -187,15 +194,15 @@ struct HabitEditorView:View {
                                 DatePicker("من",selection:timeBinding(start:true),displayedComponents:.hourAndMinute)
                                 DatePicker("إلى",selection:timeBinding(start:false),displayedComponents:.hourAndMinute)
                             } else {
-                                Stepper("البداية: "+((rule.windowStart ?? 0) < 0 ? digits.string(-(rule.windowStart ?? 0))+" دقيقة قبل الأذان" : digits.string(rule.windowStart ?? 0)+" دقيقة من الأذان"),value:Binding(get:{rule.windowStart ?? 0},set:{rule.windowStart=$0}),in:-720...720,step:15)
-                                Stepper("النهاية: "+digits.string(rule.windowEnd ?? 90)+" دقيقة من الأذان",value:Binding(get:{rule.windowEnd ?? 90},set:{rule.windowEnd=$0}),in:15...1440,step:15)
+                                Stepper("البداية: "+adhanOffset(rule.windowStart ?? 0),value:Binding(get:{rule.windowStart ?? 0},set:{rule.windowStart=$0}),in:-720...720,step:15)
+                                Stepper("النهاية: "+adhanOffset(rule.windowEnd ?? 90),value:Binding(get:{rule.windowEnd ?? 90},set:{rule.windowEnd=$0}),in:15...1440,step:15)
                             }
                             Text("الوقت يتبع مدينتك النشطة؛ ونافذة الليل تتبع يوم مدار الذي بدأت فيه.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                             Toggle("وقتها في رمضان",isOn:$ramadanOn).frame(minHeight:44).accessibilityIdentifier("habit-ramadan-toggle")
                             if ramadanOn {
                                 Picker("في رمضان تبدأ من",selection:$ramadanAnchor) { ForEach(Prayer.allCases,id:\.self){p in Text(prayerName(p)).tag(p)} }.pickerStyle(.menu)
-                                Stepper("البداية: "+(ramadanStart < 0 ? digits.string(-ramadanStart)+" دقيقة قبل الأذان" : digits.string(ramadanStart)+" دقيقة من الأذان"),value:$ramadanStart,in:-720...720,step:15)
-                                Stepper("النهاية: "+digits.string(ramadanEnd)+" دقيقة من الأذان",value:$ramadanEnd,in:-705...1440,step:15)
+                                Stepper("البداية: "+adhanOffset(ramadanStart),value:$ramadanStart,in:-720...720,step:15)
+                                Stepper("النهاية: "+adhanOffset(ramadanEnd),value:$ramadanEnd,in:-705...1440,step:15)
                                 Text("يتغيّر وقتها من أول رمضان، ويعود وقتها المعتاد في أول شوال، في رمضانين قادمين. أي تعديل لاحق يلغي هذه الخطوات.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                             }
                         }
