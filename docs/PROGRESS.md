@@ -289,7 +289,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Usage
 
-- After the motion and notification batches: 5-hour 61%, weekly 75%.
+- After the motion and notification batches: 5-hour 61%, weekly 75%. Delivery: build 64 archived and uploaded to internal TestFlight (`Artifacts/OWNER-TestFlight-64`, «Upload succeeded»); Apple processing not awaited.
 
 ## Handover — «اكمل… طور كل مايحتاج» — 2026-11-22/23 — Claude
 
