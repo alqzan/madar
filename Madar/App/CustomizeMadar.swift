@@ -349,7 +349,7 @@ struct SettingControl: View {
                     let n = shownInt
                     // AU-44: the Hijri correction reads as a sentence, not a signed number.
                     if definition.key == "core.hijriOffset" {
-                        Text(n == 0 ? "بلا تصحيح" : (abs(n) == 1 ? "يوم" : abs(n) == 2 ? "يومان" : session.digits(abs(n)) + " أيام") + (n > 0 ? " زيادة" : " نقصان"))
+                        Text(n == 0 ? "بلا تصحيح" : (n > 0 ? "زيادة " : "نقصان ") + (abs(n) == 1 ? "يوم" : abs(n) == 2 ? "يومين" : session.digits(abs(n)) + " أيام"))
                     } else {
                     Text(unitForms.map { arabicCount(n, $0, MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)) } ?? session.digits(n))
                     }
