@@ -238,7 +238,7 @@ struct MoneyLogView: View {
         guard !known.isEmpty else { return nil }
         let met = known.filter { $0.within == .met }.count
         let of = known.count == 1 ? "من يوم واحد" : known.count == 2 ? "من يومين" : "من " + service.digits.string(known.count) + (known.count <= 10 ? " أيام" : " يومًا")
-        return service.digits.string(met) + " " + of + " ضمن اليومية"
+        return (met == 0 ? "لا يوم" : service.digits.string(met)) + " " + of + " ضمن اليومية"
     }
     private func metric(_ title: String, value: String, note: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) { Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); Text(figure: value).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.65); Text(note).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }

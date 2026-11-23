@@ -229,7 +229,7 @@ struct MoneyChargeLinesView: View {
         return VStack(alignment: .leading, spacing: 2) {
             Divider().overlay(theme.line)
             if c.isForeign {
-                row("المبلغ الأصلي", service.amount(c.originalAmountMinor, currency: c.originalCurrency, full: true) + " " + c.originalCurrency, "original")
+                row("المبلغ الأصلي", service.amount(c.originalAmountMinor, currency: c.originalCurrency, full: true) + " " + service.currencyName(c.originalCurrency), "original")
                 if let rate = c.rate { row("سعر الصرف", service.digits.localized(rate).replacingOccurrences(of: ".", with: service.digits.style == .hindi ? "٫" : "."), "rate") }
             }
             if c.feeMinor > 0 { row("الرسوم", service.amount(c.feeMinor, currency: c.chargeCurrency), "fee") }

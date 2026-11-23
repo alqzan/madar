@@ -267,7 +267,7 @@ struct BahwYearView: View {
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("ما يهمّك").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
-                Text(service.daysPhrase(all.count) + "، الأقرب أولًا").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
+                if !all.isEmpty { Text(service.daysPhrase(all.count) + "، الأقرب أولًا").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk) }
                 Spacer()
                 Button { editing = .init(service: service) } label: {
                     Label("يوم يهمّك", systemImage: "plus").font(MadarTypography.section()).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(minHeight: 46).glassEffect(.regular.interactive(), in: .capsule)

@@ -66,7 +66,10 @@ import XCTest
         let row = app.buttons["money-log-row-متجر خارجي"]; XCTAssertTrue(row.waitForExistence(timeout: 8), app.debugDescription); row.tap()
         let charges = app.descendants(matching: .any)["money-charges"].firstMatch
         XCTAssertTrue(charges.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(app.descendants(matching: .any)["money-charges-original"].firstMatch.exists)
+        let original = app.descendants(matching: .any)["money-charges-original"].firstMatch
+        XCTAssertTrue(original.exists)
+        // The foreign currency is named in Arabic, never as its code («USD»).
+        XCTAssertNil(original.label.range(of: "[A-Z]{3}", options: .regularExpression), original.label)
         XCTAssertTrue(app.descendants(matching: .any)["money-charges-rate"].firstMatch.exists)
         XCTAssertTrue(app.descendants(matching: .any)["money-charges-fee"].firstMatch.exists)
         XCTAssertTrue(app.descendants(matching: .any)["money-charges-vat"].firstMatch.exists)
