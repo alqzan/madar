@@ -19,7 +19,8 @@ struct CustomizeMadar: View {
     @State private var galleryURL: URL?
     @State private var widgetMaker = false
     @State private var quranTafsirLibrary = false
-    @State private var diarySettings = false
+    @State private var quranSettingsKey: String?
+    @State private var diarySettingsKey: String?
     @State private var moneySettingsRoute: MoneySettingsRoute?
     @State private var moneySettingsRevealed = false
     @State private var missingSettingsRoute = false
@@ -73,8 +74,15 @@ struct CustomizeMadar: View {
                 .onChange(of: session.bool("core.hideMoneyUntilTouch")) { moneySettingsRevealed = false }
                 .onDisappear { moneySettingsRevealed = false }
         }
+        .navigationDestination(item: $quranSettingsKey) { key in
+            QuranPlanView(service: AppQuranService(session: session), close: { quranSettingsKey = nil }, initialSettingKey: key)
+                .environment(\.roomTheme, RoomTheme(room: "quran", dark: theme.dark))
+                .toolbarVisibility(.hidden, for: .navigationBar)
+        }
         .navigationDestination(isPresented: $quranTafsirLibrary) { QuranTafsirLibraryView(app: session) }
-        .navigationDestination(isPresented: $diarySettings) { DiaryCustomizeView(app: session) }
+        .navigationDestination(item: $diarySettingsKey) { key in
+            DiaryCustomizeView(app: session, initialSettingKey: key)
+        }
         #if os(iOS)
         .sheet(isPresented: $widgetMaker, onDismiss: { session.widgetMakerRoute = nil; session.widgetMakerRouteID = nil }) {
             WidgetMakerView(session: session)
@@ -253,8 +261,8 @@ struct CustomizeMadar: View {
     private func openRoomSetting(_ hit: RoomSettingsIndex.Hit) {
         switch hit.place {
         case .money: moneySettingsRoute = .setting(hit.key)
-        case .diary: diarySettings = true
-        case .quran: session.selectedTab = "quran"
+        case .diary: diarySettingsKey = hit.key
+        case .quran: quranSettingsKey = hit.key
         }
     }
     private var filtered: [SettingDefinition] {

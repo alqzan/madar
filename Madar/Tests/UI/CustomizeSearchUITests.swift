@@ -66,6 +66,52 @@ import XCTest
         add(attachment)
     }
 
+    func testQuranSearchOpensTheSettingAndReturnsToResults() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_QURAN_FIXTURE": "home",
+                                 "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-24T15:00:00+03:00"]
+        app.launch()
+        let tab = app.buttons["tab-customize"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 20))
+        tab.tap()
+        let search = app.textFields["settings-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        search.tap()
+        search.typeText("دورة المراجعة\n")
+        let result = app.buttons["room-setting-quran.reviewSchedule"]
+        XCTAssertTrue(result.waitForExistence(timeout: 10), app.debugDescription)
+        result.tap()
+        let setting = app.buttons["quran-plan-quran.reviewSchedule"]
+        XCTAssertTrue(setting.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(setting.isHittable, app.debugDescription)
+        setting.tap()
+        let weekly = app.buttons["المنازل الأسبوعية"]
+        XCTAssertTrue(weekly.waitForExistence(timeout: 5), app.debugDescription)
+        weekly.tap()
+        let updated = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "المنازل الأسبوعية"), object: setting)
+        XCTAssertEqual(XCTWaiter.wait(for: [updated], timeout: 10), .completed)
+        let back = app.buttons["quran-screen-close"]
+        for _ in 0..<3 where !back.isHittable { app.swipeDown(velocity: .slow) }
+        back.tap()
+        XCTAssertTrue(result.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(search.value as? String, "دورة المراجعة")
+    }
+
+    func testDiarySearchExpandsAndReachesTheRequestedSetting() {
+        continueAfterFailure = false
+        let (app, search) = openSearch()
+        search.tap()
+        search.typeText("محتوى المذكرات\n")
+        let result = app.buttons["room-setting-notes.widgetContent"]
+        XCTAssertTrue(result.waitForExistence(timeout: 10), app.debugDescription)
+        result.tap()
+        let setting = app.switches["setting-notes.widgetContent"]
+        XCTAssertTrue(setting.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(setting.isHittable, app.debugDescription)
+        XCTAssertEqual(app.buttons["diary-customize-section-outside"].value as? String, "مفتوح")
+    }
+
     func testHiddenMoneyRoomHasNoSearchResults() {
         continueAfterFailure = false
         let (app, search) = openSearch()

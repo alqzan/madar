@@ -22,7 +22,7 @@ enum RoomSettingsIndex {
                  "mal.cashWithdrawalAsSpend", "mal.merchantLearnAfter", "mal.travelPausesDaily", "mal.hawlStyle", "mal.figureStyle", "mal.alert80", "mal.cardDue",
                  "mal.zakatReminder", "mal.sinceLastVisit", "mal.offsetCapDailies", "mal.bigExpenseRule", "mal.bigExpenseSalaryBp", "mal.bigExpenseMinor",
                  "mal.salarySchedule", "mal.reconcileEveryDays"],
-        .diary: ["notes.homeShape", "notes.memorySize", "notes.match", "notes.noMemory", "notes.yearsBack", "notes.showPhoto", "notes.showPlace", "notes.showAutoSections",
+        .diary: ["notes.memorySize", "notes.match", "notes.noMemory", "notes.yearsBack", "notes.showPhoto", "notes.showPlace", "notes.showAutoSections",
                  "notes.sinceMetrics", "notes.includeDayOne", "notes.dictationFirst", "notes.serverDictationConsent", "notes.secondInk", "notes.ramadanStyle",
                  "notes.fridayStyle", "notes.autoLines", "notes.widgetContent"],
         .quran: ["quran.hifzLevel", "quran.reviewLevel", "quran.restDay", "quran.reviewSchedule", "quran.wirdReminder"],

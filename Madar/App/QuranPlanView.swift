@@ -6,6 +6,7 @@ import MadarCommands
 struct QuranPlanView: View {
     let service: AppQuranService
     let close: () -> Void
+    let initialSettingKey: String?
     let onSetupPresentationChange: (Bool) -> Void
     @Environment(\.roomTheme) private var theme
     @Environment(\.isFrontRoom) private var isFrontRoom
@@ -27,9 +28,11 @@ struct QuranPlanView: View {
         [Int(instant.timeIntervalSince1970 / 60), app.quranRevision, app.quranRevision, isFrontRoom ? 1 : 0]
     }
     private let resetKeys = ["quran.hifzLevel", "quran.reviewLevel", "quran.restDay", "quran.wirdReminder", "quran.reviewSchedule"]
-    init(service: AppQuranService, close: @escaping () -> Void, onSetupPresentationChange: @escaping (Bool) -> Void = { _ in }) {
+    init(service: AppQuranService, close: @escaping () -> Void, initialSettingKey: String? = nil,
+         onSetupPresentationChange: @escaping (Bool) -> Void = { _ in }) {
         self.service = service
         self.close = close
+        self.initialSettingKey = initialSettingKey
         self.onSetupPresentationChange = onSetupPresentationChange
     }
     var body: some View {
@@ -37,6 +40,7 @@ struct QuranPlanView: View {
             let evaluatedAt = service.currentTime()
             let dayReadKey = dayReadKey(at: evaluatedAt)
             let currentDay = displayedMadarDay
+            ScrollViewReader { scroll in
             ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 QuranScreenHeader(title: "خطّتك", close: close)
@@ -142,6 +146,10 @@ struct QuranPlanView: View {
                     Button { reload(at: service.currentTime()) } label: { Text("أعِد المحاولة").font(quranFont(14, bold: true)).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("quran-plan-retry")
                 }
             }.padding(16)
+            }
+            .onChange(of: overview != nil, initial: true) { _, ready in
+                if ready, let initialSettingKey { scroll.scrollTo(initialSettingKey, anchor: .center) }
+            }
         }.madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
             .safeAreaInset(edge: .bottom) { if app.undoToastVisible { app.undoToast().hostsUndo(app).accessibilityIdentifier("quran-plan-undo") } }
             .fullScreenCover(isPresented: $showSetup, onDismiss: { reload(at: service.currentTime()) }) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
@@ -261,6 +269,7 @@ struct QuranPlanView: View {
     private func levelRow(_ title: String, key: String, dot: String = "review") -> some View { choiceRow(title, key: key, options: QuranUILevel.allCases.map { ($0.id,$0.title) }, dot: dot) }
     private func choiceRow(_ title: String, key: String, options: [(String,String)], dot: String? = "review") -> some View {
         Menu { ForEach(options, id: \.0) { value, label in Button(label) { app.set(.string(value), key: key) }.accessibilityIdentifier("quran-plan-option-" + key + "-" + value) } } label: { row(title, detail: options.first { $0.0 == app.string(key) }?.1 ?? "—", dot: dot, chevron: true) }.accessibilityIdentifier("quran-plan-" + key)
+            .id(key)
     }
     @MainActor private func load(at instant: Date? = nil) async {
         let requestID = UUID(); overviewRequestID = requestID

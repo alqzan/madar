@@ -139,12 +139,13 @@ struct QuranMushafView: View {
     private var marked: [QuranBookmark] { bookmarks.filter { $0.page == page?.page || (twoUp && $0.page == facing?.page) } }
     private var bookmarkMenu: some View {
         Menu {
-            Button {
-                guard let page else { return }
-                bookmarkName = "علامة " + service.numerals.string(page.page)
-                bookmarkPage = page.page
-            } label: { Label("علامة على هذا الوجه", systemImage: "bookmark") }
-                .disabled(page == nil)
+            if twoUp, let page, let facing {
+                ForEach([page.page, facing.page].sorted(), id: \.self) { target in
+                    bookmarkAction(on: target, title: "علامة على الوجه " + service.numerals.string(target))
+                }
+            } else if let page {
+                bookmarkAction(on: page.page, title: "علامة على هذا الوجه")
+            }
             if !bookmarks.isEmpty {
                 Section("العلامات") {
                     ForEach(bookmarks) { mark in
@@ -168,6 +169,7 @@ struct QuranMushafView: View {
                 .frame(width: 44, height: 44)
         }
             .buttonStyle(.madarPlain).accessibilityLabel("العلامات")
+            .disabled(page == nil && bookmarks.isEmpty)
             .accessibilityValue(marked.isEmpty ? "" : "هذا الموضع معلَّم")
             .accessibilityIdentifier("quran-mushaf-bookmarks")
             .alert("اسم العلامة", item: $bookmarkPage) { target in
@@ -181,6 +183,15 @@ struct QuranMushafView: View {
                 Text("تظهر العلامة في القائمة وتعيدك إلى الوجه \(service.numerals.string(target)).")
             }
     }
+    private func bookmarkAction(on target: Int, title: String) -> some View {
+        Button {
+            bookmarkName = "علامة " + service.numerals.string(target)
+            bookmarkPage = target
+        } label: {
+            Label(title, systemImage: "bookmark")
+        }
+    }
+
     private func saveBookmark(_ name: String, on target: Int) async {
         guard !name.isEmpty else { return }
         do {

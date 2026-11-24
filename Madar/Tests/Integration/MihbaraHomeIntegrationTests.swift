@@ -347,6 +347,7 @@ import CoreSpotlight
         // The room's name finds all of its settings.
         let diary = RoomSettingsIndex.hits(in: definitions, query: "المذكرات", supported: supported)
         XCTAssertEqual(Set(diary.map(\.key)), Set(RoomSettingsIndex.keys[.diary] ?? []))
+        XCTAssertFalse(diary.contains { $0.key == "notes.homeShape" }, "The diary only supports its today-first layout.")
         // A central key is never repeated here.
         XCTAssertFalse(RoomSettingsIndex.hits(in: definitions, query: "core.dayStart", supported: supported).contains { $0.key == "core.dayStart" })
     }

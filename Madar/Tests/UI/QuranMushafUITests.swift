@@ -146,6 +146,49 @@ import XCTest
         waitForExpectations(timeout: 10)
     }
 
+    func testLandscapePadCanBookmarkEitherFace() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-24T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+            "MADAR_UI_QURAN_ROUTE": "madar://quran/page/128"
+        ]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["quran-mushaf-page"].waitForExistence(timeout: 25))
+        app.tapCoordinate(x: 0.65, y: 0.5)
+        let menu = app.buttons["quran-mushaf-bookmarks"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        let right = app.descendants(matching: .any)["علامة على الوجه ١٢٧"].firstMatch
+        let left = app.descendants(matching: .any)["علامة على الوجه ١٢٨"].firstMatch
+        XCTAssertTrue(right.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(left.exists, app.debugDescription)
+        attach(app, "mushaf-two-face-bookmarks-pad")
+        right.tap()
+
+        let naming = app.alerts["اسم العلامة"]
+        XCTAssertTrue(naming.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(naming.textFields.firstMatch.value as? String, "علامة ١٢٧")
+        naming.buttons["احفظ"].tap()
+        expectation(for: NSPredicate(format: "value == %@", "هذا الموضع معلَّم"), evaluatedWith: menu)
+        waitForExpectations(timeout: 10)
+
+        app.buttons["quran-mushaf-next"].tap()
+        let title = app.staticTexts["quran-mushaf-number"]
+        expectation(for: NSPredicate(format: "label == %@", "الوجه ١٣٠"), evaluatedWith: title)
+        waitForExpectations(timeout: 10)
+        menu.tap()
+        let bookmark = app.descendants(matching: .any)["علامة ١٢٧، الوجه ١٢٧"].firstMatch
+        XCTAssertTrue(bookmark.waitForExistence(timeout: 5), app.debugDescription)
+        bookmark.tap()
+        expectation(for: NSPredicate(format: "label == %@", "الوجه ١٢٧"), evaluatedWith: title)
+        waitForExpectations(timeout: 10)
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let image = app.screenshot(), shot = XCTAttachment(screenshot: image)
         shot.name = name; shot.lifetime = .keepAlways; add(shot)

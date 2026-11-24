@@ -34,10 +34,11 @@ struct DiaryHomeLayout {
 
 struct DiaryCustomizeView: View {
     @Bindable var app: AppSession
+    let initialSettingKey: String?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var query = ""
-    @State private var expanded: Set<String> = ["home"]
+    @State private var expanded: Set<String>
     @State private var confirmReset = false
     @State private var transfer: String?
     private var layout: DiaryHomeLayout { .init(app.values["notes.layout"]) }
@@ -51,7 +52,7 @@ struct DiaryCustomizeView: View {
         }
         return id == "thatDay" ? "سطور ذاك اليوم" : DiaryHomeLayout.titles[id] ?? id
     }
-    private let groups: [(String, String, String, [String])] = [
+    private static let groups: [(String, String, String, [String])] = [
         ("calendar", "التقويم", "calendar", ["notes.calendarFirst"]),
         ("memory", "أي ذكرى تظهر", "clock", ["notes.match", "notes.noMemory", "notes.yearsBack", "notes.includeDayOne"]),
         ("display", "ما تعرضه الذكرى", "photo", ["notes.memorySize", "notes.showPhoto", "notes.showPlace", "notes.showAutoSections", "notes.sinceMetrics", "notes.autoLines"]),
@@ -59,9 +60,17 @@ struct DiaryCustomizeView: View {
         ("seasons", "الجمعة ورمضان", "moon.stars", ["notes.fridayStyle", "notes.ramadanStyle"]),
         ("outside", "خارج التطبيق", "rectangle.on.rectangle", ["notes.widgetContent"])
     ]
-    private var keys: [String] { ["notes.layout"] + groups.flatMap(\.3) }
+    init(app: AppSession, initialSettingKey: String? = nil) {
+        self.app = app
+        self.initialSettingKey = initialSettingKey
+        let group = initialSettingKey.flatMap { key in Self.groups.first { $0.3.contains(key) }?.0 }
+        _expanded = State(initialValue: [group ?? "home"])
+    }
+
+    private var keys: [String] { ["notes.layout"] + Self.groups.flatMap(\.3) }
     private var changed: Int { app.schema.settings.filter { keys.contains($0.key) && app.values[$0.key] != $0.defaultValue }.count }
     var body: some View {
+        ScrollViewReader { scroll in
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
@@ -76,22 +85,24 @@ struct DiaryCustomizeView: View {
                     TextField("ابحث: الهجري، الهامش، الصورة…", text: $query).font(MadarTypography.body()).accessibilityIdentifier("diary-customize-search")
                 }.padding(16).background(theme.surface, in: .capsule).glassEffect(.regular.interactive(), in: .capsule)
                 if matches("الرئيسية ترتيب الواجهة النافذة الأصداء الهامش") { homeCard }
-                ForEach(groups, id: \.0) { group in
+                ForEach(Self.groups, id: \.0) { group in
                     let definitions = app.schema.settings.filter { group.3.contains($0.key) && matches(group.1 + " " + $0.title) }
                     if !definitions.isEmpty {
                         section(group.0, title: group.1, subtitle: summary(group.0), symbol: group.2) {
                             ForEach(definitions, id: \.key) { definition in
                                 Divider().overlay(theme.line)
-                                if definition.key == "notes.sinceMetrics" { metricControls }
-                                else if definition.key == "notes.autoLines" { autoControls }
-                                else if definition.key == "notes.serverDictationConsent" {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text("تحويل الصوت عبر Apple").font(MadarTypography.section())
-                                        Text(app.bool("notes.serverDictationConsent") ? "مسموح على هذا الجهاز عند غياب التحويل المحلي" : "لا يُرسل الصوت دون سؤال صريح عند التحويل").font(DiaryType.label)
-                                        if app.bool("notes.serverDictationConsent") { Button { app.set(.bool(false), key: "notes.serverDictationConsent") } label: { Text("ألغِ الموافقة على إرسال الصوت").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-revoke-speech-consent") }
+                                Group {
+                                    if definition.key == "notes.sinceMetrics" { metricControls }
+                                    else if definition.key == "notes.autoLines" { autoControls }
+                                    else if definition.key == "notes.serverDictationConsent" {
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Text("تحويل الصوت عبر Apple").font(MadarTypography.section())
+                                            Text(app.bool("notes.serverDictationConsent") ? "مسموح على هذا الجهاز عند غياب التحويل المحلي" : "لا يُرسل الصوت دون سؤال صريح عند التحويل").font(DiaryType.label)
+                                            if app.bool("notes.serverDictationConsent") { Button { app.set(.bool(false), key: "notes.serverDictationConsent") } label: { Text("ألغِ الموافقة على إرسال الصوت").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-revoke-speech-consent") }
+                                        }
                                     }
-                                }
-                                else { SettingControl(definition: definition, session: app) }
+                                    else { SettingControl(definition: definition, session: app) }
+                                }.id(definition.key)
                             }
                         }
                     }
@@ -103,6 +114,13 @@ struct DiaryCustomizeView: View {
                 Text("بداية اليوم والتقويم من «خصّص مدار». تغيير الشكل لا يمسّ كتابتك.")
                     .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 12)
             }.padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
+        }
+        .task {
+            guard let initialSettingKey else { return }
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            scroll.scrollTo(initialSettingKey, anchor: .center)
+        }
         }.background(theme.background).foregroundStyle(theme.ink).toolbarVisibility(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .bottom) { if app.undoToastVisible { app.undoToast().hostsUndo(app) } }
             .confirmationDialog("أعِد إعدادات المذكرات؟", isPresented: $confirmReset, titleVisibility: .visible) {
