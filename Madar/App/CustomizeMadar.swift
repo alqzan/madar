@@ -4,6 +4,14 @@ import MadarCore
 import MadarDesign
 
 struct CustomizeMadar: View {
+    private enum MoneySettingsRoute: Hashable {
+        case home, setting(String)
+
+        var key: String? {
+            if case .setting(let key) = self { key } else { nil }
+        }
+    }
+
     @Bindable var session: AppSession
     private var query: String { session.settingsQuery }
     @State private var confirmReset = false
@@ -12,6 +20,8 @@ struct CustomizeMadar: View {
     @State private var widgetMaker = false
     @State private var quranTafsirLibrary = false
     @State private var diarySettings = false
+    @State private var moneySettingsRoute: MoneySettingsRoute?
+    @State private var moneySettingsRevealed = false
     @State private var missingSettingsRoute = false
     @State private var highlightedSettingKey: String?
     @State private var routedSettingsQuery: String?
@@ -20,7 +30,8 @@ struct CustomizeMadar: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var settingsWidth: CGFloat = 0
-    private var settingsWide: Bool { isPadWide(sizeClass) && settingsWidth >= 960 && query.isEmpty }
+    private var searchTerm: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var settingsWide: Bool { isPadWide(sizeClass) && settingsWidth >= 960 && searchTerm.isEmpty }
     var body: some View {
         ScrollViewReader { proxy in
         CustomizationTemplate(title: "إعدادات مدار", subtitle: "كل تعديل يُحفظ وحده", maxWidth: settingsWide ? 1060 : 620) {
@@ -44,76 +55,24 @@ struct CustomizeMadar: View {
                             .accessibilityIdentifier("settings-route-missing")
                     }
                 }
-                if query.isEmpty {
-                    SettingsHome(session: session, openTafsir: { quranTafsirLibrary = true }, openMaker: { widgetMaker = true }, openGallery: { widgetGallery = true },
+                if searchTerm.isEmpty {
+                    SettingsHome(session: session, openTafsir: { quranTafsirLibrary = true }, openMoney: { moneySettingsRoute = .home },
+                                 openMaker: { widgetMaker = true }, openGallery: { widgetGallery = true },
                                  resetAll: { confirmReset = true }, changes: changesLabel, twoColumns: settingsWide)
                 } else {
-                if query.isEmpty || normalized("المحبرة").contains(normalized(query)) {
-                    Button { session.selectedTab = "mihbara" } label: {
-                        HStack { Text("افتح المحبرة").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }.padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
-                    }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-open")
-                }
-                if query.isEmpty || normalized("المال").contains(normalized(query)) {
-                    Button { session.moneyOpen = true } label: {
-                        HStack { Text("افتح المال").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }
-                            .padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
-                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-open")
-                }
-                if query.isEmpty || normalized("القرآن التفسير مكتبة التفاسير مرجع الورد").contains(normalized(query)) {
-                    Button { quranTafsirLibrary = true } label: {
-                        HStack {
-                            Label("خصّص تفاسير القرآن", systemImage: "books.vertical").font(MadarTypography.section())
-                            Spacer()
-                            Image(systemName: "chevron.left")
-                        }
-                        .padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
-                    }
-                    .buttonStyle(.madarPlain).accessibilityIdentifier("quran-tafsir-library-open")
-                }
-                if query.isEmpty || normalized("الودجات وأحجامها البهو الكتل").contains(normalized(query)) { BahwBlocksSection(session: session) }
-                if MadarPlatform.hasHomeScreenWidgets, query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query)) {
-                    Button { widgetMaker = true } label: { Label("اصنع ودجة", systemImage: "square.stack.3d.up").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).background(theme.surface, in: .rect(cornerRadius: 20)) }
-                        .buttonStyle(.madarPlain).accessibilityIdentifier("widget-maker-open")
-                }
-                if MadarPlatform.hasHomeScreenWidgets, query.isEmpty || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) {
-                    Button {widgetGallery=true} label:{Label("ودجات الشاشة الرئيسية",systemImage:"square.grid.2x2").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:50).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widgets-gallery")
-                }
-                if showsRoomLayouts { RoomHomeLayoutSection(session: session, searching: !query.isEmpty) }
-                if filtered.isEmpty && roomHits.isEmpty && !showsRoomLayouts && !(query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query))) && !(query.isEmpty || normalized("المال").contains(normalized(query)) || normalized("المحبرة").contains(normalized(query)) || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) || normalized("القرآن التفسير مكتبة التفاسير مرجع الورد").contains(normalized(query))) && !normalized("النسخ والاستعادة نسخة احتياطية انقل من مدار القديم استيراد المزامنة iCloud").contains(normalized(query)) {
-                    ContentUnavailableView.search(text: query)
-                } else {
-                    ForEach(sections, id: \.self) { section in
-                        SettingsSection(title: section, symbol: symbols[section] ?? "slider.horizontal.3", definitions: filtered.filter { sectionFor($0.key) == section }, session: session, searching: !query.isEmpty, highlightedSettingKey: highlightedSettingKey)
-                    }
-                    if sections.contains("الإشعارات") { NotificationPermissionCard(session: session) }
-                }
-                if !roomHits.isEmpty { roomResults }
-                // The data links are searchable too: «نسخ» or «انقل» used to land on an empty result.
-                if query.isEmpty || normalized("النسخ والاستعادة نسخة احتياطية انقل من مدار القديم المزامنة").contains(normalized(query)) {
-                    if let backup = session.backupService, query.isEmpty || normalized("النسخ والاستعادة نسخة احتياطية").contains(normalized(query)) {
-                        NavigationLink("النسخ والاستعادة") {
-                            BackupSettingsView(service: backup, numerals: session.string("core.numerals") == "western" ? .western : .hindi,
-                                dates: { session.dateLabels(GregorianDay.containing($0, in: session.activePlace.timeZone)) },
-                                time: { session.backupTime($0) }, hidesAdvanced: session.bool("core.essentials"))
-                        }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("backup-settings-link")
-                    }
-                    // Only a build signed for iCloud shows sync (no entry point to an unconfigured feature).
-                    if AppSyncService.isProvisioned, let sync = session.syncService, query.isEmpty || normalized("المزامنة iCloud").contains(normalized(query)) {
-                        NavigationLink("المزامنة عبر iCloud") {
-                            SyncSettingsView(service: sync, dates: { session.dateLabels(GregorianDay.containing($0, in: session.activePlace.timeZone)) }, time: { session.backupTime($0) })
-                        }
-                            .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("sync-settings-link")
-                    }
-                    if query.isEmpty || normalized("انقل من مدار القديم استيراد").contains(normalized(query)) {
-                        NavigationLink("انقل من مدار القديم") { LegacyMoveView(app: session) }
-                            .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("legacy-move-link")
-                    }
-                }
+                    searchResults
                 }
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { settingsWidth = $0 }
         .navigationDestination(isPresented: $session.moneyOpen) { MoneyRoomView(app: session) }
+        .navigationDestination(item: $moneySettingsRoute) { route in
+            MoneySettingsView(app: session, revealed: $moneySettingsRevealed, initialSettingKey: route.key)
+                .hidesMoneyInBackground($moneySettingsRevealed)
+                .onChange(of: session.selectedTab) { moneySettingsRevealed = false }
+                .onChange(of: session.bool("core.hideMoneyUntilTouch")) { moneySettingsRevealed = false }
+                .onDisappear { moneySettingsRevealed = false }
+        }
         .navigationDestination(isPresented: $quranTafsirLibrary) { QuranTafsirLibraryView(app: session) }
         .navigationDestination(isPresented: $diarySettings) { DiaryCustomizeView(app: session) }
         #if os(iOS)
@@ -147,6 +106,87 @@ struct CustomizeMadar: View {
         }
         }
     }
+    @ViewBuilder private var searchResults: some View {
+        let needle = normalized(searchTerm)
+        let matches: (String) -> Bool = { !needle.isEmpty && normalized($0).contains(needle) }
+        let showsMihbara = session.roomEnabled(.mihbara) && matches("المحبرة")
+        let showsMoney = session.roomEnabled(.mal) && matches("المال")
+        let showsTafsir = session.roomEnabled(.quran) && matches("القرآن التفسير مكتبة التفاسير مرجع الورد")
+        let showsLobby = matches("الودجات وأحجامها البهو الكتل")
+        let showsWidgetMaker = MadarPlatform.hasHomeScreenWidgets && matches("صانع الودجة اصنع ودجة ودجاتي")
+        let showsWidgetGallery = MadarPlatform.hasHomeScreenWidgets && matches("ودجات الشاشة الرئيسية خارج التطبيق")
+        let showsRoomLayouts = matches("ما يعرضه كل باب ترتيب الغرف")
+        let backup = matches("النسخ والاستعادة نسخة احتياطية") ? session.backupService : nil
+        let sync = AppSyncService.isProvisioned && matches("المزامنة iCloud") ? session.syncService : nil
+        let showsLegacyMove = matches("انقل من مدار القديم استيراد")
+        let hits = roomHits
+        let definitions = filtered
+        let sections = searchableSections.filter { section in
+            (section != "الإشعارات" || MadarPlatform.hasNotifications) && definitions.contains { sectionFor($0.key) == section }
+        }
+        let hasResult = showsMihbara || showsMoney || showsTafsir || showsLobby || showsWidgetMaker || showsWidgetGallery
+            || showsRoomLayouts || backup != nil || sync != nil || showsLegacyMove || !hits.isEmpty || !sections.isEmpty
+
+        if showsMihbara {
+            Button { session.selectedTab = "mihbara" } label: {
+                HStack { Text("افتح المحبرة").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }.padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-open")
+        }
+        if showsMoney {
+            Button { session.moneyOpen = true } label: {
+                HStack { Text("افتح المال").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }
+                    .padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("money-open")
+        }
+        if showsTafsir {
+            Button { quranTafsirLibrary = true } label: {
+                HStack {
+                    Label("خصّص تفاسير القرآن", systemImage: "books.vertical").font(MadarTypography.section())
+                    Spacer()
+                    Image(systemName: "chevron.left")
+                }
+                .padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-tafsir-library-open")
+        }
+        if showsLobby { BahwBlocksSection(session: session) }
+        if showsWidgetMaker {
+            Button { widgetMaker = true } label: {
+                Label("اصنع ودجة", systemImage: "square.stack.3d.up").font(MadarTypography.section())
+                    .frame(maxWidth: .infinity, minHeight: 50).background(theme.surface, in: .rect(cornerRadius: 20))
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("widget-maker-open")
+        }
+        if showsWidgetGallery {
+            Button { widgetGallery = true } label: {
+                Label("ودجات الشاشة الرئيسية", systemImage: "square.grid.2x2").font(MadarTypography.section())
+                    .frame(maxWidth: .infinity, minHeight: 50).background(theme.surface, in: .rect(cornerRadius: 20))
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("room-widgets-gallery")
+        }
+        if showsRoomLayouts { RoomHomeLayoutSection(session: session, searching: true) }
+        ForEach(sections, id: \.self) { section in
+            SettingsSection(title: section, symbol: symbols[section] ?? "slider.horizontal.3",
+                            definitions: definitions.filter { sectionFor($0.key) == section }, session: session, searching: true,
+                            highlightedSettingKey: highlightedSettingKey)
+        }
+        if sections.contains("الإشعارات") { NotificationPermissionCard(session: session) }
+        if !hits.isEmpty { roomResults(hits) }
+        if let backup {
+            NavigationLink("النسخ والاستعادة") {
+                BackupSettingsView(service: backup, numerals: session.string("core.numerals") == "western" ? .western : .hindi,
+                    dates: { session.dateLabels(GregorianDay.containing($0, in: session.activePlace.timeZone)) }, time: { session.backupTime($0) }, hidesAdvanced: session.bool("core.essentials"))
+            }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("backup-settings-link")
+        }
+        if let sync {
+            NavigationLink("المزامنة عبر iCloud") {
+                SyncSettingsView(service: sync, dates: { session.dateLabels(GregorianDay.containing($0, in: session.activePlace.timeZone)) }, time: { session.backupTime($0) })
+            }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("sync-settings-link")
+        }
+        if showsLegacyMove {
+            NavigationLink("انقل من مدار القديم") { LegacyMoveView(app: session) }
+                .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("legacy-move-link")
+        }
+        if !hasResult { ContentUnavailableView.search(text: searchTerm).accessibilityIdentifier("settings-search-empty") }
+    }
+
     private func updateSettingsQuery(_ value: String) {
         session.settingsQuery = value
         if value != routedSettingsQuery {
@@ -182,11 +222,19 @@ struct CustomizeMadar: View {
         }
     }
     /// B2-18: settings that live on a room's own page.
-    private var roomHits: [RoomSettingsIndex.Hit] { RoomSettingsIndex.hits(in: session.schema.settings, query: query, supported: Set(AppSession.supportedKeys)) }
-    private var roomResults: some View {
+    private var roomHits: [RoomSettingsIndex.Hit] {
+        RoomSettingsIndex.hits(in: session.schema.settings, query: searchTerm, supported: Set(AppSession.supportedKeys)).filter { hit in
+            switch hit.place {
+            case .money: session.roomEnabled(.mal)
+            case .diary: session.roomEnabled(.notes)
+            case .quran: session.roomEnabled(.quran)
+            }
+        }
+    }
+    private func roomResults(_ hits: [RoomSettingsIndex.Hit]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("داخل الأقسام").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
-            ForEach(roomHits) { hit in
+            ForEach(hits) { hit in
                 Button { openRoomSetting(hit) } label: {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
@@ -204,21 +252,22 @@ struct CustomizeMadar: View {
     }
     private func openRoomSetting(_ hit: RoomSettingsIndex.Hit) {
         switch hit.place {
-        case .money: session.moneyOpensSettings = true; session.moneyOpen = true
+        case .money: moneySettingsRoute = .setting(hit.key)
         case .diary: diarySettings = true
         case .quran: session.selectedTab = "quran"
         }
     }
-    private var showsRoomLayouts: Bool { query.isEmpty || normalized("ما يعرضه كل باب ترتيب الغرف").contains(normalized(query)) }
     private var filtered: [SettingDefinition] {
-        session.schema.settings.filter { definition in
+        let needle = normalized(searchTerm)
+        guard !needle.isEmpty else { return [] }
+        return session.schema.settings.filter { definition in
             guard AppSession.supportedKeys.contains(definition.key) else { return false }
             if definition.key == "core.hijriOffset" && session.string("core.hijriSource") != "sighting" && definition.key != routedSettingKey { return false }
             if ["notif.quietFrom", "notif.quietUntil"].contains(definition.key) && !session.bool("notif.quietAfterIsha") && definition.key != routedSettingKey { return false }
-            return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
+            return normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(needle)
         }
     }
-    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "الذكاء", "اليوم والتقويم", "المظهر", "مدينتك", "البحث", "الإشعارات", "المواقيت", "متقدم"].filter { section in (section != "الإشعارات" || MadarPlatform.hasNotifications) && !(section == "متقدم" && query.isEmpty && session.bool("core.essentials")) && filtered.contains { sectionFor($0.key) == section } } }
+    private let searchableSections = ["العادات", "السنة", "الأيام القادمة", "الذكاء", "اليوم والتقويم", "المظهر", "مدينتك", "البحث", "الإشعارات", "المواقيت", "متقدم"]
     private let symbols = ["متقدم": "gearshape.2", "الذكاء": "sparkles", "العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "البحث": "magnifyingglass", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"] + RoomHomeLayout.rooms.map { $0.0 + ".layout" }).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count

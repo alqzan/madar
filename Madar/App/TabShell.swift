@@ -47,14 +47,23 @@ struct TabShell<Content: View>: View {
     @State private var bottomInset: CGFloat = 0
 
     @Environment(\.horizontalSizeClass) private var sizeClass
+    private var usesSidebar: Bool { isPadWide(sizeClass) }
 
     /// Owner, 9 Nov 2026: «ابيك تبدا ببناء نسخه للايباد» — on a wide screen (iPad, regular width) the rooms sit beside a sidebar on the
     /// leading (right) edge instead of above the bottom bar. iPhone keeps the bar.
     var body: some View {
-        Group {
-            if isPadWide(sizeClass) { padBody } else { phoneBody }
+        HStack(spacing: 0) {
+            if usesSidebar && !sidebarHidden {
+                MadarSidebar(tabs: tabs, selection: selection, select: select, fold: { setSidebarHidden(true) })
+                    .frame(width: 250).transition(.move(edge: .trailing).combined(with: .opacity))
+                Rectangle().fill(theme.ink.opacity(0.08)).frame(width: 0.5).ignoresSafeArea()
+            }
+            // Keep each room's navigation and local drafts alive as the iPad window crosses size classes.
+            roomColumn
         }
         .tint(theme.accent)
+        .onChange(of: usesSidebar, initial: true) { _, _ in updateTabBarHeight() }
+        .sensoryFeedback(.selection, trigger: selection)
         .onChange(of: selection, initial: true) { _, tab in
             // Retained rooms keep drafts, but their keyboard must not cover the destination.
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -67,38 +76,39 @@ struct TabShell<Content: View>: View {
 
     /// B2-19: the sidebar folds away so a room can use the whole wide screen (reading, the Mushaf, a long diary page).
     @AppStorage("Madar.pad.sidebarHidden") private var sidebarHidden = false
-    private var padBody: some View {
-        HStack(spacing: 0) {
-            if !sidebarHidden {
-                MadarSidebar(tabs: tabs, selection: selection, select: select, fold: { withAnimation(reduceMotion ? nil : .snappy) { sidebarHidden = true } })
-                    .frame(width: 250).transition(.move(edge: .trailing).combined(with: .opacity))
-                Rectangle().fill(theme.ink.opacity(0.08)).frame(width: 0.5).ignoresSafeArea()
-            }
-            rooms.frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(alignment: .topTrailing) {
-                    if sidebarHidden {
-                        Button { withAnimation(reduceMotion ? nil : .snappy) { sidebarHidden = false } } label: {
-                            Image(systemName: "sidebar.trailing").font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.ink)
-                                .frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
-                        }.buttonStyle(.madarPlain).padding(12).accessibilityLabel("أظهر القائمة").accessibilityIdentifier("pad-sidebar-show")
-                    }
-                }
-        }
-        .onAppear { session.tabBarHeight = 0 }
-        .sensoryFeedback(.selection, trigger: selection)
+    private func setSidebarHidden(_ hidden: Bool) {
+        withAnimation(reduceMotion ? nil : .snappy) { sidebarHidden = hidden }
     }
 
-    private var phoneBody: some View {
-        rooms
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0; session.tabBarHeight = max(0, barHeight - $0) }
+    private var roomColumn: some View {
+        VStack(spacing: 0) {
+            if usesSidebar && sidebarHidden {
+                Button { setSidebarHidden(false) } label: {
+                    Image(systemName: "sidebar.trailing").font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.ink)
+                        .frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
+                }
+                .buttonStyle(.madarPlain)
+                .accessibilityLabel("أظهر القائمة").accessibilityIdentifier("pad-sidebar-show")
+                .padding(.horizontal, 12).padding(.vertical, 4)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .background(theme.background)
+            }
+            rooms.frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: {
+                bottomInset = $0
+                updateTabBarHeight()
+            }
             // A `safeAreaInset` outside the navigation stack never reached the rooms' own layouts, so the bar is an overlay and its
             // measured height is added to the safe area of everything inside.
             .overlay(alignment: .bottom) {
                 if barShown {
                     fixedBar
                         // The system bar reaches down over the home indicator; only the part above it is added to the rooms' safe area.
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { barHeight = $0; session.tabBarHeight = max(0, $0 - bottomInset) }
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                            barHeight = $0
+                            updateTabBarHeight()
+                        }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
@@ -115,6 +125,11 @@ struct TabShell<Content: View>: View {
                 }
             }
             #endif
+    }
+
+    private func updateTabBarHeight() {
+        let height = usesSidebar ? 0 : max(0, barHeight - bottomInset)
+        if session.tabBarHeight != height { session.tabBarHeight = height }
     }
 
     private var rooms: some View {
@@ -157,7 +172,7 @@ struct TabShell<Content: View>: View {
             || !session.mihbaraRootDraftBlockers.isEmpty
     }
 
-    private var barShown: Bool { session.accessoryHiders.isEmpty }
+    private var barShown: Bool { !usesSidebar && session.accessoryHiders.isEmpty }
     private var barTabs: [FoundationTab] { tabs.filter { $0.id != "customize" } }
 
     private func select(_ id: String) {
@@ -173,7 +188,6 @@ struct TabShell<Content: View>: View {
             .accessibilityIdentifier("fixed-tab-bar")
             .ignoresSafeArea(.container, edges: .bottom)
             .ignoresSafeArea(.keyboard)
-            .sensoryFeedback(.selection, trigger: selection)
     }
 }
 
@@ -293,6 +307,15 @@ struct MadarRootView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if DEBUG
+    @State private var testPadSizeClass: UserInterfaceSizeClass?
+    private var testsPadSizeChanges: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return UIDevice.current.userInterfaceIdiom == .pad
+            && environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil
+            && environment["MADAR_UI_PAD_SIZE_CHANGE"] == "1"
+    }
+    #endif
     var body: some View {
         let readingSaveCoordinator = MihbaraReadingSaveCoordinator.forSession(session)
         let dark = forcedColorScheme == .dark || (forcedColorScheme == nil && colorScheme == .dark)
@@ -304,6 +327,18 @@ struct MadarRootView: View {
         TabShell(session: session, selection: $session.selectedTab, tabs: allTabs) { tab in
             MadarRoomRoot(session: session, tab: tab)
         }
+        #if DEBUG
+        .transformEnvironment(\.horizontalSizeClass) { sizeClass in
+            if let testPadSizeClass { sizeClass = testPadSizeClass }
+        }
+        .overlay(alignment: .top) {
+            if testsPadSizeChanges {
+                Button("بدّل عرض الاختبار") { testPadSizeClass = testPadSizeClass == .compact ? .regular : .compact }
+                    .padding(.horizontal, 12).frame(height: 44).background(.regularMaterial, in: .capsule)
+                    .accessibilityIdentifier("pad-size-class-test-toggle")
+            }
+        }
+        #endif
         // Owner, 30 Oct 2026: the «افتح المحبرة» door in «خصّص» used to hang this cover on the settings page, which is rebuilt after every write,
         // so saving a note closed the whole room. Hosted here at the root it stays up until the reader leaves.
         .fullScreenCover(isPresented: $session.mihbaraOpen) { MihbaraHomeView(app: session).environment(\.roomTheme, theme).madarSheetErrorAlert(session) }
@@ -449,8 +484,12 @@ private struct MadarSidebar: View {
                 Button(action: fold) { Image(systemName: "sidebar.trailing").foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44).contentShape(Rectangle()) }
                     .buttonStyle(.madarPlain).accessibilityLabel("أخفِ القائمة").accessibilityIdentifier("pad-sidebar-hide")
             }.padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 8)
-            ForEach(tabs.filter { $0.id != "customize" }) { row($0) }
-            Spacer(minLength: 12)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(tabs.filter { $0.id != "customize" }) { row($0) }
+                }
+            }
+            .scrollBounceBehavior(.basedOnSize)
             if let customize = tabs.first(where: { $0.id == "customize" }) { row(customize) }
         }
         .padding(.horizontal, 12).padding(.bottom, 12)

@@ -48,9 +48,16 @@ struct HabitsRoomView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
     @State private var readings: [HabitReading] = []
-    /// FB-38: the readings are computed off the main thread; until the first arrives nothing (not the empty state) is drawn.
+    /// FB-38: the readings are computed off the main thread.
     @State private var loaded = false
+    @State private var loadFailed = false
     @State private var reloadTask: Task<Void, Never>?
+    #if DEBUG
+    @State private var failNextRead = {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil && environment["MADAR_UI_HABIT_READ_FAILURE_ONCE"] == "1"
+    }()
+    #endif
     @State private var liveHealth: [UUID:Int] = [:]
     @State private var detail: HabitReading?
     @State private var editor: HabitEditorIdentity?
@@ -65,6 +72,8 @@ struct HabitsRoomView: View {
     /// AU-95: repeated quick taps submit one command while a habit completion is still saving.
     @State private var completionInFlight: Set<UUID> = []
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isFrontRoom) private var isFrontRoom
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -89,7 +98,10 @@ struct HabitsRoomView: View {
             ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment:.leading,spacing:20) {
-                    if !loaded { Color.clear.frame(height: 1) }
+                    if loadFailed { loadFailure }
+                    if !loaded {
+                        if !loadFailed { ProgressView().frame(maxWidth: .infinity).padding(.vertical, 24) }
+                    }
                     else if active.isEmpty { empty; roomHabits; archivedBlock }
                     else {
                         periodSummaries
@@ -113,7 +125,9 @@ struct HabitsRoomView: View {
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent)
         .toolbarVisibility(.hidden,for:.navigationBar).environment(\.roomTheme,theme)
-        .task(id:session.habitsRevision) { reload() }
+        .task(id: isFrontRoom && scenePhase == .active ? session.habitsRevision : nil) {
+            if isFrontRoom && scenePhase == .active { reload() }
+        }
         .onChange(of: session.habitRouteID) { _, routeID in
             guard routeID != nil else { return }
             reload()
@@ -128,9 +142,13 @@ struct HabitsRoomView: View {
             }
         }
         .onChange(of: detailPastDayDraftPresented) { _, _ in applyPendingBahwRootIfReady() }
-        // A room left open across midnight shows the new day without waiting for a Health change.
-        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in reload() }
-        .task { do {liveHealth=try await HabitHealthStore.refresh(session:session);reload()} catch {session.errorMessage="لم تتجدد قراءة الصحة؛ سجلك السابق محفوظ."} }
+        .refreshesAtMadarDay(session) { reload() }
+        .task {
+            do {
+                let fresh = try await HabitHealthStore.refresh(session: session)
+                if fresh != liveHealth { liveHealth = fresh; reload() }
+            } catch { session.errorMessage = "لم تتجدد قراءة الصحة؛ سجلك السابق محفوظ." }
+        }
         .task {
             while !Task.isCancelled {
                 // The tab stays alive behind the others: only poll Health while habits is the room being looked at.
@@ -225,6 +243,20 @@ struct HabitsRoomView: View {
 
     private var empty: some View {
         VStack(spacing:16) { HabitRingGlyph(share:0,done:false,symbol:nil,lineWidth:5).frame(width:60,height:60); Text("القليل الذي تدوم عليه").font(HabitType.title()); Text("اختر عادة صغيرة تبدأ بها، أو اربطها بما تسجّله في غرف مدار.").font(HabitType.body()).multilineTextAlignment(.center).foregroundStyle(theme.secondaryInk); Button { editor = .init(id:UUID()) } label: { Text("أضف أول عادة").font(HabitType.section()).padding(.horizontal,22).frame(minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-first") }.padding(28).frame(maxWidth:.infinity).background(theme.surface,in:.rect(cornerRadius:24)).padding(.top,25)
+    }
+
+    private var loadFailure: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("تعذّرت قراءة عاداتك.").font(HabitType.body())
+            Button(action: reload) {
+                Text("حاول مرة أخرى").font(HabitType.section()).frame(minHeight: 44).contentShape(Rectangle())
+            }
+            .buttonStyle(.madarPlain)
+            .foregroundStyle(theme.accent)
+            .accessibilityIdentifier("habits-retry")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
     }
 
     @ViewBuilder private var archivedBlock: some View {
@@ -478,6 +510,7 @@ struct HabitsRoomView: View {
     /// latest request lands, so a tap, a Health refresh and a prayer write in a row never stack reads on the main thread.
     private func reload() {
         reloadTask?.cancel()
+        loadFailed = false
         let container = session.container, now = session.prayerNow(), health = liveHealth
         reloadTask = Task {
             let result = await Task.detached(priority: .userInitiated) {
@@ -489,6 +522,12 @@ struct HabitsRoomView: View {
     }
     private func apply(_ result: Result<[HabitReading], Error>) {
         do {
+            #if DEBUG
+            if failNextRead {
+                failNextRead = false
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
             let fresh = try result.get()
             readings = fresh; loaded = true
             if let selected = detail, let updated = selected.refreshed(in: fresh) { detail = updated }
@@ -498,7 +537,7 @@ struct HabitsRoomView: View {
                 }
                 session.habitRouteID = nil
             }
-        } catch { loaded = true; session.errorMessage = madarUserMessage(error) }
+        } catch { loadFailed = true }
     }
     private func complete(_ row: HabitReading, delta: Int) {
         guard !completionInFlight.contains(row.id) else { return }

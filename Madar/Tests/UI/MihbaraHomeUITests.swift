@@ -270,6 +270,7 @@ import UIKit
         XCTAssertTrue(hit.label.contains("نافذة"), hit.label)
         shot(app, "MIH-SEARCH-hits-L")
         hit.tap()
+        XCTAssertTrue(field.waitForNonExistence(timeout: 8), "The library closes before the reader opens.")
         XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 20), app.debugDescription)
         shot(app, "MIH-SEARCH-reader-L")
         app.terminate()

@@ -63,6 +63,47 @@ import XCTest
         XCTAssertFalse(app.buttons["quran-resume"].exists)
         app.terminate()
     }
+
+    func testLandscapeMushafTurnsOnlyToAnotherVisiblePageOrSpread() {
+        continueAfterFailure = false
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+
+        for openingFirstSpread in [true, false] {
+            let app = XCUIApplication()
+            let pageNumber = openingFirstSpread ? 2 : 603
+            app.launchEnvironment = [
+                "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+                "MADAR_UI_NOW": "2026-10-24T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+                "MADAR_UI_QURAN_ROUTE": "madar://quran/page/\(pageNumber)"
+            ]
+            app.launch()
+            XCTAssertTrue(app.descendants(matching: .any)["quran-mushaf-page"].waitForExistence(timeout: 25), app.debugDescription)
+            let window = app.windows.firstMatch.frame
+            XCTAssertGreaterThan(window.width, window.height)
+            app.tapCoordinate(x: isPad ? 0.65 : 0.5, y: 0.5)
+
+            let previous = app.buttons["quran-mushaf-previous"]
+            let next = app.buttons["quran-mushaf-next"]
+            let title = app.staticTexts["quran-mushaf-number"]
+            XCTAssertTrue(title.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertEqual(title.label, openingFirstSpread ? "الوجه ٢" : "الوجه ٦٠٣")
+            let outward = openingFirstSpread ? previous : next
+            let inward = openingFirstSpread ? next : previous
+            XCTAssertEqual(outward.isEnabled, !isPad, "A spread at the edge of the mushaf has no outward turn")
+            XCTAssertTrue(inward.isEnabled)
+            if isPad { inward.tap() } else { outward.tap() }
+
+            let expectedTitle: String
+            if openingFirstSpread { expectedTitle = isPad ? "الوجه ٤" : "الوجه ١" }
+            else { expectedTitle = isPad ? "الوجه ٦٠١" : "الوجه ٦٠٤" }
+            expectation(for: NSPredicate(format: "label == %@", expectedTitle), evaluatedWith: title)
+            waitForExpectations(timeout: 10)
+            app.terminate()
+        }
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let image = app.screenshot(), shot = XCTAttachment(screenshot: image)
         shot.name = name; shot.lifetime = .keepAlways; add(shot)

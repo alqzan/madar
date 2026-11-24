@@ -226,14 +226,15 @@ struct BahwLobbyView: View {
     }
 
     private func presentAttention(force: Bool) {
-        // Never over the first-run welcome (it opened on top of it and hid the welcome until dismissed).
-        guard session.onboardingComplete, session.pendingIntro == nil, !arranging, !drawerOpen, !searchOpen, travelSheet == nil, attention == nil, session.selectedTab == "foundation" else { return }
-        let value = service.attention(includeReconcile: true, ignoringThrottle: force)
+        guard scenePhase == .active, isFrontRoom, session.onboardingComplete, session.pendingIntro == nil,
+              !session.yearOpen, session.moneyExpenseSeed == nil, !session.mihbaraOpen,
+              !arranging, !drawerOpen, !searchOpen, travelSheet == nil, attention == nil else { return }
         #if DEBUG
         // UI tests drive the lobby behind a fixed clock and a fresh store; the sheet is opened there only on request (`MADAR_UI_ATTENTION=1`).
         let environment = ProcessInfo.processInfo.environment
         if !force, environment["MADAR_UI_STORE_ID"] != nil && environment["MADAR_UI_ATTENTION"] != "1" { return }
         #endif
+        let value = service.attention(includeReconcile: true, ignoringThrottle: force)
         guard !value.isEmpty, force || BahwAttentionMemory.isNew(value) else { return }
         attention = value
     }

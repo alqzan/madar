@@ -8,6 +8,7 @@ import MadarDesign
 struct SettingsHome: View {
     @Bindable var session: AppSession
     let openTafsir: () -> Void
+    let openMoney: () -> Void
     let openMaker: () -> Void
     let openGallery: () -> Void
     let resetAll: () -> Void
@@ -48,7 +49,7 @@ struct SettingsHome: View {
                 if session.roomEnabled(.upcoming) { link("الأيام القادمة", "عدد الأيام المعروضة", "hourglass") { sectionsPage("الأيام القادمة", ["الأيام القادمة"]) } }
                 if session.roomEnabled(.quran) { door("القرآن", "مكتبة التفاسير", "book", openTafsir) }
                 if session.roomEnabled(.notes) { link("المذكرات", "الصفحة والتقويم والهامش والنقل", "book.closed") { DiaryCustomizeView(app: session) } }
-                if session.roomEnabled(.mal) { door("المال", "اليوم والحدود والتذكيرات والسفر", "banknote") { session.moneyOpensSettings = true; session.moneyOpen = true } }
+                if session.roomEnabled(.mal) { door("المال", "اليوم والحدود والتذكيرات والسفر", "banknote", openMoney) }
                 if session.roomEnabled(.mihbara) { door("المحبرة", "إعدادات المحبرة داخل القسم", "books.vertical") { session.selectedTab = "mihbara" } }
                 if !hasRoomSettings { Text("أضف قسمًا من «أقسامك والبهو» لتظهر إعداداته هنا.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
             }
@@ -62,7 +63,7 @@ struct SettingsHome: View {
                     link("الإشعارات", "تذكيرات الغرف وأوقات الصمت", "bell.badge") { sectionsPage("الإشعارات", ["الإشعارات"]) }
                 }
                 link("صحة مدار", "النسخة الاحتياطية والطلبات المعلّقة والإشعارات", "heart.text.square") { MadarHealthView(session: session) }
-                link("الخصوصية والبحث", "فهرسة Spotlight وإخفاء الأرقام", "lock") { sectionsPage("الخصوصية والبحث", ["البحث"]) }
+                link("الخصوصية والبحث", "ظهور عناوين الكتب في بحث الجهاز", "lock") { privacyPage }
                 if let backup = session.backupService {
                     link("النسخ والاستعادة", "احفظ بياناتك أو استعدها", "externaldrive") {
                         BackupSettingsView(service: backup, numerals: session.string("core.numerals") == "western" ? .western : .hindi,
@@ -82,6 +83,16 @@ struct SettingsHome: View {
     }
 
     private var hasRoomSettings: Bool { [BahwBlock.habits, .year, .upcoming, .quran, .notes, .mal, .mihbara].contains { session.roomEnabled($0) } }
+
+    private var privacyPage: some View {
+        SettingsPage(title: "الخصوصية والبحث") {
+            if let definition = try? session.schema.definition(for: "core.spotlightIndex") {
+                SettingsSection(title: "بحث الجهاز", symbol: "magnifyingglass", definitions: [definition],
+                                session: session, searching: true, highlightedSettingKey: nil)
+                SettingsPageReset(session: session, keys: [definition.key])
+            }
+        }
+    }
 
     private func sectionsPage(_ title: String, _ sections: [String]) -> some View {
         SettingsPage(title: title) {

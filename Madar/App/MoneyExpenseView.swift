@@ -107,7 +107,7 @@ struct MoneyExpenseView: View {
                     if let h = nextHeadline {
                         VStack(spacing: 3) {
                             Text(figure: h.availableNowMinor >= 0 ? "يبقى لك الآن " + amount(h.availableNowMinor) : "تتجاوز الدورة بـ" + amount(-h.availableNowMinor))
-                                .font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color("surplusText")).contentTransition(.numericText()).accessibilityIdentifier("money-expense-after")
+                                .font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color(h.availableNowMinor >= 0 ? "surplusText" : "dueText")).contentTransition(.numericText()).accessibilityIdentifier("money-expense-after")
                             Text(figure: "اليوم: صرفت " + amount(h.todaySpentMinor) + " من " + amount(h.todayAllowanceMinor)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }.padding(.top, 12)
                     }
@@ -144,7 +144,7 @@ struct MoneyExpenseView: View {
     }
     private func amountHeading(_ r: MoneyExpenseReading? = nil) -> some View {
         VStack(spacing: 0) {
-            Text(figure: service.amount(minor, currency: inputCurrency) + (raw.hasSuffix(".") ? "٫" : "")).font(.custom("thmanyahserifdisplay-Black", size: 60, relativeTo: .largeTitle)).contentTransition(.numericText()).accessibilityIdentifier("money-expense-amount")
+            Text(figure: service.amount(minor, currency: inputCurrency) + (raw.last == "." || raw.last == "٫" ? "٫" : "")).font(.custom("thmanyahserifdisplay-Black", size: 60, relativeTo: .largeTitle)).contentTransition(.numericText()).accessibilityIdentifier("money-expense-amount")
             Text((inputCurrency == "SAR" ? "ريال" : service.currencyName(inputCurrency)) + dailyDescription).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         }.frame(maxWidth: .infinity).frame(minHeight: 94)
     }
@@ -265,10 +265,11 @@ struct MoneyExpenseView: View {
     }
     private func tap(_ key: String) {
         let update = {
+            let decimal = raw.firstIndex { $0 == "." || $0 == "٫" }
             if key == "clear" { raw = "" }
             else if key == "delete" { if !raw.isEmpty { raw.removeLast() } }
-            else if key == "dot" { if !raw.contains(".") { raw += raw.isEmpty ? "0." : "." } }
-            else if raw.count < 9, raw.split(separator: ".", omittingEmptySubsequences: false).dropFirst().first.map({ $0.count < inputExponent }) ?? true { raw += key }
+            else if key == "dot" { if decimal == nil { raw += raw.isEmpty ? "0." : "." } }
+            else if raw.count < 9, decimal.map({ raw[raw.index(after: $0)...].count < inputExponent }) ?? true { raw += key }
         }
         if reduceMotion { update() } else { withAnimation(.easeOut(duration: 0.16), update) }
     }

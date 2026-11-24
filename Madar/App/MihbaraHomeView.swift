@@ -507,8 +507,8 @@ struct MihbaraHomeView: View {
             renaming = book
         case .remove(let target):
             pendingRemoval = target
-        case .open(let book, let volume, let locatorJSON):
-            if case .opened = openBook(book, volume: volume, locatorJSON: locatorJSON) {
+        case .open(let book, let volume, let page, let locatorJSON):
+            if case .opened = openBook(book, volume: volume, page: page, locatorJSON: locatorJSON) {
                 clearPendingBookOpen(for: book.id)
             }
             // The library transition is complete once the reader or details sheet
@@ -922,8 +922,8 @@ struct MihbaraHomeView: View {
                 TextField("ابحث في كتبك…", text: $libraryQuery).font(MadarTypography.body()).padding(15).background(theme.surface, in: .capsule).accessibilityIdentifier("mihbara-library-search")
                 Picker("رفّ الكتب", selection: $libraryShelf) { Text("كل الكتب").tag("all"); Text("أقرؤها الآن").tag("reading"); Text("أبي أقرأها").tag("want"); Text("أنهيتها").tag("finished"); Text("قديمًا").tag("old") }.pickerStyle(.menu)
                 MihbaraTextSearchSection(query: libraryQuery, books: r.books, service: service) { hit in
-                    sheet = nil
-                    readerRoute = MihbaraReaderRoute(bookID: hit.bookID, page: hit.pdfPage, locatorJSON: hit.locatorJSON)
+                    guard let book = r.book(hit.bookID) else { return }
+                    openBook(book, page: hit.pdfPage, locatorJSON: hit.locatorJSON)
                 }
                 libraryStatus(r, matchingBookCount: matchingBookIDs.count)
                 // Owner, 21 Oct 2026: the «قديمًا» cabinet is a section here now, after the three shelves.
@@ -1001,9 +1001,9 @@ struct MihbaraHomeView: View {
         }
     }
 
-    @discardableResult private func openBook(_ book: MihbaraBook, volume: Int? = nil, locatorJSON: String? = nil) -> MihbaraBookOpenResult {
+    @discardableResult private func openBook(_ book: MihbaraBook, volume: Int? = nil, page: Int? = nil, locatorJSON: String? = nil) -> MihbaraBookOpenResult {
         if case .library? = sheet {
-            scheduleLibraryAction(.open(book, volume: volume, locatorJSON: locatorJSON))
+            scheduleLibraryAction(.open(book, volume: volume, page: page, locatorJSON: locatorJSON))
             return .deferred
         }
         guard book.isReadableEPUB || book.isReadablePDF else { sheet = .book(book.id); return .opened }
@@ -1013,7 +1013,7 @@ struct MihbaraHomeView: View {
             // the managed generation before constructing the next reader route.
             try app.reload()
             reading = try service.load()
-            let pdfPage = book.isReadablePDF ? MihbaraPDFLocator.pageIndex(locatorJSON: locatorJSON, fileHash: book.fileHash) : nil
+            let pdfPage = book.isReadablePDF ? page ?? MihbaraPDFLocator.pageIndex(locatorJSON: locatorJSON, fileHash: book.fileHash) : nil
             readerRoute = MihbaraReaderRoute(bookID: book.id, volume: volume, page: pdfPage, locatorJSON: locatorJSON)
             return .opened
         } catch {
@@ -1027,7 +1027,11 @@ struct MihbaraHomeView: View {
 }
 private enum MihbaraRemovalConfirmation { case book(MihbaraBook), file(MihbaraBook) }
 private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook; var id: String { String(describing: self) } }
-private enum MihbaraLibraryAction { case rename(MihbaraBook), remove(MihbaraRemovalConfirmation), open(MihbaraBook, volume: Int?, locatorJSON: String?) }
+private enum MihbaraLibraryAction {
+    case rename(MihbaraBook)
+    case remove(MihbaraRemovalConfirmation)
+    case open(MihbaraBook, volume: Int?, page: Int?, locatorJSON: String?)
+}
 private enum MihbaraBookOpenResult { case opened, deferred, failed }
 private struct MihbaraGoalEditor: Identifiable { let reading: HabitReading?; var id: UUID { reading?.id ?? fresh }; private let fresh = UUID()
     init(reading: HabitReading?) { self.reading = reading }

@@ -79,6 +79,9 @@ private struct DiaryReadingPage: View {
                 if let page {
                     let flow = page.lines.filter { $0.kind != "intention" }
                     let media = Dictionary(grouping: page.media, by: \.entryID)
+                    if let photo = page.photo, !page.media.contains(where: { $0.kind == "photo" && $0.id == page.photoID }) {
+                        readingPhoto(photo)
+                    }
                     ForEach(flow, id: \.id) { line in
                         if let label = labels[line.id] { heading(label) }
                         entry(line, media: media[line.id] ?? [])
@@ -122,12 +125,17 @@ private struct DiaryReadingPage: View {
         }
         ForEach(media.filter { $0.kind != "missing" }) { item in
             if item.kind == "photo" {
-                DiaryDataThumbnail(data: item.data, maxPixel: 1400) { image in
-                    image.resizable().scaledToFit().frame(maxWidth: .infinity).clipShape(.rect(cornerRadius: 14))
-                }.accessibilityLabel("صورة").accessibilityIdentifier("diary-reading-photo")
+                readingPhoto(item.data)
             } else if item.kind == "audio" {
                 audioLine(item, transcript: line.text)
             }
+        }
+    }
+
+    private func readingPhoto(_ data: Data) -> some View {
+        DiaryDataThumbnail(data: data, maxPixel: 1400) { image in
+            image.resizable().scaledToFit().frame(maxWidth: .infinity).clipShape(.rect(cornerRadius: 14))
+                .accessibilityLabel("صورة").accessibilityIdentifier("diary-reading-photo")
         }
     }
 

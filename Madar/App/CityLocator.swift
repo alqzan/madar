@@ -8,13 +8,13 @@ import MapKit
     struct Found { let name: String; let lat: Double; let lon: Double; let tz: String; let country: String; let currency: String }
     @Published var working = false
     @Published var message: String?
-    /// True when the only way forward is the iPhone's Settings (location refused for Madar).
+    /// Location permission was refused for Madar and can be changed in device Settings.
     @Published var needsSettings = false
     private let manager = CLLocationManager()
     private var onFound: ((Found) -> Void)?
     private var requested = false
     private var timeout: Task<Void, Never>?
-    private static let deniedText = "الموقع مغلق لمدار؛ اختر مدينتك من القائمة، أو فعّل الموقع لمدار من إعدادات الآيفون."
+    private static let deniedText = "الموقع مغلق لمدار. اختر مدينتك من القائمة، أو فعّل الموقع لمدار من إعدادات الجهاز."
 
     func start(_ onFound: @escaping (Found) -> Void) {
         guard !working else { return }

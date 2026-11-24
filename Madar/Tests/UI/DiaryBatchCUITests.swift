@@ -47,6 +47,9 @@ import XCTest
         XCTAssertTrue(pager.waitForExistence(timeout: 10))
         pager.swipeLeft()
         XCTAssertTrue(app.staticTexts["يوم أمس فيه صورة."].waitForExistence(timeout: 10), app.debugDescription)
+        let photos = app.images.matching(identifier: "diary-reading-photo")
+        XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(photos.count, 1, "The day's cover photo appears once in reading mode.")
         app.buttons["diary-reading-close"].tap()
         XCTAssertTrue(app.staticTexts["diary-day-title"].waitForExistence(timeout: 10))
     }

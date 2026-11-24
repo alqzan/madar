@@ -182,7 +182,6 @@ struct MoneyHomeView: View {
                 guard !Task.isCancelled else { return }
             }
             if app.moneyOpensMessages { app.moneyOpensMessages = false; messagesOpen = true; return }
-            if app.moneyOpensSettings { app.moneyOpensSettings = false; settingsOpen = true; return }
             // §7.5 «بعد غياب»: «منذ آخر زيارة» opens first; otherwise this visit is the new mark.
             guard !visitChecked else { return }
             guard reading != nil else { visitWaitsForReading = true; return }

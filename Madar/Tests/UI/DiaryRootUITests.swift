@@ -105,6 +105,12 @@ import XCTest
         XCTAssertTrue(past.isHittable, app.debugDescription)
         past.tap()
         XCTAssertTrue(app.staticTexts["١٤ أكتوبر ٢٠٢٦"].waitForExistence(timeout: 15), app.debugDescription)
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            shot.name = "pad-diary-archive-day-page"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
         let todayQuery = app.buttons.matching(identifier: "diary-day-today")
         XCTAssertGreaterThan(todayQuery.count, 0, app.debugDescription)
         let today = todayQuery.element(boundBy: todayQuery.count - 1)

@@ -36,6 +36,7 @@ import XCTest
 
     func testSidebarRoomChangesKeepAnUnsavedExpenseOpen() throws {
         try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad)
+        continueAfterFailure = false
         XCUIDevice.shared.orientation = .landscapeLeft
         let app = XCUIApplication()
         app.launchEnvironment = [
@@ -43,13 +44,20 @@ import XCTest
             "MADAR_UI_MONEY_FIXTURE": "expense",
             "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00",
             "MADAR_UI_START_TAB": "money",
+            "MADAR_UI_PAD_SIZE_CHANGE": "1",
         ]
         app.launch()
 
+        let show = app.buttons["pad-sidebar-show"]
+        let hide = app.buttons["pad-sidebar-hide"]
+        XCTAssertTrue(app.staticTexts["money-reserve"].waitForExistence(timeout: 25), app.debugDescription)
+        if show.exists { show.tap() }
+        XCTAssertTrue(hide.waitForExistence(timeout: 10), app.debugDescription)
         let open = app.buttons["money-expense-open"]
         XCTAssertTrue(open.waitForExistence(timeout: 25), app.debugDescription)
-        open.tap()
         let amount = app.staticTexts["money-expense-amount"]
+        open.tap()
+        if !amount.waitForExistence(timeout: 3), open.isHittable { open.tap() }
         XCTAssertTrue(amount.waitForExistence(timeout: 15), app.debugDescription)
         app.buttons["money-expense-key-4"].tap()
         app.buttons["money-expense-key-2"].tap()
@@ -65,6 +73,51 @@ import XCTest
         XCTAssertTrue(app.buttons["money-expense-close"].waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertTrue(amount.label.contains("٤٢"), "Room retention must preserve the unsaved amount: \(amount.label)")
         XCTAssertTrue(app.buttons["money-expense-save"].isEnabled)
+
+        let sizeClass = app.buttons["pad-size-class-test-toggle"]
+        sizeClass.tap()
+        XCTAssertTrue(hide.waitForNonExistence(timeout: 10), "Compact iPad windows fold the sidebar")
+        XCTAssertTrue(amount.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(amount.label.contains("٤٢"), "The editor must survive the narrower size class")
+        XCTAssertFalse(app.buttons["tab-foundation"].exists, "The expense editor conceals the compact navigation bar")
+
+        sizeClass.tap()
+        XCTAssertTrue(hide.waitForExistence(timeout: 10))
+        XCTAssertTrue(amount.label.contains("٤٢"), "Returning to the sidebar must preserve the same draft")
+    }
+
+    func testFoldedSidebarLeavesLobbyActionsReachable() throws {
+        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad)
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString,
+            "MADAR_UI_MONEY_FIXTURE": "expense",
+            "MADAR_UI_START_TAB": "foundation",
+        ]
+        app.launch()
+
+        let hide = app.buttons["pad-sidebar-hide"]
+        let show = app.buttons["pad-sidebar-show"]
+        if show.exists { show.tap() }
+        XCTAssertTrue(hide.waitForExistence(timeout: 25), app.debugDescription)
+        XCTAssertTrue(waitForWindow(app, landscape: false))
+        hide.tap()
+        defer { if show.isHittable { show.tap() } }
+        XCTAssertTrue(show.waitForExistence(timeout: 10))
+
+        let customize = app.buttons["bahw-customize"]
+        XCTAssertTrue(customize.waitForExistence(timeout: 10))
+        XCTAssertFalse(show.frame.intersects(customize.frame), "Restoring the sidebar must leave the lobby controls clear")
+        let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        shot.name = "pad-folded-sidebar-lobby-portrait"
+        shot.lifetime = .keepAlways
+        add(shot)
+        customize.tap()
+        XCTAssertTrue(app.textFields["settings-search"].waitForExistence(timeout: 10), app.debugDescription)
+        show.tap()
+        XCTAssertTrue(hide.waitForExistence(timeout: 10))
     }
 
     func testWideRoomsInLandscape() throws {

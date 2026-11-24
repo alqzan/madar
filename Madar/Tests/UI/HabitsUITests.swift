@@ -2,11 +2,12 @@ import XCTest
 import UIKit
 
 @MainActor final class HabitsUITests:XCTestCase {
-    private func app(_ fixture:String, appearance:String = "light", now:String = "2026-10-15T20:00:00+03:00", firstCalendar: String? = nil, habitWriteHoldMS: Int? = nil, rootRouteHarness: Bool = false)->XCUIApplication {
+    private func app(_ fixture:String, appearance:String = "light", now:String = "2026-10-15T20:00:00+03:00", firstCalendar: String? = nil, habitWriteHoldMS: Int? = nil, rootRouteHarness: Bool = false, readFailureOnce: Bool = false)->XCUIApplication {
         let app=XCUIApplication();var environment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":fixture,"MADAR_UI_NOW":now,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":appearance]
         if let firstCalendar { environment["MADAR_UI_FIRST_CALENDAR"] = firstCalendar }
         if let habitWriteHoldMS { environment["MADAR_UI_HABIT_WRITE_HOLD_MS"] = String(habitWriteHoldMS) }
         if rootRouteHarness { environment["MADAR_UI_BAHW_ROOT_ROUTE_HARNESS"] = "1" }
+        if readFailureOnce { environment["MADAR_UI_HABIT_READ_FAILURE_ONCE"] = "1" }
         app.launchEnvironment=environment;app.launch();return app
     }
     /// Owner, 17 Nov 2026: habits is a tab of its own, no longer a lobby sub-room.
@@ -14,6 +15,22 @@ import UIKit
     private func openDetail(_ app:XCUIApplication,_ row:XCUIElement){let d=app.buttons["habit-story-details"].firstMatch;if !d.exists{row.tap()};XCTAssertTrue(d.waitForExistence(timeout:5),app.debugDescription);d.tap()}
     private func open(_ app:XCUIApplication){let tab=app.buttons["tab-habits"].firstMatch;XCTAssertTrue(tab.waitForExistence(timeout:20));tab.tap();XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
     private func shot(_ app:XCUIApplication,_ name:String){guard ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] != nil else {return};let s=app.screenshot(),a=XCTAttachment(screenshot:s);a.name=name;a.lifetime = .keepAlways;add(a); if let dir=ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to:URL(fileURLWithPath:dir).appendingPathComponent(name+".png")) }}
+    func testFailedFirstReadShowsRetryAndKeepsExistingHabits() {
+        continueAfterFailure = false
+        let app = app("partialDuration", readFailureOnce: true)
+        open(app)
+
+        let retry = app.buttons["habits-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.buttons["habit-first"].exists)
+        shot(app, "Habits-read-retry-L")
+        retry.tap()
+
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "قراءة هادئة،")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(retry.exists)
+    }
+
     func testAutomaticThemeUsesResolvedAppearanceInLobbyAndHabitSheets() throws {
         continueAfterFailure = false
         // Fixture leaves core.theme at its schema default, auto. Only the root's resolved scheme is forced.

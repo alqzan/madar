@@ -156,7 +156,10 @@ struct DiaryDayView: View {
     var body: some View {
         Group {
             if embeddedInNavigationStack { dayContent }
-            else { NavigationStack { dayContent } }
+            else {
+                NavigationStack { dayContent }
+                    .presentationSizing(.page)
+            }
         }.toolbarVisibility(.visible, for: .navigationBar)
     }
     @ViewBuilder private var dayContent: some View {

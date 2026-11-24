@@ -18,7 +18,7 @@ struct FirstRunView: View {
         case 0: Page(symbol: "circle.hexagongrid", title: "مرحبًا بك في مدار",
                      text: "مدار يرتّب يومك: عاداتك، وردك من القرآن، ومذكراتك، وكتبك، ومالك. تبدأ بقسم واحد وتضيف الباقي متى شئت.")
         case 1: Page(symbol: "location.circle", title: "موقعك",
-                     text: "نحتاج مدينتك لحساب مواقيت الصلاة بدقة. يقرأ مدار موقعك مرة واحدة ليعرف المدينة، ويحفظ المدينة بتقريب نحو كيلومتر، ولا يتتبّع موقعك.")
+                     text: "نحتاج مدينتك لحساب مواقيت الصلاة. إذا سمحت، يستخدم النظام موقعك لدى Apple لمعرفة اسم المدينة مرة واحدة. يحفظ مدار موقعًا تقريبيًا على مستوى المدينة.")
         default: Page(symbol: "photo.on.rectangle", title: "صورك",
                       text: "إذا سمحت، تقدر تضيف صورًا من يومك إلى مذكراتك. لا ينسخ مدار صورك ولا يرسلها لأحد، ويمكنك تخطي هذا الآن.")
         }
@@ -38,7 +38,7 @@ struct FirstRunView: View {
                     if let message = locator.message, step == 1 {
                         Text(message).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         if locator.needsSettings {
-                            Button { MadarPlatform.openAppSettings() } label: { Text("افتح إعدادات الآيفون")
+                            Button { MadarPlatform.openAppSettings() } label: { Text("افتح إعدادات الجهاز")
                                 .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("first-run-open-settings")
                         }
                     }
@@ -60,9 +60,10 @@ struct FirstRunView: View {
             Button("لنبدأ") { step = 1 }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("first-run-continue")
         case 1:
             Button(locator.working ? "أبحث عن موقعك…" : "اسمح بالموقع") { locator.start(save) }
-                .buttonStyle(MadarPrimaryButton()).disabled(locator.working).accessibilityIdentifier("first-run-locate")
+                .buttonStyle(MadarPrimaryButton()).disabled(locator.working || session.userWritesInFlight > 0).accessibilityIdentifier("first-run-locate")
             NavigationLink("اختر مدينتي بنفسي") { CityEditor(session: session, onSaved: { session.completeOnboarding() }) }
-                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("first-run-city")
+                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                .disabled(session.userWritesInFlight > 0).accessibilityIdentifier("first-run-city")
         default:
             // B2-12: the photo permission is asked at the first photo the writer adds, not here.
             EmptyView()
@@ -73,8 +74,9 @@ struct FirstRunView: View {
     private static func cityScale(_ degrees: Double) -> Double { (degrees * 100).rounded() / 100 }
     private func save(_ found: CityLocator.Found) {
         session.set(.object(["name": .string(found.name), "country": .string(found.country), "lat": .number(Self.cityScale(found.lat)), "lon": .number(Self.cityScale(found.lon)),
-                             "tz": .string(found.tz), "currency": .string(found.currency)]), key: "core.homeCity")
-        session.completeOnboarding()
+                             "tz": .string(found.tz), "currency": .string(found.currency)]), key: "core.homeCity") {
+            session.completeOnboarding()
+        }
     }
 }
 

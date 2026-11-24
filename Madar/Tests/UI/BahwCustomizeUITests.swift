@@ -244,9 +244,18 @@ import XCTest
 
     /// B2-18: the central search also finds a setting that lives on a room's own page and opens that page.
     func testSearchFindsRoomSettingsAndOpensTheirPage() {
+        openSalarySetting(fixture: "showcase")
+    }
+
+    func testMoneySettingsSearchOpensDuringActiveTrip() {
+        openSalarySetting(fixture: "travel")
+    }
+
+    private func openSalarySetting(fixture: String) {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture,
+                                 "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
         app.launch(); finishOnboarding(app)
         app.buttons["tab-customize"].tap()
         let search = app.textFields["settings-search"]
@@ -257,6 +266,10 @@ import XCTest
         XCTAssertTrue(hit.label.contains("المال"), hit.label)
         hit.tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-settings"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["money-settings-salary-day"].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["money-settings-page-2"].isSelected)
+        app.buttons["money-settings-close"].tap()
+        XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription)
     }
 
     /// Batch 3: «وضع الأساسيات» folds the «متقدم» group away on the settings home; searching still finds what it hides.

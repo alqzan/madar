@@ -27,8 +27,26 @@ struct MoneySettingsView: View {
             case .reconciliation: "المطابقة"
             }
         }
+        var keys: [String] {
+            switch self {
+            case .daily: ["mal.dailyAllowance"]
+            case .cycle: ["mal.salaryDay", "mal.cycleCalendar", "mal.salarySchedule"]
+            case .deficit: ["mal.autoOffset", "mal.offsetCapDailies", "mal.salaryRemainder", "mal.cashWithdrawalAsSpend"]
+            case .messages: ["mal.merchantLearnAfter", "mal.alert80", "mal.sinceLastVisit", "mal.cardDue", "mal.zakatReminder"]
+            case .travel: ["mal.travelPausesDaily"]
+            case .room: ["core.hideMoneyOutside", "core.hideMoneyUntilTouch", "mal.figureStyle", "mal.hawlStyle",
+                         "mal.bigExpenseRule", "mal.bigExpenseDays", "mal.bigExpenseSalaryBp", "mal.bigExpenseMinor"]
+            case .reconciliation: ["mal.reconcileEveryDays"]
+            }
+        }
     }
-    @State private var page = Page.daily
+    @State private var page: Page
+
+    init(app: AppSession, revealed: Binding<Bool>, initialSettingKey: String? = nil) {
+        self.app = app
+        _revealed = revealed
+        _page = State(initialValue: initialSettingKey.flatMap { key in Page.allCases.first { $0.keys.contains(key) } } ?? .daily)
+    }
     /// AU-95: quick +/− taps each stepped from the stored value until the write landed, so three taps moved one step.
     @State private var sentInts: [String: Int] = [:]
     private func shownInt(_ key: String) -> Int { sentInts[key] ?? Int(app.number(key)) }
@@ -115,28 +133,32 @@ struct MoneySettingsView: View {
                         Spacer()
                     }
                     VStack(spacing: 0) {
-                        ScrollView(.horizontal) {
-                            HStack(alignment: .bottom, spacing: 4) {
-                                ForEach(Page.allCases, id: \.rawValue) { p in
-                                    Button {
-                                        editing = false; page = p
-                                    } label: {
-                                        VStack(spacing: 3) {
-                                            Text(service.digits.string(p.rawValue + 1)).font(MadarTypography.fine())
-                                                .foregroundStyle(theme.color("reserveText"));
-                                            Text(p.title).font(MadarTypography.caption());
-                                            Text(tabValue(p)).font(MadarTypography.fine()).foregroundStyle(
-                                                theme.secondaryInk)
-                                        }.frame(width: 58, height: p == page ? 76 : 66).background(
-                                            p == page ? theme.surface : theme.background
-                                        ).clipShape(.rect(topLeadingRadius: 12, topTrailingRadius: 12)).overlay {
-                                            UnevenRoundedRectangle(topLeadingRadius: 12, topTrailingRadius: 12).stroke(
-                                                p == page ? theme.color("reserveText") : theme.line, lineWidth: 1)
-                                        }
-                                    }.accessibilityIdentifier("money-settings-page-" + String(p.rawValue))
+                        ScrollViewReader { proxy in
+                            ScrollView(.horizontal) {
+                                HStack(alignment: .bottom, spacing: 4) {
+                                    ForEach(Page.allCases, id: \.rawValue) { p in
+                                        Button {
+                                            editing = false; page = p
+                                        } label: {
+                                            VStack(spacing: 3) {
+                                                Text(service.digits.string(p.rawValue + 1)).font(MadarTypography.fine())
+                                                    .foregroundStyle(theme.color("reserveText"));
+                                                Text(p.title).font(MadarTypography.caption());
+                                                Text(tabValue(p)).font(MadarTypography.fine()).foregroundStyle(
+                                                    theme.secondaryInk)
+                                            }.frame(width: 58, height: p == page ? 76 : 66).background(
+                                                p == page ? theme.surface : theme.background
+                                            ).clipShape(.rect(topLeadingRadius: 12, topTrailingRadius: 12)).overlay {
+                                                UnevenRoundedRectangle(topLeadingRadius: 12, topTrailingRadius: 12).stroke(
+                                                    p == page ? theme.color("reserveText") : theme.line, lineWidth: 1)
+                                            }
+                                        }.accessibilityAddTraits(p == page ? .isSelected : [])
+                                            .accessibilityIdentifier("money-settings-page-" + String(p.rawValue)).id(p)
+                                    }
                                 }
-                            }
-                        }.scrollIndicators(.hidden)
+                            }.scrollIndicators(.hidden)
+                                .onAppear { proxy.scrollTo(page, anchor: .center) }
+                        }
                         VStack(alignment: .leading, spacing: 18) {
                             HStack {
                                 VStack(alignment: .leading, spacing: 0) {
@@ -163,7 +185,7 @@ struct MoneySettingsView: View {
                             case .reconciliation: reconciliationPage
                             }
                             Button {
-                                editing = false; app.reset(keys) { load() }
+                                editing = false; app.reset(page.keys) { load() }
                             } label: { Text("أعِد الافتراضي").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier(
                                 "money-settings-reset")
                             Text("— " + service.digits.string(page.rawValue + 1) + " —").font(MadarTypography.fine())
@@ -191,6 +213,7 @@ struct MoneySettingsView: View {
                 }
                 .accessibilityIdentifier("money-settings")
         }
+        .environment(\.roomTheme, theme)
         .madarSheetLock(saving: app.settingsWriteInProgress)
     }
     private var dailyPage: some View {
@@ -587,21 +610,6 @@ struct MoneySettingsView: View {
         case .messages: "الاختصار";
         case .room: "خصوصيتك";
         case .reconciliation: WidgetCopy.agree(Int(app.number("mal.reconcileEveryDays")), service.digits, one: "يوم واحد", two: "يومان", few: "أيام", many: "يومًا")
-        }
-    }
-    private var keys: [String] {
-        switch page {
-        case .daily: ["mal.dailyAllowance"];
-        case .cycle: ["mal.salaryDay", "mal.cycleCalendar", "mal.salarySchedule"];
-        case .deficit: ["mal.autoOffset", "mal.offsetCapDailies", "mal.salaryRemainder", "mal.cashWithdrawalAsSpend"];
-        case .messages: ["mal.merchantLearnAfter", "mal.alert80", "mal.sinceLastVisit", "mal.cardDue", "mal.zakatReminder"];
-        case .travel: ["mal.travelPausesDaily"];
-        case .room:
-            [
-                "core.hideMoneyOutside", "core.hideMoneyUntilTouch", "mal.figureStyle", "mal.hawlStyle",
-                "mal.bigExpenseRule", "mal.bigExpenseDays", "mal.bigExpenseSalaryBp", "mal.bigExpenseMinor",
-            ];
-        case .reconciliation: ["mal.reconcileEveryDays"]
         }
     }
     private var localSettingKeys: [String] {

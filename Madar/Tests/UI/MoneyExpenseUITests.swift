@@ -26,6 +26,29 @@ import XCTest
         app.buttons["money-expense-key-delete"].press(forDuration: 0.8)
         XCTAssertFalse(app.staticTexts["money-expense-amount"].label.contains("٤"), "Long-pressing delete clears the amount.")
     }
+
+    func testCalculatorAcceptsArabicDecimalFromTheAmountField() {
+        continueAfterFailure = false
+        let app = openExpense()
+        let details = app.buttons["money-expense-details"]
+        for _ in 0..<6 where !details.isHittable { app.swipeDown(velocity: .slow) }
+        details.tap()
+        let field = app.textFields["money-expense-precise-amount"]
+        for _ in 0..<8 where !field.isHittable || field.frame.midY > app.frame.maxY - 80 { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(field.isHittable, app.debugDescription)
+        field.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        field.typeText("٤٫٥")
+        XCTAssertEqual(field.value as? String, "٤٫٥")
+
+        let seven = app.buttons["money-expense-key-7"]
+        for _ in 0..<6 where !seven.isHittable { app.swipeDown(velocity: .slow) }
+        app.buttons["money-expense-key-dot"].tap()
+        seven.tap()
+        app.buttons["money-expense-key-8"].tap()
+        XCTAssertEqual(field.value as? String, "٤٫٥7")
+        XCTAssertTrue(app.staticTexts["money-expense-amount"].label.contains("٤٫٥٧"))
+    }
     func testClosePromptsBeforeDiscardingExpenseDraft() {
         continueAfterFailure = false
         let app = openExpense()
