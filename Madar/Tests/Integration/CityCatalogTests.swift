@@ -1,3 +1,4 @@
+import CoreLocation
 import XCTest
 @testable import Madar
 
@@ -31,4 +32,46 @@ final class CityCatalogTests: XCTestCase {
         // «ان» begins «انقره» ("أنقرة") and sits inside «الاسكندريه»/«الجزائر»? it does not, so only the first matches by prefix.
         XCTAssertEqual(CityCatalog.search("ان").first?.name, "أنقرة")
     }
+}
+
+@MainActor final class CityLocatorTests: XCTestCase {
+    func testCancelledLookupCannotFinishOrInterruptTheNextLookup() async throws {
+        let firstManager = StubCityLocationManager()
+        let secondManager = StubCityLocationManager()
+        var managers = [firstManager, secondManager]
+        let locator = CityLocator(makeManager: { managers.removeFirst() }) { location in
+            CityLocator.Found(name: String(location.coordinate.latitude), lat: location.coordinate.latitude,
+                              lon: location.coordinate.longitude, tz: "Asia/Riyadh", country: "SA", currency: "SAR")
+        }
+        let firstLocation = CLLocation(latitude: 24, longitude: 46)
+        let secondLocation = CLLocation(latitude: 21, longitude: 39)
+        var accepted: [Double] = []
+
+        locator.start { accepted.append($0.lat) }
+        locator.locationManager(firstManager, didUpdateLocations: [firstLocation])
+        let cancelledLookup = try XCTUnwrap(locator.geocodingTask)
+        XCTAssertTrue(locator.working)
+        locator.cancel()
+        XCTAssertFalse(locator.working)
+
+        locator.start { accepted.append($0.lat) }
+        locator.locationManager(firstManager, didFailWithError: CLError(.locationUnknown))
+        locator.locationManager(firstManager, didUpdateLocations: [firstLocation])
+        await cancelledLookup.value
+        XCTAssertNil(locator.geocodingTask)
+        XCTAssertTrue(locator.working)
+        XCTAssertTrue(accepted.isEmpty)
+
+        locator.locationManager(secondManager, didUpdateLocations: [secondLocation])
+        let validLookup = try XCTUnwrap(locator.geocodingTask)
+        await validLookup.value
+        XCTAssertEqual(accepted, [21])
+        XCTAssertFalse(locator.working)
+    }
+}
+
+private final class StubCityLocationManager: CLLocationManager {
+    override var authorizationStatus: CLAuthorizationStatus { .authorizedWhenInUse }
+    override func requestLocation() {}
+    override func stopUpdatingLocation() {}
 }

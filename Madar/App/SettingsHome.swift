@@ -74,6 +74,9 @@ struct SettingsHome: View {
                 RejectedActionsRow(session: session)
                 // B2-18 (owner, 10 Nov 2026): a one-time move from the old Madar sits folded under «متقدم».
                 if !session.bool("core.essentials") { DisclosureGroup {
+                    link("ضبط التقويم والمواقيت", "حساب الهجري وإزاحات المواقيت", "calendar.badge.clock") {
+                        sectionsPage("ضبط التقويم والمواقيت", ["متقدم"], excluding: ["core.spotlightIndex"])
+                    }
                     NavigationLink { LegacyMoveView(app: session) } label: { rowLabel("انقل من مدار القديم", "استيراد بياناتك السابقة", "square.and.arrow.down") }
                         .buttonStyle(.madarPlain).accessibilityIdentifier("legacy-move-link")
                 } label: { Text("متقدم").font(MadarTypography.body().bold()).frame(minHeight: 44, alignment: .leading).accessibilityIdentifier("settings-advanced") }
@@ -94,12 +97,12 @@ struct SettingsHome: View {
         }
     }
 
-    private func sectionsPage(_ title: String, _ sections: [String]) -> some View {
+    private func sectionsPage(_ title: String, _ sections: [String], excluding: Set<String> = []) -> some View {
         SettingsPage(title: title) {
             if sections.contains("الإشعارات") { NotificationPermissionCard(session: session) }
             ForEach(sections, id: \.self) { section in
                 let definitions = session.schema.settings.filter { definition in
-                    guard AppSession.supportedKeys.contains(definition.key), sectionFor(definition.key) == section else { return false }
+                    guard !excluding.contains(definition.key), AppSession.supportedKeys.contains(definition.key), sectionFor(definition.key) == section else { return false }
                     if definition.key == "core.hijriOffset" && session.string("core.hijriSource") != "sighting" { return false }
                     if ["notif.quietFrom", "notif.quietUntil"].contains(definition.key) && !session.bool("notif.quietAfterIsha") { return false }
                     return true
@@ -109,7 +112,7 @@ struct SettingsHome: View {
                     SettingsSection(title: sections.count == 1 && section == title ? "اختياراتك" : section, symbol: "slider.horizontal.3", definitions: definitions, session: session, searching: true, highlightedSettingKey: nil)
                 }
             }
-            SettingsPageReset(session: session, keys: AppSession.supportedKeys.filter { sections.contains(sectionFor($0)) })
+            SettingsPageReset(session: session, keys: AppSession.supportedKeys.filter { !excluding.contains($0) && sections.contains(sectionFor($0)) })
         }
     }
 

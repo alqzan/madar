@@ -1,10 +1,30 @@
 import Foundation
+import SwiftData
 import MadarCore
 import MadarData
 
 extension AppDiaryService {
-    func yearbookPages(year:Int,margins:Bool,sources:Bool,photos:Bool) throws -> [DiaryExportPage] {
-        try exportPages(.init(year: year, margins: margins, sources: sources, photos: photos))
+    func yearbookPreview(_ options: DiaryExportOptions, knownYears: [Int] = []) async throws -> (years: [Int], pages: [DiaryExportPage]) {
+        try authorizeRead()
+        let container = app.container, generation = app.storeGeneration
+        let configuration = dayReadConfiguration, zone = app.activePlace.timeZone
+        let today = try await currentDayOffMain()
+        let preview = try await Self.readYearbookPreview(options, knownYears: knownYears, container: container, today: today, configuration: configuration, zone: zone)
+        try Task.checkCancellation()
+        try authorizeRead()
+        guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+        return (preview.years, try Self.finishExportPages(preview.batch, context: ModelContext(container)))
+    }
+
+    @concurrent private static func readYearbookPreview(
+        _ options: DiaryExportOptions, knownYears: [Int], container: ModelContainer, today: GregorianDay, configuration: DiaryDayReadConfiguration, zone: TimeZone
+    ) async throws -> (years: [Int], batch: DiaryExportPageBatch) {
+        let context = ModelContext(container)
+        let years = try knownYears.isEmpty ? readExportYears(context: context, today: today, zone: zone) : knownYears
+        var selected = options
+        selected.year = options.year ?? years.first ?? today.year
+        let batch = try readExportPageBatch(selected, context: context, today: today, configuration: configuration)
+        return (years, batch)
     }
 
     func exportYearbook(pages: [DiaryExportPage], year: Int, index: Bool) async throws -> DiaryExportArtifact {

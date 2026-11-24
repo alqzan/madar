@@ -8,6 +8,7 @@ import Photos
 struct FirstRunView: View {
     @Bindable var session: AppSession
     @State private var step = 0
+    @State private var choosingCity = false
     @StateObject private var locator = CityLocator()
     @Environment(\.roomTheme) private var theme
     private let lastStep = 1
@@ -47,6 +48,9 @@ struct FirstRunView: View {
                     // iPad: the card stands in the middle of the screen instead of hanging from the top.
                     .modifier(PadCentered(on: isPadWide(sizeClass)))
             }.background(theme.background).foregroundStyle(theme.ink).font(MadarTypography.body())
+                .navigationDestination(isPresented: $choosingCity) {
+                    CityEditor(session: session, onSaved: { session.completeOnboarding() })
+                }
         }
         .interactiveDismissDisabled()
         #if DEBUG && os(iOS)
@@ -61,8 +65,12 @@ struct FirstRunView: View {
         case 1:
             Button(locator.working ? "أبحث عن موقعك…" : "اسمح بالموقع") { locator.start(save) }
                 .buttonStyle(MadarPrimaryButton()).disabled(locator.working || session.userWritesInFlight > 0).accessibilityIdentifier("first-run-locate")
-            NavigationLink("اختر مدينتي بنفسي") { CityEditor(session: session, onSaved: { session.completeOnboarding() }) }
-                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+            Button {
+                locator.cancel()
+                choosingCity = true
+            } label: {
+                Text("اختر مدينتي بنفسي").frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+            }
                 .disabled(session.userWritesInFlight > 0).accessibilityIdentifier("first-run-city")
         default:
             // B2-12: the photo permission is asked at the first photo the writer adds, not here.

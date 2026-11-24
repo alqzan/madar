@@ -13,9 +13,13 @@ struct HabitSinceSection:View {
     @Environment(\.roomTheme) private var theme
     private var digits:MadarNumberFormatter{.init(style:session.string("core.numerals") == "western" ? .western : .hindi)}
     private var today:GregorianDay { AppBahwService(session:session).today }
-    /// Read once per habit change; it fetched every diary entry on each redraw.
-    @State private var memoryLines:[Memory] = []
+    @State private var memory: (request: MemoryRequest, lines: [Memory])?
+    private struct MemoryRequest: Equatable {
+        let access: HabitDiaryLines.Access
+        let times: [HabitTime]
+    }
     var body:some View {
+        let request = MemoryRequest(access: .init(session), times: Array(reading.times.prefix(3)))
         VStack(alignment:.leading,spacing:16) {
             if let last = reading.lastTime {
                 VStack(alignment:.leading,spacing:6) {
@@ -25,12 +29,25 @@ struct HabitSinceSection:View {
                     if let rhythm { Text(rhythm).font(HabitType.caption()).foregroundStyle(theme.accent).padding(.top,2) }
                 }
                 if reading.times.count > 1 { timeline }
-                memories
+                if request.access.allowed, let memory, memory.request == request {
+                    memories(memory.lines)
+                }
             } else {
                 Text("لم تسجّلها بعد؛ سجّل أول مرة اليوم أو في يوم مضى، وتظهر هنا مع سطر مذكراتك يومها.").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
             }
         }
-        .task(id: reading.times.map(\.day.description)) { memoryLines = loadMemoryLines() }
+        .task(id: request) {
+            memory = nil
+            guard request.access.allowed, !request.times.isEmpty,
+                  let lines = try? await HabitDiaryLines.read(Set(request.times.map(\.day)), session: session),
+                  !Task.isCancelled else { return }
+            let excerpts = request.times.compactMap { time -> Memory? in
+                let candidates = lines[time.day] ?? []
+                let linked = candidates.first { $0.id == time.entryID }
+                return (linked ?? candidates.first).map { Memory(id: $0.id, text: $0.text, day: time.day) }
+            }
+            memory = (request, excerpts)
+        }
         .padding(18).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:24))
         .accessibilityElement(children:.contain).accessibilityIdentifier("habit-since-card")
     }
@@ -81,8 +98,7 @@ struct HabitSinceSection:View {
         MadarDateLabel(session.yearLabels(year), primaryFont: HabitType.caption(), secondaryFont: HabitType.fine())
     }
     /// The diary line linked to each of the last times, or that day's first line when none was linked.
-    @ViewBuilder private var memories:some View {
-        let lines = memoryLines
+    @ViewBuilder private func memories(_ lines: [Memory]) -> some View {
         if !lines.isEmpty {
             VStack(alignment:.leading,spacing:10) {
                 Text("من مذكراتك يومها").font(HabitType.section())
@@ -97,13 +113,6 @@ struct HabitSinceSection:View {
         }
     }
     private struct Memory { let id:UUID; let text:String; let day:GregorianDay }
-    private func loadMemoryLines() -> [Memory] {
-        guard let entries = try? HabitDiaryLines.heads(ModelContext(session.container)) else { return [] }
-        return reading.times.prefix(3).compactMap { time in
-            let pick = time.entryID.flatMap { id in entries.first { $0.id == id } } ?? entries.filter { $0.dayKey == time.day.description }.min { $0.createdAt < $1.createdAt }
-            return pick.map { Memory(id:$0.id,text:$0.text,day:time.day) }
-        }
-    }
 }
 
 enum HabitRhythmMath {
@@ -112,12 +121,48 @@ enum HabitRhythmMath {
         return calendar.dateComponents([.day],from:a.date(in:.gmt),to:b.date(in:.gmt)).day ?? 0
     }
 }
-/// The diary's current lines (a revision replaces its original), as the diary room shows them.
 @MainActor enum HabitDiaryLines {
-    static func heads(_ context:ModelContext) throws -> [Entry] {
-        let entries = try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source != "autoPinned" && !$0.text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty }
-        let chains = DiaryRevisionChains(entries.map { .init(id:$0.id,replaces:$0.source == "revision" ? $0.sourceID.flatMap(UUID.init(uuidString:)) : nil) })
-        return entries.filter { chains.heads.contains($0.id) }
+    struct Access: Equatable {
+        let allowed: Bool
+        private let container: ObjectIdentifier
+        private let revision: Int
+
+        @MainActor init(_ session: AppSession) {
+            allowed = (try? AppDiaryService(app: session).authorizeRead()) != nil
+            container = ObjectIdentifier(session.container)
+            revision = session.prayerRevision
+        }
+    }
+
+    struct Line: Identifiable, Sendable {
+        let id: UUID
+        let text: String
+    }
+
+    static func read(_ days: Set<GregorianDay>, session: AppSession) async throws -> [GregorianDay: [Line]] {
+        let diary = AppDiaryService(app: session)
+        try diary.authorizeRead()
+        let container = session.container, generation = session.storeGeneration
+        let lines = try await readDays(days, container: container)
+        try Task.checkCancellation()
+        try diary.authorizeRead()
+        guard session.storeGeneration == generation, session.container === container else { throw CancellationError() }
+        return lines
+    }
+
+    @concurrent private static func readDays(_ days: Set<GregorianDay>, container: ModelContainer) async throws -> [GregorianDay: [Line]] {
+        let context = ModelContext(container)
+        var result: [GregorianDay: [Line]] = [:]
+        for day in days {
+            try Task.checkCancellation()
+            let key = day.description
+            // Diary edits keep the original dayKey, including the whole live revision chain in this fetch.
+            let entries = try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate {
+                $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil && $0.source != "autoPinned"
+            }, sortBy: [SortDescriptor(\.createdAt)])).filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            result[day] = AppDiaryService.visible(entries).map { Line(id: $0.id, text: $0.text) }
+        }
+        return result
     }
 }
 
@@ -131,6 +176,11 @@ struct HabitPastDaySheet:View {
     @State private var date = Date()
     @State private var entry:UUID?
     @State private var busy = false
+    @State private var loadedLines: (request: LineRequest, lines: [HabitDiaryLines.Line])?
+    private struct LineRequest: Equatable {
+        let access: HabitDiaryLines.Access
+        let day: GregorianDay
+    }
     private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
     private var today:GregorianDay { AppBahwService(session:session).today }
     private var first:GregorianDay { reading.firstEffectiveFrom }
@@ -145,7 +195,13 @@ struct HabitPastDaySheet:View {
         return "أضف " + habitUnitCount(delta, rule.unit, AppBahwService(session: session).digits) + " في يومها"
     }
     private func gmt(_ d:GregorianDay)->Date { d.date(in:.gmt) }
+    private var lineRequest: LineRequest? {
+        let access = HabitDiaryLines.Access(session)
+        guard access.allowed, day >= first, day < today else { return nil }
+        return LineRequest(access: access, day: day)
+    }
     var body:some View {
+        let request = lineRequest
         ScrollView {
             VStack(alignment:.leading,spacing:16) {
                 HStack {
@@ -167,7 +223,7 @@ struct HabitPastDaySheet:View {
                         Text("هذا اليوم ليس من أيام العادة، اختر يومًا آخر.").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
                             .accessibilityIdentifier("habit-past-unavailable")
                     }
-                    let lines = dayLines
+                    let lines = request == loadedLines?.request ? loadedLines?.lines ?? [] : []
                     if !lines.isEmpty {
                         VStack(alignment:.leading,spacing:8) {
                             Text("اربطها بسطر من مذكراتك يومها").font(HabitType.section())
@@ -193,13 +249,23 @@ struct HabitPastDaySheet:View {
         .madarSheetLock(saving: busy, draft: entry != nil || day != defaultDay)
         .onAppear { date = gmt(defaultDay) }
         .onChange(of:date) { entry = nil }
+        .task(id: request) {
+            loadedLines = nil
+            guard let request,
+                  let lines = try? await HabitDiaryLines.read([request.day], session: session)[request.day],
+                  !Task.isCancelled else { return }
+            loadedLines = (request, lines)
+            if let entry, !lines.contains(where: { $0.id == entry }) { self.entry = nil }
+        }
     }
-    private var dayLines:[Entry] { ((try? HabitDiaryLines.heads(ModelContext(session.container))) ?? []).filter { $0.dayKey == day.description }.sorted { $0.createdAt < $1.createdAt } }
     private func log() {
         guard !busy else { return }
         busy = true
         var payload:[String:MadarCore.JSONValue] = ["id":.string(reading.id.uuidString),"day":.string(day.description),"delta":.number(Double(delta))]
-        if let entry { payload["entryID"] = .string(entry.uuidString) }
+        if let entry, let loadedLines, loadedLines.request == lineRequest,
+           loadedLines.lines.contains(where: { $0.id == entry }) {
+            payload["entryID"] = .string(entry.uuidString)
+        }
         Task { do { try await session.executeDiaryCommand("habit.complete",payload:payload); dismiss(); done() } catch { session.errorMessage = madarUserMessage(error) }; busy = false }
     }
 }

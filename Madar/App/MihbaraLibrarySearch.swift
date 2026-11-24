@@ -41,7 +41,7 @@ struct MihbaraTextHit: Identifiable {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("MadarSearch-" + UUID().uuidString).appendingPathExtension("epub")
         defer { try? FileManager.default.removeItem(at: file) }
         // The book's bytes live only inside this call, so the copy in memory is gone before the book is opened and searched.
-        guard await writeBook(book, to: file, service) else { return [] }
+        guard await writeBook(book, to: file, service), !Task.isCancelled else { return [] }
         guard let publication = try? await MihbaraEPUBLoader.open(at: file) else { return [] }
         defer { publication.close() }
         guard case .success(let iterator) = await publication.search(query: needle, options: SearchOptions(caseSensitive: false, diacriticSensitive: false)) else { return [] }
@@ -99,20 +99,22 @@ struct MihbaraTextHit: Identifiable {
     }
 
     private static func pdf(_ needle: String, _ book: MihbaraBook, _ data: Data) async -> [MihbaraTextHit] {
-        let found: [(page: Int, before: String, match: String, after: String)] = await Task.detached(priority: .userInitiated) {
-            guard let document = PDFDocument(data: data) else { return [] }
-            var result: [(Int, String, String, String)] = []
-            for selection in document.findString(needle, withOptions: [.caseInsensitive, .diacriticInsensitive]) {
-                if result.count >= perBook || Task.isCancelled { break }
-                guard let page = selection.pages.first, let text = page.string as NSString?,
-                      case let range = selection.range(at: 0, on: page), range.location != NSNotFound, NSMaxRange(range) <= text.length else { continue }
-                let start = max(0, range.location - 60), end = min(text.length, NSMaxRange(range) + 60)
-                result.append((document.index(for: page), text.substring(with: NSRange(location: start, length: range.location - start)),
-                               text.substring(with: range), text.substring(with: NSRange(location: NSMaxRange(range), length: end - NSMaxRange(range)))))
-            }
-            return result
-        }.value
-        return found.map { .init(bookID: book.id, title: book.title, before: tail($0.before), match: $0.match, after: head($0.after), pdfPage: $0.page) }  // 0-based, as the reader's `startPage` is
+        let found = await pdfMatches(needle, in: data)
+        return found.map { .init(bookID: book.id, title: book.title, before: tail($0.before), match: $0.match, after: head($0.after), pdfPage: $0.page) }
+    }
+
+    @concurrent private static func pdfMatches(_ needle: String, in data: Data) async -> [(page: Int, before: String, match: String, after: String)] {
+        guard !Task.isCancelled, let document = PDFDocument(data: data), !Task.isCancelled else { return [] }
+        var result: [(Int, String, String, String)] = []
+        for selection in document.findString(needle, withOptions: [.caseInsensitive, .diacriticInsensitive]) {
+            if result.count >= perBook || Task.isCancelled { break }
+            guard let page = selection.pages.first, let text = page.string as NSString?,
+                  case let range = selection.range(at: 0, on: page), range.location != NSNotFound, NSMaxRange(range) <= text.length else { continue }
+            let start = max(0, range.location - 60), end = min(text.length, NSMaxRange(range) + 60)
+            result.append((document.index(for: page), text.substring(with: NSRange(location: start, length: range.location - start)),
+                           text.substring(with: range), text.substring(with: NSRange(location: NSMaxRange(range), length: end - NSMaxRange(range)))))
+        }
+        return result
     }
 
     nonisolated private static func clean(_ text: String?) -> String { (text ?? "").replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression) }
@@ -145,7 +147,7 @@ struct MihbaraTextSearchSection: View {
                         ProgressView()
                         Text("أبحث في " + service.digits.string(progress) + " من " + service.digits.string(readable.count)).font(MadarTypography.caption())
                         Spacer()
-                        Button { running?.cancel(); running = nil; runID = nil } label: { Text("أوقف").frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-text-search-stop")
+                        Button { stop() } label: { Text("أوقف").frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-text-search-stop")
                     }
                 } else if hits == nil || searchedFor != trimmed {
                     Button { start() } label: {
@@ -176,10 +178,15 @@ struct MihbaraTextSearchSection: View {
                     }
                 }
             }
-            .onDisappear { running?.cancel() }
-            // A new word stops the old search, so the offer to search for it appears at once.
-            .onChange(of: trimmed) { _, _ in if running != nil { running?.cancel(); running = nil; runID = nil } }
+            .onDisappear { stop() }
+            .onChange(of: trimmed) { _, _ in stop() }
         }
+    }
+
+    private func stop() {
+        runID = nil
+        running?.cancel()
+        running = nil
     }
 
     private func start() {

@@ -104,6 +104,48 @@ import XCTest
         }
     }
 
+    func testBookmarkNamesItsFaceAndReturnsThereAfterTurning() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-24T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+            "MADAR_UI_QURAN_ROUTE": "madar://quran/page/128"
+        ]
+        app.launch()
+        let face = app.descendants(matching: .any)["quran-mushaf-page"]
+        XCTAssertTrue(face.waitForExistence(timeout: 25), app.debugDescription)
+        app.tapCoordinate(x: 0.5, y: 0.5)
+
+        let title = app.staticTexts["quran-mushaf-number"]
+        expectation(for: NSPredicate(format: "label == %@", "الوجه ١٢٨"), evaluatedWith: title)
+        waitForExpectations(timeout: 10)
+        let menu = app.buttons["quran-mushaf-bookmarks"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), app.debugDescription)
+        menu.tap()
+        let add = app.descendants(matching: .any)["علامة على هذا الوجه"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 5), app.debugDescription)
+        add.tap()
+
+        let naming = app.alerts["اسم العلامة"]
+        XCTAssertTrue(naming.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(naming.textFields.firstMatch.value as? String, "علامة ١٢٨", naming.debugDescription)
+        attach(app, "mushaf-bookmark-face-128")
+        naming.buttons["احفظ"].tap()
+        expectation(for: NSPredicate(format: "value == %@", "هذا الموضع معلَّم"), evaluatedWith: menu)
+        waitForExpectations(timeout: 10)
+
+        app.buttons["quran-mushaf-next"].tap()
+        expectation(for: NSPredicate(format: "label != %@", "الوجه ١٢٨"), evaluatedWith: title)
+        waitForExpectations(timeout: 10)
+        menu.tap()
+        let target = app.descendants(matching: .any)["علامة ١٢٨، الوجه ١٢٨"].firstMatch
+        XCTAssertTrue(target.waitForExistence(timeout: 5), app.debugDescription)
+        target.tap()
+        expectation(for: NSPredicate(format: "label == %@", "الوجه ١٢٨"), evaluatedWith: title)
+        waitForExpectations(timeout: 10)
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let image = app.screenshot(), shot = XCTAttachment(screenshot: image)
         shot.name = name; shot.lifetime = .keepAlways; add(shot)

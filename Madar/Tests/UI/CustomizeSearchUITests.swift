@@ -42,6 +42,30 @@ import XCTest
         XCTAssertTrue(app.switches["setting-core.spotlightIndex"].waitForExistence(timeout: 10), app.debugDescription)
     }
 
+    func testAdvancedCalendarAndTimesAreAvailableWithoutSearch() {
+        continueAfterFailure = false
+        let (app, _) = openSearch()
+        let advanced = app.descendants(matching: .any)["settings-advanced"].firstMatch
+        for _ in 0..<9 where !advanced.isHittable || advanced.frame.midY > app.frame.maxY - 90 {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(advanced.isHittable, app.debugDescription)
+        advanced.tap()
+        let calendar = app.buttons["settings-link-ضبط التقويم والمواقيت"]
+        for _ in 0..<4 where !calendar.isHittable || calendar.frame.midY > app.frame.maxY - 90 {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(calendar.isHittable, app.debugDescription)
+        calendar.tap()
+        XCTAssertTrue(app.buttons["option-core.hijriSource-ummAlQura"].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["قاعدة خطوط العرض العالية"].exists, app.debugDescription)
+        XCTAssertFalse(app.switches["setting-core.spotlightIndex"].exists)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "settings-advanced-calendar-phone"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     func testHiddenMoneyRoomHasNoSearchResults() {
         continueAfterFailure = false
         let (app, search) = openSearch()

@@ -13,7 +13,7 @@ import MadarData
 import MadarCommands
 import MadarDesign
 
-struct DiaryExportOptions {
+struct DiaryExportOptions: Equatable, Sendable {
     var format = "pdf"
     var year: Int?
     var month: Int?
@@ -43,6 +43,11 @@ struct DiaryExportPage: Sendable {
     let lines: [DiaryDisplayLine]
     let media: [DiaryDisplayMedia]
 }
+struct DiaryExportPageBatch: Sendable {
+    let pages: [DiaryExportPage]
+    let liveKeys: Set<String>
+    let visibility: DiaryAutoLineVisibility?
+}
 struct DiaryExportArtifact: Identifiable {
     let id=UUID()
     let url:URL
@@ -56,21 +61,33 @@ extension AppDiaryService {
     /// The years that have writing, from day keys alone: opening the export screen must not read photos, audio or frozen lines.
     func exportYears() throws -> [Int] {
         try authorizeRead()
-        let context = ModelContext(app.container)
+        return try Self.readExportYears(context: ModelContext(app.container), today: currentDay(), zone: app.activePlace.timeZone)
+    }
+
+    nonisolated static func readExportYears(context: ModelContext, today: GregorianDay, zone: TimeZone) throws -> [Int] {
+        try Task.checkCancellation()
         var keys = Set(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).map(\.dayKey))
         keys.formUnion(try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).filter { $0.photoMediaID != nil || $0.questionAnswer != nil }.map(\.dayKey))
         keys.formUnion(try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).map(\.writtenDayKey))
         keys.formUnion(try context.fetch(FetchDescriptor<Niyya>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).map(\.dayKey))
         keys.formUnion(try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).filter { $0.key.hasPrefix("sys.diaryAutoLines.") }.map { String($0.key.dropFirst("sys.diaryAutoLines.".count)) })
         // An opened letter is exported on the day it was opened, so that day counts too (its date only, never its text).
-        let zone = app.activePlace.timeZone
         keys.formUnion(try context.fetch(FetchDescriptor<Letter>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.state == "opened" })).map { GregorianDay.containing($0.openedAt ?? $0.createdAt, in: zone).description })
-        let today = try currentDay()
+        try Task.checkCancellation()
         return Set(keys.compactMap { try? GregorianDay($0) }.filter { $0 <= today }.map(\.year) + [today.year]).sorted(by: >)
     }
     func exportPages(_ options:DiaryExportOptions) throws -> [DiaryExportPage] {
         try authorizeRead()
         let context = ModelContext(app.container)
+        let batch = try Self.readExportPageBatch(options, context: context, today: currentDay(), configuration: dayReadConfiguration)
+        return try Self.finishExportPages(batch, context: context)
+    }
+
+    nonisolated static func readExportPageBatch(
+        _ options: DiaryExportOptions, context: ModelContext, today: GregorianDay, configuration: DiaryDayReadConfiguration
+    ) throws -> DiaryExportPageBatch {
+        try Task.checkCancellation()
+        let zone = TimeZone(identifier: configuration.timeZoneID) ?? .current
         let bounds = options.dayKeyBounds
         let first = bounds.lowerBound, last = bounds.upperBound
         // Read each diary table once. Calling day() for every exported date made
@@ -94,7 +111,7 @@ extension AppDiaryService {
         let entriesByDay = Dictionary(grouping: entries, by: \.dayKey)
         let pagesByDay = Dictionary(grouping: pages, by: \.dayKey)
         let intentionsByDay = Dictionary(grouping: intentions, by: \.dayKey)
-        let lettersByDay = Dictionary(grouping: letters) { GregorianDay.containing($0.openedAt ?? $0.createdAt, in: app.activePlace.timeZone).description }
+        let lettersByDay = Dictionary(grouping: letters) { GregorianDay.containing($0.openedAt ?? $0.createdAt, in: zone).description }
         var marginsByDay: [String: [MarginNote]] = [:]
         for margin in margins {
             marginsByDay[margin.targetDayKey, default: []].append(margin)
@@ -121,23 +138,28 @@ extension AppDiaryService {
             sessions.propertiesToFetch = [\.dayKey]
             keys.formUnion(try context.fetch(sessions).map(\.dayKey))
         }
-        let today=try currentDay()
+        try Task.checkCancellation()
         let dates = keys.compactMap{try? GregorianDay($0)}.filter{$0<=today && (options.year==nil || $0.year==options.year) && (options.month==nil || $0.month==options.month)}.sorted()
         let selectedKeys = Set(dates.map(\.description))
         let liveKeys = selectedKeys.subtracting(frozen.keys)
-        let live = options.sources ? try DiaryLineRenderer.live(days: liveKeys, context: context) : [:]
+        let visibility = options.sources && !liveKeys.isEmpty ? try DiaryLineRenderer.visibility(context: context) : nil
+        let live = try visibility.map {
+            try DiaryLineRenderer.liveWithoutMoney(days: liveKeys, visibility: $0, context: context)
+        } ?? [:]
         var mediaIDs = Set(entries.filter { selectedKeys.contains($0.dayKey) }.flatMap { $0.attachmentMediaIDs + ($0.mediaID.map { [$0] } ?? []) })
         if options.photos { mediaIDs.formUnion(pages.filter { selectedKeys.contains($0.dayKey) }.compactMap(\.photoMediaID)) }
         // Fetch referenced media in bounded batches; unrelated photo bytes stay out of memory.
         var mediaByID: [UUID: Media] = [:]
         let ids = Array(mediaIDs)
         for start in stride(from: 0, to: ids.count, by: 400) {
+            try Task.checkCancellation()
             let batch = Array(ids[start..<min(start + 400, ids.count)])
             for row in try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { batch.contains($0.id) && $0.deletedAt == nil && $0.mergedInto == nil })) where mediaByID[row.id] == nil {
                 mediaByID[row.id] = row
             }
         }
-        return try dates.compactMap { date in
+        let exportPages = try dates.map { date -> DiaryExportPage in
+            try Task.checkCancellation()
             let key = date.description, written = entriesByDay[key] ?? []
             var lines: [DiaryDisplayLine] = written.filter { ["normal", "late", "ghad"].contains($0.ink) }.map { row in
                 let markdown = row.textFormat == "markdown"
@@ -146,14 +168,14 @@ extension AppDiaryService {
             }
             if options.margins {
                 for margin in marginsByDay[key] ?? [] {
-                    let text = margin.targetDayKey == key ? margin.text : "كتبت في هامش " + bothDates(try GregorianDay(margin.targetDayKey), calendar: .gregorian) + ": " + margin.text
+                    let text = margin.targetDayKey == key ? margin.text : "كتبت في هامش " + configuration.bothDates(try GregorianDay(margin.targetDayKey), calendar: .gregorian) + ": " + margin.text
                     lines.append(.init(id: "margin." + margin.id.uuidString, at: margin.writtenAt, text: text, kind: "margin"))
                 }
             }
             // Frozen lines (including an empty snapshot) replace live lines. Export
             // source selection is independent of the home screen's auto-line toggles.
             if options.sources { lines += frozen[key] ?? live[key] ?? [] }
-            let at = date.date(in: app.activePlace.timeZone)
+            let at = date.date(in: zone)
             for row in intentionsByDay[key] ?? [] { lines.append(.init(id: row.id.uuidString, at: at, text: row.text, kind: "intention")) }
             for row in lettersByDay[key] ?? [] { lines.append(.init(id: row.id.uuidString, at: at, text: row.text, kind: "letter")) }
             for row in pagesByDay[key] ?? [] {
@@ -177,8 +199,23 @@ extension AppDiaryService {
                 media.append(.init(id: id, entryID: "page", kind: "photo", contentType: row.contentType, data: data, duration: nil))
             }
             lines=lines.filter{!$0.text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty}
-            guard !lines.isEmpty || !media.isEmpty else{return nil}
-            return .init(day:date,title:bothDates(date,calendar:app.diaryFirstCalendar),lines:lines.sorted{$0.at == $1.at ? $0.id<$1.id : $0.at<$1.at},media:media)
+            return .init(day: date, title: configuration.bothDates(date), lines: lines, media: media)
+        }
+        return .init(pages: exportPages, liveKeys: liveKeys, visibility: visibility)
+    }
+
+    static func finishExportPages(_ batch: DiaryExportPageBatch, context: ModelContext) throws -> [DiaryExportPage] {
+        let moneyLines = try batch.visibility.map {
+            try DiaryLineRenderer.liveMoneyLines(days: batch.liveKeys, visibility: $0, context: context)
+        } ?? [:]
+        return batch.pages.compactMap { page in
+            let lines = page.lines + (moneyLines[page.day.description] ?? []).filter {
+                !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            guard !lines.isEmpty || !page.media.isEmpty else { return nil }
+            return .init(day: page.day, title: page.title, lines: lines.sorted {
+                $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at
+            }, media: page.media)
         }
     }
     /// B2-3: the rows are read on the main actor (the store is read through the session); everything after that

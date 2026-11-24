@@ -10,7 +10,9 @@ struct DiaryYearbookView:View {
     @Environment(\.scenePhase) private var phase
     @State private var year:Int?
     @State private var years:[Int]=[]
-    @State private var pages:[DiaryExportPage]=[]
+    @State private var yearsStore: Int?
+    @State private var loadedPages: [DiaryExportPage] = []
+    @State private var loadedRequest: PreviewRequest?
     @State private var margins=true
     @State private var sources=true
     @State private var photos=true
@@ -25,7 +27,22 @@ struct DiaryYearbookView:View {
 #if DEBUG
     @State private var loadCount = 0
 #endif
+    private struct PreviewRequest: Equatable {
+        let options: DiaryExportOptions
+        let store: Int
+        let revision: Int
+        let authorized: Bool
+        let attempt: Int
+    }
+
     private var service:AppDiaryService{.init(app:app)}
+    private var request: PreviewRequest {
+        .init(options: .init(year: year, margins: margins, sources: sources, photos: photos),
+              store: app.storeGeneration, revision: app.prayerRevision,
+              authorized: app.protectedDataAuthorized && !app.maintenanceInProgress, attempt: attempt)
+    }
+    private var loading: Bool { request.authorized && loadedRequest != request && failure == nil }
+    private var pages: [DiaryExportPage] { loadedRequest == request ? loadedPages : [] }
     private var selectedYear: Int { year ?? years.first ?? GregorianDay.containing(.now, in: app.activePlace.timeZone).year }
     private var busy: Bool { preparation != nil }
     private var bookColor:Color{MadarToken.colors["rooms.notes.lockCover.leather"] ?? theme.accent}
@@ -42,7 +59,13 @@ struct DiaryYearbookView:View {
                     HStack{Text("كتاب السنة").font(DiaryType.title);Spacer();Picker("السنة الميلادية",selection:Binding(get:{selectedYear},set:{year=$0})){ForEach(years,id:\.self){year in yearOption(year).tag(year)}}.labelsHidden().accessibilityIdentifier("diary-book-year")}
                     Text("سنة في كتاب واحد، وكل يوم يبدأ صفحة").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     cover.frame(maxWidth:.infinity)
-                    if pages.isEmpty {Text("لم تكتب في هذه السنة بعد.").font(DiaryType.writing)} else {spread}
+                    if loading {
+                        ProgressView("يقرأ صفحات السنة…")
+                    } else if !pages.isEmpty {
+                        spread
+                    } else if failure == nil, request.authorized {
+                        Text("لم تكتب في هذه السنة بعد.").font(DiaryType.writing)
+                    }
                     VStack(alignment:.leading,spacing:12){
                         Text("في الكتاب").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                         Toggle("الهوامش",isOn:$margins).accessibilityIdentifier("diary-book-margins");Divider().overlay(theme.line)
@@ -60,24 +83,20 @@ struct DiaryYearbookView:View {
             }.background(theme.background).foregroundStyle(theme.ink).navigationBarTitleDisplayMode(.inline)
                 .toolbar{ToolbarItemGroup(placement:.topBarLeading){Button{dismiss()}label:{HStack{Image(systemName:"chevron.backward");Text("رجوع").font(DiaryType.label)}}.disabled(busy).accessibilityIdentifier("diary-book-close")
                 }}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
-                .task(id:attempt){do{
-                    years=try service.exportYears()
-                    load()
+                .task(id: request) { [request] in
+                    await load(request)
                     #if DEBUG
                     let environment = ProcessInfo.processInfo.environment
-                    if environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+                    if loadCount == 1,
+                       environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
                        environment["MADAR_UI_DIARY_YEARBOOK_READ_FAILURE_AFTER_FIRST"] == "1" {
                         await Task.yield()
-                        load()
+                        await load(request)
                     }
                     #endif
-                }catch{pages=[];failure=madarUserMessage(error)}}
-                .onChange(of:year){_,_ in load()}.onChange(of:margins){_,_ in load()}.onChange(of:sources){_,_ in load()}.onChange(of:photos){_,_ in load()}.onChange(of:includeIndex){_,_ in clear()}
-                .onChange(of:phase){_,v in if v == .background {preview=false;clear()}}
-                .onChange(of: app.protectedDataAuthorized) { _, authorized in
-                    if authorized { attempt += 1 }
-                    else { preview = false; pages = []; years = []; clear() }
                 }
+                .onChange(of: includeIndex) { _, _ in clear() }
+                .onChange(of: phase) { _, value in if value == .background { preview = false; clear() } }
                 .sheet(isPresented:$preview){if let artifact {DiaryQuickLook(url:artifact.url)}}
                 .onDisappear{clear()}
         }
@@ -91,7 +110,7 @@ struct DiaryYearbookView:View {
     }
     private var cover:some View {
         let dates = app.yearLabels(selectedYear, first: app.diaryFirstCalendar)
-        return VStack(spacing:20){Text("مذكرات").font(.custom("thmanyahserifdisplay-Bold",size:32,relativeTo:.largeTitle));Rectangle().fill(coverInk.opacity(0.6)).frame(width:60,height:1);VStack(spacing: 4) { Text(dates.primary).font(.custom("thmanyahseriftext-Bold",size:26,relativeTo:.largeTitle)).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.85).padding(.horizontal,12); Text(dates.secondary).font(DiaryType.label) };Text(pages.isEmpty ? "لا أيام بعد" : arabicCount(pages.count,["يوم واحد محفوظ","يومان محفوظان","أيام محفوظة","يومًا محفوظًا"],service.digits)).font(DiaryType.label)}
+        return VStack(spacing:20){Text("مذكرات").font(.custom("thmanyahserifdisplay-Bold",size:32,relativeTo:.largeTitle));Rectangle().fill(coverInk.opacity(0.6)).frame(width:60,height:1);VStack(spacing: 4) { Text(dates.primary).font(.custom("thmanyahseriftext-Bold",size:26,relativeTo:.largeTitle)).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.85).padding(.horizontal,12); Text(dates.secondary).font(DiaryType.label) };Text(pages.isEmpty ? (loading || failure != nil ? "" : "لا أيام بعد") : arabicCount(pages.count,["يوم واحد محفوظ","يومان محفوظان","أيام محفوظة","يومًا محفوظًا"],service.digits)).font(DiaryType.label)}
             .foregroundStyle(coverInk).frame(width:210,height:280).background(bookColor,in:.rect(topLeadingRadius:4,bottomLeadingRadius:4,bottomTrailingRadius:10,topTrailingRadius:10))
             .overlay(alignment:.trailing){Rectangle().fill(.black.opacity(0.14)).frame(width:10)}.shadow(color:theme.ink.opacity(0.2),radius:16,x:5,y:14).padding(.vertical,4).accessibilityElement(children:.combine).accessibilityIdentifier("diary-book-cover")
     }
@@ -121,18 +140,40 @@ struct DiaryYearbookView:View {
         .frame(maxWidth: .infinity, alignment: .leading).frame(minHeight: 155, alignment: .top)
         .padding(10).background(theme.surface)
     }
-    private func load(){clear();pages=[];do{
-        #if DEBUG
-        loadCount += 1
-        let environment = ProcessInfo.processInfo.environment
-        if loadCount == 2,
-           environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
-           environment["MADAR_UI_DIARY_YEARBOOK_READ_FAILURE_AFTER_FIRST"] == "1" {
-            throw CocoaError(.fileReadUnknown)
+    private func load(_ selection: PreviewRequest) async {
+        guard !Task.isCancelled, request == selection else { return }
+        clear()
+        loadedPages = []
+        loadedRequest = nil
+        failure = nil
+        guard selection.authorized else {
+            years = []
+            yearsStore = nil
+            preview = false
+            return
         }
-        #endif
-        pages=try service.yearbookPages(year:selectedYear,margins:margins,sources:sources,photos:photos);failure=nil
-    }catch{pages=[];failure=madarUserMessage(error)}}
+        do {
+            #if DEBUG
+            loadCount += 1
+            let environment = ProcessInfo.processInfo.environment
+            if loadCount == 2,
+               environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               environment["MADAR_UI_DIARY_YEARBOOK_READ_FAILURE_AFTER_FIRST"] == "1" {
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            let knownYears = yearsStore == selection.store ? years : []
+            let result = try await service.yearbookPreview(selection.options, knownYears: knownYears)
+            guard !Task.isCancelled, request == selection else { return }
+            years = result.years
+            yearsStore = selection.store
+            loadedPages = result.pages
+            loadedRequest = selection
+        } catch {
+            guard !Task.isCancelled, request == selection else { return }
+            failure = madarUserMessage(error)
+        }
+    }
     private func prepare() {
         clear()
         failure = nil

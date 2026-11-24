@@ -45,6 +45,7 @@ struct CityEditor: View {
             Section { Button("احفظ المدينة") { save() }.accessibilityIdentifier("city-save") }
         }.navigationTitle("مدينتك")
             .onAppear { load() }
+            .onDisappear { locator.cancel() }
             // AU-43: an old complaint goes as soon as the user edits.
             .onChange(of: [name, latitude, longitude, timeZone, country, currency]) { validationError = nil }
     }
@@ -83,6 +84,7 @@ struct CityEditor: View {
         guard TimeZone(identifier: timeZone) != nil else { validationError = "المنطقة الزمنية بالإنجليزية، مثل Asia/Riyadh"; return }
         guard Locale.Region.isoRegions.map(\.identifier).contains(country.uppercased()) else { validationError = "رمز البلد حرفان، مثل SA"; return }
         guard Locale.Currency.isoCurrencies.map(\.identifier).contains(currency.uppercased()) else { validationError = "رمز العملة ثلاثة أحرف، مثل SAR"; return }
+        locator.cancel()
         session.set(.object(["name": .string(trimmed), "country": .string(country.uppercased()), "lat": .number(lat), "lon": .number(lon), "tz": .string(timeZone), "currency": .string(currency.uppercased())]), key: "core.homeCity") { onSaved?(); dismiss() }
     }
 }

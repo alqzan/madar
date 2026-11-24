@@ -61,7 +61,7 @@ private struct DiaryHomePlanConfiguration: Sendable {
     let hijriSource: HijriSource
     let sightingOffset: Int
 }
-private struct DiaryDayReadConfiguration: Sendable {
+struct DiaryDayReadConfiguration: Sendable {
     let timeZoneID: String
     let firstCalendar: FirstCalendar
     let hijriSource: HijriSource
@@ -200,7 +200,7 @@ private struct DiaryDayReadConfiguration: Sendable {
             days: plan.visible.sorted(by: >).map { try self.day($0, liveAutoLines: automaticLines[$0.description] ?? []) }, echoes: plan.echoes,
             todayPage: day(today, liveAutoLines: automaticLines[today.description] ?? []))
     }
-    private var dayReadConfiguration: DiaryDayReadConfiguration {
+    var dayReadConfiguration: DiaryDayReadConfiguration {
         let auto = app.values["notes.autoLines"]?.object ?? [:]
         var kinds = Set(auto.compactMap { $0.value == .bool(true) ? $0.key : nil })
         if auto["habits"] == nil { kinds.insert("habits") }

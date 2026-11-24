@@ -398,7 +398,7 @@ import UIKit
         for _ in 0..<4 where !gift.isHittable { app.swipeUp(velocity:.slow) }
         openDetail(app,gift)
         let since=app.staticTexts["habit-since"];XCTAssertTrue(since.waitForExistence(timeout:5));XCTAssertEqual(since.label,"منذ ٧ أشهر")
-        XCTAssertTrue(app.staticTexts["أهديت أمي عطرها الذي تحبه، وفرحت به كثيرًا."].exists)
+        XCTAssertTrue(app.staticTexts["أهديت أمي عطرها الذي تحبه، وفرحت به كثيرًا."].waitForExistence(timeout: 5))
         shot(app,"I26-since-L");app.swipeUp(velocity:.slow);shot(app,"I26-since-s1-L")
         let past=app.buttons["habit-past-day"];for _ in 0..<3 where !past.isHittable { app.swipeUp(velocity:.slow) }
         past.tap()
@@ -412,7 +412,7 @@ import UIKit
         let again=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@","habit-row-","إهداء من تحب")).firstMatch
         XCTAssertTrue(again.waitForExistence(timeout:10));for _ in 0..<4 where !again.isHittable { app.swipeUp(velocity:.slow) };openDetail(app,again)
         XCTAssertTrue(since.waitForExistence(timeout:10));XCTAssertEqual(since.label,"منذ ٣ أيام")
-        XCTAssertTrue(app.staticTexts["مشيت مع أخي بعد العصر."].exists);shot(app,"I26-since-after-L")
+        XCTAssertTrue(app.staticTexts["مشيت مع أخي بعد العصر."].waitForExistence(timeout: 5));shot(app,"I26-since-after-L")
         // A forgotten day is a long-press away from the room's row.
         app.buttons["تمّ"].tap()
         let water=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","الماء،")).firstMatch

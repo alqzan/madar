@@ -1,8 +1,54 @@
 import XCTest
+import SwiftData
 import MadarCore
+import MadarData
 @testable import Madar
 
 final class HabitRhythmTests: XCTestCase {
+    @MainActor func testHabitDiaryExcerptsRequireAuthorizationAndKeepOnlyRequestedLiveHeads() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "HabitDiaryLines-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let app = try AppSession(container: container, groupDirectory: root)
+        let context = ModelContext(container), day = try GregorianDay("2026-10-15")
+        let other = day.adding(days: -1), now = day.date(in: .gmt)
+
+        func insert(_ text: String, on date: GregorianDay? = nil, createdAt: Date? = nil) -> Entry {
+            let row = Entry()
+            row.dayKey = (date ?? day).description
+            row.text = text
+            row.createdAt = createdAt ?? now
+            context.insert(row)
+            return row
+        }
+
+        let original = insert("النص السابق")
+        let kept = insert("سطر آخر", createdAt: now.addingTimeInterval(1))
+        let revised = insert("النص الحالي", createdAt: now.addingTimeInterval(2))
+        revised.source = "revision"
+        revised.sourceID = original.id.uuidString
+        insert("سطر محذوف").deletedAt = now
+        insert("سطر آلي").source = "autoPinned"
+        _ = insert("سطر من يوم آخر", on: other)
+        try context.save()
+
+        XCTAssertFalse(HabitDiaryLines.Access(app).allowed)
+        do {
+            _ = try await HabitDiaryLines.read([day], session: app)
+            XCTFail("Habit excerpts must use the diary authorization gate")
+        } catch let error as DataError {
+            XCTAssertEqual(error, .invalidValue("المذكرات مقفلة"))
+        }
+
+        app.authorizeProtectedData()
+        let authorized = HabitDiaryLines.Access(app)
+        let days = try await HabitDiaryLines.read([day], session: app)
+        XCTAssertEqual(days[day]?.map(\.id), [kept.id, revised.id])
+        XCTAssertNil(days[other])
+        app.redactProtectedData()
+        XCTAssertNotEqual(HabitDiaryLines.Access(app), authorized)
+    }
+
     func testDailyBandKeepsPartialCountBelowACompleteDayEvenAtMinimum() throws {
         let today = try GregorianDay("2026-10-15"), yesterday = today.adding(days: -1)
         var rule = HabitRule(effectiveFrom: yesterday)

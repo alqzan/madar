@@ -17,13 +17,16 @@ import MadarData
         let photoPage = DayPage()
         photoPage.dayKey = "2024-04-12"; photoPage.photoMediaID = photo.id; context.insert(photoPage)
         try context.save()
-        let pages=try service.yearbookPages(year:2024,margins:true,sources:true,photos:true)
+        let firstPreview = try await service.yearbookPreview(.init())
+        XCTAssertTrue(firstPreview.years.contains(2024))
+        let pages = try await service.yearbookPreview(.init(year: 2024), knownYears: firstPreview.years).pages
         XCTAssertEqual(pages.map(\.day.description),["2024-03-11","2024-04-11","2024-04-12"]);XCTAssertTrue(pages.first?.lines.contains{$0.text=="BOOK-MARGIN"}==true)
         XCTAssertEqual(pages.last?.media.map(\.id), [photo.id])
-        let withoutPhotos = try service.yearbookPages(year:2024,margins:false,sources:false,photos:false)
+        let withoutPhotos = try await service.yearbookPreview(.init(year: 2024, margins: false, sources: false, photos: false)).pages
         XCTAssertEqual(withoutPhotos.map(\.day.description), ["2024-03-11", "2024-04-11"])
         XCTAssertFalse(withoutPhotos.flatMap(\.lines).contains{$0.kind=="margin"})
-        XCTAssertTrue(try service.yearbookPages(year:2020,margins:true,sources:true,photos:true).isEmpty)
+        let empty = try await service.yearbookPreview(.init(year: 2020))
+        XCTAssertTrue(empty.pages.isEmpty)
         let seen = LockedFlags()
         AppDiaryService.exportBuildProbe = { seen.record(Thread.isMainThread) }
         defer { AppDiaryService.exportBuildProbe = nil }
