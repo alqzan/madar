@@ -16,6 +16,8 @@
 
 ## Verified baseline and delivery
 
+- Build 0.1.0 (69) was archived, signed and uploaded to internal TestFlight on 24 November at 23:54 Riyadh. Source `c8df617d`. App, widget and Watch app are build 69 with minimum OS 27.0. Apple accepted the upload for processing. See `Madar/Artifacts/OWNER-TestFlight-69/`.
+
 - Build 0.1.0 (68) was archived and uploaded to internal TestFlight on 24 November at 16:20 Riyadh. Source `3d57715c`. The iOS app, widget and Watch app all carry build 68 and minimum OS 27.0. Strict signature verification passed. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-68/`.
 - Build 0.1.0 (67) was archived and uploaded to internal TestFlight on 24 November at 10:42 Riyadh. Source `30232a20`. The archive contains one iOS app with its widget and Watch app embedded, all at build 67 and minimum OS 27.0. Strict signature checking passed. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-67/`.
 - Build 0.1.0 (66) was archived and uploaded to internal TestFlight on 23 November at 23:24 Riyadh. The archive contains one installed app with the widget and Watch app embedded, all at build 66. The upload log confirms success and receipt for Apple processing. See `Madar/Artifacts/OWNER-TestFlight-66/`.
@@ -276,7 +278,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Next
 
-- تجهيز بناء ٦٩ من آخر مصدر متحقق لرفعه إلى TestFlight الداخلي.
+- رُفع بناء ٠٫١٫٠ (٦٩) إلى TestFlight الداخلي الساعة ٢٣:٥٤ بتوقيت الرياض. نجحت الأرشفة والتوقيع والتصدير وتسلمت Apple الحزمة للمعالجة. تجربة المالك على جهازه بعد ظهور البناء هي التحقق التالي.
 
 ### Model/effort
 
@@ -284,7 +286,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Usage
 
-- البداية ٩٩٪ لخمس ساعات و١٠٪ للأسبوع. بعد التحقق ٦٧٪ لخمس ساعات و٥٪ للأسبوع. احتُفظ بهذه النسبة للأرشفة والرفع والتسليم.
+- البداية ٩٩٪ لخمس ساعات و١٠٪ للأسبوع. بعد التحقق ٦٧٪ لخمس ساعات و٥٪ للأسبوع. بعد الرفع ٦٣٪ لخمس ساعات و٥٪ للأسبوع.
 
 ## Handover — الجولة الثانية للمال والمذكرات — 2026-11-24 — Codex
 
