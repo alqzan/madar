@@ -119,6 +119,13 @@ Text("\\(digits(count)) سجلًّا")
         for phrase in ['invalid default','cut key','unknown supported']:
             self.assertTrue(any(phrase in issue for issue in issues), phrase)
 
+    @staticmethod
+    def add_companion_targets(project):
+        for name, product in [('MadarWidgets', 'app-extension'), ('MadarMac', 'application'),
+                              ('MadarWatchApp', 'application')]:
+            project['objects'][name] = {'isa': 'PBXNativeTarget', 'name': name,
+                                        'productType': f'com.apple.product-type.{product}', 'buildPhases': []}
+
     def test_build_scope_uses_phases_not_unlisted_swift_and_unknown_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); (root/'Included.swift').write_text(''); (root/'Excluded.swift').write_text('')
@@ -129,8 +136,8 @@ Text("\\(digits(count)) سجلًّا")
                 'excluded':{'isa':'PBXFileReference','path':'Excluded.swift'},
                 'build':{'isa':'PBXBuildFile','fileRef':'included'},
                 'phase':{'isa':'PBXSourcesBuildPhase','files':['build']},
-                'app':{'isa':'PBXNativeTarget','name':'Madar','productType':'com.apple.product-type.application','buildPhases':['phase']},
-                'widget':{'isa':'PBXNativeTarget','name':'MadarWidgets','productType':'com.apple.product-type.app-extension','buildPhases':[]}}}
+                'app':{'isa':'PBXNativeTarget','name':'Madar','productType':'com.apple.product-type.application','buildPhases':['phase']}}}
+            self.add_companion_targets(project)
             sources, _, _, _, _ = checks.build_files(project, root)
             self.assertEqual(sources, [root/'Included.swift'])
             project['objects']['included']['sourceTree'] = 'UNRESOLVED'
@@ -147,9 +154,8 @@ Text("\\(digits(count)) سجلًّا")
                            'requirement':{'kind':'exactVersion','version':'3.11.1'}},
                 'product':{'isa':'XCSwiftPackageProductDependency','productName':'ReadiumNavigator','package':'package'},
                 'app':{'isa':'PBXNativeTarget','name':'Madar','productType':'com.apple.product-type.application',
-                       'buildPhases':[],'packageProductDependencies':['product']},
-                'widget':{'isa':'PBXNativeTarget','name':'MadarWidgets','productType':'com.apple.product-type.app-extension',
-                          'buildPhases':[]}}}
+                       'buildPhases':[],'packageProductDependencies':['product']}}}
+            self.add_companion_targets(project)
             with self.assertRaises(FileNotFoundError): checks.build_files(project, root)
 
             lock = root/'Madar.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved'
@@ -159,7 +165,7 @@ Text("\\(digits(count)) سجلًّا")
                 'state':{'revision':'a'*40,'version':'3.11.1'}}]}))
             _, _, _, remote_products, targets = checks.build_files(project, root)
             self.assertEqual(remote_products, [(url,'ReadiumNavigator','3.11.1','a'*40)])
-            self.assertEqual(set(targets), {'Madar','MadarWidgets'})
+            self.assertEqual(set(targets), {'Madar', 'MadarWidgets', 'MadarMac', 'MadarWatchApp'})
 
             project['objects']['package']['requirement']['version'] = '3.11.0'
             with self.assertRaisesRegex(ValueError, 'not pinned to its exact Xcode requirement'):
@@ -180,8 +186,8 @@ targets: [.target(name: "Main", dependencies: ["Helper"]), .target(name: "Helper
                 'group':{'isa':'PBXGroup','children':[]},
                 'package':{'isa':'XCLocalSwiftPackageReference','relativePath':'Packages/Main'},
                 'product':{'isa':'XCSwiftPackageProductDependency','productName':'Main'},
-                'app':{'isa':'PBXNativeTarget','name':'Madar','productType':'com.apple.product-type.application','buildPhases':[], 'packageProductDependencies':['product']},
-                'widget':{'isa':'PBXNativeTarget','name':'MadarWidgets','productType':'com.apple.product-type.app-extension','buildPhases':[]}}}
+                'app':{'isa':'PBXNativeTarget','name':'Madar','productType':'com.apple.product-type.application','buildPhases':[], 'packageProductDependencies':['product']}}}
+            self.add_companion_targets(project)
             # Independent known violation in Helper must never disappear behind a green scope.
             self.assertTrue(any('colour value' in x for x in checks.scan_source(helper.read_text(), 'Helper/File.swift', {})[0]))
             with self.assertRaisesRegex(ValueError, 'Main -> Helper'):
@@ -225,8 +231,8 @@ targets: [.target(name: "MadarCore")])''')
                 'core':{'isa':'XCLocalSwiftPackageReference','relativePath':'Packages/MadarCore'},
                 'mainProduct':{'isa':'XCSwiftPackageProductDependency','productName':'Main'},
                 'coreProduct':{'isa':'XCSwiftPackageProductDependency','productName':'MadarCore'},
-                'app':{'isa':'PBXNativeTarget','name':'Madar','productType':'com.apple.product-type.application','buildPhases':[], 'packageProductDependencies':['mainProduct','coreProduct']},
-                'widget':{'isa':'PBXNativeTarget','name':'MadarWidgets','productType':'com.apple.product-type.app-extension','buildPhases':[]}}}
+                'app':{'isa':'PBXNativeTarget','name':'Madar','productType':'com.apple.product-type.application','buildPhases':[], 'packageProductDependencies':['mainProduct','coreProduct']}}}
+            self.add_companion_targets(project)
             for expression in expressions:
                 with self.subTest(expression=expression):
                     (root/'Packages/Main/Package.swift').write_text('''import PackageDescription

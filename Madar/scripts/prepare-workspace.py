@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Validate private local font resources; --source copies only missing verified files."""
+"""Check Madar's local font resources and configure the repository's commit hook."""
 import argparse
 import hashlib
 import json
 from pathlib import Path
 import plistlib
 import shutil
+import subprocess
 import sys
 
 
@@ -77,6 +78,17 @@ def prepare(root, source=None):
     return len(expected), len(missing)
 
 
+def configure_git_hooks(root):
+    hooks = Path('Madar/scripts/git-hooks')
+    if not (root / hooks / 'commit-msg').is_file():
+        raise PreparationError(f'Missing commit hook in {root / hooks}')
+    git = ['git', '-C', str(root)]
+    top_level = subprocess.check_output([*git, 'rev-parse', '--show-toplevel'], text=True).strip()
+    if Path(top_level).resolve() != root.resolve():
+        raise PreparationError(f'Expected a Git checkout root: {root}')
+    subprocess.run([*git, 'config', '--local', 'core.hooksPath', hooks.as_posix()], check=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[2],
@@ -91,12 +103,12 @@ def main():
         print(f'FONT PREFLIGHT FAILED:\n{error}', file=sys.stderr)
         return 1
     print(f'FONT PREFLIGHT PASS: {count} font/license resources match provenance; {copied} copied')
-    print('This checks fonts only; build, signing and runtime acceptance remain separate.')
-    # Owner, 17 Nov 2026: every commit states how it was verified (scripts/git-hooks/commit-msg).
-    import subprocess
-    hooks = Path(__file__).resolve().parent / 'git-hooks'
-    if subprocess.run(['git', '-C', str(hooks), 'config', 'core.hooksPath', str(hooks.relative_to(hooks.parents[2]))]).returncode == 0:
-        print('Git hooks: commit messages need a «Verified:» line (Madar/scripts/git-hooks).')
+    try:
+        configure_git_hooks(args.root)
+    except (PreparationError, OSError, subprocess.CalledProcessError) as error:
+        print(f'GIT HOOK SETUP FAILED:\n{error}', file=sys.stderr)
+        return 1
+    print('Git hooks: commit messages need a «Verified:» line (Madar/scripts/git-hooks).')
     return 0
 
 

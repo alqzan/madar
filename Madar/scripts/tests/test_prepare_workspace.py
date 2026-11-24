@@ -3,6 +3,8 @@ import importlib.util
 import json
 from pathlib import Path
 import plistlib
+import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -77,6 +79,24 @@ class WorkspacePreparationTests(unittest.TestCase):
             checks.prepare(self.root, self.source)
         (self.origin / 'LICENSE.txt').write_bytes(b'license')
         self.assertEqual(checks.prepare(self.root, self.source), (3, 3))
+
+    def test_hook_applies_to_the_requested_checkout(self):
+        checkout = Path(self.temp.name) / 'target checkout'
+        local_hook = checkout / 'Madar/scripts/git-hooks/commit-msg'
+        local_hook.parent.mkdir(parents=True)
+        shutil.copy2(SCRIPT.parent / 'git-hooks/commit-msg', local_hook)
+        git = ['git', '-C', str(checkout)]
+        subprocess.run([*git, 'init', '-q'], check=True)
+        checks.configure_git_hooks(checkout)
+        self.assertEqual(subprocess.check_output([*git, 'config', '--local', 'core.hooksPath'], text=True).strip(),
+                         'Madar/scripts/git-hooks')
+
+        for trailer, status in [('Verified:\t ', 1), ('Verified: docs only', 0)]:
+            with self.subTest(trailer=trailer):
+                message = checkout / 'message'
+                message.write_text(f'Fixture\n\n{trailer}\n')
+                result = subprocess.run([*git, 'hook', 'run', 'commit-msg', '--', str(message)], capture_output=True)
+                self.assertEqual(result.returncode, status, result.stderr.decode())
 
 
 if __name__ == '__main__':

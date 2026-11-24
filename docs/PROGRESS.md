@@ -1,5 +1,7 @@
 # Current work — 24 November 2026
 
+- **ترتيب المستودع بعد بناء ٦٧.** مهارة Codex تشير إلى دليل التحقق المشترك، وخطافه يستدعي السكربت المعتمد بمسار يصلح لأي checkout. صحّحت تهيئة خطاف Git عند تمرير `--root`، ورفضت سطر تحقق من مسافات فقط، وحدّثت عينات اختبار الشحن لتشمل أهداف الماك والساعة. تحقق أدوات التطوير في أحدث تسليم.
+
 استكمال البند ٣٣ بعد بناء ٦٦. تحسين سهولة الاستخدام والواجهات داخل تصاميم الغرف الحالية، على الآيفون والآيباد. يشمل الفحص الترحيب والبهو والعادات والقرآن والمذكرات والمال والمحبرة والإعدادات. تبقى المزامنة مؤجلة إلى تجربة المالك.
 
 - **جولة ٢٤ نوفمبر.** ثبات صفحة الغرفة عند تبدّل عرض النافذة، وإتاحة أدوات البهو مع القائمة المطوية. تنبيه الفرز التلقائي ينتظر ظهور البهو. العادات تعرض إعادة المحاولة عند تعذّر فتح السجل وتتجدد عند بداية يوم مدار. المصحف يتقلب إلى وجهين مختلفين على الآيباد. صفحات المذكرات من الأرشيف والبحث تفتح بحجم صفحة على الآيباد، وصورة اليوم تظهر في «اقرأ». نتيجة نص الكتاب تفتح القارئ بعد إغلاق المكتبة. بحث الإعدادات يعرض الحالة الفارغة عند انعدام النتائج المتاحة ويفتح إعداد المال في صفحته. صفحة الخصوصية تعرض خيار فهرسة الكتب. حقل المصروف ولوحته يتفقان على الفاصلة العربية. الترحيب ينتظر نجاح حفظ المدينة التلقائية.
@@ -246,6 +248,16 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 # Handovers
 
+## Handover — ترتيب المستودع والتحقق بعد بناء ٦٧ — 2026-11-24 — Codex
+
+- **Works now** — دليل تحقق مشترك لـCodex وClaude، وخطاف Git يُضبط في الـcheckout المطلوب. ملفات الإعداد الفعلية متتبعة في Git، والنسخ المحلية القديمة وسجل الخطاف محفوظة في `tmp/verification-cleanup.n8jchk/` المستثنى من Git. تشترك اختبارات الشحن في تعريف أهداف الودجت والماك والساعة.
+- **Verified** — اجتاز ٢٣ اختبارًا في `Madar/scripts/tests`، منها تمرير checkout بمسار يحوي مسافة ورفض ترويسة تحقق فارغة. طابقت التهيئة ٢١ مورد خط وترخيص. اشتغل أمر خطاف Codex من جذر المستودع ومن `Madar/`، واجتاز فحص صياغة الشِل و`git diff --check` وتطابق البروتوكولين.
+- **Differences left** — التغيير خاص بأدوات المستودع واختباراتها. آخر بناء TestFlight هو ٦٧.
+- **Not verified** — تحميل إعداد الخطاف في جلسة Codex جديدة، وقبول بناء ٦٧ على أجهزة المالك.
+- **Next** — استخدام التهيئة المشتركة في الجلسة التالية.
+- **Model/effort** — Codex، تسمية النموذج التفصيلية ودرجة الاستدلال غير متاحتين.
+- **Usage** — البداية ١٥٪ متبقٍ لخمس ساعات و٢٧٪ للأسبوع. قبل الالتزام ١٠٪ و٢٦٪.
+
 ## Handover — جولة الواجهات وسهولة الاستخدام بعد بناء ٦٦ — 2026-11-24 — Codex
 
 ### Works now
@@ -321,53 +333,3 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 ### Usage
 
 - المتبقي في البداية ٩٨٪ لخمس ساعات و٥٥٪ للأسبوع. قبل الأرشفة ١٩٪ لخمس ساعات و٤٢٪ للأسبوع. بعد تأكيد الرفع ٨٪ لخمس ساعات و٤١٪ للأسبوع.
-
-## Handover — حركات في كل زاوية، إشعارات أذكى، مراجعة أخيرة — 2026-11-23 — Claude
-
-### Works now
-
-- Rows 34–36. The owner rejected the six room redesigns («ولا وحده اعتمدها… بس تحسن الموجود»), then approved every UI-Moments motion («في كل مكان وكل زاوية»). Built inside the current designs; Reduce Motion stops each one and shows its end state. Details in row 35 and DECISIONS (23 Nov).
-- New shared pieces in `App/MadarPlainButtonStyle.swift`:
-  - `MadarInkToggleStyle`, set at the root, so every switch fills with the room's ink. A hidden label gives only the track. `.accessibilityRepresentation { Toggle }` lets UI tests still see a switch. Tests must tap the element itself when it has no inner switch (MoneySettingsUITests now does).
-  - `madarSwipeConfirm`, used for the Mihbara trash purge and the year-page day delete. UI tests use `app.slideToConfirm()` (helper at the bottom of BahwYearUITests.swift).
-- Notifications (row 36):
-  - A line written, edited or deleted re-plans the evening line reminder at once. A new day re-plans while the app is open.
-  - The wird reminder names the portion (or the faces due), worded from the plan's own snapshot.
-  - Diary reminders keep fixed offsets behind the Quran reminder, so they no longer pile into one minute.
-  - Bill timing is in words. Retired salah leftovers are removed.
-- Final review: the owner asked for Fable, but Fable needs paid usage credits and extra usage is off, so the review ran on Opus. All its High and Medium findings and most Low ones were fixed (listed in row 35).
-
-### Verified
-
-- MadarCore package: 264/264 (`swift test`), including the new diary offset golden test.
-- iPhone UI and integration (ad-hoc signed, Madar 15 Pro Max iOS 27.0, synthetic stores):
-  - `r35` 44/44 and `r36` 56/56.
-  - `r37` 36 passed, 28 skipped (old FB-33 Quran home skips).
-  - `r38` 130/137: SecurePassword known failure; MoneySettings flexible switch, fixed later; 5 skipped.
-  - `r39` 112/131: the new wird test's diacritics, test fixed; 18 skipped (FB-34 Mihbara, Photos fixture).
-  - `r40` 79/83: the review's `.toggleStyle(.switch)` gave a zero-frame switch, reverted; the wird text cache leaked between sessions, now keyed per session.
-  - `r41` 41/41: Quran outside and room notification integration, MoneySettings flexible, RoomWidgets opt-in, BahwYear, BahwCustomize, DiaryCustomize.
-- `verify-smoke.sh` passed (showcase habits). The ink switch was driven on and off by hand (`Artifacts/verify/OWNER-23nov-ink-switch-on.png` / `-off.png`).
-
-### Differences left
-
-- The motions have no canonical; built — awaiting owner. Card and bill names stay off the lock screen on purpose (M5-V12 test, RU2). Quiet hours stay off by default (schema).
-
-### Not verified
-
-- iPad layout of the new sheet and switch, owner device, Apple processing.
-- The paper plane, card fan, tide and seal were checked by building and by the screens' UI tests, not frame by frame.
-- `FoundationUITests.test_M0S2_SecurePasswordTypingTransport` still fails (open defect below).
-
-### Next
-
-- Open defect from the previous handover: on a pushed settings page, the floating tab bar covers a focused field near the bottom (SecurePassword test).
-- Obsolete skipped tests (FB-33 Quran home, FB-34 Mihbara desk) should be deleted with a reason, not kept as skips.
-
-### Model/effort
-
-- Claude, claude-opus-5-5, effort not exposed. Read-only helpers: a Sonnet notification map and an Opus final review (Fable unavailable: needs usage credits).
-
-### Usage
-
-- After the motion and notification batches: 5-hour 61%, weekly 75%. Delivery: build 64 archived and uploaded to internal TestFlight (`Artifacts/OWNER-TestFlight-64`, «Upload succeeded»); Apple processing not awaited.

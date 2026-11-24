@@ -4,6 +4,6 @@
 # or `Verified: none — <reason>`. Merge and revert commits made by git itself pass.
 msg="$1"
 head -1 "$msg" | grep -qE '^(Merge|Revert) ' && exit 0
-grep -qE '^Verified: *[^ ]' "$msg" && exit 0
+grep -qE '^Verified:[[:blank:]]*[^[:space:]]' "$msg" && exit 0
 echo "Madar: the commit message needs a 'Verified:' line (see .claude/skills/verify/SKILL.md)." >&2
 exit 1
