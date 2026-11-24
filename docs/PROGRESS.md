@@ -18,6 +18,8 @@
 
 ## Verified baseline and delivery
 
+- Build 0.1.0 (70) was archived, signed and uploaded to internal TestFlight on 25 November at 00:33 Riyadh. Source `a66b5477`. App, widget and Watch app are build 70 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-70/`.
+
 - Build 0.1.0 (69) was archived, signed and uploaded to internal TestFlight on 24 November at 23:54 Riyadh. Source `c8df617d`. App, widget and Watch app are build 69 with minimum OS 27.0. Apple accepted the upload for processing. See `Madar/Artifacts/OWNER-TestFlight-69/`.
 
 - Build 0.1.0 (68) was archived and uploaded to internal TestFlight on 24 November at 16:20 Riyadh. Source `3d57715c`. The iOS app, widget and Watch app all carry build 68 and minimum OS 27.0. Strict signature verification passed. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-68/`.
@@ -279,7 +281,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Next
 
-- أرشفة ورفع بناء ٧٠ إلى TestFlight الداخلي. في إعدادات المذكرات، حجم الذكرى وإظهار ما كتبه مدار والإملاء أولًا لها صفوف تخزّن القيم، ولم نجد لها قراءة تشغيلية في ملفات Swift. يلزم التحقق من سلوكها وفق قرارات المذكرات قبل تعديلها.
+- استلمت Apple بناء ٧٠ للمعالجة الساعة ٠٠:٣٣ بتوقيت الرياض. التحقق التالي تجربة المالك على جهازه. في إعدادات المذكرات، حجم الذكرى وإظهار ما كتبه مدار والإملاء أولًا لها صفوف تخزّن القيم، ولم نجد لها قراءة تشغيلية في ملفات Swift. يلزم التحقق من سلوكها وفق قرارات المذكرات قبل تعديلها.
 
 ### Model/effort
 
@@ -287,7 +289,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Usage
 
-- البداية ٦٢٪ لخمس ساعات و٤٪ للأسبوع. وصل الأسبوعي إلى ٣٪، ثم تجدّد أثناء اختبار الدفعة. طلب المالك تسليم الدفعة الحالية.
+- البداية ٦٢٪ لخمس ساعات و٤٪ للأسبوع. وصل الأسبوعي إلى ٣٪، ثم تجدّد أثناء اختبار الدفعة. طلب المالك تسليم الدفعة الحالية. بعد الرفع بقي ٨٠٪ لخمس ساعات و٩٧٪ للأسبوع.
 
 ## Handover — متابعة الغرف والقراءة والإعدادات — 2026-11-24 — Codex
 
