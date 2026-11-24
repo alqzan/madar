@@ -10,6 +10,7 @@
 
 ## Verified baseline and delivery
 
+- Build 0.1.0 (67) was archived and uploaded to internal TestFlight on 24 November at 10:42 Riyadh. Source `30232a20`. The archive contains one iOS app with its widget and Watch app embedded, all at build 67 and minimum OS 27.0. Strict signature checking passed. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-67/`.
 - Build 0.1.0 (66) was archived and uploaded to internal TestFlight on 23 November at 23:24 Riyadh. The archive contains one installed app with the widget and Watch app embedded, all at build 66. The upload log confirms success and receipt for Apple processing. See `Madar/Artifacts/OWNER-TestFlight-66/`.
 - M0–M6 software is on main; M7 owner-device/system acceptance remains open. Build 0.1.0 (60), source `bef2b256`, was uploaded internally on 22 November at 16:41 Riyadh. The archive contains one installed app, with the widget and Watch app embedded at build 60. The upload log reports success. Apple processing and owner-device acceptance remain open. See `Madar/Artifacts/OWNER-TestFlight-60/` and Claude’s 22 November handover for the prior evidence and failures.
 - Simulators: `Madar 15 Pro Max` and `Madar iPad Pro 13`, both iOS 27.0, no others. Storage remains local-only (RA1); this request used synthetic stores only and did not open or migrate owner data. Owner-device installation and acceptance are separate.
@@ -260,7 +261,8 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 - `ipad-ui.xcresult` اجتاز ٣ من ٥ حالات، منها فتح يوم الأرشيف وتقليب المصحف. ظهر تداخل زر استعادة القائمة وتعثّر فتح المصروف في تلك الجولة. بعد تخصيص صف مستقل للقائمة وانتظار جاهزية المال، اجتاز `ipad-ui-r2.xcresult` الحالات الثلاث ٣/٣، ومنها فتح «خصّص» وحفظ المسودة عبر تبديل الغرف.
 - نتائج الأوامر وحزم الاختبار في `Madar/Artifacts/codex-20261124-ux/`. اجتاز `git diff --check` وفحص فواصل الأرقام، وتطابق بروتوكولا Codex وClaude.
 - `iphone-regressions.xcresult` اجتاز ٤/٤ واجهة (النسخ الاحتياطي والثيم الفاتح والداكن وأول فتح للقرآن وودجة المحبرة)، و١٤/١٤ تكامل للودجات. فحوص تشغيل التطبيق بمخازن اصطناعية أظهرت الترحيب والبهو على الآيفون خلال ٣ ثوانٍ، والبهو على الآيباد خلال ثانيتين.
-- `ipad-size-transition-r2.xcresult` اجتاز ١/١ بعد تصحيح توقّع الاختبار لأن محرر المصروف يخفي شريط العرض الضيق أصلًا. جرّب تبديل فئة عرض SwiftUI للآيباد من الواسع إلى الضيق ثم الرجوع بينما بقي مبلغ المسودة. `iphone-writing-reading.xcresult` اجتاز ٢/٢ للكتابة من زر لوحة المفاتيح وصفحة الكتاب الأخيرة. فُتح مفتاح فهرسة الكتب كذلك من رابط مباشر في التطبيق المشغّل.
+- `ipad-size-transition-r2.xcresult` اجتاز ١/١ بعد تصحيح توقّع الاختبار لأن محرر المصروف يخفي شريط العرض الضيق أصلًا. جرّب تبديل فئة عرض SwiftUI للآيباد من الواسع إلى الضيق ثم الرجوع بينما بقي مبلغ المسودة. `iphone-writing-reading.xcresult` اجتاز ٢/٢ للكتابة من زر لوحة المفاتيح وعرض أن للكتاب صفحةً واحدةً باقية. فُتح مفتاح فهرسة الكتب كذلك من رابط مباشر في التطبيق المشغّل.
+- اكتمل تحقق مسارات السفر والودجات قبل التوزيع. `iphone-routing-regression.xcresult` اجتاز ٣/٣ للسفر اليدوي، والمحطات التي تتطابق أسماؤها في بلدين، وفتح العادات من معاينات الودجات والتحكم. `iphone-gestures-regression.xcresult` اجتاز ٢/٢ لتسجيل العادة بالنقر المتكرر، وللتقليب والتكبير وتفسير الآية في المصحف. المجموع ٣٤ حالة واجهة مختلفة ناجحة عبر الجولات.
 
 ### Differences left
 
@@ -272,7 +274,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Next
 
-- بناء ٦٧ مخصّص للتوزيع الداخلي لهذه الجولة.
+- رُفع بناء `0.1.0 (67)` إلى TestFlight الداخلي الساعة ١٠:٤٢ بتوقيت الرياض. نجحت الأرشفة والتوقيع والتصدير، وأكدت Apple استلام البناء وبدء معالجته في `Madar/Artifacts/OWNER-TestFlight-67/upload.log`. قبول المالك بعد توفر البناء هو التحقق المتبقي على أجهزته.
 
 ### Model/effort
 
@@ -280,7 +282,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Usage
 
-- البداية ٩٩٪ متبقٍ لخمس ساعات و٤٠٪ للأسبوع. قبل الأرشفة ٣١٪ لخمس ساعات و٢٩٪ للأسبوع.
+- البداية ٩٩٪ متبقٍ لخمس ساعات و٤٠٪ للأسبوع. قبل الأرشفة ٣١٪ لخمس ساعات و٢٩٪ للأسبوع. بعد الرفع ١٨٪ لخمس ساعات و٢٧٪ للأسبوع.
 
 ## Handover — استكمال بناء ٦٥ — 2026-11-23 — Codex
 
