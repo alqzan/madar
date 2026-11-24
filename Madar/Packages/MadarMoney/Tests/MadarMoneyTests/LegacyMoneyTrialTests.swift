@@ -4,7 +4,7 @@ import XCTest
 
 /// Owner data trial (22 Oct): the old app's backup stays only on this Mac in Madar/Artifacts/owner-data (git-ignored).
 /// Re-parses every stored bank message with today's parser and compares it with what the old app recorded.
-/// Skipped when the backup is absent. Writes counts to the same ignored folder; masked layouts of disagreements go
+/// Requires MADAR_TEST_OWNER_LEGACY_MONEY=1. Writes counts to the same ignored folder; masked layouts of disagreements go
 /// to a local-only file next to it. Nothing here enters Git, the board or a helper agent.
 final class LegacyMoneyTrialTests: XCTestCase {
     private static let ownerData = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -41,6 +41,9 @@ final class LegacyMoneyTrialTests: XCTestCase {
     }
 
     func testOwnerLegacyMoneyReparse() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_TEST_OWNER_LEGACY_MONEY"] == "1" else {
+            throw XCTSkip("Owner legacy backup requires MADAR_TEST_OWNER_LEGACY_MONEY=1.")
+        }
         guard let file = try? FileManager.default.contentsOfDirectory(at: Self.ownerData, includingPropertiesForKeys: nil)
             .filter({ $0.lastPathComponent.hasPrefix("madar-backup-") && $0.pathExtension == "json" }).sorted(by: { $0.lastPathComponent < $1.lastPathComponent }).last else {
             throw XCTSkip("No owner backup on this machine.")

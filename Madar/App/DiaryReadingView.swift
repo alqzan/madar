@@ -10,12 +10,15 @@ struct DiaryReadingView: View {
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var days: [GregorianDay] = []
+    @State private var days: [GregorianDay]
     @State private var current: GregorianDay
     private var service: AppDiaryService { .init(app: app) }
 
     init(app: AppSession, start: GregorianDay) {
-        self.app = app; self.start = start; _current = State(initialValue: start)
+        self.app = app
+        self.start = start
+        _current = State(initialValue: start)
+        _days = State(initialValue: [start])
     }
 
     private var index: Int? { days.firstIndex(of: current) }
@@ -23,24 +26,20 @@ struct DiaryReadingView: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             theme.background.ignoresSafeArea()
-            Group {
-                if days.isEmpty {
-                    DiaryReadingPage(app: app, day: start)
-                } else {
-                    TabView(selection: $current) {
-                        ForEach(days, id: \.self) { day in
-                            DiaryReadingPage(app: app, day: day).tag(day)
-                        }
-                    }.tabViewStyle(.page(indexDisplayMode: .never)).accessibilityIdentifier("diary-reading-pager")
+            TabView(selection: $current) {
+                ForEach(days, id: \.self) { day in
+                    DiaryReadingPage(app: app, day: day).tag(day)
                 }
             }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .accessibilityIdentifier(days.count > 1 ? "diary-reading-pager" : "diary-reading-single-page")
             HStack {
                 Button { dismiss() } label: {
                     Text("تمّ").font(DiaryType.label).padding(.horizontal, 16).frame(minHeight: 44)
                         .background(theme.surface.opacity(0.9), in: .capsule).overlay { Capsule().stroke(theme.line) }
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-reading-close")
                 Spacer()
-                if typeSize.isAccessibilitySize, let index {
+                if typeSize.isAccessibilitySize, days.count > 1, let index {
                     // Large text: the same neighbours as plain buttons beside the swipe.
                     Button("اليوم السابق") { if index > 0 { current = days[index - 1] } }.disabled(index == 0)
                     Button("اليوم التالي") { if index < days.count - 1 { current = days[index + 1] } }.disabled(index == days.count - 1)
@@ -48,12 +47,16 @@ struct DiaryReadingView: View {
             }.padding(.horizontal, 16).padding(.top, 6).font(DiaryType.label)
         }
         .foregroundStyle(theme.ink).environment(\.roomTheme, theme)
-        .task {
-            guard let archive = try? await service.archiveOffMain() else { return }
+        .task(id: "\(app.prayerRevision)-\(app.protectedDataAuthorized)") {
+            guard app.protectedDataAuthorized else {
+                current = start
+                days = [start]
+                return
+            }
+            guard let archive = try? await service.archiveOffMain(), !Task.isCancelled, app.protectedDataAuthorized else { return }
             var list = archive.days.filter { $0.writings > 0 || !$0.photoIDs.isEmpty }.map(\.day)
             if !list.contains(start) { list.append(start) }
             days = Array(Set(list)).sorted()
-            current = start
         }
     }
 }
@@ -66,17 +69,20 @@ private struct DiaryReadingPage: View {
     @State private var page: DiaryDisplayDay?
     @State private var labels: [String: DiaryPeriodLabel] = [:]
     @State private var failed = false
+    @State private var readAttempt = 0
     private var service: AppDiaryService { .init(app: app) }
     private let body19 = Font.custom("thmanyahseriftext-Regular", size: 22, relativeTo: .body)
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            LazyVStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(service.weekday(day)).font(DiaryType.title)
                     Text(service.diaryDates(day)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                 }.padding(.top, 54)
-                if let page {
+                if !app.protectedDataAuthorized {
+                    Text("تُتاح المذكرات عند فتح الجهاز.").font(DiaryType.writing)
+                } else if let page {
                     let flow = page.lines.filter { $0.kind != "intention" }
                     let media = Dictionary(grouping: page.media, by: \.entryID)
                     if let photo = page.photo, !page.media.contains(where: { $0.kind == "photo" && $0.id == page.photoID }) {
@@ -91,18 +97,27 @@ private struct DiaryReadingPage: View {
                     }
                 } else if failed {
                     Text("تعذّر فتح الصفحة.").font(body19).foregroundStyle(theme.color("ink3Text"))
+                    Button("حاول مرة أخرى") { readAttempt += 1 }
+                        .font(DiaryType.label).frame(minHeight: 44)
+                        .accessibilityIdentifier("diary-reading-retry")
                 } else {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 }
             }.padding(.horizontal, 26).padding(.bottom, 60).frame(maxWidth: 620).frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .contain).accessibilityIdentifier("diary-reading-page-" + day.description)
-        .task(id: day) {
-            guard app.protectedDataAuthorized else { return }
+        .task(id: "\(app.protectedDataAuthorized)-\(readAttempt)") {
+            guard app.protectedDataAuthorized else { page = nil; labels = [:]; return }
+            failed = false
             do {
                 let loaded = try await service.dayOffMain(day)
+                try Task.checkCancellation()
+                guard app.protectedDataAuthorized else { return }
                 labels = service.periodLabels(for: loaded); page = loaded
-            } catch is CancellationError {} catch { failed = true }
+            } catch is CancellationError {
+            } catch {
+                if !Task.isCancelled, app.protectedDataAuthorized { failed = true }
+            }
         }
     }
 

@@ -72,7 +72,7 @@ extension AppMoneyService {
                     message: messages.first { $0.id == row.messageID }?.text, date: day))
         }
         let readings = try cards.map { card -> MoneyCardReading in
-            let history = statements.filter { $0.cardID == card.id }.sorted { $0.closeDate < $1.closeDate }
+            let history = statements.filter { $0.cardID == card.id }.sorted { ($0.closeDate, $0.id.uuidString) < ($1.closeDate, $1.id.uuidString) }
             let statement = history.last, debt = debts.first { $0.cardID == card.id }
             let next = CardStatements.predictNextClose(history.map(\.closeDate), calendar: calendar).flatMap { $0 > now ? $0 : nil }
             let purchaseDue = next.flatMap { next -> Date? in
@@ -109,10 +109,9 @@ extension AppMoneyService {
                     message: (field?["messageID"] as? String).flatMap(UUID.init(uuidString:)).flatMap { id in messages.first { $0.id == id }?.text }, date: nil)
                 if key != "limitMinor" || value == nil { sources[key]?.valueText = value.map { digits.amount(minorUnits: Int64($0), fractionDigits: 2, signed: false) + "٪" } ?? "غير معروف" }
             }
-            let paid = max(0, (statement?.statementMinor ?? 0) - (debt?.statementLeftMinor ?? 0))
             return .init(id: card.id, name: card.name, bank: card.bank, last4: card.last4, kind: card.kind, network: card.network,
                 billedMinor: debt?.statementLeftMinor ?? 0, unbilledMinor: debt?.unbilledLeftMinor ?? 0, limitMinor: card.limitMinor,
-                minimumMinor: statement.map { max(0, $0.minimumDueMinor - paid) }, cashbackBp: card.cashbackBp, aprBp: card.aprBp,
+                minimumMinor: debt?.minimumLeftMinor, cashbackBp: card.cashbackBp, aprBp: card.aprBp,
                 close: closeDay, due: statement?.dueDate.map { GregorianDay.containing($0, in: zone) }, nextClose: next.map { GregorianDay.containing($0, in: zone) },
                 purchaseDue: purchaseDue.map { GregorianDay.containing($0, in: zone) }, estimatedClose: statement?.closeDateSource == "estimated",
                 graceDays: purchaseDue.map { max(0, MadarCalendarDays.distance(from: today, to: .containing($0, in: zone))) },

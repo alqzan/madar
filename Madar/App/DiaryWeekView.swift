@@ -7,25 +7,54 @@ struct DiaryWeekView:View {
     let day:GregorianDay
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
-    @State private var days:[DiaryDaySummary]=[]
+    @State private var days:[DiaryDaySummary]?
     @State private var reader:GregorianDay?
     @State private var writing=false
     @State private var failure:String?
+    @State private var retry = 0
     private var service:AppDiaryService{.init(app:app)}
     var body:some View {
         NavigationStack {
             ScrollView {VStack(alignment:.leading,spacing:16){
                 Text("صندوق الأسبوع").font(DiaryType.title)
                 Text("ارجع إلى ما كتبت، ثم اكتب ما تختاره عن أسبوعك.").font(DiaryType.writing)
-                if days.isEmpty {Text("لم تُكتب صفحات هذا الأسبوع بعد.").font(DiaryType.writing)}
-                ForEach(days){row in Button{reader=row.day}label:{VStack(alignment:.leading,spacing:8){MadarDateLabel(service.bothDates(row.day,calendar:app.diaryFirstCalendar)).font(DiaryType.label);Text(row.excerpt).font(DiaryType.writing).lineLimit(4)}.frame(maxWidth:.infinity,alignment:.leading).padding(16).background(theme.surface,in:.rect(cornerRadius:16)).contentShape(.rect)}.buttonStyle(.madarPlain).accessibilityIdentifier("diary-week-day-"+row.id)}
-                Button {writing=true} label: { Text("اكتب عن أسبوعك").font(DiaryType.heading).frame(minHeight:54).contentShape(Rectangle()) }.accessibilityIdentifier("diary-week-write")
-                if let failure{Text(failure).font(DiaryType.label)}
+                if !app.protectedDataAuthorized {
+                    Text("تُتاح المذكرات عند فتح الجهاز.").font(DiaryType.writing)
+                } else if let days {
+                    if days.isEmpty {Text("لم تُكتب صفحات هذا الأسبوع بعد.").font(DiaryType.writing)}
+                    ForEach(days){row in Button{reader=row.day}label:{VStack(alignment:.leading,spacing:8){MadarDateLabel(service.bothDates(row.day,calendar:app.diaryFirstCalendar)).font(DiaryType.label);Text(row.excerpt).font(DiaryType.writing).lineLimit(4)}.frame(maxWidth:.infinity,alignment:.leading).padding(16).background(theme.surface,in:.rect(cornerRadius:16)).contentShape(.rect)}.buttonStyle(.madarPlain).accessibilityIdentifier("diary-week-day-"+row.id)}
+                    Button {writing=true} label: { Text("اكتب عن أسبوعك").font(DiaryType.heading).frame(minHeight:54).contentShape(Rectangle()) }.accessibilityIdentifier("diary-week-write")
+                } else if let failure {
+                    Text(failure).font(DiaryType.label)
+                    Button("حاول مرة أخرى") { retry += 1 }.frame(minHeight: 44)
+                        .accessibilityIdentifier("diary-week-retry")
+                } else {
+                    ProgressView("تُفتح صفحات الأسبوع…").font(DiaryType.label)
+                }
             }.padding(18)}.background(theme.background).foregroundStyle(theme.ink).navigationBarTitleDisplayMode(.inline)
                 .toolbar{ToolbarItem(placement:.topBarLeading){Button("الصفحة"){dismiss()}.accessibilityIdentifier("diary-week-close")}}.tint(theme.accent)
-                .task{do{days=try await service.weekDaysOffMain(ending:day)}catch{failure=madarUserMessage(error)}}
+                .task(id: "\(app.prayerRevision)-\(retry)-\(app.protectedDataAuthorized)") { await loadWeek() }
                 .sheet(isPresented:Binding(get:{reader != nil},set:{if !$0{reader=nil}})){if let reader{DiaryDayView(app:app,day:reader,showsNavigationTools:false).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}}
                 .sheet(isPresented:$writing){if let today=try? service.currentDay(){DiaryDayView(app:app,day:today,focusComposerOnOpen:true,showsNavigationTools:false).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}}
+        }
+    }
+    private func loadWeek() async {
+        guard app.protectedDataAuthorized else {
+            days = nil
+            reader = nil
+            writing = false
+            return
+        }
+        failure = nil
+        do {
+            let loaded = try await service.weekDaysOffMain(ending: day)
+            try Task.checkCancellation()
+            if app.protectedDataAuthorized { days = loaded }
+        } catch is CancellationError {
+        } catch {
+            guard !Task.isCancelled, app.protectedDataAuthorized else { return }
+            days = nil
+            failure = "تعذّر فتح صفحات الأسبوع."
         }
     }
 }

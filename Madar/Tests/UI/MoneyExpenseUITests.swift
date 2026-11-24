@@ -69,6 +69,7 @@ import XCTest
         XCTAssertFalse(app.buttons["money-expense-save"].isEnabled)
         app.buttons["money-expense-key-4"].tap(); app.buttons["money-expense-key-2"].tap()
         app.buttons["money-expense-merchant-مقهى الزاوية"].tap()
+        XCTAssertEqual(app.buttons["money-expense-merchant-edit"].label, "عدّل الاسم")
         let after = app.staticTexts["money-expense-after"]; XCTAssertTrue(after.waitForExistence(timeout: 5)); let before = after.label
         shot(app, "M5-V17-add-L")
         app.buttons["money-expense-share-quarter"].tap()

@@ -13,12 +13,31 @@ import XCTest
         return app
     }
     private func element(_ app: XCUIApplication, _ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
+    private func selectAccount(_ name: String, in app: XCUIApplication) {
+        let account = app.buttons["money-reconcile-row-" + name]
+        revealAboveSave(account, in: app)
+        account.tap()
+        let selected = app.buttons["money-reconcile-account"]
+        let updated = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", name), object: selected)
+        XCTAssertEqual(XCTWaiter.wait(for: [updated], timeout: 5), .completed, app.debugDescription)
+    }
+    private func revealAboveSave(_ element: XCUIElement, in app: XCUIApplication) {
+        let save = app.buttons["money-reconcile-save"]
+        for _ in 0..<8 {
+            if element.isHittable, element.frame.midY < save.frame.minY { break }
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(element.isHittable, app.debugDescription)
+        XCTAssertLessThan(element.frame.midY, save.frame.minY, app.debugDescription)
+    }
 
     func testRecordNameTheDifferencesAndSettleInOneUndo() throws {
         continueAfterFailure = false
         let app = openReconcile(fixture: "reconcile")
         // The newest bank message printed a balance 320 below the book; the line opens on it, and a 320 draft is named.
         let sentence = element(app, "money-reconcile-sentence"); XCTAssertTrue(sentence.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["tab-customize"].exists, "The room bar must clear the pinned save button while matching.")
+        XCTAssertTrue(app.buttons["money-reconcile-save"].isHittable)
         XCTAssertTrue(sentence.label.contains("عندك أقل"), sentence.label)
         XCTAssertTrue(element(app, "money-reconcile-delta").label.contains("٣٢٠"))
         XCTAssertTrue(element(app, "money-reconcile-from-message").exists)
@@ -28,22 +47,23 @@ import XCTest
         app.buttons["money-reconcile-name-missedSpend"].tap()
         XCTAssertTrue(element(app, "money-reconcile-name-caption").label.contains("أخرى"))
         // The wallet matches the bank; the travel card owes 120 more.
-        app.buttons["money-reconcile-row-المحفظة الرقمية"].tap()
+        selectAccount("المحفظة الرقمية", in: app)
         app.buttons["money-reconcile-nudge-10"].tap(); app.buttons["money-reconcile-nudge--10"].tap()
-        XCTAssertTrue(element(app, "money-reconcile-sentence").label.contains("يطابق"))
-        app.buttons["money-reconcile-row-بطاقة السفر"].tap()
+        XCTAssertTrue(sentence.label.contains("يطابق"), sentence.label)
+        selectAccount("بطاقة السفر", in: app)
         for step in ["100", "10", "10"] { app.buttons["money-reconcile-nudge-" + step].tap() }
         XCTAssertTrue(element(app, "money-reconcile-sentence").label.contains("عليك أكثر"))
         XCTAssertTrue(app.buttons["money-reconcile-name-missedSpend"].exists, "A card that owes more can be missed spending")
         app.buttons["money-reconcile-name-unexplained"].tap()
-        app.buttons["money-reconcile-row-الحساب الجاري"].tap()
+        selectAccount("الحساب الجاري", in: app)
         XCTAssertTrue(app.buttons["money-reconcile-name-missedSpend"].isSelected)
         XCTAssertTrue(app.buttons["money-reconcile-save"].label.contains("تسويتان"), app.buttons["money-reconcile-save"].label)
         app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
-        XCTAssertTrue(app.buttons["money-reconcile-close"].waitForExistence(timeout: 5)); sleep(1)
+        XCTAssertTrue(app.buttons["money-reconcile-close"].waitForExistence(timeout: 5))
         shot(app, "M5-V15-rec-L")
-        app.swipeUp(velocity: .slow)
-        XCTAssertTrue(element(app, "money-reconcile-open-count").label.contains("لا فروق مفتوحة"))
+        let openCount = element(app, "money-reconcile-open-count")
+        revealAboveSave(openCount, in: app)
+        XCTAssertTrue(openCount.label.contains("لا فروق مفتوحة"))
         shot(app, "M5-V15-rec-s1-L")
         app.buttons["money-reconcile-save"].tap()
         // Written: the book now matches, the line starts afresh and the record is dated today.
@@ -113,5 +133,31 @@ import XCTest
         XCTAssertFalse(app.buttons["money-reconcile-name-missedSpend"].exists)
         XCTAssertFalse(app.buttons["money-reconcile-name-unexplained"].exists)
         shot(app, "M5-V15-bnpl-open-L")
+    }
+
+    func testInvalidObservedAmountCannotSaveThePreviousBalance() throws {
+        continueAfterFailure = false
+        let app = openReconcile(fixture: "reconcile")
+        let tamara = app.buttons["money-reconcile-row-تمارا"]
+        XCTAssertTrue(tamara.waitForExistence(timeout: 10))
+        for _ in 0..<8 where !tamara.isHittable { app.swipeUp(velocity: .slow) }
+        tamara.tap()
+        let bank = element(app, "money-reconcile-bank-field")
+        XCTAssertTrue(bank.waitForExistence(timeout: 5))
+        bank.tap()
+        bank.typeText("1,500")
+        let sentence = element(app, "money-reconcile-sentence")
+        XCTAssertTrue(sentence.label.contains("٣٠٠"), sentence.label)
+        let save = app.buttons["money-reconcile-save"]
+        XCTAssertTrue(save.isEnabled)
+
+        bank.typeText(".12.3")
+        let note = element(app, "money-reconcile-note")
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        XCTAssertFalse(save.isEnabled, "The previous valid balance must not be written for malformed input.")
+
+        bank.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 2))
+        XCTAssertTrue(note.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(save.isEnabled, "Correcting the amount makes the draft saveable again.")
     }
 }

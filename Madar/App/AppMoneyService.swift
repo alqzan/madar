@@ -184,19 +184,23 @@ enum MoneyHomeReadingBuilder {
         let balances = Dictionary(uniqueKeysWithValues: envelopes.map { ($0.id, envelopeBalance($0.id)) })
         let projections = try MoneyHomeProjectionBuilder.fundingProjections(context: context, cycle: cycle, today: today, now: now, zone: zone, envelopes: envelopes,
                                                 plans: plans, allocations: allocations, balances: balances, surplus: surplus, reserve: reserve)
+        var dailyFundingByEnvelope: [UUID: Int] = [:]
+        if let cycle {
+            for (planID, amount) in CycleEngine.day(cycle.elapsedDays, cycle.input).dripsMinor {
+                guard let envelopeID = cycle.planEnvelopes[planID] else { continue }
+                dailyFundingByEnvelope[envelopeID, default: 0] += amount
+            }
+        }
         let goals = envelopes.filter { !["reserve", "surplus"].contains($0.role) }.sorted { $0.createdAt == $1.createdAt ? $0.id.uuidString < $1.id.uuidString : $0.createdAt < $1.createdAt }.map { envelope in
             MoneyHomeEnvelope(id: envelope.id, name: envelope.name, balanceMinor: envelopeBalance(envelope.id), targetMinor: envelope.targetMinor,
                 due: envelope.due.map { GregorianDay.containing($0, in: zone) },
                 perSalaryMinor: (activePlansByEnvelope[envelope.id] ?? []).reduce(0) { $0 + $1.perPaycheckMinor },
-                dailyFundingMinor: cycle.map { reading in
-                    CycleEngine.day(reading.elapsedDays, reading.input).dripsMinor.filter { reading.planEnvelopes[$0.key] == envelope.id }.values.reduce(0, +)
-                } ?? 0, fundingProjection: projections[envelope.id])
+                dailyFundingMinor: dailyFundingByEnvelope[envelope.id] ?? 0, fundingProjection: projections[envelope.id])
         }
         var limits: [MoneyHomeLimit] = []
         let categories = try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        let categoriesByID = Dictionary(categories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let confirmed = try repo.confirmedTransactions()
-        let movements = confirmed.filter { $0.cycleID == cycle?.id }
+        let movements = cycle.map { active in confirmed.filter { $0.cycleID == active.id } } ?? []
         var categoryIDsByMovementID: [UUID: Set<UUID>] = [:]
         for movement in movements {
             if let categoryID = movement.categoryID { categoryIDsByMovementID[movement.id, default: []].insert(categoryID) }
@@ -207,13 +211,12 @@ enum MoneyHomeReadingBuilder {
                   let categoryIDs = categoryIDsByMovementID[transactionID] else { continue }
             for categoryID in categoryIDs { spentByCategory[categoryID, default: 0] -= allocation.amountMinor }
         }
-        let cycleRow = try context.fetch(FetchDescriptor<Cycle>()).first { $0.id == cycle?.id }
-        for limit in try context.fetch(FetchDescriptor<CategoryLimit>()) where limit.deletedAt == nil && limit.mergedInto == nil {
-            guard let categoryID = limit.categoryID,
-                  let category = categoriesByID[categoryID], limit.mode != "none" else { continue }
-            let mode: CategoryLimitMode = limit.mode == "percent" ? .percent(basisPoints: limit.percentBp ?? 0, base: limit.base == "allowance" ? .allowance : .income) : .fixed(limitMinor: limit.limitMinor)
-            guard let actual = LimitEngine.effectiveLimit(mode, cycleIncomeMinor: cycleRow?.incomeMinor ?? 0,
-                cycleAllowanceMinor: cycle.map { CycleEngine.accruedDaily(through: $0.input.expectedLengthDays, $0.input) } ?? 0) else { continue }
+        let cycleAllowance = cycle.map { CycleEngine.accruedDaily(through: $0.input.expectedLengthDays, $0.input) } ?? 0
+        let latestLimits = try CategoryLimit.latestByCategory(in: context)
+        for category in categories.sorted(by: { ($0.order, $0.name) < ($1.order, $1.name) }) {
+            guard let limit = latestLimits[category.id],
+                  let actual = LimitEngine.effectiveLimit(limit.effectiveMode, cycleIncomeMinor: cycle?.incomeMinor ?? 0,
+                cycleAllowanceMinor: cycleAllowance) else { continue }
             let spent = spentByCategory[category.id] ?? 0
             limits.append(.init(id: category.id, title: category.name, spentMinor: spent, limitMinor: actual))
         }

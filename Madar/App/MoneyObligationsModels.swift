@@ -75,18 +75,18 @@ extension AppMoneyService {
         }
     }
 
-    func loadObligations() throws -> MoneyObligationsReading {
-        guard app.protectedDataAuthorized else { throw DataError.authenticationFailed }
-        _ = app.moneyRevision
-        let context = ModelContext(app.container), now = app.prayerNow(), zone = app.activePlace.timeZone, home = app.string("core.currency")
+    func loadObligations(at instant: Date? = nil) throws -> MoneyObligationsReading {
+        try requireReadableStore()
+        let context = ModelContext(app.container), now = instant ?? app.prayerNow(), zone = app.activePlace.timeZone, home = app.string("core.currency")
+        let repo = MoneyRepository(context: context)
         let today = try DiaryLineRenderer.today(context: context, now: now)
-        let cycle = try MoneyRepository(context: context).cycle(at: now)
+        let cycle = try repo.cycle(at: now)
         let start = cycle?.startDay ?? today, end = cycle?.expectedEndDay ?? today.adding(days: 30)
         func live<T: MadarRecordModel>(_ row: T) -> Bool { (try? row.record().isLive) == true }
         let liveObligations = try context.fetch(FetchDescriptor<Obligation>()).filter(live)
         let obligations = liveObligations.filter { $0.currency == home }
         let items = try context.fetch(FetchDescriptor<InstallmentItem>()).filter(live)
-        let confirmed = try MoneyRepository(context: context).confirmedTransactions()
+        let confirmed = try repo.confirmedTransactions()
         let paidBills = confirmed.filter { $0.obligationID != nil }
         let subscriptionSuggestions = SubscriptionSuggestionEngine.suggestions(
             charges: confirmed.filter { $0.currency.uppercased() == home.uppercased() }.map {
@@ -135,12 +135,12 @@ extension AppMoneyService {
         }
         let bills = obligations.filter { $0.kind == "bill" }, subscriptions = obligations.filter { $0.kind == "subscription" }
         let billDues = (bills + subscriptions).flatMap { occurrences($0, months: 13) }
-        let cards = try context.fetch(FetchDescriptor<Card>()).filter(live)
-        let statements: [MoneyObligationDue] = try context.fetch(FetchDescriptor<Statement>()).filter { live($0) && $0.dueDate != nil && $0.statementMinor > 0 }.compactMap { s in
-            let due = GregorianDay.containing(s.dueDate!, in: zone)
+        let statements: [MoneyObligationDue] = try repo.cardDebts(at: now).compactMap { debt in
+            guard let id = debt.statementID, let date = debt.dueDate, debt.statementLeftMinor > 0 else { return nil }
+            let due = GregorianDay.containing(date, in: zone)
             guard due >= today else { return nil }
-            return .init(id: s.id.uuidString, group: .statement, name: "كشف " + (cards.first { $0.id == s.cardID }?.name ?? "بطاقة"), amountMinor: s.statementMinor,
-                         due: due, minimumMinor: s.minimumDueMinor, estimated: s.closeDateSource == "estimated")
+            return .init(id: id.uuidString, group: .statement, name: "كشف " + debt.cardName, amountMinor: debt.statementLeftMinor,
+                         due: due, minimumMinor: debt.minimumLeftMinor, estimated: debt.estimatedClose)
         }
 
         let inCycle: (MoneyObligationDue) -> Bool = { $0.due >= start && $0.due < end }

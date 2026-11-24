@@ -3,9 +3,13 @@ import XCTest
 @testable import MadarMoney
 
 /// The owner's 16 special cases (My-dream corpus, OTP-redacted copy in Madar/Private, git-ignored).
+/// Requires MADAR_TEST_OWNER_BANK_CORPUS=1.
 /// Expectations come from the owner's file, mapped onto Madar's kinds; results print as pass/fail only, never message text.
 final class BankSpecialCaseTests: XCTestCase {
     func testOwnerSpecialCases() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_TEST_OWNER_BANK_CORPUS"] == "1" else {
+            throw XCTSkip("Owner bank corpus requires MADAR_TEST_OWNER_BANK_CORPUS=1.")
+        }
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Private/bank-messages/bank-sms-corpus-1.auth-redacted.json")
         guard let data = try? Data(contentsOf: url), let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],

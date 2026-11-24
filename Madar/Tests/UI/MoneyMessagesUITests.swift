@@ -9,6 +9,9 @@ import UIKit
     func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
 
     private func localCorpusSamples() throws -> [LocalCorpusLine] {
+        guard ProcessInfo.processInfo.environment["MADAR_TEST_OWNER_BANK_CORPUS"] == "1" else {
+            throw XCTSkip("Owner bank corpus requires MADAR_TEST_OWNER_BANK_CORPUS=1.")
+        }
         let madar = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let folder = madar.appendingPathComponent("Private/bank-messages", isDirectory: true)
         let selectors: [(String, [String])] = [
@@ -259,6 +262,9 @@ import UIKit
     /// Private inputs stay on this Mac and in the isolated simulator store; no real text enters Git.
     func testAllLocalCorpusMessagesReachReviewTray() throws {
         continueAfterFailure = false
+        guard ProcessInfo.processInfo.environment["MADAR_TEST_OWNER_BANK_CORPUS"] == "1" else {
+            throw XCTSkip("Owner bank corpus requires MADAR_TEST_OWNER_BANK_CORPUS=1.")
+        }
         let madar = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let folder = madar.appendingPathComponent("Private/bank-messages", isDirectory: true)
         guard let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)

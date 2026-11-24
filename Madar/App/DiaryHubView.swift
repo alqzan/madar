@@ -94,7 +94,9 @@ struct DiaryHubView: View {
                 Divider().overlay(theme.line)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        if let archive {
+                        if !canReadDiary {
+                            Text("تُتاح المذكرات عند فتح الجهاز.").font(DiaryType.writing)
+                        } else if let archive {
                             switch tab {
                             case "calendar": calendar(archive)
                             case "photos": photos(archive)
@@ -168,7 +170,17 @@ struct DiaryHubView: View {
                     aiAvailability = await MadarAIAvailabilityChecker.check()
                 }
                 .onChange(of: canReadDiary) { _, canRead in
-                    if !canRead { aiComposerOpen = false; aiAvailability = .checking }
+                    guard !canRead else { return }
+                    aiComposerOpen = false
+                    aiAvailability = .checking
+                    archive = nil
+                    dayCounts = [:]
+                    writtenDays = []
+                    photoByDay = [:]
+                    travelDays = []
+                    reader = nil
+                    bookOpen = false
+                    exportOpen = false
                 }
                 .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } }), onDismiss: {
                     guard returnToRoomAfterReaderDismiss else { return }
@@ -186,7 +198,8 @@ struct DiaryHubView: View {
                 .onChange(of: initialTab) { _, target in
                     if let target, tabs.contains(where: { $0.0 == target }) { tab = target; initialRouteApplied = true }
                 }
-                .task(id: "\(app.prayerRevision)-\(loadAttempt)") {
+                .task(id: "\(app.prayerRevision)-\(loadAttempt)-\(canReadDiary)") {
+                    guard canReadDiary else { return }
                     failure = nil
                     do {
                         #if DEBUG
@@ -201,6 +214,8 @@ struct DiaryHubView: View {
                             }
                         #endif
                         let loaded = try await service.archiveOffMain()
+                        try Task.checkCancellation()
+                        guard canReadDiary else { return }
                         dayCounts = Dictionary(loaded.days.map { ($0.day, max($0.writings, $0.hasSavedContent ? 1 : 0)) }, uniquingKeysWith: { first, _ in first })
                         writtenDays = Set(loaded.days.filter(\.hasSavedContent).map(\.day))
                         photoByDay = Dictionary(loaded.days.compactMap { d in d.photoIDs.first.map { (d.day, $0) } }, uniquingKeysWith: { first, _ in first })
@@ -211,7 +226,9 @@ struct DiaryHubView: View {
                             tab = initialTab
                             initialRouteApplied = true
                         }
+                    } catch is CancellationError {
                     } catch {
+                        guard !Task.isCancelled, canReadDiary else { return }
                         archive = nil
                         travelDays = []
                         failure = "تعذّر فتح سجل اليوميات."

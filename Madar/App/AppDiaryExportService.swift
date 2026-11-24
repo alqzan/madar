@@ -19,6 +19,23 @@ struct DiaryExportOptions {
     var month: Int?
     var margins = true
     var sources = true
+    var photos = true
+
+    var dayKeyBounds: ClosedRange<String> {
+        guard let year, let first = try? GregorianDay(year: year, month: month ?? 1, day: 1) else {
+            return ""..."9999-99-99"
+        }
+        let last: GregorianDay
+        if month != nil {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = .gmt
+            let days = calendar.range(of: .day, in: .month, for: first.date(in: .gmt))?.count ?? 1
+            last = first.adding(days: days - 1)
+        } else {
+            last = (try? GregorianDay(year: year, month: 12, day: 31)) ?? first
+        }
+        return first.description...last.description
+    }
 }
 struct DiaryExportPage: Sendable {
     let day: GregorianDay
@@ -54,12 +71,24 @@ extension AppDiaryService {
     func exportPages(_ options:DiaryExportOptions) throws -> [DiaryExportPage] {
         try authorizeRead()
         let context = ModelContext(app.container)
+        let bounds = options.dayKeyBounds
+        let first = bounds.lowerBound, last = bounds.upperBound
         // Read each diary table once. Calling day() for every exported date made
         // a large imported diary repeatedly scan its store.
-        let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)])))
-        let pages = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
-        let margins = try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
-        let intentions = try context.fetch(FetchDescriptor<Niyya>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+        let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.dayKey >= first && $0.dayKey <= last
+        }, sortBy: [SortDescriptor(\.eventAt)])))
+        let pages = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.dayKey >= first && $0.dayKey <= last
+        }))
+        let margins = try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && (
+                ($0.targetDayKey >= first && $0.targetDayKey <= last) ||
+                ($0.writtenDayKey >= first && $0.writtenDayKey <= last))
+        }))
+        let intentions = try context.fetch(FetchDescriptor<Niyya>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.dayKey >= first && $0.dayKey <= last
+        }))
         // Fetch only opened letters: sealed and eligible letters never enter an export.
         let letters = try context.fetch(FetchDescriptor<Letter>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.state == "opened" }))
         let entriesByDay = Dictionary(grouping: entries, by: \.dayKey)
@@ -71,10 +100,14 @@ extension AppDiaryService {
             marginsByDay[margin.targetDayKey, default: []].append(margin)
             if margin.writtenDayKey != margin.targetDayKey { marginsByDay[margin.writtenDayKey, default: []].append(margin) }
         }
-        let snapshots=try context.fetch(FetchDescriptor<DeviceSetting>(predicate:#Predicate{$0.deletedAt == nil && $0.mergedInto == nil})).filter{$0.key.hasPrefix("sys.diaryAutoLines.")}
+        let frozenPrefix = "sys.diaryAutoLines."
+        let firstSnapshot = frozenPrefix + first, lastSnapshot = frozenPrefix + last
+        let snapshots = try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.key >= firstSnapshot && $0.key <= lastSnapshot
+        }))
         var frozen:[String:[DiaryDisplayLine]]=[:]
         // A damaged snapshot is skipped: that day falls back to its live lines instead of stopping every export.
-        for row in snapshots {if let lines=(try? JSONDecoder().decode([DiaryDisplayLine].self,from:row.valueJSON))?.filter({$0.kind != "salah"}){frozen[String(row.key.dropFirst("sys.diaryAutoLines.".count))]=lines}}
+        for row in snapshots {if let lines=(try? JSONDecoder().decode([DiaryDisplayLine].self,from:row.valueJSON))?.filter({$0.kind != "salah"}){frozen[String(row.key.dropFirst(frozenPrefix.count))]=lines}}
         var keys = Set(entriesByDay.keys)
         keys.formUnion(pages.filter { $0.photoMediaID != nil || $0.questionAnswer != nil }.map(\.dayKey))
         keys.formUnion(margins.map(\.writtenDayKey))
@@ -82,7 +115,11 @@ extension AppDiaryService {
         keys.formUnion(lettersByDay.keys)
         keys.formUnion(frozen.keys)
         if options.sources {
-            keys.formUnion(try context.fetch(FetchDescriptor<HifzSession>(predicate:#Predicate{$0.deletedAt == nil && $0.mergedInto == nil})).map(\.dayKey))
+            var sessions = FetchDescriptor<HifzSession>(predicate: #Predicate {
+                $0.deletedAt == nil && $0.mergedInto == nil && $0.dayKey >= first && $0.dayKey <= last
+            })
+            sessions.propertiesToFetch = [\.dayKey]
+            keys.formUnion(try context.fetch(sessions).map(\.dayKey))
         }
         let today=try currentDay()
         let dates = keys.compactMap{try? GregorianDay($0)}.filter{$0<=today && (options.year==nil || $0.year==options.year) && (options.month==nil || $0.month==options.month)}.sorted()
@@ -90,7 +127,7 @@ extension AppDiaryService {
         let liveKeys = selectedKeys.subtracting(frozen.keys)
         let live = options.sources ? try DiaryLineRenderer.live(days: liveKeys, context: context) : [:]
         var mediaIDs = Set(entries.filter { selectedKeys.contains($0.dayKey) }.flatMap { $0.attachmentMediaIDs + ($0.mediaID.map { [$0] } ?? []) })
-        mediaIDs.formUnion(pages.filter { selectedKeys.contains($0.dayKey) }.compactMap(\.photoMediaID))
+        if options.photos { mediaIDs.formUnion(pages.filter { selectedKeys.contains($0.dayKey) }.compactMap(\.photoMediaID)) }
         // Fetch referenced media in bounded batches; unrelated photo bytes stay out of memory.
         var mediaByID: [UUID: Media] = [:]
         let ids = Array(mediaIDs)
@@ -126,13 +163,17 @@ extension AppDiaryService {
             for entry in written {
                 for id in entry.attachmentMediaIDs + (entry.mediaID.map { [$0] } ?? []) {
                     guard let row = mediaByID[id] else { continue }
-                    if let data = row.data { media.append(.init(id: id, entryID: entry.id.uuidString, kind: row.kind, contentType: row.contentType, data: data, duration: row.durationS)) }
+                    if !options.photos, row.kind == "photo", row.state != "missing" { continue }
+                    if let data = row.data {
+                        guard options.photos || row.kind != "photo" else { continue }
+                        media.append(.init(id: id, entryID: entry.id.uuidString, kind: row.kind, contentType: row.contentType, data: data, duration: row.durationS))
+                    }
                     else if row.state == "missing" { media.append(.init(id: id, entryID: entry.id.uuidString, kind: "missing", contentType: row.kind, data: Data(), duration: nil)) }
                 }
             }
             // A standalone page photo is exported even when hidden on the home screen.
             let page = pagesByDay[key]?.max { $0.updatedAt < $1.updatedAt }
-            if let id = page?.photoMediaID, !media.contains(where: { $0.id == id }), let row = mediaByID[id], let data = row.data {
+            if options.photos, let id = page?.photoMediaID, !media.contains(where: { $0.id == id }), let row = mediaByID[id], let data = row.data {
                 media.append(.init(id: id, entryID: "page", kind: "photo", contentType: row.contentType, data: data, duration: nil))
             }
             lines=lines.filter{!$0.text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty}
@@ -198,6 +239,7 @@ extension AppDiaryService {
             files["Madar-lines.json"]=try JSONSerialization.data(withJSONObject:["version":1,"lines":lineRecords],options:[.sortedKeys,.prettyPrinted])
             file=root.appending(path:format=="json" ? "المذكرات-JSON.zip":"المذكرات-Markdown.zip");bytes=try DiaryExportArchive.encode(files)
         }
+        try Task.checkCancellation()
         try bytes.write(to:file,options:[.atomic,.completeFileProtection])
         return file
     }
@@ -234,6 +276,7 @@ enum DiaryPDF {
                 }
             var indexLines:[String]=[]
             for page in pages {
+                guard !Task.isCancelled else { return }
                 indexLines.append(page.title+" — "+digits.string(number+1))
                 let paragraph=NSMutableParagraphStyle();paragraph.baseWritingDirection = .rightToLeft;paragraph.alignment = .right;paragraph.minimumLineHeight=28;paragraph.paragraphSpacing=10
                 let headerParts = page.title.components(separatedBy: "، ")
@@ -246,10 +289,14 @@ enum DiaryPDF {
                 }
                 let setter=CTFramesetterCreateWithAttributedString(text);var cursor=0
                 while cursor<text.length {
+                    guard !Task.isCancelled else { return }
                     begin();let path=CGPath(rect:CGRect(x:40,y:50,width:515,height:742),transform:nil),frame=CTFramesetterCreateFrame(setter,CFRange(location:cursor,length:0),path,nil),visible=CTFrameGetVisibleStringRange(frame)
                     guard visible.length>0 else{break};let cg=renderer.cgContext;cg.saveGState();cg.translateBy(x:0,y:842);cg.scaleBy(x:1,y:-1);CTFrameDraw(frame,cg);cg.restoreGState();cursor+=visible.length
                 }
-                for item in page.media where item.kind=="photo" {if let image=UIImage(data:item.data){begin();(page.title as NSString).draw(in:CGRect(x:40,y:36,width:515,height:65),withAttributes:[.font:UIFont.systemFont(ofSize:18),.foregroundColor:ink,.paragraphStyle:paragraph]);let scale=min(515/image.size.width,665/image.size.height),size=CGSize(width:image.size.width*scale,height:image.size.height*scale);image.draw(in:CGRect(x:(595-size.width)/2,y:115,width:size.width,height:size.height))}}
+                for item in page.media where item.kind=="photo" {
+                    guard !Task.isCancelled else { return }
+                    if let image=UIImage(data:item.data){begin();(page.title as NSString).draw(in:CGRect(x:40,y:36,width:515,height:65),withAttributes:[.font:UIFont.systemFont(ofSize:18),.foregroundColor:ink,.paragraphStyle:paragraph]);let scale=min(515/image.size.width,665/image.size.height),size=CGSize(width:image.size.width*scale,height:image.size.height*scale);image.draw(in:CGRect(x:(595-size.width)/2,y:115,width:size.width,height:size.height))}
+                }
             }
             if index {
                 let paragraph=NSMutableParagraphStyle();paragraph.alignment = .right;paragraph.baseWritingDirection = .rightToLeft;paragraph.minimumLineHeight=28

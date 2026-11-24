@@ -88,6 +88,29 @@ import MadarCommands
             XCTAssertNil(result.balance(on: try .init("2027-12-01")))
         }
     }
+    func testFutureDailyFundingHonorsMoneyMovedIntoAndOutOfTheGoal() throws {
+        try run { c, app, service, _ in
+            let envelope = goal(c, balance: 20_000)
+            let plan = EnvelopePlan()
+            plan.id = envelope.id; plan.envelopeID = envelope.id; plan.source = "daily"
+            plan.period = "perDay"; plan.perPaycheckMinor = 10_000; plan.startDayKey = "2026-10-27"
+            c.insert(plan)
+            for amount in [25_000, -5_000] {
+                let transfer = Allocation()
+                transfer.target = "envelope"; transfer.targetID = envelope.id
+                transfer.kind = "adjust"; transfer.amountMinor = amount
+                transfer.idempotencyKey = "move:" + UUID().uuidString
+                c.insert(transfer)
+            }
+            try c.save()
+
+            let forecast = try XCTUnwrap(project(c, app, service)[envelope.id])
+            XCTAssertEqual(forecast.balance(on: try .init("2026-10-26")), 40_000)
+            XCTAssertEqual(forecast.balance(on: try .init("2026-10-27")), 50_000)
+            XCTAssertEqual(forecast.balance(on: try .init("2026-10-28")), 60_000)
+            XCTAssertEqual(forecast.balance(on: try .init("2026-11-27")), 60_000)
+        }
+    }
     func testKnownFutureTripPausesTheNextCycleWithoutInventingAnOpenTripReturn() throws {
         try run { c, app, service, _ in
             let envelope = goal(c, target: 1_000_000)

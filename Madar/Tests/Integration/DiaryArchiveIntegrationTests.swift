@@ -29,4 +29,50 @@ import MadarData
         XCTAssertEqual(archive.days.map(\.excerpt), ["هامش اليوم","يوم محفوظ"])
         XCTAssertEqual(archive.days.map(\.writings), [1,1]); XCTAssertFalse(archive.days.contains { $0.excerpt.contains("سر") })
     }
+
+    func testWeekReadsOnlyItsDaysAndKeepsPhotoAndWrittenMargin() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryWeek-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        let context = ModelContext(container)
+
+        let older = Entry()
+        older.dayKey = "2026-11-20"
+        older.text = "خارج الأسبوع"
+        context.insert(older)
+        let photo = Media()
+        photo.kind = "photo"
+        context.insert(photo)
+        let duplicate = Media()
+        duplicate.id = photo.id
+        duplicate.kind = "photo"
+        context.insert(duplicate)
+
+        let page = DayPage()
+        page.dayKey = "2026-11-22"
+        page.photoMediaID = photo.id
+        context.insert(page)
+        let margin = MarginNote()
+        margin.targetDayKey = older.dayKey
+        margin.writtenDayKey = "2026-11-23"
+        margin.text = "هامش هذا الأسبوع"
+        context.insert(margin)
+        let later = Entry()
+        later.dayKey = "2026-11-25"
+        later.text = "بعد نهاية النطاق"
+        context.insert(later)
+        try context.save()
+
+        let service = AppDiaryService(app: app)
+        let ending = try GregorianDay("2026-11-24")
+        let week = try await service.weekDaysOffMain(ending: ending)
+        XCTAssertEqual(week.map(\.day.description), ["2026-11-22", "2026-11-23"])
+        XCTAssertEqual(week.first?.photoIDs, [photo.id])
+        XCTAssertEqual(week.last?.excerpt, margin.text)
+        XCTAssertEqual(try service.weekDays(ending: ending).map(\.id), week.map(\.id))
+        let archive = try await service.archiveOffMain()
+        XCTAssertEqual(archive.days.first { $0.day.description == page.dayKey }?.photoIDs, [photo.id])
+    }
 }

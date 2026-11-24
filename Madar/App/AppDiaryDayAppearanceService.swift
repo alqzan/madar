@@ -36,13 +36,19 @@ extension AppDiaryService {
         try authorizeRead();return found
     }
     func weekDaysOffMain(ending day:GregorianDay) async throws -> [DiaryDaySummary] {
-        try authorizeRead();var calendar=Calendar(identifier:.gregorian);calendar.timeZone=app.activePlace.timeZone
-        let weekday=calendar.component(.weekday,from:day.date(in:calendar.timeZone)),start=day.adding(days:-(weekday-diaryCalendar.weekStart+7)%7)
-        return try await archiveOffMain().days.filter{$0.day>=start && $0.day<=day}.sorted{$0.day<$1.day}
+        try authorizeRead()
+        return try await archiveDaysOffMain(in: weekRange(ending: day)).reversed()
     }
     func weekDays(ending day:GregorianDay) throws -> [DiaryDaySummary] {
-        try authorizeRead();var calendar=Calendar(identifier:.gregorian);calendar.timeZone=app.activePlace.timeZone
-        let weekday=calendar.component(.weekday,from:day.date(in:calendar.timeZone)),start=day.adding(days:-(weekday-diaryCalendar.weekStart+7)%7)
-        return try archive().days.filter{$0.day>=start && $0.day<=day}.sorted{$0.day<$1.day}
+        try authorizeRead()
+        return try archiveDays(in: weekRange(ending: day)).reversed()
+    }
+    private func weekRange(ending day: GregorianDay) -> ClosedRange<GregorianDay> {
+        let grid = diaryCalendar
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = grid.zone
+        let weekday = calendar.component(.weekday, from: day.date(in: grid.zone))
+        let daysSinceWeekStart = (weekday - grid.weekStart + 7) % 7
+        return day.adding(days: -daysSinceWeekStart)...day
     }
 }

@@ -54,10 +54,13 @@ extension MoneyRepository {
         let plans = try context.fetch(FetchDescriptor<EnvelopePlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source == "daily" && ($0.untilDate == nil || $0.untilDate! >= cycle.start) }.sorted { $0.createdAt == $1.createdAt ? $0.id.uuidString < $1.id.uuidString : $0.createdAt < $1.createdAt }
         let allAllocations = try context.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let allMovements = try confirmedTransactions()
+        let movementsByID = Dictionary(allMovements.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let goalEnvelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.role == "goal" }
+        let goalsByID = Dictionary(goalEnvelopes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let priorGoalFunding = Self.goalFundingTotals(allAllocations, excludingDailyIn: cycle.id)
         let planSpecs = plans.compactMap { plan -> DailyPlan? in
             if plan.kind == "repay", let total = plan.repaymentTotalMinor, let count = plan.repaymentPaychecks,
-               let purchase = allMovements.first(where: { $0.id == plan.id }) {
+               let purchase = movementsByID[plan.id] {
                 guard purchase.cycleID != cycle.id, purchase.eventAt < cycle.start, let envelope = plan.envelopeID else { return nil }
                 let paid = allAllocations.filter { $0.cycleID != cycle.id && $0.targetID == envelope && $0.amountMinor > 0 && $0.kind == "repay" && $0.idempotencyKey.hasPrefix("daily:") && $0.idempotencyKey.contains(":" + plan.id.uuidString + ":") }
                 let refunds = Set(allMovements.filter { $0.kind == "refund" && $0.relatedTransactionID == purchase.id }.map(\.id))
@@ -70,20 +73,17 @@ extension MoneyRepository {
             return .init(id: plan.id.uuidString, amountMinor: plan.perPaycheckMinor, period: plan.period == "perDay" ? .perDay : .perCycle,
                 startDay: max(1, plan.startDayKey.flatMap { try? GregorianDay($0) }.map { MadarCalendarDays.distance(from: start, to: $0) + 1 } ?? 1),
                 endDay: plan.untilDate.map { MadarCalendarDays.distance(from: start, to: .containing($0, in: place.timeZone)) + 1 },
-                maximumMinorPerCycle: goalEnvelopes.first(where: { $0.id == plan.id && $0.id == envelope })?.targetMinor.map { target in
-                    // FB-39 review: money moved in (or out) by the user counts toward the goal like its funding.
-                    let alreadyFunded = allAllocations.filter { $0.targetID == envelope && (($0.kind == "fund" && $0.amountMinor > 0 && !($0.cycleID == cycle.id && $0.idempotencyKey.hasPrefix("daily:"))) || $0.idempotencyKey.hasPrefix("move:")) }.reduce(0) { $0 + $1.amountMinor }
-                    return max(0, target - alreadyFunded)
-                })
+                maximumMinorPerCycle: plan.id == envelope
+                    ? goalsByID[envelope]?.targetMinor.map { max(0, $0 - (priorGoalFunding[envelope] ?? 0)) }
+                    : nil)
         }
         let paused = try moneyPausedDays(from: start, count: max(length, elapsed), knownAt: now)
         let input = CycleInput(expectedLengthDays: length, policies: specs, plans: planSpecs, carryMinor: cycle.carryAdjustMinor, pausedDays: paused)
-        let tx = try confirmedTransactions(), rows = try context.fetch(FetchDescriptor<Allocation>())
         var spent: [Int: Int] = [:]
-        for allocation in rows where allocation.deletedAt == nil && allocation.mergedInto == nil && allocation.target == "daily" && allocation.cycleID == cycle.id && ["spend", "refund", "adjust", "offset"].contains(allocation.kind) {
-            guard let transaction = tx.first(where: { $0.id == allocation.transactionID }) else { continue }
+        for allocation in allAllocations where allocation.target == "daily" && allocation.cycleID == cycle.id && ["spend", "refund", "adjust", "offset"].contains(allocation.kind) {
+            guard let id = allocation.transactionID, let transaction = movementsByID[id] else { continue }
             let budgetDay: String
-            if transaction.kind == "refund", let original = tx.first(where: { $0.id == transaction.relatedTransactionID }) { budgetDay = original.dayKey }
+            if transaction.kind == "refund", let relatedID = transaction.relatedTransactionID, let original = movementsByID[relatedID] { budgetDay = original.dayKey }
             else { budgetDay = transaction.dayKey }
             let index = MadarCalendarDays.distance(from: start, to: try GregorianDay(budgetDay)) + 1
             spent[index, default: 0] -= allocation.amountMinor
@@ -92,34 +92,50 @@ extension MoneyRepository {
         return .init(id: cycle.id, startDay: start, today: today, expectedEndDay: end, incomeMinor: cycle.incomeMinor, elapsedDays: elapsed, input: input, spent: spent,
             headline: headline, curve: CycleEngine.curve(through: max(length, elapsed), input, dailySpentMinor: spent), planEnvelopes: planEnvelopes)
     }
+
+    /// FB-39: positive funding and signed manual transfers both count toward a goal's lifetime cap.
+    /// Cycle replay excludes that cycle's daily drops because the engine applies them itself.
+    public static func goalFundingTotals(_ allocations: [Allocation], excludingDailyIn cycleID: UUID? = nil) -> [UUID: Int] {
+        var totals: [UUID: Int] = [:]
+        for row in allocations {
+            guard let target = row.targetID else { continue }
+            let isManualMove = row.idempotencyKey.hasPrefix("move:")
+            let replaysDailyDrop = cycleID != nil && row.cycleID == cycleID && row.idempotencyKey.hasPrefix("daily:")
+            if isManualMove || (row.kind == "fund" && row.amountMinor > 0 && !replaysDailyDrop) {
+                totals[target, default: 0] += row.amountMinor
+            }
+        }
+        return totals
+    }
     /// The same known travel intervals govern actual cycle readings and conditional funding forecasts.
     public func moneyPausedDays(from start: GregorianDay, count: Int, knownAt now: Date) throws -> Set<Int> {
         guard count > 0 else { return [] }
-        var paused: Set<Int> = []
+        let settings = try SettingsStore(context: context)
+        guard try settings.value(for: "mal.travelPausesDaily") == .bool(true) else { return [] }
+        let trips = try context.fetch(FetchDescriptor<Trip>()).compactMap { trip -> (start: Date, end: Date)? in
+            guard trip.deletedAt == nil, trip.mergedInto == nil, !trip.dismissed, let began = trip.start else { return nil }
+            // An open trip pauses through now; its unknown return does not erase future forecast dailies.
+            return (began, trip.end ?? now)
+        }
+        guard !trips.isEmpty else { return [] }
         let prayer = try PrayerRepository(context: context)
         let place = prayer.place(at: now)
-        let settings = try SettingsStore(context: context)
-        if try settings.value(for: "mal.travelPausesDaily") == .bool(true) {
-            let trips = try context.fetch(FetchDescriptor<Trip>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-            let boundary = DayBoundary(rawValue: try settings.value(for: "core.dayStart").string ?? "fajr") ?? .fajr
-            for day in 1...count {
-                let key = start.adding(days: day - 1), nextKey = key.adding(days: 1)
-                let dayInstant = key.date(in: place.timeZone).addingTimeInterval(12 * 3600)
-                let dayPlace = prayer.place(at: dayInstant), dayOptions = prayer.calculationOptions(at: dayInstant)
-                let beginning: Date, ending: Date
-                if boundary == .midnight { beginning = key.date(in: dayPlace.timeZone); ending = nextKey.date(in: dayPlace.timeZone) }
-                else {
-                    guard let first = PrayerTimesEngine.calculate(day: key, place: dayPlace, options: dayOptions),
-                          let next = PrayerTimesEngine.calculate(day: nextKey, place: dayPlace, options: dayOptions) else { throw CoreError.missingPrayerTimes }
-                    beginning = boundary == .fajr ? first.fajr : first.maghrib
-                    ending = boundary == .fajr ? next.fajr : next.maghrib
-                }
-                if trips.contains(where: { trip in
-                    guard !trip.dismissed, let began = trip.start else { return false }
-                    // An open trip pauses through now; its unknown return does not erase future forecast dailies.
-                    return began < ending && (trip.end ?? now) > beginning
-                }) { paused.insert(day) }
+        var paused: Set<Int> = []
+        let boundary = DayBoundary(rawValue: try settings.value(for: "core.dayStart").string ?? "fajr") ?? .fajr
+        for day in 1...count {
+            let key = start.adding(days: day - 1), nextKey = key.adding(days: 1)
+            let dayInstant = key.date(in: place.timeZone).addingTimeInterval(12 * 3600)
+            let dayPlace = prayer.place(at: dayInstant)
+            let beginning: Date, ending: Date
+            if boundary == .midnight { beginning = key.date(in: dayPlace.timeZone); ending = nextKey.date(in: dayPlace.timeZone) }
+            else {
+                let dayOptions = prayer.calculationOptions(at: dayInstant)
+                guard let first = PrayerTimesEngine.calculate(day: key, place: dayPlace, options: dayOptions),
+                      let next = PrayerTimesEngine.calculate(day: nextKey, place: dayPlace, options: dayOptions) else { throw CoreError.missingPrayerTimes }
+                beginning = boundary == .fajr ? first.fajr : first.maghrib
+                ending = boundary == .fajr ? next.fajr : next.maghrib
             }
+            if trips.contains(where: { $0.start < ending && $0.end > beginning }) { paused.insert(day) }
         }
         return paused
     }

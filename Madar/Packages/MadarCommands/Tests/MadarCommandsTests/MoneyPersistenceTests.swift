@@ -665,6 +665,34 @@ import MadarInbox
         #expect(try repo.basis(at: f.now).owedMinor == 80000)
     }
 
+    @Test func refundBeyondTheCurrentStatementReducesUnbilledDebtAndKeepsTheExcessAsCredit() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let c = ModelContext(f.container)
+        let close = f.now.addingTimeInterval(-86_400)
+        let statement = Statement(); statement.cardID = f.credit; statement.closeDate = close
+        statement.statementMinor = 10_000; c.insert(statement)
+        func movement(_ kind: String, _ amount: Int, at date: Date) -> MoneyTransaction {
+            let row = MoneyTransaction(); row.cardID = f.credit; row.kind = kind
+            row.amountMinor = amount; row.homeAmountMinor = amount; row.eventAt = date
+            c.insert(row)
+            return row
+        }
+        let original = movement("expense", 30_000, at: close.addingTimeInterval(-60))
+        _ = movement("expense", 5_000, at: close.addingTimeInterval(60))
+        let refund = movement("refund", 30_000, at: f.now)
+        refund.relatedTransactionID = original.id
+        try c.save()
+
+        let repo = MoneyRepository(context: ModelContext(f.container))
+        let before = try repo.basis(at: f.now.addingTimeInterval(-1))
+        let after = try repo.basis(at: f.now)
+        let debt = try #require(try repo.cardDebts(at: f.now).first)
+        #expect(before.owedMinor == 15_000)
+        #expect(after.owedMinor == 0)
+        #expect(debt.creditMinor == 15_000)
+        #expect(after.netMinor - before.netMinor == 30_000, "F01: the card refund increases the owner's net by the full amount")
+    }
+
     /// F07: a statement message updates its card once, keyed by (card, estimated close day); a second message within
     /// five days with the same amount updates the same row, a different amount stays in review, an unknown card is refused.
     @Test func statementMessageUpdatesItsCardOnceAndUndoReturnsItToReview() async throws {

@@ -18,7 +18,9 @@ struct MoneyReconcileView: View {
     @State private var failure: String?
     @State private var entries: [UUID: Entry] = [:]
     @State private var selected: UUID?
+    @State private var position = ScrollPosition(edge: .top)
     @State private var typed = ""
+    @State private var inputInvalid = false
     @State private var source: MoneySourceDetail?
     @State private var saving = false
     @State private var note: String?
@@ -60,9 +62,10 @@ struct MoneyReconcileView: View {
                     }
                     if reading.rows.isEmpty && reading.unknownAccounts.isEmpty { emptyPage }
                     else if let row {
-                        status(row)
                         identity(row, reading: reading)
-                        arches(row)
+                        status(row)
+                        if dynamicType.isAccessibilitySize { comparisonList(row) }
+                        else { arches(row) }
                         sentence(row)
                         if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-reconcile-reveal") }
                         nudges(row)
@@ -75,9 +78,11 @@ struct MoneyReconcileView: View {
             }.padding(.horizontal, 16).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
                 .accessibilityElement(children: .contain).accessibilityIdentifier("money-reconcile")
         }
+        .scrollPosition($position)
         .safeAreaInset(edge: .bottom) { if reading?.rows.isEmpty == false { saveButton } }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .hidesRoomAccessory(app, id: "money-reconcile")
         .task { load() }.onChange(of: app.moneyRevision) { load() }
         .madarSheetLock(saving: saving)
         .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
@@ -143,10 +148,12 @@ struct MoneyReconcileView: View {
                     .frame(width: 32, height: 32).glassEffect(.regular.interactive(), in: .circle)
                 Text(r.name).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.7)
                 Spacer(minLength: 6)
-                Text(r.side == .account ? "حساب، يقارن النقد" : r.side == .creditCard ? "بطاقة، تقارن الدين" : "تقسيط، يقارن رصيد المزود")
-                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-            }.contentShape(Rectangle())
-        }.buttonStyle(.madarPlain).accessibilityIdentifier("money-reconcile-account")
+                Image(systemName: "chevron.up.chevron.down").font(MadarTypography.caption())
+                    .foregroundStyle(theme.secondaryInk).accessibilityHidden(true)
+            }.frame(minHeight: 44).contentShape(Rectangle())
+        }.buttonStyle(.madarPlain).disabled(inputInvalid || saving)
+            .accessibilityLabel("اختر حسابًا للمطابقة، " + r.name)
+            .accessibilityIdentifier("money-reconcile-account")
     }
 
     private func arches(_ r: MoneyReconcileRow) -> some View {
@@ -156,28 +163,13 @@ struct MoneyReconcileView: View {
             HStack(spacing: 50) {
                 Button { source = composition(r) } label: {
                     arch(caption: bookCaption(r), title: bookTitle(r), tint: theme.color("accent"), titleTint: theme.color("accentText"), matched: matched) {
-                        Text(figure: amount(r.expectedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 33, relativeTo: .largeTitle)).minimumScaleFactor(0.5).lineLimit(1)
-                            .accessibilityIdentifier("money-reconcile-expected")
+                        bookFigure(r)
                     }
                 }.buttonStyle(.madarPlain).disabled(!visible).accessibilityHint("يعرض كيف تكوّن هذا الرقم")
                     .accessibilityIdentifier("money-reconcile-madar")
                 arch(caption: providerCaption(r), title: providerTitle(r), tint: theme.color("dueText"), titleTint: theme.color("dueText"), matched: matched) {
                     VStack(spacing: 4) {
-                        if visible {
-                            // The figure reads like Madar's (grouped digits); a tap turns it into the field.
-                            ZStack {
-                                TextField("أدخِل", text: $typed).keyboardType(.decimalPad).multilineTextAlignment(.center).focused($typing)
-                                    .font(.custom("thmanyahserifdisplay-Black", size: 33, relativeTo: .largeTitle)).foregroundStyle(theme.color("dueText"))
-                                    .minimumScaleFactor(0.5).opacity(typing || entry == nil ? 1 : 0)
-                                    .accessibilityLabel(r.side == .account ? "رصيد البنك" : "مستحق البنك").accessibilityIdentifier("money-reconcile-bank-field")
-                                    .onChange(of: typed) { commitTyped(r) }
-                                if let entry, !typing {
-                                    Text(figure: amount(entry.observedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 33, relativeTo: .largeTitle)).foregroundStyle(theme.color("dueText"))
-                                        .minimumScaleFactor(0.5).lineLimit(1).contentTransition(.numericText()).onTapGesture { typing = true }
-                                        .accessibilityHidden(true)
-                                }
-                            }
-                        } else { Text("•••").font(.custom("thmanyahserifdisplay-Black", size: 33, relativeTo: .largeTitle)) }
+                        providerFigure(r)
                         Line().stroke(theme.color("dueText"), style: .init(lineWidth: 0.9, dash: [3, 3])).frame(height: 1).padding(.horizontal, 14)
                     }
                 }
@@ -194,6 +186,45 @@ struct MoneyReconcileView: View {
                 }.padding(.top, 34)
             }
         }.frame(maxWidth: .infinity).animation(reduceMotion ? nil : .snappy, value: entry)
+    }
+    private var figureFont: Font { .custom("thmanyahserifdisplay-Black", size: 33, relativeTo: .largeTitle) }
+    private func bookFigure(_ r: MoneyReconcileRow) -> some View {
+        Text(figure: amount(r.expectedMinor)).font(figureFont).minimumScaleFactor(0.5).lineLimit(1)
+            .accessibilityIdentifier("money-reconcile-expected")
+    }
+    @ViewBuilder private func providerFigure(_ r: MoneyReconcileRow) -> some View {
+        if visible {
+            let entry = entries[r.id]
+            // Keep the invalid draft visible when the keyboard is dismissed.
+            let showsField = typing || entry == nil || inputInvalid
+            ZStack {
+                TextField("أدخِل", text: $typed).keyboardType(.decimalPad).multilineTextAlignment(.center).focused($typing)
+                    .font(figureFont).foregroundStyle(theme.color("dueText")).minimumScaleFactor(0.5)
+                    .frame(minHeight: 44).opacity(showsField ? 1 : 0)
+                    .accessibilityLabel(providerTitle(r)).accessibilityIdentifier("money-reconcile-bank-field")
+                    .onChange(of: typed) { commitTyped(r) }
+                if let entry, !showsField {
+                    Text(figure: amount(entry.observedMinor)).font(figureFont).foregroundStyle(theme.color("dueText"))
+                        .minimumScaleFactor(0.5).lineLimit(1).contentTransition(.numericText()).onTapGesture { typing = true }
+                        .accessibilityHidden(true)
+                }
+            }.disabled(saving)
+        } else { Text("•••").font(figureFont) }
+    }
+    private func comparisonList(_ r: MoneyReconcileRow) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button { source = composition(r) } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(bookTitle(r)).font(MadarTypography.caption())
+                    bookFigure(r)
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(theme.surface)
+            }.buttonStyle(.madarPlain).disabled(!visible).accessibilityHint("يعرض كيف تكوّن هذا الرقم")
+                .accessibilityIdentifier("money-reconcile-madar")
+            VStack(alignment: .leading, spacing: 4) {
+                Text(providerTitle(r)).font(MadarTypography.caption())
+                providerFigure(r)
+            }.padding(12).background(theme.surface)
+        }
     }
 
     private func bookCaption(_ r: MoneyReconcileRow) -> String {
@@ -231,7 +262,14 @@ struct MoneyReconcileView: View {
             else if r.side == .account { text = (line.deltaMinor < 0 ? "عندك أقل" : "عندك أكثر") + size + " مما يظن مدار"; color = theme.color("dueText") }
             else if r.side == .creditCard { text = (line.deltaMinor > 0 ? "عليك أكثر" : "عليك أقل") + size + " مما يحسب مدار"; color = theme.color("dueText") }
             else { text = (line.deltaMinor > 0 ? "المزود يطلب أكثر" : "المزود يطلب أقل") + size + " من جدول مدار"; color = theme.color("dueText") }
-        } else { text = r.side == .account ? "اكتب رصيدك كما يظهر في تطبيق البنك" : "اكتب ما تطلبه البطاقة كما يظهر في تطبيق البنك"; color = theme.secondaryInk }
+        } else {
+            text = switch r.side {
+            case .account: "اكتب رصيدك كما يظهر في تطبيق البنك"
+            case .creditCard: "اكتب ما تطلبه البطاقة كما يظهر في تطبيق البنك"
+            case .installment: "اكتب المتبقي كما يظهر في تطبيق التقسيط"
+            }
+            color = theme.secondaryInk
+        }
         return VStack(spacing: 4) {
             Text(text).font(MadarTypography.body()).bold().foregroundStyle(color).multilineTextAlignment(.center).accessibilityIdentifier("money-reconcile-sentence")
             if let entry = entries[r.id], let at = entry.at, let suggestion = r.suggestion, entry.observedMinor == suggestion.observedMinor {
@@ -252,7 +290,7 @@ struct MoneyReconcileView: View {
                     Text("\u{2066}" + (units < 0 ? "−" : "+") + service.digits.string(abs(units)) + "\u{2069}").font(MadarTypography.body())
                         .frame(maxWidth: 66, minHeight: 58).frame(maxWidth: .infinity)
                         .background(theme.color("surface2"), in: Rectangle()).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
-                }.buttonStyle(.madarPlain).disabled(!visible).accessibilityLabel((units < 0 ? "أنقص " : "زِد ") + service.digits.string(abs(units)))
+                }.buttonStyle(.madarPlain).disabled(!visible || inputInvalid || saving).accessibilityLabel((units < 0 ? "أنقص " : "زِد ") + service.digits.string(abs(units)))
                     .accessibilityIdentifier("money-reconcile-nudge-" + String(units))
             }
         }
@@ -272,7 +310,7 @@ struct MoneyReconcileView: View {
                                 .frame(minHeight: 58).frame(maxWidth: .infinity)
                                 .background(chosen == name ? theme.ink : theme.color("surface2"), in: Rectangle())
                                 .foregroundStyle(chosen == name ? theme.background : theme.ink).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
-                        }.buttonStyle(.madarPlain).disabled(!visible).accessibilityAddTraits(chosen == name ? .isSelected : []).accessibilityIdentifier("money-reconcile-name-" + name.rawValue)
+                        }.buttonStyle(.madarPlain).disabled(!visible || inputInvalid || saving).accessibilityAddTraits(chosen == name ? .isSelected : []).accessibilityIdentifier("money-reconcile-name-" + name.rawValue)
                     }
                 }
                 Text(caption(chosen, reading: reading)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-reconcile-name-caption")
@@ -422,7 +460,7 @@ struct MoneyReconcileView: View {
                 Text("ثبّت المطابقة" + count).font(MadarTypography.cardTitle()).bold().lineLimit(1).minimumScaleFactor(0.8)
             }.frame(maxWidth: .infinity, minHeight: 60).foregroundStyle(theme.background)
                 .background(theme.ink.opacity(any && !saving ? 1 : 0.35), in: RoundedRectangle(cornerRadius: 8))
-        }.buttonStyle(.madarPlain).disabled(!any || saving || !visible).accessibilityIdentifier("money-reconcile-save")
+        }.buttonStyle(.madarPlain).disabled(!any || inputInvalid || saving || !visible).accessibilityIdentifier("money-reconcile-save")
         }
             .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 4).background(theme.background.opacity(0.94))
     }
@@ -458,8 +496,10 @@ struct MoneyReconcileView: View {
     }
 
     private func select(_ id: UUID) {
+        guard !inputInvalid, !saving else { return }
         typing = false; selected = id
         typed = entries[id].map { plain($0.observedMinor) } ?? ""
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) { position.scrollTo(edge: .top) }
     }
     private func plain(_ minor: Int) -> String {
         // An overdrawn balance is shown as a sign and its size, so it can be read back as typed.
@@ -469,24 +509,34 @@ struct MoneyReconcileView: View {
         return service.digits.string(minor / scale) == whole ? (fraction == 0 ? whole : whole + "." + String(format: "%0\(exponent)d", fraction))
             : service.amount(minor).filter { !"\u{2068}\u{2069}٬".contains($0) }
     }
-    // A typed amount that cannot be read says so; the row keeps its last good figure.
-    private static let unreadable = "لم أفهم هذا المبلغ؛ اكتب أرقامًا وفاصلة واحدة على الأكثر."
+    // Keep the last good entry for recovery, but require a valid edit before writing it.
+    private static let unreadable = "لم أفهم المبلغ. اكتب مثل ١٥٠٠ أو ١٥٠٠٫٥."
     private func commitTyped(_ r: MoneyReconcileRow) {
-        let ascii = String(typed.map { ch -> Character in
-            if let v = "٠١٢٣٤٥٦٧٨٩".firstIndex(of: ch) { return Character(String("٠١٢٣٤٥٦٧٨٩".distance(from: "٠١٢٣٤٥٦٧٨٩".startIndex, to: v))) }
-            return ch == "٫" || ch == "," ? "." : ch
-        }).filter { $0 != "٬" && $0 != " " }
-        if ascii.isEmpty { if note == Self.unreadable { note = nil }; if entries[r.id] != nil, typing { entries[r.id] = nil }; return }
-        let negative = ascii.first == "-" || ascii.first == "\u{2212}"
-        guard let size = MoneyAmountInput.minor(negative ? String(ascii.dropFirst()) : ascii, exponent: exponent) else { note = Self.unreadable; return }
-        let value = negative ? -size : size
+        let input = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        if input.isEmpty {
+            inputInvalid = false
+            if note == Self.unreadable { note = nil }
+            if typing { entries[r.id] = nil }
+            return
+        }
+        guard let value = MoneyAmountInput.minor(input, exponent: exponent),
+              MoneyCommandPayload.integer(.string(String(value))) != nil,
+              MoneyCommandPayload.integer(.string(String(r.expectedMinor))) != nil else {
+            inputInvalid = true
+            note = Self.unreadable
+            return
+        }
+        inputInvalid = false
         if note == Self.unreadable { note = nil }
         if entries[r.id]?.observedMinor != value { set(r, value, at: nil) }
     }
     private func nudge(_ r: MoneyReconcileRow, _ units: Int) {
         let base = entries[r.id]?.observedMinor ?? r.expectedMinor
-        set(r, ReconcileEngine.nudge(base, units: units, exponent: exponent), at: nil)
-        typed = plain(entries[r.id]!.observedMinor)
+        guard MoneyCommandPayload.integer(.string(String(base))) != nil else { note = Self.unreadable; return }
+        let value = ReconcileEngine.nudge(base, units: units, exponent: exponent)
+        guard MoneyCommandPayload.integer(.string(String(value))) != nil else { note = Self.unreadable; return }
+        set(r, value, at: nil)
+        typed = plain(value)
     }
     private func set(_ r: MoneyReconcileRow, _ value: Int, at: Date?) {
         note = nil // AU-38: an edited row is a new attempt; the old note no longer applies.
@@ -500,6 +550,7 @@ struct MoneyReconcileView: View {
     private func load() {
         do {
             let next = try service.loadReconcile()
+            let oldSelected = row
             // Lines the book moved under are dropped; a balance printed in the newest message fills an untouched line.
             var kept: [UUID: Entry] = [:]
             for r in next.rows {
@@ -510,12 +561,19 @@ struct MoneyReconcileView: View {
             if selected == nil || !next.rows.contains(where: { $0.id == selected }) {
                 selected = next.rows.first { r in kept[r.id].map { $0.observedMinor != r.expectedMinor } ?? false }?.id ?? next.rows.first?.id
             }
-            if let id = selected { typed = kept[id].map { plain($0.observedMinor) } ?? "" }
+            let sameSelectedBook = row?.id == oldSelected?.id && row?.expectedMinor == oldSelected?.expectedMinor
+            if !(sameSelectedBook && (typing || inputInvalid)) {
+                if inputInvalid {
+                    inputInvalid = false
+                    note = "تغيّر دفتر مدار. راجع رصيد البنك قبل تثبيت المطابقة."
+                }
+                typed = selected.flatMap { kept[$0] }.map { plain($0.observedMinor) } ?? ""
+            }
         } catch { reading = nil; failure = "لم تكتمل قراءة الحسابات. حاول مرة أخرى." }
     }
     private func save() {
         // AU-95: `.disabled` lands a render later; a fast second tap must not send the same reconcile twice.
-        guard !saving, let reading else { return }
+        guard !saving, !inputInvalid, visible, let reading else { return }
         note = nil
         let formatter = ISO8601DateFormatter()
         let rows: [MadarCore.JSONValue] = reading.rows.compactMap { r in

@@ -28,13 +28,14 @@ extension AppSession {
             .labels(firstCalendar: first ?? FirstCalendar(rawValue: string("core.firstCalendar")) ?? .hijri,
                     numerals: string("core.numerals") == "western" ? .western : .hindi, compact: compact, weekday: weekday)
     }
-    func yearLabels(_ year: Int) -> MadarDateLabels {
+    func yearLabels(_ year: Int, first calendar: FirstCalendar? = nil) -> MadarDateLabels {
         guard let first = try? GregorianDay(year: year, month: 1, day: 1), let last = try? GregorianDay(year: year, month: 12, day: 31) else { return .init(primary: "", secondary: "") }
         let start = dateLabels(first, first: .gregorian).secondary.split(separator: " ").suffix(2).joined(separator: " ")
         let end = dateLabels(last, first: .gregorian).secondary.split(separator: " ").suffix(2).joined(separator: " ")
         let h = start == end ? start : start + " – " + end
         let g = digits(year) + " م"
-        return string("core.firstCalendar") == "gregorian" ? .init(primary: g, secondary: h) : .init(primary: h, secondary: g)
+        let primary = calendar ?? FirstCalendar(rawValue: string("core.firstCalendar"))
+        return primary == .gregorian ? .init(primary: g, secondary: h) : .init(primary: h, secondary: g)
     }
 }
 extension AppDiaryService {

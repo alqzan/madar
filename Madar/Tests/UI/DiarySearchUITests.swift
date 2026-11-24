@@ -10,7 +10,8 @@ import XCTest
         XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText("#سفر\n")
         let result = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'diary-search-result-'")).firstMatch
         XCTAssertTrue(result.waitForExistence(timeout: 10), app.debugDescription)
-        app.buttons["مسح البحث"].tap(); field.tap(); field.typeText("كلمةغيرموجودة\n")
+        field.tap()
+        field.typeText(" كلمةغيرموجودة\n")
         XCTAssertTrue(app.staticTexts["diary-search-empty"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(result.exists, "The previous query's results must not remain visible")
         app.buttons["مسح البحث"].tap(); field.tap(); field.typeText("#سفر\n")

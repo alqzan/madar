@@ -461,22 +461,10 @@ enum MoneyAnalysisReadingBuilder {
             }
         }
         let ordered = ledger.categories.filter { $0.mergedInto == nil }.sorted { $0.order == $1.order ? $0.name < $1.name : $0.order < $1.order }
-        let limits = try context.fetch(FetchDescriptor<CategoryLimit>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        let latestLimitByCategory = limits.reduce(into: [UUID: CategoryLimit]()) { latest, limit in
-            guard let categoryID = limit.categoryID else { return }
-            guard let current = latest[categoryID] else { latest[categoryID] = limit; return }
-            if current.updatedAt < limit.updatedAt { latest[categoryID] = limit }
-        }
-        func mode(_ category: UUID) -> CategoryLimitMode? {
-            guard let limit = latestLimitByCategory[category] else { return nil }
-            switch limit.mode {
-            case "fixed": return .fixed(limitMinor: limit.limitMinor)
-            case "percent": return .percent(basisPoints: limit.percentBp ?? 0, base: limit.base == "allowance" ? .allowance : .income)
-            default: return nil
-            }
-        }
+        let latestLimitByCategory = try CategoryLimit.latestByCategory(in: context)
         func cycleLimit(_ category: UUID, _ index: Int) -> (limit: Int, length: Int)? {
-            guard let mode = mode(category), let reading = ledger.reading(of: starts[index].0) else { return nil }
+            guard let mode = latestLimitByCategory[category]?.effectiveMode, mode != .none,
+                  let reading = ledger.reading(of: starts[index].0) else { return nil }
             let length = max(1, reading.input.expectedLengthDays)
             return LimitEngine.effectiveLimit(mode, cycleIncomeMinor: starts[index].0.incomeMinor, cycleAllowanceMinor: CycleEngine.accruedDaily(through: length, reading.input)).map { ($0, length) }
         }

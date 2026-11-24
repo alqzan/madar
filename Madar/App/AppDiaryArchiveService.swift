@@ -17,7 +17,7 @@ struct DiaryArchiveSnapshot: Sendable {
     let today: GregorianDay
     let days: [DiaryDaySummary]
 }
-struct DiaryCalendarGrid {
+struct DiaryCalendarGrid: Sendable {
     let first: FirstCalendar
     let zone: TimeZone
     let offset: Int
@@ -66,32 +66,59 @@ extension AppDiaryService {
         let days = try Self.archiveDays(context: ModelContext(app.container))
         return try .init(today: currentDay(), days: days)
     }
-    /// The same read without holding the main actor: the fetches and grouping run in a detached task with its own context.
+    /// The same read without holding the main actor: the fetches and grouping use a separate context.
     func archiveOffMain() async throws -> DiaryArchiveSnapshot {
         try authorizeRead()
-        let container = app.container
-        let worker = Task.detached(priority: .userInitiated) {
-            try Task.checkCancellation()
-            let days = try Self.archiveDays(context: ModelContext(container))
-            try Task.checkCancellation()
-            return days
-        }
-        let days = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+        let generation = app.storeGeneration, container = app.container
         let today = try await currentDayOffMain()
+        let days = try await Self.readArchiveDays(container: container, range: nil)
         try authorizeRead()
+        try Task.checkCancellation()
+        guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
         return .init(today: today, days: days)
     }
-    nonisolated private static func archiveDays(context: ModelContext) throws -> [DiaryDaySummary] {
-        let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)])))
-        let pages = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
-        let margins = try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
-        var descriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.state != "missing" && $0.deletedAt == nil && $0.mergedInto == nil })
-        descriptor.propertiesToFetch = [\.id, \.kind]
-        let media = try context.fetch(descriptor)
-        let activeMediaIDs = Set(media.map(\.id))
-        let photos = Set(media.filter { $0.kind == "photo" }.map(\.id))
-        let mediaKinds = Dictionary(uniqueKeysWithValues: media.map { ($0.id, $0.kind) })
-        let niyyas=try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil}))
+
+    func archiveDays(in range: ClosedRange<GregorianDay>) throws -> [DiaryDaySummary] {
+        try authorizeRead()
+        return try Self.archiveDays(context: ModelContext(app.container), range: range)
+    }
+
+    func archiveDaysOffMain(in range: ClosedRange<GregorianDay>) async throws -> [DiaryDaySummary] {
+        try authorizeRead()
+        let generation = app.storeGeneration, container = app.container
+        let days = try await Self.readArchiveDays(container: container, range: range)
+        try authorizeRead()
+        try Task.checkCancellation()
+        guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
+        return days
+    }
+
+    @concurrent private static func readArchiveDays(container: ModelContainer, range: ClosedRange<GregorianDay>?) async throws -> [DiaryDaySummary] {
+        try archiveDays(context: ModelContext(container), range: range)
+    }
+
+    nonisolated private static func archiveDays(context: ModelContext, range: ClosedRange<GregorianDay>? = nil) throws -> [DiaryDaySummary] {
+        try Task.checkCancellation()
+        let first = range?.lowerBound.description ?? "", last = range?.upperBound.description ?? "9999-99-99"
+        let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.dayKey >= first && $0.dayKey <= last
+        }, sortBy: [SortDescriptor(\.eventAt)])))
+        let pages = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.dayKey >= first && $0.dayKey <= last
+        }))
+        let margins = try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.writtenDayKey >= first && $0.writtenDayKey <= last
+        }))
+        let niyyas = try context.fetch(FetchDescriptor<Niyya>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.dayKey >= first && $0.dayKey <= last
+        }))
+        let mediaKinds: [UUID: String]
+        if range != nil {
+            let referenced = Set(entries.compactMap(\.mediaID) + entries.flatMap(\.attachmentMediaIDs) + pages.compactMap(\.photoMediaID))
+            mediaKinds = try archiveMediaKinds(context: context, referenced: Array(referenced))
+        } else {
+            mediaKinds = try archiveMediaKinds(context: context, referenced: nil)
+        }
         let entriesByDay = Dictionary(grouping: entries, by: \.dayKey)
         let pagesByDay = Dictionary(grouping: pages, by: \.dayKey)
         let marginsByDay = Dictionary(grouping: margins, by: \.writtenDayKey)
@@ -100,14 +127,15 @@ extension AppDiaryService {
             $0.photoMediaID != nil || !($0.questionAnswer ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
         let keys = Set(entries.map(\.dayKey) + pagesWithContent.map(\.dayKey) + margins.map(\.writtenDayKey) + niyyas.map(\.dayKey))
-        let days = keys.compactMap { key -> DiaryDaySummary? in
+        let days = try keys.compactMap { key -> DiaryDaySummary? in
+            try Task.checkCancellation()
             guard let day = try? GregorianDay(key) else { return nil }
             let rows = entriesByDay[key] ?? []
             let pageRows = pagesByDay[key] ?? []
             let written = rows.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             let linkedMediaIDs = Set(rows.compactMap(\.mediaID) + rows.flatMap(\.attachmentMediaIDs) + pageRows.compactMap(\.photoMediaID))
-                .intersection(activeMediaIDs)
-            let photoIDs = linkedMediaIDs.intersection(photos)
+                .filter { mediaKinds[$0] != nil }
+            let photoIDs = linkedMediaIDs.filter { mediaKinds[$0] == "photo" }
             let notes = marginsByDay[key] ?? []
             let intentions = intentionsByDay[key] ?? []
             let answerExists = pageRows.contains {
@@ -129,6 +157,25 @@ extension AppDiaryService {
                 projectIDs: Set(rows.compactMap(\.projectID)))
         }.sorted { $0.day > $1.day }
         return days
+    }
+
+    nonisolated private static func archiveMediaKinds(context: ModelContext, referenced: [UUID]?) throws -> [UUID: String] {
+        var kinds: [UUID: String] = [:]
+        func read(_ predicate: Predicate<Media>) throws {
+            try Task.checkCancellation()
+            var descriptor = FetchDescriptor<Media>(predicate: predicate, sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
+            descriptor.propertiesToFetch = [\.id, \.kind, \.updatedAt]
+            for media in try context.fetch(descriptor) where kinds[media.id] == nil { kinds[media.id] = media.kind }
+        }
+        if let referenced {
+            for start in stride(from: 0, to: referenced.count, by: 400) {
+                let batch = Array(referenced[start..<min(start + 400, referenced.count)])
+                try read(#Predicate { batch.contains($0.id) && $0.state != "missing" && $0.deletedAt == nil && $0.mergedInto == nil })
+            }
+        } else {
+            try read(#Predicate { $0.state != "missing" && $0.deletedAt == nil && $0.mergedInto == nil })
+        }
+        return kinds
     }
     func archivePhoto(_ id: UUID) throws -> Data? {
         try authorizeRead()

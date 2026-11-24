@@ -23,11 +23,16 @@ struct MoneyExpenseView: View {
     @State private var showInDiary = true
     @State private var details = false
     @State private var date = Date()
+    @State private var expenseDay: GregorianDay?
+    @State private var preparedDraft = false
+    @State private var paymentChosen = false
+    @State private var focusMerchantOnAppear = false
     @State private var saving = false
     @State private var rootBlockerID = UUID()
     @State private var confirmDiscard = false
     @State private var failure: String?
-    @FocusState private var editing: Bool
+    private enum Field { case merchant, amount }
+    @FocusState private var field: Field?
     @State private var commandID = UUID()
     @State private var bigRoute: MoneyBigExpenseRoute?
     private var service: AppMoneyService { .init(app: app) }
@@ -60,8 +65,7 @@ struct MoneyExpenseView: View {
     private func amount(_ value: Int) -> String { visible ? service.amount(value) : "•••" }
     private var split: ExpenseEntry.Split { ExpenseEntry.split(chargeMinor: method?.kind == .cash && reading?.cashCountedAtWithdrawal == true ? 0 : homeMinor, share: share) }
     private var nextHeadline: Headline? {
-        guard let cycle = reading?.cycle else { return nil }
-        guard let day = try? service.expenseDay(at: date) else { return nil }
+        guard let cycle = reading?.cycle, let day = expenseDay else { return nil }
         return ExpenseEntry.headlineAfter(elapsedDays: cycle.elapsedDays, cycle.input, dailySpentMinor: cycle.spent,
             expenseDay: MadarCalendarDays.distance(from: cycle.startDay, to: day) + 1, dailyChargeMinor: split.dailyMinor)
     }
@@ -70,10 +74,18 @@ struct MoneyExpenseView: View {
         ScrollView {
             VStack(spacing: 12) {
                 HStack {
-                    Button { if hasUnsavedInput { editing = false; confirmDiscard = true } else { dismiss() } } label: { Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.madarWaitsForSave()
+                    Button { if hasUnsavedInput { field = nil; confirmDiscard = true } else { dismiss() } } label: { Image(systemName: "xmark").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.madarWaitsForSave()
                         .disabled(saving).accessibilityLabel("إغلاق").accessibilityIdentifier("money-expense-close")
                     Text("سجّل مصروفًا").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer()
-                    Button { details.toggle() } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44) }.accessibilityLabel("تفاصيل المصروف").accessibilityIdentifier("money-expense-details")
+                    Button {
+                        if details { field = nil }
+                        details.toggle()
+                    } label: {
+                        Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44)
+                            .foregroundStyle(details ? theme.background : theme.ink)
+                            .background(details ? theme.ink : .clear, in: Circle())
+                    }.accessibilityLabel(details ? "أخفِ تفاصيل المصروف" : "تفاصيل المصروف")
+                        .accessibilityIdentifier("money-expense-details")
                 }
 #if DEBUG
                 if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIFO_HARNESS"] == "1",
@@ -86,38 +98,36 @@ struct MoneyExpenseView: View {
 #endif
                 if let reading {
                     amountHeading(reading)
-                    if !visible { Button { revealed = true } label: { Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-expense-reveal") }
                     if let code = reading.tripCurrency, code != reading.currency {
                         Picker("عملة المصروف", selection: $foreign) { Text(service.currencyName(code)).tag(true); Text(service.currencyName(reading.currency)).tag(false) }.pickerStyle(.segmented).accessibilityIdentifier("money-expense-currency")
-                        if foreign { Text(figure: reading.tripRate == nil ? "أدخل سعر الرحلة أولًا" : "بعملة البيت " + service.amount(homeMinor)).font(MadarTypography.caption()) }
+                        if foreign {
+                            Text(figure: reading.tripRate == nil ? "أدخل سعر الرحلة أولًا" : "بعملة البيت " + amount(homeMinor))
+                                .font(MadarTypography.caption()).accessibilityIdentifier("money-expense-home-equivalent")
+                        }
                     }
                     if !raw.isEmpty, MoneyAmountInput.minor(raw, exponent: CurrencyExponents.specified.exponent(inputCurrency) ?? 2) == nil {
                         Text("اكتب مبلغًا صحيحًا، مثل ١٢ أو ١٢٫٥").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
                     }
+                    keypad
                     merchantChips(reading)
+                    if details { merchantField }
+                    payment(reading)
                     categorySuggestion(reading)
                     preferredCardSuggestion(reading)
                     shares(reading)
-                    keypad
                     diary(reading)
-                    payment(reading)
                     if details { extraDetails(reading) }
-                    if duplicate { Label("تبدو مسجّلة من قبل؛ راجع السجل قبل تسجيلها مرة أخرى.", systemImage: "doc.on.doc").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-expense-duplicate") }
-                    if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
+                    if !visible {
+                        Button { revealed = true } label: {
+                            Text("أظهر الأرقام").font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle())
+                        }.accessibilityIdentifier("money-expense-reveal")
+                    }
                     if let h = nextHeadline {
                         VStack(spacing: 3) {
                             Text(figure: h.availableNowMinor >= 0 ? "يبقى لك الآن " + amount(h.availableNowMinor) : "تتجاوز الدورة بـ" + amount(-h.availableNowMinor))
-                                .font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color(h.availableNowMinor >= 0 ? "surplusText" : "dueText")).contentTransition(.numericText()).accessibilityIdentifier("money-expense-after")
+                                .font(MadarTypography.section()).foregroundStyle(theme.color(h.availableNowMinor >= 0 ? "surplusText" : "dueText")).contentTransition(.numericText()).accessibilityIdentifier("money-expense-after")
                             Text(figure: "اليوم: صرفت " + amount(h.todaySpentMinor) + " من " + amount(h.todayAllowanceMinor)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                        }.padding(.top, 12)
-                    }
-                    Button(action: save) {
-                        Text(saving ? "جارٍ التسجيل…" : duplicate ? "سجّل عملية أخرى" : "سجّل").font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background)
-                    }.disabled(saving || homeMinor <= 0 || (foreign && inputCurrency != reading.currency && reading.tripRate == nil) || method == nil || (method?.kind != .credit && method?.currency != reading.currency && method?.currency != inputCurrency) || (share != .daily && envelopeID == nil)).accessibilityIdentifier("money-expense-save")
-                    // AU-30: a disabled «سجّل» says what it is waiting for.
-                    if !saving, homeMinor > 0 {
-                        let waiting: String? = method == nil ? "اختر مصدر الدفع" : (method?.kind != .credit && method?.currency != reading.currency && method?.currency != inputCurrency) ? "هذا المصدر بعملة أخرى؛ اختر غيره" : (share != .daily && envelopeID == nil) ? "اختر المظروف الذي يُخصم منه" : nil
-                        if let waiting { Text(waiting).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-expense-waiting") }
+                        }.padding(.top, 4)
                     }
                 } else if let failure { Text(failure); Button("أعِد المحاولة", action: load) }
                 else {
@@ -126,11 +136,28 @@ struct MoneyExpenseView: View {
                     keypad
                 }
             }.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 20).frame(maxWidth: 620).frame(maxWidth: .infinity)
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
+        }.accessibilityIdentifier("money-expense")
+            .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar, .tabBar).hidesRoomAccessory(app, id: "money-expense")
             .scrollDismissesKeyboard(.interactively)
-            .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false } } }
-            .task { await app.seedMoneyDefaults(); load(); if let seed { raw = seed.amount; merchant = seed.merchant; commandID = seed.id; if seed.homeCurrency { foreign = false } } }.accessibilityIdentifier("money-expense")
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let reading, field == nil { saveBar(reading) }
+            }
+            .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { field = nil } } }
+            .task {
+                if !preparedDraft {
+                    preparedDraft = true
+                    if let seed {
+                        raw = seed.amount; merchant = seed.merchant; commandID = seed.id
+                        if seed.homeCurrency { foreign = false }
+                    }
+                }
+                guard reading == nil else { return }
+                await app.seedMoneyDefaults()
+                guard !Task.isCancelled else { return }
+                load()
+            }
+            .onChange(of: date) { expenseDay = try? service.expenseDay(at: date) }
             .fullScreenCover(item: $bigRoute) { route in
                 MoneyBigExpenseView(app: app, route: route, revealed: $revealed) { bigRoute = nil; dismiss() }
             }
@@ -141,6 +168,38 @@ struct MoneyExpenseView: View {
             .madarSheetLock(saving: saving, draft: hasUnsavedInput)
             .onChange(of: hasUnsavedInput || saving, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
             .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }
+    }
+    private func canUse(_ payment: MoneyPaymentChoice, _ r: MoneyExpenseReading) -> Bool {
+        payment.kind == .credit || payment.currency == r.currency || payment.currency == inputCurrency
+    }
+    private func waiting(_ r: MoneyExpenseReading) -> String? {
+        if foreign, inputCurrency != r.currency, r.tripRate == nil { return "أدخل سعر الرحلة أولًا" }
+        if r.methods.isEmpty { return "أضف مصدر دفع أولًا" }
+        guard let method else { return "اختر مصدر الدفع" }
+        if !canUse(method, r) { return "هذا المصدر بعملة أخرى؛ اختر غيره" }
+        if share != .daily && envelopeID == nil { return "اختر المظروف الذي يُخصم منه" }
+        return nil
+    }
+    private func saveBar(_ r: MoneyExpenseReading) -> some View {
+        let blocked = waiting(r)
+        let enabled = !saving && homeMinor > 0 && blocked == nil
+        return VStack(spacing: 6) {
+            if let failure {
+                Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
+            } else if duplicate {
+                Label("تبدو مسجّلة من قبل؛ راجع السجل قبل تسجيلها مرة أخرى.", systemImage: "doc.on.doc")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-expense-duplicate")
+            } else if !saving, minor > 0, let blocked {
+                Text(blocked).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-expense-waiting")
+            }
+            Button(action: save) {
+                Text(saving ? "جارٍ التسجيل…" : duplicate ? "سجّل عملية أخرى" : "سجّل")
+                    .font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50)
+                    .background(theme.ink.opacity(enabled ? 1 : 0.4)).foregroundStyle(theme.background)
+            }.disabled(!enabled).accessibilityIdentifier("money-expense-save")
+        }
+        .padding(.horizontal, 20).padding(.vertical, 8).frame(maxWidth: 620).frame(maxWidth: .infinity)
+        .background(theme.background)
     }
     private func amountHeading(_ r: MoneyExpenseReading? = nil) -> some View {
         VStack(spacing: 0) {
@@ -160,24 +219,35 @@ struct MoneyExpenseView: View {
         return "، " + label
     }
     private func merchantChips(_ r: MoneyExpenseReading) -> some View {
-        ScrollView(.horizontal) {
+        let editTitle = if merchant.isEmpty { "اسم المتجر" }
+            else if r.merchants.contains(where: { $0.name == merchant }) { "عدّل الاسم" }
+            else { merchant }
+        return ScrollView(.horizontal) {
             HStack(spacing: 6) {
                 ForEach(r.merchants) { item in
-                    Button { chooseMerchant(item) } label: { chip(item.name, selected: merchant == item.name) }.accessibilityIdentifier("money-expense-merchant-" + item.name)
+                    Button { chooseMerchant(item) } label: { chip(item.name, selected: merchant == item.name) }
+                        .accessibilityAddTraits(merchant == item.name ? .isSelected : [])
+                        .accessibilityIdentifier("money-expense-merchant-" + item.name)
                 }
-                Button { details = true } label: { chip(merchant.isEmpty ? "اسم المتجر" : merchant, selected: false) }.accessibilityIdentifier("money-expense-merchant-edit")
+                Button {
+                    if details { field = .merchant }
+                    else { focusMerchantOnAppear = true; details = true }
+                } label: { chip(editTitle, selected: false) }.accessibilityIdentifier("money-expense-merchant-edit")
             }
         }.scrollIndicators(.hidden)
     }
     private func chip(_ text: String, selected: Bool) -> some View {
-        Text(text).font(.custom("thmanyahseriftext-Regular", size: 15, relativeTo: .body)).padding(.horizontal, 13).frame(minHeight: 40).background(selected ? theme.ink : .clear).foregroundStyle(selected ? theme.background : theme.ink).clipShape(.capsule).glassEffect(.regular.interactive(), in: .capsule)
+        Text(text).font(.custom("thmanyahseriftext-Regular", size: 15, relativeTo: .body)).padding(.horizontal, 13).frame(minHeight: 44).background(selected ? theme.ink : .clear).foregroundStyle(selected ? theme.background : theme.ink).clipShape(.capsule).glassEffect(.regular.interactive(), in: .capsule)
     }
     private func categorySuggestion(_ r: MoneyExpenseReading) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Image(systemName: "square.fill").font(.system(size: 8)).foregroundStyle(theme.color("accentText"))
                 Text("التصنيف").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                Menu { ForEach(r.categories) { c in Button(c.name) { categoryID = c.id; categorySource = "manual" } }; Button("بلا تصنيف") { categoryID = nil; categorySource = nil } } label: { Text(r.categories.first { $0.id == categoryID }?.name ?? "اختر تصنيفًا").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)) }
+                Menu { ForEach(r.categories) { c in Button(c.name) { categoryID = c.id; categorySource = "manual" } }; Button("بلا تصنيف") { categoryID = nil; categorySource = "manual" } } label: {
+                    Text(r.categories.first { $0.id == categoryID }?.name ?? (categorySource == "manual" ? "بلا تصنيف" : "اختر تصنيفًا"))
+                        .font(MadarTypography.section()).frame(minHeight: 44)
+                }
                     .accessibilityIdentifier("money-expense-category")
                 Spacer()
             }
@@ -190,13 +260,17 @@ struct MoneyExpenseView: View {
         }.padding(11).frame(minHeight: 44).overlay { Rectangle().stroke(theme.color("reserveText"), style: StrokeStyle(lineWidth: 1, dash: [3, 2])) }
     }
     private func chooseMerchant(_ item: MoneyExpenseMerchant) {
-        let sameMerchant = BankDedupe.normalize(merchant) == BankDedupe.normalize(item.name)
         merchant = item.name
-        if !sameMerchant || categorySource != "manual" {
+        if categorySource != "manual" {
             categoryID = item.categoryID
             categorySource = item.categorySource
         }
-        if let id = item.methodID { methodID = id }
+        if !paymentChosen, let reading, let suggestion = reading.methods.first(where: { $0.id == item.methodID }),
+           canUse(suggestion, reading) { selectPayment(suggestion, reading) }
+    }
+    private func selectPayment(_ payment: MoneyPaymentChoice, _ r: MoneyExpenseReading) {
+        methodID = payment.id
+        if payment.kind == .cash && r.cashCountedAtWithdrawal && r.tripEnvelopeID == nil { share = .daily }
     }
     @ViewBuilder private func preferredCardSuggestion(_ r: MoneyExpenseReading) -> some View {
         if let category = r.categories.first(where: { $0.id == categoryID }),
@@ -211,7 +285,7 @@ struct MoneyExpenseView: View {
                             .accessibilityIdentifier("money-expense-preferred-card-name")
                     }
                     Spacer(minLength: 6)
-                    Button { methodID = payment.id } label: {
+                    Button { paymentChosen = true; selectPayment(payment, r) } label: {
                         Text(selected ? "مختارة للدفع" : "استخدمها للدفع").font(MadarTypography.fine().weight(.semibold))
                             .frame(minWidth: 96, minHeight: 44)
                     }
@@ -233,7 +307,7 @@ struct MoneyExpenseView: View {
             HStack(spacing: 5) {
                 ForEach(ExpenseEntry.Share.allCases, id: \.rawValue) { s in
                     Button { share = s; if envelopeID == nil { envelopeID = r.envelopes.first?.id } } label: {
-                        Text(shareTitle(s)).font(MadarTypography.fine()).frame(maxWidth: .infinity, minHeight: 33).background(share == s ? theme.ink : .clear).foregroundStyle(share == s ? theme.background : theme.ink).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) }
+                        Text(shareTitle(s)).font(MadarTypography.fine()).frame(maxWidth: .infinity, minHeight: 44).background(share == s ? theme.ink : .clear).foregroundStyle(share == s ? theme.background : theme.ink).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) }
                     }.disabled(s != .daily && (r.envelopes.isEmpty || (method?.kind == .cash && r.cashCountedAtWithdrawal))).accessibilityIdentifier("money-expense-share-" + s.rawValue)
                 }
             }
@@ -274,16 +348,30 @@ struct MoneyExpenseView: View {
         if reduceMotion { update() } else { withAnimation(.easeOut(duration: 0.16), update) }
     }
     private func diary(_ r: MoneyExpenseReading) -> some View {
-        Button { showInDiary.toggle() } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Image(systemName: showInDiary ? "pencil.line" : "eye.slash")
-                Text(figure: r.diaryOn ? (showInDiary ? "يدخل صفحة اليوم: «صرفت " + service.amount(minor) + (merchant.isEmpty ? "»" : " في " + merchant + "»") : "لن يظهر في صفحة اليوم") : "سطور المال مخفية من المذكرات في الإعدادات")
-            }.font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity, minHeight: 30)
-        }.accessibilityIdentifier("money-expense-diary").accessibilityValue(showInDiary ? "ظاهر" : "مخفي")
+        VStack(alignment: .leading, spacing: 3) {
+            if r.diaryOn {
+                Button { showInDiary.toggle() } label: {
+                    Label(showInDiary ? "يظهر في المذكرات" : "مخفي من المذكرات", systemImage: showInDiary ? "pencil.line" : "eye.slash")
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                }.accessibilityIdentifier("money-expense-diary").accessibilityValue(showInDiary ? "ظاهر" : "مخفي")
+            } else {
+                Text("سطور المال مخفية من المذكرات في الإعدادات").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            }
+        }
     }
     private func payment(_ r: MoneyExpenseReading) -> some View {
-        VStack(spacing: 7) {
-            ScrollView(.horizontal) { HStack(spacing: 7) { ForEach(r.methods) { m in Button { methodID = m.id; if m.kind == .cash && r.cashCountedAtWithdrawal { share = .daily } } label: { chip(m.title, selected: methodID == m.id) }.disabled(m.kind != .credit && m.currency != r.currency && m.currency != inputCurrency).accessibilityIdentifier("money-expense-method-" + m.title) } } }.scrollIndicators(.hidden)
+        VStack(alignment: .leading, spacing: 7) {
+            Text("مصدر الدفع").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            ScrollView(.horizontal) {
+                HStack(spacing: 7) {
+                    ForEach(r.methods) { m in
+                        Button { paymentChosen = true; selectPayment(m, r) } label: { chip(m.title, selected: methodID == m.id) }
+                            .disabled(!canUse(m, r)).accessibilityAddTraits(methodID == m.id ? .isSelected : [])
+                            .accessibilityIdentifier("money-expense-method-" + m.title)
+                    }
+                }
+            }.scrollIndicators(.hidden)
             if r.methods.isEmpty { Text("أضف حسابًا من «الحسابات» أو بطاقة من «البطاقات» أولًا.").font(MadarTypography.body()) }
             else if let m = method {
                 if m.kind == .credit {
@@ -291,13 +379,25 @@ struct MoneyExpenseView: View {
                     if let due = m.purchaseDue { MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                 } else { Text(m.kind == .cash && r.cashCountedAtWithdrawal ? "احتُسب عند السحب؛ لن يُخصم من يومك مرة أخرى." : "يخرج النقد الآن من " + (m.accountName ?? m.title)).font(MadarTypography.fine()).foregroundStyle(theme.color("accentText")) }
             }
-            Text("أغلب عملياتك تدخل من رسائل البنك").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         }
+    }
+    private var merchantField: some View {
+        TextField("اسم المتجر، إن أردت", text: merchantInput)
+            .textInputAutocapitalization(.never).focused($field, equals: .merchant)
+            .submitLabel(.done).onSubmit { field = nil }
+            .font(MadarTypography.body()).padding(.horizontal, 12).frame(minHeight: 44)
+            .background(theme.surface).accessibilityIdentifier("money-expense-merchant-field")
+            .onAppear {
+                if focusMerchantOnAppear {
+                    focusMerchantOnAppear = false
+                    field = .merchant
+                }
+            }
     }
     private func extraDetails(_ r: MoneyExpenseReading) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            TextField("اسم المتجر، إن أردت", text: merchantInput).textInputAutocapitalization(.never).focused($editing).font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-expense-merchant-field")
-            TextField("المبلغ، مع الكسور إن احتجت", text: $raw).keyboardType(.decimalPad).focused($editing).font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-expense-precise-amount")
+            TextField("المبلغ، مع الكسور إن احتجت", text: $raw).keyboardType(.decimalPad).focused($field, equals: .amount)
+                .font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-expense-precise-amount")
             DatePicker("وقت المصروف", selection: $date, in: r.earliest...app.prayerNow(), displayedComponents: [.date, .hourAndMinute]).font(MadarTypography.caption())
             MadarDateLabel(app.dateLabels(.containing(date, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
         }.padding(12).background(theme.surface)
@@ -307,14 +407,19 @@ struct MoneyExpenseView: View {
             let r = try service.loadExpense()
             reading = r
             let requestedMethod = seed?.method.flatMap { requested in r.methods.contains(where: { $0.id == requested }) ? requested : nil }
-            methodID = requestedMethod ?? r.defaultMethodID ?? ""
-            date = app.prayerNow(); failure = nil
+            if let id = requestedMethod ?? r.defaultMethodID, let payment = r.methods.first(where: { $0.id == id }) {
+                selectPayment(payment, r)
+            }
+            expenseDay = r.today; date = app.prayerNow(); failure = nil
             if let id = r.tripEnvelopeID { envelopeID = id; share = .envelope }
+            if let suggestion = currentMerchantLearning?.suggestedCategoryID, categorySource != "manual" {
+                categoryID = suggestion; categorySource = "learned"
+            }
         }
         catch { failure = "لم تكتمل قراءة مصادر الدفع. حاول مرة أخرى." }
     }
     private func save() {
-        guard !saving, minor > 0, let m = method, let r = reading else { return }
+        guard !saving, homeMinor > 0, let m = method, let r = reading, waiting(r) == nil else { return }
         var p: [String: MadarCore.JSONValue] = ["amountMinor": .string(String(minor)), "currency": .string(inputCurrency), "merchant": .string(merchant), "method": .string(m.kind == .cash ? "cash" : m.cardID == nil ? "transfer" : "card"), "eventAt": .string(ISO8601DateFormatter().string(from: date)), "showInDiary": .bool(showInDiary)]
         if let id = m.cardID { p["cardID"] = .string(id.uuidString) } else if let id = m.accountID { p["fromAccountID"] = .string(id.uuidString) }
         if let id = categoryID { p["categoryID"] = .string(id.uuidString) }

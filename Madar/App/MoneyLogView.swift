@@ -35,7 +35,10 @@ struct MoneyLogView: View {
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
     private func amount(_ n: Int) -> String { visible ? service.amount(n) : "•••" }
-    private var chosen: MoneyLogDay? { reading?.arcadeDays.first { $0.day == selected } ?? reading?.days.last { $0.day <= reading!.today } ?? reading?.days.first }
+    private var chosen: MoneyLogDay? {
+        guard let reading else { return nil }
+        return reading.arcadeDays.first { $0.day == selected } ?? reading.days.last { $0.day <= reading.today } ?? reading.days.first
+    }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -54,24 +57,39 @@ struct MoneyLogView: View {
                     .accessibilityIdentifier("money-log-refreshing")
                     .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                 }
-                if let reading {
+                if let failure {
+                    HStack(spacing: 8) {
+                        Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Button("أعِد المحاولة", action: load).frame(minHeight: 44).accessibilityIdentifier("money-log-retry")
+                    }
+                }
+                if !app.protectedDataAuthorized {
+                    Text("يُتاح سجل المال عند فتح الجهاز.").font(MadarTypography.body())
+                } else if let reading {
                     if initialRouteMissing {
                         Text("هذه الحركة لم تعد موجودة في السجل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                             .accessibilityIdentifier("money-log-route-unavailable")
                     }
+                    if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     ScrollView(.horizontal) {
                         HStack(spacing: 8) {
                             ForEach(reading.monthStarts, id: \.description) { start in
-                                Button { month = start; selected = nil; load() } label: {
+                                Button {
+                                    guard month != start || failure != nil else { return }
+                                    month = start
+                                    load()
+                                } label: {
                                     let labels = service.logMonthLabels(start)
                                     VStack(alignment: .leading, spacing: 1) { Text(labels.primary).font(.custom("thmanyahserifdisplay-Bold", size: 16, relativeTo: .subheadline)); Text(labels.secondary).font(MadarTypography.fine()).opacity(0.8) }.padding(.horizontal, 12).padding(.vertical, 6)
                                         .background(start == reading.monthStart ? theme.ink : theme.surface, in: UnevenRoundedRectangle(topLeadingRadius: 14, topTrailingRadius: 14))
                                         .overlay { if start != reading.monthStart { UnevenRoundedRectangle(topLeadingRadius: 14, topTrailingRadius: 14).stroke(theme.line, lineWidth: 1) } }
                                         .foregroundStyle(start == reading.monthStart ? theme.background : theme.ink)
-                                }.buttonStyle(.madarPlain).accessibilityIdentifier("money-log-month-" + start.description)
+                                }.buttonStyle(.madarPlain).accessibilityAddTraits(start == reading.monthStart ? .isSelected : [])
+                                    .accessibilityIdentifier("money-log-month-" + start.description)
                             }
                         }
                     }.scrollIndicators(.hidden)
+                    }
                     if searching || !query.isEmpty {
                         HStack(spacing: 8) { Image(systemName: "magnifyingglass"); TextField("التاجر أو المبلغ", text: $query).font(MadarTypography.body()).focused($searchFocused).submitLabel(.search).onSubmit { searchFocused = false }.autocorrectionDisabled().accessibilityIdentifier("money-log-search"); Button { query = ""; searching = false; searchFocused = false } label: { Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("مسح البحث") }.padding(.horizontal, 12).frame(minHeight: 44).background(theme.surface, in: Capsule()).glassEffect(.regular.interactive(), in: .capsule)
                     }
@@ -87,16 +105,26 @@ struct MoneyLogView: View {
                         else if calendarMode { monthGrid(reading) }
                         else { arcade(reading) }
                         if let chosen { detail(chosen, reading: reading) }
+                        monthSummary(reading)
                     } else {
                         searchResults(reading)
                     }
-                    monthSummary(reading)
-                } else if let failure { Text(failure).font(MadarTypography.body()); Button { load() } label: { Text("أعِد المحاولة").frame(minHeight: 44).contentShape(Rectangle()) } }
-                else { ProgressView().frame(maxWidth: .infinity, minHeight: 220) }
+                } else if failure == nil { ProgressView().frame(maxWidth: .infinity, minHeight: 220) }
             }.padding(.horizontal, 20).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task(id: initialRouteRequestID) { load() }
             .onChange(of: app.moneyRevision) { load() }
+            .onChange(of: app.protectedDataAuthorized) { _, authorized in
+                if authorized { load() }
+                else {
+                    readingLoadTask?.cancel()
+                    reading = nil
+                    source = nil
+                    editing = nil
+                    failure = nil
+                    isRefreshing = false
+                }
+            }
             .onDisappear { readingLoadTask?.cancel(); readingLoadTask = nil }
             .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
             .sheet(item: $editing) { MoneyMovementEditSheet(app: app, movement: $0, visible: visible).environment(\.roomTheme, theme) }
@@ -184,11 +212,7 @@ struct MoneyLogView: View {
         return formatter.string(from: day.date(in: app.activePlace.timeZone).addingTimeInterval(43200))
     }
     private func detail(_ d: MoneyLogDay, reading r: MoneyLogReading) -> some View {
-        let rows = r.movements.filter { row in
-            guard row.day == d.day else { return false }
-            func normalized(_ s: String) -> String { BankDedupe.normalize(s).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "ar")).filter { $0.isLetter || $0.isNumber } }
-            return matchesFilter(row) && (query.isEmpty || normalized(row.title + row.category + row.payment + (visible ? service.amount(row.amountMinor) : "")).contains(normalized(query)))
-        }
+        let rows = r.movements.filter { $0.day == d.day && matchesFilter($0) }
         return VStack(alignment: .leading, spacing: 14) {
             DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.8).frame(height: 3)
             let title = MadarDateLabel(app.dateLabels(d.day, weekday: true), primaryFont: MadarTypography.cardTitle(), secondaryFont: MadarTypography.caption())
@@ -273,11 +297,18 @@ struct MoneyLogView: View {
     @ViewBuilder private func searchResults(_ r: MoneyLogReading) -> some View {
         let rows = matchingMovements(r)
         if rows.isEmpty {
-            Text("لا حركة تطابق بحثك.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                .accessibilityIdentifier("money-log-search-empty")
+            VStack(alignment: .leading, spacing: 6) {
+                Text("لا حركة تطابق بحثك.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                    .accessibilityIdentifier("money-log-search-empty")
+                if filter != "all" {
+                    Button("ابحث في كل الحركات") { filter = "all" }
+                        .font(MadarTypography.caption()).frame(minHeight: 44)
+                        .accessibilityIdentifier("money-log-search-clear-filter")
+                }
+            }
         } else {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("نتائج البحث: " + service.digits.string(rows.count)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            LazyVStack(alignment: .leading, spacing: 8) {
+                Text("نتائج البحث في كل الشهور: " + service.digits.string(rows.count)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 ForEach(rows) { row in
                     Button { open(row) } label: {
                         HStack(spacing: 12) {
@@ -348,6 +379,7 @@ struct MoneyLogView: View {
                         initialRouteApplied = true
                     }
                 } else {
+                    let monthChanged = reading?.monthStart != loaded.monthStart
                     reading = loaded
                     if appliesNewRoute {
                         query = initialQuery ?? ""
@@ -358,14 +390,15 @@ struct MoneyLogView: View {
                         if let initialQuery { query = initialQuery; searching = true }
                         initialRouteApplied = true
                     }
-                    if selected == nil { selected = loaded.days.last { $0.day <= loaded.today }?.day ?? loaded.days.first?.day }
+                    if selected == nil || monthChanged {
+                        selected = loaded.days.last { $0.day <= loaded.today }?.day ?? loaded.days.first?.day
+                    }
                 }
                 if appliesNewRoute { routeRequestTracker.markApplied(requestID) }
                 failure = nil
                 withAnimation(MadarMotion.quick.animation(reduceMotion: reduceMotion)) { isRefreshing = false }
             } catch {
                 guard !Task.isCancelled, activeReadingLoadID == loadID else { return }
-                reading = nil
                 failure = "لم تكتمل قراءة السجل. حاول مرة أخرى."
                 withAnimation(MadarMotion.quick.animation(reduceMotion: reduceMotion)) { isRefreshing = false }
             }

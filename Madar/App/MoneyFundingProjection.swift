@@ -48,7 +48,7 @@ enum MoneyHomeProjectionBuilder {
     static func fundingProjections(context: ModelContext, cycle: MoneyCycleReading?, today: GregorianDay, now: Date, zone: TimeZone,
                                    envelopes: [Envelope], plans: [EnvelopePlan], allocations: [Allocation],
                                    balances: [UUID: Int], surplus: Int, reserve: Int) throws -> [UUID: MoneyGoalFundingProjection] {
-        guard let cycle else { return [:] }
+        guard let cycle, envelopes.contains(where: { !["reserve", "surplus"].contains($0.role) }) else { return [:] }
         let settings = try SettingsStore(context: context)
         let dates = try salaryForecastDays(context: context, cycle: cycle, today: today, zone: zone)
         guard let last = dates.last else { return [:] }
@@ -79,10 +79,11 @@ enum MoneyHomeProjectionBuilder {
             guard let id = plan.envelopeID else { return nil }; return (plan.id.uuidString, id.uuidString)
         })
         var caps: [String: Int] = [:]
+        let fundedByEnvelope = MoneyRepository.goalFundingTotals(allocations)
         for plan in sorted where plan.source == "daily" {
-            guard let envelope = envelopes.first(where: { $0.id == plan.envelopeID && $0.role == "goal" }), let target = envelope.targetMinor else { continue }
-            let funded = allocations.filter { $0.targetID == envelope.id && $0.kind == "fund" && $0.amountMinor > 0 }.reduce(0) { $0 + $1.amountMinor }
-            caps[plan.id.uuidString] = max(0, target - funded)
+            guard let envelope = envelopes.first(where: { $0.id == plan.id && $0.id == plan.envelopeID && $0.role == "goal" }),
+                  let target = envelope.targetMinor else { continue }
+            caps[plan.id.uuidString] = max(0, target - (fundedByEnvelope[envelope.id] ?? 0))
         }
         let startOffset = MadarCalendarDays.distance(from: today, to: cycle.startDay)
         var windows: [FundingProjectionCycle] = [.init(start: startOffset, firstDay: cycle.elapsedDays + 1,

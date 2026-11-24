@@ -3,7 +3,8 @@ import XCTest
 @testable import MadarMoney
 
 /// RM6: the owner's real bank messages, kept only on this Mac in Madar/Private/bank-messages (git-ignored).
-/// Skipped when the folder is absent. Writes aggregate counts only to Madar/Artifacts/bank-corpus-report.json and redacted layouts to the git-ignored local guide.
+/// Requires MADAR_TEST_OWNER_BANK_CORPUS=1. Writes aggregate counts only to Madar/Artifacts/bank-corpus-report.json
+/// and redacted layouts to the git-ignored local guide.
 final class BankCorpusTests: XCTestCase {
     private struct Line: Decodable { let sender: String; let date: String; let text: String }
     private struct Layout { var count = 0; var kinds: [String: Int] = [:]; var missing = Set<String>() }
@@ -168,6 +169,9 @@ final class BankCorpusTests: XCTestCase {
     }
 
     func testOwnerCorpusReport() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_TEST_OWNER_BANK_CORPUS"] == "1" else {
+            throw XCTSkip("Owner bank corpus requires MADAR_TEST_OWNER_BANK_CORPUS=1.")
+        }
         let folder = Self.madar.appendingPathComponent("Private/bank-messages")
         guard let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).filter({ $0.pathExtension == "jsonl" }), !files.isEmpty else {
             throw XCTSkip("No local bank-message corpus on this machine.")

@@ -3,7 +3,7 @@ import XCTest
 @testable import MadarMoney
 
 /// D3 (owner, 11 Nov 2026): the merchant rule checked against the owner's real messages, locally and read-only. Skipped when the
-/// git-ignored corpus is absent. Prints counts only: never a merchant name, an amount or message text. A second word is named only when
+/// git-ignored corpus is absent or MADAR_TEST_OWNER_BANK_CORPUS=1 was not set. Prints counts only. A second word is named only when
 /// it is in the fixed candidate list below; any other second word is counted as «other».
 final class MerchantKeyCorpusTests: XCTestCase {
     private struct Line: Decodable { let sender: String; let date: String; let text: String }
@@ -13,6 +13,9 @@ final class MerchantKeyCorpusTests: XCTestCase {
         "sa", "ksa", "retail", "services", "help", "bv", "eu", "video", "music", "now", "plus", "quik", "box", "ايتس", "فود", "باي", "برايم"]
 
     func testMerchantRuleAgainstOwnerCorpus() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_TEST_OWNER_BANK_CORPUS"] == "1" else {
+            throw XCTSkip("Owner bank corpus requires MADAR_TEST_OWNER_BANK_CORPUS=1.")
+        }
         let folder = Self.madar.appendingPathComponent("Private/bank-messages")
         guard let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).filter({ $0.pathExtension == "jsonl" }), !files.isEmpty else {
             throw XCTSkip("No local bank-message corpus on this machine.")

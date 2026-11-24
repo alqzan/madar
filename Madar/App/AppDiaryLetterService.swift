@@ -27,17 +27,22 @@ extension AppDiaryService {
     func letters() throws -> [DiaryLetterCard] {
         try authorizeRead()
         let context = ModelContext(app.container)
+        let rows = try context.fetch(FetchDescriptor<Letter>(
+            predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        ))
+        guard !rows.isEmpty else { return [] }
         let projects = Dictionary(try context.fetch(FetchDescriptor<Project>()).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
-        return try context.fetch(FetchDescriptor<Letter>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.createdAt, order: .reverse)])).compactMap { row in
+        let locations = try? PrayerRepository(context: context)
+        let fallbackPlace = app.activePlace
+        return rows.compactMap { row in
             guard let state = DiaryLetterState(rawValue: row.state), let trigger = DiaryLetterTrigger(rawValue: row.triggerKind) else { return nil }
-            return .init(id: row.id, state: state, writtenDay: writtenDay(row.createdAt), waitingFor: waitingFor(trigger, value: row.triggerValue, target: row.triggerTargetID.flatMap { projects[$0] }),
+            // Letters have no day key. Use the place active when each letter was written.
+            let place = locations?.place(at: row.createdAt) ?? fallbackPlace
+            let day = GregorianDay.containing(row.createdAt, in: place.timeZone)
+            return .init(id: row.id, state: state, writtenDay: day, waitingFor: waitingFor(trigger, value: row.triggerValue, target: row.triggerTargetID.flatMap { projects[$0] }),
                          text: state == .opened ? row.text : nil, openedAt: row.openedAt)
         }
-    }
-    /// Display only: Letter stores no day, so the written day is read from createdAt in the place active then.
-    func writtenDay(_ at: Date) -> GregorianDay {
-        let place = (try? PrayerRepository(context: ModelContext(app.container)).place(at: at)) ?? app.activePlace
-        return GregorianDay.containing(at, in: place.timeZone)
     }
     func waitingFor(_ trigger: DiaryLetterTrigger, value: String?, target: String?) -> String {
         switch trigger {
@@ -105,8 +110,13 @@ extension AppDiaryService {
     }
     /// Opens once and returns the text; reading an opened letter again changes nothing.
     func openLetter(_ id: UUID) async throws -> String {
+        let container = app.container
         try await command("diary.openLetter", ["id": .string(id.uuidString)])
-        guard let row = try ModelContext(app.container).fetch(FetchDescriptor<Letter>(predicate: #Predicate { $0.id == id })).first, row.state == DiaryLetterState.opened.rawValue else { throw DataError.invalidValue("missing letter") }
+        try authorizeRead()
+        guard app.container === container else { throw CancellationError() }
+        guard let row = try ModelContext(container).fetch(FetchDescriptor<Letter>(
+            predicate: #Predicate { $0.id == id && $0.state == "opened" && $0.deletedAt == nil && $0.mergedInto == nil }
+        )).first else { throw DataError.invalidValue("missing letter") }
         return row.text
     }
     func rescheduleLetter(_ id: UUID, to date: Date) async throws {

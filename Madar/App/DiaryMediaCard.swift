@@ -301,18 +301,24 @@ struct DiaryDataThumbnail<Content: View>: View {
     let data: Data
     var maxPixel: CGFloat = 400
     @ViewBuilder let content: (Image) -> Content
-    @State private var image: UIImage?
+    @State private var thumbnail: (source: Data, image: UIImage)?
     var body: some View {
         Group {
-            if let image { content(Image(uiImage: image)) } else { Color.clear }
-        }.task(id: data.count) {
+            if let thumbnail, thumbnail.source == data {
+                content(Image(uiImage: thumbnail.image))
+            } else {
+                Color.clear
+            }
+        }.task(id: data) {
             let source = data, side = maxPixel
-            image = await Task.detached(priority: .utility) { () -> UIImage? in
+            let decoded = await Task.detached(priority: .utility) { () -> UIImage? in
                 let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: side]
                 guard let imageSource = CGImageSourceCreateWithData(source as CFData, nil),
                       let cg = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) else { return UIImage(data: source) }
                 return UIImage(cgImage: cg)
             }.value
+            guard !Task.isCancelled else { return }
+            thumbnail = decoded.map { (source, $0) }
         }
     }
 }

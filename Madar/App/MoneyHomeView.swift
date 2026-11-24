@@ -156,9 +156,10 @@ struct MoneyHomeView: View {
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task(id: roomVisit) {
             await app.seedMoneyDefaults()
-            await app.rereadStoredBankMessages()
-            // Show the saved reading before the bounded accrual command; refresh it when that write settles.
+            // Show the saved reading before old-message maintenance and plan accrual.
             await loadAndWait()
+            guard !Task.isCancelled else { return }
+            await app.rereadStoredBankMessages()
             guard !Task.isCancelled else { return }
             // Opening the room must not write on every visit (hangs on tab switches): accrue at most once every 5 minutes.
             if Date().timeIntervalSince(Self.lastAccrual) > 300 {

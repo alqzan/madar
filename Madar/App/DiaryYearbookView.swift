@@ -19,14 +19,15 @@ struct DiaryYearbookView:View {
     /// Bumped by every clear, so a file finished after the screen moved on is deleted, never kept.
     @State private var generation = 0
     @State private var preview=false
-    @State private var busy=false
+    @State private var preparation: Task<Void, Never>?
     @State private var failure:String?
     @State private var attempt = 0
 #if DEBUG
     @State private var loadCount = 0
 #endif
     private var service:AppDiaryService{.init(app:app)}
-    private var selectedYear:Int{year ?? (try? service.currentDay().year) ?? Calendar.current.component(.year,from:.now)}
+    private var selectedYear: Int { year ?? years.first ?? GregorianDay.containing(.now, in: app.activePlace.timeZone).year }
+    private var busy: Bool { preparation != nil }
     private var bookColor:Color{MadarToken.colors["rooms.notes.lockCover.leather"] ?? theme.accent}
     private var coverInk:Color{MadarToken.colors["rooms.notes.lockCover.text"] ?? theme.background}
     var body:some View {
@@ -73,19 +74,24 @@ struct DiaryYearbookView:View {
                 }catch{pages=[];failure=madarUserMessage(error)}}
                 .onChange(of:year){_,_ in load()}.onChange(of:margins){_,_ in load()}.onChange(of:sources){_,_ in load()}.onChange(of:photos){_,_ in load()}.onChange(of:includeIndex){_,_ in clear()}
                 .onChange(of:phase){_,v in if v == .background {preview=false;clear()}}
+                .onChange(of: app.protectedDataAuthorized) { _, authorized in
+                    if authorized { attempt += 1 }
+                    else { preview = false; pages = []; years = []; clear() }
+                }
                 .sheet(isPresented:$preview){if let artifact {DiaryQuickLook(url:artifact.url)}}
                 .onDisappear{clear()}
         }
     }
     private func yearOption(_ year:Int)->some View {
-        let labels=app.yearLabels(year)
+        let labels=app.yearLabels(year, first: app.diaryFirstCalendar)
         let primary=Text(labels.primary).font(DiaryType.label)
         let secondary=Text(labels.secondary).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         return Text("\(primary)\n\(secondary)")
             .accessibilityLabel(labels.combined)
     }
     private var cover:some View {
-        VStack(spacing:20){Text("مذكرات").font(.custom("thmanyahserifdisplay-Bold",size:32,relativeTo:.largeTitle));Rectangle().fill(coverInk.opacity(0.6)).frame(width:60,height:1);VStack(spacing: 4) { Text(app.yearLabels(selectedYear).primary).font(.custom("thmanyahseriftext-Bold",size:26,relativeTo:.largeTitle)).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.85).padding(.horizontal,12); Text(app.yearLabels(selectedYear).secondary).font(DiaryType.label) };Text(pages.isEmpty ? "لا أيام بعد" : arabicCount(pages.count,["يوم واحد محفوظ","يومان محفوظان","أيام محفوظة","يومًا محفوظًا"],service.digits)).font(DiaryType.label)}
+        let dates = app.yearLabels(selectedYear, first: app.diaryFirstCalendar)
+        return VStack(spacing:20){Text("مذكرات").font(.custom("thmanyahserifdisplay-Bold",size:32,relativeTo:.largeTitle));Rectangle().fill(coverInk.opacity(0.6)).frame(width:60,height:1);VStack(spacing: 4) { Text(dates.primary).font(.custom("thmanyahseriftext-Bold",size:26,relativeTo:.largeTitle)).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.85).padding(.horizontal,12); Text(dates.secondary).font(DiaryType.label) };Text(pages.isEmpty ? "لا أيام بعد" : arabicCount(pages.count,["يوم واحد محفوظ","يومان محفوظان","أيام محفوظة","يومًا محفوظًا"],service.digits)).font(DiaryType.label)}
             .foregroundStyle(coverInk).frame(width:210,height:280).background(bookColor,in:.rect(topLeadingRadius:4,bottomLeadingRadius:4,bottomTrailingRadius:10,topTrailingRadius:10))
             .overlay(alignment:.trailing){Rectangle().fill(.black.opacity(0.14)).frame(width:10)}.shadow(color:theme.ink.opacity(0.2),radius:16,x:5,y:14).padding(.vertical,4).accessibilityElement(children:.combine).accessibilityIdentifier("diary-book-cover")
     }
@@ -97,7 +103,23 @@ struct DiaryYearbookView:View {
         }.background(theme.line).clipShape(.rect(cornerRadius:4)).shadow(color:theme.ink.opacity(0.12),radius:8,y:7)
     }
     private func previewPage(_ page:DiaryExportPage)->some View {
-        VStack(alignment:.leading,spacing:8){MadarDateLabel(page.title);ForEach(Array(page.lines.prefix(4))){line in Text(AppDiaryService.exportLabel(line.kind)+line.text).font(.custom("thmanyahseriftext-Regular",size:12,relativeTo:.caption)).foregroundStyle(line.kind=="margin" ? theme.color("pencil"):theme.ink).lineLimit(3)};if photos,let item=page.media.first(where:{$0.kind=="photo"}),let image=UIImage(data:item.data){Image(uiImage:image).resizable().scaledToFill().frame(height:50).clipped()};Spacer(minLength:0)}.frame(maxWidth:.infinity,alignment:.leading).frame(minHeight:155,alignment:.top).padding(10).background(theme.surface)
+        VStack(alignment: .leading, spacing: 8) {
+            MadarDateLabel(page.title)
+            ForEach(Array(page.lines.prefix(4))) { line in
+                Text(AppDiaryService.exportLabel(line.kind) + line.text)
+                    .font(.custom("thmanyahseriftext-Regular", size: 12, relativeTo: .caption))
+                    .foregroundStyle(line.kind == "margin" ? theme.color("pencil") : theme.ink)
+                    .lineLimit(3)
+            }
+            if photos, let item = page.media.first(where: { $0.kind == "photo" }) {
+                Color.clear.frame(height: 50).overlay {
+                    DiaryDataThumbnail(data: item.data, maxPixel: 420) { $0.resizable().scaledToFill() }
+                }.clipped()
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).frame(minHeight: 155, alignment: .top)
+        .padding(10).background(theme.surface)
     }
     private func load(){clear();pages=[];do{
         #if DEBUG
@@ -111,6 +133,27 @@ struct DiaryYearbookView:View {
         #endif
         pages=try service.yearbookPages(year:selectedYear,margins:margins,sources:sources,photos:photos);failure=nil
     }catch{pages=[];failure=madarUserMessage(error)}}
-    private func prepare(){busy=true;failure=nil;clear();let started=generation;Task{@MainActor in await Task.yield();defer{busy=false};do{let made=try service.exportYearbook(pages:pages,year:selectedYear,index:includeIndex);if started == generation {artifact=made}else{try? FileManager.default.removeItem(at:made.url.deletingLastPathComponent())}}catch{failure=madarUserMessage(error)}}}
-    private func clear(){generation += 1;if let artifact {try? FileManager.default.removeItem(at:artifact.url.deletingLastPathComponent())};artifact=nil}
+    private func prepare() {
+        clear()
+        failure = nil
+        let started = generation, selectedPages = pages, selectedYear = selectedYear, withIndex = includeIndex
+        preparation = Task {
+            do {
+                let made = try await service.exportYearbook(pages: selectedPages, year: selectedYear, index: withIndex)
+                if started == generation { artifact = made }
+                else { try? FileManager.default.removeItem(at: made.url.deletingLastPathComponent()) }
+            } catch is CancellationError {
+            } catch {
+                if started == generation { failure = madarUserMessage(error) }
+            }
+            if started == generation { preparation = nil }
+        }
+    }
+    private func clear() {
+        generation += 1
+        preparation?.cancel()
+        preparation = nil
+        if let artifact { try? FileManager.default.removeItem(at: artifact.url.deletingLastPathComponent()) }
+        artifact = nil
+    }
 }

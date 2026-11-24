@@ -253,18 +253,18 @@ struct DiaryDayView: View {
                     ScrollViewReader { proxy in
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 0) {
-                                if inlineWriting, let intentionFollowUp {
+                                if canReadDiary, inlineWriting, let intentionFollowUp {
                                     IntentionReviewCard(app: app, item: intentionFollowUp, saved: { onIntentionFollowUpSaved?($0) })
                                         .id("\(intentionFollowUp.id)-\(intentionFollowUp.period)")
                                         .padding(.horizontal, 18).padding(.bottom, 12)
                                 }
-                                if let page {
+                                if let page, page.day == shownDay, canReadDiary {
                                     // 10 Nov owner design: the day is one flow — the day's library photos on top, then every line, recording and attachment in the order it happened.
                                     if travel == nil { dayPhotoStrip }
                                     let flow = page.lines.filter { $0.kind != "intention" }
                                     let mediaByEntry = Dictionary(grouping: page.media, by: \.entryID)
                                     let runs = autoRuns(flow, mediaByEntry: mediaByEntry)
-                                    ForEach(Array(flow.enumerated()), id: \.element.id) { index, line in
+                                    ForEach(flow, id: \.id) { line in
                                         let attached = mediaByEntry[line.id] ?? []
                                         let hasAudio = attached.contains { $0.kind == "audio" }
                                         // A recording's text is its transcript: the card below shows it whole and editable, so the line itself is not repeated.
@@ -311,6 +311,8 @@ struct DiaryDayView: View {
                                             .accessibilityIdentifier("diary-day-empty-invitation")
                                         if shownDay == today, let echo { echoBlock(echo) }
                                     }
+                                } else if !canReadDiary {
+                                    Text("تُتاح المذكرات عند فتح الجهاز.").font(DiaryType.writing).padding(30)
                                 } else if failure == nil {
                                     ProgressView("تُفتح الصفحة…").padding(30)
                                 }
@@ -386,9 +388,15 @@ struct DiaryDayView: View {
                         .onChange(of: page?.lines.map(\.id), initial: true) { old, new in
                             revealInitialEntry(using: proxy)
                             // A line just written is brought into view (the keyboard and the composer cover the foot of the page); a whole page loading is not.
-                            if inlineWriting, let old, let new, !old.isEmpty, new.count > old.count, new.count - old.count <= 2,
-                               let added = new.first(where: { !old.contains($0) }) {
-                                withAnimation(.snappy(duration: 0.25)) { proxy.scrollTo("diary-entry-" + added, anchor: .center) }
+                            if inlineWriting, let old, let new, new.count > old.count, new.count - old.count <= 2 {
+                                let previous = Set(old)
+                                if let added = page?.lines.first(where: {
+                                    !previous.contains($0.id) && $0.kind != "intention" && !Self.autoKinds.contains($0.kind)
+                                }) {
+                                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
+                                        proxy.scrollTo("diary-entry-" + added.id, anchor: .center)
+                                    }
+                                }
                             }
                         }
                         .onChange(of: initialEntryID) { _, _ in revealedEntryID = nil; revealInitialEntry(using: proxy) }
@@ -517,7 +525,7 @@ struct DiaryDayView: View {
             }
             .onChange(of: expandComposerOnOpen) { _, open in if open, inlineWriting { composerExpanded = true } }
             .onChange(of: shownDay) { _, _ in
-                // A line being edited or a «write after» chip belongs to the page it began on.
+                clearDayContent()
                 inlineEdit = nil; insertAt = nil; anchorLabel = nil; composerExpanded = false
             }
             .onChange(of: rootReturnToTodayToken) { _, token in
@@ -531,7 +539,9 @@ struct DiaryDayView: View {
                 } else {
                     aiComposerOpen = false
                     aiAvailability = .checking
-                    page = nil
+                    clearDayContent()
+                    photoViewer = nil; readingOpen = false; reviewOpen = false; original = nil; editing = nil
+                    openingLetter = nil; questionsOpen = false
                     retry += 1
                 }
             }
@@ -540,7 +550,7 @@ struct DiaryDayView: View {
                     do {
                         try await Task.sleep(for: .seconds(30)); displayNow = service.clock(); followToday()
                         // One failed read must not end the loop: it is what moves an open page on at the day boundary.
-                        if let fresh = try? service.appearance(shownDay) { appearance = fresh }
+                        if canReadDiary, let fresh = try? service.appearance(shownDay) { appearance = fresh }
                     } catch { break }
                 }
             }
@@ -556,6 +566,25 @@ struct DiaryDayView: View {
                 // No reset to «checking» here: the button stays put while a new line is saved, instead of blinking away and back.
                 aiAvailability = await MadarAIAvailabilityChecker.check()
             }
+    }
+
+    private func clearDayContent() {
+        page = nil
+        periodLabels = [:]
+        expandedRuns = []
+        highlightedEntryID = nil
+        revealedEntryID = nil
+        intentions = []
+        intentionsOpen = false
+        appearance = nil
+        travel = nil
+        travelReturn = nil
+        echo = nil
+        returnDay = nil
+        waitingLetter = nil
+        sealedHere = 0
+        afterIsha = false
+        failure = nil
     }
 
     /// The foot of the page: the undo line, a chosen question and the writing area (the composer on today's root page).
@@ -591,10 +620,13 @@ struct DiaryDayView: View {
         let target = shownDay
         do {
             let fresh = try await service.dayOffMain(target)
-            guard target == shownDay, canReadDiary else { return }
+            guard !Task.isCancelled, target == shownDay, canReadDiary else { return }
             page = fresh; periodLabels = service.periodLabels(for: fresh); echo = nil
         } catch is CancellationError {
-        } catch { failure = madarUserMessage(error) }
+        } catch {
+            guard !Task.isCancelled, target == shownDay, canReadDiary else { return }
+            failure = madarUserMessage(error)
+        }
     }
     @MainActor private func followToday() {
         todayBox.value = nil
@@ -603,36 +635,40 @@ struct DiaryDayView: View {
         if selected == nil || selected == followed { selected = now }
     }
     @MainActor private func loadDiaryPage() async {
+        let target = shownDay
         if followedToday == nil, selected == nil, day == today { followedToday = day }
         do {
-            guard canReadDiary else { page = nil; aiComposerOpen = false; return }
-            if page?.day != shownDay { page = nil; aiComposerOpen = false; aiAvailability = .checking }
-            try await service.prepareClosedDay(shownDay)
-            guard !Task.isCancelled, canReadDiary else { page = nil; aiComposerOpen = false; return }
-            let displayPage = try await service.dayOffMain(shownDay)
+            guard canReadDiary else { return }
+            if page?.day != target { aiComposerOpen = false; aiAvailability = .checking }
+            try await service.prepareClosedDay(target)
+            guard !Task.isCancelled, canReadDiary, target == shownDay else { return }
+            let displayPage = try await service.dayOffMain(target)
             try Task.checkCancellation()
-            guard canReadDiary, displayPage.day == shownDay else { return }
+            guard canReadDiary, target == shownDay else { return }
             page = displayPage
             periodLabels = service.periodLabels(for: displayPage)
-            afterIsha = shownDay == today && service.ishaPassed(on: shownDay)
-            intentions = try service.intentions(shownDay)
-            appearance = try service.appearance(shownDay)
+            afterIsha = target == today && service.ishaPassed(on: target)
+            intentions = try service.intentions(target)
+            appearance = try service.appearance(target)
+            travel = try service.travel(target)
+            travelReturn = travel == nil ? try service.travelReturn(target) : nil
             displayNow = service.clock()
-            echo = nil
-            if shownDay == today, displayPage.lines.isEmpty, displayPage.photo == nil,
-               let old = try? await service.dayOffMain(aYearAgo), (!old.lines.isEmpty || old.photo != nil) { echo = old }
-            returnDay = try await service.returnAfterAbsenceOffMain(shownDay)
-            travel = try service.travel(shownDay)
-            travelReturn = travel == nil ? try service.travelReturn(shownDay) : nil
-            if shownDay == today { try? await service.refreshLetters() }
-            guard !Task.isCancelled, canReadDiary else { page = nil; aiComposerOpen = false; return }
+            let old = target == today && displayPage.lines.isEmpty && displayPage.photo == nil
+                ? try? await service.dayOffMain(aYearAgo) : nil
+            guard !Task.isCancelled, canReadDiary, target == shownDay else { return }
+            echo = old.flatMap { $0.lines.isEmpty && $0.photo == nil ? nil : $0 }
+            let latestWrittenDay = try await service.returnAfterAbsenceOffMain(target)
+            guard !Task.isCancelled, canReadDiary, target == shownDay else { return }
+            returnDay = latestWrittenDay
+            if target == today { try? await service.refreshLetters() }
+            guard !Task.isCancelled, canReadDiary, target == shownDay else { return }
             do {
 #if DEBUG
                 try injectReadFailureOnce("letters")
 #endif
                 let letters = try service.letters()
                 waitingLetter = letters.first { $0.state == .eligible }
-                sealedHere = letters.filter { $0.writtenDay == shownDay && $0.state != .opened }.count
+                sealedHere = letters.filter { $0.writtenDay == target && $0.state != .opened }.count
             } catch {
                 waitingLetter = nil; sealedHere = 0
                 failure = madarUserMessage(error)
@@ -642,8 +678,7 @@ struct DiaryDayView: View {
         } catch is CancellationError {
             return
         } catch {
-            // A failed secondary read (intentions, appearance, travel) must not blank a page that already loaded.
-            if page?.day != shownDay { page = nil }
+            guard !Task.isCancelled, canReadDiary, target == shownDay else { return }
             failure = madarUserMessage(error)
         }
     }

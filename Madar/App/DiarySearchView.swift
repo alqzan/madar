@@ -5,9 +5,6 @@ import MadarDesign
 struct DiarySearchView: View {
     private struct SearchRequest: Equatable {
         let indexGeneration: Int
-        let chips: [DiarySearchChip]
-    }
-    private struct AdjustedSearch {
         let query: String
         let chips: [DiarySearchChip]
     }
@@ -19,9 +16,10 @@ struct DiarySearchView: View {
     @State private var query=""
     @State private var index:DiarySearchIndex?
     @State private var chips:[DiarySearchChip]=[]
-    @State private var adjustedSearch: AdjustedSearch?
+    @State private var adjustedFilters: [DiarySearchChip]?
     @State private var results:[DiarySearchDocument]=[]
     @State private var searching=false
+    @State private var parsedQuery = ""
     @State private var indexGeneration=0
     @State private var failure:String?
     @State private var loadAttempt=0
@@ -37,13 +35,14 @@ struct DiarySearchView: View {
     @State private var routedLetterID:UUID?
     @FocusState private var focused:Bool
     private var service:AppDiaryService { .init(app:app) }
+    private var canReadDiary: Bool { app.protectedDataAuthorized }
     var body:some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment:.leading,spacing:18) {
                     HStack {
                         Image(systemName: "magnifyingglass")
-                        TextField("ابحث في مذكراتك: كلمة، أو تاريخ", text: Binding(get: { query }, set: { if $0 != query { adjustedSearch = nil; query = $0 } }))
+                        TextField("ابحث في مذكراتك: كلمة، أو تاريخ", text: Binding(get: { query }, set: { if $0 != query { adjustedFilters = nil; query = $0 } }))
                             .font(DiaryType.writing).focused($focused).submitLabel(.search).onSubmit { focused = false }
                             .accessibilityIdentifier("diary-search-query")
                         if !query.isEmpty {
@@ -53,15 +52,18 @@ struct DiarySearchView: View {
                         }
                     }.padding(.horizontal, 16).padding(.vertical, 8).frame(minHeight: 56)
                         .background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line) }
-                    if let failure {
+                    if !canReadDiary {
+                        Text("تُتاح المذكرات عند فتح الجهاز.").font(DiaryType.writing)
+                    } else if let failure {
                         VStack(alignment:.leading,spacing:10) {
                             Text(failure).font(DiaryType.writing).accessibilityIdentifier("diary-search-read-error")
                             Button { loadAttempt += 1 } label: { Text("أعد المحاولة")
                                 .font(DiaryType.label).frame(minHeight:44).contentShape(Rectangle()) }.accessibilityIdentifier("diary-search-retry")
                         }
-                    }
-                    let found = results
-                    if !chips.isEmpty {
+                    } else if parsedQuery != query {
+                        ProgressView("نبحث في مذكراتك…").font(DiaryType.label).accessibilityIdentifier("diary-search-loading")
+                    } else if !chips.isEmpty {
+                        let found = results
                         ScrollView(.horizontal) {
                             HStack(spacing: 8) {
                                 ForEach(chips) { chip in
@@ -119,37 +121,24 @@ struct DiarySearchView: View {
 #endif
                 }
                 .toolbarBackground(theme.background,for:.navigationBar).tint(theme.accent)
-                .task(id: loadAttempt) { await loadIndex() }
-                .onChange(of: initialQueryRequestID, initial: true) { _, _ in applyInitialQuery() }
-                .onChange(of: app.prayerRevision) { _, _ in if failure == nil { Task { await loadIndex() } } }
-                .task(id:query) {
-                    guard adjustedSearch?.query != query else { return }
-                    // Typing waits a moment so a long diary is filtered once per word, not once per key.
-                    if !query.isEmpty { try? await Task.sleep(for:.milliseconds(220)); guard !Task.isCancelled else {return} }
-                    guard adjustedSearch?.query != query else { return }
-                    chips=index?.parser.parse(query) ?? []
+                .task(id: "\(app.prayerRevision)-\(loadAttempt)-\(canReadDiary)") {
+                    if canReadDiary { await loadIndex() }
                 }
-                .onChange(of: chips) { _, _ in
+                .onChange(of: canReadDiary) { _, authorized in
+                    guard !authorized else { return }
+                    beginSearch("")
+                    parsedQuery = ""
+                    index = nil
+                    chips = []
                     results = []
-                    searching = index != nil && !chips.isEmpty
+                    reader = nil
+                    readerEntryID = nil
+                    readerEntryRouteID = nil
+                    letterHubOpen = false
+                    editing = nil
                 }
-                .task(id: SearchRequest(indexGeneration: indexGeneration, chips: chips)) {
-                    guard let index, !chips.isEmpty else { results = []; searching = false; return }
-                    let requestChips = chips
-                    let requestGeneration = indexGeneration
-                    searching = true
-                    do {
-                        let matches = try await index.matching(requestChips)
-                        guard !Task.isCancelled, requestGeneration == indexGeneration, requestChips == chips else { return }
-                        results = matches
-                        searching = false
-                    } catch is CancellationError { return }
-                    catch {
-                        guard !Task.isCancelled, requestGeneration == indexGeneration, requestChips == chips else { return }
-                        results = []
-                        searching = false
-                    }
-                }
+                .onChange(of: initialQueryRequestID, initial: true) { _, _ in applyInitialQuery() }
+                .task(id: searchRequest) { await runSearch(searchRequest) }
                 .alert("تعديل البحث", isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } }), presenting: editing) { chip in
                     TextField("الكلمة أو التاريخ", text: $replacement)
                     Button("ابحث") {
@@ -168,6 +157,34 @@ struct DiarySearchView: View {
                 }
         }
     }
+    private var searchRequest: SearchRequest {
+        .init(indexGeneration: indexGeneration, query: query, chips: adjustedFilters ?? [])
+    }
+    private func runSearch(_ request: SearchRequest) async {
+        guard canReadDiary, let index else { return }
+        do {
+            if !request.query.isEmpty, request.chips.isEmpty {
+                try await Task.sleep(for: .milliseconds(220))
+            }
+            try Task.checkCancellation()
+            guard canReadDiary, request == searchRequest else { return }
+            let filters = adjustedFilters ?? index.parser.parse(request.query)
+            results = []
+            chips = filters
+            searching = !filters.isEmpty
+            parsedQuery = request.query
+            guard !filters.isEmpty else { return }
+            let matches = try await index.matching(filters)
+            try Task.checkCancellation()
+            guard canReadDiary, request == searchRequest else { return }
+            results = matches
+            searching = false
+        } catch is CancellationError {
+        } catch {
+            guard canReadDiary, request == searchRequest else { return }
+            searching = false
+        }
+    }
     private func loadIndex() async {
         do {
             #if DEBUG
@@ -178,31 +195,39 @@ struct DiarySearchView: View {
                 throw CocoaError(.fileReadUnknown)
             }
             #endif
-            index=try await service.searchIndexOffMain()
+            let loaded = try await service.searchIndexOffMain()
+            try Task.checkCancellation()
+            guard canReadDiary else { return }
+            index = loaded
             indexGeneration += 1
-            if let adjustedSearch, adjustedSearch.query == query { chips = adjustedSearch.chips }
-            else { chips=index?.parser.parse(query) ?? [] }
             failure=nil
-        } catch { index=nil; chips=[]; failure="تعذّر فتح فهرس المذكرات. أعد المحاولة." }
+        } catch is CancellationError {
+        } catch {
+            guard !Task.isCancelled, canReadDiary else { return }
+            index=nil; chips=[]; results=[]; failure="تعذّر فتح فهرس المذكرات. أعد المحاولة."
+        }
     }
     private func applyInitialQuery() {
         beginSearch(initialQuery ?? "", focus: initialQuery?.isEmpty ?? true)
-        chips = index?.parser.parse(query) ?? []
     }
     private func beginSearch(_ text: String, focus: Bool = false) {
-        adjustedSearch = nil
+        adjustedFilters = nil
         query = text
         focused = focus
     }
     private func adjustFilters(_ updated: [DiarySearchChip]) {
         let text = updated.map(\.label).joined(separator: " ")
         // Keep the selected rules: reparsing joined labels could reinterpret adjacent month/year filters.
-        adjustedSearch = AdjustedSearch(query: text, chips: updated)
+        adjustedFilters = updated
         chips = updated
+        results = []
+        searching = !updated.isEmpty
+        parsedQuery = text
         query = text
         focused = false
     }
     private func open(_ row: DiarySearchDocument) {
+        guard canReadDiary else { return }
         focused=false
         if row.kind == "letter", let id=UUID(uuidString:row.id) {
             routedLetterID=id
@@ -214,7 +239,7 @@ struct DiarySearchView: View {
                 if let actualDay=try service.entryDay(id) { readerEntryID=id; readerEntryRouteID=UUID(); reader=actualDay }
                 else { readerEntryID=nil; readerEntryRouteID=nil; reader=row.day }
             } catch { app.errorMessage=madarUserMessage(error) }
-        } else { readerEntryID=nil; reader=row.day }
+        } else { readerEntryID=nil; readerEntryRouteID=nil; reader=row.day }
     }
     private func source(_ kind:String)->String {switch kind{case "photo":"صورة";case "audio":"تسجيل";case "margin":"هامش";case "intention":"نيّة";case "tomorrow":"لِغد";case "letter":"رسالة مفتوحة";default:"كتابتك"}}
 }

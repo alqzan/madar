@@ -14,6 +14,88 @@ import MadarMoney
         XCTAssertEqual(MoneySafeArithmetic.percent(Int.max, of: Int.max, rounded: false), 100)
     }
 
+    func testHomeAndShelvesAgreeOnCycleSpendingAndRecognizeCategoryProvenance() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MoneyCategories-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let context = ModelContext(container)
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-16T12:00:00+03:00"))
+        let category = MadarData.Category()
+        category.name = "مطاعم"
+        context.insert(category)
+        let limit = CategoryLimit()
+        limit.categoryID = category.id
+        limit.mode = "fixed"
+        limit.limitMinor = 2_000
+        limit.updatedAt = now
+        context.insert(limit)
+        let olderLimit = CategoryLimit()
+        olderLimit.categoryID = category.id
+        olderLimit.limitMinor = 500
+        olderLimit.updatedAt = now.addingTimeInterval(-60)
+        context.insert(olderLimit)
+        let rule = MerchantRule()
+        rule.pattern = BankDedupe.normalize("مقهى")
+        rule.categoryID = category.id
+        context.insert(rule)
+
+        let inputs: [(String?, String, Int)] = [("learned", "مطعم", 100), ("manual", "مقهى", 200), (nil, "مقهى", 300)]
+        let records = inputs.map { source, merchant, amount in
+            let movement = MoneyTransaction()
+            movement.eventAt = now
+            movement.dayKey = "2026-10-16"
+            movement.categoryID = category.id
+            movement.categorySource = source
+            movement.merchant = merchant
+            movement.amountMinor = amount
+            movement.homeAmountMinor = amount
+            context.insert(movement)
+            let allocation = Allocation()
+            allocation.transactionID = movement.id
+            allocation.kind = "spend"
+            allocation.amountMinor = -amount
+            allocation.idempotencyKey = UUID().uuidString
+            context.insert(allocation)
+            return (movement, allocation)
+        }
+        try context.save()
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        let service = AppMoneyService(app: app)
+        XCTAssertEqual(try service.load(at: now).limits.first?.spentMinor, 0)
+        XCTAssertEqual(try service.loadCategories(at: now).shelves.first?.spentMinor, 0)
+
+        let cycle = Cycle()
+        cycle.start = now.addingTimeInterval(-86_400)
+        cycle.expectedEnd = now.addingTimeInterval(29 * 86_400)
+        context.insert(cycle)
+        let policy = CyclePolicy()
+        policy.cycleID = cycle.id
+        policy.effectiveFromDayKey = "2026-10-15"
+        policy.allowanceMinor = 30_000
+        policy.dailyRateMinor = 1_000
+        context.insert(policy)
+        for (movement, allocation) in records {
+            movement.cycleID = cycle.id
+            allocation.cycleID = cycle.id
+        }
+        try context.save()
+        let shelf = try service.loadCategories(at: now)
+        let currentLimits = try service.load(at: now).limits
+        XCTAssertEqual(currentLimits.map(\.spentMinor), [600])
+        XCTAssertEqual(currentLimits.map(\.limitMinor), [2_000])
+        XCTAssertEqual(shelf.shelves.first?.spentMinor, 600)
+        XCTAssertEqual(shelf.autoCategorized, 2, "Learned and legacy matching rows are automatic. A manual match stays manual.")
+
+        limit.mode = "none"
+        try context.save()
+        XCTAssertTrue(try service.load(at: now).limits.isEmpty)
+        XCTAssertNil(try service.loadCategories(at: now).shelves.first?.limitMinor)
+        let analysis = try XCTUnwrap(try service.loadAnalysis(period: .cycle, at: now))
+        let analyzedCategory = try XCTUnwrap(analysis.categories.first { $0.name == category.name })
+        XCTAssertNil(analyzedCategory.capMinor)
+    }
+
     func testAnalysisReadsTheLogLedgerAndTheShelfDefinition() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MoneyAnalysis-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
