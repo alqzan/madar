@@ -24,6 +24,8 @@
 
 ## Verified baseline and delivery
 
+- Build 0.1.0 (71) was archived, signed and uploaded to internal TestFlight on 25 November at 11:45 Riyadh. Source `84da6d40`. The app, widget and Watch app are build 71 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-71/`.
+
 - Build 0.1.0 (70) was archived, signed and uploaded to internal TestFlight on 25 November at 00:33 Riyadh. Source `a66b5477`. App, widget and Watch app are build 70 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-70/`.
 
 - Build 0.1.0 (69) was archived, signed and uploaded to internal TestFlight on 24 November at 23:54 Riyadh. Source `c8df617d`. App, widget and Watch app are build 69 with minimum OS 27.0. Apple accepted the upload for processing. See `Madar/Artifacts/OWNER-TestFlight-69/`.
@@ -289,7 +291,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Next
 
-- بناء TestFlight الداخلي `0.1.0 (71)`. سجل الأرشفة والتوقيع ونتيجة الإرسال في `Madar/Artifacts/OWNER-TestFlight-71/`. المعالجة وتجربة المالك على جهازه مرحلتان منفصلتان.
+- تسلّمت Apple بناء TestFlight الداخلي `0.1.0 (71)` الساعة ١١:٤٥ بتوقيت الرياض وبدأت معالجته. اجتاز الأرشيف تدقيق التوقيع، وتحمل أجزاؤه بناء ٧١ وهدف 27.0. الأدلة في `Madar/Artifacts/OWNER-TestFlight-71/`. تظل التجربة على أجهزة المالك مفتوحة.
 - فحص تجربة البحث عند غياب ملف كتاب، وتجديد قائمة سنوات المذكرات، وربط خيارات الذكرى والإملاء وفق قراراتها.
 
 ### Model/effort
