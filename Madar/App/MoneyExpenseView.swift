@@ -35,6 +35,8 @@ struct MoneyExpenseView: View {
     @FocusState private var field: Field?
     @State private var commandID = UUID()
     @State private var bigRoute: MoneyBigExpenseRoute?
+    @State private var newAccount: MoneyAccountEdit?
+    @State private var savedAccountID: UUID?
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var minor: Int { MoneyAmountInput.minor(raw, exponent: CurrencyExponents.specified.exponent(inputCurrency) ?? 2) ?? 0 }
@@ -158,6 +160,11 @@ struct MoneyExpenseView: View {
                 load()
             }
             .onChange(of: date) { expenseDay = try? service.expenseDay(at: date) }
+            .sheet(item: $newAccount, onDismiss: refreshPaymentSources) { account in
+                MoneyAccountSheet(app: app, original: account, visible: visible, revealed: $revealed) {
+                    savedAccountID = account.id
+                }.madarSheetErrorAlert(app)
+            }
             .fullScreenCover(item: $bigRoute) { route in
                 MoneyBigExpenseView(app: app, route: route, revealed: $revealed) { bigRoute = nil; dismiss() }
             }
@@ -372,8 +379,23 @@ struct MoneyExpenseView: View {
                     }
                 }
             }.scrollIndicators(.hidden)
-            if r.methods.isEmpty { Text("أضف حسابًا من «الحسابات» أو بطاقة من «البطاقات» أولًا.").font(MadarTypography.body()) }
-            else if let m = method {
+            if r.methods.isEmpty {
+                if savedAccountID != nil {
+                    Button("أعِد قراءة مصادر الدفع", action: refreshPaymentSources).frame(minHeight: 44)
+                        .accessibilityIdentifier("money-expense-payment-retry")
+                } else {
+                    Text("أدخل رصيد الحساب قبل هذا المصروف.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Button {
+                        field = nil
+                        // Balances include movements strictly after their opening checkpoint. Both dates are saved to whole seconds.
+                        newAccount = .new(currency: inputCurrency, openingAt: date.addingTimeInterval(-1))
+                    } label: {
+                        Label("أضف حسابًا", systemImage: "plus").font(MadarTypography.body())
+                            .padding(.horizontal, 16).frame(minHeight: 44)
+                            .glassEffect(.regular.interactive(), in: .capsule).contentShape(Capsule())
+                    }.accessibilityIdentifier("money-expense-add-account")
+                }
+            } else if let m = method {
                 if m.kind == .credit {
                     Text("يُحسب من يومك يوم الشراء، ويخرج النقد عند سداد البطاقة.").font(MadarTypography.fine()).foregroundStyle(theme.color("accentText"))
                     if let due = m.purchaseDue { MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
@@ -417,6 +439,23 @@ struct MoneyExpenseView: View {
             }
         }
         catch { failure = "لم تكتمل قراءة مصادر الدفع. حاول مرة أخرى." }
+    }
+    private func refreshPaymentSources() {
+        guard let savedAccountID else { return }
+        do {
+            let updated = try service.loadExpense()
+            reading = updated
+            self.savedAccountID = nil
+            if let payment = updated.methods.first(where: { $0.accountID == savedAccountID && canUse($0, updated) }) {
+                paymentChosen = true
+                selectPayment(payment, updated)
+                failure = nil
+            } else {
+                failure = "حُفظ الحساب. اختر مصدر دفع يناسب هذا المصروف."
+            }
+        } catch {
+            failure = "حُفظ الحساب. تعذّرت قراءة مصادر الدفع."
+        }
     }
     private func save() {
         guard !saving, homeMinor > 0, let m = method, let r = reading, waiting(r) == nil else { return }

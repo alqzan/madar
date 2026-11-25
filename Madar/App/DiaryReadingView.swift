@@ -12,7 +12,25 @@ struct DiaryReadingView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var days: [GregorianDay]
     @State private var current: GregorianDay
+    @State private var archiveStore: ObjectIdentifier?
+    @State private var archiveFailed = false
+    @State private var archiveAttempt = 0
+    #if DEBUG
+    @State private var injectedArchiveFailure = false
+    #endif
     private var service: AppDiaryService { .init(app: app) }
+
+    private struct ArchiveRequest: Equatable {
+        let store: ObjectIdentifier
+        let revision: Int
+        let canRead: Bool
+        let attempt: Int
+    }
+
+    private var archiveRequest: ArchiveRequest {
+        .init(store: ObjectIdentifier(app.container), revision: app.prayerRevision,
+              canRead: app.protectedDataAuthorized && !app.maintenanceInProgress, attempt: archiveAttempt)
+    }
 
     init(app: AppSession, start: GregorianDay) {
         self.app = app
@@ -21,42 +39,79 @@ struct DiaryReadingView: View {
         _days = State(initialValue: [start])
     }
 
-    private var index: Int? { days.firstIndex(of: current) }
-
     var body: some View {
+        let request = archiveRequest
+        let visibleDays = archiveStore == request.store && app.protectedDataAuthorized ? days : [start]
         ZStack(alignment: .topLeading) {
             theme.background.ignoresSafeArea()
             TabView(selection: $current) {
-                ForEach(days, id: \.self) { day in
+                ForEach(visibleDays, id: \.self) { day in
                     DiaryReadingPage(app: app, day: day).tag(day)
                 }
             }
+            .id(request.store)
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .accessibilityIdentifier(days.count > 1 ? "diary-reading-pager" : "diary-reading-single-page")
+            .accessibilityIdentifier(visibleDays.count > 1 ? "diary-reading-pager" : "diary-reading-single-page")
             HStack {
                 Button { dismiss() } label: {
                     Text("تمّ").font(DiaryType.label).padding(.horizontal, 16).frame(minHeight: 44)
                         .background(theme.surface.opacity(0.9), in: .capsule).overlay { Capsule().stroke(theme.line) }
                 }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-reading-close")
                 Spacer()
-                if typeSize.isAccessibilitySize, days.count > 1, let index {
+                if typeSize.isAccessibilitySize, visibleDays.count > 1, let index = visibleDays.firstIndex(of: current) {
                     // Large text: the same neighbours as plain buttons beside the swipe.
-                    Button("اليوم السابق") { if index > 0 { current = days[index - 1] } }.disabled(index == 0)
-                    Button("اليوم التالي") { if index < days.count - 1 { current = days[index + 1] } }.disabled(index == days.count - 1)
+                    Button("اليوم السابق") { if index > 0 { current = visibleDays[index - 1] } }.disabled(index == 0)
+                    Button("اليوم التالي") { if index < visibleDays.count - 1 { current = visibleDays[index + 1] } }.disabled(index == visibleDays.count - 1)
                 }
             }.padding(.horizontal, 16).padding(.top, 6).font(DiaryType.label)
         }
         .foregroundStyle(theme.ink).environment(\.roomTheme, theme)
-        .task(id: "\(app.prayerRevision)-\(app.protectedDataAuthorized)") {
-            guard app.protectedDataAuthorized else {
-                current = start
-                days = [start]
-                return
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if archiveFailed, request.canRead, archiveStore == request.store {
+                HStack(spacing: 12) {
+                    Text("تعذّر فتح بقية الصفحات.").foregroundStyle(theme.secondaryInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button { archiveAttempt += 1 } label: {
+                        Text("حاول مرة أخرى").frame(minHeight: 44).contentShape(.rect)
+                    }.buttonStyle(.madarPlain).foregroundStyle(theme.accent)
+                        .accessibilityIdentifier("diary-reading-archive-retry")
+                }.font(DiaryType.label).padding(.horizontal, 24).padding(.vertical, 4)
+                    .background(theme.surface)
             }
-            guard let archive = try? await service.archiveOffMain(), !Task.isCancelled, app.protectedDataAuthorized else { return }
+        }
+        .task(id: request) { await loadArchive(request) }
+    }
+
+    private func loadArchive(_ request: ArchiveRequest) async {
+        guard !Task.isCancelled, request == archiveRequest else { return }
+        if archiveStore != request.store || !app.protectedDataAuthorized {
+            current = start
+            days = [start]
+            archiveStore = request.store
+        }
+        archiveFailed = false
+        guard request.canRead else { return }
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedArchiveFailure,
+               environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               environment["MADAR_UI_DIARY_READING_ARCHIVE_FAILURE_ONCE"] == "1" {
+                injectedArchiveFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            let archive = try await service.archiveOffMain()
+            try Task.checkCancellation()
+            guard request == archiveRequest else { return }
             var list = archive.days.filter { $0.writings > 0 || !$0.photoIDs.isEmpty }.map(\.day)
             if !list.contains(start) { list.append(start) }
             days = Array(Set(list)).sorted()
+            if !days.contains(current) { current = start }
+        } catch is CancellationError {
+        } catch {
+            guard !Task.isCancelled, request == archiveRequest else { return }
+            archiveFailed = true
         }
     }
 }

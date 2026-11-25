@@ -120,6 +120,31 @@ import XCTest
         app.terminate()
     }
 
+    func testFirstUseCanOpenMushafBeforeSettingUpPlan() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_START_TAB": "quran", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+
+        let startPlan = app.buttons["quran-start-plan"]
+        XCTAssertTrue(startPlan.waitForExistence(timeout: 15), app.debugDescription)
+        let mushaf = app.buttons["quran-tool-mushaf"]
+        XCTAssertTrue(mushaf.isHittable, app.debugDescription)
+        XCTAssertLessThan(mushaf.frame.maxY, startPlan.frame.minY)
+        attach(app, "quran-first-use-mushaf-entry-L")
+
+        mushaf.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["quran-mushaf-page"].waitForExistence(timeout: 15), app.debugDescription)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let number = app.staticTexts["quran-mushaf-number"]
+        XCTAssertTrue(number.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(number.label, "الوجه ١")
+        app.buttons["quran-mushaf-close"].tap()
+        XCTAssertTrue(startPlan.waitForExistence(timeout: 10), app.debugDescription)
+        app.terminate()
+    }
+
     func testFirstUseShowsPlanActionWithoutZeroStreakOrDepthControls() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

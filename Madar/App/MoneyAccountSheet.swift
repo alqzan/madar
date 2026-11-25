@@ -9,6 +9,7 @@ struct MoneyAccountSheet: View {
     let original: MoneyAccountEdit
     let visible: Bool
     @Binding var revealed: Bool
+    private let onSaved: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @State private var draft: MoneyAccountEdit
@@ -50,8 +51,9 @@ struct MoneyAccountSheet: View {
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var numbersVisible: Bool { visible || revealed }
-    init(app: AppSession, original: MoneyAccountEdit, visible: Bool, revealed: Binding<Bool>) {
+    init(app: AppSession, original: MoneyAccountEdit, visible: Bool, revealed: Binding<Bool>, onSaved: @escaping () -> Void = {}) {
         self.app = app; self.original = original; self.visible = visible; self._revealed = revealed; _draft = State(initialValue: original)
+        self.onSaved = onSaved
         let exp = CurrencyExponents.specified.exponent(original.currency) ?? 2
         var scale = 1; for _ in 0..<exp { scale *= 10 }
         let n = abs(original.openingMinor), fraction = String(n % scale)
@@ -189,6 +191,6 @@ struct MoneyAccountSheet: View {
         var payload: [String: MadarCore.JSONValue] = ["id": .string(draft.id.uuidString), "name": .string(draft.name.trimmingCharacters(in: .whitespacesAndNewlines)), "bank": .string(draft.bank.trimmingCharacters(in: .whitespacesAndNewlines)), "last4": .string(last4), "kind": .string(draft.kind), "ownership": .string(draft.ownership), "currency": .string(draft.currency), "balanceMinor": .string(String(balanceMinor)), "balanceAt": .string(ISO8601DateFormatter().string(from: draft.openingAt)), "senderIDs": .array(aliases.map { .string($0) }), "tracked": .bool(draft.tracked), "zakatInclude": .bool(draft.zakatInclude)]
         if !draft.openingKnown { payload["establishBalance"] = .bool(true) }
         saving = true
-        Task { do { try await app.executeMoneyCommand("money.saveAccount", payload: payload); dismiss() } catch { saving = false; failure = "لم يُحفظ الحساب. " + ((error as? MoneyCommandError) == .invalidReference ? "راجع آخر أربعة أرقام واسم البنك؛ يجب أن يميّزا حسابًا واحدًا." : madarUserDetail(error)) } }
+        Task { do { try await app.executeMoneyCommand("money.saveAccount", payload: payload); onSaved(); dismiss() } catch { saving = false; failure = "لم يُحفظ الحساب. " + ((error as? MoneyCommandError) == .invalidReference ? "راجع آخر أربعة أرقام واسم البنك؛ يجب أن يميّزا حسابًا واحدًا." : madarUserDetail(error)) } }
     }
 }

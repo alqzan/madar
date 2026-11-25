@@ -12,6 +12,8 @@ struct MihbaraHomeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isFrontRoom) private var isFrontRoom
+    @Environment(\.scenePhase) private var scenePhase
     @State private var reading: MihbaraHomeReading?
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var roomWidth: CGFloat = 0
@@ -68,7 +70,7 @@ struct MihbaraHomeView: View {
         .background(theme.surface, in: .rect(cornerRadius: 18))
     }
     var body: some View {
-        timelineContent
+        ScrollViewReader { proxy in shelfScrollView(proxy: proxy) }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .bottom) {
@@ -81,11 +83,14 @@ struct MihbaraHomeView: View {
             #if DEBUG
             injectRouteForUITestIfNeeded()
             #endif
-            load()
+            if isFrontRoom { load() }
             MihbaraConversions.shared.onFinished = { load() }
             await MihbaraCoverStore.shared.reload(app.container)
         }
         .onDisappear { cancelShelfRead() }
+        .onChange(of: isFrontRoom) { _, front in if front { load() } }
+        .onChange(of: scenePhase) { _, phase in if phase == .active && isFrontRoom { load() } }
+        .refreshesAtMadarDay(app) { if scenePhase == .active { load() } }
         .modifier(MihbaraConversionOffer(app: app, book: $offerConversion))
         .onChange(of: app.mihbaraBookToOpen) { _, _ in openSpotlightBookIfNeeded() }
         .onChange(of: app.mihbaraRoute, initial: true) { _, route in
@@ -97,7 +102,8 @@ struct MihbaraHomeView: View {
             if empty, let route = app.mihbaraRoute { openRoute(route) }
         }
         .onChange(of: app.undoToken?.id) { load() }
-        .onChange(of: app.booksRevision) { load() }
+        // Book writes also bump the habits revision. The reading goal changes when its linked habit does.
+        .onChange(of: app.habitsRevision) { load() }
         .modifier(MihbaraHomeConfirmations(
             slotBook: $slotBook, pendingRemoval: $pendingRemoval,
             replacementBooks: { replacementBooks(for: $0) },
@@ -196,14 +202,7 @@ struct MihbaraHomeView: View {
         }
     }
     private var wide: Bool { isPadWide(sizeClass) && roomWidth >= 960 }
-    private var timelineContent: some View {
-        TimelineView(.periodic(from: Date(timeIntervalSince1970: 0), by: 60)) { tick in
-            ScrollViewReader { proxy in
-                shelfScrollView(at: tick.date, proxy: proxy)
-            }
-        }
-    }
-    private func shelfScrollView(at date: Date, proxy: ScrollViewProxy) -> some View {
+    private func shelfScrollView(proxy: ScrollViewProxy) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
@@ -235,7 +234,6 @@ struct MihbaraHomeView: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
         .madarTopClipped()
-        .onChange(of: date) { if !shelfReadFailed { load() } }
         .onChange(of: scrollTarget) { _, target in handleScrollTargetChange(target, proxy: proxy) }
     }
     /// PDFs converting in the background, and those just finished («افتحه»).

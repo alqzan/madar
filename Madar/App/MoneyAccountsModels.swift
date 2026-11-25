@@ -36,6 +36,12 @@ struct MoneyAccountEdit: Identifiable {
     var openingKnown = true
     /// Item 34: nothing ever referred to it (no movement, card, reconciliation or sub-account), so it may be removed.
     var removable = false
+
+    static func new(currency: String, openingAt: Date) -> Self {
+        .init(id: UUID(), isNew: true, name: "", bank: "", last4: "", kind: "current", ownership: "mine",
+              currency: currency, openingMinor: 0, openingAt: openingAt, senderIDs: [], tracked: true,
+              zakatInclude: true, fixedCheckpoint: false)
+    }
 }
 struct MoneyAccountsReading {
     var rows: [MoneyAccountRow]

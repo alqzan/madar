@@ -32,7 +32,7 @@ struct CityEditor: View {
                 Button { locator.start(fill) } label: { Label(locator.working ? "أبحث عن موقعك…" : "استخدم موقعي", systemImage: "location") }
                     .disabled(locator.working).accessibilityIdentifier("city-locate")
                 if let message = locator.message { Text(message).font(.footnote).foregroundStyle(.secondary) }
-            } header: { Text("ابحث أو استخدم موقعك") } footer: { Text("المدينة التي تختارها من القائمة تُحفظ مباشرة. وموقعك يُقرأ مرة واحدة عند الضغط، ويعرف النظام اسم مدينتك بإرساله إلى Apple، ولا يحفظ مدار إلا ما تؤكده بـ«احفظ المدينة».") }
+            } header: { Text("ابحث أو استخدم موقعك") } footer: { Text("اختيار المدينة من القائمة يحفظها مباشرة. عند استخدام موقعك، يتعرّف النظام على مدينتك عبر Apple مرة واحدة. يحفظ مدار الموقع التقريبي للمدينة عند ضغط «احفظ المدينة».") }
             Section("مدينة أخرى") {
                 TextField("اسم المدينة", text: $name).accessibilityIdentifier("city-name")
                 TextField("خط العرض", text: $latitude).keyboardType(.numbersAndPunctuation).environment(\.layoutDirection, .leftToRight)

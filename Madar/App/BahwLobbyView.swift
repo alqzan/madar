@@ -141,8 +141,8 @@ struct BahwLobbyView: View {
                     // AU-32: hiding every widget leaves a way back, not a blank lobby.
                     if visible.isEmpty && !arranging {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("أخفيت كل الودجات").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                            Button { arranging = true; drawerOpen = true } label: { Text("أظهر الودجات المخفية").font(MadarTypography.body().bold()).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle()) }.accessibilityIdentifier("bahw-show-hidden")
+                            Text("تقدر تعرض في البهو ما تتابعه كل يوم.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                            Button { arranging = true; drawerOpen = true } label: { Text("اختر ودجات البهو").font(MadarTypography.body().bold()).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle()) }.accessibilityIdentifier("bahw-show-hidden")
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if !arranging {

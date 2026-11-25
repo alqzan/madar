@@ -321,6 +321,15 @@ struct QuranHomeView: View {
             if state.plan != nil {
                 Button { showPlan = true } label: { Label("خطّتك", systemImage: "slider.horizontal.3").font(bodyFont(12, bold: true)).frame(minHeight: 44) }
                     .buttonStyle(.madarPlain).accessibilityIdentifier("quran-open-plan")
+            } else {
+                Button { openMushaf(state) } label: {
+                    Label("المصحف", systemImage: "book")
+                        .font(bodyFont(14, bold: true))
+                        .foregroundStyle(theme.accent)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-tool-mushaf")
             }
         }.padding(.horizontal, 8)
     }
@@ -527,7 +536,9 @@ struct QuranHomeView: View {
         card {
             VStack(spacing: 12) {
                 HStack(alignment: .top, spacing: 4) {
-                    tool("المصحف", icon: "book", id: "mushaf") { mushaf = .init(page: state.steps.first(where: { $0.kind == .hifz })?.range?.fromPage ?? 1) }
+                    if state.plan != nil {
+                        tool("المصحف", icon: "book", id: "mushaf") { openMushaf(state) }
+                    }
                     tool("الفهرس", icon: "line.3.horizontal.decrease", id: "index") { showIndex = true }
                     tool("مراجعة حرة", icon: "arrow.left.arrow.right", id: "free") { showFree = true }
                     tool("منسوب الحفظ", icon: "chart.bar", id: "strength") { showStrength = true }
@@ -538,6 +549,9 @@ struct QuranHomeView: View {
                 }
             }
         }
+    }
+    private func openMushaf(_ state: QuranRoomState) {
+        mushaf = .init(page: state.steps.first(where: { $0.kind == .hifz })?.range?.fromPage ?? 1)
     }
     private func tool(_ title: String, icon: String, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { VStack(spacing: 8) { Image(systemName: icon).font(.system(size: 18)).frame(height: 24); Text(title).font(bodyFont(11, bold: true)).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, minHeight: 74, alignment: .top).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-tool-" + id)

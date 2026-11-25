@@ -44,17 +44,17 @@ final class CityCatalogTests: XCTestCase {
                               lon: location.coordinate.longitude, tz: "Asia/Riyadh", country: "SA", currency: "SAR")
         }
         let firstLocation = CLLocation(latitude: 24, longitude: 46)
-        let secondLocation = CLLocation(latitude: 21, longitude: 39)
+        let secondLocation = CLLocation(latitude: 21.4225, longitude: 39.8262)
         var accepted: [Double] = []
 
-        locator.start { accepted.append($0.lat) }
+        locator.start { accepted += [$0.lat, $0.lon] }
         locator.locationManager(firstManager, didUpdateLocations: [firstLocation])
         let cancelledLookup = try XCTUnwrap(locator.geocodingTask)
         XCTAssertTrue(locator.working)
         locator.cancel()
         XCTAssertFalse(locator.working)
 
-        locator.start { accepted.append($0.lat) }
+        locator.start { accepted += [$0.lat, $0.lon] }
         locator.locationManager(firstManager, didFailWithError: CLError(.locationUnknown))
         locator.locationManager(firstManager, didUpdateLocations: [firstLocation])
         await cancelledLookup.value
@@ -65,7 +65,7 @@ final class CityCatalogTests: XCTestCase {
         locator.locationManager(secondManager, didUpdateLocations: [secondLocation])
         let validLookup = try XCTUnwrap(locator.geocodingTask)
         await validLookup.value
-        XCTAssertEqual(accepted, [21])
+        XCTAssertEqual(accepted, [21.42, 39.83])
         XCTAssertFalse(locator.working)
     }
 }

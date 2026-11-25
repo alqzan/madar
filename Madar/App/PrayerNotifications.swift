@@ -149,7 +149,7 @@ final class PrayerNotificationCoordinator {
         // a background launch (a notification answered while Madar was closed) still plans now, before it can be suspended.
         if UIApplication.shared.applicationState == .background {
             do { try await refresh() }
-            catch { session.errorMessage = "تعذّر إعداد تذكيرات الصلاة. \(madarUserMessage(error))" }
+            catch { session.errorMessage = "تعذّر إعداد التذكيرات. \(madarUserMessage(error))" }
         } else {
             requestRefresh()
         }
@@ -180,7 +180,7 @@ final class PrayerNotificationCoordinator {
     }
     private func refreshReportingFailure() async {
         do { try await refresh() }
-        catch { session?.errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(madarUserMessage(error))" }
+        catch { session?.errorMessage = "تعذّر تحديث التذكيرات. \(madarUserMessage(error))" }
     }
 
     func requestAuthorization() async throws {
@@ -219,7 +219,7 @@ final class PrayerNotificationCoordinator {
         do { try await refreshLocked(session: session, suppliedNow: nil) }
         catch {
             guard !isExpectedNoPrayerBoundary(error, session: session) else { return }
-            session.errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(madarUserMessage(error))"
+            session.errorMessage = "تعذّر تحديث التذكيرات. \(madarUserMessage(error))"
         }
     }
 
@@ -235,7 +235,7 @@ final class PrayerNotificationCoordinator {
         pendingResponses.removeAll()
         for response in queued { await handle(response) }
         do { try await refresh() }
-        catch { session?.errorMessage = "تعذّر تحديث تذكيرات الصلاة بعد تحديث البيانات. \(madarUserMessage(error))" }
+        catch { session?.errorMessage = "تعذّر تحديث التذكيرات بعد تحديث البيانات. \(madarUserMessage(error))" }
     }
 
     private func refreshLocked(session: AppSession, suppliedNow: Date?) async throws {
@@ -266,7 +266,7 @@ final class PrayerNotificationCoordinator {
         }
         let planningDays = RoomNotificationContent.planningPrayerDays(session: session, candidates: candidates, current: days, now: now)
         let externalPendingCount = existing.filter { !Self.manages($0.identifier) }.count
-        let ledger = try ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>()).filter { $0.deletedAt == nil && ["submitted", "observed"].contains($0.state) && $0.requestClass != "prayer" }
+        let ledger = try ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>()).filter { RoomNotificationContent.tracksReminderBudget($0) }
         let consumed = ledger.filter { $0.scheduledFor <= now || $0.kind == "activityStart" }
         let sharedConsumed = try session.notificationBudget.reservations().filter { $0.scheduledAt <= now || $0.activity }
         let counts = Dictionary(grouping: sharedConsumed, by: \.dayKey).mapValues { Set($0.map(\.id)).count }
@@ -348,14 +348,15 @@ final class PrayerNotificationCoordinator {
                 if RoomNotificationContent.isRoomRequest(request.identifier) { RoomNotificationContent.open(request.identifier, userInfo: request.content.userInfo, session: session) }
                 else { session.selectedTab = "habits" }
             }
-        } catch { session.errorMessage = "تعذّر تنفيذ تذكير الصلاة. \(madarUserMessage(error))" }
+        } catch { session.errorMessage = "تعذّر تنفيذ التذكير. \(madarUserMessage(error))" }
     }
 
     /// «٣»، «3»، «٢٫٥» → a whole amount (a fraction rounds to the nearest; below one half is not an amount).
     nonisolated static func typedAmount(_ text: String) -> Int? {
         let map: [Character: Character] = ["٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9","٫":".","،":".",",":"."]
-        let latin = String(text.trimmingCharacters(in: .whitespacesAndNewlines).map { map[$0] ?? $0 }.filter { $0.isNumber || $0 == "." })
-        guard let value = Double(latin), value.isFinite, value >= 0.5, value <= 100_000 else { return nil }
+        let latin = String(text.trimmingCharacters(in: .whitespacesAndNewlines).map { map[$0] ?? $0 })
+        guard latin.allSatisfy({ ($0.isASCII && $0.isNumber) || $0 == "." }),
+              let value = Double(latin), value >= 0.5, value <= 100_000 else { return nil }
         return Int(value.rounded())
     }
 
@@ -409,7 +410,8 @@ final class PrayerNotificationCoordinator {
                 // simply not scheduled; it is not a failure to show the user.
                 center.removePendingNotificationRequests(withIdentifiers: [candidate.id])
                 try session.notificationBudget.cancel(id: candidate.id, now: now)
-                try updateLedger(requestID: candidate.id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "dropped", reason: error == .full ? "budget" : "disabled")
+                try updateLedger(requestID: candidate.id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "dropped",
+                                 reason: error == .full ? "budget" : "disabled", kind: RoomNotificationContent.ledgerKind(candidate.id))
                 continue
             }
             if !current.contains(where: { $0.identifier == candidate.id && Self.matches($0, dueAt: candidate.dueAt) && $0.content.title == content.title && $0.content.body == content.body && $0.content.categoryIdentifier == content.categoryIdentifier }) {
@@ -604,8 +606,7 @@ final class PrayerNotificationCoordinator {
 
     static func activityBudgetCounts(rows: [NotificationLedger]) -> [String: Int] {
         var counts: [String: Set<String>] = [:]
-        for row in rows where row.deletedAt == nil && ["room", "digest", "nudge"].contains(row.requestClass)
-            && ["submitted", "observed"].contains(row.state) {
+        for row in rows where RoomNotificationContent.tracksReminderBudget(row) {
             // Natural request identity avoids counting duplicate ledger rows.
             counts[row.dayKey, default: []].insert(row.requestID)
         }
@@ -648,6 +649,7 @@ final class PrayerNotificationCoordinator {
         else { container = session.container }
         let context = ModelContext(container)
         let rows = try context.fetch(FetchDescriptor<NotificationLedger>(predicate: #Predicate { $0.requestID == requestID })).filter { $0.deletedAt == nil }
+        let classification = RoomNotificationContent.ledgerClassification(for: requestID, kind: kind)
         if state == "submitted", let dueAt,
            let current = rows.first(where: { $0.state == "submitted" && abs($0.scheduledFor.timeIntervalSince(dueAt)) < 1 }) {
             for duplicate in rows where duplicate.state == "submitted" && duplicate.id != current.id {
@@ -661,9 +663,9 @@ final class PrayerNotificationCoordinator {
             let row = NotificationLedger()
             row.dayKey = dayKey ?? rows.last?.dayKey ?? ""
             row.requestID = requestID
-            row.room = requestID.hasPrefix("quran.") ? "quran" : requestID.hasPrefix("digest.") ? "core" : requestID.hasPrefix("mal.") ? "mal" : "salah"
+            row.room = classification.room
             row.kind = kind ?? (requestID.hasSuffix(".snooze") ? "snooze" : "ask")
-            row.requestClass = requestID.hasPrefix("digest.") ? "digest" : requestID.hasPrefix("quran.") || requestID.hasPrefix("mal.") || kind == "activityStart" ? "room" : "prayer"
+            row.requestClass = classification.requestClass
             row.scheduledFor = dueAt ?? Date()
             row.state = state
             row.reason = reason
@@ -676,8 +678,8 @@ final class PrayerNotificationCoordinator {
             if state == "dropped", let dueAt,
                !rows.contains(where: { $0.state == "dropped" && $0.scheduledFor == dueAt && $0.reason == reason }) {
                 let row = NotificationLedger()
-                row.dayKey = dayKey ?? ""; row.requestID = requestID; row.room = requestID.hasPrefix("quran.") ? "quran" : "salah"
-                row.kind = kind ?? "ask"; row.requestClass = requestID.hasPrefix("quran.") || requestID.hasPrefix("mal.") ? "room" : "prayer"; row.scheduledFor = dueAt
+                row.dayKey = dayKey ?? ""; row.requestID = requestID; row.room = classification.room
+                row.kind = kind ?? "ask"; row.requestClass = classification.requestClass; row.scheduledFor = dueAt
                 row.state = state; row.reason = reason; row.writerID = "madar.app.notifications"
                 context.insert(row)
             }

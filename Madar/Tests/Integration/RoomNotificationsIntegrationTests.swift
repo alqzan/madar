@@ -7,6 +7,14 @@ import MadarCore
 
 /// M4-F02: built rooms share the arbiter; app protection hides content (§8 item 10); a tap opens the room it speaks for.
 @MainActor final class RoomNotificationsIntegrationTests: XCTestCase {
+    func testHabitNotificationAmountRequiresAWholeValidInput() {
+        XCTAssertEqual(PrayerNotificationCoordinator.typedAmount(" ٢٫٥ "), 3)
+        XCTAssertEqual(PrayerNotificationCoordinator.typedAmount("12"), 12)
+        XCTAssertNil(PrayerNotificationCoordinator.typedAmount("-٣"))
+        XCTAssertNil(PrayerNotificationCoordinator.typedAmount("٣ص٥"))
+        XCTAssertNil(PrayerNotificationCoordinator.typedAmount("٣ ٥"))
+    }
+
     func testCardRemindersAreAmountFreeAndStopAfterPaymentOrOff() throws {
         let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight"), "mal.cardDue": .string("3days")])
         app.authorizeProtectedData()
@@ -255,6 +263,41 @@ import MadarCore
         return (try AppSession(container: container, groupDirectory: root), root, now, day)
     }
 
+    func testLegacyHabitAndDiaryRequestsSeedSharedBudgetAfterUpgrade() throws {
+        let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight")])
+        let context = ModelContext(app.container)
+        let dayKey = day.day.description
+        let habitID = "habits.\(dayKey).\(UUID().uuidString)"
+        let notesID = "notes.\(dayKey).niyya"
+        let nudgeID = "nudge.\(dayKey)"
+        let activeIDs = [habitID, notesID, nudgeID]
+        let retiredPrayerID = "salah.\(dayKey).fajr.ask"
+        let cancelledHabitID = "habits.\(dayKey).\(UUID().uuidString)"
+        for requestID in activeIDs + [retiredPrayerID, cancelledHabitID] {
+            let row = NotificationLedger()
+            row.dayKey = dayKey
+            row.requestID = requestID
+            row.room = "salah"
+            row.requestClass = "prayer"
+            row.scheduledFor = now.addingTimeInterval(-60)
+            row.state = requestID == cancelledHabitID ? "cancelled" : (requestID == notesID ? "observed" : "submitted")
+            context.insert(row)
+        }
+        try context.save()
+
+        try app.publishNotificationBudget(at: now)
+        XCTAssertEqual(Set(try app.notificationBudget.reservations().map(\.id)), Set(activeIDs))
+        let rows = try context.fetch(FetchDescriptor<NotificationLedger>())
+        XCTAssertEqual(PrayerNotificationCoordinator.activityBudgetCounts(rows: rows), [dayKey: activeIDs.count])
+        XCTAssertTrue(rows.allSatisfy { $0.requestClass == "prayer" }, "Existing cache metadata is reinterpreted without rewriting the ledger")
+
+        for (requestID, room, requestClass) in [(habitID, "habits", "room"), (notesID, "notes", "room"), (nudgeID, "core", "nudge")] {
+            let classification = RoomNotificationContent.ledgerClassification(for: requestID, kind: RoomNotificationContent.ledgerKind(requestID))
+            XCTAssertEqual(classification.room, room)
+            XCTAssertEqual(classification.requestClass, requestClass)
+        }
+    }
+
     func testLegacyQadaReminderSettingHasNoSchemaEntryOrScheduledWork() async throws {
         let schema = try SettingsSchema.bundled()
         XCTAssertThrowsError(try schema.definition(for: "salah.qadaReminder"))
@@ -373,6 +416,36 @@ import MadarCore
         let mine = candidates.filter { $0.id.hasSuffix(habit.id.uuidString) && $0.id.hasPrefix("habits.") && !$0.id.contains("risk") }
         XCTAssertTrue(mine.contains { $0.dayKey == "2026-10-16" && $0.id == "habits.2026-10-16.\(habit.id.uuidString)" }, mine.map(\.id).joined(separator: ","))
         XCTAssertFalse(mine.contains { $0.dayKey == "2026-10-15" }, "a window that has passed is never asked again for today")
+    }
+
+    func testPreFajrHabitReminderUsesTheMadarDayOfItsWindowStart() async throws {
+        let (app, _, now, prayerDay) = try fixture(["core.dayStart": .string("fajr")])
+        let context = ModelContext(app.container)
+        let beforeFajr = addPushHabit(context, name: "قراءة هادئة", clockStart: 3 * 60)
+        let afterFajr = addPushHabit(context, name: "مشي صباحي", clockStart: 8 * 60)
+        let atFajr = addPushHabit(context, name: "أذكار الصباح", anchor: (0, 120))
+        try context.save()
+        let days = (-1...2).compactMap { PrayerTimesEngine.calculate(day: prayerDay.day.adding(days: $0), place: prayerDay.place) }
+        let candidates = try await RoomNotificationContent.candidates(session: app, prayerDays: days, now: now)
+        let earlier = try XCTUnwrap(candidates.first { $0.id.hasSuffix(beforeFajr.id.uuidString) })
+        let later = try XCTUnwrap(candidates.first { $0.id.hasSuffix(afterFajr.id.uuidString) })
+        let guarded = try XCTUnwrap(candidates.first { $0.id.hasSuffix(atFajr.id.uuidString) })
+        XCTAssertEqual(earlier.id, "habits.2026-10-14.\(beforeFajr.id.uuidString)")
+        XCTAssertEqual(later.id, "habits.2026-10-15.\(afterFajr.id.uuidString)")
+        XCTAssertEqual(guarded.id, "habits.2026-10-15.\(atFajr.id.uuidString)")
+        XCTAssertEqual(guarded.dueAt, prayerDay.fajr.addingTimeInterval(30 * 60))
+    }
+
+    func testNextDaysWeeklyHabitReminderKeepsItsCompletionAction() async throws {
+        let (app, _, now, prayerDay) = try fixture(["core.dayStart": .string("midnight")])
+        let context = ModelContext(app.container)
+        let fridayHabit = addPushHabit(context, name: "عادة الجمعة", frequency: "weekly", weekdays: ["fri"], clockStart: 8 * 60)
+        try context.save()
+        let days = (0...2).compactMap { PrayerTimesEngine.calculate(day: prayerDay.day.adding(days: $0), place: prayerDay.place) }
+        let candidates = try await RoomNotificationContent.candidates(session: app, prayerDays: days, now: now)
+        let candidate = try XCTUnwrap(candidates.first { $0.id.hasSuffix(fridayHabit.id.uuidString) })
+        XCTAssertEqual(candidate.id, "habits.2026-10-16.\(fridayHabit.id.uuidString)")
+        XCTAssertEqual(candidate.dayKey, "2026-10-16")
     }
 
     /// Rows for a custom push habit: daily or weekly, with an optional clock window or Fajr-anchored window.

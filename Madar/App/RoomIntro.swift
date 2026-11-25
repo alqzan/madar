@@ -35,6 +35,7 @@ extension AppSession {
         return "Madar.introSeen." + block.rawValue
     }
     func introNeeded(_ block: BahwBlock) -> Bool {
+        guard BahwBlock.built.contains(block), block != .notes else { return false }
         #if DEBUG
         // UI tests that are not about the intro open rooms directly; MADAR_UI_INTRO=1 brings the sheet back.
         let environment = ProcessInfo.processInfo.environment
@@ -48,7 +49,15 @@ extension AppSession {
 
     /// The lobby's door: the first visit shows the introduction, later visits open the room.
     func requestOpen(_ block: BahwBlock) {
+        if block == .notes { markIntroSeen(block) }
         if introNeeded(block) { pendingIntro = block } else { openRoom(block) }
+    }
+
+    func prepareRoomTab(_ tab: String) {
+        guard let block = Self.roomTabs.first(where: { $0.tab == tab })?.block else { return }
+        if !roomEnabled(block) && !roomWasOpenedBefore(block) { enableRoom(block) }
+        if block == .notes { markIntroSeen(block) }
+        if introNeeded(block) { pendingIntro = block }
     }
 
     func openRoom(_ block: BahwBlock) {
@@ -96,17 +105,45 @@ extension AppSession {
 }
 
 extension BahwBlock {
-    /// One sentence a person can understand, the three things done there, and the few settings worth choosing on day one.
-    var intro: (sentence: String, steps: [String], toggles: [(key: String, title: String)]) {
+    /// The first actions are shared by the first-visit sheet and the guide.
+    var intro: (sentence: String, steps: [String]) {
         switch self {
-        case .salah: ("سجّل ما صلّيت وشاهد الصلاة القادمة.", ["اضغط على الصلاة لتسجّلها", "اطّلع على المواقيت", "تابع التزامك"], [])
-        case .quran: ("ورد يومي من القرآن بمقدار يناسبك.", ["اختر ورد اليوم", "سجّل ما قرأت", "تابع تقدّمك"], [("quran.lateReminder", "ذكّرني بالورد المتأخر")])
-        case .habits: ("عادات صغيرة تتابعها كل يوم.", ["أضف عادة", "علّمها حين تنجزها", "شاهد سلسلتك"], [])
-        case .notes: ("صفحة تكتب فيها يومك بصوتك أو بقلمك.", ["اكتب أو سجّل صوتك", "أضف صورة من يومك", "ارجع لذكرياتك"], [("notes.morningNiyya", "نيّة الصباح")])
-        case .mal: ("سجّل مصروفك واعرف ما بقي لك.", ["أضف حسابك وبطاقاتك", "اضبط راتبك", "سجّل مصروفك وشاهد ما بقي"], [("mal.alert80", "نبّهني عند ٨٠٪ من الحد")])
-        case .mihbara: ("مكتبتك وقراءاتك في مكان واحد.", ["أضف كتابًا", "اقرأ وعلّم ما يعجبك", "ارجع لاقتباساتك"], [])
-        case .year: ("سنتك أمامك أيامًا أيامًا.", ["شاهد أيام السنة", "أضف حدثًا", "تابع ما مضى"], [])
-        case .upcoming: ("الأيام القادمة التي تنتظرها.", ["أضف موعدًا", "شاهد العدّ التنازلي"], [])
+        case .salah:
+            ("تُستخدم مواقيت مدينتك لحساب بداية اليوم والتذكيرات المرتبطة بالصلاة.", [])
+        case .quran:
+            ("اقرأ من المصحف، أو تابع الحفظ والمراجعة.", [
+                "افتح «المصحف» وابدأ القراءة من الوجه الذي تختاره.",
+                "اختر «ابدأ خطة الحفظ» ليقترح لك مدار وردًا ومراجعة.",
+                "سجّل ما أنجزت من الورد وتابع تقدّمك."
+            ])
+        case .habits:
+            ("عادة صغيرة تقدر تتابعها كل يوم.", [
+                "اختر «أضف أول عادة»، واكتب اسمها وطريقة متابعتها.",
+                "سجّل إنجازك من العادات أو من ودجتها في البهو.",
+                "ارجع إلى سجل العادة وشاهد سلسلتها."
+            ])
+        case .notes:
+            ("صفحة لكل يوم، للكتابة والصور والتسجيلات.", [
+                "افتح صفحة اليوم واكتب سطرك الأول.",
+                "سجّل صوتك أو أضف صورة إلى الصفحة.",
+                "ارجع إلى أيامك السابقة من الأرشيف."
+            ])
+        case .mal:
+            ("حساباتك ومصروفاتك وما عليك من التزامات.", [
+                "اختر «أضف حسابك يدويًا» وعرّف أول حساب.",
+                "استخدم زر الإضافة لتسجيل مصروف من الحساب.",
+                "راجع حركاتك، وأضف راتبك إذا أردت تتبّع الصرف خلال دورته."
+            ])
+        case .mihbara:
+            ("مكتبتك وصفحتك الأخيرة واقتباساتك.", [
+                "اختر «أضف كتابك الأول» وأضف ملف PDF أو EPUB، أو سجّل كتابًا ورقيًا.",
+                "افتح الكتاب من رفّك وارجع إلى الموضع الذي وقفت عنده.",
+                "احفظ ما يعجبك من الكتاب في اقتباساتك."
+            ])
+        case .year:
+            ("تصفّح أيام السنة بالهجري والميلادي.", ["افتح ودجة «السنة» من البهو."])
+        case .upcoming:
+            ("تابع الأيام التي تنتظرها.", ["أضف يومًا يهمّك وتابع كم بقي عليه."])
         }
     }
 }
@@ -115,7 +152,6 @@ struct RoomIntroSheet: View {
     @Bindable var session: AppSession
     let block: BahwBlock
     @Environment(\.roomTheme) private var theme
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         let content = block.intro
@@ -136,28 +172,12 @@ struct RoomIntroSheet: View {
                             .accessibilityIdentifier("intro-step-\(index + 1)")
                     }
                 }
-                if !content.toggles.isEmpty {
-                    VStack(spacing: 0) {
-                        ForEach(content.toggles, id: \.key) { item in
-                            Toggle(item.title, isOn: Binding(get: { session.bool(item.key) }, set: { session.set(.bool($0), key: item.key) }))
-                                .frame(minHeight: 48).accessibilityIdentifier("intro-\(item.key)")
-                        }
-                    }
-                }
-                if MadarPlatform.hasNotifications, let reminder = block.reminderLine, session.canRequestNotificationPermission {
-                    Text(reminder).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    Button { session.requestPrayerNotificationPermission() } label: {
-                        Label("اسمح بالتذكيرات", systemImage: "bell").font(MadarTypography.body().bold()).foregroundStyle(theme.accent)
-                            .frame(maxWidth: .infinity, minHeight: 48).contentShape(Capsule())
-                            .glassEffect(.regular.interactive(), in: .capsule)
-                    }.buttonStyle(.madarPlain).accessibilityIdentifier("intro-notifications")
-                }
                 Button("ابدأ") {
                     session.markIntroSeen(block); session.pendingIntro = nil
-                    if let tab = block.tab, session.selectedTab == tab { return }
+                    if AppSession.roomTabs.contains(where: { $0.block == block && $0.tab == session.selectedTab }) { return }
                     session.openRoom(block)
                 }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("intro-start")
-                Button { session.markIntroSeen(block); session.pendingIntro = nil } label: { Text("ليس الآن")
+                Button { session.markIntroSeen(block); session.pendingIntro = nil } label: { Text("تخطَّ التعريف")
                     .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
                     .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("intro-later")
             }.padding(24).frame(maxWidth: 560).frame(maxWidth: .infinity)
@@ -170,19 +190,6 @@ struct RoomIntroSheet: View {
 
 extension BahwBlock {
     var themeRoom: String {
-        switch self { case .salah: "salah"; case .quran: "quran"; case .mal: "mal"; case .notes: "notes"; case .mihbara: "mihbara"; default: "bahw" }
-    }
-}
-
-extension BahwBlock {
-    /// What a reminder from this room says it will do, shown beside the one permission button.
-    var reminderLine: String? {
-        switch self {
-        case .salah: "يسألك مدار عن صلاتك بعد الأذان بنحو نصف ساعة، ولا يصلك شيء وقت الصلاة نفسها."
-        case .quran: "يذكّرك بوردك بلطف في الوقت الذي تختاره، ولا يزعجك إن قرأته."
-        case .habits: "يذكّرك بعادتك في وقتها بكلمة خفيفة تشجّعك."
-        case .notes: "يسألك عن نيّة يومك، ويذكّرك بذكرى من مثل هذا اليوم."
-        default: nil
-        }
+        switch self { case .salah, .habits: "salah"; case .quran: "quran"; case .mal: "mal"; case .notes: "notes"; case .mihbara: "mihbara"; default: "bahw" }
     }
 }

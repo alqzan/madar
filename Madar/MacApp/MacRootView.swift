@@ -40,9 +40,7 @@ struct MacRootView: View {
                 .interactiveDismissDisabled()
         }
         .onChange(of: session.selectedTab) { _, tab in
-            guard let block = AppSession.roomTabs.first(where: { $0.tab == tab })?.block else { return }
-            if !session.roomEnabled(block) && !session.roomWasOpenedBefore(block) { session.enableRoom(block) }
-            if session.introNeeded(block) { session.pendingIntro = block }
+            session.prepareRoomTab(tab)
         }
         .onChange(of: session.mihbaraOpen) { _, open in
             // The Mihbara is a sidebar room on the Mac: a shared screen that asks for it selects that room.

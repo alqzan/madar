@@ -6,7 +6,20 @@ import MapKit
 /// time zone and country by the system geocoder, and thrown away: only the city the reader confirms is saved.
 // Core Location calls the delegate on the RunLoop that created the manager, here the main RunLoop.
 @MainActor final class CityLocator: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
-    struct Found { let name: String; let lat: Double; let lon: Double; let tz: String; let country: String; let currency: String }
+    struct Found {
+        let name: String
+        let lat: Double
+        let lon: Double
+        let tz: String
+        let country: String
+        let currency: String
+
+        /// Keep only city-scale coordinates after the system has resolved the city.
+        var approximateCity: Found {
+            Found(name: name, lat: (lat * 100).rounded() / 100, lon: (lon * 100).rounded() / 100,
+                  tz: tz, country: country, currency: currency)
+        }
+    }
     @Published var working = false
     @Published var message: String?
     /// Location permission was refused for Madar and can be changed in device Settings.
@@ -96,7 +109,7 @@ import MapKit
                 }
                 let completion = self.onFound
                 self.cancel()
-                completion?(found)
+                completion?(found.approximateCity)
             } catch {
                 guard !Task.isCancelled else { return }
                 self?.fail("تعذّر معرفة مدينتك الآن؛ اختر من القائمة.")

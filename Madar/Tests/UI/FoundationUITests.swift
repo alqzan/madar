@@ -1,6 +1,86 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func testWelcomeGuideIsOptionalAndCityPersistsAcrossRelaunch() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+
+        let guide = app.buttons["first-run-guide"]
+        XCTAssertTrue(guide.waitForExistence(timeout: 15), app.debugDescription)
+        attachScreenshot(app, named: "madar-welcome")
+        guide.tap()
+
+        let title = app.staticTexts["madar-guide-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 8), app.debugDescription)
+        attachScreenshot(app, named: "madar-guide")
+        let quran = app.buttons["madar-guide-topic-quran"]
+        let habits = app.buttons["madar-guide-topic-habits"]
+        XCTAssertTrue(quran.isHittable, app.debugDescription)
+        quran.tap()
+        let quranCopy = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "اختر «ابدأ خطة الحفظ»")).firstMatch
+        XCTAssertTrue(quranCopy.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.buttons["madar-guide-open-quran"].exists)
+        habits.tap()
+        XCTAssertTrue(quranCopy.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "اختر «أضف أول عادة»")).firstMatch.exists)
+
+        let back = app.navigationBars.buttons.firstMatch
+        XCTAssertTrue(back.isHittable, app.debugDescription)
+        back.tap()
+        let start = app.buttons["first-run-continue"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5), app.debugDescription)
+        start.tap()
+        let city = app.buttons["first-run-city"]
+        XCTAssertTrue(city.waitForExistence(timeout: 5), app.debugDescription)
+        attachScreenshot(app, named: "madar-welcome-city")
+        city.tap()
+        let makkah = app.buttons["مكة المكرمة"]
+        XCTAssertTrue(makkah.waitForExistence(timeout: 5), app.debugDescription)
+        makkah.tap()
+        let lobbySettings = app.buttons["bahw-customize"]
+        XCTAssertTrue(lobbySettings.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(city.waitForNonExistence(timeout: 10), app.debugDescription)
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(lobbySettings.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(start.exists)
+        lobbySettings.tap()
+        let citySettings = app.buttons["settings-link-اليوم والتقويم"]
+        XCTAssertTrue(citySettings.waitForExistence(timeout: 8), app.debugDescription)
+        scrollTo(citySettings, in: app)
+        citySettings.tap()
+        let savedCity = app.buttons["setting-core.homeCity"]
+        XCTAssertTrue(savedCity.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(savedCity.label, "مكة المكرمة")
+    }
+
+    func testGuideReopensFromSettingsAndOffersFirstHabit() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L"]
+        app.launch()
+        finishOnboarding(app)
+        let settings = app.buttons["bahw-customize"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
+        settings.tap()
+        let guide = app.buttons["settings-link-دليل مدار"]
+        XCTAssertTrue(guide.waitForExistence(timeout: 8), app.debugDescription)
+        scrollTo(guide, in: app)
+        guide.tap()
+        let topic = app.buttons["madar-guide-topic-habits"]
+        XCTAssertTrue(topic.waitForExistence(timeout: 8), app.debugDescription)
+        topic.tap()
+        let open = app.buttons["madar-guide-open-habits"]
+        XCTAssertTrue(open.waitForExistence(timeout: 5), app.debugDescription)
+        scrollTo(open, in: app)
+        open.tap()
+        XCTAssertTrue(app.buttons["habit-first"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["madar-guide-title"].exists)
+    }
+
     func testFirstQuranVisitExplainsItsThreeStepsAndOpensTheRoom() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -725,7 +805,7 @@ import XCTest
             start.tap()
             if start.exists && start.isHittable { start.tap() }
         }
-        // A store without a fixture reaches the location step: choose a city by hand, then «ليس الآن» for photos.
+        // A store without a fixture reaches the location step. The cover closes when the city is saved.
         let city = app.buttons["first-run-city"]
         guard city.waitForExistence(timeout: 2) else { return }
         city.tap()
@@ -733,9 +813,7 @@ import XCTest
         XCTAssertTrue(field.waitForExistence(timeout: 5), app.debugDescription); field.tap(); field.typeText("الرياض")
         let hit = app.buttons["city-hit-الرياض"]
         XCTAssertTrue(hit.waitForExistence(timeout: 5), app.debugDescription); hit.tap()
-        if field.waitForExistence(timeout: 2) { app.navigationBars.buttons.firstMatch.tap() }
-        let later = app.buttons["first-run-continue"]
-        // B2-12: first run now ends after the city, so the second «متابعة» may not exist.
-        if later.waitForExistence(timeout: 3) { later.tap(); XCTAssertTrue(later.waitForNonExistence(timeout: 5), app.debugDescription) }
+        XCTAssertTrue(field.waitForNonExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(city.waitForNonExistence(timeout: 8), app.debugDescription)
     }
 }

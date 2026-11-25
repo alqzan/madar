@@ -63,6 +63,62 @@ import XCTest
         XCTAssertTrue(discard.waitForExistence(timeout: 8), app.debugDescription); discard.tap()
         XCTAssertTrue(app.buttons["money-expense-open"].waitForExistence(timeout: 10), app.debugDescription)
     }
+    func testFirstExpenseAddsAccountAndKeepsTheDraft() {
+        continueAfterFailure = false
+        let app = openExpense("empty")
+        app.buttons["money-expense-key-4"].tap()
+        app.buttons["money-expense-key-2"].tap()
+        let amount = app.staticTexts["money-expense-amount"]
+        let enteredAmount = amount.label
+        XCTAssertTrue(enteredAmount.contains("٤٢"), app.debugDescription)
+
+        let add = app.buttons["money-expense-add-account"]
+        for _ in 0..<6 where !add.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(add.isHittable, app.debugDescription)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "money-expense-first-source"
+        attachment.lifetime = .keepAlways
+        self.add(attachment)
+        add.tap()
+
+        let name = app.textFields["money-account-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 8), app.debugDescription)
+        name.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        name.typeText("حساب التجربة")
+        app.buttons["money-account-keyboard-done"].firstMatch.tap()
+
+        let opening = app.textFields["money-account-opening"]
+        for _ in 0..<6 where !opening.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(opening.isHittable, app.debugDescription)
+        opening.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        let previous = opening.value as? String ?? ""
+        opening.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: previous.count) + "1000")
+        app.buttons["money-account-keyboard-done"].firstMatch.tap()
+
+        let saveAccount = app.buttons["money-account-save"]
+        for _ in 0..<6 where !saveAccount.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(saveAccount.isHittable && saveAccount.isEnabled, app.debugDescription)
+        saveAccount.tap()
+
+        let method = app.buttons["money-expense-method-حساب التجربة"]
+        XCTAssertTrue(method.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(amount.label, enteredAmount)
+        let saveExpense = app.buttons["money-expense-save"]
+        XCTAssertTrue(saveExpense.isEnabled, app.debugDescription)
+        saveExpense.tap()
+
+        let home = app.buttons["money-expense-open"]
+        XCTAssertTrue(home.waitForExistence(timeout: 10), app.debugDescription)
+        let accounts = app.buttons["money-accounts-open"].firstMatch
+        for _ in 0..<8 where !accounts.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(accounts.isHittable, app.debugDescription)
+        accounts.tap()
+        let balance = app.staticTexts["money-accounts-net"]
+        let updatedBalance = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "٩٥٨"), object: balance)
+        XCTAssertEqual(XCTWaiter.wait(for: [updatedBalance], timeout: 8), .completed, app.debugDescription)
+    }
     func testCalculatorSplitSaveAndUndo() {
         continueAfterFailure = false
         let app = openExpense()

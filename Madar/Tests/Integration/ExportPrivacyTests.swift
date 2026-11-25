@@ -75,10 +75,23 @@ import MadarData
         let deadline = ContinuousClock.now.advanced(by: .seconds(5))
         while !predicate() { guard ContinuousClock.now < deadline else { throw ProbeError.timeout }; await Task.yield() }
     }
-    private func importedPreview(_ fixture: Fixture) async throws -> BackupRestorePreview {
+    private func importedBackupFile() async throws -> URL {
         let source = try self.fixture()
         let receipt = try await source.backup.coordinator.export(passphrase: "test-only-passphrase")
-        return try await fixture.backup.previewRestore(file: receipt.fileURL, passphrase: "test-only-passphrase", progress: { _ in })
+        return receipt.fileURL
+    }
+    private func importedPreview(_ fixture: Fixture) async throws -> BackupRestorePreview {
+        let file = try await importedBackupFile()
+        return try await fixture.backup.previewRestore(file: file, passphrase: "test-only-passphrase", progress: { _ in })
+    }
+    private func modelWithRestorePreview(_ fixture: Fixture) async throws -> BackupSettingsModel {
+        let model = BackupSettingsModel(service: fixture.backup)
+        model.selectedFile = try await importedBackupFile()
+        model.restorePassphrase = "test-only-passphrase"
+        model.inspect()
+        try await waitUntil { !model.busy }
+        XCTAssertNotNil(model.preview)
+        return model
     }
 
     func testPlainExportCarriesPrivateNotesAndTombstonesWithoutAnyPrompt() async throws {
@@ -149,6 +162,60 @@ import MadarData
         let file = try XCTUnwrap(model.plainExportedURL)
         XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
         model.close()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    func testCancellingRestoreClearsPreviewAndAllowsReinspection() async throws {
+        let fixture = try fixture()
+        let generation = fixture.store.binding.generationID
+        let model = try await modelWithRestorePreview(fixture)
+        let previous = try XCTUnwrap(model.preview).id
+        model.restore()
+        model.cancel()
+        XCTAssertNil(model.preview)
+        try await waitUntil { !model.busy }
+        XCTAssertNil(model.errorMessage)
+        XCTAssertNotNil(model.resultMessage)
+        XCTAssertEqual(fixture.store.binding.generationID, generation)
+        XCTAssertTrue(model.canInspect)
+        model.inspect()
+        try await waitUntil { !model.busy }
+        XCTAssertNotEqual(try XCTUnwrap(model.preview).id, previous)
+        model.close()
+    }
+
+    func testStaleRestorePreviewClearsAndAsksForReinspection() async throws {
+        let fixture = try fixture()
+        let generation = fixture.store.binding.generationID
+        let model = try await modelWithRestorePreview(fixture)
+        try await fixture.session.applySettingsAndWait(["core.firstCalendar": .string("hijri")])
+
+        model.restore()
+        try await waitUntil { !model.busy }
+        XCTAssertNil(model.preview)
+        XCTAssertTrue(model.errorMessage?.contains("افحص النسخة مرة أخرى") == true)
+        XCTAssertEqual(fixture.store.binding.generationID, generation)
+        XCTAssertTrue(model.canInspect)
+        model.inspect()
+        try await waitUntil { !model.busy }
+        XCTAssertNotNil(model.preview)
+        model.close()
+    }
+
+    func testCancellingActiveExportShowsCancellationInsteadOfError() async throws {
+        let gate = PlainExportGate()
+        gate.pauseOnReturn = true
+        let fixture = try fixture(plainExportGate: gate)
+        let model = BackupSettingsModel(service: fixture.backup)
+        model.exportPlain()
+        try await waitUntil { gate.continuation != nil }
+        let file = try XCTUnwrap(gate.fileURL)
+        model.cancel()
+        gate.resume()
+        try await waitUntil { !model.busy }
+        XCTAssertNil(model.errorMessage)
+        XCTAssertEqual(model.resultMessage, "أُلغي الإجراء. النسخ السابقة محفوظة.")
+        XCTAssertNil(model.plainExportedURL)
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
     }
 }

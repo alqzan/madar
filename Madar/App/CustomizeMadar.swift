@@ -120,6 +120,7 @@ struct CustomizeMadar: View {
         let showsMihbara = session.roomEnabled(.mihbara) && matches("المحبرة")
         let showsMoney = session.roomEnabled(.mal) && matches("المال")
         let showsTafsir = session.roomEnabled(.quran) && matches("القرآن التفسير مكتبة التفاسير مرجع الورد")
+        let showsGuide = matches("دليل مدار خطوات البداية ترحيب تعرّف على الأقسام")
         let showsLobby = matches("الودجات وأحجامها البهو الكتل")
         let showsWidgetMaker = MadarPlatform.hasHomeScreenWidgets && matches("صانع الودجة اصنع ودجة ودجاتي")
         let showsWidgetGallery = MadarPlatform.hasHomeScreenWidgets && matches("ودجات الشاشة الرئيسية خارج التطبيق")
@@ -132,9 +133,21 @@ struct CustomizeMadar: View {
         let sections = searchableSections.filter { section in
             (section != "الإشعارات" || MadarPlatform.hasNotifications) && definitions.contains { sectionFor($0.key) == section }
         }
-        let hasResult = showsMihbara || showsMoney || showsTafsir || showsLobby || showsWidgetMaker || showsWidgetGallery
+        let hasResult = showsMihbara || showsMoney || showsTafsir || showsGuide || showsLobby || showsWidgetMaker || showsWidgetGallery
             || showsRoomLayouts || backup != nil || sync != nil || showsLegacyMove || !hits.isEmpty || !sections.isEmpty
 
+        if showsGuide {
+            NavigationLink {
+                MadarGuideView(openTab: { session.selectedTab = $0 })
+            } label: {
+                HStack {
+                    Label(MadarGuideView.title, systemImage: "book").font(MadarTypography.section())
+                    Spacer()
+                    Image(systemName: "chevron.left").accessibilityHidden(true)
+                }
+                .padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("settings-search-guide")
+        }
         if showsMihbara {
             Button { session.selectedTab = "mihbara" } label: {
                 HStack { Text("افتح المحبرة").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }.padding(16).background(theme.surface, in: .rect(cornerRadius: 20))

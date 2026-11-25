@@ -2,9 +2,10 @@ import XCTest
 
 /// 12 Nov batch C: prayer-period headings, reading mode, the on-demand night review, the calendar with photos and the Arabic question bank.
 @MainActor final class DiaryBatchCUITests: XCTestCase {
-    private func launch(_ fixture: String) -> XCUIApplication {
+    private func launch(_ fixture: String, failReadingArchiveOnce: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+        if failReadingArchiveOnce { app.launchEnvironment["MADAR_UI_DIARY_READING_ARCHIVE_FAILURE_ONCE"] = "1" }
         app.launch(); return app
     }
     private func openToday(_ app: XCUIApplication) {
@@ -52,6 +53,28 @@ import XCTest
         XCTAssertEqual(photos.count, 1, "The day's cover photo appears once in reading mode.")
         app.buttons["diary-reading-close"].tap()
         XCTAssertTrue(app.staticTexts["diary-day-title"].waitForExistence(timeout: 10))
+    }
+
+    func testReadingModeRetriesTheArchiveWithoutClosingTheOpenPage() {
+        continueAfterFailure = false
+        let app = launch("periods", failReadingArchiveOnce: true)
+        openToday(app)
+        openMenuItem(app, "diary-day-read")
+        let retry = app.buttons["diary-reading-archive-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+        let currentLine = app.staticTexts["قهوة الضحى."]
+        XCTAssertTrue(currentLine.waitForExistence(timeout: 15), app.debugDescription)
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "diary-reading-archive-retry"
+        capture.lifetime = .keepAlways
+        add(capture)
+        retry.tap()
+        let pager = app.descendants(matching: .any)["diary-reading-pager"]
+        XCTAssertTrue(pager.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(retry.exists)
+        XCTAssertTrue(currentLine.exists)
+        pager.swipeLeft()
+        XCTAssertTrue(app.staticTexts["يوم أمس فيه صورة."].waitForExistence(timeout: 10), app.debugDescription)
     }
 
     func testNightReviewOnDemandSavesALineToToday() throws {

@@ -345,9 +345,7 @@ struct MadarRootView: View {
         .fullScreenCover(item: $session.moneyExpenseSeed, onDismiss: { session.presentNextMoneyExpenseSeed() }) { seed in MoneyQuickExpense(app: session, seed: seed) }
         .sheet(item: $session.pendingIntro) { block in RoomIntroSheet(session: session, block: block).environment(\.roomTheme, RoomTheme(room: block.themeRoom, dark: dark)) }
         .onChange(of: session.selectedTab) { _, tab in
-            guard let block = AppSession.roomTabs.first(where: { $0.tab == tab })?.block else { return }
-            if !session.roomEnabled(block) && !session.roomWasOpenedBefore(block) { session.enableRoom(block) }
-            if session.introNeeded(block) { session.pendingIntro = block }
+            session.prepareRoomTab(tab)
         }
         .font(MadarTypography.body())
         .environment(\.roomTheme, theme)

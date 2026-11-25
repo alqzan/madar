@@ -17,37 +17,53 @@ import MadarPrayer
     static func candidates(session: AppSession, prayerDays: [PrayerDay], now: Date) async throws -> [NotificationCandidate] {
         var result: [NotificationCandidate] = []
         let service = AppBahwService(session: session, evaluationDate: now), today = service.today
-        let place = try PrayerRepository(context: ModelContext(session.container)).place(at: now)
+        let context = ModelContext(session.container)
+        let place = try PrayerRepository(context: context).place(at: now)
         let civil = GregorianDay.containing(now, in: place.timeZone)
-        for reading in try HabitRepository(context: ModelContext(session.container)).readings(at: now) {
+        let boundary = DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr
+        let nextDay = today.adding(days: 1)
+        let prayerByDay = Dictionary(prayerDays.filter { $0.place == place }.map { ($0.day, $0) }, uniquingKeysWith: { first, _ in first })
+        let readings = try HabitRepository(context: context).readings(at: now)
+        for reading in readings {
             guard reading.reminder == "push", reading.source == nil, !reading.archived, !reading.paused,
                   let current = reading.summary.current, current.target > 0, !current.met else { continue }
             // Owner, 17 Nov 2026 (idea 9): a push habit with no window is asked at the median time of its last 14 logged times.
             let learned = current.rule.windowStart == nil ? RoomReminders.learnedHabitMinute(eventTimes: reading.eventTimes, timeZone: place.timeZone) : nil
             guard current.rule.windowStart != nil || learned != nil else { continue }
-            // Today's window, or tomorrow's when it opens the evening before (idea 17); each needs its own day to be due.
-            var eveningBefore = false, askedOffset = 0
-            let start = (0...1).lazy.compactMap { offset -> (Date, Int)? in
-                let dueDay = today.adding(days: offset), civilDay = civil.adding(days: offset)
-                guard current.dueDays.contains(dueDay) || (offset == 1 && HabitEngine.schedulesDay(current.rule, dueDay)) else { return nil }
-                if let learned { return RoomReminders.habitLearnedStart(minute: learned, on: civilDay, timeZone: place.timeZone).map { ($0, offset) } }
-                return (HabitEngine.window(rule: current.rule, civilDay: civilDay, place: place, prayer: prayerDays.first { $0.day == civilDay })?.start).map { ($0, offset) }
-            }.first { $0.0 > now }.map { found -> Date in eveningBefore = found.1 == 1 && !current.dueDays.contains(today); askedOffset = found.1; return found.0 }
-            // A window that opens tomorrow belongs to tomorrow's day: the key is fixed here, so «تمّت» tapped tomorrow morning
-            // never writes yesterday.
-            let askedDay = eveningBefore ? today : today.adding(days: askedOffset) // the night-before ask keeps today's key: it only asks, never logs
-            if var candidate = RoomReminders.habit(id: reading.id, windowStart: start, dayKey: askedDay.description, prayerDays: prayerDays, now: now) {
-                // A reminder for tomorrow's day (the fast asked the night before) only asks; it never logs tonight.
-                if eveningBefore { candidate = .init(id: "habits.\(askedDay).eve.\(reading.id.uuidString)", room: .habits, dueAt: candidate.dueAt, dayKey: candidate.dayKey) }
-                result.append(candidate)
+            func isDue(_ day: GregorianDay) -> Bool {
+                current.dueDays.contains(day) || (day == nextDay && HabitEngine.schedulesDay(current.rule, day))
             }
+            // Like the habit itself, a reminder belongs to the Madar day in which its window starts.
+            let window = (-1...2).compactMap { offset -> (start: Date, day: GregorianDay, eveningBefore: Bool)? in
+                let anchorDay = civil.adding(days: offset)
+                let start: Date?
+                if let learned {
+                    start = RoomReminders.habitLearnedStart(minute: learned, on: anchorDay, timeZone: place.timeZone)
+                } else {
+                    start = HabitEngine.window(rule: current.rule, civilDay: anchorDay, place: place, prayer: prayerByDay[anchorDay])?.start
+                }
+                guard let start, start > now else { return nil }
+                let startCivil = GregorianDay.containing(start, in: place.timeZone)
+                let startPrayers = prayerByDay[startCivil].map { [$0] } ?? []
+                guard let day = try? MadarDay.resolve(instant: start, place: place, boundary: boundary, prayerDays: startPrayers).date,
+                      day >= today, day <= nextDay else { return nil }
+                if isDue(day) { return (start, day, false) }
+                // A Fajr-anchored fast can open the preceding civil evening. It asks about tomorrow and cannot log a completion.
+                guard current.rule.windowAnchor == .fajr, anchorDay == nextDay, startCivil < anchorDay, isDue(anchorDay) else { return nil }
+                return (start, day, true)
+            }.min { $0.start < $1.start }
+            guard let window, var candidate = RoomReminders.habit(id: reading.id, windowStart: window.start, dayKey: window.day.description, prayerDays: prayerDays, now: now) else { continue }
+            if window.eveningBefore {
+                candidate = .init(id: "habits.\(window.day).eve.\(reading.id.uuidString)", room: .habits, dueAt: candidate.dueAt, dayKey: candidate.dayKey)
+            }
+            result.append(candidate)
         }
         // Owner, 17 Nov 2026: a daily habit missed yesterday is one miss from breaking. If it is still not done today,
         // one last alert comes an hour and a half after Isha («سلسلة … بتروح الليلة»); then the streak resets and the longest stays.
-        for reading in try HabitRepository(context: ModelContext(session.container)).readings(at: now) {
+        for reading in readings {
             guard reading.summary.atRisk, reading.reminder != "none", !reading.archived, !reading.paused,
                   let current = reading.summary.current, current.rule.frequency == .daily, current.target > 0, !current.met,
-                  current.dueDays.contains(today), let isha = prayerDays.first(where: { $0.day == civil })?.isha else { continue }
+                  current.dueDays.contains(today), let isha = prayerByDay[today]?.isha else { continue }
             let due = SanctityGuard(prayerDays: prayerDays).clamp(isha.addingTimeInterval(90 * 60))
             guard due > now else { continue }
             result.append(.init(id: "habits.\(today).final.\(reading.id.uuidString)", room: .habits, dueAt: due, dayKey: today.description))
@@ -341,6 +357,26 @@ import MadarPrayer
         if id.hasPrefix("mal.reconcile.") { return "reconciliation" }
         if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "niyya" : id.hasSuffix(".line") ? "line" : id.hasSuffix(".letter") ? "letter" : "onThisDay" }
         return "nudge"
+    }
+
+    static func ledgerClassification(for requestID: String, kind: String?) -> (room: String, requestClass: String) {
+        switch requestID.split(separator: ".", maxSplits: 1).first {
+        case "quran": ("quran", "room")
+        case "mal": ("mal", "room")
+        case "habits": ("habits", "room")
+        case "notes": ("notes", "room")
+        case "digest": ("core", "digest")
+        case "nudge": ("core", "nudge")
+        default: ("salah", kind == "activityStart" ? "room" : "prayer")
+        }
+    }
+
+    static func tracksReminderBudget(_ row: NotificationLedger) -> Bool {
+        guard row.deletedAt == nil, row.mergedInto == nil,
+              row.state == "submitted" || row.state == "observed" else { return false }
+        if ["room", "digest", "nudge"].contains(row.requestClass) { return true }
+        // Older versions classified habit, diary and nudge reminders as prayer asks.
+        return ledgerClassification(for: row.requestID, kind: row.kind).requestClass != "prayer"
     }
 
     /// Whether a room reminder still matters when it arrives in the foreground; a stale one stays silent.

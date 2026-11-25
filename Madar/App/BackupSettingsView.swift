@@ -4,6 +4,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import MadarDesign
 import MadarCore
+import MadarData
 
 // UI contracts intentionally expose verified backend facts, never simulated success.
 enum BackupUISchedule: String, CaseIterable, Identifiable, Sendable {
@@ -97,6 +98,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     var restoreMode: BackupUIRestoreMode = .merge
     private var operation: Task<Void, Never>?
     private var operationID: UUID?
+    private var cancellation: Task<Void, Never>?
     private var retainedPlainExportURL: URL?
     init(service: any BackupUIService) { self.service = service }
     var canExport: Bool { !busy && exportPassphrase.count >= 10 && exportPassphrase == exportConfirmation }
@@ -205,13 +207,15 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     func close() {
         operation?.cancel(); exportPassphrase = ""; exportConfirmation = ""; restorePassphrase = ""; preview = nil
         exportedURL = nil; discardPlain(); operationID = nil; busy = false; progress = nil
-        Task { [service] in await service.cancel() }
+        if cancellation == nil { Task { [service] in await service.cancel() } }
+        cancellation = nil
     }
     func dismissResult() { resultMessage = nil; restoreResult = nil }
     func cancel() {
-        guard busy else { return }
+        guard busy, cancellation == nil else { return }
         operation?.cancel()
-        Task { [service] in await service.cancel() }
+        preview = nil
+        cancellation = Task { [service] in await service.cancel() }
     }
     private func run(initial: String, action: @escaping @MainActor (@escaping @MainActor @Sendable (BackupUIProgress) -> Void, UUID) async throws -> Void) {
         guard !busy else { return }
@@ -219,7 +223,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
         progress = BackupUIProgress(message: initial)
         operation = Task { [weak self] in
             guard let self else { return }
-            defer { if operationID == id { busy = false; progress = nil; operation = nil } }
+            defer { if operationID == id { busy = false; progress = nil; operation = nil; cancellation = nil } }
             do {
                 #if DEBUG
                 // Controlled UI-state fixture, in an isolated test store only.
@@ -227,12 +231,21 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
                     try await Task.sleep(for: .seconds(20))
                 }
                 #endif
+                try Task.checkCancellation()
                 try await action({ [weak self] update in
                     guard let self, operationID == id else { return }
                     progress = update
                 }, id)
-            } catch is CancellationError { if operationID == id { resultMessage = "أُلغي الإجراء. النسخ السابقة محفوظة." } }
-            catch { if operationID == id { errorMessage = "لم يكتمل الإجراء. \(madarUserMessage(error))" } }
+            } catch is CancellationError, BackupOperationError.cancelled {
+                if operationID == id { resultMessage = "أُلغي الإجراء. النسخ السابقة محفوظة." }
+            } catch BackupOperationError.stalePreview {
+                guard operationID == id else { return }
+                dismissPreview()
+                errorMessage = "تحتاج المعاينة إلى تحديث. افحص النسخة مرة أخرى قبل الاستعادة."
+            } catch {
+                if operationID == id { errorMessage = "لم يكتمل الإجراء. \(madarUserMessage(error))" }
+            }
+            if operationID == id { await cancellation?.value }
         }
     }
 }

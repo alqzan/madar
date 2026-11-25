@@ -31,7 +31,10 @@ struct SettingsHome: View {
 
     @ViewBuilder private var roomGroups: some View {
             group("الأقسام") {
-                link("أقسامك والبهو", "أضف قسمًا أو أخفِه، ورتّب البهو وأحجامه", "square.grid.2x2") {
+                link(MadarGuideView.title, "خطوات البداية في كل قسم", "book") {
+                    MadarGuideView(openTab: { session.selectedTab = $0 })
+                }
+                link("أقسامك والبهو", "أظهر الودجات أو أخفِها ورتّبها", "square.grid.2x2") {
                     SettingsPage(title: "أقسامك والبهو") {
                         BahwBlocksSection(session: session)
                         if MadarPlatform.hasHomeScreenWidgets {

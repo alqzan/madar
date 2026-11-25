@@ -17,7 +17,7 @@ extension AppSession {
         let first = repository.prayerDay(at: now), place = repository.place(at: now), options = repository.calculationOptions(at: now)
         let days = (0..<4).compactMap { PrayerTimesEngine.calculate(day: first.adding(days: $0), place: place, options: options) }
         let rows = try context.fetch(FetchDescriptor<NotificationLedger>()).filter {
-            $0.deletedAt == nil && ["room", "digest", "nudge"].contains($0.requestClass) && ["submitted", "observed"].contains($0.state)
+            RoomNotificationContent.tracksReminderBudget($0)
                 && $0.scheduledFor >= now.addingTimeInterval(-7 * 86400)
         }
         let seeds = rows.map { NotificationBudgetReservation(id: $0.requestID, dayKey: $0.dayKey, scheduledAt: $0.scheduledFor, activity: $0.kind == "activityStart") }

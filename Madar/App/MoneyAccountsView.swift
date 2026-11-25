@@ -182,7 +182,7 @@ struct MoneyAccountsView: View {
         }.padding(24) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium, .large])
     }
     private func sourceTitle(_ source: AccountBalanceSource) -> String { switch source { case .entered: "رصيد بداية أدخلته"; case .reconciled: "من مطابقة اعتمدتها"; case .message: "رصيد رسالة يطابق الدفتر"; case .messageDiffers: "رصيد رسالة يختلف عن الدفتر" } }
-    private func addAccount() { selected = .init(id: UUID(), isNew: true, name: "", bank: "", last4: "", kind: "current", ownership: "mine", currency: app.string("core.currency"), openingMinor: 0, openingAt: app.prayerNow(), senderIDs: [], tracked: true, zakatInclude: true, fixedCheckpoint: false) }
+    private func addAccount() { selected = .new(currency: app.string("core.currency"), openingAt: app.prayerNow()) }
     private func load() {
         do {
             #if DEBUG
