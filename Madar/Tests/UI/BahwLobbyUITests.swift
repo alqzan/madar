@@ -413,11 +413,19 @@ import XCTest
         search.tap()
         let field = app.textFields["madar-search-field"]
         XCTAssertTrue(field.waitForExistence(timeout: 8), app.debugDescription)
+        field.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        field.typeText("الماء")
+        let hit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "madar-search-hit-habit-")).firstMatch
+        XCTAssertTrue(hit.waitForExistence(timeout: 8), app.debugDescription)
+        app.buttons["امسح البحث"].tap()
+        XCTAssertTrue(hit.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["madar-search-loading"].firstMatch.exists)
+
         field.tap(); field.typeText("زززز")
         XCTAssertTrue(app.descendants(matching: .any)["madar-search-empty"].waitForExistence(timeout: 8), app.debugDescription)
         app.buttons["امسح البحث"].tap()
         field.tap(); field.typeText("الماء")
-        let hit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "madar-search-hit-habit-")).firstMatch
         XCTAssertTrue(hit.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(hit.label.contains("الماء"), hit.label)
         hit.tap()

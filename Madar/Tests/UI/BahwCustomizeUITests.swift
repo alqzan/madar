@@ -313,6 +313,35 @@ import XCTest
         XCTAssertTrue(backup.label.contains("لا توجد نسخة بعد"), backup.label)
     }
 
+    func testMadarHealthSeparatesAnUnreadableBackupFromNoBackupAndRetries() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_HEALTH_FAIL_FIRST": "1"]
+        app.launch(); finishOnboarding(app)
+        let settings = app.buttons["bahw-customize"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
+        settings.tap()
+        let link = app.buttons["settings-link-صحة مدار"]
+        for _ in 0..<9 where !link.isHittable { app.swipeUp(velocity: .fast) }
+        XCTAssertTrue(link.isHittable, app.debugDescription)
+        link.tap()
+
+        let retry = app.buttons["health-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+        let verdict = app.descendants(matching: .any)["health-verdict"].firstMatch
+        XCTAssertFalse(verdict.exists)
+        let backup = app.descendants(matching: .any)["health-backup"].firstMatch
+        XCTAssertTrue(backup.label.contains("تعذّرت قراءة حالة النسخ"), backup.label)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "health-backup-read-retry"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        retry.tap()
+        XCTAssertTrue(verdict.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(retry.exists)
+        XCTAssertTrue(backup.label.contains("لا توجد نسخة بعد"), backup.label)
+    }
+
     func testHabitWidgetScopeLabelsUndoAndRelaunch() {
         continueAfterFailure = false
         let app = XCUIApplication()

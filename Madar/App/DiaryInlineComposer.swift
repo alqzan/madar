@@ -434,12 +434,14 @@ struct DiaryInlineComposer: View {
 
     /// Tools that exist only on the full surface.
     private var toolsRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        let dictationFirst = app.bool("notes.dictationFirst")
+        return ScrollView(.horizontal) {
             HStack(spacing: 6) {
+                if dictationFirst { editorVoiceTools(primary: true) }
                 if margin == nil {
-                PhotosPicker(selection: $photo, matching: .images, photoLibrary: .shared()) {
-                    Image(systemName: "photo").frame(width: 44, height: 44).contentShape(Rectangle())
-                }.buttonStyle(.madarPlain).disabled(edit != nil || saving).accessibilityLabel("أضف صورة").accessibilityIdentifier("diary-editor-photo")
+                    PhotosPicker(selection: $photo, matching: .images, photoLibrary: .shared()) {
+                        Image(systemName: "photo").frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.buttonStyle(.madarPlain).disabled(edit != nil || saving).accessibilityLabel("أضف صورة").accessibilityIdentifier("diary-editor-photo")
                 }
                 if margin == nil, UIImagePickerController.isSourceTypeAvailable(.camera) {
                     Button { focused = false; cameraOpen = true } label: { Image(systemName: "camera").frame(width: 44, height: 44).contentShape(Rectangle()) }
@@ -449,11 +451,7 @@ struct DiaryInlineComposer: View {
                 Button { focused = false; choosingFile = true } label: { Image(systemName: "doc").frame(width: 44, height: 44).contentShape(Rectangle()) }
                     .buttonStyle(.madarPlain).disabled(edit != nil || saving).accessibilityLabel("أرفق ملفًا").accessibilityIdentifier("diary-editor-file")
                 }
-                if edit == nil, margin == nil {
-                    Button { Task { await startRecording() } } label: { Image(systemName: "mic").frame(width: 44, height: 44).contentShape(Rectangle()) }
-                        .buttonStyle(.madarPlain).accessibilityLabel("سجّل صوتًا").accessibilityIdentifier("diary-editor-record")
-                    languageMenu
-                }
+                if !dictationFirst { editorVoiceTools(primary: false) }
                 if focused {
                     Button { focused = false } label: { Image(systemName: "keyboard.chevron.compact.down").frame(width: 44, height: 44).contentShape(Rectangle()) }
                         .buttonStyle(.madarPlain).accessibilityLabel("أخفِ لوحة الكتابة").accessibilityIdentifier("diary-editor-hide-keyboard")
@@ -465,7 +463,18 @@ struct DiaryInlineComposer: View {
                 formatButton("clock", "أدرج الوقت", id: "diary-editor-time") { insertAtCursor(service.time(app.prayerNow()) + " ") }
                 formatButton("list.bullet", "سطر في قائمة", id: "diary-editor-list") { insertAtCursor("• ", ownLine: true) }
             }
-        }.scrollBounceBehavior(.basedOnSize).foregroundStyle(theme.color("ink3Text"))
+        }.scrollIndicators(.hidden).scrollBounceBehavior(.basedOnSize).foregroundStyle(theme.color("ink3Text"))
+    }
+
+    @ViewBuilder private func editorVoiceTools(primary: Bool) -> some View {
+        if edit == nil, margin == nil {
+            Button { Task { await startRecording() } } label: {
+                Image(systemName: "mic").frame(width: 44, height: 44).contentShape(Rectangle())
+                    .foregroundStyle(primary ? theme.onAccent : theme.color("ink3Text"))
+                    .background(primary ? theme.accentFill : .clear, in: .circle)
+            }.buttonStyle(.madarPlain).accessibilityLabel("سجّل صوتًا").accessibilityIdentifier("diary-editor-record")
+            languageMenu
+        }
     }
 
     private func formatButton(_ symbol: String, _ label: String, id: String, action: @escaping () -> Void) -> some View {

@@ -18,8 +18,8 @@ import MadarData
         photoPage.dayKey = "2024-04-12"; photoPage.photoMediaID = photo.id; context.insert(photoPage)
         try context.save()
         let firstPreview = try await service.yearbookPreview(.init())
-        XCTAssertTrue(firstPreview.years.contains(2024))
-        let pages = try await service.yearbookPreview(.init(year: 2024), knownYears: firstPreview.years).pages
+        XCTAssertTrue(firstPreview.yearIndex.years.contains(2024))
+        let pages = try await service.yearbookPreview(.init(year: 2024), cachedYearIndex: firstPreview.yearIndex).pages
         XCTAssertEqual(pages.map(\.day.description),["2024-03-11","2024-04-11","2024-04-12"]);XCTAssertTrue(pages.first?.lines.contains{$0.text=="BOOK-MARGIN"}==true)
         XCTAssertEqual(pages.last?.media.map(\.id), [photo.id])
         let withoutPhotos = try await service.yearbookPreview(.init(year: 2024, margins: false, sources: false, photos: false)).pages
@@ -38,5 +38,45 @@ import MadarData
         defer{try? FileManager.default.removeItem(at:indexed.url.deletingLastPathComponent())}
         let p=try XCTUnwrap(PDFDocument(url:plain.url)),i=try XCTUnwrap(PDFDocument(url:indexed.url));XCTAssertEqual(p.pageCount,3);XCTAssertEqual(i.pageCount,4)
         XCTAssertTrue(i.string?.contains("BOOK-LAST")==true);XCTAssertFalse(i.string?.contains("SEALED-BOOK-SECRET")==true);XCTAssertNotEqual(i.page(at:0)?.string,i.page(at:1)?.string)
+    }
+
+    func testYearIndexReusesSameRevisionAndRefreshesAfterArchiveChangeAndNewYear() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryBook-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        let formatter = ISO8601DateFormatter()
+        var now = try XCTUnwrap(formatter.date(from: "2026-12-31T12:00:00+03:00"))
+        let service = AppDiaryService(app: app, clock: { now })
+        let context = ModelContext(container)
+
+        let old = Entry()
+        old.dayKey = "2024-03-11"
+        old.text = "OLDER-YEAR"
+        context.insert(old)
+        try context.save()
+        let initial = try await service.yearbookPreview(.init(year: 2024))
+        XCTAssertEqual(initial.yearIndex.years, [2026, 2024])
+
+        // A write has landed, but the session has not published its new revision yet.
+        old.deletedAt = now
+        old.deletionBarrierAt = now
+        let addition = Entry()
+        addition.dayKey = "2025-04-11"
+        addition.text = "NEWLY-ADDED-YEAR"
+        context.insert(addition)
+        try context.save()
+        let optionsOnly = try await service.yearbookPreview(.init(year: 2024, photos: false), cachedYearIndex: initial.yearIndex)
+        XCTAssertEqual(optionsOnly.yearIndex.years, [2026, 2024])
+
+        try app.reload()
+        let updated = try await service.yearbookPreview(.init(year: 2025), cachedYearIndex: optionsOnly.yearIndex)
+        XCTAssertEqual(updated.yearIndex.years, [2026, 2025])
+        XCTAssertEqual(updated.pages.map(\.day.description), ["2025-04-11"])
+
+        now = try XCTUnwrap(formatter.date(from: "2027-01-01T12:00:00+03:00"))
+        let nextYear = try await service.yearbookPreview(.init(), cachedYearIndex: updated.yearIndex)
+        XCTAssertEqual(nextYear.yearIndex.years, [2027, 2025])
     }
 }

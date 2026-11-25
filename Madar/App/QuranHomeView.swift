@@ -759,24 +759,35 @@ struct QuranMadarDayRefresh: ViewModifier {
     let app: AppSession
     let refresh: () -> Void
     @Environment(\.isFrontRoom) private var isFrontRoom
-    @State private var shownKey: String?
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var shownDay: GregorianDay?
     func body(content: Content) -> some View {
-        content.task(id: isFrontRoom) {
-            guard isFrontRoom else { return }
-            do { shownKey = try await app.madarDayOffMain(at: app.prayerNow())?.description }
-            catch is CancellationError { return }
-            catch { }
-            while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(60)) }
-                catch { return }
-                do {
-                    guard let key = try await app.madarDayOffMain(at: app.prayerNow())?.description,
-                          key != shownKey else { continue }
-                    shownKey = key
-                    refresh()
-                } catch is CancellationError { return }
-                catch { continue }
+        let observing = isFrontRoom && scenePhase == .active
+        content.task(id: observing) {
+            guard observing else { return }
+            await Self.observe(from: shownDay, read: { try await app.madarDayOffMain(at: app.prayerNow()) }) { day, changed in
+                shownDay = day
+                if changed { refresh() }
             }
+        }
+    }
+
+    static func observe(from previous: GregorianDay?, read: () async throws -> GregorianDay?,
+                        wait: () async throws -> Void = { try await Task.sleep(for: .seconds(60)) },
+                        receive: (GregorianDay, Bool) -> Void) async {
+        var current = previous
+        var initial = true
+        while !Task.isCancelled {
+            // A reload can supersede just the store read. The room keeps observing until its own task is cancelled.
+            let day = try? await read()
+            guard !Task.isCancelled else { return }
+            if let day, day != current {
+                let changed = !initial || current != nil
+                current = day
+                receive(day, changed)
+            }
+            initial = false
+            do { try await wait() } catch { return }
         }
     }
 }

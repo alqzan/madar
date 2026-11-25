@@ -172,11 +172,11 @@ struct DiaryCustomizeView: View {
             VStack(spacing: 5) {
                 Capsule().fill(theme.ink.opacity(0.3)).frame(width: 30, height: 4).padding(.vertical, 5)
                 ForEach(visibleOrder, id: \.self) { id in
-                    RoundedRectangle(cornerRadius: id == "memory" && app.string("notes.homeShape") == "margin" ? 2 : 7)
+                    RoundedRectangle(cornerRadius: 7)
                         .fill(id == "memory" ? theme.accentFill : theme.line)
                         // AU-04 (K-Mudhakkirat): the mini page names its parts, so the order reads at a glance.
                         .overlay { Text(blockTitle(id)).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(id == "memory" ? theme.onAccent : theme.ink).lineLimit(id == "memory" ? 2 : 1).multilineTextAlignment(.center).truncationMode(.tail).padding(.horizontal, 4) }
-                        .frame(height: id == "memory" ? 62 : 22)
+                        .frame(height: id == "memory" ? (app.string("notes.memorySize") == "medium" ? 44 : 62) : 22)
                 }
                 Spacer(minLength: 0)
             }.padding(8).frame(width: 108, height: 220).overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.color("ink3Text")) }.accessibilityHidden(true)
@@ -190,7 +190,8 @@ struct DiaryCustomizeView: View {
     private func previewLine(_ title: String, _ value: String) -> some View { HStack { Text(title).foregroundStyle(theme.color("ink3Text")); Spacer(minLength: 5); Text(figure: value) }.font(DiaryType.label) }
     private var homeCard: some View {
         section("home", title: "الرئيسية", subtitle: visiblePartsText, symbol: "square.grid.2x2") {
-            Text("اليوم أولًا في الأعلى. قدّم بطاقات السنين أو أيامك بما يناسبك؛ زر الكتابة يظهر في الأسفل حين تغيب بطاقة اليوم عن الشاشة.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+            Text("تظهر بطاقات السنين فوق صفحة اليوم. رتّب أجزاء العمود الجانبي على الآيباد بما يناسبك.")
+                .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
             ForEach(activeOrder, id: \.self) { id in
                 Divider().overlay(theme.line)
                 HStack {

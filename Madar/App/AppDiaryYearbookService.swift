@@ -3,24 +3,43 @@ import SwiftData
 import MadarCore
 import MadarData
 
+struct DiaryYearbookYearIndex: Sendable {
+    fileprivate struct Source: Equatable, Sendable {
+        let store: ObjectIdentifier
+        let generation: Int
+        let today: GregorianDay
+        let timeZoneID: String
+    }
+
+    fileprivate let source: Source
+    let years: [Int]
+}
+
 extension AppDiaryService {
-    func yearbookPreview(_ options: DiaryExportOptions, knownYears: [Int] = []) async throws -> (years: [Int], pages: [DiaryExportPage]) {
+    func yearbookPreview(
+        _ options: DiaryExportOptions, cachedYearIndex: DiaryYearbookYearIndex? = nil
+    ) async throws -> (yearIndex: DiaryYearbookYearIndex, pages: [DiaryExportPage]) {
         try authorizeRead()
         let container = app.container, generation = app.storeGeneration
         let configuration = dayReadConfiguration, zone = app.activePlace.timeZone
         let today = try await currentDayOffMain()
+        let source = DiaryYearbookYearIndex.Source(
+            store: ObjectIdentifier(container), generation: generation, today: today, timeZoneID: zone.identifier
+        )
+        let knownYears = cachedYearIndex.flatMap { $0.source == source ? $0.years : nil }
         let preview = try await Self.readYearbookPreview(options, knownYears: knownYears, container: container, today: today, configuration: configuration, zone: zone)
         try Task.checkCancellation()
         try authorizeRead()
         guard app.storeGeneration == generation, app.container === container else { throw CancellationError() }
-        return (preview.years, try Self.finishExportPages(preview.batch, context: ModelContext(container)))
+        let index = DiaryYearbookYearIndex(source: source, years: preview.years)
+        return (index, try Self.finishExportPages(preview.batch, context: ModelContext(container)))
     }
 
     @concurrent private static func readYearbookPreview(
-        _ options: DiaryExportOptions, knownYears: [Int], container: ModelContainer, today: GregorianDay, configuration: DiaryDayReadConfiguration, zone: TimeZone
+        _ options: DiaryExportOptions, knownYears: [Int]?, container: ModelContainer, today: GregorianDay, configuration: DiaryDayReadConfiguration, zone: TimeZone
     ) async throws -> (years: [Int], batch: DiaryExportPageBatch) {
         let context = ModelContext(container)
-        let years = try knownYears.isEmpty ? readExportYears(context: context, today: today, zone: zone) : knownYears
+        let years = try knownYears ?? readExportYears(context: context, today: today, zone: zone)
         var selected = options
         selected.year = options.year ?? years.first ?? today.year
         let batch = try readExportPageBatch(selected, context: context, today: today, configuration: configuration)

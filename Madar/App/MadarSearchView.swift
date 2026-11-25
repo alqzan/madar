@@ -8,8 +8,8 @@ import MadarDesign
 // a book, a surah or a money movement, and opens it in its room. It only reads what each room already owns;
 // nothing is written or copied, and each room keeps its own search for deeper filters.
 
-struct MadarSearchHit: Identifiable, Equatable {
-    enum Room: String, CaseIterable { case habits, notes, mihbara, quran, mal
+struct MadarSearchHit: Identifiable, Equatable, Sendable {
+    enum Room: String, CaseIterable, Sendable { case habits, notes, mihbara, quran, mal
         var title: String { switch self { case .habits: "العادات"; case .notes: "المذكرات"; case .mihbara: "المحبرة"; case .quran: "القرآن"; case .mal: "المال" } }
         var theme: String { switch self { case .habits: "bahw"; case .notes: "notes"; case .mihbara: "mihbara"; case .quran: "quran"; case .mal: "mal" } }
     }
@@ -19,27 +19,35 @@ struct MadarSearchHit: Identifiable, Equatable {
     let detail: String
     var day: GregorianDay? = nil
     let url: URL
-    static func == (a: Self, b: Self) -> Bool { a.id == b.id && a.title == b.title && a.detail == b.detail }
 }
 
 @MainActor struct MadarSearch {
     let session: AppSession
-    static let limitPerRoom = 4
+    nonisolated static let limitPerRoom = 4
 
     /// Arabic-insensitive matching: diacritics, tatweel, alef forms, taa marbuta and yaa folded the same way the diary search folds them.
     nonisolated static func key(_ text: String) -> String { DiarySearchParser.normalize(text) }
 
-    func hits(for query: String) async -> [MadarSearchHit] {
-        let needle = Self.key(query)
-        guard needle.count >= 2 else { return [] }
-        var result: [MadarSearchHit] = []
-        result += habits(needle)
-        guard session.protectedDataAuthorized else { return result }
-        result += await quran(needle)
-        result += books(needle)
-        result += await diary(needle)
-        result += money(needle)
-        return result
+    func hits(for needle: String) async -> [MadarSearchHit] {
+        guard needle.count >= 2, !session.maintenanceInProgress else { return [] }
+        let container = session.container
+        let habitHits = habits(needle)
+        guard session.protectedDataAuthorized else { return habitHits }
+        let quranHits = await quran(needle)
+        guard canRead(container) else { return habitHits }
+        let diaryHits = await diary(needle)
+        guard canRead(container) else { return habitHits }
+        let records = Task.detached(priority: .userInitiated) {
+            let context = ModelContext(container)
+            return Self.books(needle, in: context) + Self.money(needle, in: context)
+        }
+        let recordHits = await withTaskCancellationHandler { await records.value } onCancel: { records.cancel() }
+        guard canRead(container) else { return habitHits }
+        return habitHits + quranHits + diaryHits + recordHits
+    }
+
+    private func canRead(_ container: ModelContainer) -> Bool {
+        !Task.isCancelled && session.protectedDataAuthorized && !session.maintenanceInProgress && session.container === container
     }
 
     private func habits(_ needle: String) -> [MadarSearchHit] {
@@ -49,7 +57,7 @@ struct MadarSearchHit: Identifiable, Equatable {
             .map { row in
                 MadarSearchHit(id: "habit-" + row.id.uuidString, room: .habits, title: row.name,
                                detail: row.paused ? "مجمّدة" : row.statusTitle(AppBahwService(session: session).digits),
-                               url: URL(string: "madar://habits/habit/" + row.id.uuidString)!)
+                               url: URL(string: "madar://bahw/habits/" + row.id.uuidString)!)
             }
     }
 
@@ -63,16 +71,18 @@ struct MadarSearchHit: Identifiable, Equatable {
             }
     }
 
-    private func books(_ needle: String) -> [MadarSearchHit] {
-        let rows = (try? ModelContext(session.container).fetch(FetchDescriptor<Book>())) ?? []
-        return rows.filter { $0.deletedAt == nil && $0.mergedInto == nil && (Self.key($0.title).contains(needle) || Self.key($0.author).contains(needle)) }
-            .sorted { $0.updatedAt > $1.updatedAt }
+    nonisolated private static func books(_ needle: String, in context: ModelContext) -> [MadarSearchHit] {
+        guard !Task.isCancelled else { return [] }
+        let descriptor = FetchDescriptor<Book>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil },
+                                               sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
+        let rows = (try? context.fetch(descriptor)) ?? []
+        let matching = rows.lazy.filter { !Task.isCancelled && (Self.key($0.title).contains(needle) || Self.key($0.author).contains(needle)) }
             .prefix(Self.limitPerRoom)
-            .map { book in
-                MadarSearchHit(id: "book-" + book.id.uuidString, room: .mihbara, title: book.title,
-                               detail: book.author.isEmpty ? "كتاب في رفوفك" : book.author,
-                               url: URL(string: "madar://mihbara/book/" + book.id.uuidString)!)
-            }
+        return matching.map { book in
+            MadarSearchHit(id: "book-" + book.id.uuidString, room: .mihbara, title: book.title,
+                           detail: book.author.isEmpty ? "كتاب في رفوفك" : book.author,
+                           url: URL(string: "madar://mihbara/book/" + book.id.uuidString)!)
+        }
     }
 
     private func diary(_ needle: String) async -> [MadarSearchHit] {
@@ -90,15 +100,15 @@ struct MadarSearchHit: Identifiable, Equatable {
     }
 
     /// Movements by their name only; amounts stay in the money room, where «المال مخفي حتى اللمس» is honoured.
-    private func money(_ needle: String) -> [MadarSearchHit] {
-        let rows = (try? ModelContext(session.container).fetch(FetchDescriptor<MoneyTransaction>())) ?? []
-        return rows.filter { row in
-            row.deletedAt == nil && row.mergedInto == nil
-                && [row.merchant, row.counterparty].compactMap { $0 }.contains { Self.key($0).contains(needle) }
-        }
-        .sorted { $0.dayKey > $1.dayKey }
-        .prefix(Self.limitPerRoom)
-        .map { row in
+    nonisolated private static func money(_ needle: String, in context: ModelContext) -> [MadarSearchHit] {
+        guard !Task.isCancelled else { return [] }
+        let descriptor = FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil },
+                                                           sortBy: [SortDescriptor(\.dayKey, order: .reverse)])
+        let rows = (try? context.fetch(descriptor)) ?? []
+        let matching = rows.lazy.filter { row in
+            !Task.isCancelled && [row.merchant, row.counterparty].compactMap { $0 }.contains { Self.key($0).contains(needle) }
+        }.prefix(Self.limitPerRoom)
+        return matching.map { row in
             MadarSearchHit(id: "tx-" + row.id.uuidString, room: .mal, title: row.merchant ?? row.counterparty ?? "حركة",
                            detail: "", day: try? GregorianDay(row.dayKey),
                            url: URL(string: "madar://mal/tx/" + row.id.uuidString)!)
@@ -108,20 +118,34 @@ struct MadarSearchHit: Identifiable, Equatable {
 
 struct MadarSearchView: View {
     let session: AppSession
+    let onSelect: (URL) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var query = ""
-    @State private var hits: [MadarSearchHit] = []
-    @State private var searching = false
+    @State private var result: (request: Request, hits: [MadarSearchHit])?
     @FocusState private var focused: Bool
     private var theme: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
+
+    private struct Request: Equatable {
+        let needle: String
+        let container: ObjectIdentifier
+        let canRead: Bool
+        let maintenance: Bool
+    }
+
+    private var request: Request {
+        Request(needle: MadarSearch.key(query), container: ObjectIdentifier(session.container),
+                canRead: session.protectedDataAuthorized, maintenance: session.maintenanceInProgress)
+    }
+    private var hits: [MadarSearchHit] { result?.request == request ? result?.hits ?? [] : [] }
+    private var searching: Bool { request.needle.count >= 2 && result?.request != request }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
-                    if query.trimmingCharacters(in: .whitespaces).count < 2 {
+                    if request.needle.count < 2 {
                         Text("اكتب حرفين أو أكثر: اسم عادة، سطر من مذكراتك، كتاب، سورة، أو اسم متجر.")
                             .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).padding(.top, 8)
                     } else if hits.isEmpty && !searching {
@@ -146,15 +170,15 @@ struct MadarSearchView: View {
             .background(theme.background.ignoresSafeArea())
             .navigationTitle("ابحث في مدار").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تمّ") { dismiss() }.accessibilityIdentifier("madar-search-close") } }
-            .task(id: query) {
-                let text = query
-                guard MadarSearch.key(text).count >= 2 else { hits = []; return }
-                searching = true
-                try? await Task.sleep(for: .milliseconds(180))
-                guard !Task.isCancelled else { return }
-                let found = await MadarSearch(session: session).hits(for: text)
-                guard !Task.isCancelled, text == query else { return }
-                hits = found; searching = false
+            .task(id: request) { [request] in
+                guard !Task.isCancelled, request == self.request else { return }
+                result = nil
+                guard request.needle.count >= 2 else { return }
+                do { try await Task.sleep(for: .milliseconds(180)) } catch { return }
+                guard !Task.isCancelled, request == self.request else { return }
+                let found = await MadarSearch(session: session).hits(for: request.needle)
+                guard !Task.isCancelled, request == self.request else { return }
+                result = (request, found)
             }
         }
         .environment(\.roomTheme, theme).tint(theme.accent)
@@ -167,8 +191,8 @@ struct MadarSearchView: View {
             TextField("ابحث في عاداتك ومذكراتك وكتبك ومالك", text: $query)
                 .font(MadarTypography.body()).focused($focused).submitLabel(.search)
                 .accessibilityIdentifier("madar-search-field")
-            if searching { ProgressView().controlSize(.small) }
-            else if !query.isEmpty {
+            if searching { ProgressView().controlSize(.small).accessibilityIdentifier("madar-search-loading") }
+            if !query.isEmpty {
                 Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(theme.secondaryInk).frame(width: 32, height: 44) }
                     .buttonStyle(.madarPlain).accessibilityLabel("امسح البحث")
             }
@@ -203,15 +227,7 @@ struct MadarSearchView: View {
     }
 
     private func open(_ hit: MadarSearchHit) {
+        onSelect(hit.url)
         dismiss()
-        // The sheet leaves first, so the room's own navigation receives the route on a settled screen.
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(350))
-            if hit.room == .mihbara, let id = UUID(uuidString: String(hit.id.dropFirst(5))) { session.openSpotlightBook(id) }
-            else if hit.room == .habits, let id = UUID(uuidString: String(hit.id.dropFirst(6))) {
-                session.selectedTab = "foundation"; session.habitRouteID = id; session.habitsOpen = true
-            }
-            else { session.open(hit.url) }
-        }
     }
 }

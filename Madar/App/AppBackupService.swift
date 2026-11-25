@@ -68,6 +68,34 @@ import WidgetKit
             folderName: folder?.folderName, folderCopiedAt: folder?.lastCopiedAt,
             folderUploadConfirmed: uploaded, folderMessage: folderMessage, canUndoFolderChange: folderUndo != nil)
     }
+    func healthReading() async throws -> (lastSuccess: Date?, estimatedBytes: Int?) {
+        let actual = try coordinator.status()
+        let store = coordinator.store, binding = store.binding
+        let measurement = Task.detached(priority: .utility) { try Self.activeDataBytes(binding) }
+        let bytes = try? await withTaskCancellationHandler { try await measurement.value } onCancel: { measurement.cancel() }
+        try Task.checkCancellation()
+        guard store.binding == binding else { throw CancellationError() }
+        return (actual.lastSuccessAt, bytes)
+    }
+    nonisolated private static func activeDataBytes(_ binding: ManagedStoreBinding) throws -> Int {
+        let manager = FileManager.default
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey]
+        guard let files = manager.enumerator(at: binding.syncedDirectory, includingPropertiesForKeys: Array(keys)) else {
+            throw BackupOperationError.invalidManagedStore
+        }
+        var bytes = 0
+        for case let file as URL in files {
+            try Task.checkCancellation()
+            let metadata = try file.resourceValues(forKeys: keys)
+            if metadata.isRegularFile == true { bytes += metadata.fileSize ?? 0 }
+        }
+        // The device-only store is beside the generations, so include its database and journal separately.
+        for suffix in ["", "-wal", "-shm"] {
+            let file = URL(fileURLWithPath: binding.deviceStoreURL.path + suffix)
+            if let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize { bytes += size }
+        }
+        return bytes
+    }
     func setSchedule(_ schedule: BackupUISchedule) async throws {
         guard let session else { throw DataError.invalidValue("session unavailable") }
         try await session.applySettingsAndWait(["core.backup": .string(schedule.rawValue)])

@@ -6,6 +6,44 @@ import MadarSnapshots
 @testable import Madar
 
 @MainActor final class QuranOutsideIntegrationTests: XCTestCase {
+    func testMadarDayObservationSurvivesSupersededReadAcrossBoundary() async throws {
+        let oldDay = try GregorianDay("2026-10-15")
+        let newDay = try GregorianDay("2026-10-16")
+        var reads = 0
+        var updates: [GregorianDay] = []
+        var changes: [Bool] = []
+        await QuranMadarDayRefresh.observe(from: nil, read: {
+            reads += 1
+            if reads == 1 { return oldDay }
+            if reads == 2 { throw CancellationError() }
+            return newDay
+        }, wait: {
+            if reads == 3 { throw CancellationError() }
+        }) { day, changed in
+            updates.append(day)
+            changes.append(changed)
+        }
+        XCTAssertEqual(reads, 3)
+        XCTAssertEqual(updates, [oldDay, newDay])
+        XCTAssertEqual(changes, [false, true])
+    }
+
+    func testMadarDayObservationRefreshesAfterMissingTheInitialDay() async throws {
+        let day = try GregorianDay("2026-10-16")
+        var reads = 0
+        var refreshed: [GregorianDay] = []
+        await QuranMadarDayRefresh.observe(from: nil, read: {
+            reads += 1
+            if reads == 1 { throw CancellationError() }
+            return day
+        }, wait: {
+            if reads == 2 { throw CancellationError() }
+        }) { observed, changed in
+            if changed { refreshed.append(observed) }
+        }
+        XCTAssertEqual(refreshed, [day])
+    }
+
     private func fixture() throws -> (AppSession, AppQuranService, URL, Date) {
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarQuranOutside-\(UUID())")
         let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))

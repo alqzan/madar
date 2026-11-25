@@ -460,21 +460,38 @@ struct DiaryHomeView: View {
             .accessibilityIdentifier("diary-match-menu")
     }
     private func yearCard(_ page: DiaryDisplayDay, snapshot: DiaryHomeSnapshot) -> some View {
-        Button { reader = page.day } label: {
+        let compact = app.string("notes.memorySize") == "medium" && !typeSize.isAccessibilitySize
+        let photoWidth: CGFloat = compact ? 44 : 52
+        let photoHeight: CGFloat = compact ? 52 : 64
+        let roomKinds: Set<String> = ["quran", "mal", "mihbara", "habits", "salah"]
+        let lines = page.lines.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let written = lines.first { $0.kind == "normal" || $0.kind == "late" }
+            ?? lines.first { !roomKinds.contains($0.kind) }
+        let automatic = app.bool("notes.showAutoSections") ? lines.last { roomKinds.contains($0.kind) } : nil
+        return Button { reader = page.day } label: {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(service.distance(page.day, snapshot.today)).font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)).foregroundStyle(theme.color("accentText"))
                     MadarDateLabel(app.dateLabels(page.day)).foregroundStyle(theme.color("ink3Text"))
-                    Text(page.excerpt).font(.custom("thmanyahseriftext-Regular", size: 16, relativeTo: .body)).lineSpacing(4).lineLimit(2).multilineTextAlignment(.leading)
+                    if let written {
+                        Text(written.markdown == true ? DayOneMarkdown.plain(written.text) : written.text)
+                            .font(.custom("thmanyahseriftext-Regular", size: 16, relativeTo: .body))
+                            .lineSpacing(4).lineLimit(compact ? 1 : 2).multilineTextAlignment(.leading)
+                    }
+                    if let automatic {
+                        // The memory previews an automatic line already enabled for this day. Opening the card reads the whole page.
+                        Text(automatic.text).font(DiaryType.label).foregroundStyle(theme.color("autoInkText"))
+                            .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                    }
                     // A photo the import did not carry is named, never invented.
                     if page.photo == nil, page.missingPhotos > 0 { Label(page.missingPhotos == 1 ? "صورة هذا اليوم لم تُنقل" : page.missingPhotos == 2 ? "صورتا هذا اليوم لم تُنقلا" : "صور هذا اليوم لم تُنقل", systemImage: "photo.on.rectangle.angled").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 if let data = page.photo, !typeSize.isAccessibilitySize {
                     DiaryDataThumbnail(data: data, maxPixel: 144) { image in
-                        image.resizable().scaledToFill().frame(width: 52, height: 64).clipShape(.rect(cornerRadius: 10)).accessibilityHidden(true)
-                    }.id(page.photoID?.uuidString ?? page.id).frame(width: 52, height: 64)
+                        image.resizable().scaledToFill().frame(width: photoWidth, height: photoHeight).clipShape(.rect(cornerRadius: 10)).accessibilityHidden(true)
+                    }.id(page.photoID?.uuidString ?? page.id).frame(width: photoWidth, height: photoHeight)
                 }
-            }.padding(12).frame(width: typeSize.isAccessibilitySize ? 300 : 230, alignment: .leading)
+            }.padding(12).frame(width: typeSize.isAccessibilitySize ? 300 : compact ? 195 : 230, alignment: .leading)
                 .background(theme.surface, in: .rect(cornerRadius: 20)).overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.line) }
                 .contentShape(.rect(cornerRadius: 20))
         }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-year-" + page.day.description)

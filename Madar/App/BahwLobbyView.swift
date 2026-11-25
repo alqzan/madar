@@ -101,6 +101,7 @@ struct BahwLobbyView: View {
     @State private var moneyRevealed = false
     @State private var moneyRevealID = 0
     @State private var searchOpen = false
+    @State private var pendingSearchRoute: URL?
     @State private var travel = BahwTravelModel()
     @State private var travelSheet: BahwTravelSheet?
     /// The tiles fade up one after another the first time the lobby appears in a launch, never on every return.
@@ -193,7 +194,13 @@ struct BahwLobbyView: View {
         }
         .task { travel.refresh(session) }
         .onChange(of: session.string("core.travelMode")) { _, _ in travel.refresh(session) }
-        .sheet(isPresented: $searchOpen) { MadarSearchView(session: session).madarSheetErrorAlert(session) }
+        .sheet(isPresented: $searchOpen, onDismiss: {
+            guard let route = pendingSearchRoute else { return }
+            pendingSearchRoute = nil
+            session.open(route)
+        }) {
+            MadarSearchView(session: session, onSelect: { pendingSearchRoute = $0 }).madarSheetErrorAlert(session)
+        }
         .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]).madarSheetErrorAlert(session) }
         .onChange(of: arranging) { _, on in wiggle = on && !reduceMotion }
         .task(id: moneyRevealID) {

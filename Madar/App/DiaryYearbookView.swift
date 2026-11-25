@@ -9,8 +9,7 @@ struct DiaryYearbookView:View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.scenePhase) private var phase
     @State private var year:Int?
-    @State private var years:[Int]=[]
-    @State private var yearsStore: Int?
+    @State private var yearIndex: DiaryYearbookYearIndex?
     @State private var loadedPages: [DiaryExportPage] = []
     @State private var loadedRequest: PreviewRequest?
     @State private var margins=true
@@ -43,6 +42,7 @@ struct DiaryYearbookView:View {
     }
     private var loading: Bool { request.authorized && loadedRequest != request && failure == nil }
     private var pages: [DiaryExportPage] { loadedRequest == request ? loadedPages : [] }
+    private var years: [Int] { request.authorized ? yearIndex?.years ?? [] : [] }
     private var selectedYear: Int { year ?? years.first ?? GregorianDay.containing(.now, in: app.activePlace.timeZone).year }
     private var busy: Bool { preparation != nil }
     private var bookColor:Color{MadarToken.colors["rooms.notes.lockCover.leather"] ?? theme.accent}
@@ -95,6 +95,7 @@ struct DiaryYearbookView:View {
                     }
                     #endif
                 }
+                .refreshesAtMadarDay(app) { attempt += 1 }
                 .onChange(of: includeIndex) { _, _ in clear() }
                 .onChange(of: phase) { _, value in if value == .background { preview = false; clear() } }
                 .sheet(isPresented:$preview){if let artifact {DiaryQuickLook(url:artifact.url)}}
@@ -142,14 +143,13 @@ struct DiaryYearbookView:View {
     }
     private func load(_ selection: PreviewRequest) async {
         guard !Task.isCancelled, request == selection else { return }
+        preview = false
         clear()
         loadedPages = []
         loadedRequest = nil
         failure = nil
         guard selection.authorized else {
-            years = []
-            yearsStore = nil
-            preview = false
+            yearIndex = nil
             return
         }
         do {
@@ -162,11 +162,14 @@ struct DiaryYearbookView:View {
                 throw CocoaError(.fileReadUnknown)
             }
             #endif
-            let knownYears = yearsStore == selection.store ? years : []
-            let result = try await service.yearbookPreview(selection.options, knownYears: knownYears)
+            let result = try await service.yearbookPreview(selection.options, cachedYearIndex: yearIndex)
             guard !Task.isCancelled, request == selection else { return }
-            years = result.years
-            yearsStore = selection.store
+            yearIndex = result.yearIndex
+            if let selected = selection.options.year, !result.yearIndex.years.contains(selected) {
+                // An archive change can remove the last page of the chosen year. Reset the picker and load its new default.
+                year = nil
+                return
+            }
             loadedPages = result.pages
             loadedRequest = selection
         } catch {

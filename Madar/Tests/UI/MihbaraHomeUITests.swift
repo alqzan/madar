@@ -276,6 +276,32 @@ import UIKit
         app.terminate()
     }
 
+    func testLibrarySearchReportsAnUnavailableBookAndOffersRetry() {
+        continueAfterFailure = false
+        let app = app("missingFile")
+        app.launch(); open(app)
+        let library = app.buttons["mihbara-library"]
+        reach(app, library)
+        library.tap()
+        let field = app.textFields["mihbara-library-search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8), app.debugDescription)
+        field.tap()
+        field.typeText("نافذة")
+        let search = app.buttons["mihbara-text-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5), app.debugDescription)
+        search.tap()
+        let incomplete = app.staticTexts["mihbara-text-search-incomplete"]
+        XCTAssertTrue(incomplete.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(incomplete.label.contains("كتاب بلا ملف"), incomplete.label)
+        XCTAssertFalse(app.staticTexts["mihbara-text-search-none"].exists)
+        shot(app, "MIH-SEARCH-unavailable-L")
+        let retry = app.buttons["mihbara-text-search-retry"]
+        XCTAssertTrue(retry.isHittable, app.debugDescription)
+        retry.tap()
+        XCTAssertTrue(incomplete.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["mihbara-text-search-none"].exists)
+    }
+
     func testMihbaraRouteRetriesAfterFirstShelfReadFails() throws {
         continueAfterFailure = false
         let app = app("home")

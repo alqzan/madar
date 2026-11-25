@@ -5,6 +5,7 @@ import MadarData
 import MadarCommands
 import CryptoKit
 import CoreSpotlight
+import UIKit
 @testable import Madar
 
 @MainActor private final class SpotlightIndexProbe {
@@ -70,6 +71,59 @@ import CoreSpotlight
 }
 
 @MainActor final class MihbaraHomeIntegrationTests: XCTestCase {
+    func testLibraryTextSearchKeepsMatchesAndReportsIncompleteFiles() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraTextSearch-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        let context = ModelContext(container)
+        let bounds = CGRect(x: 0, y: 0, width: 300, height: 400)
+        let pdf = UIGraphicsPDFRenderer(bounds: bounds).pdfData { page in
+            page.beginPage()
+            ("A search term in a readable book." as NSString).draw(
+                at: CGPoint(x: 24, y: 32), withAttributes: [.font: UIFont.systemFont(ofSize: 14)]
+            )
+        }
+
+        func addFile(_ title: String, data: Data?) -> UUID {
+            let book = Book()
+            book.title = title
+            book.kind = "file"
+            book.format = "pdf"
+            if let data {
+                let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                let media = Media()
+                media.kind = "doc"; media.contentType = "com.adobe.pdf"; media.state = "ok"
+                media.data = data; media.sizeBytes = data.count; media.sha256 = hash
+                context.insert(media)
+                book.mediaID = media.id
+                book.fileHash = hash
+            }
+            context.insert(book)
+            return book.id
+        }
+        let intact = addFile("كتاب صالح", data: pdf)
+        let absent = addFile("كتاب بلا ملف", data: nil)
+        let corrupt = addFile("كتاب تالف", data: Data("Not a PDF".utf8))
+        try context.save()
+
+        let service = AppMihbaraService(app: app)
+        let books = try service.load().books
+        var progress: [Int] = []
+        let result = try await MihbaraLibrarySearch.search("search term", in: books, service: service) { progress.append($0) }
+        XCTAssertEqual(result.hits.map(\.bookID), [intact])
+        XCTAssertEqual(result.hits.first?.pdfPage, 0)
+        XCTAssertEqual(Set(result.incompleteBooks.map(\.id)), [absent, corrupt])
+        XCTAssertEqual(result.completedBooks, 1)
+        XCTAssertEqual(progress, [1, 2, 3])
+
+        let noMatch = try await MihbaraLibrarySearch.search("missing term", in: books, service: service) { _ in }
+        XCTAssertTrue(noMatch.hits.isEmpty)
+        XCTAssertEqual(noMatch.completedBooks, 1)
+        XCTAssertEqual(Set(noMatch.incompleteBooks.map(\.id)), [absent, corrupt])
+    }
+
     func testCancellingEPUBLinkScanAlsoCancelsItsDetachedWorker() async {
         let worker = Task.detached(priority: .utility) { () throws -> String? in
             try await Task.sleep(for: .seconds(30))

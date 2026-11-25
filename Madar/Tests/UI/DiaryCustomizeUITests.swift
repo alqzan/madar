@@ -56,6 +56,66 @@ import XCTest
         checkOrder(); capture(app, "OR-10-days-first-L")
         app.terminate(); app.launch(); checkOrder()
     }
+
+    func testMemorySizeAndAutomaticLinesChangeTheMemoryCard() throws {
+        continueAfterFailure = false
+        let app = launch()
+        let card = app.buttons["diary-year-2025-10-15"]
+        XCTAssertTrue(card.waitForExistence(timeout: 25), app.debugDescription)
+        reveal(card, app)
+        let largeWidth = card.frame.width
+        XCTAssertTrue(card.label.contains("راجعت"), card.label)
+
+        let customize = app.buttons["diary-customize"]
+        reveal(customize, app, down: true); customize.tap()
+        let display = app.buttons["diary-customize-section-display"]
+        reveal(display, app); display.tap()
+        let medium = app.buttons["option-notes.memorySize-medium"]
+        reveal(medium, app); medium.tap()
+        let automatic = app.switches["setting-notes.showAutoSections"]
+        reveal(automatic, app); automatic.tap()
+        let switchedOff = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "0"), object: automatic)
+        XCTAssertEqual(XCTWaiter.wait(for: [switchedOff], timeout: 8), .completed, app.debugDescription)
+        let back = app.buttons["diary-customize-back"]
+        reveal(back, app, down: true); back.tap()
+
+        XCTAssertTrue(card.waitForExistence(timeout: 10), app.debugDescription)
+        reveal(card, app)
+        XCTAssertLessThan(card.frame.width, largeWidth)
+        XCTAssertFalse(card.label.contains("راجعت"), card.label)
+        XCTAssertTrue(card.label.contains("عشاء عند أهلي"), card.label)
+        capture(app, "OWNER-diary-memory-compact-L")
+
+        card.tap()
+        let fullDayAutomaticLine = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "راجعت")).firstMatch
+        XCTAssertTrue(fullDayAutomaticLine.waitForExistence(timeout: 10), app.debugDescription)
+    }
+
+    func testDictationFirstPromotesTheRecorderWithoutStartingIt() throws {
+        continueAfterFailure = false
+        let app = launch()
+        let customize = app.buttons["diary-customize"]
+        XCTAssertTrue(customize.waitForExistence(timeout: 25), app.debugDescription)
+        customize.tap()
+        let ink = app.buttons["diary-customize-section-ink"]
+        reveal(ink, app); ink.tap()
+        let setting = app.switches["setting-notes.dictationFirst"]
+        reveal(setting, app); setting.tap()
+        let switchedOn = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "1"), object: setting)
+        XCTAssertEqual(XCTWaiter.wait(for: [switchedOn], timeout: 8), .completed, app.debugDescription)
+        let back = app.buttons["diary-customize-back"]
+        reveal(back, app, down: true); back.tap()
+
+        app.open(URL(string: "madar://notes/write")!)
+        let recorder = app.buttons["diary-editor-record"]
+        let photos = app.buttons["diary-editor-photo"]
+        XCTAssertTrue(recorder.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(photos.exists, app.debugDescription)
+        XCTAssertGreaterThan(recorder.frame.midX, photos.frame.midX, "The recorder leads the RTL toolbar")
+        XCTAssertFalse(app.descendants(matching: .any)["diary-inline-voice"].exists, "Recording still needs a tap")
+        capture(app, "OWNER-diary-dictation-first-L")
+    }
+
     private func reveal(_ element: XCUIElement, _ app: XCUIApplication, down: Bool = false) {
         for _ in 0..<8 where !element.isHittable { if down { app.swipeDown() } else { app.swipeUp() } }
         XCTAssertTrue(element.isHittable, app.debugDescription)
