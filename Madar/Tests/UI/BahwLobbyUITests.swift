@@ -434,6 +434,44 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any)["habit-progress"].waitForExistence(timeout: 10), app.debugDescription)
     }
 
+    func testLobbySearchKeepsMatchesWhenOneRoomFailsAndCanRetry() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_HABIT_FIXTURE": "lobbySix",
+            "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light", "MADAR_UI_SEARCH_FAIL_QURAN": "1"
+        ]
+        app.launch(); finishOnboarding(app)
+        let search = app.buttons["bahw-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 15), app.debugDescription)
+        search.tap()
+
+        let field = app.textFields["madar-search-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8), app.debugDescription)
+        field.tap()
+        field.typeText("زززز")
+        let failure = app.staticTexts["madar-search-read-failure"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(failure.label.contains("القرآن"), failure.label)
+        XCTAssertFalse(app.staticTexts["madar-search-empty"].exists)
+
+        app.buttons["امسح البحث"].tap()
+        field.tap()
+        field.typeText("الماء")
+        let habit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "madar-search-hit-habit-")).firstMatch
+        XCTAssertTrue(habit.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(habit.label.contains("الماء"), habit.label)
+        let retry = app.buttons["madar-search-retry"]
+        XCTAssertTrue(retry.isHittable, app.debugDescription)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "lobby-search-partial-results"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        retry.tap()
+        XCTAssertTrue(failure.waitForNonExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(habit.exists, app.debugDescription)
+    }
+
     /// Travel stays after the prayer room left (17 Nov plan): away from home the lobby asks once, starts and ends the trip.
     func testTravelQuestionStartsAndEndsATripFromTheLobby() throws {
         continueAfterFailure = false

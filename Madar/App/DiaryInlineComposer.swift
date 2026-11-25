@@ -108,6 +108,9 @@ struct DiaryInlineComposer: View {
     private var trimmed: String { field.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedText: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var canSend: Bool { !trimmed.isEmpty && !saving && (edit == nil || editText != edit?.text) }
+    private var hasPendingBlankDraft: Bool {
+        trimmedText.isEmpty && (draftTask != nil || (hasDraftRecord && text != lastSaved))
+    }
     /// Words that carry formatting are never shown as raw marks: the folded field shows them formatted (read-only) and a tap opens the full surface.
     private var formatted: Bool { DiaryRichText.hasFormatting(field.wrappedValue) }
     private var words: Int { field.wrappedValue.split(whereSeparator: { $0.isWhitespace }).count }
@@ -174,8 +177,7 @@ struct DiaryInlineComposer: View {
         .onDisappear {
             visible = false
             guard loaded, edit == nil else { return }
-            let wrote = !trimmedText.isEmpty
-            DiaryDraftFlush.run { if wrote { await keepDraft() }; app.diaryComposerEpoch += 1 }
+            DiaryDraftFlush.run { await keepDraft(); app.diaryComposerEpoch += 1 }
         }
         // A sheet that also wrote today's draft has closed: this field, still on screen beneath it, takes the shared draft again (never over typing).
         .onChange(of: app.diaryComposerEpoch) { _, _ in
@@ -187,8 +189,12 @@ struct DiaryInlineComposer: View {
         .onChange(of: cameraOpen) { _, open in if !open { holdCommit = false } }
         // 14 Nov owner (T10): leaving the app is a boundary. What was written becomes the line; no idle timer ever commits (one paragraph stays one line).
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .background, visible, touchedSinceLoad, loaded, edit == nil, canSend, !expanded, !voiceBusy else { return }
-            Task { await send() }
+            guard phase == .background, visible, loaded, edit == nil, !saving else { return }
+            if hasPendingBlankDraft {
+                DiaryDraftFlush.run { await keepDraft() }
+            } else if touchedSinceLoad, canSend, !expanded, !voiceBusy {
+                Task { await send() }
+            }
         }
         .onChange(of: focused) { old, new in
             // Leaving the field (a tap on the page, another room) is a boundary; folding out or the keyboard bar are not.
@@ -289,9 +295,20 @@ struct DiaryInlineComposer: View {
             }.buttonStyle(.madarPlain).disabled(saving || (edit != nil && !canSend)).accessibilityIdentifier("diary-editor-save")
         }
     }
-    /// «تمّ»: what was written becomes the line (nothing to commit: the surface just folds).
+    /// «تمّ»: commit written words, or finish clearing the draft before folding.
     private func finish() {
-        if edit == nil, !canSend { toggle(false); return }
+        if edit == nil, !canSend {
+            guard !saving else { return }
+            guard hasPendingBlankDraft else { toggle(false); return }
+            saving = true; failure = nil
+            Task {
+                defer { saving = false }
+                await settleDraftTask()
+                do { try await persistDraft(); toggle(false) }
+                catch { failure = madarUserMessage(error) }
+            }
+            return
+        }
         Task { await send() }
     }
 
@@ -596,8 +613,16 @@ struct DiaryInlineComposer: View {
     }
     private func scheduleDraft() {
         guard loaded, !saving, text != lastSaved else { return }
-        draftTask?.cancel()
+#if DEBUG
+        // Exercise clearing at a navigation boundary without relying on the timing of a tap.
+        let environment = ProcessInfo.processInfo.environment
+        if trimmedText.isEmpty, environment["MADAR_UI_DIARY_BLANK_DRAFT_BOUNDARY"] == "1",
+           environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil { return }
+#endif
+        let previous = draftTask
+        previous?.cancel()
         draftTask = Task {
+            await previous?.value
             do { try await Task.sleep(for: .milliseconds(600)); try Task.checkCancellation(); try await persistDraft() }
             catch is CancellationError {} catch { failure = madarUserMessage(error) }
         }

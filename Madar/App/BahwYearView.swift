@@ -375,6 +375,7 @@ struct BahwDaySheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
     @State var draft: BahwDayDraft
+    @State private var needsOneTimeDate: Bool
     /// What the sheet opened with: the swipe-down is held back once the draft differs, so typed edits are never lost by a stray swipe.
     private let original: BahwDayDraft
     private let didSave: () -> Void
@@ -387,6 +388,7 @@ struct BahwDaySheet: View {
     init(session: AppSession, draft: BahwDayDraft, didSave: @escaping () -> Void) {
         _session = Bindable(session)
         _draft = State(initialValue: draft)
+        _needsOneTimeDate = State(initialValue: draft.repeats != "none")
         original = draft
         self.didSave = didSave
     }
@@ -408,7 +410,11 @@ struct BahwDaySheet: View {
                             }
                     }
                     field("يتكرر") {
-                        Picker("يتكرر", selection: $draft.repeats) { Text("كل سنة").tag("yearly"); Text("كل شهر").tag("monthly"); Text("مرة واحدة").tag("none") }.pickerStyle(.segmented)
+                        Picker("يتكرر", selection: Binding(get: { draft.repeats }, set: selectRepetition)) {
+                            Text("كل سنة").tag("yearly")
+                            Text("كل شهر").tag("monthly")
+                            Text("مرة واحدة").tag("none")
+                        }.pickerStyle(.segmented)
                             .accessibilityIdentifier("bahw-day-repeats")
                     }
                     HStack(spacing: 12) {
@@ -466,6 +472,22 @@ struct BahwDaySheet: View {
         let rule = MadarUpcomingRule(calendar: draft.hijri ? .hijri : .gregorian, year: draft.year, month: draft.month, day: draft.day,
                                      repeats: MadarUpcomingRule.Repeats(rawValue: draft.repeats) ?? .yearly, countUpAfter: draft.repeats == "none" && draft.countUpAfter)
         return rule.counter(today: service.today, service.calendarDays)?.occurrence
+    }
+    private func selectRepetition(_ repeats: String) {
+        guard draft.repeats != repeats else { return }
+        if repeats == "none", needsOneTimeDate, let upcoming = previewOccurrence {
+            // Keep the next occurrence shown for the repeating rule, including after its month has passed this year.
+            if draft.hijri {
+                let date = AppBahwService(session: session).calendarDays.hijri(upcoming)
+                draft.year = date.year
+                draft.month = date.month
+            } else {
+                draft.year = upcoming.year
+                draft.month = upcoming.month
+            }
+            needsOneTimeDate = false
+        }
+        draft.repeats = repeats
     }
     private func save() {
         let today = AppBahwService(session: session).today

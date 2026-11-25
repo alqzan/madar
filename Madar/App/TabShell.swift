@@ -48,12 +48,14 @@ struct TabShell<Content: View>: View {
 
     @Environment(\.horizontalSizeClass) private var sizeClass
     private var usesSidebar: Bool { isPadWide(sizeClass) }
+    private var demonstratesNavigation: Bool { session.madarTour.step == .navigation }
+    private var showsSidebar: Bool { usesSidebar && (!sidebarHidden || demonstratesNavigation) }
 
     /// Owner, 9 Nov 2026: «ابيك تبدا ببناء نسخه للايباد» — on a wide screen (iPad, regular width) the rooms sit beside a sidebar on the
     /// leading (right) edge instead of above the bottom bar. iPhone keeps the bar.
     var body: some View {
         HStack(spacing: 0) {
-            if usesSidebar && !sidebarHidden {
+            if showsSidebar {
                 MadarSidebar(tabs: tabs, selection: selection, select: select, fold: { setSidebarHidden(true) })
                     .frame(width: 250).madarTourAnchor(.navigation)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -83,14 +85,13 @@ struct TabShell<Content: View>: View {
 
     private var roomColumn: some View {
         VStack(spacing: 0) {
-            if usesSidebar && sidebarHidden {
+            if usesSidebar && !showsSidebar {
                 Button { setSidebarHidden(false) } label: {
                     Image(systemName: "sidebar.trailing").font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.ink)
                         .frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
                 }
                 .buttonStyle(.madarPlain)
                 .accessibilityLabel("أظهر القائمة").accessibilityIdentifier("pad-sidebar-show")
-                .madarTourAnchor(.navigation)
                 .padding(.horizontal, 12).padding(.vertical, 4)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .background(theme.background)
@@ -174,7 +175,7 @@ struct TabShell<Content: View>: View {
             || !session.mihbaraRootDraftBlockers.isEmpty
     }
 
-    private var barShown: Bool { !usesSidebar && session.accessoryHiders.isEmpty }
+    private var barShown: Bool { !usesSidebar && (session.accessoryHiders.isEmpty || demonstratesNavigation) }
     private var barTabs: [FoundationTab] { tabs.filter { $0.id != "customize" } }
 
     private func select(_ id: String) {
@@ -286,6 +287,7 @@ struct MadarRoomRoot: View {
     let session: AppSession
     let tab: String
     var body: some View {
+        let showsAccessory = session.accessoryHiders.isEmpty || session.madarTour.step == .navigation
         NavigationStack {
             Group {
                 if tab == "customize" { CustomizeMadar(session: session) }
@@ -297,7 +299,7 @@ struct MadarRoomRoot: View {
                 // M4-V01: the lobby replaces the M0 foundation home.
                 else { BahwLobbyView(session: session) }
             }
-            .safeAreaPadding(.bottom, session.accessoryHiders.isEmpty ? session.tabBarHeight : 0)
+            .safeAreaPadding(.bottom, showsAccessory ? session.tabBarHeight : 0)
             // Every scrolling page in the room, settings and pushed pages included, fades softly under the clock instead of a hard cut.
             .scrollEdgeEffectStyle(.soft, for: .top)
         }

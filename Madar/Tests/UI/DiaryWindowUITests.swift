@@ -2,12 +2,14 @@ import XCTest
 
 @MainActor final class DiaryWindowUITests: XCTestCase {
     private func launch(_ variant: String, rootRouteHarness: Bool = false, diaryCommandHoldMS: Int? = nil,
-                        now: String = "2026-10-15T15:00:00+03:00", dayBoundaryHarness: Bool = false) -> XCUIApplication {
+                        now: String = "2026-10-15T15:00:00+03:00", dayBoundaryHarness: Bool = false,
+                        blankDraftBoundaryOnly: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         var environment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": variant,
             "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": now]
         if rootRouteHarness { environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] = "1" }
         if dayBoundaryHarness { environment["MADAR_UI_DIARY_DAY_BOUNDARY_HARNESS"] = "1" }
+        if blankDraftBoundaryOnly { environment["MADAR_UI_DIARY_BLANK_DRAFT_BOUNDARY"] = "1" }
         if let diaryCommandHoldMS { environment["MADAR_UI_DIARY_COMMAND_HOLD_MS"] = String(diaryCommandHoldMS) }
         app.launchEnvironment = environment
         app.launch(); XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 25), app.debugDescription)
@@ -54,6 +56,41 @@ import XCTest
         XCTAssertTrue(NSPredicate(format: "value CONTAINS %@", "مسودة اليوم").evaluate(with: page), "\(String(describing: page.value))")
         XCTAssertTrue(app.buttons["diary-editor-today"].isSelected, app.debugDescription)
         app.terminate()
+    }
+    func testClearedDraftStaysEmptyAfterNavigationAndBackground() {
+        continueAfterFailure = false
+        let app = launch("empty", rootRouteHarness: true, blankDraftBoundaryOnly: true)
+        let editor = app.textViews["diary-editor-text"]
+        let savedStatus = app.staticTexts.matching(identifier: "diary-draft-status")
+            .matching(NSPredicate(format: "label CONTAINS %@", "المسودة محفوظة")).firstMatch
+
+        func clearSavedDraft(_ draft: String) {
+            XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+            editor.tap()
+            editor.typeText(draft)
+            XCTAssertTrue(savedStatus.waitForExistence(timeout: 10), app.debugDescription)
+            editor.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: draft.count))
+            XCTAssertEqual(editor.value as? String, "")
+        }
+
+        app.openDiaryEditorFromHome()
+        clearSavedDraft("مسودة سابقة")
+        app.buttons["ui-test-open-diary-root"].tap()
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 10), app.debugDescription)
+        app.openDiaryEditorFromHome()
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(editor.value as? String, "", "Returning to the page must never restore text that was cleared.")
+
+        clearSavedDraft("مسودة أخرى")
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(savedStatus.waitForNonExistence(timeout: 10), app.debugDescription)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25), app.debugDescription)
+        app.openDiaryEditorFromHome()
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(editor.value as? String, "", "A clear flushed in the background must survive a relaunch.")
     }
     func testDiaryTodayDraftDisclosesAndKeepsItsOriginalDayAfterFajr() {
         continueAfterFailure = false

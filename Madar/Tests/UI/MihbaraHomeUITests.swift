@@ -276,6 +276,41 @@ import UIKit
         app.terminate()
     }
 
+    func testLibrarySearchRetriesTheSelectedPDFPageAfterOpenFails() {
+        continueAfterFailure = false
+        let pdf = fixturePDF(pageTexts: ["First page", "A landmark on the second page"])
+        let app = app("missingFile", pdf: pdf)
+        app.launchEnvironment["MADAR_UI_MIHBARA_PDF_READY"] = "1"
+        app.launchEnvironment["MADAR_UI_MIHBARA_LIBRARY_OPEN_FAILURE_ONCE"] = "1"
+        app.launch(); open(app)
+        let library = app.buttons["mihbara-library"]
+        reach(app, library); library.tap()
+        let field = app.textFields["mihbara-library-search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8), app.debugDescription)
+        field.tap(); field.typeText("landmark")
+        let search = app.buttons["mihbara-text-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5), app.debugDescription)
+        search.tap()
+        let hit = app.buttons["mihbara-text-hit"].firstMatch
+        XCTAssertTrue(hit.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(hit.label.contains("landmark"), hit.label)
+        hit.tap()
+
+        let retry = app.buttons["mihbara-home-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-pdf-close"].exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        retry.tap()
+        let page = app.descendants(matching: .any)["mihbara-pdf-page"]
+        XCTAssertTrue(page.waitForExistence(timeout: 15), app.debugDescription)
+        let label = page.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "")
+        XCTAssertTrue(label.contains("٢ من ٢"), label)
+        let close = app.buttons["mihbara-pdf-close"]
+        close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(retry.exists)
+    }
+
     func testLibrarySearchReportsAnUnavailableBookAndOffersRetry() {
         continueAfterFailure = false
         let app = app("missingFile")
@@ -792,14 +827,15 @@ import UIKit
         XCTAssertTrue(retainedRows.firstMatch.label.contains("نسخة الملف"), retainedRows.firstMatch.label)
     }
 
-    private func fixturePDF() -> Data {
+    private func fixturePDF(pageTexts: [String] = ["نسخة الملف الأصلية\n\nيُستعاد الملف إلى سجل الكتاب نفسه."]) -> Data {
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [kCGPDFContextTitle as String: "نسخة الملف", kCGPDFContextAuthor as String: "اختبار المحبرة"]
         return UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 300, height: 400), format: format).pdfData { canvas in
-            canvas.beginPage()
             let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .right
-            let content = ("نسخة الملف الأصلية\n\nيُستعاد الملف إلى سجل الكتاب نفسه.") as NSString
-            content.draw(in: CGRect(x: 22, y: 30, width: 256, height: 330), withAttributes: [.font: UIFont.systemFont(ofSize: 22), .foregroundColor: UIColor.darkText, .paragraphStyle: paragraph])
+            for text in pageTexts {
+                canvas.beginPage()
+                (text as NSString).draw(in: CGRect(x: 22, y: 30, width: 256, height: 330), withAttributes: [.font: UIFont.systemFont(ofSize: 22), .foregroundColor: UIColor.darkText, .paragraphStyle: paragraph])
+            }
         }
     }
     private func keepPDF(_ app: XCUIApplication) {

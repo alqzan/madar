@@ -97,6 +97,37 @@ import XCTest
         XCTAssertTrue(edited.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(edited.label.contains("٢٥"), edited.debugDescription)
     }
+    func testClosingMovementEditorKeepsDraftUntilDiscardIsConfirmed() {
+        continueAfterFailure = false
+        let app = openExpenseLog()
+        tapRow(app, "مقهى الزاوية")
+        let label = app.textFields["money-edit-label"]
+        XCTAssertTrue(label.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(label.value as? String, "مقهى الزاوية")
+        label.tap()
+        label.typeText(" الجديد\n")
+        XCTAssertEqual(label.value as? String, "مقهى الزاوية الجديد")
+
+        let close = app.buttons["money-page-close"].firstMatch
+        close.tap()
+        let keep = app.alerts.buttons["أكمل التعديل"].firstMatch
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), app.debugDescription)
+        keep.tap()
+        XCTAssertEqual(label.value as? String, "مقهى الزاوية الجديد")
+        XCTAssertTrue(app.buttons["money-edit-save"].isEnabled)
+
+        close.tap()
+        let discard = app.alerts.buttons["تجاهل التعديل"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 5), app.debugDescription)
+        discard.tap()
+        XCTAssertTrue(label.waitForNonExistence(timeout: 8))
+
+        tapRow(app, "مقهى الزاوية")
+        XCTAssertTrue(label.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(label.value as? String, "مقهى الزاوية")
+        close.tap()
+        XCTAssertTrue(label.waitForNonExistence(timeout: 8), app.debugDescription)
+    }
     func testDeletingAConfirmedMovementAsksFirst() throws {
         continueAfterFailure = false
         let app = openExpenseLog(); tapRow(app, "متجر الحي")

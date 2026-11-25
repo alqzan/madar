@@ -64,6 +64,41 @@ import XCTest
         app.terminate()
     }
 
+    func testFailedTurnKeepsVisibleFaceAndRetriesRequestedPage() {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-24T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+            "MADAR_UI_QURAN_ROUTE": "madar://quran/page/128", "MADAR_UI_QURAN_MUSHAF_FAIL_PAGE_ONCE": "129"
+        ]
+        app.launch()
+        let face = app.descendants(matching: .any)["quran-mushaf-page"]
+        XCTAssertTrue(face.waitForExistence(timeout: 25), app.debugDescription)
+        app.tapCoordinate(x: 0.5, y: 0.5)
+
+        let title = app.staticTexts["quran-mushaf-number"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(title.label, "الوجه ١٢٨")
+        app.buttons["quran-mushaf-next"].tap()
+
+        let error = app.staticTexts["quran-mushaf-read-error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(error.label.contains("١٢٩"), error.label)
+        XCTAssertTrue(face.exists)
+        XCTAssertEqual(title.label, "الوجه ١٢٨")
+        XCTAssertTrue(app.buttons["quran-mushaf-close"].isHittable)
+        attach(app, "mushaf-page-turn-failure")
+
+        app.buttons["quran-mushaf-retry"].tap()
+        expectation(for: NSPredicate(format: "label == %@", "الوجه ١٢٩"), evaluatedWith: title)
+        waitForExpectations(timeout: 10)
+        XCTAssertFalse(error.exists)
+        XCTAssertTrue(face.exists)
+        app.terminate()
+    }
+
     func testLandscapeMushafTurnsOnlyToAnotherVisiblePageOrSpread() {
         continueAfterFailure = false
         let isPad = UIDevice.current.userInterfaceIdiom == .pad

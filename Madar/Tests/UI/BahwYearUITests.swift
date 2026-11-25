@@ -102,6 +102,9 @@ import XCTest
         let increment = app.buttons["bahw-day-year-Increment"]
         XCTAssertTrue(increment.waitForExistence(timeout: 5))
         for _ in 0..<4 { increment.tap() }
+        let repeats = app.segmentedControls["bahw-day-repeats"]
+        repeats.buttons["كل سنة"].tap()
+        repeats.buttons["مرة واحدة"].tap()
         let preview = app.staticTexts.matching(identifier: "bahw-day-date-preview")
         XCTAssertTrue(preview.firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(preview.allElementsBoundByIndex.contains { $0.label.contains("٢٠٣٠") })
@@ -115,6 +118,55 @@ import XCTest
         capture(app, "M4-V03-far-future-saved-L")
         app.terminate(); app.launch(); open(); app.buttons["أيامي"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "bahw-matter-موعد بعيد").firstMatch.waitForExistence(timeout: 10))
+    }
+    func testConvertingYearlyDayToOneTimeKeepsItsNextOccurrence() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_HABIT_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-25T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+        let year = app.descendants(matching: .any)["bahw-block-year"].firstMatch
+        XCTAssertTrue(year.waitForExistence(timeout: 25))
+        for _ in 0..<6 where !year.isHittable { app.swipeUp(velocity: .slow) }
+        year.tap()
+        let add = app.buttons["bahw-add-day"]
+        for _ in 0..<6 where !add.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(add.isHittable, app.debugDescription)
+        add.tap()
+
+        let title = app.textFields["bahw-day-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap(); title.typeText("موعد دوري\n")
+        let month = app.buttons["bahw-day-month"].firstMatch
+        for _ in 0..<5 where !month.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(month.isHittable, app.debugDescription)
+        month.tap()
+        let may = app.buttons["مايو"].firstMatch
+        XCTAssertTrue(may.waitForExistence(timeout: 5), app.debugDescription)
+        may.tap()
+
+        let save = app.buttons["bahw-day-save"]
+        save.tap()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 10))
+        app.buttons["أيامي"].tap()
+        let saved = app.descendants(matching: .any).matching(identifier: "bahw-matter-موعد دوري").firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<5 where !saved.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(saved.isHittable, app.debugDescription)
+        saved.tap()
+
+        let once = app.segmentedControls["bahw-day-repeats"].buttons["مرة واحدة"]
+        XCTAssertTrue(once.waitForExistence(timeout: 5))
+        once.tap()
+        let date = NSPredicate(format: "label CONTAINS %@", "٢٥ مايو ٢٠٢٧")
+        let preview = app.staticTexts.matching(identifier: "bahw-day-date-preview").matching(date).firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 5), app.debugDescription)
+        for _ in 0..<5 where !save.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(save.isHittable, app.debugDescription)
+        save.tap()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(saved.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(date.evaluate(with: saved), saved.label)
     }
     /// Owner, 25 Oct: a passed one-time day with «واصل العدّ بعد الموعد» stays and shows the days since it.
     func testPassedOneTimeDayKeepsCountingWhenAsked() throws {

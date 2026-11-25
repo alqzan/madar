@@ -5,23 +5,31 @@ import MadarDesign
 import MadarInbox
 
 /// B1-10: a widget, control or Siri action that the app refused for good used to be moved aside and never shown.
-/// This row appears in the general settings only while at least one such action exists; the page lets the owner retry or drop each one.
+/// The entry stays available during a read failure so the user can retry from the same place.
 struct RejectedActionsRow: View {
     let session: AppSession
     @State private var items: [PendingInbox.RejectedDelivery] = []
+    @State private var readFailed = false
+    @State private var updating = false
+    #if DEBUG
+    @State private var injectedReadFailure = false
+    #endif
     @Environment(\.roomTheme) private var theme
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        Group {
-            if !items.isEmpty {
-                NavigationLink { RejectedActionsPage(session: session, items: $items) } label: {
+        // Keep a host for the read task when the healthy list has no rows.
+        VStack(spacing: 0) {
+            if !items.isEmpty || readFailed {
+                NavigationLink {
+                    RejectedActionsPage(session: session, items: $items, readFailed: $readFailed, updating: $updating)
+                } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90").font(.system(size: 18)).frame(width: 28).foregroundStyle(theme.accent)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("إجراءات لم تُطبَّق (\(MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi).string(items.count)))")
-                                .font(MadarTypography.body().bold())
-                            Text("طلبات من الودجة أو الاختصارات رفضها التطبيق").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            Text(title).font(MadarTypography.body().bold())
+                            Text(readFailed ? "تعذّرت قراءة الطلبات. افتح الصفحة لإعادة المحاولة." : "طلبات من الودجة أو الاختصارات رفضها التطبيق")
+                                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         }
                         Spacer(minLength: 8)
                         Image(systemName: "chevron.left").font(.footnote).foregroundStyle(theme.secondaryInk)
@@ -31,20 +39,57 @@ struct RejectedActionsRow: View {
                 .buttonStyle(.madarPlain).accessibilityIdentifier("settings-rejected-actions")
             }
         }
-        .task(id: scenePhase) { items = await session.rejectedActions() }
+        .task(id: scenePhase) {
+            guard scenePhase == .active, !updating else { return }
+            updating = true
+            defer { updating = false }
+            do {
+                #if DEBUG
+                let environment = ProcessInfo.processInfo.environment
+                if !injectedReadFailure, environment["MADAR_UI_REJECTED_READ_FAIL_ONCE"] == "1",
+                   environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil {
+                    injectedReadFailure = true
+                    throw CocoaError(.fileReadUnknown)
+                }
+                #endif
+                let listed = try await session.rejectedActions()
+                guard !Task.isCancelled else { return }
+                items = listed
+                readFailed = false
+            } catch {
+                guard !Task.isCancelled else { return }
+                readFailed = true
+            }
+        }
+    }
+
+    private var title: String {
+        guard !readFailed else { return "إجراءات لم تُطبَّق" }
+        let digits = MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)
+        return "إجراءات لم تُطبَّق (\(digits.string(items.count)))"
     }
 }
 
 private struct RejectedActionsPage: View {
     let session: AppSession
     @Binding var items: [PendingInbox.RejectedDelivery]
+    @Binding var readFailed: Bool
+    @Binding var updating: Bool
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         SettingsPage(title: "إجراءات لم تُطبَّق") {
-            Text("هذه طلبات وصلت من الودجة أو الاختصارات ولم يقبلها التطبيق. أعد المحاولة أو تجاهلها.")
-                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            if readFailed {
+                Text("تعذّرت قراءة الطلبات.")
+                    .font(MadarTypography.body()).accessibilityIdentifier("rejected-actions-read-failure")
+                Button("أعد قراءة الطلبات") { Task { await refresh() } }
+                    .buttonStyle(.bordered).frame(minHeight: 44)
+                    .disabled(updating).accessibilityIdentifier("rejected-actions-reload")
+            } else {
+                Text("هذه طلبات وصلت من الودجة أو الاختصارات ولم يقبلها التطبيق. أعد المحاولة أو تجاهلها.")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            }
             ForEach(items) { item in
                 VStack(alignment: .leading, spacing: 10) {
                     Text(Self.title(item.commandName)).font(MadarTypography.body().bold())
@@ -57,7 +102,7 @@ private struct RejectedActionsPage: View {
                             Button("أعد المحاولة") { act(item, retry: true) }.buttonStyle(.borderedProminent).tint(theme.accent)
                         }
                         Button("تجاهل", role: .destructive) { act(item, retry: false) }.buttonStyle(.bordered)
-                    }
+                    }.disabled(readFailed || updating)
                 }
                 .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 .background(theme.surface, in: .rect(cornerRadius: 20))
@@ -66,10 +111,30 @@ private struct RejectedActionsPage: View {
     }
 
     private func act(_ item: PendingInbox.RejectedDelivery, retry: Bool) {
+        guard !readFailed, !updating else { return }
+        updating = true
         Task {
+            defer { updating = false }
             if retry { await session.retryRejectedAction(item) } else { await session.dismissRejectedAction(item) }
-            items = await session.rejectedActions()
+            await load()
+        }
+    }
+
+    private func refresh() async {
+        guard !updating else { return }
+        updating = true
+        defer { updating = false }
+        await load()
+    }
+
+    private func load() async {
+        do {
+            let listed = try await session.rejectedActions()
+            items = listed
+            readFailed = false
             if items.isEmpty { dismiss() }
+        } catch {
+            readFailed = true
         }
     }
 
@@ -84,9 +149,9 @@ private struct RejectedActionsPage: View {
 }
 
 extension AppSession {
-    func rejectedActions() async -> [PendingInbox.RejectedDelivery] {
+    func rejectedActions() async throws -> [PendingInbox.RejectedDelivery] {
         let inbox = pendingInbox
-        return await Task.detached { (try? inbox.rejectedDeliveries()) ?? [] }.value
+        return try await Task.detached(priority: .utility) { try inbox.rejectedDeliveries() }.value
     }
     func retryRejectedAction(_ item: PendingInbox.RejectedDelivery) async {
         let inbox = pendingInbox, name = item.fileName

@@ -62,13 +62,28 @@ import UIKit
 
     func testTourCanRestartFromSettingsAndContinueThroughRooms() {
         continueAfterFailure = false
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        if isPad { XCUIDevice.shared.orientation = .landscapeLeft }
+        defer { if isPad { XCUIDevice.shared.orientation = .portrait } }
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L"]
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_DIARY_ROOT": "1"]
         app.launch()
         saveTourTestCity(in: app)
 
         let search = app.buttons["bahw-search"]
         XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription)
+        let showSidebar = app.buttons["pad-sidebar-show"]
+        var foldedForTest = false
+        defer { if foldedForTest && showSidebar.isHittable { showSidebar.tap() } }
+        if isPad {
+            let hideSidebar = app.buttons["pad-sidebar-hide"]
+            if hideSidebar.exists {
+                hideSidebar.tap()
+                foldedForTest = true
+            }
+            XCTAssertTrue(showSidebar.waitForExistence(timeout: 8), app.debugDescription)
+        }
+
         let searchFrame = search.frame
         let settings = app.buttons["bahw-customize"]
         settings.tap()
@@ -95,6 +110,21 @@ import UIKit
         ] {
             next.tap()
             waitForTourTitle(step, in: app)
+            if step == "انتقل بين الأقسام" {
+                XCTAssertTrue(spotlight.waitForExistence(timeout: 8), app.debugDescription)
+                if isPad {
+                    // The sidebar is 250 points wide; the button that opens it is only 44.
+                    XCTAssertGreaterThan(spotlight.frame.width, 240)
+                    XCTAssertGreaterThan(spotlight.frame.height, 200)
+                    attachScreenshot(app, named: "madar-tour-folded-sidebar")
+                } else {
+                    XCTAssertGreaterThan(spotlight.frame.width, 200)
+                }
+            }
+            if step == "تصفّح مذكراتك" {
+                let instructions = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "«اقرأ»", "«كل الذكريات»")).firstMatch
+                XCTAssertTrue(instructions.exists, app.debugDescription)
+            }
             if ["أضف عادة", "المصحف", "الأيام القادمة", "النسخ والاستعادة"].contains(step) {
                 XCTAssertTrue(spotlight.waitForExistence(timeout: 8), app.debugDescription)
             }
@@ -108,6 +138,22 @@ import UIKit
         XCTAssertTrue(title.waitForNonExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(settings.isHittable, app.debugDescription)
+        if isPad {
+            XCTAssertTrue(showSidebar.isHittable, "The tour must keep the saved folded preference.")
+        } else {
+            app.buttons["tab-notes"].tap()
+            let more = app.buttons["diary-day-more"]
+            XCTAssertTrue(more.waitForExistence(timeout: 10), app.debugDescription)
+            let archive = app.buttons["diary-all-memories"]
+            XCTAssertTrue(archive.waitForExistence(timeout: 10), app.debugDescription)
+            archive.tap()
+            let displayMenu = app.buttons["diary-hub-view-menu"]
+            XCTAssertTrue(displayMenu.waitForExistence(timeout: 10), app.debugDescription)
+            app.buttons["diary-hub-close"].tap()
+            XCTAssertTrue(displayMenu.waitForNonExistence(timeout: 8), app.debugDescription)
+            more.tap()
+            XCTAssertTrue(app.buttons["diary-day-read"].waitForExistence(timeout: 5), app.debugDescription)
+        }
     }
 
     func testWelcomeNameCanBeRemovedFromPrivacy() {

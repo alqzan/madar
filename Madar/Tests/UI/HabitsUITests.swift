@@ -187,6 +187,38 @@ import UIKit
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         shot(app, "Final-habits-past-saved-L")
     }
+
+    func testRenamingDurationHabitKeepsItsSavedTarget() {
+        continueAfterFailure = false
+        let app = app("partialDuration")
+        open(app)
+        func habitRow(named name: String) -> XCUIElement {
+            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", name + "،")).firstMatch
+        }
+
+        let original = habitRow(named: "قراءة هادئة")
+        XCTAssertTrue(original.waitForExistence(timeout: 5), app.debugDescription)
+        openDetail(app, original)
+        let edit = app.buttons["habit-edit"]
+        for _ in 0..<6 where !edit.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(edit.isHittable, app.debugDescription)
+        edit.tap()
+
+        let name = app.textFields["habit-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
+        name.tap()
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 20) + "وقت القراءة")
+        app.buttons["habit-save"].tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 10))
+
+        let renamed = habitRow(named: "وقت القراءة")
+        XCTAssertTrue(renamed.waitForExistence(timeout: 10), app.debugDescription)
+        openDetail(app, renamed)
+        let progress = app.staticTexts["habit-progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 5))
+        XCTAssertTrue(progress.label.contains("٣٠ دقيقة"), progress.label)
+    }
+
     /// FB-35 (owner, 5 Nov): Madar's own habits wait in the habits room; one tap opens the editor on that source, and a
     /// habit already kept is not offered again.
     func testRoomHabitsAreOfferedAndLeaveOnceAdded() throws {

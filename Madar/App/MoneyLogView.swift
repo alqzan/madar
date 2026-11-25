@@ -424,6 +424,7 @@ private struct MoneyMovementEditSheet: View {
     @State private var saving = false
     @State private var failure: String?
     @State private var confirmDelete = false
+    @State private var confirmDiscard = false
     @State private var charges: MoneyChargeLines?
     @FocusState private var focused: Bool
     private var service: AppMoneyService { .init(app: app) }
@@ -436,6 +437,7 @@ private struct MoneyMovementEditSheet: View {
     private var amountChanged: Bool { !rawAmount.isEmpty && typedAmount != nil && typedAmount != edit.amountMinor }
     private var amountInvalid: Bool { !rawAmount.isEmpty && typedAmount == nil }
     private var timeChanged: Bool { abs(date.timeIntervalSince(movement.at)) >= 60 }
+    private var hasUnsavedEdits: Bool { loaded && (labelChanged || categoryChanged || amountChanged || amountInvalid || timeChanged) }
     private var canSave: Bool { loaded && !saving && !amountInvalid && (labelChanged || categoryChanged || (edit.lockReason == nil && (amountChanged || timeChanged))) }
     private var unitName: String { edit.currency == app.string("core.currency") && edit.currency == "SAR" ? "ريال" : service.currencyName(edit.currency) }
     private var timeZone: TimeZone { edit.timeZoneID.flatMap(TimeZone.init(identifier:)) ?? app.activePlace.timeZone }
@@ -443,7 +445,7 @@ private struct MoneyMovementEditSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                MoneyPageHeader(title: "عدّل الحركة", close: { dismiss() }, closeDisabled: saving)
+                MoneyPageHeader(title: "عدّل الحركة", close: close, closeDisabled: saving)
                 Text(figure: visible ? service.amount(movement.amountMinor) : "•••").font(.custom("thmanyahserifdisplay-Black", size: 34, relativeTo: .largeTitle))
                 Text(movement.detail.explanation).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 field("الاسم") { TextField(movement.title, text: $label).focused($focused).submitLabel(.done).accessibilityIdentifier("money-edit-label") }
@@ -489,7 +491,13 @@ private struct MoneyMovementEditSheet: View {
                 }
             }.padding(20)
         }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
-            .presentationDetents([.large]).presentationDragIndicator(.visible).madarSheetLock(saving: saving, draft: loaded && (labelChanged || categoryChanged || amountChanged || timeChanged))
+            .presentationDetents([.large]).presentationDragIndicator(.visible).madarSheetLock(saving: saving, draft: hasUnsavedEdits)
+            .alert("تتجاهل تعديلك؟", isPresented: $confirmDiscard) {
+                Button("تجاهل التعديل", role: .destructive) { dismiss() }
+                Button("أكمل التعديل", role: .cancel) {}
+            } message: {
+                Text("تعديلاتك على هذه الحركة لم تُحفظ بعد.")
+            }
             .confirmationDialog("تُحذف هذه الحركة وتعود أرقامك كأنها لم تُسجَّل. يمكنك التراجع بعدها.", isPresented: $confirmDelete, titleVisibility: .visible) {
                 Button("احذف الحركة", role: .destructive, action: delete).accessibilityIdentifier("money-edit-confirm-delete")
                 Button("ليس الآن", role: .cancel) {}
@@ -515,6 +523,11 @@ private struct MoneyMovementEditSheet: View {
             Text(title).font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44)
                 .foregroundStyle(on ? theme.onAccent : theme.ink).background(on ? theme.color("accent") : theme.surface, in: Capsule())
         }.buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier(id)
+    }
+    private func close() {
+        guard hasUnsavedEdits else { dismiss(); return }
+        focused = false
+        confirmDiscard = true
     }
     private func save() {
         guard canSave else { return }

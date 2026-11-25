@@ -134,7 +134,12 @@ struct HabitEditorView:View {
                     }
                     section("قدر يسهل أن تدوم عليه") {
                         if source == "custom" {
-                            Picker("الحساب",selection:$rule.measure){Text("مرة").tag(HabitMeasure.once);Text("بالعدد").tag(HabitMeasure.count);Text("بالوقت").tag(HabitMeasure.duration);Text("عادة تركتها").tag(HabitMeasure.abstain)}.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-measure")
+                            Picker("الحساب",selection:Binding(get: { rule.measure }, set: selectMeasure)) {
+                                Text("مرة").tag(HabitMeasure.once)
+                                Text("بالعدد").tag(HabitMeasure.count)
+                                Text("بالوقت").tag(HabitMeasure.duration)
+                                Text("عادة تركتها").tag(HabitMeasure.abstain)
+                            }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-measure")
                             if rule.measure == .abstain { Text("تعدّ مدار الأيام منذ آخر زلّة. تسجّل الزلّة من صفحة العادة، ولا يسألك مدار عنها ولا يذكّرك.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("habit-abstain-hint") }
                             if rule.measure == .count { TextField("الوحدة، مثل كوب أو صفحة",text:Binding(get:{rule.unit ?? ""},set:{rule.unit=$0})).frame(minHeight:44).accessibilityIdentifier("habit-unit") }
                         }
@@ -258,24 +263,35 @@ struct HabitEditorView:View {
         .onChange(of:name){issue=nil}.onChange(of:monthDays){issue=nil}.onChange(of:windowOn){issue=nil}
         .onChange(of:source){old,value in
             if reading == nil && value != "custom" && reminder == "push" { reminder = "dot" }
-            if value == "custom",reading == nil {rule.measure = .once;rule.unit=nil;rule.target=1}
+            if value == "custom", reading == nil {
+                selectMeasure(.once)
+                rule.unit = nil
+                rule.target = 1
+            }
             let defaults=["jamaah":"الجماعة","review":"المراجعة","reading":"القراءة","diaryLine":"سطر اليوم","walking":"المشي","wird":"ورد الحفظ"]
             if let previous=defaults[old],name==previous {name=defaults[value] ?? ""}
-            if value != "custom" && reading == nil { rule.measure = value == "walking" ? .health : value == "reading" ? .duration : .count;rule.unit=["jamaah":"صلاة","review":"وجه","reading":"minutes","diaryLine":"سطر","walking":"steps","wird":"ورد"][value];rule.target=value == "walking" ? 6000 : value == "jamaah" ? 5 : value == "reading" ? 15 : 1; if name.isEmpty {name=["jamaah":"الجماعة","review":"المراجعة","reading":"القراءة","diaryLine":"سطر اليوم","walking":"المشي","wird":"ورد الحفظ"][value] ?? ""} }
+            if value != "custom", reading == nil {
+                if rule.measure == .abstain && reminder == "none" { reminder = "dot" }
+                rule.measure = value == "walking" ? .health : value == "reading" ? .duration : .count
+                rule.unit = ["jamaah":"صلاة","review":"وجه","reading":"minutes","diaryLine":"سطر","walking":"steps","wird":"ورد"][value]
+                rule.target = value == "walking" ? 6000 : value == "jamaah" ? 5 : value == "reading" ? 15 : 1
+                if name.isEmpty { name = defaults[value] ?? "" }
+            }
         }
-        .onChange(of:rule.measure){old,value in measureChanged(from:old,to:value)}
         .madarSheetLock(saving: busy, draft: hasUnsavedChanges)
     }
     /// Switching back from minutes to a count drops the «minutes» unit, so a count habit never reads as time.
-    private func measureChanged(from old:HabitMeasure,to value:HabitMeasure) {
+    private func selectMeasure(_ value: HabitMeasure) {
+        let old = rule.measure
+        guard old != value else { return }
+        // Defaults belong to a picker change. Loading a saved rule keeps its exact measure and target.
+        rule.measure = value
         if value == .abstain {
             // A habit you quit: daily, one «day» a unit, nothing to ask — and never a window, reminder, minimum or growth.
             rule.frequency = .daily;rule.intervalDays=nil;rule.target=1;rule.unit=nil;rule.minimum=nil;rule.weekdays=[];rule.restWeekdays=[];rule.windowStart=nil;rule.windowEnd=nil;rule.windowAnchor=nil
             minimumOn=false;windowOn=false;ramadanOn=false;rampOn=false;reminder="none";return
         }
         if old == .abstain, reminder == "none" { reminder="dot" }
-        // Each linked source sets its own measure, unit and target together.
-        guard source == "custom" else { return }
         if value == .duration {rule.unit="minutes";rule.target=15}
         else if value == .once {rule.target=1;rule.minimum=nil;minimumOn=false}
         else if value == .count, old == .duration {rule.unit=nil}

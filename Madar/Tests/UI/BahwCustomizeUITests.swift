@@ -296,6 +296,34 @@ import XCTest
         XCTAssertFalse(app.descendants(matching: .any)["settings-advanced"].firstMatch.exists, "Essentials mode hides the «متقدم» group")
     }
 
+    func testRejectedActionsStayReachableAfterReadFailureAndReload() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_THEME": "light", "MADAR_UI_REJECTED_READ_FAIL_ONCE": "1"
+        ]
+        app.launch(); finishOnboarding(app)
+        let settings = app.buttons["bahw-customize"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
+        settings.tap()
+        let entry = app.buttons["settings-rejected-actions"]
+        for _ in 0..<10 where !entry.isHittable { app.swipeUp(velocity: .fast) }
+        XCTAssertTrue(entry.isHittable, app.debugDescription)
+        entry.tap()
+
+        let reload = app.buttons["rejected-actions-reload"]
+        XCTAssertTrue(reload.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["rejected-actions-read-failure"].exists)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "rejected-actions-read-retry"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        reload.tap()
+        XCTAssertTrue(reload.waitForNonExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(entry.exists, "A readable empty queue clears the settings row.")
+    }
+
     /// Batch 3: «صحة مدار» opens from the settings home and gives a verdict plus the backup row (a fresh store has no backup yet).
     func testMadarHealthPageShowsAVerdictAndTheBackupRow() {
         continueAfterFailure = false

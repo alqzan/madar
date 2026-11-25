@@ -84,6 +84,32 @@ import MadarSnapshots
         XCTFail("resumeWriters did not acknowledge the queued delivery within five seconds")
     }
 
+    func testRejectedActionsSurfaceAReadFailureAndCanBeReadAfterRecovery() async throws {
+        let isolated = try fixture()
+        let inbox = isolated.session.pendingInbox
+        let quarantine = inbox.directory.appendingPathComponent("quarantine")
+        let original = inbox.directory.appendingPathComponent("quarantine-test-original")
+        let files = FileManager.default
+        let delivery = try record(prayerCommand(source: .widget), fixture: isolated)
+        _ = try inbox.enqueue(delivery)
+        let claimed = try XCTUnwrap(try inbox.claimBatch().first)
+        try inbox.quarantine(claimed, reason: "invalidCommand")
+        let before = try await isolated.session.rejectedActions()
+        XCTAssertEqual(before.count, 1)
+        try files.moveItem(at: quarantine, to: original)
+        try Data("temporary test obstruction".utf8).write(to: quarantine)
+        do {
+            _ = try await isolated.session.rejectedActions()
+            XCTFail("A read failure must not look like an empty queue.")
+        } catch {
+            XCTAssertFalse(Task.isCancelled)
+        }
+        try files.removeItem(at: quarantine)
+        try files.moveItem(at: original, to: quarantine)
+        let recovered = try await isolated.session.rejectedActions()
+        XCTAssertEqual(recovered.map(\.id), before.map(\.id))
+    }
+
     func testNotificationAndWidgetLeaveNoFactUntilSessionDrainThenOneFactTwoReceipts() async throws {
         let fixture = try fixture()
         let issuedAt = Date()

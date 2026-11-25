@@ -4,16 +4,21 @@ import MadarDesign
 
 /// R18-Mushaf, with the owner's borderless 1405 palette and the verified 1439 page glyphs.
 struct QuranMushafView: View {
+    private struct PageRequest: Equatable {
+        let page: Int
+        var attempt = 0
+    }
+
     let service: AppQuranService
-    let initialPage: Int
-    /// FB-33: opened on an ayah (the wird's first), its tafsir is already up.
-    var initialAyah: Int? = nil
     let close: () -> Void
     @Environment(\.roomTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var number = 1
+    @State private var request: PageRequest
     @State private var page: QuranUIPage?
-    @State private var error: String?
+    @State private var loadFailed = false
+    #if DEBUG
+    @State private var injectedReadFailure = false
+    #endif
     @State private var tools = false
     /// The page fills the screen with no chrome, so the first reading says once how to bring the controls back.
     @State private var hint = !UserDefaults.standard.bool(forKey: "quran.mushaf.toolsHintSeen")
@@ -32,6 +37,15 @@ struct QuranMushafView: View {
     @State private var bookmarkPage: Int?
     @State private var bookmarkName = ""
     @State private var bookmarkError: String?
+
+    /// FB-33: an ayah link opens its tafsir with the reader.
+    init(service: AppQuranService, initialPage: Int, initialAyah: Int? = nil, close: @escaping () -> Void) {
+        self.service = service
+        self.close = close
+        _request = State(initialValue: PageRequest(page: min(604, max(1, initialPage))))
+        _selectedAyah = State(initialValue: initialAyah)
+    }
+
     private var twoUp: Bool { landscapeWide && isPadWide(sizeClass) }
     private func sheet(_ page: QuranUIPage) -> some View {
         QuranCoachPage(page: page, coach: reading(page), stage: .grading, reveal: { _ in },
@@ -71,12 +85,18 @@ struct QuranMushafView: View {
                         .accessibilityIdentifier("quran-mushaf-page")
                         .accessibilityAction(named: "إظهار الأدوات") { tools = true }
                         .accessibilityScrollAction { edge in if edge == .leading { turn(forward: true) } else if edge == .trailing { turn(forward: false) } }
-                } else if let error {
-                    VStack(spacing: 16) { Text(error); Button("حاول مرة أخرى") { self.error = nil; Task { await load() } }; Button("رجوع", action: close) }.padding(24)
-                } else { ProgressView() }
+                } else if !loadFailed { ProgressView() }
                 // AU-18: while the page loads there is no page to tap, so the close stays visible.
-                if tools || (page == nil && error == nil) { controls }
-                if hint && !tools && page != nil {
+                if tools || (page == nil && !loadFailed) { controls }
+                if loadFailed {
+                    VStack {
+                        if page != nil { Spacer() }
+                        loadFailure
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, page == nil ? 0 : tools ? 76 : 12)
+                }
+                if hint && !tools && !loadFailed && page != nil {
                     VStack { Spacer(); Text("اضغط مطوّلًا على آية لتفسيرها، والمس الصفحة للأدوات").font(MadarTypography.caption()).padding(.horizontal, 16).padding(.vertical, 10).glassEffect(.regular, in: .capsule).padding(.bottom, 28) }
                         .allowsHitTesting(false).transition(.opacity).accessibilityHidden(true)
                 }
@@ -87,8 +107,7 @@ struct QuranMushafView: View {
         .statusBarHidden(!tools).interactiveDismissDisabled()
         .onChange(of: tools) { _, shown in if shown { hint = false; UserDefaults.standard.set(true, forKey: "quran.mushaf.toolsHintSeen") } }
         .task(id: page != nil) { guard hint, page != nil else { return }; try? await Task.sleep(for: .seconds(5)); withAnimation { hint = false } }
-        .task { number = min(604, max(1, initialPage)); if let initialAyah { selectedAyah = initialAyah } }
-        .task(id: number) { await load() }
+        .task(id: request) { [request] in await load(request) }
         .task { await QuranTafsirLibrary.shared.loadLocal() }
         .task { await loadBookmarks() }
         .alert("لم تكتمل عملية العلامة", item: $bookmarkError) { _ in
@@ -110,6 +129,23 @@ struct QuranMushafView: View {
     private func reading(_ page: QuranUIPage) -> QuranUICoach {
         let ids = Set(page.semanticAyat.map(\.id))
         return QuranUICoach(activeAyahID: 0, activeAyahNumber: "", plannedAyahs: ids, revealedAyahs: ids, repetition: 0, target: 0, bridge: false, method: "continuous", stageTitle: "", pageProgress: "", caption: "", pages: [page.page], pastDay: false)
+    }
+    private var loadFailure: some View {
+        QuranPaperCard {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("تعذّر فتح الوجه \(service.numerals.string(request.page))")
+                    .font(quranFont(15)).accessibilityIdentifier("quran-mushaf-read-error")
+                Button(action: retryLoad) {
+                    Text("حاول مرة أخرى").font(quranFont(14, bold: true)).frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-mushaf-retry")
+                if page == nil {
+                    Button(action: close) {
+                        Text("رجوع").font(quranFont(14)).frame(minHeight: 44).contentShape(Rectangle())
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-mushaf-error-close")
+                }
+            }
+        }
     }
     private var controls: some View {
         VStack {
@@ -211,8 +247,9 @@ struct QuranMushafView: View {
             .buttonStyle(.madarPlain).accessibilityLabel(label).accessibilityIdentifier(id)
     }
     private func turnTarget(forward: Bool) -> Int? {
+        guard let page else { return nil }
         let stride = twoUp ? 2 : 1
-        let target = number + (forward ? stride : -stride)
+        let target = page.page + (forward ? stride : -stride)
         // Clamping a two-page turn at either end would show the same spread again.
         return (1...604).contains(target) ? target : nil
     }
@@ -221,22 +258,58 @@ struct QuranMushafView: View {
         selectedAyah = nil
         go(to: target)
     }
-    private func go(to target: Int) { let next = min(604, max(1, target)); if next != number { number = next; facing = nil;  /* the shown page stays until the next one is ready (B1-4) */ error = nil; zoom = 1; pan = .zero } }
+    private func go(to target: Int) {
+        let next = min(604, max(1, target))
+        guard next != request.page else {
+            if loadFailed { retryLoad() }
+            return
+        }
+        loadFailed = false
+        request = PageRequest(page: next)
+    }
+
+    private func retryLoad() {
+        loadFailed = false
+        request.attempt += 1
+    }
+
     /// The tafsir sheet walked to another ayah: light it, and turn the page when it starts on another one.
     private func open(_ ayahID: Int) {
         guard let ayah = try? QuranResources.catalog().ayah(id: ayahID) else { return }
         selectedAyah = ayahID
-        if ayah.page != number && !(page?.semanticAyat.contains { $0.id == ayahID } ?? false) { go(to: ayah.page) }
+        if ayah.page != request.page && !(page?.semanticAyat.contains { $0.id == ayahID } ?? false) { go(to: ayah.page) }
     }
-    private func load() async {
-        let requested = number
-        do { let loaded = try await service.page(requested); guard number == requested else { return }; page = loaded; error = nil }
-        catch { guard number == requested else { return }; page = nil; self.error = quranUserMessage(error) }
+
+    private func load(_ requested: PageRequest) async {
+        guard request == requested, !Task.isCancelled else { return }
+        let other = requested.page % 2 == 1 ? requested.page + 1 : requested.page - 1
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedReadFailure,
+               UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+               environment["MADAR_UI_QURAN_MUSHAF_FAIL_PAGE_ONCE"] == String(requested.page) {
+                injectedReadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            let loaded = try await service.page(requested.page)
+            guard request == requested, !Task.isCancelled else { return }
+            let companion = isPadWide(sizeClass) ? try? await service.page(other) : nil
+            guard request == requested, !Task.isCancelled else { return }
+            // Keep the current face or spread intact until its replacement is ready (B1-4).
+            if page?.page != loaded.page { zoom = 1; pan = .zero }
+            page = loaded
+            facing = companion
+        } catch {
+            guard request == requested, !Task.isCancelled else { return }
+            loadFailed = true
+            return
+        }
         // Warm the two neighbours (font registration and glyph table) so turning the page does not wait.
-        for neighbour in [requested + 1, requested - 1] where (1...604).contains(neighbour) { _ = try? await service.page(neighbour); guard number == requested else { return } }
-        guard isPadWide(sizeClass), page != nil else { return }
-        let other = requested % 2 == 1 ? requested + 1 : requested - 1
-        guard (1...604).contains(other), let loaded = try? await service.page(other), number == requested else { return }
-        facing = loaded
+        for neighbour in [requested.page + 1, requested.page - 1] where (1...604).contains(neighbour) && neighbour != facing?.page {
+            guard request == requested, !Task.isCancelled else { return }
+            _ = try? await service.page(neighbour)
+        }
     }
 }

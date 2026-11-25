@@ -38,6 +38,7 @@ struct MihbaraHomeView: View {
     @State private var slotBook: MihbaraBook?
     @State private var pendingSlotBook: MihbaraBook?
     @State private var pendingLibraryAction: MihbaraLibraryAction?
+    @State private var failedLibraryOpen: MihbaraReaderRoute?
     @State private var libraryActionIsActive = false
     @State private var libraryActionWriteIsRunning = false
     @State private var restoreFileAfterSheet = false
@@ -51,16 +52,21 @@ struct MihbaraHomeView: View {
     #if DEBUG
     @State private var injectedShelfReadFailure = false
     @State private var injectedRouteOpenFailure = false
+    @State private var injectedLibraryOpenFailure = false
     @State private var injectedRouteForUITest = false
     #endif
     private var theme: RoomTheme { .init(room: "mihbara", dark: colorScheme == .dark) }
     private var service: AppMihbaraService { .init(app: app) }
     private func setStand(_ id: UUID) { tableID = id; MihbaraStand.save(id); try? app.publishSnapshot() }
+    private var hasActiveBookNavigation: Bool {
+        sheet != nil || readerRoute != nil || showingAddBook || goalEditor != nil || renaming != nil || pendingRemoval != nil || slotBook != nil
+    }
     private var shelfReadFailurePanel: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(shelfReadError ?? "تعذّرت قراءة بيانات المحبرة الآن.")
+            Text(failedLibraryOpen != nil ? "تعذّر فتح الكتاب الآن. أعد المحاولة لفتح الموضع الذي اخترته."
+                : shelfReadError ?? "تعذّرت قراءة بيانات المحبرة الآن.")
                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-            Button { load(retryingAfterFailure: true) } label: { Text("أعِد المحاولة")
+            Button(action: retryShelfRead) { Text("أعِد المحاولة")
                 .font(MadarTypography.section()).frame(minHeight: 44)
                 .foregroundStyle(theme.accent).contentShape(Rectangle()) }
                 .accessibilityIdentifier("mihbara-home-retry")
@@ -92,9 +98,14 @@ struct MihbaraHomeView: View {
         .onChange(of: scenePhase) { _, phase in if phase == .active && isFrontRoom { load() } }
         .refreshesAtMadarDay(app) { if scenePhase == .active { load() } }
         .modifier(MihbaraConversionOffer(app: app, book: $offerConversion))
-        .onChange(of: app.mihbaraBookToOpen) { _, _ in openSpotlightBookIfNeeded() }
+        .onChange(of: hasActiveBookNavigation) { _, active in if active { failedLibraryOpen = nil } }
+        .onChange(of: app.mihbaraBookToOpen) { _, id in
+            if id != nil { failedLibraryOpen = nil }
+            openSpotlightBookIfNeeded()
+        }
         .onChange(of: app.mihbaraRoute, initial: true) { _, route in
             if let route {
+                failedLibraryOpen = nil
                 openRoute(route)
             }
         }
@@ -213,7 +224,7 @@ struct MihbaraHomeView: View {
                     Spacer(minLength: 8)
                     Image(systemName: "books.vertical").font(.title2).frame(width: 44, height: 44)
                 }
-                if shelfReadFailed { shelfReadFailurePanel }
+                if shelfReadFailed { shelfReadFailurePanel.id("shelf-read-failure") }
                 if let reading {
                     MadarDateLabel(app.dateLabels(reading.day)).foregroundStyle(theme.secondaryInk)
                     conversionCards
@@ -280,6 +291,16 @@ struct MihbaraHomeView: View {
     private func originalPDFID(_ hash: String) -> UUID? {
         let all: [MihbaraBook] = (reading?.originals ?? []) + (reading?.books ?? [])
         return all.first { $0.isReadablePDF && $0.fileHash == hash }?.id
+    }
+    private func retryShelfRead() {
+        let destination = failedLibraryOpen
+        failedLibraryOpen = nil
+        if let destination, !hasActiveBookNavigation, app.mihbaraRootDraftBlockers.isEmpty,
+           app.mihbaraRoute == nil, app.mihbaraBookToOpen == nil {
+            present(.open(destination))
+        } else {
+            load(retryingAfterFailure: true)
+        }
     }
     private func load(retryingAfterFailure: Bool = false) {
         guard !shelfReadFailed || retryingAfterFailure else { return }
@@ -506,14 +527,20 @@ struct MihbaraHomeView: View {
             renaming = book
         case .remove(let target):
             pendingRemoval = target
-        case .open(let book, let volume, let page, let locatorJSON):
-            if case .opened = openBook(book, volume: volume, page: page, locatorJSON: locatorJSON) {
+        case .open(let destination):
+            defer { finishLibraryAction() }
+            guard let book = reading?.book(destination.bookID) else {
+                shelfReadFailed = false
+                shelfReadError = nil
+                app.errorMessage = "الكتاب لم يعد موجودًا في المحبرة."
+                return
+            }
+            if case .opened = openBook(book, volume: destination.volume, page: destination.page,
+                                      locatorJSON: destination.locatorJSON, fromLibrary: true) {
+                shelfReadFailed = false
+                shelfReadError = nil
                 clearPendingBookOpen(for: book.id)
             }
-            // The library transition is complete once the reader or details sheet
-            // has been presented. Keeping this active until that destination closes
-            // prevents a queued room-root link from dismissing it after saving.
-            finishLibraryAction()
         }
     }
     private func clearPendingBookOpen(for id: UUID) {
@@ -1000,25 +1027,43 @@ struct MihbaraHomeView: View {
         }
     }
 
-    @discardableResult private func openBook(_ book: MihbaraBook, volume: Int? = nil, page: Int? = nil, locatorJSON: String? = nil) -> MihbaraBookOpenResult {
+    @discardableResult private func openBook(_ book: MihbaraBook, volume: Int? = nil, page: Int? = nil,
+                                            locatorJSON: String? = nil, fromLibrary: Bool = false) -> MihbaraBookOpenResult {
+        var destination = MihbaraReaderRoute(bookID: book.id, volume: volume, page: page, locatorJSON: locatorJSON)
         if case .library? = sheet {
-            scheduleLibraryAction(.open(book, volume: volume, page: page, locatorJSON: locatorJSON))
+            scheduleLibraryAction(.open(destination))
             return .deferred
         }
+        failedLibraryOpen = nil
         guard book.isReadableEPUB || book.isReadablePDF else { sheet = .book(book.id); return .opened }
         guard service.hasLocalFile(for: book) else { sheet = .book(book.id); return .opened }
         do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if fromLibrary, !injectedLibraryOpenFailure,
+               environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               environment["MADAR_UI_MIHBARA_LIBRARY_OPEN_FAILURE_ONCE"] == "1" {
+                injectedLibraryOpenFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
             // A reader can close while its last locator is being committed. Refresh
             // the managed generation before constructing the next reader route.
             try app.reload()
             reading = try service.load()
-            let pdfPage = book.isReadablePDF ? page ?? MihbaraPDFLocator.pageIndex(locatorJSON: locatorJSON, fileHash: book.fileHash) : nil
-            readerRoute = MihbaraReaderRoute(bookID: book.id, volume: volume, page: pdfPage, locatorJSON: locatorJSON)
+            destination.page = book.isReadablePDF ? page ?? MihbaraPDFLocator.pageIndex(locatorJSON: locatorJSON, fileHash: book.fileHash) : nil
+            readerRoute = destination
             return .opened
         } catch {
-            app.errorMessage = madarUserMessage(error)
             shelfReadFailed = true
             shelfReadError = "تعذّر فتح الكتاب الآن. كتبك محفوظة في مكانها؛ حاول مرة أخرى."
+            if fromLibrary {
+                cancelShelfRead()
+                failedLibraryOpen = destination
+                scrollTarget = "read-failure"
+            } else {
+                app.errorMessage = madarUserMessage(error)
+            }
             return .failed
         }
     }
@@ -1029,7 +1074,7 @@ private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int),
 private enum MihbaraLibraryAction {
     case rename(MihbaraBook)
     case remove(MihbaraRemovalConfirmation)
-    case open(MihbaraBook, volume: Int?, page: Int?, locatorJSON: String?)
+    case open(MihbaraReaderRoute)
 }
 private enum MihbaraBookOpenResult { case opened, deferred, failed }
 private struct MihbaraGoalEditor: Identifiable { let reading: HabitReading?; var id: UUID { reading?.id ?? fresh }; private let fresh = UUID()
