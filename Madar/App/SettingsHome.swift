@@ -31,8 +31,8 @@ struct SettingsHome: View {
 
     @ViewBuilder private var roomGroups: some View {
             group("الأقسام") {
-                link(MadarGuideView.title, "خطوات البداية في كل قسم", "book") {
-                    MadarGuideView(openTab: { session.selectedTab = $0 })
+                door("جولة مدار", "تعرّف على الأزرار داخل الأقسام", "sparkle.magnifyingglass", id: "settings-tour-start") {
+                    session.startMadarTour()
                 }
                 link("أقسامك والبهو", "أظهر الودجات أو أخفِها ورتّبها", "square.grid.2x2") {
                     SettingsPage(title: "أقسامك والبهو") {
@@ -42,7 +42,7 @@ struct SettingsHome: View {
                             action("اصنع ودجة", "square.stack.3d.up", openMaker)
                         }
                     }
-                }
+                }.madarTourAnchor(.settingsWidgets)
             }
             group("إعدادات كل قسم") {
                 // Owner 17 Nov 2026: the prayer room is gone; its times stay because reminders and the wird hang on them.
@@ -72,7 +72,7 @@ struct SettingsHome: View {
                         BackupSettingsView(service: backup, numerals: session.string("core.numerals") == "western" ? .western : .hindi,
                                            dates: { session.dateLabels(GregorianDay.containing($0, in: session.activePlace.timeZone)) },
                                            time: { session.backupTime($0) }, hidesAdvanced: session.bool("core.essentials"))
-                    }
+                    }.madarTourAnchor(.settingsBackup)
                 }
                 RejectedActionsRow(session: session)
                 // B2-18 (owner, 10 Nov 2026): a one-time move from the old Madar sits folded under «متقدم».
@@ -92,6 +92,9 @@ struct SettingsHome: View {
 
     private var privacyPage: some View {
         SettingsPage(title: "الخصوصية والبحث") {
+            link("اسم الترحيب", "غيّر الاسم الذي يناديك به مدار أو احذفه", "person.crop.circle") {
+                MadarWelcomeNameView(tour: session.madarTour)
+            }
             if let definition = try? session.schema.definition(for: "core.spotlightIndex") {
                 SettingsSection(title: "بحث الجهاز", symbol: "magnifyingglass", definitions: [definition],
                                 session: session, searching: true, highlightedSettingKey: nil)
@@ -145,8 +148,8 @@ struct SettingsHome: View {
             .buttonStyle(.madarPlain).accessibilityIdentifier("settings-link-" + title)
     }
 
-    private func door(_ title: String, _ subtitle: String, _ symbol: String, _ open: @escaping () -> Void) -> some View {
-        Button(action: open) { rowLabel(title, subtitle, symbol) }.buttonStyle(.madarPlain).accessibilityIdentifier("settings-door-" + title)
+    private func door(_ title: String, _ subtitle: String, _ symbol: String, id: String? = nil, _ open: @escaping () -> Void) -> some View {
+        Button(action: open) { rowLabel(title, subtitle, symbol) }.buttonStyle(.madarPlain).accessibilityIdentifier(id ?? ("settings-door-" + title))
     }
 
     private func action(_ title: String, _ symbol: String, _ run: @escaping () -> Void) -> some View {

@@ -16,6 +16,7 @@ struct AppUndoToken { let id: UUID; let expiresAt: Date }
 
 @MainActor @Observable
 final class AppSession {
+    let madarTour = MadarTour()
     private static let bahwReturnStateKey = "sys.bahwReturnPlan"
     let diaryPlayback = DiaryPlayback()
     /// One voice controller for the whole session, so a take survives the writing page being rebuilt or closed.
@@ -561,6 +562,7 @@ final class AppSession {
             var components=URLComponents(url:url,resolvingAgainstBaseURL:false)
             if components?.host == "prayer" {components?.host="salah"} // Existing placed widgets used this legacy alias.
             let route = try RouteRegistry.parse(components?.url ?? url, context: context)
+            if madarTour.step != nil { endMadarTour(returnToLobby: false) }
             if url.host == "settings" {
                 settingsRoute = route
                 settingsQuery = (try? schema.definition(for: route.path[1]).title) ?? ""
@@ -710,7 +712,7 @@ final class AppSession {
             } catch { errorMessage = "لم يُحفظ النمط. \(madarUserMessage(error))" }
         }
     }
-    func completeOnboarding() {
+    func completeOnboarding(displayName: String = "") {
         guard beginWrite() else { return }
         Task {
             defer { endWrite() }
@@ -719,6 +721,7 @@ final class AppSession {
                 guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue("onboarding") }
                 // Only a person who has just finished the first run gets the one-room start; an update never hides rooms (see applyProgressiveRoomsOnce).
                 UserDefaults.standard.set(true, forKey: "Madar.progressiveRooms.pending")
+                madarTour.prepareFirstRun(name: displayName)
                 onboardingComplete = true
             } catch { errorMessage = "لم تُحفظ البداية. \(madarUserMessage(error))" }
         }

@@ -111,12 +111,15 @@ struct BahwYearView: View {
         TimelineView(.periodic(from: .now, by: 60)) { _ in
             VStack(spacing: 0) {
                 topBar.padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 10)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        hero
-                        strips
-                        matters
-                    }.padding(.horizontal, 18).padding(.bottom, 28).frame(maxWidth: 620).frame(maxWidth: .infinity)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 18) {
+                            hero
+                            strips
+                            matters
+                        }.padding(.horizontal, 18).padding(.bottom, 28).frame(maxWidth: 620).frame(maxWidth: .infinity)
+                    }
+                    .madarTourScroll(proxy, to: .yearUpcoming)
                 }
             }
         }
@@ -143,7 +146,7 @@ struct BahwYearView: View {
                 HStack(spacing: 2) {
                     segment("هجرية", on: hijri) { hijriHero = true }.accessibilityIdentifier("bahw-year-hijri-toggle")
                     segment("ميلادية", on: !hijri) { hijriHero = false }.accessibilityIdentifier("bahw-year-gregorian-toggle")
-                }.padding(4).background(lobby.line, in: .capsule)
+                }.padding(4).background(lobby.line, in: .capsule).madarTourAnchor(.yearCalendars)
             }
             Spacer()
             Color.clear.frame(width: 96, height: 1)
@@ -275,7 +278,7 @@ struct BahwYearView: View {
                 Spacer()
                 Button { editing = .init(service: service) } label: {
                     Label("يوم يهمّك", systemImage: "plus").font(MadarTypography.section()).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(minHeight: 46).glassEffect(.regular.interactive(), in: .capsule)
-                }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-add-day")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-add-day").madarTourAnchor(.yearUpcoming)
             }.padding(.top, 10)
             Picker("التصفية", selection: $filter) { Text("الكل").tag(0); Text("المواسم").tag(1); Text("أيامي").tag(2) }
                 .pickerStyle(.segmented).accessibilityIdentifier("bahw-matters-filter")

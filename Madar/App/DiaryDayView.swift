@@ -432,7 +432,7 @@ struct DiaryDayView: View {
                             Button { questionsOpen = true } label: { Label("أسئلة الكتابة", systemImage: "questionmark.bubble") }
                                 .accessibilityIdentifier("diary-day-questions")
                         }
-                    } label: { Image(systemName: "ellipsis.circle") }.accessibilityLabel("المزيد").accessibilityIdentifier("diary-day-more")
+                    } label: { Image(systemName: "ellipsis.circle") }.accessibilityLabel("المزيد").accessibilityIdentifier("diary-day-more").madarTourAnchor(.diaryBrowse)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if niyyaSaved, let token = app.undoToken, token.id == niyyaToken {
@@ -606,7 +606,7 @@ struct DiaryDayView: View {
                     DiaryInlineComposer(app: app, insertAt: $insertAt, anchor: $anchorLabel, edit: $inlineEdit, focusTick: $focusTick,
                                         expanded: $composerExpanded, page: page, margin: shownDay == today ? nil : shownDay,
                                         presetDay: writeDayPreset, saved: { Task { await refreshLines() } })
-                        .id(shownDay)
+                        .id(shownDay).madarTourAnchor(.diaryWrite)
                     if travel != nil {
                         Button { stampsOpen = true } label: {
                             Text("الأختام").font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 44).glassEffect(.regular.interactive(), in: .capsule)

@@ -234,6 +234,7 @@ struct MihbaraHomeView: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
         .madarTopClipped()
+        .madarTourScroll(proxy, ready: reading != nil, to: .bookAdd, .bookShelf)
         .onChange(of: scrollTarget) { _, target in handleScrollTargetChange(target, proxy: proxy) }
     }
     /// PDFs converting in the background, and those just finished («افتحه»).
@@ -626,12 +627,12 @@ struct MihbaraHomeView: View {
         let want = shelfBooks(r.books, "want"), finished = shelfBooks(r.books, "finished")
         return VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("مكتبتك").font(MadarTypography.cardTitle())
+                Text("مكتبتك").font(MadarTypography.cardTitle()).madarTourAnchor(.bookShelf)
                 Spacer()
                 Button { showingAddBook = true } label: {
                     if r.books.isEmpty { Image(systemName: "plus").frame(width: 44, height: 44) }
                     else { Label("أضف كتابًا", systemImage: "plus") }
-                }.accessibilityLabel("أضف كتابًا").accessibilityIdentifier("mihbara-add-paper")
+                }.accessibilityLabel("أضف كتابًا").accessibilityIdentifier("mihbara-add-paper").madarTourAnchor(.bookAdd)
             }
             if r.books.isEmpty {
                 emptyShelf(r)

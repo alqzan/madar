@@ -335,7 +335,7 @@ struct DiaryHomeView: View {
                 Text("المذكرات").font(DiaryType.title).accessibilityIdentifier("diary-home-title")
             }.frame(maxWidth: .infinity, alignment: .leading)
             Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
-            Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("أيامك").accessibilityIdentifier("diary-days")
+            Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("أيامك").accessibilityIdentifier("diary-days").madarTourAnchor(.diaryBrowse)
             Button { customizing = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle) }
                 .buttonStyle(.madarPlain).accessibilityLabel("خصّص المذكرات").accessibilityIdentifier("diary-customize")
         }.padding(.vertical, 4)
@@ -391,7 +391,7 @@ struct DiaryHomeView: View {
                 Button { writeToday(day.day) } label: {
                     Label("اكتب", systemImage: "pencil").font(MadarTypography.section())
                         .padding(.horizontal, 20).frame(minHeight: 48).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
-                }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-write")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-write").madarTourAnchor(.diaryWrite)
             }
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading)

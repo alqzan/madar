@@ -91,7 +91,7 @@ struct HabitsRoomView: View {
                 Spacer()
                 VStack(spacing:2) { Text("العادات").font(.custom("thmanyahserifdisplay-Bold",size:26,relativeTo:.title)).accessibilityIdentifier("habits-title"); MadarDateLabel(session.dateLabels(today,weekday:true),primaryFont:HabitType.fine(),secondaryFont:HabitType.fine()).foregroundStyle(theme.secondaryInk) }
                 Spacer()
-                Button { editor = .init(id:UUID()) } label: { Image(systemName:"plus").frame(width:44,height:44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("عادة جديدة").accessibilityIdentifier("habit-add")
+                Button { editor = .init(id:UUID()) } label: { Image(systemName:"plus").frame(width:44,height:44).glassEffect(.regular.interactive(), in: .circle) }.buttonStyle(.madarPlain).accessibilityLabel("عادة جديدة").accessibilityIdentifier("habit-add").madarTourAnchor(.habitAdd)
             }.padding(.horizontal,14).padding(.vertical,8)
                 // iPad with the sidebar folded: its «أظهر القائمة» button sits in this corner, so the add button steps inward.
                 .padding(.trailing, sidebarHidden && isPadWide(sizeClass) ? 56 : 0)
@@ -104,7 +104,7 @@ struct HabitsRoomView: View {
                     }
                     else if active.isEmpty { empty; roomHabits; archivedBlock }
                     else {
-                        periodSummaries
+                        periodSummaries.madarTourAnchor(.habitPeriods)
                         VStack(alignment:.leading,spacing:8) { dailySection; longerSection; archivedBlock }
                         if let chosen = selectedReading { story(chosen).id("habit-story") }
                         orbit

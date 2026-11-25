@@ -5,6 +5,7 @@ Run the UI class for every area the diff touches. Smoke env pairs are passed to 
 
 | Area (files) | Where the user meets it | End-to-end (MadarUITests) | Integration / package | Smoke env | Works when |
 |---|---|---|---|---|---|
+| Welcome and guided tour `FirstRunView`, `MadarTour`, `TabShell` | First launch, or «جولة مدار» in Settings | `FoundationUITests` first-launch and replay tour cases | `CityCatalogTests`, `CityLocatorTests` for city changes | `MADAR_UI_TOUR=1` | Optional name, city saves, spotlight follows the real controls through each room, progress resumes on relaunch, skip and replay work |
 | Lobby `BahwLobbyView`, `BahwBlocks`, `AppBahwService`, `TabShell` | Home tab «البهو», room blocks, suggestions | `BahwLobbyUITests`, `FoundationUITests`, `BahwCustomizeUITests` | `BahwAttentionTests` | `MADAR_UI_HABIT_FIXTURE=lobbySix` | Lobby opens, blocks show today's state, a tap opens its room |
 | Year `BahwYearView` | «السنة» and «ما يهمّك» | `BahwYearUITests` | `BahwPrayerIntegrationTests`, `BahwUpcomingPersistenceTests` | `MADAR_UI_HABIT_FIXTURE=lobbySix` | Filters count visible days, a new day appears after saving, and a short swipe leaves the day available |
 | Travel `BahwTravel`, `BahwLobbyView` | The travel pill in «البهو» | Travel cases in `BahwLobbyUITests` | `DiaryTravelIntegrationTests` | `MADAR_UI_TRAVEL_FIX=<fixture used by the UI class>` | A manual journey follows the selected cities and a detected journey distinguishes stops with the same name |

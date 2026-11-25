@@ -77,7 +77,7 @@ struct QuranHomeView: View {
                             }
                         } }
                     }
-                    if state.plan == nil { Button { showSetup = true } label: { Text("ابدأ خطة الحفظ").font(bodyFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).contentShape(Capsule()) }.accessibilityIdentifier("quran-start-plan") }
+                    if state.plan == nil { Button { showSetup = true } label: { Text("ابدأ خطة الحفظ").font(bodyFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).contentShape(Capsule()) }.accessibilityIdentifier("quran-start-plan").madarTourAnchor(.quranPlan) }
                     if state.plan != nil || !state.steps.isEmpty { path(state) }
     }
     private enum HomeDetail: Identifiable {
@@ -98,7 +98,7 @@ struct QuranHomeView: View {
         default: EmptyView()
         }
     }
-    var body: some View {
+    private var homeScroll: some View {
         ScrollView {
             if let error {
                 VStack(alignment: .leading, spacing: 12) {
@@ -173,6 +173,12 @@ struct QuranHomeView: View {
                     }
                 }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36).frame(maxWidth: wide ? 1100 : 700).frame(maxWidth: .infinity)
             } else if error == nil { ProgressView().frame(maxWidth: .infinity).padding(60) }
+        }
+    }
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            homeScroll.madarTourScroll(proxy, ready: state != nil, to: .mushaf, .quranPlan)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
         .madarTopClipped()
@@ -320,7 +326,7 @@ struct QuranHomeView: View {
             // FB-39: the plan (amount, reminder, rest day, missed-day choice) is always one tap away, not only behind a streak pill.
             if state.plan != nil {
                 Button { showPlan = true } label: { Label("خطّتك", systemImage: "slider.horizontal.3").font(bodyFont(12, bold: true)).frame(minHeight: 44) }
-                    .buttonStyle(.madarPlain).accessibilityIdentifier("quran-open-plan")
+                    .buttonStyle(.madarPlain).accessibilityIdentifier("quran-open-plan").madarTourAnchor(.quranPlan)
             } else {
                 Button { openMushaf(state) } label: {
                     Label("المصحف", systemImage: "book")
@@ -329,7 +335,7 @@ struct QuranHomeView: View {
                         .padding(.horizontal, 10)
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
-                }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-tool-mushaf")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-tool-mushaf").madarTourAnchor(.mushaf)
             }
         }.padding(.horizontal, 8)
     }
@@ -537,7 +543,7 @@ struct QuranHomeView: View {
             VStack(spacing: 12) {
                 HStack(alignment: .top, spacing: 4) {
                     if state.plan != nil {
-                        tool("المصحف", icon: "book", id: "mushaf") { openMushaf(state) }
+                        tool("المصحف", icon: "book", id: "mushaf") { openMushaf(state) }.madarTourAnchor(.mushaf)
                     }
                     tool("الفهرس", icon: "line.3.horizontal.decrease", id: "index") { showIndex = true }
                     tool("مراجعة حرة", icon: "arrow.left.arrow.right", id: "free") { showFree = true }

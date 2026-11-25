@@ -74,7 +74,7 @@ struct MoneyHomeView: View {
         } label: {
             Image(systemName: "plus").font(.system(size: 20, weight: .medium)).foregroundStyle(theme.ink)
                 .frame(width: 46, height: 46).glassEffect(.regular.interactive(), in: .circle).contentShape(Circle())
-        }.buttonStyle(.madarPlain).accessibilityLabel("سجّل مصروفًا").accessibilityIdentifier("money-expense-open")
+        }.buttonStyle(.madarPlain).accessibilityLabel("سجّل مصروفًا").accessibilityIdentifier("money-expense-open").madarTourAnchor(.expense)
     }
     /// The room's other doors as drawers of one desk, two to a row, most used first; settings close the desk.
     private var doors: some View {
@@ -124,8 +124,11 @@ struct MoneyHomeView: View {
     @State private var roomWidth: CGFloat = 0
     private var wide: Bool { isPadWide(sizeClass) && roomWidth >= 960 }
     var body: some View {
-        ScrollView { homeContent }
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
+        ScrollViewReader { proxy in
+            ScrollView { homeContent }
+                .madarTourScroll(proxy, ready: reading != nil, to: .expense, .moneyAccounts)
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { roomWidth = $0 }
         .madarTopClipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $envelopesOpen) { MoneyEnvelopesView(app: app, revealed: $revealed, initialEnvelopeID: $routedEnvelopeID, initialRouteRequestID: $routedEnvelopeRequestID) }
@@ -369,7 +372,7 @@ struct MoneyHomeView: View {
                 Button { guideOpen = true } label: { Text("إعداد استقبال رسائل البنك").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).contentShape(Rectangle()) }.accessibilityIdentifier("money-guide-open")
             } else {
                 Button { guideOpen = true } label: { Text("إعداد استقبال رسائل البنك").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink, in: Capsule()).foregroundStyle(theme.background).contentShape(Rectangle()) }.accessibilityIdentifier("money-guide-open")
-                Button { accountsOpen = true } label: { Text("أضف حسابك يدويًا").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).contentShape(Rectangle()) }.accessibilityIdentifier("money-first-account")
+                Button { accountsOpen = true } label: { Text("أضف حسابك يدويًا").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).contentShape(Rectangle()) }.accessibilityIdentifier("money-first-account").madarTourAnchor(.moneyAccounts)
                 Button { messagesOpen = true } label: { Text("ابدأ برسالة الراتب").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 46).glassEffect(.regular.interactive(), in: .capsule).contentShape(Rectangle()) }.accessibilityIdentifier("money-first-salary")
             }
             if reading.hasAccounts {

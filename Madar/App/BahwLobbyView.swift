@@ -226,7 +226,8 @@ struct BahwLobbyView: View {
     }
 
     private func presentAttention(force: Bool) {
-        guard scenePhase == .active, isFrontRoom, session.onboardingComplete, session.pendingIntro == nil,
+        guard scenePhase == .active, isFrontRoom, session.onboardingComplete,
+              session.pendingIntro == nil, !session.madarTour.pending, session.madarTour.step == nil,
               !session.yearOpen, session.moneyExpenseSeed == nil, !session.mihbaraOpen,
               !arranging, !drawerOpen, !searchOpen, travelSheet == nil, attention == nil else { return }
         #if DEBUG
@@ -244,6 +245,7 @@ struct BahwLobbyView: View {
             VStack(alignment: .leading, spacing: 4) {
                 MadarDateLabel(session.dateLabels(service.today, weekday: true)).foregroundStyle(theme.secondaryInk).accessibilityElement(children: .combine).accessibilityIdentifier("bahw-date")
                 Text(greeting).font(MadarTypography.title()).accessibilityAddTraits(.isHeader).accessibilityIdentifier("bahw-greeting")
+                    .madarTourAnchor(.welcome)
             }.frame(maxWidth: .infinity, alignment: .leading)
 
             // Owner 22 Nov 2026 («ابحث في مدار», approved): one search across the rooms. Pulling the lobby down stays the refresh.
@@ -257,6 +259,7 @@ struct BahwLobbyView: View {
             .buttonStyle(.madarPlain)
             .accessibilityLabel("ابحث في مدار")
             .accessibilityIdentifier("bahw-search")
+            .madarTourAnchor(.search)
 
             Button { withAnimation(.snappy) { arranging = true } } label: {
                 Text("رتّب")
@@ -267,6 +270,7 @@ struct BahwLobbyView: View {
             }
             .buttonStyle(.madarPlain)
             .accessibilityIdentifier("bahw-arrange-start")
+            .madarTourAnchor(.arrange)
 
             Button { session.selectedTab = "customize" } label: {
                 Image(systemName: "slider.horizontal.3")
@@ -278,10 +282,12 @@ struct BahwLobbyView: View {
             .buttonStyle(.madarPlain)
             .accessibilityLabel("خصّص مدار")
             .accessibilityIdentifier("bahw-customize")
+            .madarTourAnchor(.settingsDoor)
         }
     }
     private var greeting: String {
-        service.greeting
+        let name = session.madarTour.displayName
+        return name.isEmpty ? service.greeting : service.greeting + " يا " + MadarTour.isolate(name)
     }
 
     @ViewBuilder private func tile(_ block: BahwBlock, size: BahwBlockSize) -> some View {

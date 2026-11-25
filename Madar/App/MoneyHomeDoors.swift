@@ -29,7 +29,12 @@ struct MoneyHomeDoors: View {
                 }
                 GridRow {
                     drawer("البطاقات", "creditcard", "money-cards-open", fact: cardsFact, action: openCards)
-                    drawer("الحسابات", "tree", "money-accounts-open", fact: accountsFact, action: openAccounts)
+                    if let accountsFact {
+                        drawer("الحسابات", "tree", "money-accounts-open", fact: accountsFact, action: openAccounts)
+                            .madarTourAnchor(.moneyAccounts)
+                    } else {
+                        drawer("الحسابات", "tree", "money-accounts-open", action: openAccounts)
+                    }
                 }
                 GridRow {
                     drawer("المطابقة مع البنك", "checkmark.seal", "money-reconcile-open", fact: reconcileFact, action: openReconcile)

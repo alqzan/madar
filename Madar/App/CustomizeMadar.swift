@@ -50,6 +50,7 @@ struct CustomizeMadar: View {
                             }
                         }
                 }.padding(16).background(theme.surface, in: .capsule)
+                    .madarTourAnchor(.settingsSearch)
                 if missingSettingsRoute {
                     MadarCard {
                         Text("الإعداد غير موجود").font(MadarTypography.section())
@@ -98,6 +99,7 @@ struct CustomizeMadar: View {
             Button("أعِد الافتراضي", role: .destructive) { session.reset(AppSession.supportedKeys + ["bahw.layout"] + RoomHomeLayout.rooms.map { $0.0 + ".layout" }) }
         } message: { Text("يعود الشكل والترتيب والإعدادات. البيانات لا تُمسّ.") }
         .onChange(of: session.settingsRoute, initial: true) { _, route in showSettingsRoute(route, using: proxy) }
+        .madarTourScroll(proxy, to: .settingsSearch, .settingsWidgets, .settingsBackup)
         .task(id: highlightedSettingKey) {
             guard highlightedSettingKey != nil else { return }
             do { try await Task.sleep(for: .seconds(2)) } catch { return }
@@ -120,7 +122,7 @@ struct CustomizeMadar: View {
         let showsMihbara = session.roomEnabled(.mihbara) && matches("المحبرة")
         let showsMoney = session.roomEnabled(.mal) && matches("المال")
         let showsTafsir = session.roomEnabled(.quran) && matches("القرآن التفسير مكتبة التفاسير مرجع الورد")
-        let showsGuide = matches("دليل مدار خطوات البداية ترحيب تعرّف على الأقسام")
+        let showsTour = matches("جولة مدار الدليل خطوات البداية ترحيب تعرّف على الأزرار والأقسام")
         let showsLobby = matches("الودجات وأحجامها البهو الكتل")
         let showsWidgetMaker = MadarPlatform.hasHomeScreenWidgets && matches("صانع الودجة اصنع ودجة ودجاتي")
         let showsWidgetGallery = MadarPlatform.hasHomeScreenWidgets && matches("ودجات الشاشة الرئيسية خارج التطبيق")
@@ -133,20 +135,20 @@ struct CustomizeMadar: View {
         let sections = searchableSections.filter { section in
             (section != "الإشعارات" || MadarPlatform.hasNotifications) && definitions.contains { sectionFor($0.key) == section }
         }
-        let hasResult = showsMihbara || showsMoney || showsTafsir || showsGuide || showsLobby || showsWidgetMaker || showsWidgetGallery
+        let hasResult = showsMihbara || showsMoney || showsTafsir || showsTour || showsLobby || showsWidgetMaker || showsWidgetGallery
             || showsRoomLayouts || backup != nil || sync != nil || showsLegacyMove || !hits.isEmpty || !sections.isEmpty
 
-        if showsGuide {
-            NavigationLink {
-                MadarGuideView(openTab: { session.selectedTab = $0 })
+        if showsTour {
+            Button {
+                session.startMadarTour()
             } label: {
                 HStack {
-                    Label(MadarGuideView.title, systemImage: "book").font(MadarTypography.section())
+                    Label("جولة مدار", systemImage: "sparkle.magnifyingglass").font(MadarTypography.section())
                     Spacer()
                     Image(systemName: "chevron.left").accessibilityHidden(true)
                 }
                 .padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
-            }.buttonStyle(.madarPlain).accessibilityIdentifier("settings-search-guide")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("settings-search-tour")
         }
         if showsMihbara {
             Button { session.selectedTab = "mihbara" } label: {

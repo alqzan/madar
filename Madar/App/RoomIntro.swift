@@ -49,14 +49,14 @@ extension AppSession {
 
     /// The lobby's door: the first visit shows the introduction, later visits open the room.
     func requestOpen(_ block: BahwBlock) {
-        if block == .notes { markIntroSeen(block) }
+        if block == .notes || madarTour.completed { markIntroSeen(block) }
         if introNeeded(block) { pendingIntro = block } else { openRoom(block) }
     }
 
     func prepareRoomTab(_ tab: String) {
         guard let block = Self.roomTabs.first(where: { $0.tab == tab })?.block else { return }
         if !roomEnabled(block) && !roomWasOpenedBefore(block) { enableRoom(block) }
-        if block == .notes { markIntroSeen(block) }
+        if block == .notes || madarTour.completed { markIntroSeen(block) }
         if introNeeded(block) { pendingIntro = block }
     }
 

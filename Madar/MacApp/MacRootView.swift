@@ -22,11 +22,13 @@ struct MacRootView: View {
         let theme = RoomTheme(dark: dark, calmPaper: false)
         NavigationSplitView(columnVisibility: $columns) {
             MacSidebar(session: session)
+                .madarTourAnchor(.navigation)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 300)
         } detail: {
             MacRoomRoot(session: session, tab: session.selectedTab)
                 .id(session.selectedTab)
         }
+        .madarTourHost(session)
         .sheet(item: $session.moneyExpenseSeed, onDismiss: { session.presentNextMoneyExpenseSeed() }) { seed in
             MoneyQuickExpense(app: session, seed: seed).frame(minWidth: 520, minHeight: 560)
         }
@@ -34,13 +36,14 @@ struct MacRootView: View {
             RoomIntroSheet(session: session, block: block).environment(\.roomTheme, RoomTheme(room: block.themeRoom, dark: dark))
                 .frame(minWidth: 480, minHeight: 520)
         }
-        .sheet(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in })) {
+        .sheet(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in }),
+               onDismiss: { session.startPendingMadarTour() }) {
             FirstRunView(session: session).environment(\.roomTheme, theme).madarSheetErrorAlert(session)
                 .frame(minWidth: 560, minHeight: 640)
                 .interactiveDismissDisabled()
         }
         .onChange(of: session.selectedTab) { _, tab in
-            session.prepareRoomTab(tab)
+            if session.madarTour.step == nil { session.prepareRoomTab(tab) }
         }
         .onChange(of: session.mihbaraOpen) { _, open in
             // The Mihbara is a sidebar room on the Mac: a shared screen that asks for it selects that room.
@@ -55,6 +58,7 @@ struct MacRootView: View {
             Button("حسنًا") { session.errorMessage = nil }
         } message: { Text(session.errorMessage ?? "") }
         .task {
+            session.startPendingMadarTour()
             if !MacRooms.tabs.contains(where: { $0.id == session.selectedTab }) && session.selectedTab != "customize" { session.selectedTab = "foundation" }
             await session.applyProgressiveRoomsOnce()
             session.recordBahwReturnVisit()
