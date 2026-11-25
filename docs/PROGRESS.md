@@ -24,6 +24,8 @@
 
 ## Verified baseline and delivery
 
+- Build 0.1.0 (72) was archived, signed and uploaded to internal TestFlight on 25 November at 16:39:59 Riyadh. Source `031c217b`. The app, widget and Watch app are build 72 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-72/`.
+
 - Build 0.1.0 (71) was archived, signed and uploaded to internal TestFlight on 25 November at 11:45 Riyadh. Source `84da6d40`. The app, widget and Watch app are build 71 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-71/`.
 
 - Build 0.1.0 (70) was archived, signed and uploaded to internal TestFlight on 25 November at 00:33 Riyadh. Source `a66b5477`. App, widget and Watch app are build 70 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-70/`.
@@ -286,11 +288,11 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Not verified
 
-- قبول المالك على الأجهزة الفعلية، والتوافق الصوتي للقراءة على جهاز فعلي.
+- قبول المالك على الأجهزة الفعلية.
 
 ### Next
 
-- بناء TestFlight الداخلي ٠٫١٫٠ (٧٢)، وسجل تسليمه في `Madar/Artifacts/OWNER-TestFlight-72/`.
+- تسلّمت Apple بناء TestFlight الداخلي ٠٫١٫٠ (٧٢) الساعة ١٦:٣٩:٥٩ بتوقيت الرياض وبدأت معالجته. اجتاز الأرشيف فحص التوقيع وتحمِل أجزاؤه بناء ٧٢ وهدف 27.0. سجل التسليم في `Madar/Artifacts/OWNER-TestFlight-72/`.
 
 ### Model/effort
 
