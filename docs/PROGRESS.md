@@ -28,6 +28,8 @@
 
 ## Verified baseline and delivery
 
+- Build 0.1.0 (73) was archived, signed and uploaded to internal TestFlight on 25 November at 21:29 Riyadh. Source `04f8aad6`. App, widget and Watch app are build 73 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-73/`.
+
 - Build 0.1.0 (72) was archived, signed and uploaded to internal TestFlight on 25 November at 16:39:59 Riyadh. Source `031c217b`. The app, widget and Watch app are build 72 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-72/`.
 
 - Build 0.1.0 (71) was archived, signed and uploaded to internal TestFlight on 25 November at 11:45 Riyadh. Source `84da6d40`. The app, widget and Watch app are build 71 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-71/`.
@@ -296,7 +298,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Next
 
-- بناء TestFlight الداخلي ٠٫١٫٠ (٧٣). سجل الأرشفة والإرسال في `Madar/Artifacts/OWNER-TestFlight-73/`.
+- استلمت Apple بناء TestFlight الداخلي ٠٫١٫٠ (٧٣) الساعة ٢١:٢٩ بتوقيت الرياض وبدأت معالجته. اجتاز التوقيع، وتحمل أجزاؤه بناء ٧٣ وهدف 27.0. المحاولة الأولى توقفت خلال التجميع، وسجلها `archive-interrupted.log`. نجح الرفع بعد استئناف الأرشفة من المصدر نفسه. الأدلة في `Madar/Artifacts/OWNER-TestFlight-73/`.
 
 ### Model/effort
 
@@ -304,7 +306,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Usage
 
-- البداية ٧٣٪ متبقٍ لخمس ساعات و٧١٪ للأسبوع. قبل الأرشفة ٩٪ و٦١٪.
+- البداية ٧٣٪ متبقٍ لخمس ساعات و٧١٪ للأسبوع. قبل الأرشفة ٩٪ و٦١٪. تجددت نافذة الخمس ساعات أثناء الانقطاع، واستؤنف تسليم الدفعة بعد التحقق من غياب رفع سابق.
 
 ## Handover — ترحيب شخصي وجولة فوق الواجهة — 2026-11-25 — Codex
 
