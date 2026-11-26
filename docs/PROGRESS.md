@@ -36,6 +36,8 @@
 
 ## Verified baseline and delivery
 
+- Build 0.1.0 (75) was archived, signed and uploaded to internal TestFlight on 26 November at 09:48:50 Riyadh. Source `055d8d35`. The app, widget and Watch app carry build 75 and minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-75/`.
+
 - Build 0.1.0 (74) was archived, signed and uploaded to internal TestFlight on 25 November at 22:48:58 Riyadh. Source `99981880`. App, widget and Watch app are build 74 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-74/`.
 
 - Build 0.1.0 (73) was archived, signed and uploaded to internal TestFlight on 25 November at 21:29 Riyadh. Source `04f8aad6`. App, widget and Watch app are build 73 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-73/`.
