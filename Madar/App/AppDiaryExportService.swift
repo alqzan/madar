@@ -218,12 +218,31 @@ extension AppDiaryService {
             }, media: page.media)
         }
     }
-    /// B2-3: the rows are read on the main actor (the store is read through the session); everything after that
-    /// (PDF layout, photo re-encoding, hashing, zip) runs on a background task so the screen keeps responding.
+    @concurrent private static func readDiaryExportBatch(
+        _ options: DiaryExportOptions, container: ModelContainer, today: GregorianDay,
+        configuration: DiaryDayReadConfiguration
+    ) async throws -> DiaryExportPageBatch {
+        try readExportPageBatch(options, context: ModelContext(container), today: today, configuration: configuration)
+    }
+
+    /// Keep the archive read and file rendering off the main actor. The shared money lines are resolved through
+    /// the same main-actor reader used by the diary page, after revalidating the archive snapshot.
     func exportDiary(_ options:DiaryExportOptions) async throws -> DiaryExportArtifact {
         try authorizeRead()
-        let pages=try exportPages(options)
+        let container = app.container
+        let generation = app.storeGeneration
+        let configuration = dayReadConfiguration
+        let today = try await currentDayOffMain()
+        let batch = try await Self.readDiaryExportBatch(options, container: container, today: today, configuration: configuration)
+        try Task.checkCancellation()
+        try authorizeRead()
+        guard app.container === container, app.storeGeneration == generation else { throw CancellationError() }
+        let context = ModelContext(container)
+        let pages = try Self.finishExportPages(batch, context: context)
         guard !pages.isEmpty else{throw DataError.invalidValue("لا توجد كتابة في الفترة المختارة")}
+        let sealed = try context.fetchCount(FetchDescriptor<Letter>(predicate: #Predicate {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.state != "opened"
+        }))
         let root=FileManager.default.temporaryDirectory.appending(path:"DiaryExport/"+UUID().uuidString,directoryHint:.isDirectory)
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.protectionKey:FileProtectionType.complete])
         let zone=app.activePlace.timeZone,numerals:NumeralStyle=app.string("core.numerals") == "western" ? .western : .hindi
@@ -233,8 +252,9 @@ extension AppDiaryService {
                 try Self.buildExportFile(pages:pages,format:format,root:root,zone:zone,numerals:numerals,digits:digits)
             }
             let file=try await withTaskCancellationHandler{try await worker.value}onCancel:{worker.cancel()}
+            try Task.checkCancellation()
             try authorizeRead()
-            let sealed=try ModelContext(app.container).fetchCount(FetchDescriptor<Letter>(predicate:#Predicate{$0.deletedAt == nil && $0.mergedInto == nil && $0.state != "opened"}))
+            guard app.container === container else { throw CancellationError() }
             return .init(url:file,dayCount:pages.count,omittedNote:sealed>0 ? "لا يشمل "+Self.sealedLetters(sealed,digits:digits)+" لم تُفتح بعد." : nil)
         } catch {try? FileManager.default.removeItem(at:root);throw error}
     }

@@ -99,6 +99,41 @@ import XCTest
         app.terminate()
     }
 
+    func testTafsirStepperReturnsToAyahHeadingAfterScrolling() {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-24T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+            "MADAR_UI_QURAN_ROUTE": "madar://quran/page/2"
+        ]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.descendants(matching: .any)["quran-mushaf-page"].waitForExistence(timeout: 25))
+        app.tapCoordinate(x: 0.5, y: 0.5)
+        let tafsir = app.buttons["quran-mushaf-ayahs"]
+        XCTAssertTrue(tafsir.waitForExistence(timeout: 5))
+        tafsir.tap()
+
+        let scroll = app.scrollViews["quran-tafsir-scroll"]
+        let heading = app.descendants(matching: .any)["quran-tafsir-ayah-title"]
+        let close = app.buttons["quran-tafsir-close"]
+        let next = app.buttons["quran-tafsir-next"]
+        // The first two ayahs of al-Baqarah share a long passage in the bundled tafsir.
+        XCTAssertTrue(app.staticTexts["quran-tafsir-text-42-8"].waitForExistence(timeout: 10))
+        XCTAssertTrue(close.isHittable)
+        XCTAssertTrue(heading.label.contains("الآية ١"), heading.label)
+        for _ in 0..<3 where close.isHittable { scroll.swipeUp() }
+        XCTAssertFalse(close.isHittable, "Scroll far enough to move past the heading")
+        next.tap()
+
+        expectation(for: NSPredicate { _, _ in
+            close.isHittable && heading.exists && heading.label.contains("الآية ٢")
+        }, evaluatedWith: nil)
+        waitForExpectations(timeout: 5)
+    }
+
     func testLandscapeMushafTurnsOnlyToAnotherVisiblePageOrSpread() {
         continueAfterFailure = false
         let isPad = UIDevice.current.userInterfaceIdiom == .pad

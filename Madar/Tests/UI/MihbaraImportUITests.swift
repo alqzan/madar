@@ -100,8 +100,9 @@ import UIKit
             if imported.frame.minY > 125 && imported.frame.maxY < app.frame.maxY - 220 { break }
             if imported.frame.minY <= 125 { app.swipeDown(velocity: .slow) } else { app.swipeUp(velocity: .slow) }
         }
-        XCTAssertTrue(imported.isHittable, app.debugDescription)
-        imported.tap()
+        XCTAssertGreaterThan(imported.frame.minY, 125, app.debugDescription)
+        XCTAssertLessThan(imported.frame.maxY, app.frame.maxY - 220, app.debugDescription)
+        imported.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         if failFirstOpen {
             let retry = app.buttons["mihbara-pdf-retry"]
             XCTAssertTrue(retry.waitForExistence(timeout: 12), app.debugDescription)
@@ -130,10 +131,11 @@ import UIKit
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-page"].label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("٢ من ٢"), app.debugDescription)
         attach(app, "M6-V18-PDF-s1-L")
         app.buttons["mihbara-pdf-close"].tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-close"].waitForNonExistence(timeout: 12), app.debugDescription)
         XCTAssertTrue(imported.waitForExistence(timeout: 8))
-        let importedReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: imported)
-        XCTAssertEqual(XCTWaiter.wait(for: [importedReady], timeout: 12), .completed, app.debugDescription)
-        imported.tap()
+        XCTAssertGreaterThan(imported.frame.minY, 125, app.debugDescription)
+        XCTAssertLessThan(imported.frame.maxY, app.frame.maxY - 220, app.debugDescription)
+        imported.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(app.buttons["mihbara-pdf-close"].waitForExistence(timeout: 12))
         if failFirstOpen {
             let retry = app.buttons["mihbara-pdf-retry"]

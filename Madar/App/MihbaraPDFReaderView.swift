@@ -55,6 +55,7 @@ struct MihbaraPDFReaderView: View {
     private var paper: Color { readerTheme.background }
     private var ink: Color { readerTheme.ink }
     private var pageCount: Int { document?.pageCount ?? 0 }
+    private var readerCovered: Bool { searching || flowing }
     private var currentLabel: String? {
         guard let label = document?.page(at: pageIndex)?.label?.trimmingCharacters(in: .whitespacesAndNewlines),
               !label.isEmpty else { return nil }
@@ -118,6 +119,10 @@ struct MihbaraPDFReaderView: View {
         .onChange(of: canRead) { _, authorized in
             if authorized, scenePhase == .active { resume(at: Date()) }
             else if !authorized { searching = false; flowing = false; pause(at: Date()) }
+        }
+        .onChange(of: readerCovered) { _, covered in
+            if covered { pause(at: Date()) }
+            else { resume(at: Date()) }
         }
         .sheet(isPresented: $searching) {
             MihbaraPDFSearchView(app: app, book: book) { index in
@@ -266,9 +271,7 @@ struct MihbaraPDFReaderView: View {
             inkLayer = savedInk.map { makeInkLayer(saved: $0) }
             #endif
             pageIndex = startPage.map { min(max($0, 0), opened.pageCount - 1) } ?? restoredIndex(count: opened.pageCount)
-            let now = Date()
-            beginSegment(at: now)
-            readingClock = ActiveReadingClock(startedAt: now, foreground: scenePhase == .active && canRead)
+            resume(at: Date())
         } catch is CancellationError {
             return
         } catch { self.error = madarUserMessage(error) }
@@ -317,7 +320,7 @@ struct MihbaraPDFReaderView: View {
     }
 
     @MainActor private func resume(at now: Date) {
-        guard document != nil, canRead, scenePhase == .active, readingClock == nil else { return }
+        guard document != nil, canRead, scenePhase == .active, !readerCovered, !closing, readingClock == nil else { return }
         beginSegment(at: now)
         readingClock = ActiveReadingClock(startedAt: now)
     }

@@ -290,6 +290,8 @@ struct CustomizeMadar: View {
         guard !needle.isEmpty else { return [] }
         return session.schema.settings.filter { definition in
             guard AppSession.supportedKeys.contains(definition.key) else { return false }
+            if definition.key == "bahw.yearWhich" && !session.roomEnabled(.year) && definition.key != routedSettingKey { return false }
+            if definition.key == "bahw.upcomingCount" && !session.roomEnabled(.upcoming) && definition.key != routedSettingKey { return false }
             if definition.key == "core.hijriOffset" && session.string("core.hijriSource") != "sighting" && definition.key != routedSettingKey { return false }
             if ["notif.quietFrom", "notif.quietUntil"].contains(definition.key) && !session.bool("notif.quietAfterIsha") && definition.key != routedSettingKey { return false }
             return normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(needle)

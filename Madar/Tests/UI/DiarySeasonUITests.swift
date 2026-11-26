@@ -1,7 +1,32 @@
 import XCTest
 @MainActor final class DiarySeasonUITests:XCTestCase {
-    private func launch(_ variant:String,_ now:String,_ theme:String="light",styles:String?=nil)->XCUIApplication {
-        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":variant,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":theme,"MADAR_UI_NOW":now];if let styles{app.launchEnvironment["MADAR_UI_STYLE_SETTINGS"]=styles};app.launch();let opener=app.buttons["diary-today"].waitForExistence(timeout:25) ? app.buttons["diary-today"] : app.diaryOpener;XCTAssertTrue(opener.waitForExistence(timeout:10));opener.tap();XCTAssertTrue(app.staticTexts["diary-day-title"].waitForExistence(timeout:10));return app
+    private func launch(_ variant:String,_ now:String,_ theme:String="light",styles:String?=nil,environment: [String: String] = [:])->XCUIApplication {
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": variant,
+                                 "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": theme, "MADAR_UI_NOW": now]
+        if let styles { app.launchEnvironment["MADAR_UI_STYLE_SETTINGS"] = styles }
+        app.launchEnvironment.merge(environment) { _, value in value }
+        app.launch()
+        let opener = app.buttons["diary-today"].waitForExistence(timeout: 25) ? app.buttons["diary-today"] : app.diaryOpener
+        XCTAssertTrue(opener.waitForExistence(timeout: 10))
+        opener.tap()
+        XCTAssertTrue(app.staticTexts["diary-day-title"].waitForExistence(timeout: 10))
+        return app
+    }
+    func testWeekWritingCanRetryWhenTodaysPageCannotOpen() {
+        continueAfterFailure = false
+        let app = launch("today", "2026-10-16T16:00:00+03:00", environment: ["MADAR_UI_DIARY_WEEK_WRITE_FAILURE_ONCE": "1"])
+        app.buttons["diary-week-open"].tap()
+        let write = app.buttons["diary-week-write"]
+        XCTAssertTrue(write.waitForExistence(timeout: 10))
+        write.tap()
+
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        XCTAssertTrue(alert.staticTexts["تعذّر فتح صفحة اليوم للكتابة. حاول مرة أخرى."].exists)
+        alert.buttons.firstMatch.tap()
+        write.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10))
     }
     func testFridayFrameAndActualWeekRoute() throws {
         continueAfterFailure=false

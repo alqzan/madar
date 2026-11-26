@@ -46,6 +46,9 @@ struct QuranAyahTafsirSheet: View {
             .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 96)
         }
         .scrollIndicators(.hidden)
+        .accessibilityIdentifier("quran-tafsir-scroll")
+        // A step between ayahs starts at the heading, even when both share the same passage.
+        .id(ayahID)
         .safeAreaInset(edge: .bottom) { stepper }
         .foregroundStyle(theme.ink)
         .environment(\.layoutDirection, .rightToLeft)

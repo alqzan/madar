@@ -101,6 +101,45 @@ final class LockedFlags: @unchecked Sendable {
         XCTAssertEqual(seen.values, [false, false, false])
     }
 
+    func testExportDiscardsTheFileWhenTheActiveStoreChangesDuringRendering() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryExportRebind-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let original = try MadarContainerFactory.makeLocal(at: root.appending(path: "Original"))
+        let replacement = try MadarContainerFactory.makeLocal(at: root.appending(path: "Replacement"))
+        let app = try AppSession(container: original, groupDirectory: root)
+        app.authorizeProtectedData()
+        let context = ModelContext(original)
+        let entry = Entry()
+        entry.dayKey = "2024-03-11"
+        entry.text = "صفحة من السجل السابق"
+        context.insert(entry)
+        try context.save()
+
+        let service = AppDiaryService(app: app)
+        let exportDirectory = FileManager.default.temporaryDirectory.appending(path: "DiaryExport")
+        let existing = Set((try? FileManager.default.contentsOfDirectory(atPath: exportDirectory.path)) ?? [])
+        let rendering = expectation(description: "Export is rendering the original store")
+        let gate = DispatchSemaphore(value: 0)
+        AppDiaryService.exportBuildProbe = {
+            rendering.fulfill()
+            _ = gate.wait(timeout: .now() + 10)
+        }
+        defer { AppDiaryService.exportBuildProbe = nil }
+
+        let task = Task { try await service.exportDiary(.init(format: "markdown", year: 2024)) }
+        await fulfillment(of: [rendering], timeout: 10)
+        app.bindContainer(replacement)
+        gate.signal()
+        do {
+            let file = try await task.value
+            try? FileManager.default.removeItem(at: file.url.deletingLastPathComponent())
+            XCTFail("An old store’s export must not be presented after the store changes")
+        } catch is CancellationError {
+            let remaining = Set(try FileManager.default.contentsOfDirectory(atPath: exportDirectory.path))
+            XCTAssertTrue(remaining.subtracting(existing).isEmpty, "The cancelled export must remove its temporary file")
+        }
+    }
+
     func testFrozenSourcesMediaSealedExclusionAndOutputFormats() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"DiaryExportTest-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),app=try AppSession(container:container,groupDirectory:root),service=AppDiaryService(app:app)

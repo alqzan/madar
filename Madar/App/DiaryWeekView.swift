@@ -9,9 +9,12 @@ struct DiaryWeekView:View {
     @Environment(\.roomTheme) private var theme
     @State private var days:[DiaryDaySummary]?
     @State private var reader:GregorianDay?
-    @State private var writing=false
+    @State private var writingDay: GregorianDay?
     @State private var failure:String?
     @State private var retry = 0
+#if DEBUG
+    @State private var injectedWritingFailure = false
+#endif
     private var service:AppDiaryService{.init(app:app)}
     var body:some View {
         NavigationStack {
@@ -23,7 +26,9 @@ struct DiaryWeekView:View {
                 } else if let days {
                     if days.isEmpty {Text("لم تُكتب صفحات هذا الأسبوع بعد.").font(DiaryType.writing)}
                     ForEach(days){row in Button{reader=row.day}label:{VStack(alignment:.leading,spacing:8){MadarDateLabel(service.bothDates(row.day,calendar:app.diaryFirstCalendar)).font(DiaryType.label);Text(row.excerpt).font(DiaryType.writing).lineLimit(4)}.frame(maxWidth:.infinity,alignment:.leading).padding(16).background(theme.surface,in:.rect(cornerRadius:16)).contentShape(.rect)}.buttonStyle(.madarPlain).accessibilityIdentifier("diary-week-day-"+row.id)}
-                    Button {writing=true} label: { Text("اكتب عن أسبوعك").font(DiaryType.heading).frame(minHeight:54).contentShape(Rectangle()) }.accessibilityIdentifier("diary-week-write")
+                    Button(action: openWriting) {
+                        Text("اكتب عن أسبوعك").font(DiaryType.heading).frame(minHeight: 54).contentShape(Rectangle())
+                    }.accessibilityIdentifier("diary-week-write")
                 } else if let failure {
                     Text(failure).font(DiaryType.label)
                     Button("حاول مرة أخرى") { retry += 1 }.frame(minHeight: 44)
@@ -35,14 +40,37 @@ struct DiaryWeekView:View {
                 .toolbar{ToolbarItem(placement:.topBarLeading){Button("الصفحة"){dismiss()}.accessibilityIdentifier("diary-week-close")}}.tint(theme.accent)
                 .task(id: "\(app.prayerRevision)-\(retry)-\(app.protectedDataAuthorized)") { await loadWeek() }
                 .sheet(isPresented:Binding(get:{reader != nil},set:{if !$0{reader=nil}})){if let reader{DiaryDayView(app:app,day:reader,showsNavigationTools:false).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}}
-                .sheet(isPresented:$writing){if let today=try? service.currentDay(){DiaryDayView(app:app,day:today,focusComposerOnOpen:true,showsNavigationTools:false).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}}
+                .sheet(isPresented: Binding(get: { writingDay != nil }, set: { if !$0 { writingDay = nil } })) {
+                    if let writingDay {
+                        DiaryDayView(app: app, day: writingDay, focusComposerOnOpen: true, showsNavigationTools: false)
+                            .environment(\.roomTheme, theme)
+                            .madarSheetErrorAlert(app)
+                    }
+                }
+        }
+        .madarSheetErrorAlert(app)
+    }
+
+    private func openWriting() {
+        do {
+#if DEBUG
+            if !injectedWritingFailure,
+               ProcessInfo.processInfo.environment["MADAR_UI_DIARY_WEEK_WRITE_FAILURE_ONCE"] == "1" {
+                injectedWritingFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+#endif
+            writingDay = try service.currentDay()
+        } catch {
+            app.errorMessage = "تعذّر فتح صفحة اليوم للكتابة. حاول مرة أخرى."
         }
     }
+
     private func loadWeek() async {
         guard app.protectedDataAuthorized else {
             days = nil
             reader = nil
-            writing = false
+            writingDay = nil
             return
         }
         failure = nil

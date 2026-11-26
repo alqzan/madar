@@ -618,8 +618,7 @@ import UIKit
         let checksRoomBar = UIDevice.current.userInterfaceIdiom == .phone
         if checksRoomBar { XCTAssertTrue(roomBar.exists) }
         scrollBackupForm(to: password, in: app)
-        password.tap()
-        if !keyboardDone.waitForExistence(timeout: 3) { password.tap() }
+        password.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5), app.debugDescription)
         if checksRoomBar { XCTAssertTrue(roomBar.waitForNonExistence(timeout: 5)) }
         // XCTest's secure input is limited to characters in the active Arabic keyboard layout.
@@ -651,13 +650,13 @@ import UIKit
             let export = app.buttons["backup-now"]
             let password = app.secureTextFields["backup-password"]
             scrollBackupForm(to: password, in: app, towardsTop: true)
-            password.tap()
+            password.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             let keyboardDone = app.buttons["backup-keyboard-done"]
             XCTAssertTrue(keyboardDone.waitForExistence(timeout: 10), app.debugDescription)
             password.typeText(passphrase)
             attachScreenshot(app, named: "M0-backup-before-confirmation-\(size)")
             XCTAssertEqual(keyboardDone.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=0;matches=false;busy=false;can-export=false", "Validate first-field input before submitting or changing focus.")
-            // Exercise native Next while the keyboard changes the Form's visible area,
+            // Exercise native Next while the keyboard changes the visible area,
             // instead of tapping a row whose frame may be outside that area.
             password.typeText("\n")
             let confirmation = app.secureTextFields["backup-password-confirmation"]
@@ -679,8 +678,7 @@ import UIKit
             attachScreenshot(app, named: "M0-backup-native-export-\(size)")
 
             app.terminate(); app.launch(); openBackupSettings(app)
-            // The setup notice is below the fields. Materialize its section before
-            // asserting absence, so an offscreen cell cannot masquerade as persistence.
+            // Bring the export card into view before checking that its setup notice is absent.
             scrollBackupForm(to: app.buttons["backup-now"], in: app)
             XCTAssertFalse(keySetup.exists, "The same fixture must retain its configured key after relaunch.")
             app.terminate()
@@ -907,25 +905,27 @@ import UIKit
         link.tap()
         XCTAssertTrue(app.navigationBars["النسخ والاستعادة"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons["backup-schedule"].waitForExistence(timeout: 10), app.debugDescription)
-        // AX3's plain-export section pushes password cells out of the Form's
-        // accessibility tree. Scroll the actual Form before requiring the field.
-        scrollBackupForm(to: app.secureTextFields["backup-password"], in: app)
     }
     private func scrollBackupForm(to element: XCUIElement, in app: XCUIApplication, towardsTop: Bool = false) {
-        let form = app.scrollViews.firstMatch // The backup screen is a Madar paper scroll view, not a grouped Form.
-        XCTAssertTrue(form.waitForExistence(timeout: 10), app.debugDescription)
-        for _ in 0..<12 {
-            if elementIsOnscreenAndHittable(element, in: app) { return }
-            if element.exists {
-                // A materialized offscreen row gives the direction; otherwise the
-                // caller supplies the known section order for virtualized cells.
-                if element.frame.midY < form.frame.midY { form.swipeDown() }
-                else { form.swipeUp() }
-            } else if towardsTop { form.swipeDown() }
-            else { form.swipeUp() }
+        let navigation = app.navigationBars["النسخ والاستعادة"].frame
+        let roomBar = app.tabBars["fixed-tab-bar"]
+        let top = navigation.maxY
+        let bottom = roomBar.exists ? roomBar.frame.minY : app.frame.maxY
+        let midpoint = (top + bottom) / 2
+        for _ in 0..<8 {
+            let frame = element.exists ? element.frame : .null
+            // Secure fields can have an invalid XCTest activation point while visible.
+            // The callers tap the rendered field and assert that the keyboard opened.
+            if !frame.isEmpty, frame.minY >= top, frame.maxY <= bottom { return }
+            let maxDrag = (bottom - top) / 2
+            let distance = frame.isNull ? (towardsTop ? maxDrag : -maxDrag)
+                : min(maxDrag, max(-maxDrag, midpoint - frame.midY))
+            let start = app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: app.frame.width / 2, dy: midpoint - distance / 2))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: distance)),
+                        withVelocity: .slow, thenHoldForDuration: 0)
         }
-        XCTAssertTrue(element.exists, app.debugDescription)
-        XCTAssertTrue(elementIsOnscreenAndHittable(element, in: app), app.debugDescription)
+        XCTFail("Could not bring \(element) into the backup viewport. \(app.debugDescription)")
     }
     private func openPlainExportSettings(_ app: XCUIApplication) {
         finishOnboarding(app)

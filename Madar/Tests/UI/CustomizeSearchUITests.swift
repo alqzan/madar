@@ -142,6 +142,48 @@ import XCTest
         XCTAssertFalse(app.buttons["money-open"].exists)
     }
 
+    func testYearAndUpcomingSearchFollowLobbyVisibility() {
+        continueAfterFailure = false
+        let (app, search) = openSearch()
+        let clear = app.buttons["settings-clear-search"]
+        let settings = [(block: "year", key: "bahw.yearWhich"), (block: "upcoming", key: "bahw.upcomingCount")]
+
+        func option(for key: String) -> XCUIElement {
+            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "option-\(key)-")).firstMatch
+        }
+
+        for setting in settings {
+            search.tap()
+            search.typeText(setting.key + "\n")
+            XCTAssertTrue(option(for: setting.key).waitForExistence(timeout: 5), app.debugDescription)
+            clear.tap()
+        }
+
+        search.tap()
+        search.typeText("البهو\n")
+        for setting in settings {
+            let visibility = app.switches["bahw-custom-visible-" + setting.block]
+            XCTAssertTrue(visibility.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertEqual(visibility.value as? String, "1")
+            for _ in 0..<8 where visibility.frame.maxY > app.frame.maxY - 130 {
+                app.swipeUp(velocity: .slow)
+            }
+            visibility.tap()
+            let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "0"), object: visibility)
+            XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed, app.debugDescription)
+        }
+
+        for _ in 0..<8 where clear.frame.minY < 100 { app.swipeDown(velocity: .slow) }
+        clear.tap()
+        for setting in settings {
+            search.tap()
+            search.typeText(setting.key + "\n")
+            XCTAssertTrue(emptyResult(in: app).waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertFalse(option(for: setting.key).exists)
+            clear.tap()
+        }
+    }
+
     private func openSearch() -> (XCUIApplication, XCUIElement) {
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "empty", "MADAR_UI_THEME": "light"]
