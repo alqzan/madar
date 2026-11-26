@@ -219,6 +219,67 @@ import UIKit
         XCTAssertTrue(progress.label.contains("٣٠ دقيقة"), progress.label)
     }
 
+    func testRenamingHabitKeepsReminderWithoutAFixedTime() {
+        continueAfterFailure = false
+        let app = app("empty")
+        open(app)
+        app.buttons["habit-first"].tap()
+        let name = app.textFields["habit-name"]
+        let save = app.buttons["habit-save"]
+        let advanced = app.buttons["habit-advanced"]
+        let reminder = app.buttons["habit-reminder"]
+        let window = app.switches["habit-time-window"]
+
+        func reveal(_ element: XCUIElement) {
+            for _ in 0..<6 where !element.isHittable { app.swipeUp(velocity: .slow) }
+            XCTAssertTrue(element.isHittable, app.debugDescription)
+        }
+        func editHabit(named name: String) {
+            let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", name + "،")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
+            openDetail(app, row)
+            let edit = app.buttons["habit-edit"]
+            reveal(edit)
+            edit.tap()
+        }
+        func assertLearnedReminder() {
+            reveal(window)
+            XCTAssertEqual(window.value as? String, "0")
+            let hint = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "بلا وقت محدد يتعلّم مدار وقتك")).firstMatch
+            XCTAssertTrue(hint.exists, app.debugDescription)
+        }
+
+        XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
+        name.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        name.typeText("أذكار هادئة\n")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        reveal(advanced)
+        advanced.tap()
+        if !reminder.waitForExistence(timeout: 3), advanced.isHittable { advanced.tap() }
+        XCTAssertTrue(reminder.waitForExistence(timeout: 5), app.debugDescription)
+        reveal(reminder)
+        reminder.tap()
+        app.buttons["إشعار لطيف"].tap()
+        // Choosing push offers a fixed time. Turn it off to use the habit's learned reminder.
+        for _ in 0..<6 where !window.isHittable { app.swipeDown(velocity: .slow) }
+        XCTAssertTrue(window.isHittable, app.debugDescription)
+        XCTAssertEqual(window.value as? String, "1")
+        window.tap()
+        save.tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 10))
+
+        editHabit(named: "أذكار هادئة")
+        XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
+        name.tap()
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 20) + "أذكار المساء")
+        save.tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 10))
+
+        editHabit(named: "أذكار المساء")
+        assertLearnedReminder()
+    }
+
     /// FB-35 (owner, 5 Nov): Madar's own habits wait in the habits room; one tap opens the editor on that source, and a
     /// habit already kept is not offered again.
     func testRoomHabitsAreOfferedAndLeaveOnceAdded() throws {

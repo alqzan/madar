@@ -168,6 +168,71 @@ import XCTest
         XCTAssertTrue(saved.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(date.evaluate(with: saved), saved.label)
     }
+
+    func testSavedDaysCanBeReadAgainAndDirtyEditorAsksBeforeClosing() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_HABIT_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-25T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        let add = app.buttons["bahw-add-day"]
+        func openYear() {
+            let block = app.descendants(matching: .any)["bahw-block-year"].firstMatch
+            XCTAssertTrue(block.waitForExistence(timeout: 25))
+            for _ in 0..<6 where !block.isHittable { app.swipeUp(velocity: .slow) }
+            XCTAssertTrue(block.isHittable)
+            block.tap()
+            XCTAssertTrue(add.waitForExistence(timeout: 10))
+            for _ in 0..<6 where !add.isHittable { app.swipeUp(velocity: .slow) }
+            XCTAssertTrue(add.isHittable, app.debugDescription)
+        }
+        app.launch()
+        openYear()
+        add.tap()
+        let title = app.textFields["bahw-day-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        title.typeText("موعد محفوظ\n")
+        let save = app.buttons["bahw-day-save"]
+        for _ in 0..<6 where !save.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(save.isHittable)
+        save.tap()
+        XCTAssertTrue(title.waitForNonExistence(timeout: 10))
+        app.terminate()
+
+        app.launchEnvironment["MADAR_UI_YEAR_DAYS_READ_FAILURE_ONCE"] = "1"
+        app.launch()
+        openYear()
+        app.buttons["أيامي"].tap()
+        let retry = app.buttons["bahw-days-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["لم تضف يومًا بعد. أضف يومًا يهمّك ليظهر هنا."].exists)
+        let recoveryShot = XCTAttachment(screenshot: app.screenshot())
+        recoveryShot.name = "bahw-year-days-read-retry"
+        recoveryShot.lifetime = .keepAlways
+        self.add(recoveryShot)
+        retry.tap()
+        XCTAssertTrue(retry.waitForNonExistence(timeout: 5))
+        let saved = app.buttons["bahw-matter-موعد محفوظ"]
+        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        for _ in 0..<5 where !saved.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(saved.isHittable)
+        saved.tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        title.typeText(" للتعديل\n")
+        let cancel = app.buttons["bahw-day-cancel"]
+        cancel.tap()
+        let keep = app.alerts.buttons["أكمل التعديل"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 5))
+        keep.tap()
+        XCTAssertEqual(title.value as? String, "موعد محفوظ للتعديل")
+        cancel.tap()
+        app.alerts.buttons["تجاهل التعديل"].tap()
+        XCTAssertTrue(title.waitForNonExistence(timeout: 8))
+        XCTAssertTrue(saved.exists)
+    }
     /// Owner, 25 Oct: a passed one-time day with «واصل العدّ بعد الموعد» stays and shows the days since it.
     func testPassedOneTimeDayKeepsCountingWhenAsked() throws {
         continueAfterFailure = false

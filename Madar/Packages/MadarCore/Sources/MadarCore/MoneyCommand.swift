@@ -14,15 +14,23 @@ public enum MoneyCommandPayload {
     public static let maxRepaySalaries = 12
     /// M5-X00: the budget-ignore stamp's optional reason.
     public static let maxReasonLength = 120
+    public static let maxObligationInstallments = 120
+    private static let maximumExactInteger = 9_007_199_254_740_991
 
     public static func integer(_ value: JSONValue?) -> Int? {
         switch value {
         case .string(let raw):
-            guard let n = Int(raw), n >= -9_007_199_254_740_991, n <= 9_007_199_254_740_991 else { return nil }
+            guard let n = Int(raw), (-maximumExactInteger...maximumExactInteger).contains(n) else { return nil }
             return n
-        case .number(let n) where n.isFinite && n.rounded() == n && abs(n) <= 9_007_199_254_740_991: return Int(n)
+        case .number(let n) where n.isFinite && n.rounded() == n && abs(n) <= Double(maximumExactInteger): return Int(n)
         default: return nil
         }
+    }
+
+    /// Fixed installments must fit exactly in the record bridge even for the longest plan.
+    public static func acceptsObligationAmount(_ minor: Int, recurring: Bool) -> Bool {
+        let limit = recurring ? maximumExactInteger : maximumExactInteger / maxObligationInstallments
+        return (1...limit).contains(minor)
     }
 
     public static func date(_ value: JSONValue?) -> Date? {
@@ -126,7 +134,8 @@ public enum MoneyCommandPayload {
             // A bill or subscription repeating every N days/weeks/months/years from a free first due day (M5-X00), or the
             // older monthly bill on a day; a loan / instalment plan of equal instalments from a first due day, monthly
             // unless an interval is given.
-            guard Set(p.keys).isSubset(of: ["kind", "name", "amountMinor", "dueDay", "count", "firstDue", "repeatEvery", "repeatUnit"]), text("name", max: 60), positive("amountMinor") else { return false }
+            guard Set(p.keys).isSubset(of: ["kind", "name", "amountMinor", "dueDay", "count", "firstDue", "repeatEvery", "repeatUnit"]), text("name", max: 60),
+                  let amount = integer(p["amountMinor"]) else { return false }
             let hasFirst: Bool = { if case .string(let first) = p["firstDue"] { (try? GregorianDay(first)) != nil } else { false } }()
             let interval: Bool? = {
                 if p["repeatEvery"] == nil && p["repeatUnit"] == nil { return nil }
@@ -135,12 +144,13 @@ public enum MoneyCommandPayload {
             }()
             if interval == false { return false }
             if choices("kind", ["bill", "subscription"]) {
-                guard p["count"] == nil else { return false }
+                guard p["count"] == nil, acceptsObligationAmount(amount, recurring: true) else { return false }
                 if interval == true { return p["dueDay"] == nil && hasFirst }
                 return choices("kind", ["bill"]) && p["firstDue"] == nil && (integer(p["dueDay"]).map { (1...31).contains($0) } ?? false)
             }
-            guard choices("kind", ["loan", "installment"]), p["dueDay"] == nil, (integer(p["count"]).map { (1...120).contains($0) } ?? false), hasFirst else { return false }
-            return integer(p["amountMinor"]).map { $0 <= 9_007_199_254_740_991 / 120 } ?? false
+            guard choices("kind", ["loan", "installment"]), p["dueDay"] == nil,
+                  (integer(p["count"]).map { (1...maxObligationInstallments).contains($0) } ?? false), hasFirst else { return false }
+            return acceptsObligationAmount(amount, recurring: false)
         case "money.confirmSalary":
             return Set(p.keys).isSubset(of: ["id", "remainderTo"]) && id("id") && (p["remainderTo"] == nil || choices("remainderTo", ["surplus", "reserve"]))
         case "money.forgetMerchantRule": return Set(p.keys) == ["id"] && id("id")

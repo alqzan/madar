@@ -192,7 +192,7 @@ struct HabitEditorView:View {
                                 .font(MadarTypography.caption()).frame(minHeight:44).contentShape(Rectangle())
                         }.buttonStyle(.plain).accessibilityIdentifier("habit-advanced")
                         if advancedOpen {
-                        Toggle("له وقت في اليوم",isOn:$windowOn).frame(minHeight:44)
+                        Toggle("له وقت في اليوم",isOn:$windowOn).frame(minHeight:44).accessibilityIdentifier("habit-time-window")
                         if windowOn {
                             Picker("البداية من",selection:Binding(get:{rule.windowAnchor?.rawValue ?? "clock"},set:{rule.windowAnchor=Prayer(rawValue:$0)})) { Text("الساعة المحلية").tag("clock");ForEach(Prayer.allCases,id:\.self){p in Text(prayerName(p)).tag(p.rawValue)} }.pickerStyle(.menu)
                             if rule.windowAnchor == nil {
@@ -211,7 +211,7 @@ struct HabitEditorView:View {
                                 Text("يتغيّر وقتها من أول رمضان، ويعود وقتها المعتاد في أول شوال، في رمضانين قادمين. أي تعديل لاحق يلغي هذه الخطوات.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                             }
                         }
-                        if rule.measure != .abstain { Picker("التذكير",selection:$reminder){
+                        if rule.measure != .abstain { Picker("التذكير",selection:Binding(get: { reminder }, set: selectReminder)){
                             Text("نقطة في البهو").tag("dot")
                             if source == "custom" || (reading != nil && reminder == "push") { Text("إشعار لطيف").tag("push") }
                             Text("بلا تذكير").tag("none")
@@ -228,8 +228,6 @@ struct HabitEditorView:View {
                 }.padding(20)
             }
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.timeZone,session.activePlace.timeZone)
-        // Lives here, not on the picker: the picker is folded away under «متقدم», and a push reminder still needs its time.
-        .onChange(of:reminder){ _,new in if new == "push" && source == "custom" { windowOn = true } }
         .task(id:source) {
             guard source == "reading" else { return }
             let service=AppMihbaraService(app:session)
@@ -252,10 +250,11 @@ struct HabitEditorView:View {
             initialRule.effectiveFrom=editStart
             let initialMonthDays = initialRule.monthDays.map{digits.string($0)}.joined(separator:"، ")
             let initialMinimumOn = initialRule.minimum != nil
-            let initialWindowOn = initialRule.windowStart != nil
             let initialHomeOnly = reading?.homeOnly ?? false
             let defaultReminder = session.string("bahw.reminder")
             let initialReminder = jamaahPreset || fastPreset ? "push" : reading?.reminder ?? (["dot", "push", "none"].contains(defaultReminder) ? defaultReminder : "dot")
+            // A saved push reminder without a time learns from the habit's history.
+            let initialWindowOn = initialRule.windowStart != nil || (reading == nil && initialSource == "custom" && initialReminder == "push")
             advancedOpen = initialWindowOn || initialHomeOnly || initialReminder != "dot" || !initialRule.restWeekdays.isEmpty
             name=initialName;source=initialSource;rule=initialRule;monthDays=initialMonthDays;minimumOn=initialMinimumOn;windowOn=initialWindowOn;homeOnly=initialHomeOnly;reminder=initialReminder
             initialSnapshot = .init(name:initialName,source:initialSource,rule:initialRule,monthDays:initialMonthDays,minimumOn:initialMinimumOn,windowOn:initialWindowOn,homeOnly:initialHomeOnly,reminder:initialReminder)
@@ -279,6 +278,11 @@ struct HabitEditorView:View {
             }
         }
         .madarSheetLock(saving: busy, draft: hasUnsavedChanges)
+    }
+    private func selectReminder(_ value: String) {
+        guard reminder != value else { return }
+        reminder = value
+        if value == "push" && source == "custom" { windowOn = true }
     }
     /// Switching back from minutes to a count drops the «minutes» unit, so a count habit never reads as time.
     private func selectMeasure(_ value: HabitMeasure) {

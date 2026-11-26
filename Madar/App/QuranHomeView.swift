@@ -16,6 +16,7 @@ struct QuranHomeView: View {
     @Environment(\.isFrontRoom) private var isFrontRoom
     @State private var state: QuranRoomState?
     @State private var error: String?
+    @State private var homeReadFailed = false
     @State private var showUnreadableDraftConfirmation = false
     @State private var detail: HomeDetail?
     @State private var active: QuranUISessionState?
@@ -53,6 +54,7 @@ struct QuranHomeView: View {
 #endif
     #if DEBUG
     @State private var injectedRouteReadFailure = false
+    @State private var injectedHomeReadFailure = false
     #endif
     @ViewBuilder private func planContent(_ state: QuranRoomState) -> some View {
                     if let draft = state.draft {
@@ -100,15 +102,15 @@ struct QuranHomeView: View {
     }
     private var homeScroll: some View {
         ScrollView {
-            if let error {
+            if homeReadFailed {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(error).font(bodyFont(14)).fixedSize(horizontal: false, vertical: true)
-                    Button("حاول مرة أخرى") {
-                        if pendingQuranRoute != nil {
-                            acknowledgeError(retryRoute: true)
-                        } else { acknowledgeError(refreshIfNeeded: true) }
+                    Text("تعذّرت قراءة صفحة القرآن.").font(bodyFont(14)).fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        run(refresh: true) { try await refresh() }
+                    } label: {
+                        Text("حاول مرة أخرى").font(bodyFont(14, bold: true)).frame(minHeight: 44).contentShape(.rect)
                     }
-                    .font(bodyFont(14, bold: true))
+                    .disabled(busy)
                     .accessibilityIdentifier("quran-home-retry")
                 }
                 .padding(16)
@@ -172,7 +174,7 @@ struct QuranHomeView: View {
                         ForEach(blocks, id: \.self) { block($0, state) }
                     }
                 }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36).frame(maxWidth: wide ? 1100 : 700).frame(maxWidth: .infinity)
-            } else if error == nil { ProgressView().frame(maxWidth: .infinity).padding(60) }
+            } else if !homeReadFailed { ProgressView().frame(maxWidth: .infinity).padding(60) }
         }
     }
 
@@ -187,11 +189,7 @@ struct QuranHomeView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .environment(\.roomTheme, theme)
         .accessibilityIdentifier("quran-home")
-        .task(id: roomVisit) {
-            do { try await refresh() }
-            catch is CancellationError { }
-            catch { if !Task.isCancelled { self.error = quranUserMessage(error) } }
-        }
+        .task(id: roomVisit) { run(refresh: true) { try await refresh() } }
         // Back from the lock screen or past midnight, «مسار اليوم» and a missed day reflect the day it is now.
         .onChange(of: scenePhase) { _, phase in if phase == .active, active == nil, isFrontRoom { run(refresh: true) { try await refresh() } } }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in if active == nil { run(refresh: true) { try await refresh() } } }
@@ -566,10 +564,25 @@ struct QuranHomeView: View {
         let generation = UUID()
         refreshGeneration = generation
         let previous = state?.hifzAmounts ?? [:]
-        var loaded = try await service.loadState(deferHifzAmounts: true)
+        var loaded: QuranRoomState
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedHomeReadFailure, environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               environment["MADAR_UI_QURAN_HOME_READ_FAILURE_ONCE"] == "1" {
+                injectedHomeReadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            loaded = try await service.loadState(deferHifzAmounts: true)
+        } catch {
+            guard !Task.isCancelled, refreshGeneration == generation else { return }
+            throw error
+        }
         guard !Task.isCancelled, refreshGeneration == generation else { return }
         loaded.hifzAmounts = previous
         state = loaded
+        homeReadFailed = false
         // Level amounts follow the first paint; the previous ones stay on screen meanwhile.
         if let unit = loaded.plan?.input.unit {
             try? await Task.sleep(for: .milliseconds(60))
@@ -710,7 +723,7 @@ struct QuranHomeView: View {
 #if DEBUG
         let environment = ProcessInfo.processInfo.environment
         let runHold: Int
-        if !injectedRunHold,
+        if state != nil, !injectedRunHold,
            environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
            let raw = environment["MADAR_UI_QURAN_RUN_HOLD_MS"], let milliseconds = Int(raw), (1...5000).contains(milliseconds) {
             injectedRunHold = true
@@ -733,16 +746,20 @@ struct QuranHomeView: View {
             do {
                 if runHold > 0 { try await Task.sleep(for: .milliseconds(Int64(runHold))) }
                 try await operation()
-            } catch { self.error = quranUserMessage(error) }
+            } catch {
+                if isRefresh {
+                    if !(error is CancellationError) { homeReadFailed = true }
+                } else { self.error = quranUserMessage(error) }
+            }
         }
     }
-    private func acknowledgeError(retryRoute: Bool = false, refreshIfNeeded: Bool = false) {
-        guard error != nil || retryRoute || refreshIfNeeded else { return }
+    private func acknowledgeError(retryRoute: Bool = false) {
+        guard error != nil || retryRoute else { return }
         if retryRoute { failedQuranRouteRequestID = nil }
         error = nil
         Task { @MainActor in
             await Task.yield()
-            if refreshPending || refreshIfNeeded {
+            if refreshPending {
                 refreshPending = false
                 run(refresh: true) { try await refresh() }
             } else {

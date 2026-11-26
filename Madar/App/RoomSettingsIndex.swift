@@ -1,4 +1,5 @@
 import Foundation
+import MadarCore
 import MadarData
 
 /// B2-18 (owner, 10 Nov 2026): the settings a room edits on its own page, found by the central search too.
@@ -9,6 +10,13 @@ enum RoomSettingsIndex {
         case money, diary, quran
         var roomName: String {
             switch self { case .money: "المال"; case .diary: "المذكرات"; case .quran: "القرآن" }
+        }
+        var destination: (room: Room, block: BahwBlock) {
+            switch self {
+            case .money: (.mal, .mal)
+            case .diary: (.notes, .notes)
+            case .quran: (.quran, .quran)
+            }
         }
     }
     struct Hit: Identifiable, Equatable {
@@ -28,6 +36,10 @@ enum RoomSettingsIndex {
         .quran: ["quran.hifzLevel", "quran.reviewLevel", "quran.restDay", "quran.reviewSchedule", "quran.wirdReminder"],
     ]
     static var allKeys: Set<String> { Set(keys.values.flatMap { $0 }) }
+
+    static func place(for key: String) -> Place? {
+        Place.allCases.first { keys[$0]?.contains(key) == true }
+    }
 
     /// Hits for a non-empty query: the title, the room's name or the key contains it. Keys already on the central page are never repeated.
     static func hits(in definitions: [SettingDefinition], query: String, supported: Set<String>) -> [Hit] {

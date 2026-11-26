@@ -4,12 +4,10 @@ import MadarCore
 import MadarDesign
 
 struct CustomizeMadar: View {
-    private enum MoneySettingsRoute: Hashable {
-        case home, setting(String)
-
-        var key: String? {
-            if case .setting(let key) = self { key } else { nil }
-        }
+    private enum RoomSettingsRoute: Hashable {
+        case money(String?)
+        case diary(String)
+        case quran(String)
     }
 
     @Bindable var session: AppSession
@@ -19,14 +17,13 @@ struct CustomizeMadar: View {
     @State private var galleryURL: URL?
     @State private var widgetMaker = false
     @State private var quranTafsirLibrary = false
-    @State private var quranSettingsKey: String?
-    @State private var diarySettingsKey: String?
-    @State private var moneySettingsRoute: MoneySettingsRoute?
+    @State private var roomSettingsRoute: RoomSettingsRoute?
     @State private var moneySettingsRevealed = false
     @State private var missingSettingsRoute = false
     @State private var highlightedSettingKey: String?
     @State private var routedSettingsQuery: String?
     @State private var routedSettingKey: String?
+    @FocusState private var searchFocused: Bool
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -42,6 +39,7 @@ struct CustomizeMadar: View {
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(theme.secondaryInk)
                     TextField("ابحث في إعدادات مدار…", text: Binding(get: { session.settingsQuery }, set: updateSettingsQuery)).accessibilityIdentifier("settings-search")
+                        .focused($searchFocused).onSubmit { searchFocused = false }
                         .submitLabel(.search).padding(.trailing, query.isEmpty ? 0 : 34)
                         .overlay(alignment: .trailing) {
                             if !query.isEmpty {
@@ -58,7 +56,7 @@ struct CustomizeMadar: View {
                     }
                 }
                 if searchTerm.isEmpty {
-                    SettingsHome(session: session, openTafsir: { quranTafsirLibrary = true }, openMoney: { moneySettingsRoute = .home },
+                    SettingsHome(session: session, openTafsir: { quranTafsirLibrary = true }, openMoney: { roomSettingsRoute = .money(nil) },
                                  openMaker: { widgetMaker = true }, openGallery: { widgetGallery = true },
                                  resetAll: { confirmReset = true }, changes: changesLabel, twoColumns: settingsWide)
                 } else {
@@ -68,22 +66,23 @@ struct CustomizeMadar: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { settingsWidth = $0 }
         .navigationDestination(isPresented: $session.moneyOpen) { MoneyRoomView(app: session) }
-        .navigationDestination(item: $moneySettingsRoute) { route in
-            MoneySettingsView(app: session, revealed: $moneySettingsRevealed, initialSettingKey: route.key)
-                .hidesMoneyInBackground($moneySettingsRevealed)
-                .onChange(of: session.selectedTab) { moneySettingsRevealed = false }
-                .onChange(of: session.bool("core.hideMoneyUntilTouch")) { moneySettingsRevealed = false }
-                .onDisappear { moneySettingsRevealed = false }
-        }
-        .navigationDestination(item: $quranSettingsKey) { key in
-            QuranPlanView(service: AppQuranService(session: session), close: { quranSettingsKey = nil }, initialSettingKey: key)
-                .environment(\.roomTheme, RoomTheme(room: "quran", dark: theme.dark))
-                .toolbarVisibility(.hidden, for: .navigationBar)
+        .navigationDestination(item: $roomSettingsRoute) { route in
+            switch route {
+            case .money(let key):
+                MoneySettingsView(app: session, revealed: $moneySettingsRevealed, initialSettingKey: key)
+                    .hidesMoneyInBackground($moneySettingsRevealed)
+                    .onChange(of: session.selectedTab) { moneySettingsRevealed = false }
+                    .onChange(of: session.bool("core.hideMoneyUntilTouch")) { moneySettingsRevealed = false }
+                    .onDisappear { moneySettingsRevealed = false }
+            case .quran(let key):
+                QuranPlanView(service: AppQuranService(session: session), close: { roomSettingsRoute = nil }, initialSettingKey: key)
+                    .environment(\.roomTheme, RoomTheme(room: "quran", dark: theme.dark))
+                    .toolbarVisibility(.hidden, for: .navigationBar)
+            case .diary(let key):
+                DiaryCustomizeView(app: session, initialSettingKey: key)
+            }
         }
         .navigationDestination(isPresented: $quranTafsirLibrary) { QuranTafsirLibraryView(app: session) }
-        .navigationDestination(item: $diarySettingsKey) { key in
-            DiaryCustomizeView(app: session, initialSettingKey: key)
-        }
         #if os(iOS)
         .sheet(isPresented: $widgetMaker, onDismiss: { session.widgetMakerRoute = nil; session.widgetMakerRouteID = nil }) {
             WidgetMakerView(session: session)
@@ -221,9 +220,12 @@ struct CustomizeMadar: View {
     }
     private func showSettingsRoute(_ route: Route?, using proxy: ScrollViewProxy) {
         guard let route else { return }
+        searchFocused = false
         session.settingsRoute = nil
-        guard let key = route.path.last, AppSession.supportedKeys.contains(key),
+        let place = route.path.last.flatMap { RoomSettingsIndex.place(for: $0) }
+        guard let key = route.path.last, AppSession.supportedKeys.contains(key) || place != nil,
               let definition = try? session.schema.definition(for: key) else {
+            roomSettingsRoute = nil
             session.settingsQuery = ""
             routedSettingsQuery = ""
             routedSettingKey = nil
@@ -233,8 +235,15 @@ struct CustomizeMadar: View {
         }
         session.settingsQuery = definition.title
         routedSettingsQuery = definition.title
-        routedSettingKey = key
         missingSettingsRoute = false
+        if let place {
+            routedSettingKey = nil
+            highlightedSettingKey = nil
+            openRoomSetting(place, key: key)
+            return
+        }
+        roomSettingsRoute = nil
+        routedSettingKey = key
         highlightedSettingKey = key
         Task { @MainActor in
             await Task.yield()
@@ -246,19 +255,14 @@ struct CustomizeMadar: View {
     }
     /// B2-18: settings that live on a room's own page.
     private var roomHits: [RoomSettingsIndex.Hit] {
-        RoomSettingsIndex.hits(in: session.schema.settings, query: searchTerm, supported: Set(AppSession.supportedKeys)).filter { hit in
-            switch hit.place {
-            case .money: session.roomEnabled(.mal)
-            case .diary: session.roomEnabled(.notes)
-            case .quran: session.roomEnabled(.quran)
-            }
-        }
+        RoomSettingsIndex.hits(in: session.schema.settings, query: searchTerm, supported: Set(AppSession.supportedKeys))
+            .filter { session.roomEnabled($0.place.destination.block) }
     }
     private func roomResults(_ hits: [RoomSettingsIndex.Hit]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("داخل الأقسام").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
             ForEach(hits) { hit in
-                Button { openRoomSetting(hit) } label: {
+                Button { openRoomSetting(hit.place, key: hit.key) } label: {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(hit.title).font(MadarTypography.body())
@@ -273,11 +277,12 @@ struct CustomizeMadar: View {
             }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("room-setting-results")
     }
-    private func openRoomSetting(_ hit: RoomSettingsIndex.Hit) {
-        switch hit.place {
-        case .money: moneySettingsRoute = .setting(hit.key)
-        case .diary: diarySettingsKey = hit.key
-        case .quran: quranSettingsKey = hit.key
+    private func openRoomSetting(_ place: RoomSettingsIndex.Place, key: String) {
+        searchFocused = false
+        switch place {
+        case .money: roomSettingsRoute = .money(key)
+        case .diary: roomSettingsRoute = .diary(key)
+        case .quran: roomSettingsRoute = .quran(key)
         }
     }
     private var filtered: [SettingDefinition] {

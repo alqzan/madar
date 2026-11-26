@@ -15,7 +15,7 @@ struct BahwMatter: Identifiable, Equatable {
     let closed: Double
     let hijri: Bool
     let tone: String
-    let rowID: UUID?
+    let draft: BahwDayDraft?
     /// Whole days since a passed one-time day that keeps counting (`countUpAfter`).
     var elapsedDays: Int? = nil
     var count: Int { elapsedDays ?? daysLeft }
@@ -36,16 +36,13 @@ extension AppBahwService {
     var weekStart: MadarWeekStart { MadarWeekStart(rawValue: session.string("core.weekStart")) ?? .saturday }
 
     /// Seasons, the Hijri new year, the Gregorian year end and the user's days, nearest first.
-    func matters() -> [BahwMatter] {
+    func matters(savedDays: [BahwDayDraft]) -> [BahwMatter] {
         let days = calendarDays, day = today
         var items: [BahwMatter] = []
-        if let rows = try? ModelContext(session.container).fetch(FetchDescriptor<UpcomingDay>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })) {
-            for row in rows {
-                let rule = MadarUpcomingRule(calendar: row.calendar == "hijri" ? .hijri : .gregorian, year: row.year, month: row.month, day: row.day,
-                                             repeats: MadarUpcomingRule.Repeats(rawValue: row.repeats) ?? .yearly, countFrom: try? GregorianDay(row.countFromDayKey), countUpAfter: row.countUpAfter)
-                if let counter = rule.counter(today: day, days) {
-                    items.append(.init(id: row.id.uuidString, title: row.title, kind: .mine, day: counter.occurrence, daysLeft: counter.daysLeft, closed: counter.closed, hijri: rule.calendar == .hijri, tone: "sepia", rowID: row.id, elapsedDays: counter.elapsedDays))
-                }
+        for draft in savedDays {
+            let rule = draft.rule(year: draft.storedYear)
+            if let counter = rule.counter(today: day, days) {
+                items.append(.init(id: draft.id.uuidString, title: draft.title, kind: .mine, day: counter.occurrence, daysLeft: counter.daysLeft, closed: counter.closed, hijri: draft.hijri, tone: "sepia", draft: draft, elapsedDays: counter.elapsedDays))
             }
         }
         let seasons: [(String, Int, Int, String)] = [("رمضان", 9, 1, "amber"), ("عيد الفطر", 10, 1, "amber"), ("يوم عرفة", 12, 9, "green"), ("عيد الأضحى", 12, 10, "green"), ("رأس السنة", 1, 1, "amber")]
@@ -53,11 +50,11 @@ extension AppBahwService {
             let rule = MadarUpcomingRule(calendar: .hijri, month: month, day: date, repeats: .yearly)
             guard let ring = rule.ring(today: day, days), !items.contains(where: { $0.title == title && $0.day == ring.next }) else { continue }
             let name = month == 1 ? title + " " + digits.string(days.hijri(ring.next).year) + "هـ" : title
-            items.append(.init(id: "season-\(month)-\(date)", title: name, kind: .season, day: ring.next, daysLeft: ring.daysLeft, closed: ring.closed, hijri: true, tone: tone, rowID: nil))
+            items.append(.init(id: "season-\(month)-\(date)", title: name, kind: .season, day: ring.next, daysLeft: ring.daysLeft, closed: ring.closed, hijri: true, tone: tone, draft: nil))
         }
         let end = MadarUpcomingRule(calendar: .gregorian, month: 12, day: 31, repeats: .yearly)
         if let ring = end.ring(today: day, days) {
-            items.append(.init(id: "year-end", title: "نهاية " + digits.string(ring.next.year) + "م", kind: .year, day: ring.next, daysLeft: ring.daysLeft, closed: ring.closed, hijri: false, tone: "gregorianInk", rowID: nil))
+            items.append(.init(id: "year-end", title: "نهاية " + digits.string(ring.next.year) + "م", kind: .year, day: ring.next, daysLeft: ring.daysLeft, closed: ring.closed, hijri: false, tone: "gregorianInk", draft: nil))
         }
         return items.sorted { Self.nearestFirst(($0.elapsedDays, $0.daysLeft, $0.title), ($1.elapsedDays, $1.daysLeft, $1.title)) }
     }
@@ -101,6 +98,11 @@ struct BahwYearView: View {
     @State private var hijriHero: Bool?
     @State private var filter = 0
     @State private var editing: BahwDayDraft?
+    @State private var savedDays: [BahwDayDraft]?
+    @State private var daysReadFailed = false
+    #if DEBUG
+    @State private var injectedReadFailure = false
+    #endif
     private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var service: AppBahwService { .init(session: session) }
     private var digits: MadarNumberFormatter { service.digits }
@@ -120,19 +122,24 @@ struct BahwYearView: View {
                         }.padding(.horizontal, 18).padding(.bottom, 28).frame(maxWidth: 620).frame(maxWidth: .infinity)
                     }
                     .madarTourScroll(proxy, to: .yearUpcoming)
+                    .onChange(of: daysReadFailed) {
+                        if daysReadFailed, session.yearDayID != nil {
+                            proxy.scrollTo("bahw-days-retry", anchor: .center)
+                        }
+                    }
                 }
             }
         }
         .background(lobby.background.ignoresSafeArea()).foregroundStyle(lobby.ink)
         .environment(\.roomTheme, lobby)
         .toolbarVisibility(.hidden, for: .navigationBar).toolbarVisibility(.hidden, for: .tabBar).hidesRoomAccessory(session, id: "bahw-year")
-        .sheet(item: $editing) { draft in
+        .sheet(item: $editing, onDismiss: openRoutedDayIfReady) { draft in
             BahwDaySheet(session: session, draft: draft) {
                 if !draft.existing && filter == 1 { filter = 2 }
             }.presentationDetents([.large])
         }
-        .onChange(of: session.yearDayID, initial: true) { _, id in if let id { openRoutedDay(id) } }
-        .onChange(of: editing?.id) { _, id in if id == nil, let routed = session.yearDayID { openRoutedDay(routed) } }
+        .task(id: session.prayerRevision) { loadSavedDays() }
+        .onChange(of: session.yearDayID) { openRoutedDayIfReady() }
     }
 
     private var topBar: some View {
@@ -269,7 +276,7 @@ struct BahwYearView: View {
 
     // MARK: what matters
     private var matters: some View {
-        let all = service.matters()
+        let all = service.matters(savedDays: savedDays ?? [])
         let shown = all.filter { filter == 0 || (filter == 1 ? $0.kind != .mine : $0.kind == .mine) }
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -282,8 +289,18 @@ struct BahwYearView: View {
             }.padding(.top, 10)
             Picker("التصفية", selection: $filter) { Text("الكل").tag(0); Text("المواسم").tag(1); Text("أيامي").tag(2) }
                 .pickerStyle(.segmented).accessibilityIdentifier("bahw-matters-filter")
+            if daysReadFailed {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("تعذّر قراءة أيامك.").font(MadarTypography.body()).foregroundStyle(lobby.secondaryInk)
+                    Button(action: loadSavedDays) {
+                        Text("أعد القراءة").font(MadarTypography.section()).frame(minHeight: 44).contentShape(.rect)
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-days-retry")
+                }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(lobby.surface, in: .rect(cornerRadius: 18))
+                    .id("bahw-days-retry")
+            }
             VStack(spacing: 0) {
-                if shown.isEmpty {
+                if shown.isEmpty, filter == 1 || (savedDays != nil && !daysReadFailed) {
                     Text(filter == 2 ? "لم تضف يومًا بعد. أضف يومًا يهمّك ليظهر هنا." : filter == 1 ? "لا مواسم في الأيام القادمة؛ تظهر هنا حين يقترب موسم." : "لا شيء قادم بعد. أضف يومًا يهمّك ليظهر هنا.").font(MadarTypography.body()).foregroundStyle(lobby.secondaryInk).padding(22).frame(maxWidth: .infinity)
                 }
                 ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
@@ -294,15 +311,38 @@ struct BahwYearView: View {
         }
     }
 
-    private func openRoutedDay(_ id: UUID) {
+    private func loadSavedDays() {
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedReadFailure, environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               environment["MADAR_UI_YEAR_DAYS_READ_FAILURE_ONCE"] == "1" {
+                injectedReadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            let context = ModelContext(session.container)
+            let rows = try context.fetch(FetchDescriptor<UpcomingDay>(predicate: #Predicate {
+                $0.deletedAt == nil && $0.mergedInto == nil
+            }))
+            let service = service
+            savedDays = rows.map { BahwDayDraft(service: service, row: $0) }
+            daysReadFailed = false
+            openRoutedDayIfReady()
+        } catch {
+            daysReadFailed = true
+        }
+    }
+
+    private func openRoutedDayIfReady() {
         // A link never swaps out an open day sheet that may hold typed edits; it waits and runs once that sheet closes.
-        guard editing == nil else { return }
-        defer { session.yearDayID = nil }
-        guard let matter = service.matters().first(where: { $0.rowID == id }) else {
+        guard editing == nil, let id = session.yearDayID, let savedDays, !daysReadFailed else { return }
+        session.yearDayID = nil
+        guard let draft = savedDays.first(where: { $0.id == id }) else {
             session.errorMessage = "هذا اليوم لم يعد موجودًا في الأيام القادمة."
             return
         }
-        editing = .init(service: service, matter: matter, id: id)
+        editing = draft
     }
     @ViewBuilder private func matterRow(_ item: BahwMatter) -> some View {
         let content = HStack(alignment: .center, spacing: 14) {
@@ -328,9 +368,10 @@ struct BahwYearView: View {
             }
             Text(service.weekday(item.day)).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk).frame(width: 56, alignment: .trailing)
         }.padding(.horizontal, 16).padding(.vertical, 14).contentShape(.rect)
-        if let id = item.rowID {
-            Button { editing = .init(service: service, matter: item, id: id) } label: { content }.buttonStyle(.madarPlain)
+        if let draft = item.draft {
+            Button { editing = draft } label: { content }.buttonStyle(.madarPlain)
                 .accessibilityElement(children: .combine).accessibilityHint("لتعديل اليوم أو حذفه").accessibilityIdentifier("bahw-matter-" + item.title)
+                .disabled(daysReadFailed)
         } else {
             content.accessibilityElement(children: .combine).accessibilityIdentifier("bahw-matter-" + item.title)
         }
@@ -353,6 +394,7 @@ struct BahwDayDraft: Identifiable, Equatable {
     var day = 1
     var repeats = "yearly"
     var year: Int
+    private(set) var storedYear: Int?
     var countFrom: String?
     var countUpAfter = false
     @MainActor init(service: AppBahwService) {
@@ -362,19 +404,31 @@ struct BahwDayDraft: Identifiable, Equatable {
         let h = service.calendarDays.hijri(today)
         month = hijri ? h.month : today.month; day = hijri ? h.day : today.day; year = hijri ? h.year : today.year
     }
-    @MainActor init(service: AppBahwService, matter: BahwMatter, id: UUID) {
-        self.id = id; existing = true; title = matter.title
-        let row = try? ModelContext(service.session.container).fetch(FetchDescriptor<UpcomingDay>()).first { $0.id == id }
-        hijri = row?.calendar == "hijri"; month = row?.month ?? 1; day = row?.day ?? 1; repeats = row?.repeats ?? "yearly"
-        countFrom = row?.countFromDayKey; countUpAfter = row?.countUpAfter ?? false
-        year = row?.year ?? (hijri ? service.calendarDays.hijri(service.today).year : service.today.year)
+    @MainActor init(service: AppBahwService, row: UpcomingDay) {
+        id = row.id
+        existing = true
+        title = row.title
+        hijri = row.calendar == "hijri"
+        month = row.month
+        day = row.day
+        repeats = row.repeats
+        countFrom = row.countFromDayKey
+        countUpAfter = row.countUpAfter
+        storedYear = row.year
+        year = row.year ?? (hijri ? service.calendarDays.hijri(service.today).year : service.today.year)
+    }
+
+    func rule(year: Int?) -> MadarUpcomingRule {
+        .init(calendar: hijri ? .hijri : .gregorian, year: year, month: month, day: day,
+              repeats: MadarUpcomingRule.Repeats(rawValue: repeats) ?? .yearly,
+              countFrom: countFrom.flatMap { try? GregorianDay($0) }, countUpAfter: repeats == "none" && countUpAfter)
     }
 }
 
 struct BahwDaySheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
-    @State var draft: BahwDayDraft
+    @State private var draft: BahwDayDraft
     @State private var needsOneTimeDate: Bool
     /// What the sheet opened with: the swipe-down is held back once the draft differs, so typed edits are never lost by a stray swipe.
     private let original: BahwDayDraft
@@ -383,6 +437,7 @@ struct BahwDaySheet: View {
     @State private var failure: String?
     @State private var saving = false
     @State private var confirmingDelete = false
+    @State private var confirmingDiscard = false
     private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var digits: MadarNumberFormatter { .init(style: session.string("core.numerals") == "western" ? .western : .hindi) }
     init(session: AppSession, draft: BahwDayDraft, didSave: @escaping () -> Void) {
@@ -456,11 +511,21 @@ struct BahwDaySheet: View {
                             // Audit 28 Oct: a one-tap delete now asks first, like the other deletes in Madar.
                             .madarSwipeConfirm(isPresented: $confirmingDelete, title: "تحذف «" + draft.title + "»؟", message: "يختفي من صفحة السنة.", action: "احذف اليوم") { remove() }
                     }
-                }.padding(18)
+                }.padding(18).disabled(saving)
             }
             .background(lobby.background).foregroundStyle(lobby.ink)
             .navigationTitle(draft.existing ? "عدّل اليوم" : "يوم يهمّك").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() }.madarWaitsForSave() } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("إلغاء") {
+                        if draft == original { dismiss() } else { confirmingDiscard = true }
+                    }.madarWaitsForSave().accessibilityIdentifier("bahw-day-cancel")
+                }
+            }
+            .alert("تتجاهل تعديلك؟", isPresented: $confirmingDiscard) {
+                Button("تجاهل التعديل", role: .destructive) { dismiss() }
+                Button("أكمل التعديل", role: .cancel) {}
+            }
         }.tint(lobby.accent)
             .madarSheetLock(saving: saving, draft: draft != original)
     }
@@ -469,9 +534,7 @@ struct BahwDaySheet: View {
     }
     private var previewOccurrence: GregorianDay? {
         let service = AppBahwService(session: session)
-        let rule = MadarUpcomingRule(calendar: draft.hijri ? .hijri : .gregorian, year: draft.year, month: draft.month, day: draft.day,
-                                     repeats: MadarUpcomingRule.Repeats(rawValue: draft.repeats) ?? .yearly, countUpAfter: draft.repeats == "none" && draft.countUpAfter)
-        return rule.counter(today: service.today, service.calendarDays)?.occurrence
+        return draft.rule(year: draft.year).counter(today: service.today, service.calendarDays)?.occurrence
     }
     private func selectRepetition(_ repeats: String) {
         guard draft.repeats != repeats else { return }

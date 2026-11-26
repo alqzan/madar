@@ -86,14 +86,21 @@ struct MihbaraMarginNoteEditor: View {
     let onSaved: () -> Void
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
-    @State private var text = ""
+    @State private var text: String
     @State private var saving = false
     @State private var rootBlockerID = UUID()
     @State private var alert: String?
+    @State private var confirmDiscard = false
     @FocusState private var focused: Bool
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var blocksRootRoute: Bool {
-        saving || trimmed != note.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var hasDraft: Bool { trimmed != note.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canSave: Bool { !saving && hasDraft && !trimmed.isEmpty && trimmed.count <= 2000 }
+
+    init(app: AppSession, note: MihbaraMarginNote, onSaved: @escaping () -> Void) {
+        self.app = app
+        self.note = note
+        self.onSaved = onSaved
+        _text = State(initialValue: note.text)
     }
 
     var body: some View {
@@ -114,6 +121,7 @@ struct MihbaraMarginNoteEditor: View {
             }
             TextEditor(text: $text).font(MadarTypography.body()).scrollContentBackground(.hidden).focused($focused)
                 .padding(10).background(theme.surface, in: .rect(cornerRadius: 16))
+                .disabled(saving)
                 .accessibilityLabel("نص الملاحظة").accessibilityIdentifier("mihbara-margin-text")
             Text(trimmed.count > 2000 ? "اختصر الملاحظة إلى ألفي حرف حتى تُحفظ." :  (note.passage == nil ? "تبقى في حاشية الكتاب، وتظهر لك على الرف حين تقترب منها." : "تبقى مربوطة بهذه الفقرة في حاشية الكتاب."))
                 .font(MadarTypography.fine()).foregroundStyle(trimmed.count > 2000 ? theme.ink : theme.secondaryInk)
@@ -122,27 +130,44 @@ struct MihbaraMarginNoteEditor: View {
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent)
         .navigationTitle(note.page.map { "هامش صفحة " + MadarNumberFormatter(style: app.string("core.numerals") == "western" ? .western : .hindi).string($0) } ?? "هامش")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden()
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    if hasDraft { confirmDiscard = true } else { dismiss() }
+                } label: {
+                    Label("رجوع", systemImage: "chevron.backward")
+                }
+                .madarWaitsForSave()
+                .accessibilityIdentifier("mihbara-margin-back")
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("احفظ") { save() }
-                    .disabled(saving || trimmed.isEmpty || trimmed.count > 2000 || trimmed == note.text.trimmingCharacters(in: .whitespacesAndNewlines))
+                    .disabled(!canSave)
                     .accessibilityIdentifier("mihbara-margin-save")
             }
         }
-        .onAppear { text = note.text; focused = true }
+        .onAppear { focused = true }
+        .alert("تترك تعديلات الحاشية؟", isPresented: $confirmDiscard) {
+            if canSave { Button("احفظ واخرج") { save() } }
+            Button("اترك التعديلات", role: .destructive) { dismiss() }
+                .accessibilityIdentifier("mihbara-margin-discard")
+            Button("أكمل الكتابة", role: .cancel) {}
+                .accessibilityIdentifier("mihbara-margin-keep-editing")
+        }
         // The book card is a sheet that covers the app's own alert, so a failed save says so here.
         .alert("الهامش", isPresented: Binding(get: { alert != nil }, set: { if !$0 { alert = nil } })) {
-            Button("حسنًا", role: .cancel) { alert = nil }
+            Button("أكمل الكتابة", role: .cancel) { alert = nil }
         } message: { Text(alert ?? "") }
-        .madarSheetLock(saving: saving, draft: trimmed != note.text.trimmingCharacters(in: .whitespacesAndNewlines))
-        .onChange(of: blocksRootRoute, initial: true) { _, blocked in
+        .madarSheetLock(saving: saving, draft: hasDraft)
+        .onChange(of: saving || hasDraft, initial: true) { _, blocked in
             app.setMihbaraRootDraftBlocker(rootBlockerID, active: blocked)
         }
         .onDisappear { app.setMihbaraRootDraftBlocker(rootBlockerID, active: false) }
     }
 
     private func save() {
-        guard !saving else { return }
+        guard canSave else { return }
         saving = true
         var payload: [String: MadarCore.JSONValue] = ["id": .string(note.id.uuidString), "bookID": .string(note.bookID.uuidString), "text": .string(trimmed), "locator": .string(note.locator)]
         if let page = note.page { payload["page"] = .number(Double(page)) }

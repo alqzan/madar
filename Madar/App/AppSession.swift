@@ -556,16 +556,21 @@ final class AppSession {
     }
     func open(_ url: URL) {
         let today = GregorianDay.containing(.now, in: activePlace.timeZone)
-        let unavailableSettings = Set(schema.settings.map(\.key)).subtracting(Self.supportedKeys)
-        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), unavailableSettings: unavailableSettings, availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year, .habits, .mal, .mihbara]))
+        let settingsKeys = Set(Self.supportedKeys).union(RoomSettingsIndex.allKeys)
+        let unavailableSettings = Set(schema.settings.map(\.key)).subtracting(settingsKeys)
+        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: settingsKeys, unavailableSettings: unavailableSettings, availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year, .habits, .mal, .mihbara]))
         do {
             var components=URLComponents(url:url,resolvingAgainstBaseURL:false)
             if components?.host == "prayer" {components?.host="salah"} // Existing placed widgets used this legacy alias.
             let route = try RouteRegistry.parse(components?.url ?? url, context: context)
+            let settingKey = url.host == "settings" ? route.path.last : nil
+            if let settingKey, let place = RoomSettingsIndex.place(for: settingKey) {
+                guard place.destination.room == route.room, roomEnabled(place.destination.block) else { throw CoreError.unavailableFeature }
+            }
             if madarTour.step != nil { endMadarTour(returnToLobby: false) }
-            if url.host == "settings" {
+            if let settingKey {
                 settingsRoute = route
-                settingsQuery = (try? schema.definition(for: route.path[1]).title) ?? ""
+                settingsQuery = (try? schema.definition(for: settingKey).title) ?? ""
                 selectedTab = "customize"
                 return
             }

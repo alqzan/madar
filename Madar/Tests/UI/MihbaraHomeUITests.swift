@@ -253,6 +253,47 @@ import UIKit
         app.terminate()
     }
 
+    func testBackProtectsMarginNoteEditsUntilDiscardIsConfirmed() {
+        continueAfterFailure = false
+        let app = app("home", fileRow: true)
+        app.launchEnvironment["MADAR_UI_MIHBARA_MARGIN_NOTE"] = "1"
+        app.launch()
+        open(app)
+        app.buttons["mihbara-library"].tap()
+        let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-library-book-' AND label CONTAINS 'ملف قابل للتعديل'")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription)
+        book.tap()
+        let note = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-margin-note-'")).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 8), app.debugDescription)
+        for _ in 0..<4 where !note.isHittable { app.swipeUp(velocity: .slow) }
+        note.tap()
+
+        let editor = app.textViews["mihbara-margin-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 6), app.debugDescription)
+        let original = editor.value as? String
+        let draft = " نص سيبقى حتى أقرر."
+        editor.tap()
+        editor.typeText(draft)
+        let back = app.buttons["mihbara-margin-back"]
+        back.tap()
+        let keep = app.alerts.buttons.matching(identifier: "mihbara-margin-keep-editing").firstMatch
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), app.debugDescription)
+        keep.tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue((editor.value as? String)?.contains(draft) == true, app.debugDescription)
+
+        back.tap()
+        let discard = app.alerts.buttons.matching(identifier: "mihbara-margin-discard").firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 5), app.debugDescription)
+        discard.tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 6), app.debugDescription)
+        XCTAssertTrue(note.waitForExistence(timeout: 6), app.debugDescription)
+        for _ in 0..<4 where !note.isHittable { app.swipeUp(velocity: .slow) }
+        note.tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 6), app.debugDescription)
+        XCTAssertEqual(editor.value as? String, original)
+    }
+
     /// Owner, 30 Oct: the library search also looks inside the text of the books and opens the reader at the match.
     func testLibrarySearchFindsWordsInsideBooks() throws {
         continueAfterFailure = false

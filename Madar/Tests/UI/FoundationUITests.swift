@@ -490,9 +490,12 @@ import UIKit
         let customize = app.buttons["tab-customize"]
         XCTAssertTrue(customize.waitForExistence(timeout: 15), app.debugDescription)
         customize.tap()
-        let option = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "option-core.dayStart-")).firstMatch
+        let option = app.buttons["option-core.dayStart-maghrib"]
         XCTAssertTrue(option.waitForExistence(timeout: 15), app.debugDescription)
-        XCTAssertTrue(option.isHittable, "The deep link must scroll to its exact setting.")
+        XCTAssertTrue(app.frame.contains(option.frame), app.debugDescription)
+        option.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: option)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed, "The deep link must reach the editable setting.")
         XCTAssertEqual(app.textFields["settings-search"].value as? String, "يبدأ يومك من")
         attachScreenshot(app, named: "AU-95-settings-route-core-dayStart-L")
         app.terminate()
@@ -510,6 +513,35 @@ import UIKit
         XCTAssertFalse(app.buttons["settings-clear-search"].exists, "A missing setting key must not remain as an active search.")
         app.terminate()
     }
+
+    func testSettingsRoomRouteOpensTheExactQuranSetting() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString,
+            "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_SETTINGS_ROUTE": "madar://settings/quran/quran.reviewSchedule"]
+        app.launch()
+        let customize = app.buttons["tab-customize"]
+        XCTAssertTrue(customize.waitForExistence(timeout: 15), app.debugDescription)
+        customize.tap()
+        let option = app.buttons["quran-plan-quran.reviewSchedule"]
+        XCTAssertTrue(option.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(option.isHittable, app.debugDescription)
+    }
+
+    func testSettingsRoomRouteRejectsAKeyFromAnotherRoom() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString,
+            "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_SETTINGS_ROUTE": "madar://settings/notes/quran.reviewSchedule"]
+        app.launch()
+        let customize = app.buttons["tab-customize"]
+        XCTAssertTrue(customize.waitForExistence(timeout: 15), app.debugDescription)
+        customize.tap()
+        let error = app.alerts.staticTexts["هذا الرابط غير متاح في إصدار مدار الحالي."]
+        XCTAssertTrue(error.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["quran-plan-quran.reviewSchedule"].exists)
+    }
+
     func testBackupFolderPickerCancellationKeepsLocalBackupSettings() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

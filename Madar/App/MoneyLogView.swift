@@ -417,6 +417,7 @@ private struct MoneyMovementEditSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var label = ""
     @State private var rawAmount = ""
+    @State private var prefilledAmount = false
     @State private var date = Date()
     @State private var categoryID: UUID?
     @State private var categories: [MoneyCategoryChoice] = []
@@ -425,6 +426,7 @@ private struct MoneyMovementEditSheet: View {
     @State private var failure: String?
     @State private var confirmDelete = false
     @State private var confirmDiscard = false
+    @State private var rootBlockerID = UUID()
     @State private var charges: MoneyChargeLines?
     @FocusState private var focused: Bool
     private var service: AppMoneyService { .init(app: app) }
@@ -435,7 +437,7 @@ private struct MoneyMovementEditSheet: View {
     private var categoryChanged: Bool { categoryID != edit.categoryID }
     private var typedAmount: Int? { exponent.flatMap { MoneyAmountInput.minor(rawAmount, exponent: $0) }.flatMap { $0 > 0 ? $0 : nil } }
     private var amountChanged: Bool { !rawAmount.isEmpty && typedAmount != nil && typedAmount != edit.amountMinor }
-    private var amountInvalid: Bool { !rawAmount.isEmpty && typedAmount == nil }
+    private var amountInvalid: Bool { loaded && (prefilledAmount || !rawAmount.isEmpty) && typedAmount == nil }
     private var timeChanged: Bool { abs(date.timeIntervalSince(movement.at)) >= 60 }
     private var hasUnsavedEdits: Bool { loaded && (labelChanged || categoryChanged || amountChanged || amountInvalid || timeChanged) }
     private var canSave: Bool { loaded && !saving && !amountInvalid && (labelChanged || categoryChanged || (edit.lockReason == nil && (amountChanged || timeChanged))) }
@@ -446,6 +448,12 @@ private struct MoneyMovementEditSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 MoneyPageHeader(title: "عدّل الحركة", close: close, closeDisabled: saving)
+#if DEBUG
+                if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_ROOT_ROUTE_HARNESS"] == "1" {
+                    Button("اختبر رابط المال") { app.open(URL(string: "madar://mal")!) }
+                        .accessibilityIdentifier("money-root-test-route")
+                }
+#endif
                 Text(figure: visible ? service.amount(movement.amountMinor) : "•••").font(.custom("thmanyahserifdisplay-Black", size: 34, relativeTo: .largeTitle))
                 Text(movement.detail.explanation).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 field("الاسم") { TextField(movement.title, text: $label).focused($focused).submitLabel(.done).accessibilityIdentifier("money-edit-label") }
@@ -458,7 +466,7 @@ private struct MoneyMovementEditSheet: View {
                             chip("بلا تصنيف", categoryID == nil, id: "money-edit-category-none") { categoryID = nil }
                             ForEach(categories) { c in chip(c.name, categoryID == c.id, id: "money-edit-category-" + c.name) { categoryID = c.id } }
                         }
-                    }.scrollIndicators(.hidden)
+                    }.scrollIndicators(.hidden).disabled(saving)
                 } }
                 if let reason = edit.lockReason {
                     Text(reason).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("money-edit-locked")
@@ -468,7 +476,7 @@ private struct MoneyMovementEditSheet: View {
                     }
                     if amountInvalid { Text("اكتب مبلغًا صحيحًا.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                     DatePicker("الوقت", selection: $date, in: ...app.prayerNow(), displayedComponents: .hourAndMinute).environment(\.timeZone, timeZone)
-                        .frame(minHeight: 44).accessibilityIdentifier("money-edit-time")
+                        .frame(minHeight: 44).disabled(saving).accessibilityIdentifier("money-edit-time")
                     MadarDateLabel(app.dateLabels(movement.day), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
                 }
                 // Editing replaced the source page for confirmed rows; the bank's own lines (original amount, rate, fees) stay here.
@@ -492,6 +500,8 @@ private struct MoneyMovementEditSheet: View {
             }.padding(20)
         }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .presentationDetents([.large]).presentationDragIndicator(.visible).madarSheetLock(saving: saving, draft: hasUnsavedEdits)
+            .onChange(of: saving || hasUnsavedEdits, initial: true) { _, blocked in app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked) }
+            .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }
             .alert("تتجاهل تعديلك؟", isPresented: $confirmDiscard) {
                 Button("تجاهل التعديل", role: .destructive) { dismiss() }
                 Button("أكمل التعديل", role: .cancel) {}
@@ -506,7 +516,10 @@ private struct MoneyMovementEditSheet: View {
                 guard !loaded else { return }
                 categories = (try? service.loadCategoryChoices()) ?? []
                 label = edit.merchant ?? ""; categoryID = edit.categoryID; date = movement.at
-                if visible, edit.lockReason == nil { rawAmount = MoneyEditNameSheet.decimal(edit.amountMinor, exponent: exponent) }
+                if visible, edit.lockReason == nil {
+                    rawAmount = MoneyEditNameSheet.decimal(edit.amountMinor, exponent: exponent)
+                    prefilledAmount = !rawAmount.isEmpty
+                }
                 loaded = true
                 if visible, let id = UUID(uuidString: movement.detail.id) { charges = await service.loadChargeLines(transactionID: id) }
             }
@@ -525,6 +538,7 @@ private struct MoneyMovementEditSheet: View {
         }.buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier(id)
     }
     private func close() {
+        guard !saving else { return }
         guard hasUnsavedEdits else { dismiss(); return }
         focused = false
         confirmDiscard = true

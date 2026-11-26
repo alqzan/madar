@@ -61,10 +61,17 @@ import XCTest
     }
 
     // Owner, 22 Nov 2026: correct or delete a confirmed movement from the log.
-    private func openExpenseLog() -> XCUIApplication {
+    private func openExpenseLog(fromMoneyTab: Bool = false) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "expense", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
-        app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
-        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
+        if fromMoneyTab { app.launchEnvironment["MADAR_UI_MONEY_ROOT_ROUTE_HARNESS"] = "1" }
+        app.launch()
+        if fromMoneyTab {
+            let tab = app.buttons["tab-money"]
+            XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        } else {
+            let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+            let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
+        }
         let log = app.buttons["money-log-open"]; XCTAssertTrue(log.waitForExistence(timeout: 10)); for _ in 0..<8 where !log.isHittable { app.swipeUp(velocity: .slow) }; log.tap()
         XCTAssertTrue(app.otherElements["money-log-arcade"].waitForExistence(timeout: 10))
         app.buttons["money-log-mode"].tap()
@@ -128,6 +135,29 @@ import XCTest
         close.tap()
         XCTAssertTrue(label.waitForNonExistence(timeout: 8), app.debugDescription)
     }
+
+    func testMoneyRootWaitsForMovementDraftThenReturnsAfterSave() {
+        continueAfterFailure = false
+        let app = openExpenseLog(fromMoneyTab: true)
+        tapRow(app, "مقهى الزاوية")
+        let label = app.textFields["money-edit-label"]
+        XCTAssertTrue(label.waitForExistence(timeout: 8))
+        label.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        label.typeText(" الجديد\n")
+
+        XCTAssertEqual(label.value as? String, "مقهى الزاوية الجديد")
+        app.buttons["money-root-test-route"].firstMatch.tap()
+        XCTAssertTrue(label.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(label.value as? String, "مقهى الزاوية الجديد")
+        let save = app.buttons["money-edit-save"]
+        for _ in 0..<6 where !save.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(save.isHittable, app.debugDescription)
+        save.tap()
+        XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(label.waitForNonExistence(timeout: 5))
+    }
+
     func testDeletingAConfirmedMovementAsksFirst() throws {
         continueAfterFailure = false
         let app = openExpenseLog(); tapRow(app, "متجر الحي")

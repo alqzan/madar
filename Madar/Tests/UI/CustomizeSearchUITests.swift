@@ -102,14 +102,20 @@ import XCTest
         continueAfterFailure = false
         let (app, search) = openSearch()
         search.tap()
-        search.typeText("محتوى المذكرات\n")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        search.typeText("محتوى المذكرات")
         let result = app.buttons["room-setting-notes.widgetContent"]
         XCTAssertTrue(result.waitForExistence(timeout: 10), app.debugDescription)
         result.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         let setting = app.switches["setting-notes.widgetContent"]
         XCTAssertTrue(setting.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(setting.isHittable, app.debugDescription)
         XCTAssertEqual(app.buttons["diary-customize-section-outside"].value as? String, "مفتوح")
+        XCTAssertEqual(setting.value as? String, "0")
+        XCTAssertTrue(app.frame.contains(setting.frame), app.debugDescription)
+        setting.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "1"), object: setting)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed, app.debugDescription)
     }
 
     func testHiddenMoneyRoomHasNoSearchResults() {

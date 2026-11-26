@@ -52,11 +52,124 @@ import XCTest
         let cancel = app.buttons["money-obligation-cancel"]; XCTAssertTrue(cancel.isEnabled)
         save.tap()
         XCTAssertTrue(app.staticTexts["التزام جديد"].exists); XCTAssertTrue(cancel.exists); XCTAssertFalse(cancel.isEnabled)
+        XCTAssertFalse(name.isEnabled)
+        XCTAssertFalse(amount.isEnabled)
         XCTAssertTrue(save.exists); XCTAssertFalse(save.isEnabled)
         shot(app, "M5-V09-add-saving-L")
         let row = app.buttons["money-obligation-row-الماء"]; XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
         for _ in 0..<5 where !row.isHittable { app.swipeUp(velocity: .slow) }
         shot(app, "M5-V09-obl-s2-L")
+    }
+
+    func testObligationDraftKeepsScheduleAndFieldsUntilExplicitDiscard() {
+        continueAfterFailure = false
+        let app = openNewObligation(fromMoneyTab: true)
+
+        let increment = app.buttons["money-obligation-every-Increment"]
+        let cancel = app.buttons["money-obligation-cancel"]
+        XCTAssertTrue(increment.waitForExistence(timeout: 5), app.debugDescription)
+        increment.tap()
+        cancel.tap()
+        let keep = app.alerts.buttons["أكمل التعديل"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), "Changing the schedule alone creates a draft.")
+        keep.tap()
+
+        let name = app.textFields["money-obligation-name"]
+        let amount = app.textFields["money-obligation-amount"]
+        name.tap()
+        name.typeText("التزام تجريبي")
+        amount.tap()
+        amount.typeText("85")
+        app.buttons["money-obligation-keyboard-done"].tap()
+        XCTAssertEqual(name.value as? String, "التزام تجريبي")
+        XCTAssertEqual(amount.value as? String, "85")
+
+        let route = app.buttons["money-root-test-route"].firstMatch
+        for _ in 0..<5 where !route.isHittable { app.swipeDown(velocity: .slow) }
+        XCTAssertTrue(route.isHittable, app.debugDescription)
+        route.tap()
+        XCTAssertTrue(cancel.exists, "The money root must wait while the obligation is being edited.")
+        cancel.tap()
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), app.debugDescription)
+        keep.tap()
+        XCTAssertEqual(name.value as? String, "التزام تجريبي")
+        XCTAssertEqual(amount.value as? String, "85")
+
+        cancel.tap()
+        let discard = app.alerts.buttons["تجاهل الالتزام"]
+        XCTAssertTrue(discard.waitForExistence(timeout: 5), app.debugDescription)
+        discard.tap()
+        XCTAssertTrue(cancel.waitForNonExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 10), app.debugDescription)
+    }
+
+    func testOversizedAmountCanBeCorrectedWithoutLosingTheDraft() {
+        continueAfterFailure = false
+        let app = openNewObligation()
+        let cadence = app.segmentedControls["money-obligation-unit"]
+        for _ in 0..<4 where !cadence.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(cadence.isHittable, app.debugDescription)
+        cadence.buttons["يوم"].tap()
+        for _ in 0..<4 where !app.textFields["money-obligation-name"].isHittable { app.swipeDown(velocity: .slow) }
+
+        let name = app.textFields["money-obligation-name"]
+        let amount = app.textFields["money-obligation-amount"]
+        name.tap()
+        name.typeText("التزام بالمبلغ الصحيح")
+        amount.tap()
+        // With the SAR exponent, this is exactly Int.max in minor units. A daily cadence would multiply it.
+        let oversized = "92233720368547758٫07"
+        amount.typeText(oversized)
+        let failure = app.staticTexts["money-obligation-amount-error"]
+        let save = app.buttons["money-obligation-save"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(failure.label.contains("الحدّ"), failure.label)
+        XCTAssertFalse(save.isEnabled)
+        XCTAssertFalse(app.descendants(matching: .any)["money-obligation-preview"].exists)
+        XCTAssertEqual(name.value as? String, "التزام بالمبلغ الصحيح")
+
+        amount.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: oversized.count) + "85")
+        XCTAssertTrue(failure.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(save.isEnabled)
+        XCTAssertTrue(app.descendants(matching: .any)["money-obligation-preview"].waitForExistence(timeout: 5))
+        app.buttons["money-obligation-keyboard-done"].tap()
+        for _ in 0..<6 where !save.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(save.isHittable, app.debugDescription)
+        save.tap()
+        XCTAssertTrue(app.buttons["money-obligation-row-التزام بالمبلغ الصحيح"].waitForExistence(timeout: 10), app.debugDescription)
+    }
+
+    private func openNewObligation(fromMoneyTab: Bool = false) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"
+        ]
+        if fromMoneyTab { app.launchEnvironment["MADAR_UI_MONEY_ROOT_ROUTE_HARNESS"] = "1" }
+        app.launch()
+        if fromMoneyTab {
+            let tab = app.buttons["tab-money"]
+            XCTAssertTrue(tab.waitForExistence(timeout: 20))
+            tab.tap()
+        } else {
+            let customize = app.buttons["tab-customize"]
+            XCTAssertTrue(customize.waitForExistence(timeout: 20))
+            customize.tap()
+            let search = app.textFields["settings-search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            search.tap()
+            search.typeText("المال")
+            app.buttons["money-open"].tap()
+        }
+        let obligations = app.buttons["money-obligations-open"]
+        XCTAssertTrue(obligations.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !obligations.isHittable { app.swipeUp(velocity: .slow) }
+        obligations.tap()
+        let add = app.buttons["money-obligations-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        for _ in 0..<5 where !add.isHittable { app.swipeUp(velocity: .slow) }
+        add.tap()
+        return app
     }
 
     func testHiddenAmountsKeepTheAddPreviewPrivate() {
@@ -173,7 +286,9 @@ import XCTest
         XCTAssertEqual(name.value as? String, "منصة شاهد")
         XCTAssertEqual(amount.value as? String, "399")
         XCTAssertTrue(app.segmentedControls["money-obligation-kind"].buttons["اشتراك"].isSelected)
-        app.buttons["إلغاء"].tap()
+        let cancel = app.buttons["money-obligation-cancel"]
+        cancel.tap()
+        XCTAssertTrue(cancel.waitForNonExistence(timeout: 5), "An untouched suggestion is not a draft.")
         XCTAssertFalse(app.buttons["money-obligation-row-منصة شاهد"].exists, app.debugDescription)
     }
 
@@ -209,6 +324,9 @@ import XCTest
         XCTAssertEqual(amount.value as? String, "399")
         XCTAssertTrue(app.staticTexts["money-obligation-monthly-peak"].waitForExistence(timeout: 5), app.debugDescription)
         shot(app, "M5-V09-subscription-suggestion-revealed-L")
+        let cancel = app.buttons["money-obligation-cancel"]
+        cancel.tap()
+        XCTAssertTrue(cancel.waitForNonExistence(timeout: 5), "Revealing an untouched suggestion is not a draft.")
     }
 
     /// M5-V25: a repeated confirmed bank charge becomes an obligation only after the owner confirms the review draft.

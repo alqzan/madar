@@ -21,7 +21,10 @@ struct MoneyObligationSheet: View {
     @State private var count = 12
     @State private var every = 1
     @State private var unit = RecurrenceUnit.month
-    @State private var firstDue = Date()
+    @State private var firstDue: Date
+    @State private var initialDueDay: GregorianDay
+    @State private var rootBlockerID = UUID()
+    @State private var confirmDiscard = false
     @State private var errorMessage: String?
     /// The decimal pad has no return key: «تم» above it, a scroll or a tap on the title closes it.
     private enum Field { case name, amount }
@@ -43,7 +46,9 @@ struct MoneyObligationSheet: View {
         // A suggested amount is passive account data. Keep it out of the editable field and
         // accessibility tree until the user explicitly reveals the room's hidden numbers.
         _rawAmount = State(initialValue: visible || revealed.wrappedValue ? suggestedAmount ?? "" : "")
-        _firstDue = State(initialValue: suggestion?.nextDue ?? .now)
+        let due = suggestion?.nextDue ?? app.prayerNow()
+        _firstDue = State(initialValue: due)
+        _initialDueDay = State(initialValue: .containing(due, in: app.activePlace.timeZone))
     }
 
     private static func decimalInput(_ amountMinor: Int, currency: String) -> String {
@@ -61,9 +66,45 @@ struct MoneyObligationSheet: View {
     private var today: GregorianDay { .containing(app.prayerNow(), in: zone) }
     private var first: GregorianDay { .containing(firstDue, in: zone) }
     private var recurring: Bool { kind == "bill" || kind == "subscription" }
+    private var hasUnsavedInput: Bool {
+        let expectedName = suggestion?.name.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let expectedKind = suggestion == nil ? "bill" : "subscription"
+        let amountChanged = amountWasEdited && rawAmount.trimmingCharacters(in: .whitespacesAndNewlines) != (suggestedAmountInput ?? "")
+        return name.trimmingCharacters(in: .whitespacesAndNewlines) != expectedName ||
+            amountChanged || kind != expectedKind || every != 1 || unit != .month ||
+            (!recurring && count != 12) || first != initialDueDay
+    }
+    private var blocksRootRoute: Bool { hasUnsavedInput || saving }
     private var schedule: Recurrence? { Recurrence(every: every, unit: unit, first: first) }
-    private var amountMinor: Int? {
-        CurrencyExponents.specified.exponent(app.string("core.currency")).flatMap { MoneyAmountInput.minor(rawAmount, exponent: $0) }.flatMap { $0 > 0 ? $0 : nil }
+    private enum DraftAmount {
+        case empty
+        case invalid(String)
+        case ready(minor: Int, preview: LadderPreview)
+
+        var canSave: Bool {
+            if case .ready = self { return true }
+            return false
+        }
+    }
+
+    private struct LadderPreview {
+        var months: [(before: Int, added: Int)] = []
+        var peak = 0
+    }
+
+    private var draftAmount: DraftAmount {
+        guard !rawAmount.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .empty }
+        guard let exponent = CurrencyExponents.specified.exponent(app.string("core.currency")),
+              let amount = MoneyAmountInput.minor(rawAmount, exponent: exponent), amount > 0 else {
+            return .invalid("أدخل مبلغًا صحيحًا أكبر من صفر.")
+        }
+        guard MoneyCommandPayload.acceptsObligationAmount(amount, recurring: recurring) else {
+            return .invalid("المبلغ أكبر من الحدّ الممكن لهذا الالتزام. خفّضه ثم احفظ.")
+        }
+        guard let preview = projectLadder(amountMinor: amount) else {
+            return .invalid("المجموع الشهري أكبر من الحدّ الممكن. خفّض المبلغ أو غيّر التكرار.")
+        }
+        return .ready(minor: amount, preview: preview)
     }
     /// Every due day this obligation adds: the open-ended schedule from today, or the plan's instalments.
     private func dues(before end: GregorianDay) -> [GregorianDay] {
@@ -76,12 +117,29 @@ struct MoneyObligationSheet: View {
         guard let schedule else { return [] }
         return recurring ? schedule.preview(from: today) : (0..<min(3, count)).compactMap { schedule.occurrence($0) }
     }
-    /// What the ladder's month `index` (from this month) gains once the obligation is saved.
-    private func added(_ index: Int) -> Int {
-        guard let amount = amountMinor, let start = try? GregorianDay(year: today.year, month: today.month, day: 1),
-              let month = Recurrence(every: 1, unit: .month, first: start), let from = month.occurrence(index), let to = month.occurrence(index + 1) else { return 0 }
-        let days = dues(before: to).filter { $0 >= from }
-        return amount * days.count
+    /// Compute the preview once from exact minor units before showing bars or enabling save.
+    private func projectLadder(amountMinor: Int) -> LadderPreview? {
+        var preview = LadderPreview()
+        let currentDay = today
+        guard let start = try? GregorianDay(year: currentDay.year, month: currentDay.month, day: 1),
+              let months = Recurrence(every: 1, unit: .month, first: start) else { return nil }
+        for (index, month) in ladder.enumerated() {
+            guard let from = months.occurrence(index), let to = months.occurrence(index + 1) else { return nil }
+            let days = dues(before: to).filter { $0 >= from }.count
+            let added = amountMinor.multipliedReportingOverflow(by: days)
+            guard !added.overflow else { return nil }
+            var before = 0
+            for part in [month.loanMinor, month.installmentMinor, month.billMinor, month.subscriptionMinor] {
+                let subtotal = before.addingReportingOverflow(part)
+                guard !subtotal.overflow else { return nil }
+                before = subtotal.partialValue
+            }
+            let total = before.addingReportingOverflow(added.partialValue)
+            guard !total.overflow else { return nil }
+            preview.months.append((before, added.partialValue))
+            preview.peak = max(preview.peak, total.partialValue)
+        }
+        return preview
     }
     private func instalments(_ n: Int) -> String {
         if n == 1 { return "قسط واحد" }
@@ -98,23 +156,42 @@ struct MoneyObligationSheet: View {
 
     var body: some View {
         // A navigation container only so the keyboard's «تم» bar can show; its own bar stays hidden.
-        NavigationStack { form.toolbar(.hidden, for: .navigationBar) }.presentationDetents([.large]).madarSheetLock(saving: saving)
+        NavigationStack { form.toolbar(.hidden, for: .navigationBar) }
+            .presentationDetents([.large])
+            .madarSheetLock(saving: saving, draft: hasUnsavedInput)
+            .alert("تتجاهل الالتزام؟", isPresented: $confirmDiscard) {
+                Button("تجاهل الالتزام", role: .destructive) { dismiss() }
+                Button("أكمل التعديل", role: .cancel) {}
+            }
+            .onChange(of: blocksRootRoute, initial: true) { _, blocked in
+                app.setMoneyRootDraftBlocker(rootBlockerID, active: blocked)
+            }
+            .onDisappear { app.setMoneyRootDraftBlocker(rootBlockerID, active: false) }
     }
 
     private var form: some View {
-        ScrollView {
+        let amount = draftAmount
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+#if DEBUG
+                if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_ROOT_ROUTE_HARNESS"] == "1" {
+                    Button("اختبر رابط المال") { app.open(URL(string: "madar://mal")!) }
+                        .accessibilityIdentifier("money-root-test-route")
+                }
+#endif
                 HStack {
                     Text("التزام جديد").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
                     Spacer()
-                    Button { dismiss() } label: { Text("إلغاء").frame(minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("money-obligation-cancel").madarWaitsForSave()
+                    Button(action: close) {
+                        Text("إلغاء").frame(minHeight: 44).contentShape(Rectangle())
+                    }.accessibilityIdentifier("money-obligation-cancel").madarWaitsForSave()
                 }.contentShape(Rectangle()).onTapGesture { field = nil }
                 Picker("النوع", selection: $kind) {
                     Text("فاتورة").tag("bill"); Text("اشتراك").tag("subscription"); Text("قرض").tag("loan"); Text("تقسيط").tag("installment")
-                }.pickerStyle(.segmented).accessibilityIdentifier("money-obligation-kind")
+                }.pickerStyle(.segmented).disabled(saving).accessibilityIdentifier("money-obligation-kind")
                 field("الاسم") {
                     TextField(placeholder, text: $name).focused($field, equals: .name).accessibilityIdentifier("money-obligation-name").onChange(of: name) { errorMessage = nil }
-                }
+                }.disabled(saving)
                 if suggestion != nil && !numbersVisible {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("المبلغ المقترح مخفي حتى تُظهر الأرقام.")
@@ -125,21 +202,25 @@ struct MoneyObligationSheet: View {
                         } label: { Text("أظهر الأرقام")
                         .font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
                         .accessibilityIdentifier("money-obligation-reveal-suggested-amount")
-                    }
+                    }.disabled(saving)
                 } else {
                     field(recurring ? "المبلغ في كل مرة" : "مبلغ القسط") {
                         TextField("٠", text: $rawAmount).keyboardType(.decimalPad).focused($field, equals: .amount)
                             .accessibilityIdentifier("money-obligation-amount")
                             .onChange(of: rawAmount) { amountWasEdited = true; errorMessage = nil }
-                    }
+                    }.disabled(saving)
+                }
+                if case .invalid(let message) = amount {
+                    Text(message).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
+                        .accessibilityIdentifier("money-obligation-amount-error")
                 }
                 if !recurring {
-                    Stepper(value: $count, in: 1...120) { Text(instalments(count)).font(MadarTypography.body()) }
-                        .accessibilityIdentifier("money-obligation-count")
+                    Stepper(value: $count, in: 1...MoneyCommandPayload.maxObligationInstallments) { Text(instalments(count)).font(MadarTypography.body()) }
+                        .disabled(saving).accessibilityIdentifier("money-obligation-count")
                 }
-                rhythm
-                if amountMinor != nil, !ladder.isEmpty {
-                    if numbersVisible { ladderPreview }
+                rhythm.disabled(saving)
+                if case .ready(_, let preview) = amount, !ladder.isEmpty {
+                    if numbersVisible { ladderPreview(preview) }
                     else {
                         Text("أرقامك مخفية؛ أظهرها من صفحة الالتزامات لترى أثر الإضافة.")
                             .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -151,7 +232,7 @@ struct MoneyObligationSheet: View {
                     Text("احفظ الالتزام").font(.custom("thmanyahsans-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.background)
                         .frame(maxWidth: .infinity, minHeight: 54).background(theme.ink)
                 }.buttonStyle(.madarPlain)
-                    .disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || amountMinor == nil)
+                    .disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !amount.canSave)
                     .accessibilityIdentifier("money-obligation-save")
             }.padding(16)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
@@ -193,6 +274,7 @@ struct MoneyObligationSheet: View {
                 }
                 Spacer(minLength: 8)
                 DatePicker("أول موعد", selection: $firstDue, displayedComponents: .date).labelsHidden()
+                    .environment(\.timeZone, zone)
                     .accessibilityIdentifier("money-obligation-first")
             }
             VStack(alignment: .leading, spacing: 0) {
@@ -215,26 +297,25 @@ struct MoneyObligationSheet: View {
         }.padding(14).background(theme.surface).overlay(alignment: .trailing) { Rectangle().fill(theme.color(kind == "subscription" ? "reserve" : kind == "bill" ? "surplus" : kind == "loan" ? "accent" : "bills")).frame(width: 4) }
     }
 
-    private var ladderPreview: some View {
+    private func ladderPreview(_ preview: LadderPreview) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("أثره على السلّم").font(MadarTypography.cardTitle())
-            let totals = ladder.enumerated().map { $0.element.total + added($0.offset) }
-            let monthlyPeak = totals.max() ?? 0
-            let peak = max(1, monthlyPeak)
+            let peak = CGFloat(max(1, preview.peak))
             HStack(spacing: 14) {
                 HStack(spacing: 5) { Rectangle().fill(theme.secondaryInk.opacity(0.35)).frame(width: 8, height: 8).accessibilityHidden(true); Text("قبل الإضافة") }
                 HStack(spacing: 5) { Rectangle().fill(theme.color("reserve")).frame(width: 8, height: 8).accessibilityHidden(true); Text("الإضافة") }
             }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             HStack(alignment: .bottom, spacing: 3) {
-                ForEach(Array(ladder.enumerated()), id: \.element.id) { index, month in
+                ForEach(Array(ladder.enumerated()), id: \.element.id) { index, _ in
+                    let month = preview.months[index]
                     VStack(spacing: 0) {
                         Spacer(minLength: 0)
-                        Rectangle().fill(theme.color("reserve")).frame(height: 70 * CGFloat(added(index)) / CGFloat(peak))
-                        Rectangle().fill(theme.secondaryInk.opacity(0.35)).frame(height: 70 * CGFloat(month.total) / CGFloat(peak))
+                        Rectangle().fill(theme.color("reserve")).frame(height: 70 * CGFloat(month.added) / peak)
+                        Rectangle().fill(theme.secondaryInk.opacity(0.35)).frame(height: 70 * CGFloat(month.before) / peak)
                     }.frame(maxWidth: .infinity).frame(height: 70)
                 }
             }.environment(\.layoutDirection, .rightToLeft)
-            Text(figure: "أعلى مجموع شهري بعد الإضافة " + service.amount(monthlyPeak) + " " + service.currencyName(app.string("core.currency")))
+            Text(figure: "أعلى مجموع شهري بعد الإضافة " + service.amount(preview.peak) + " " + service.currencyName(app.string("core.currency")))
                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-obligation-monthly-peak")
         }.accessibilityElement(children: .contain).accessibilityIdentifier("money-obligation-preview")
     }
@@ -245,14 +326,22 @@ struct MoneyObligationSheet: View {
             content().font(MadarTypography.body()).padding(10).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
         }
     }
+    private func close() {
+        guard !saving else { return }
+        field = nil
+        if hasUnsavedInput { confirmDiscard = true }
+        else { dismiss() }
+    }
+
     private func save() {
+        guard !saving, case .ready(let amount, _) = draftAmount else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { errorMessage = "اكتب اسم الالتزام."; return }
-        guard let amount = amountMinor else { errorMessage = "أدخل مبلغًا أكبر من صفر."; return }
         var payload: [String: MadarCore.JSONValue] = ["kind": .string(kind), "name": .string(String(trimmed.prefix(60))), "amountMinor": .string(String(amount)),
             "firstDue": .string(first.description), "repeatEvery": .number(Double(every)), "repeatUnit": .string(unit.rawValue)]
         if !recurring { payload["count"] = .number(Double(count)) }
-        guard !saving else { return }
+        field = nil
+        errorMessage = nil
         saving = true
         Task {
             do { try await app.executeMoneyCommand("money.saveObligation", payload: payload); dismiss() }

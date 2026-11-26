@@ -1,6 +1,23 @@
 import XCTest
 
 @MainActor final class QuranHomeUITests: XCTestCase {
+    func testHomeReadFailureKeepsRetryAvailableUntilPageLoads() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+            "MADAR_UI_QURAN_HOME_READ_FAILURE_ONCE": "1"]
+        app.launch()
+        let retry = app.buttons["quran-home-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["quran-coverage-title"].exists)
+        attach(app, "quran-home-read-retry")
+        retry.tap()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertFalse(retry.exists)
+    }
+
     // FB-33 (owner): the old Quran home tests were deleted on 23 Nov 2026; the features they covered are gone.
     func testUnreadableDraftDoesNotBlockQuranHome() throws {
         continueAfterFailure = false

@@ -161,6 +161,59 @@ import XCTest
         XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 10), app.debugDescription)
         app.terminate()
     }
+
+    func testDirtyOrphanLetterDateCanBeKeptOrDiscardedBeforeReturningHome() {
+        continueAfterFailure = false
+        let app = launch("lettersRoutes", rootRouteHarness: true)
+        app.buttons["diary-days"].tap()
+        app.buttons["diary-hub-letters"].tap()
+        let orphanDate = app.buttons["diary-letter-orphan-date"]
+        XCTAssertTrue(orphanDate.waitForExistence(timeout: 8), app.debugDescription)
+        orphanDate.tap()
+
+        let picker = app.datePickers["diary-letter-reschedule-date"]
+        let labels = app.descendants(matching: .any)["diary-letter-reschedule-date-labels"].firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(labels.exists, app.debugDescription)
+        let defaultDate = labels.label
+        picker.tap()
+        let next = app.buttons["DatePicker.NextMonth"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5), app.debugDescription)
+        next.tap()
+        let november15 = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@ OR label CONTAINS %@ OR label CONTAINS %@",
+            "١٥ نوفمبر", "15 November", "November 15"
+        )).firstMatch
+        XCTAssertTrue(november15.waitForExistence(timeout: 5), app.debugDescription)
+        november15.tap()
+        if next.exists {
+            // Dismiss the compact calendar by tapping the blank bottom of the sheet.
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
+        }
+        XCTAssertTrue(next.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertNotEqual(labels.label, defaultDate, app.debugDescription)
+        let changedDate = labels.label
+
+        app.buttons["diary-letter-reschedule-root-route"].tap()
+        XCTAssertTrue(picker.exists, "The root route must wait while the date has unsaved changes.")
+        let cancel = app.buttons["diary-letter-reschedule-cancel"]
+        cancel.tap()
+        let keep = app.alerts.buttons["أكمل الاختيار"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), app.debugDescription)
+        keep.tap()
+        XCTAssertEqual(labels.label, changedDate, app.debugDescription)
+
+        cancel.tap()
+        let discard = app.alerts.buttons["تجاهل الموعد"]
+        XCTAssertTrue(discard.waitForExistence(timeout: 5), app.debugDescription)
+        discard.tap()
+        XCTAssertTrue(picker.waitForNonExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 10), app.debugDescription)
+        app.buttons["diary-days"].tap()
+        app.buttons["diary-hub-letters"].tap()
+        XCTAssertTrue(orphanDate.waitForExistence(timeout: 8), "Discarding the date leaves the letter available for rescheduling.")
+    }
+
     func testDiaryRootWaitsForDirtyLetterComposerUntilExplicitDiscard() {
         continueAfterFailure = false
         let app = launch("letters", rootRouteHarness: true)

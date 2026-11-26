@@ -139,6 +139,48 @@ import XCTest
         }
     }
 
+    func testLandscapePadKeepsSpreadWhenFacingPageFailsAndRetriesBothFaces() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-24T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+            "MADAR_UI_QURAN_ROUTE": "madar://quran/page/128", "MADAR_UI_QURAN_MUSHAF_FAIL_PAGE_ONCE": "129"
+        ]
+        app.launch()
+        defer { app.terminate() }
+        let face = app.descendants(matching: .any)["quran-mushaf-page"]
+        XCTAssertTrue(face.waitForExistence(timeout: 25), app.debugDescription)
+        app.tapCoordinate(x: 0.5, y: 0.5)
+        let next = app.buttons["quran-mushaf-next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(next.label, "الوجه التالي")
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        expectation(for: NSPredicate(format: "label == %@", "الصفحتان التاليتان"), evaluatedWith: next)
+        waitForExpectations(timeout: 10)
+        let title = app.staticTexts["quran-mushaf-number"]
+        XCTAssertEqual(title.label, "الوجه ١٢٨")
+        next.tap()
+
+        let error = app.staticTexts["quran-mushaf-read-error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(error.label.contains("١٢٩"), error.label)
+        XCTAssertEqual(title.label, "الوجه ١٢٨", "The next spread must wait for its first face")
+        XCTAssertTrue(app.buttons["quran-mushaf-close"].isHittable)
+
+        app.buttons["quran-mushaf-retry"].tap()
+        expectation(for: NSPredicate(format: "label == %@", "الوجه ١٣٠"), evaluatedWith: title)
+        waitForExpectations(timeout: 10)
+        XCTAssertFalse(error.exists)
+        app.buttons["quran-mushaf-bookmarks"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["علامة على الوجه ١٢٩"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["علامة على الوجه ١٣٠"].firstMatch.exists)
+    }
+
     func testBookmarkNamesItsFaceAndReturnsThereAfterTurning() {
         continueAfterFailure = false
         let app = XCUIApplication()

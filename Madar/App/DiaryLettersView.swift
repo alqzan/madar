@@ -296,13 +296,28 @@ struct DiaryLetterReschedule: View {
     let letter: DiaryLetterCard
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
-    @State private var date = Date().addingTimeInterval(7 * 86_400)
+    @State private var date: Date
+    @State private var originalDay: GregorianDay
     @State private var failure: String?
     @State private var rescheduling = false
-    @State private var originalDay: GregorianDay?
-    @State private var dateChanged = false
+    @State private var confirmDiscard = false
+    private var service: AppDiaryService { .init(app: app) }
+    private var zone: TimeZone { app.activePlace.timeZone }
+    private var selectedDay: GregorianDay { .containing(date, in: zone) }
+    private var dateChanged: Bool { selectedDay != originalDay }
     private var blocksRootRoute: Bool { dateChanged || rescheduling }
+
+    init(app: AppSession, letter: DiaryLetterCard) {
+        self.app = app
+        self.letter = letter
+        let zone = app.activePlace.timeZone
+        let initialDay = AppBahwService(session: app).today.adding(days: 7)
+        _date = State(initialValue: initialDay.date(in: zone))
+        _originalDay = State(initialValue: initialDay)
+    }
+
     var body: some View {
+        let today = AppBahwService(session: app).today
         VStack(alignment: .leading, spacing: 16) {
 #if DEBUG
             if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" {
@@ -310,20 +325,50 @@ struct DiaryLetterReschedule: View {
                     .accessibilityIdentifier("diary-letter-reschedule-root-route")
             }
 #endif
-            Text("اختر موعدًا لرسالتك").font(DiaryType.heading)
-            DatePicker("اليوم", selection: $date, in: Date().addingTimeInterval(86_400)..., displayedComponents: .date).font(DiaryType.writing)
-            MadarDateLabel(app.dateLabels(GregorianDay.containing(date, in: app.activePlace.timeZone)))
+            HStack {
+                Text("اختر موعدًا لرسالتك").font(DiaryType.heading)
+                Spacer(minLength: 8)
+                Button {
+                    if dateChanged { confirmDiscard = true }
+                    else { dismiss() }
+                } label: {
+                    Text("إلغاء").font(DiaryType.label).frame(minHeight: 44).contentShape(.rect)
+                }
+                .madarWaitsForSave().accessibilityIdentifier("diary-letter-reschedule-cancel")
+            }
+            DatePicker("اليوم", selection: $date, in: today.adding(days: 1).date(in: zone)..., displayedComponents: .date)
+                .environment(\.calendar, service.letterPickerCalendar(hijri: false))
+                .environment(\.timeZone, zone).font(DiaryType.writing).disabled(rescheduling)
+                .accessibilityIdentifier("diary-letter-reschedule-date")
+            MadarDateLabel(app.dateLabels(selectedDay, first: app.diaryFirstCalendar))
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("diary-letter-reschedule-date-labels")
             if let failure { Text(failure).font(MadarTypography.body()) }
-            Button { guard !rescheduling else { return }; rescheduling = true; Task { defer { rescheduling = false }; do { try await AppDiaryService(app: app).rescheduleLetter(letter.id, to: date); dismiss() } catch { failure = madarUserMessage(error) } } } label: {
+            Button { save() } label: {
                 Text("احفظ الموعد").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
-            }.buttonStyle(.madarPlain).disabled(rescheduling).accessibilityIdentifier("diary-letter-reschedule-save")
+            }.buttonStyle(.madarPlain).disabled(rescheduling || selectedDay <= today).accessibilityIdentifier("diary-letter-reschedule-save")
         }.padding(22).frame(maxHeight: .infinity, alignment: .top).background(theme.background).foregroundStyle(theme.ink)
             .madarSheetLock(saving: rescheduling, draft: dateChanged)
-            .onAppear { originalDay = GregorianDay.containing(date, in: app.activePlace.timeZone) }
-            .onChange(of: date) { _, value in
-                let selectedDay = GregorianDay.containing(value, in: app.activePlace.timeZone)
-                dateChanged = originalDay.map { $0 != selectedDay } ?? false
+            .alert("تتجاهل الموعد الجديد؟", isPresented: $confirmDiscard) {
+                Button("تجاهل الموعد", role: .destructive) { dismiss() }
+                Button("أكمل الاختيار", role: .cancel) {}
             }
             .diaryRootDraftBlocking(app, isBlocking: blocksRootRoute)
+    }
+
+    private func save() {
+        guard !rescheduling else { return }
+        let requestedDate = date
+        rescheduling = true
+        failure = nil
+        Task {
+            defer { rescheduling = false }
+            do {
+                try await service.rescheduleLetter(letter.id, to: requestedDate)
+                dismiss()
+            } catch {
+                failure = madarUserMessage(error)
+            }
+        }
     }
 }
