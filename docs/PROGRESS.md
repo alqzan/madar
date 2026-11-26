@@ -48,6 +48,8 @@
 
 ## Verified baseline and delivery
 
+- Build 0.1.0 (76) was archived, signed and uploaded to internal TestFlight on 26 November at 21:20:40 Riyadh. Source `34f5de8b`. The app, widget and Watch app carry build 76 and minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-76/`.
+
 - Build 0.1.0 (75) was archived, signed and uploaded to internal TestFlight on 26 November at 09:48:50 Riyadh. Source `055d8d35`. The app, widget and Watch app carry build 75 and minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-75/`.
 
 - Build 0.1.0 (74) was archived, signed and uploaded to internal TestFlight on 25 November at 22:48:58 Riyadh. Source `99981880`. App, widget and Watch app are build 74 with minimum OS 27.0. Apple accepted the package for processing. See `Madar/Artifacts/OWNER-TestFlight-74/`.
@@ -299,6 +301,41 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 # Handovers
 
+## Handover — تطوير مدار ضمن الحد الأسبوعي — 2026-11-26 — Codex
+
+### Works now
+
+- يعود شرح المصحف إلى عنوان الآية عند التنقّل. يبقى صندوق الأسبوع متاحًا عند تعذّر فتح الكتابة ويتيح المحاولة مجددًا.
+- تُقرأ دفعة تصدير المذكرات في الخلفية. تُحسب ملاحظة الرسائل المختومة مع اللقطة وتُزال النسخة المؤقتة عندما يتبدّل المخزن أثناء التجهيز.
+- يتوقف عدّ وقت PDF عند ظهور البحث أو التحويل. يعكس بحث «خصّص» ظهور بطاقتي السنة والأيام القادمة في البهو.
+- يشمل البناء ٧٦ جولة الاستخدام الفعلي السابقة التي انتظرت إعادة التحقق من النسخ والعادات.
+
+### Verified
+
+- بناء iOS للاختبار. ١٦٥ اختبار حزم، و٢٤ اختبار تكامل مميزًا، و١١ مسار واجهة مميزًا. شملت الحالات النسخ المشفّر والمطابقة ومفتاح المخزن، استعادة العادة وإعادة فتح قصتها، تصدير المذكرات ومعاينتها وإلغاء ناتج قديم، تفسير المصحف، إعدادات البهو، وقارئَي PDF النصي والمصوّر.
+- تشغيل فعلي على iPhone 15 Pro Max وiPad Pro 13 بمخازن اصطناعية وiOS 27.0. مرّ فحص RU1 و`git diff --check`. حزم النتائج والسجلات في `Madar/Artifacts/owner-20261126-weekly/`.
+- أُرشف البناء ٧٦، وفُحص توقيعه ومكوّناته، وقبلته Apple للمعالجة على TestFlight الداخلي.
+
+### Differences left
+
+- اختبار الحزمة يثبت عدم احتساب وقت القارئ المغطّى. تحقق الواجهة غطّى ورقة البحث والعودة للصفحة وحفظ موضعها. قياس الثواني في مسار التحويل الفعلي على الجهاز يبقى مفتوحًا.
+
+### Not verified
+
+- انتهاء معالجة Apple وتثبيت البناء على جهاز المالك. اختبار استقبال الرسائل المصرفية تحت القفل وبعد إعادة تشغيل الآيفون، والأداء على سجل فعلي كبير.
+
+### Next
+
+- تجربة البناء ٧٦ على جهاز المالك، بما فيها أتمتة الرسائل وفتح ملفات PDF. تُستأنف مراجعة الغرف من البند ٣٣.
+
+### Model/effort
+
+- Codex وثلاثة مساعدين. النموذج والجهد التفصيليان غير متاحين.
+
+### Usage
+
+- البداية ٩٨٪ لخمس ساعات و١٣٪ للأسبوع. عند الأرشفة ٣٩٪ و٤٪. بعد الرفع ٢٩٪ و٢٪ على الترتيب.
+
 ## Handover — جولة الاستخدام الفعلي — 2026-11-26 — Codex
 
 ### Works now
@@ -363,37 +400,3 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 ### Usage
 
 - البداية ٩٩٪ متبقٍ لخمس ساعات و٤٤٪ للأسبوع. عند بدء التحقق الأخير ٧٪ و٣٠٪، وقبل الأرشفة ٣٪ و٢٩٪، على الترتيب.
-
-## Handover — استكمال الجولة وثبات مسارات مدار — 2026-11-25 — Codex
-
-### Works now
-
-- تعرض الجولة قائمة الآيباد أثناء شرح التنقّل وتعيد عرضها المحفوظ بعد الخطوة. يدلّ شرح المذكرات على «اقرأ» و«كل الذكريات» والتقويم.
-- يستبقي بحث البهو النتائج المقروءة ويذكر الأقسام التي تعذّر البحث فيها. تفتح المحبرة موضع نتيجة البحث نفسه عند إعادة المحاولة، ويحتفظ المصحف بوجهه الظاهر حتى يتم تحميل الوجه المطلوب. تتيح الإعدادات إعادة قراءة إجراءات الودجة والاختصارات.
-- تعديل اسم العادة يحفظ الهدف، وإغلاق محرر المال يطلب قرارًا حول التعديلات، ومسح مسودة المذكرات يثبت عند المغادرة. يبدأ الموعد لمرة واحدة من تكراره القادم وتبقى السنة التي اختارها المستخدم محفوظة عند التبديل داخل المحرر.
-
-### Verified
-
-- ٤٣ اختبار تكامل ناجحًا عبر `first-integration` و`final-integration` و`recheck-inbox`. صُححت عينة العزل لتستخدم سبب الرفض الفعلي `invalidCommand`، ثم نجح اختبار التعافي.
-- ١٩ تشغيلًا ناجحًا لاختبارات الواجهة على المحاكيين iOS وiPadOS 27.0. نتائج `first-bahw-habits` و`final-money-quran` و`final-diary-mihbara-settings` و`final-tour-phone` و`final-ipad` و`recheck-settings-year` و`recheck-habit`. صُحح مضيف قائمة الإجراءات الفارغة بعدما رصد الاختبار الأول غياب زر الاستعادة، واجتاز الاختبار الإعادة.
-- نجح بناء iOS للاختبار وبناء الماك وفحص فواصل الأرقام و`git diff --check`. ظهر الترحيب على الآيفون خلال ثانيتين، وظهر التطبيق على الآيباد خلال أربع ثوانٍ. أدلة الاختبار في `Madar/Artifacts/owner-20261125-flow-reliability/`.
-
-### Differences left
-
-- حالات تعذّر القراءة واستعادة المحاولة الجديدة وتظليل قائمة الآيباد **built — awaiting owner**. شواهدها `lobby-search-partial-results` و`mushaf-page-turn-failure` و`rejected-actions-read-retry` و`madar-tour-folded-sidebar`. مقارنتا `R18-Mushaf.html` و`W4-Takhsis.html` في مجلد الجولة.
-
-### Not verified
-
-- تجربة المالك على جهاز فعلي، والإشعارات والودجات ومقاطعة التسجيل والأداء مع سجل فعلي كبير. استُخدمت مخازن اصطناعية معزولة في التحقق.
-
-### Next
-
-- استلمت Apple بناء TestFlight الداخلي ٠٫١٫٠ (٧٤) 22:48:58 بتوقيت الرياض للمعالجة. المصدر `99981880`. التوقيع الصارم ناجح وأجزاء الأرشيف تحمل البناء ٧٤ والحد الأدنى 27.0. أدلة الشحن في `Madar/Artifacts/OWNER-TestFlight-74/`.
-
-### Model/effort
-
-- Codex وثلاثة مساعدين بمهام محددة. تفاصيل النموذج والجهد غير متاحة.
-
-### Usage
-
-- البداية ٨٠٪ متبقٍ لخمس ساعات و٥٧٪ للأسبوع. قبل الأرشفة ١٠٪ و٤٦٪. عند التسليم ٤٪ لخمس ساعات و٤٥٪ للأسبوع.
