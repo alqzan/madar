@@ -603,6 +603,18 @@ import MadarInbox
         #expect(try MoneyRepository(context: ModelContext(f.container)).allocationRows().isEmpty)
         #expect(try f.basis().reservedMinor == 285_000)
     }
+    @Test func recurringForeignBillReturnsAnErrorWhenItsConvertedTotalCannotFit() throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let context = ModelContext(f.container), bill = Obligation()
+        bill.kind = "bill"; bill.currency = "USD"; bill.amountMinor = Int.max / 2_000
+        bill.repeatEvery = 1; bill.repeatUnit = "day"; bill.firstDueDayKey = "2026-10-01"
+        context.insert(bill); try context.save()
+        let repository = MoneyRepository(context: ModelContext(f.container))
+        #expect(throws: MoneyCommandError.invalidAmount) {
+            try repository.basis(at: f.now, rates: ["USD": "1000"])
+        }
+        #expect(try repository.basis(at: f.now, rates: ["USD": "1"]).reservedMinor == bill.amountMinor * 31)
+    }
     @Test func foreignTransactionDoesNotAffectUnrelatedAccountAndCheckpointCannotBeRebased() async throws {
         let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
         _ = try await f.run("money.logExpense", ["amountMinor": .number(1234), "currency": .string("USD"), "method": .string("card"),

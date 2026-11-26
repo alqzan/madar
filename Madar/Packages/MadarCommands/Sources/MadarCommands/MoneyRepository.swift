@@ -207,7 +207,9 @@ public struct MoneyRepository {
     }
     /// Strict by default (reconciliation records and zakat must never persist an understated basis); only the Money home and its basis page pass `skippingUnrated`.
     public func basis(at now: Date = .now, rates: [String: String] = [:], skippingUnrated: Bool = false) throws -> Basis {
-        BasisEngine.basis(try basisInput(at: now, rates: rates, skippingUnrated: skippingUnrated))
+        let input = try basisInput(at: now, rates: rates, skippingUnrated: skippingUnrated)
+        guard let basis = BasisEngine.exactBasis(input) else { throw MoneyCommandError.invalidAmount }
+        return basis
     }
     public func basisInput(at now: Date = .now, rates: [String: String] = [:], skippingUnrated: Bool = false) throws -> BasisInput {
         let rates = try manualRates(at: now).merging(rates) { _, explicit in explicit }
@@ -235,7 +237,9 @@ public struct MoneyRepository {
         let loans = try items.compactMap { item -> Int? in
             guard item.dueDate < periodEnd,
                   let obligation = obligations.first(where: { $0.id == item.obligationID && $0.kind == "loan" }) else { return nil }
-            return try converted(max(0, item.amountMinor - item.paidMinor), currency: obligation.currency)
+            let remaining = item.amountMinor.subtractingReportingOverflow(item.paidMinor)
+            guard !remaining.overflow else { throw MoneyCommandError.invalidAmount }
+            return try converted(max(0, remaining.partialValue), currency: obligation.currency)
         }
         // All bills in this cycle are reserved, including a bill whose due day is still ahead.
         // M5-X00: a bill or subscription on a free schedule is reserved once per unpaid due day inside the period, so a
@@ -246,7 +250,11 @@ public struct MoneyRepository {
             if let schedule = obligation.recurrence {
                 let payments = transactions.filter { $0.obligationID == obligation.id }.map(\.eventAt)
                 let count = try unpaidRecurring(schedule, from: firstDay, before: endDay, payments: payments, zone: place.timeZone).count
-                if count > 0 { bills.append(try converted(obligation.amountMinor, currency: obligation.currency) * count) }
+                if count > 0 {
+                    let total = try converted(obligation.amountMinor, currency: obligation.currency).multipliedReportingOverflow(by: count)
+                    guard !total.overflow else { throw MoneyCommandError.invalidAmount }
+                    bills.append(total.partialValue)
+                }
             } else if obligation.kind == "bill", !transactions.contains(where: { $0.obligationID == obligation.id && $0.eventAt >= periodStart && $0.eventAt < periodEnd }) {
                 bills.append(try converted(obligation.amountMinor, currency: obligation.currency))
             }

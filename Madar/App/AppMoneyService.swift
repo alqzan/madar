@@ -227,7 +227,9 @@ enum MoneyHomeReadingBuilder {
         for item in items {
             guard let obligationID = item.obligationID,
                   let obligation = obligationsByID[obligationID], obligation.currency == currency else { continue }
-            due.append(.init(id: item.id, name: obligation.name, amountMinor: item.amountMinor - item.paidMinor, due: .containing(item.dueDate, in: zone)))
+            let amount = item.amountMinor.subtractingReportingOverflow(item.paidMinor)
+            guard !amount.overflow else { throw MoneyCommandError.invalidAmount }
+            due.append(.init(id: item.id, name: obligation.name, amountMinor: amount.partialValue, due: .containing(item.dueDate, in: zone)))
         }
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
         var paymentDatesByObligation: [UUID: [Date]] = [:]
@@ -235,7 +237,7 @@ enum MoneyHomeReadingBuilder {
             guard let obligationID = transaction.obligationID else { continue }
             paymentDatesByObligation[obligationID, default: []].append(transaction.eventAt)
         }
-        var flexibleExtraMinor = 0
+        var flexibleExtraMinor: Int128 = 0
         for bill in obligations where bill.isRecurring && bill.currency == currency {
             let payments = paymentDatesByObligation[bill.id] ?? []
             // M5-X00: a free schedule shows its next unpaid due day (from this cycle's start), the same rule as the obligations room.
@@ -245,7 +247,7 @@ enum MoneyHomeReadingBuilder {
                 let unpaid = try repo.unpaidRecurring(schedule, from: from, before: max(today, from).adding(days: 400), payments: payments, zone: zone)
                 if let next = unpaid.first {
                     due.append(.init(id: bill.id, name: bill.name, amountMinor: bill.amountMinor, due: next))
-                    flexibleExtraMinor += bill.amountMinor * unpaid.dropFirst().filter { $0 < cycleEnd }.count
+                    flexibleExtraMinor += Int128(bill.amountMinor) * Int128(unpaid.dropFirst().count { $0 < cycleEnd })
                 }
                 continue
             }
@@ -261,7 +263,9 @@ enum MoneyHomeReadingBuilder {
         }
         due.sort { $0.due == $1.due ? $0.id.uuidString < $1.id.uuidString : $0.due < $1.due }
         let length = cycle?.input.expectedLengthDays ?? 30
-        let cycleObligations = due.filter { $0.due < max(cycle?.expectedEndDay ?? today.adding(days: length), today.adding(days: 1)) }.reduce(0) { $0 + $1.amountMinor } + flexibleExtraMinor
+        let cycleEnd = max(cycle?.expectedEndDay ?? today.adding(days: length), today.adding(days: 1))
+        let obligationTotal = due.lazy.filter { $0.due < cycleEnd }.reduce(flexibleExtraMinor) { $0 + Int128($1.amountMinor) }
+        guard let cycleObligations = Int(exactly: obligationTotal) else { throw MoneyCommandError.invalidAmount }
         let surplusEnvelopeIDs = Set(envelopes.filter { $0.role == "surplus" }.map(\.id))
         let history = Dictionary(grouping: allocations.filter {
             !$0.idempotencyKey.hasPrefix("move:") && ($0.target == "surplus" || $0.targetID.map(surplusEnvelopeIDs.contains) == true)

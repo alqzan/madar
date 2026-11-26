@@ -21,7 +21,9 @@ struct IngestBankMessageIntent: AppIntent {
     static var parameterSummary: some ParameterSummary { Summary("سجّل رسالة البنك \(\.$text)") }
     func perform() async throws -> some IntentResult & ProvidesDialog {
         do {
-            try MoneyInboxCommandWriter.ingest(inbox: Self.inbox(), text: text, sender: sender, receivedAt: receivedAt)
+            guard try MoneyInboxCommandWriter.ingest(inbox: Self.inbox(), text: text, sender: sender, receivedAt: receivedAt) != nil else {
+                return .result(dialog: "لم تُضَف للمراجعة.")
+            }
         } catch MoneyInboxError.invalidPayload { throw MoneyIntentError.invalidMessage }
         await MainActor.run { NotificationCenter.default.post(name: .madarInboxChanged, object: nil) }
         return .result(dialog: "استُلمت.")
@@ -53,11 +55,19 @@ struct LogExpenseIntent: AppIntent {
     }
     static var parameterSummary: some ParameterSummary { Summary("سجّل مصروف \(\.$amount) \(\.$currency)") }
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let code = (currency?.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 }?.uppercased() ?? Self.homeCurrency(), raw = BankMessageParser.clean(amount).replacingOccurrences(of: ",", with: "")
-        guard let exp = CurrencyExponents.specified.exponent(code), let minor = MoneyAmountInput.minor(raw, exponent: exp), minor > 0 else { throw MoneyIntentError.invalidAmount }
-        try MoneyInboxCommandWriter.logExpense(inbox: IngestBankMessageIntent.inbox(), amountMinor: minor, currency: code, merchant: merchant, method: method?.rawValue)
+        try enqueue(in: IngestBankMessageIntent.inbox(), defaultCurrency: Self.homeCurrency())
         await MainActor.run { NotificationCenter.default.post(name: .madarInboxChanged, object: nil) }
         return .result(dialog: "حُفظ للمراجعة.")
+    }
+
+    func enqueue(in inbox: PendingInbox, defaultCurrency: String) throws {
+        let code = currency?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let currencyCode = code.flatMap { $0.isEmpty ? nil : $0 } ?? defaultCurrency
+        guard let exponent = CurrencyExponents.specified.exponent(currencyCode),
+              let minor = MoneyAmountInput.minor(BankMessageParser.clean(amount), exponent: exponent), minor > 0 else {
+            throw MoneyIntentError.invalidAmount
+        }
+        try MoneyInboxCommandWriter.logExpense(inbox: inbox, amountMinor: minor, currency: currencyCode, merchant: merchant, method: method?.rawValue)
     }
 }
 extension LogExpenseIntent {

@@ -15,10 +15,7 @@ public enum MoneyInboxCommandWriter {
         // Freeze the device time at receipt, not at a later app drain.
         if let receivedAt { p["receivedAt"] = .string(ISO8601DateFormatter().string(from: receivedAt)) }
         guard MoneyCommandPayload.validate(name: MoneyCommandPayload.intakeName, payload: p) else { throw MoneyInboxError.invalidPayload }
-        switch BankIntake.decision(BankMessageParser.classify(text)) {
-        case .discard, .discardWithoutText: return nil
-        default: break
-        }
+        guard !BankIntake.shouldDiscard(text) else { return nil }
         return try enqueue(inbox, name: MoneyCommandPayload.intakeName, payload: p, id: commandID, at: issuedAt)
     }
 

@@ -6,7 +6,7 @@ import MadarCore
 /// link, and lands with the room's own confirmation and 10-minute undo. Money opens its confirmation sheet; «فكرة: …» becomes a diary line (FB-39: the notebook has no entry point). The dialog never repeats the text (§14).
 struct CaptureIntent: AppIntent {
     static let title: LocalizedStringResource = "التقط في مدار"
-    static let description = IntentDescription("جملة واحدة تذهب إلى غرفتها: «صليت العصر جماعة» إلى الصلاة، «قهوة ١٨» إلى تأكيد المصروف، وغيرها، ومنها «فكرة: …»، إلى صفحة اليوم.")
+    static let description = IntentDescription("اكتب «قهوة ١٨» لتفتح مراجعة المصروف، أو التقط فكرة أو جملة في صفحة اليوم.")
     static let supportedModes: IntentModes = .foreground
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 

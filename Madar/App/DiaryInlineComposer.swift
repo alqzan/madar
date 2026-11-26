@@ -187,10 +187,10 @@ struct DiaryInlineComposer: View {
             Task { await loadDraft(typedSince: before) }
         }
         .onChange(of: cameraOpen) { _, open in if !open { holdCommit = false } }
-        // 14 Nov owner (T10): leaving the app is a boundary. What was written becomes the line; no idle timer ever commits (one paragraph stays one line).
+        // Finish a paragraph in the inline field when leaving. The expanded surface keeps its draft and flushes it before suspension.
         .onChange(of: scenePhase) { _, phase in
             guard phase == .background, visible, loaded, edit == nil, !saving else { return }
-            if hasPendingBlankDraft {
+            if hasPendingBlankDraft || (expanded && text != lastSaved) {
                 DiaryDraftFlush.run { await keepDraft() }
             } else if touchedSinceLoad, canSend, !expanded, !voiceBusy {
                 Task { await send() }
@@ -236,10 +236,7 @@ struct DiaryInlineComposer: View {
         .onChange(of: photo) { _, item in if let item { Task { await addPhoto(item) } } }
         .onChange(of: expanded) { _, open in
             if open {
-                let start = DiaryRichText.attributed(fromMarkdown: field.wrappedValue)
-                richBaseline = DiaryRichText.markdown(from: start)
-                rich = start
-                richSelection = AttributedTextSelection(insertionPoint: rich.endIndex)
+                loadRichField(from: field.wrappedValue)
                 focusRich()
             } else { focused = false }
         }
@@ -256,6 +253,13 @@ struct DiaryInlineComposer: View {
         .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.data]) { result in Task { await addFile(result) } }
         .modifier(InlineVoiceEvents(voice: voice, saved: saved, notice: $notice))
         .overlay(alignment: .bottom) { DiaryPaperPlane(trigger: flights, tint: theme.accent).allowsHitTesting(false) }
+    }
+
+    private func loadRichField(from markdown: String) {
+        let attributed = DiaryRichText.attributed(fromMarkdown: markdown)
+        richBaseline = DiaryRichText.markdown(from: attributed)
+        rich = attributed
+        richSelection = AttributedTextSelection(insertionPoint: rich.endIndex)
     }
 
     private func focusRich() {
@@ -581,6 +585,7 @@ struct DiaryInlineComposer: View {
 
     /// Reads the shared draft into the field, but never over words the user typed after the field appeared (`typedSince` is what it held before).
     private func loadDraft(typedSince before: String) async {
+        guard !Task.isCancelled else { return }
         let typed = text != before ? text : nil
         do {
             if let draft = try service.draft(margin: margin) {
@@ -596,6 +601,7 @@ struct DiaryInlineComposer: View {
                 text = typed ?? ""
             }
         } catch { failure = madarUserMessage(error) }
+        if expanded, edit == nil { loadRichField(from: text) }
         loadedText = text; touchedSinceLoad = typed != nil
         loaded = true
         // Typed words that arrived before the draft was read are written like any other edit.
@@ -616,8 +622,10 @@ struct DiaryInlineComposer: View {
 #if DEBUG
         // Exercise clearing at a navigation boundary without relying on the timing of a tap.
         let environment = ProcessInfo.processInfo.environment
-        if trimmedText.isEmpty, environment["MADAR_UI_DIARY_BLANK_DRAFT_BOUNDARY"] == "1",
-           environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil { return }
+        if environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil {
+            if trimmedText.isEmpty, environment["MADAR_UI_DIARY_BLANK_DRAFT_BOUNDARY"] == "1" { return }
+            if environment["MADAR_UI_DIARY_DRAFT_BACKGROUND"] == "1" { return }
+        }
 #endif
         let previous = draftTask
         previous?.cancel()

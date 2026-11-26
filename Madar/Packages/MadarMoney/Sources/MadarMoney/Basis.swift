@@ -63,14 +63,30 @@ public struct Basis: Equatable, Sendable {
 
 public enum BasisEngine {
     public static func basis(_ input: BasisInput) -> Basis {
-        // A card's credit balance is your money held at the bank: it sits with the cash, and «عليك» never goes below 0.
-        let cash = input.accounts.filter { $0.ownership == .mine }.reduce(0) { $0 + $1.balanceMinor }
-            + input.creditCards.reduce(0) { $0 + $1.creditMinor }
-        let owed = input.creditCards.reduce(0) { $0 + $1.statementLeftMinor + $1.unbilledLeftMinor }
-            + input.installments.reduce(0) { $0 + $1.leftMinor }
-        let reserved = input.loanDueMinor + input.billsDueMinor + input.envelopeAllocationsMinor.reduce(0, +)
-        return Basis(inAccountMinor: cash, owedMinor: owed, netMinor: cash - owed, reservedMinor: reserved, unallocatedMinor: cash - owed - reserved)
+        guard let basis = exactBasis(input) else { preconditionFailure("Basis amounts exceed the supported range") }
+        return basis
     }
+
+    /// Store-backed callers can report an unrepresentable total without displaying a false balance.
+    public static func exactBasis(_ input: BasisInput) -> Basis? {
+        // A card's credit balance is your money held at the bank: it sits with the cash, and «عليك» never goes below 0.
+        let cash = input.accounts.lazy.filter { $0.ownership == .mine }.reduce(Int128(0)) { $0 + Int128($1.balanceMinor) }
+            + input.creditCards.reduce(Int128(0)) { $0 + $1.wideCreditMinor }
+        let owed = input.creditCards.reduce(Int128(0)) { $0 + $1.wideStatementLeftMinor + $1.wideUnbilledLeftMinor }
+            + input.installments.reduce(Int128(0)) { $0 + max(0, Int128($1.amountMinor) - Int128($1.paidMinor)) }
+        let reserved = input.envelopeAllocationsMinor.reduce(Int128(input.loanDueMinor) + Int128(input.billsDueMinor)) { $0 + Int128($1) }
+        let net = cash - owed
+        guard let cashMinor = Int(exactly: cash), let owedMinor = Int(exactly: owed), let netMinor = Int(exactly: net),
+              let reservedMinor = Int(exactly: reserved), let unallocatedMinor = Int(exactly: net - reserved) else { return nil }
+        return Basis(inAccountMinor: cashMinor, owedMinor: owedMinor, netMinor: netMinor,
+                     reservedMinor: reservedMinor, unallocatedMinor: unallocatedMinor)
+    }
+}
+
+private extension CreditCardState {
+    var wideStatementLeftMinor: Int128 { max(0, Int128(statementMinor) - Int128(paidSinceCloseMinor)) }
+    var wideUnbilledLeftMinor: Int128 { max(0, Int128(unbilledMinor) - max(0, Int128(paidSinceCloseMinor) - Int128(statementMinor))) }
+    var wideCreditMinor: Int128 { max(0, Int128(paidSinceCloseMinor) - Int128(statementMinor) - Int128(unbilledMinor)) }
 }
 
 /// How long a balance lasts in dailies (§7.5 «الاحتياطي»). RM9: each cycle's obligations are paid from it too.
@@ -84,9 +100,9 @@ public struct Runway: Equatable, Sendable {
 public enum RunwayEngine {
     /// days = ⌊balance × L ÷ (يومك × L + obligations per cycle)⌋; nil when nothing is spent (no runway to show).
     public static func runway(balanceMinor: Int, dailyMinor: Int, cycleLengthDays: Int, obligationsPerCycleMinor: Int = 0) -> Runway? {
-        let perCycle = dailyMinor * cycleLengthDays + obligationsPerCycleMinor
+        let perCycle = Int128(dailyMinor) * Int128(cycleLengthDays) + Int128(obligationsPerCycleMinor)
         guard perCycle > 0, cycleLengthDays > 0 else { return nil }
-        let days = max(0, balanceMinor) * cycleLengthDays / perCycle
+        guard let days = Int(exactly: Int128(max(0, balanceMinor)) * Int128(cycleLengthDays) / perCycle) else { return nil }
         return Runway(days: days, cycles: days / cycleLengthDays, extraDays: days % cycleLengthDays)
     }
 }

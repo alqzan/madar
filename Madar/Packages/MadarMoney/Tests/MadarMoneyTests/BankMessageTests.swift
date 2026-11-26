@@ -406,6 +406,11 @@ import Testing
     @Test func knownBankSenderAliasesMatchButUnknownContactsDoNot() {
         #expect(BankMessageIdentity.matches("مصرف الراجحي", "AlRajhiBank"))
         #expect(BankMessageIdentity.matches("البنك السعودي البريطاني", "SABB"))
+        #expect(BankMessageIdentity.matches("البنك الأهلي", "snb-alahli"))
+        #expect(BankMessageIdentity.matches("برق", "barq_app"))
+        #expect(BankMessageIdentity.matches("دي 360", "D360_Bank"))
+        #expect(BankMessageIdentity.matches("الإنماء للاستثمار", "alinma_inv."))
+        #expect(!BankMessageIdentity.matches("الإنماء", "alinma_inv."))
         #expect(!BankMessageIdentity.matches("مصرف الراجحي", "900"))
         #expect(!BankMessageIdentity.matches("مصرف الراجحي", "AlinmaBank"))
 

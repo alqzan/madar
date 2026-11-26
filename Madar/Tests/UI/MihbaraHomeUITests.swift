@@ -1499,6 +1499,35 @@ import UIKit
         XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription)
     }
 
+    func testOpeningOriginalPDFWaitsForEPUBPositionRetry() {
+        continueAfterFailure = false
+        let pdf = fixturePDF(pageTexts: ["هذه بداية الكتاب.", "هذه خاتمة الكتاب."])
+        let app = app("reader", pdf: pdf, readingLocatorFailureOnClose: true)
+        app.launch(); open(app)
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
+        let contents = app.buttons["mihbara-reader-contents"]
+        XCTAssertTrue(contents.waitForExistence(timeout: 20), app.debugDescription); contents.tap()
+        let firstPage = app.buttons["mihbara-reader-toc-1"]
+        XCTAssertTrue(firstPage.waitForExistence(timeout: 8), app.debugDescription); firstPage.tap()
+        let printedPage = app.staticTexts.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "mihbara-reader-print-page", "ص ١")).firstMatch
+        XCTAssertTrue(printedPage.waitForExistence(timeout: 12), app.debugDescription)
+        let original = app.buttons["mihbara-reader-original-pdf"]
+        XCTAssertTrue(original.isHittable, app.debugDescription); original.tap()
+
+        let pendingSave = app.alerts["القارئ"]
+        XCTAssertTrue(pendingSave.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].exists)
+        let pdfClose = app.buttons["mihbara-pdf-close"]
+        XCTAssertFalse(pdfClose.exists)
+        let retry = pendingSave.buttons["mihbara-reading-save-retry"].firstMatch
+        XCTAssertTrue(retry.exists); retry.tap()
+        XCTAssertTrue(pdfClose.waitForExistence(timeout: 15), app.debugDescription)
+        let visiblePage = "صفحة الملف \u{2068}١\u{2069} من \u{2068}٢\u{2069}"
+        let page = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@ AND label == %@", "mihbara-pdf-page", visiblePage)).firstMatch
+        XCTAssertTrue(page.waitForExistence(timeout: 8), app.debugDescription)
+    }
+
     func testEPUBReadingSaveErrorCanRetryWithoutLeavingTheReader() throws {
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))

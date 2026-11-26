@@ -38,8 +38,20 @@ struct MoneyInboxCommandWriterTests {
     @Test func aOneTimeCodeOrAnAdIsNeverStored() throws {
         let inbox = try fixture()
         #expect(try MoneyInboxCommandWriter.ingest(inbox: inbox, text: "رمز التحقق: 482913 لا تشاركه مع أحد") == nil)
+        #expect(try MoneyInboxCommandWriter.ingest(inbox: inbox, text: "رمز التحقق لعرض فاتورة جديدة: 482913") == nil)
+        #expect(try MoneyInboxCommandWriter.ingest(inbox: inbox, text: "رمز الدخول لمرة واحدة: 482913") == nil)
+        #expect(try MoneyInboxCommandWriter.ingest(inbox: inbox, text: "Your one-time passcode for this purchase is 482913") == nil)
         #expect(try MoneyInboxCommandWriter.ingest(inbox: inbox, text: "عرض خاص! خصم حصري على البطاقات. لإلغاء الاشتراك أرسل 1") == nil)
         #expect(try inbox.claimBatch().isEmpty)
+    }
+
+    @Test func aNewBillNoticeReachesTheStoreForAnUpcomingDue() throws {
+        let inbox = try fixture()
+        let message = "تم إصدار فاتورتك والمبلغ المطلوب 50.00 ريال\nتاريخ الاستحقاق: 2026-10-20"
+        let ticket = try #require(try MoneyInboxCommandWriter.ingest(inbox: inbox, text: message, sender: "Bills", issuedAt: instant))
+        let record = try inbox.read(#require(try inbox.claimBatch().first))
+        #expect(record.command.commandID == ticket.commandID)
+        #expect(record.command.payload == .object(["text": .string(message), "sender": .string("Bills")]))
     }
 
     @Test func aMessageWeCannotReadIsKeptForALookWithItsReceiptTime() throws {

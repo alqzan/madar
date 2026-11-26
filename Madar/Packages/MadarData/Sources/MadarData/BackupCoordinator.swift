@@ -103,15 +103,18 @@ import Darwin
         let lease = StoreLease(lockURL:store.commandLockURL); try lease.acquire(); defer { lease.release() }
         try store.refreshIfNeeded()
         let records = try currentRecords()
-        let existingKeys = Set(records.map(RecordFingerprint.key)); let backupKeys = Set(value.0.records.map(RecordFingerprint.key))
-        let updates = value.0.records.filter { incoming in records.contains { current in RecordFingerprint.key(current) == RecordFingerprint.key(incoming) && current != incoming } }.count
+        let existingByKey = Dictionary(grouping: records, by: RecordFingerprint.key)
+        let backupKeys = Set(value.0.records.map(RecordFingerprint.key))
+        let updates = value.0.records.count { incoming in
+            existingByKey[RecordFingerprint.key(incoming)]?.contains { $0 != incoming } == true
+        }
         let dates = value.0.records.filter(\.isLive).compactMap { row in ["eventAt","endedAt","writtenAt","at","start","createdAt"].compactMap { row.date($0) }.first }
         var warnings = ["تتضمن الأعداد سجلات الحذف والأسماء البديلة.","عند الاستبدال: سيتغيّر هذا على كل أجهزتك بعد تفعيل المزامنة؛ السجلات الحالية الغائبة تصبح محذوفة."]
         if Self.hasMissingBookFiles(value.0.records) {
             warnings.append("النسخة لا تتضمن ملفات بعض الكتب. يحتفظ الاسترجاع بالملفات المطابقة الموجودة على هذا الجهاز؛ وإلا فأعد استيرادها.")
         }
         if store.isCloudBacked { warnings.append("الاستعادة إلى مخزن مرتبط بالسحاب غير متاحة حتى تُثبت المصالحة وانتشار الحذف.") }
-        return .init(id:UUID(),fileURL:file,fileName:file.lastPathComponent,createdAt:value.0.manifest.createdAt,counts:Self.counts(value.0.records),currentCounts:Self.counts(records),additions:value.0.records.filter { !existingKeys.contains(RecordFingerprint.key($0)) }.count,updates:updates,deletions:records.filter { $0.isLive && !backupKeys.contains(RecordFingerprint.key($0)) }.count,earliestDate:dates.min(),latestDate:dates.max(),skippedCount:0,warnings:warnings,validated:value.0,fileHash:value.1,generationID:store.binding.generationID,currentFingerprint:try RecordFingerprint.hash(records))
+        return .init(id:UUID(),fileURL:file,fileName:file.lastPathComponent,createdAt:value.0.manifest.createdAt,counts:Self.counts(value.0.records),currentCounts:Self.counts(records),additions:value.0.records.count { existingByKey[RecordFingerprint.key($0)] == nil },updates:updates,deletions:records.filter { $0.isLive && !backupKeys.contains(RecordFingerprint.key($0)) }.count,earliestDate:dates.min(),latestDate:dates.max(),skippedCount:0,warnings:warnings,validated:value.0,fileHash:value.1,generationID:store.binding.generationID,currentFingerprint:try RecordFingerprint.hash(records))
     }
     public func restore(preview: RestorePreview, mode: RestoreMode, passphrase: String? = nil, progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation(), now: Date = Date(), authorization: @MainActor () async throws -> Void = {}, validation: @MainActor () throws -> Void = {}) async throws -> RestoreResult {
         guard !store.isCloudBacked else { throw BackupOperationError.cloudRestoreUnsupported }
@@ -375,29 +378,38 @@ import Darwin
     }
     private static func planned(existing: [DataRecord], incoming: [DataRecord], mode: RestoreMode, now: Date, writerID: String) throws -> [DataRecord] {
         let incomingKept = Self.droppingPurgedBookDependents(incoming, existing: existing)
+        // Old stores can contain duplicate identities. Match the first row, as in a linear lookup.
+        let existingIndices = Dictionary(existing.indices.map { (RecordFingerprint.key(existing[$0]), $0) }, uniquingKeysWith: { first, _ in first })
         if mode == .merge {
             var rows = existing
+            var indices = existingIndices
             for record in incomingKept {
-                if let index = rows.firstIndex(where: { RecordFingerprint.key($0) == RecordFingerprint.key(record) }) { rows[index] = try RowMerger.mergeVersions(rows[index],record) }
-                else { rows.append(record) }
+                let key = RecordFingerprint.key(record)
+                if let index = indices[key] {
+                    rows[index] = try RowMerger.mergeVersions(rows[index], record)
+                } else {
+                    indices[key] = rows.endIndex
+                    rows.append(record)
+                }
             }
             return try RowMerger.reconciled(rows)
         }
         let keys = Set(incomingKept.map(RecordFingerprint.key))
         // A book the owner removed for good (emptied tombstone) is not brought back by an older copy inside a backup.
-        var rows = incomingKept.map { row -> DataRecord in
-            guard row.model == "Book", row.isLive,
-                  let current = existing.first(where: { RecordFingerprint.key($0) == RecordFingerprint.key(row) }),
-                  current.deletedAt != nil, current.fields["title"] == .string("") else { return row }
-            return current
-        }
-        for i in rows.indices {
-            let current = existing.first { RecordFingerprint.key($0) == RecordFingerprint.key(rows[i]) }
-            let previous = max(rows[i].date("updatedAt") ?? .distantPast,current?.date("updatedAt") ?? .distantPast)
+        var rows = try incomingKept.map { incoming -> DataRecord in
+            let current = existingIndices[RecordFingerprint.key(incoming)].map { existing[$0] }
+            var row = incoming
+            if row.model == "Book", row.isLive, let current, current.deletedAt != nil, current.fields["title"] == .string("") {
+                row = current
+            }
+            let previous = max(row.date("updatedAt") ?? .distantPast, current?.date("updatedAt") ?? .distantPast)
             let stamp = StableIdentity.monotonic(now:now,previous:previous)
-            let barrier = [rows[i].deletedAt,rows[i].date("deletionBarrierAt"),current?.deletedAt,current?.date("deletionBarrierAt")].compactMap { $0 }.max()
-            try rows[i].set(stamp,for:"updatedAt"); try rows[i].set(writerID,for:"writerID"); try rows[i].set(barrier,for:"deletionBarrierAt")
-            if rows[i].isLive { try rows[i].set(max(stamp,(barrier ?? .distantPast).addingTimeInterval(0.001)),for:"restoredAt") }
+            let barrier = [row.deletedAt, row.date("deletionBarrierAt"), current?.deletedAt, current?.date("deletionBarrierAt")].compactMap { $0 }.max()
+            try row.set(stamp, for: "updatedAt")
+            try row.set(writerID, for: "writerID")
+            try row.set(barrier, for: "deletionBarrierAt")
+            if row.isLive { try row.set(max(stamp, (barrier ?? .distantPast).addingTimeInterval(0.001)), for: "restoredAt") }
+            return row
         }
         for var absent in existing where !keys.contains(RecordFingerprint.key(absent)) {
             let stamp = StableIdentity.monotonic(now:now,previous:absent.date("updatedAt") ?? .distantPast)

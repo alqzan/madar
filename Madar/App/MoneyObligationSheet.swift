@@ -128,12 +128,7 @@ struct MoneyObligationSheet: View {
             let days = dues(before: to).filter { $0 >= from }.count
             let added = amountMinor.multipliedReportingOverflow(by: days)
             guard !added.overflow else { return nil }
-            var before = 0
-            for part in [month.loanMinor, month.installmentMinor, month.billMinor, month.subscriptionMinor] {
-                let subtotal = before.addingReportingOverflow(part)
-                guard !subtotal.overflow else { return nil }
-                before = subtotal.partialValue
-            }
+            guard let before = Int(exactly: month.total) else { return nil }
             let total = before.addingReportingOverflow(added.partialValue)
             guard !total.overflow else { return nil }
             preview.months.append((before, added.partialValue))

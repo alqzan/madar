@@ -37,6 +37,10 @@ struct MoneyObligationsView: View {
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
     private func amount(_ minor: Int) -> String { visible ? service.amount(minor) : "•••" }
+    private func totalAmount(_ minor: Int128) -> String {
+        guard visible else { return "•••" }
+        return Int(exactly: minor).map { service.amount($0) } ?? "المجموع خارج النطاق"
+    }
     private func color(_ group: MoneyObligationDue.Group) -> Color {
         switch group { case .loan: theme.color("accent"); case .installment: theme.color("bills"); case .bill: theme.color("surplus"); case .subscription: theme.color("reserve"); case .statement: theme.color("due") }
     }
@@ -109,7 +113,7 @@ struct MoneyObligationsView: View {
                     Text("←").font(MadarTypography.fine())
                     MadarDateLabel(app.dateLabels(r.cycleEnd, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine())
                 }.foregroundStyle(theme.secondaryInk)
-                Text(figure: amount(r.totalMinor)).font(.custom("thmanyahserifdisplay-Black", size: 58, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.5)
+                Text(figure: totalAmount(r.totalMinor)).font(.custom("thmanyahserifdisplay-Black", size: 58, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.5)
                     .accessibilityIdentifier("money-obligations-total")
             }
             Spacer(minLength: 8)
@@ -119,11 +123,11 @@ struct MoneyObligationsView: View {
             }.padding(.bottom, 10)
         }
     }
-    private func legend(_ title: String, _ minor: Int, _ tint: Color, striped: Bool) -> some View {
+    private func legend(_ title: String, _ minor: Int128, _ tint: Color, striped: Bool) -> some View {
         HStack(spacing: 6) {
             Rectangle().fill(striped ? tint.opacity(0.35) : tint).frame(width: 12, height: 12).overlay { if striped { Rectangle().stroke(tint, lineWidth: 1.5) } }
             Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-            Text(figure: amount(minor)).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .callout))
+            Text(figure: totalAmount(minor)).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .callout))
         }
     }
 
@@ -272,7 +276,7 @@ struct MoneyObligationsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("سلّم الأقساط").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
                 Spacer()
-                if let first = r.ladder.first { Text(figure: first.label + "، " + first.hijri + " " + amount(first.total)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+                if let first = r.ladder.first { Text(figure: first.label + "، " + first.hijri + " " + totalAmount(first.total)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
             }
             HStack(spacing: 12) {
                 key("القرض", theme.color("accent")); key("التقسيط", theme.color("bills")); key("الفواتير", theme.color("surplus"))
@@ -283,7 +287,7 @@ struct MoneyObligationsView: View {
                     .font(MadarTypography.fine()).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-ladder-ending")
             }
             if dynamicType.isAccessibilitySize {
-                ForEach(r.ladder) { month in HStack { Text(month.label + "، " + month.hijri); Spacer(); Text(figure: amount(month.total)) } }
+                ForEach(r.ladder) { month in HStack { Text(month.label + "، " + month.hijri); Spacer(); Text(figure: totalAmount(month.total)) } }
             } else {
                 HStack(alignment: .bottom, spacing: 4) {
                     ForEach(Array(r.ladder.enumerated()), id: \.element.id) { index, month in
@@ -308,8 +312,8 @@ struct MoneyObligationsView: View {
             }
         }
     }
-    private func segment(_ minor: Int, _ peak: Int, _ tint: Color) -> some View {
-        Rectangle().fill(tint).frame(height: visible ? 130 * CGFloat(minor) / CGFloat(peak) : 0)
+    private func segment(_ minor: Int128, _ peak: Int128, _ tint: Color) -> some View {
+        Rectangle().fill(tint).frame(height: visible ? 130 * CGFloat(Double(minor) / Double(peak)) : 0)
     }
     private func key(_ title: String, _ tint: Color) -> some View {
         HStack(spacing: 4) { Rectangle().fill(tint).frame(width: 10, height: 10); Text(title).foregroundStyle(theme.secondaryInk) }
@@ -337,7 +341,7 @@ struct MoneyObligationsView: View {
                 Image(systemName: "sparkle").foregroundStyle(theme.color("reserve"))
                 Text(title).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline))
                 Spacer()
-                Text(figure: dues.isEmpty ? "—" : amount(dues.reduce(0) { $0 + $1.amountMinor })).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                Text(figure: dues.isEmpty ? "—" : totalAmount(MoneyObligationDue.total(dues))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }.padding(.vertical, 8).overlay(alignment: .bottom) { DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.6).frame(height: 3) }
             if dues.isEmpty {
                 Text("لا شيء على هذا الرفّ.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.vertical, 10)

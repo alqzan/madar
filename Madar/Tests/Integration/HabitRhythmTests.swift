@@ -2,9 +2,42 @@ import XCTest
 import SwiftData
 import MadarCore
 import MadarData
+import MadarCommands
 @testable import Madar
 
 final class HabitRhythmTests: XCTestCase {
+    @MainActor func testDisplayedCompletionDoesNotCarryIntoTheNextPeriod() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "HabitCompletionPeriod-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let bus = CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 }))
+        let first = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-15T20:00:00+03:00"))
+        let next = first.addingTimeInterval(86400)
+        let id = UUID()
+        var rule = HabitRule(effectiveFrom: try GregorianDay("2026-10-15"))
+        rule.measure = .count
+        rule.target = 2
+        let savedRule = try JSONDecoder().decode(MadarCore.JSONValue.self, from: JSONEncoder().encode(rule))
+        func run(_ name: String, payload: [String: MadarCore.JSONValue], at date: Date) async throws -> CommandOutcome {
+            try await bus.execute(.init(name: name, payload: .object(payload), issuedAt: date), now: date)
+        }
+        let created = try await run("habit.save", payload: ["id": .string(id.uuidString), "name": .string("عادة"), "rule": savedRule], at: first)
+        XCTAssertEqual(created.status, .applied)
+        func period(at date: Date) throws -> HabitPeriodResult {
+            try XCTUnwrap(HabitRepository(context: ModelContext(container)).reading(id: id, at: date)?.summary.current)
+        }
+
+        let previous = try period(at: first)
+        let expired = try await run("habit.complete", payload: previous.completionPayload(for: id, delta: 1), at: next)
+        XCTAssertEqual(expired.status, .rejected)
+        let current = try period(at: next)
+        XCTAssertNotEqual(current.key, previous.key)
+        XCTAssertEqual(current.value, 0)
+        let logged = try await run("habit.complete", payload: current.completionPayload(for: id, delta: 1), at: next)
+        XCTAssertEqual(logged.status, .applied)
+        XCTAssertEqual(try period(at: next).value, 1)
+    }
+
     @MainActor func testHabitDiaryExcerptsRequireAuthorizationAndKeepOnlyRequestedLiveHeads() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "HabitDiaryLines-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

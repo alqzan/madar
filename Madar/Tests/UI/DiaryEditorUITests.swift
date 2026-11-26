@@ -121,6 +121,36 @@ import XCTest
         app.buttons["diary-editor-save"].tap()
         XCTAssertTrue(app.staticTexts["مسودة من الصفحة"].waitForExistence(timeout: 10))
     }
+    func testLeavingExpandedEditorSavesDraftBeforeRelaunch() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty",
+                                 "MADAR_UI_DIARY_DRAFT_BACKGROUND": "1", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+                                 "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+        app.launch()
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25))
+        app.openDiaryEditorFromHome()
+        let editor = app.textViews["diary-editor-text"]
+        let paragraph = "كتبت هذه المسودة قبل أن أغادر"
+        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        editor.tap()
+        editor.typeText(paragraph)
+        let savedDraft = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "المسودة محفوظة")).firstMatch
+        XCTAssertFalse(savedDraft.exists, "The synthetic fixture leaves the draft pending until the app backgrounds")
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(savedDraft.waitForExistence(timeout: 10), app.debugDescription)
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.diaryOpener.waitForExistence(timeout: 25))
+        app.openDiaryEditorFromHome()
+        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        XCTAssertEqual(editor.value as? String, paragraph)
+        XCTAssertFalse(app.staticTexts[paragraph].exists, "The expanded draft is only committed when the writer finishes")
+        app.buttons["diary-editor-save"].tap()
+        XCTAssertTrue(app.staticTexts[paragraph].waitForExistence(timeout: 10))
+    }
     func testWriterKeepsSavedContextAndAttachmentsVisible() throws {
         continueAfterFailure = false
         let app = launch("editor"); app.openDiaryEditorFromHome()

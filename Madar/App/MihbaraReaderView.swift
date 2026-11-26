@@ -73,11 +73,14 @@ struct MihbaraReaderView: View {
     @State private var sessionDayStamp: String?
     @State private var lastClockSample: Date?
     @State private var isClosing = false
-    @State private var isPendingSaveAlert = false
+    private enum ReaderExit {
+        case close
+        case finish
+        case originalPDF(UUID, Int)
+    }
+    @State private var pendingExit: ReaderExit?
     @State private var message: String?
     @State private var readerAlert: String?
-    /// «أنهيته؟» was asked while a save was pending: a successful retry also puts the book on «أنهيتها».
-    @State private var finishAfterPendingSave = false
     @State private var narrationStarting = false
     @State private var highlights: [MihbaraHighlight] = []
     @State private var wordCard: MihbaraWordCardState?
@@ -368,12 +371,17 @@ struct MihbaraReaderView: View {
                 .environment(\.layoutDirection, .rightToLeft).madarSheetErrorAlert(app)
                 .presentationDetents([.large])
         }
-        .alert("القارئ", isPresented: Binding(get: { readerAlert != nil }, set: { if !$0 { readerAlert = nil; isPendingSaveAlert = false } })) {
-            if isPendingSaveAlert && saveCoordinator.canRetryPendingWritesNow {
-                Button("إعادة المحاولة") { retryPendingSaveAndClose() }
+        .alert("القارئ", isPresented: Binding(get: { readerAlert != nil }, set: { if !$0 { readerAlert = nil } })) {
+            if pendingExit != nil && saveCoordinator.canRetryPendingWritesNow {
+                Button("إعادة المحاولة") { retryPendingExit() }
                     .accessibilityIdentifier("mihbara-reading-save-retry")
             }
-            Button("حسنًا", role: .cancel) { readerAlert = nil; isPendingSaveAlert = false; finishAfterPendingSave = false }
+            Button("حسنًا", role: .cancel) {
+                readerAlert = nil
+                guard pendingExit != nil else { return }
+                pendingExit = nil
+                if scenePhase == .active { resumeReader(at: Date()) }
+            }
         } message: { Text(readerAlert ?? "") }
     }
 
@@ -1440,7 +1448,6 @@ struct MihbaraReaderView: View {
 
     /// The converted book's page markers are the PDF's pages in order, so the page on screen is the same page there.
     @MainActor private func showOriginal(_ id: UUID) {
-        guard !isClosing else { return }
         let sourcePageCount = printPages.isEmpty ? (book.pages ?? 0) : printPages.count
         guard let page = ReadingSourcePage.zeroBasedPDFIndex(
             forPrintedOrdinal: pageCoordinate(printLocator), pageCount: sourcePageCount
@@ -1448,31 +1455,25 @@ struct MihbaraReaderView: View {
             readerAlert = "تعذّر تحديد الصفحة المطبوعة لهذا الموضع، فبقيتَ في الكتاب المنساب."
             return
         }
-        isClosing = true
-        pauseReader(at: Date())
-        Task { @MainActor in
-            await saveCoordinator.waitForCurrentAttempt()
-            isClosing = false
-            openOriginal?(id, page)
-        }
+        leaveReader(.originalPDF(id, page))
     }
 
     @MainActor private func prepareToFinish() async -> Bool {
         app.armMihbaraLocatorFailureOnReaderCloseForUITest()
         pauseReader(at: Date())
-        finishAfterPendingSave = false
         await saveCoordinator.waitForCurrentAttempt()
         guard !saveCoordinator.hasPending else {
-            saveCoordinator.dismissPendingWriteError()
-            finishAfterPendingSave = true
-            isPendingSaveAlert = true
-            readerAlert = pendingSaveMessage
+            presentPendingSave(for: .finish)
             return false
         }
         return true
     }
 
     @MainActor private func finishAndClose() {
+        leaveReader(.close)
+    }
+
+    @MainActor private func leaveReader(_ exit: ReaderExit) {
         guard !isClosing else { return }
         isClosing = true
         app.armMihbaraLocatorFailureOnReaderCloseForUITest()
@@ -1480,11 +1481,8 @@ struct MihbaraReaderView: View {
         Task { @MainActor in
             await saveCoordinator.waitForCurrentAttempt()
             if saveCoordinator.hasPending {
-                isClosing = false
-                saveCoordinator.dismissPendingWriteError()
-                isPendingSaveAlert = true
-                readerAlert = pendingSaveMessage
-            } else { close() }
+                presentPendingSave(for: exit)
+            } else { await completeExit(exit) }
         }
     }
 
@@ -1494,24 +1492,36 @@ struct MihbaraReaderView: View {
             : "لم يُحفظ موضع القراءة بعد. أبقِ مدار مفتوحًا حتى يعود الإذن أو ينتهي التحديث، ثم أعد المحاولة."
     }
 
-    @MainActor private func retryPendingSaveAndClose() {
-        guard !isClosing else { return }
+    @MainActor private func presentPendingSave(for exit: ReaderExit) {
+        isClosing = false
+        saveCoordinator.dismissPendingWriteError()
+        pendingExit = exit
+        readerAlert = pendingSaveMessage
+    }
+
+    @MainActor private func retryPendingExit() {
+        guard !isClosing, let exit = pendingExit else { return }
         isClosing = true
         readerAlert = nil
-        isPendingSaveAlert = false
         saveCoordinator.retryPendingWritesNow()
         Task { @MainActor in
             await saveCoordinator.waitForCurrentAttempt()
             if saveCoordinator.hasPending {
-                isClosing = false
-                saveCoordinator.dismissPendingWriteError()
-                isPendingSaveAlert = true
-                readerAlert = pendingSaveMessage
-            } else if finishAfterPendingSave {
-                finishAfterPendingSave = false
-                do { try await MihbaraFinishPrompt.moveToFinished(app: app, book: book); close() }
-                catch { isClosing = false; resumeReader(at: Date()); app.errorMessage = madarUserMessage(error) }
-            } else { close() }
+                presentPendingSave(for: exit)
+            } else { await completeExit(exit) }
+        }
+    }
+
+    @MainActor private func completeExit(_ exit: ReaderExit) async {
+        pendingExit = nil
+        switch exit {
+        case .close:
+            close()
+        case .finish:
+            do { try await MihbaraFinishPrompt.moveToFinished(app: app, book: book); close() }
+            catch { isClosing = false; resumeReader(at: Date()); app.errorMessage = madarUserMessage(error) }
+        case .originalPDF(let id, let page):
+            openOriginal?(id, page)
         }
     }
 

@@ -62,19 +62,19 @@ public enum BankMessageIdentity {
     private static let groups: [(String, [String])] = [
         ("rajhi", ["الراجحي", "مصرف الراجحي", "بنك الراجحي", "al rajhi", "alrajhibank"]),
         ("fransi", ["الفرنسي", "البنك السعودي الفرنسي", "السعودي الفرنسي", "fransi", "bsf", "saudi fransi bank"]),
-        ("snb", ["الاهلي", "الأهلي", "السعودي الاهلي", "السعودي الأهلي", "البنك الأهلي", "البنك الاهلي", "snb", "saudi national bank"]),
+        ("snb", ["الاهلي", "الأهلي", "السعودي الاهلي", "السعودي الأهلي", "البنك الأهلي", "البنك الاهلي", "snb", "snb-alahli", "saudi national bank"]),
         ("inma", ["الانماء", "الإنماء", "inma", "alinma", "alinma bank"]),
         ("sab", ["ساب", "البنك السعودي البريطاني", "sab", "saab", "sabb", "saudi british bank"]),
         ("riyad", ["بنك الرياض", "riyad", "riyad bank"]),
-        ("barq", ["برق", "barq"]),
+        ("barq", ["برق", "barq", "barq app"]),
         ("stcbank", ["stc bank", "stcbank", "بنك stc", "stc بنك", "اس تي سي بنك"]),
         ("stcpay", ["stc pay", "stcpay", "اس تي سي باي"]),
         ("drahim", ["دراهم", "drahim"]),
         ("tiqmo", ["تيقمو", "tiqmo"]),
-        ("d360", ["دي 360", "دي360", "d360"]),
+        ("d360", ["دي 360", "دي360", "d360", "d360 bank"]),
         ("tweeq", ["تويك", "tweeq"]),
         ("urpay", ["يورباي", "يو ار باي", "urpay"]),
-        ("alinma-investment", ["الإنماء للاستثمار", "الانماء للاستثمار", "alinma investment", "alinmainvestment"]),
+        ("alinma-investment", ["الإنماء للاستثمار", "الانماء للاستثمار", "alinma investment", "alinma inv"]),
         ("sukuk", ["صكوك", "sukuk"])
     ]
 
@@ -153,7 +153,9 @@ public enum BankMessageParser {
     public static func classify(_ text: String) -> BankMessageKind {
         let t = clean(text)
         // Order matters: the dangerous and the specific first.
-        if has(t, ["رمز التحقق", "رمز التفعيل", "كلمة المرور لمرة", "OTP", "verification code", "لا تشارك الرمز"]) { return .otp }
+        if has(t, ["رمز التحقق", "رمز التفعيل", "رمز المصادقة", "رمز الدخول", "رمز تسجيل الدخول",
+                   "كلمة المرور لمرة", "الرقم السري لمرة", "OTP", "verification code", "لا تشارك الرمز"])
+            || matches(t, #"\bone[-\s]+time\s+(?:password|passcode|code|pin)\b"#) { return .otp }
         // Ported from the owner's earlier My-dream analysis (src/lib/bankParser.ts): notices that move no money.
         if matches(t, #"just\s+a\s+hold|hold\s+on\s+your\s+card|حجز\s+مؤقت|حجز\s+على\s+بطاقتك|pre[\s-]?authoriz"#)
             || matches(t, #"صدور\s+فاتورة|فاتورة\s+جديدة|لم\s+يتم\s+سدادها|تم\s+إصدار\s+فاتورتك|invoice\s+(?:generated|due)|new\s+bill"#)
@@ -853,6 +855,15 @@ public enum IngestDecision: Equatable, Sendable {
 }
 
 public enum BankIntake {
+    /// Used at both the inbox boundary and the store. A bill issue is actionable even though it moves no money.
+    public static func shouldDiscard(_ text: String) -> Bool {
+        switch decision(BankMessageParser.classify(text)) {
+        case .discardWithoutText: true
+        case .discard: !BankMessageParser.isDueNotice(text)
+        case .needsLook, .record: false
+        }
+    }
+
     public static func decision(_ kind: BankMessageKind) -> IngestDecision {
         switch kind {
         case .otp: return .discardWithoutText

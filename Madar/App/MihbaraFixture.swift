@@ -144,7 +144,35 @@ extension AppSession {
             let media = Media(); media.id = mediaID; media.kind = "doc"; media.contentType = "org.idpf.epub-container"; media.data = data; media.sizeBytes = data.count; media.sha256 = hash; c.insert(media)
             let book = Book(); book.id = StableIdentity.uuid(for: "mihbara-reader-fixture-book"); book.title = "كتاب اختبار القارئ"; book.author = "نص اختباري أصلي"; book.kind = "file"; book.format = "epub"; book.shelf = "reading"; book.locatorJSON = nil; book.mediaID = mediaID; book.fileHash = hash; book.updatedAt = now; c.insert(book)
         }
+        if variant == "reader", let encoded = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_PDF"],
+           let pdf = Data(base64Encoded: encoded), !pdf.isEmpty,
+           ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_EPUB_BASE64"] == nil {
+            try prepareConvertedReaderFixture(pdf: pdf, now: now, context: c)
+        }
         try c.save()
+    }
+
+    private func prepareConvertedReaderFixture(pdf: Data, now: Date, context: ModelContext) throws {
+        let pdfHash = SHA256.hash(data: pdf).map { String(format: "%02x", $0) }.joined()
+        let pages = ["هذه بداية الكتاب.", "هذه خاتمة الكتاب."].map {
+            PDFBookEPUB.Page(text: $0, optical: false, unreliable: false)
+        }
+        let epub = try PDFBookEPUB.build(title: "نسخة منسابة للاختبار", author: "", language: "ar",
+                                         sourceHash: pdfHash, pages: pages, outline: [])
+        for (format, type, bytes, title) in [
+            ("pdf", "com.adobe.pdf", pdf, "أصل الكتاب"),
+            ("epub", "org.idpf.epub-container", epub, "نسخة منسابة للاختبار")
+        ] {
+            let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+            let media = Media()
+            media.kind = "doc"; media.contentType = type; media.data = bytes; media.sizeBytes = bytes.count; media.sha256 = hash
+            context.insert(media)
+            let book = Book()
+            book.title = title; book.kind = "file"; book.format = format; book.shelf = "reading"
+            book.pages = pages.count; book.mediaID = media.id; book.fileHash = hash
+            book.updatedAt = format == "epub" ? now : now.addingTimeInterval(-3600)
+            context.insert(book)
+        }
     }
 
     /// Title, author, printed pages per volume and volumes, for the bindings fixture.

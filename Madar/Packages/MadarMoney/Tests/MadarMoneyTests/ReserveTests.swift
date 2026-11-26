@@ -2,6 +2,12 @@ import Testing
 @testable import MadarMoney
 
 struct ReserveTests {
+    @Test func largeRepresentableCoverageSurvivesWiderIntermediateTotals() {
+        #expect(RunwayEngine.runway(balanceMinor: Int.max, dailyMinor: Int.max, cycleLengthDays: 30, obligationsPerCycleMinor: Int.max)?.days == 0)
+        #expect(RunwayEngine.runway(balanceMinor: Int.max, dailyMinor: Int.max, cycleLengthDays: 30)?.days == 1)
+        #expect(RunwayEngine.runway(balanceMinor: Int.max, dailyMinor: 0, cycleLengthDays: 30, obligationsPerCycleMinor: 1) == nil)
+    }
+
     @Test func c0DailiesAndCoverageHaveDifferentMeaningsUnderRM9() throws {
         // Reserve 100,000 / daily 400 = 250 squares. Per cycle: 30×400 + loan 2,850 + bills 410.
         // floor(10,000,000×30 / 1,526,000) = 196 days; after taking half, 98 days and 125 squares.

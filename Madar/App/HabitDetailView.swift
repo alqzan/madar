@@ -11,6 +11,7 @@ struct HabitDetailView:View {
     @Bindable var session:AppSession
     let reading:HabitReading
     @Binding var pastDayDraftPresented: Bool
+    let refresh:()->Void
     let edit:()->Void
     @Environment(\.dismiss) private var dismiss
     @State private var busy=false
@@ -84,10 +85,10 @@ struct HabitDetailView:View {
                     MadarDateLabel(session.dateLabels(reading.firstEffectiveFrom,weekday:true))
                 }
             }
-            if !reading.paused {
+            if !reading.paused, let current=reading.summary.current, current.target > 0 {
                 Button { slipping = true } label: { outline(Label("زلّة",systemImage:"arrow.counterclockwise")) }.buttonStyle(.madarPlain).disabled(busy).accessibilityIdentifier("habit-slip")
                     .confirmationDialog("تسجيل زلّة اليوم يبدأ العدّ من جديد، وسجلّك السابق يبقى.",isPresented:$slipping,titleVisibility:.visible) {
-                        Button("سجّل زلّة اليوم",role:.destructive) { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(1),"slip":.bool(true)]) }.accessibilityIdentifier("habit-slip-confirm")
+                        Button("سجّل زلّة اليوم",role:.destructive) { perform("habit.complete",current.completionPayload(for:reading.id,delta:1,slip:true)) }.accessibilityIdentifier("habit-slip-confirm")
                         Button("تراجع",role:.cancel) {}
                     }
             }
@@ -129,11 +130,11 @@ struct HabitDetailView:View {
         } else if !reading.paused && current.target > 0 && !reading.quitting {
             let doneOnce = current.met && current.rule.measure == .once
             // A once-a-period habit done in its period needs no greyed «تمّت»: the ring and the state line already say it (AU-35).
-            if !doneOnce { Button { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(current.rule.measure == .duration ? 15 : 1)]) } label: {
+            if !doneOnce { Button { perform("habit.complete",current.completionPayload(for:reading.id,delta:current.rule.measure == .duration ? 15 : 1)) } label: {
                 filled(current.rule.measure == .duration ? "أضف "+digits.string(15)+" دقيقة" : current.rule.measure == .count ? "أضف "+habitOneMore(current.rule.unit) : doneOnce ? "تمّت" : "أتممتها").opacity(doneOnce ? 0.55 : 1)
             }.buttonStyle(.madarPlain).disabled(busy || doneOnce).accessibilityIdentifier("habit-complete") }
             if current.rule.measure != .health, let start = reading.summary.periods.first?.start, start < AppBahwService(session:session).today { Button { pastDayDraftPresented = true; pastDay = true } label: { outline(Label("فعلتها في يوم سابق",systemImage:"calendar.badge.clock")) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-past-day") }
-            if let minimum=current.rule.minimum,current.value<minimum { Button { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(Double(minimum-current.value))]) } label: { outline(Text("سجّل أقلّ القليل: "+habitUnitCount(minimum,current.rule.unit,digits))) }.buttonStyle(.madarPlain).disabled(busy).accessibilityIdentifier("habit-minimum") }
+            if let minimum=current.rule.minimum,current.value<minimum { Button { perform("habit.complete",current.completionPayload(for:reading.id,delta:minimum-current.value)) } label: { outline(Text("سجّل أقلّ القليل: "+habitUnitCount(minimum,current.rule.unit,digits))) }.buttonStyle(.madarPlain).disabled(busy).accessibilityIdentifier("habit-minimum") }
         }
     }
     private func outline<L:View>(_ label:L)->some View { label.font(HabitType.caption()).frame(maxWidth:.infinity,minHeight:44).overlay { Capsule().stroke(theme.line) }.contentShape(.capsule) }
@@ -186,5 +187,5 @@ struct HabitDetailView:View {
         var p:[String:MadarCore.JSONValue]=["id":.string(reading.id.uuidString),"from":.string((yesterday ? today.adding(days:-1) : today).description)]
         if week {p["until"] = .string(today.adding(days:7).description)};if trip{p["trip"] = .bool(true)};perform("habit.pause",p)
     }
-    private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue]) { guard !busy else { return }; busy=true;Task{do{try await session.executeDiaryCommand(name,payload:payload);dismiss()}catch{session.errorMessage=madarUserMessage(error)};busy=false} }
+    private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue]) { guard !busy else { return }; busy=true;Task{do{try await session.executeDiaryCommand(name,payload:payload);dismiss()}catch{session.errorMessage=madarUserMessage(error);refresh()};busy=false} }
 }

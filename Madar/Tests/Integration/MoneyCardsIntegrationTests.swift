@@ -5,6 +5,30 @@ import MadarCore
 @testable import Madar
 
 @MainActor final class MoneyCardsIntegrationTests: XCTestCase {
+    func testLargeObligationsKeepTheirIndividualAmountsAndExactCombinedTotal() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MoneyLargeDues-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-16T12:00:00+03:00"))
+        let plan = Obligation(); plan.kind = "installment"; plan.name = "تقسيط الاختبار"; plan.currency = "SAR"
+        context.insert(plan)
+        let individual = Int.max / 2 + 100
+        for installment in 1...2 {
+            let item = InstallmentItem(); item.obligationID = plan.id; item.seq = installment
+            item.amountMinor = individual; item.paidMinor = 1
+            item.dueDate = now.addingTimeInterval(Double(installment) * 86_400)
+            context.insert(item)
+        }
+        try context.save()
+
+        let app = try AppSession(container: container, groupDirectory: root); app.authorizeProtectedData()
+        let reading = try AppMoneyService(app: app).loadObligations(at: now)
+        XCTAssertEqual(reading.cycle.map(\.amountMinor), [individual - 1, individual - 1])
+        XCTAssertEqual(reading.totalMinor, Int128(Int.max) + 197)
+        XCTAssertEqual(reading.ladder.first?.total, reading.totalMinor)
+        XCTAssertNil(reading.installments.first?.remainingMinor)
+    }
+
     func testObligationsShowOnlyTheRemainingBalanceOfTheCurrentStatement() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MoneyCardDues-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

@@ -11,6 +11,22 @@ import MadarSnapshots
 /// M4-F01: Siri/Shortcuts requests that need the app run through the app's own command path,
 /// wait behind the diary lock, and never write twice for one request (§9, §14, §16, RA2).
 @MainActor final class CaptureIntentIntegrationTests: XCTestCase {
+    func testExpenseShortcutRejectsAmbiguousGroupingAndKeepsArabicDecimal() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "ExpenseShortcut-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let inbox = PendingInbox(directory: root)
+        XCTAssertThrowsError(try LogExpenseIntent(amount: "12,50").enqueue(in: inbox, defaultCurrency: "SAR"))
+        XCTAssertTrue(try inbox.claimBatch().isEmpty)
+
+        let expense = LogExpenseIntent(amount: "١٬٢٣٤٫٥٠", method: .cash)
+        try expense.enqueue(in: inbox, defaultCurrency: "SAR")
+        let record = try inbox.read(XCTUnwrap(try inbox.claimBatch().first))
+        guard case .object(let payload) = record.command.payload else { return XCTFail("Expected expense payload") }
+        XCTAssertEqual(payload["amountMinor"], .string("123450"))
+        XCTAssertEqual(payload["currency"], .string("SAR"))
+        XCTAssertEqual(payload["method"], .string("cash"))
+    }
+
     private func session() throws -> (AppSession, ModelContainer) {
         let root = FileManager.default.temporaryDirectory.appending(path: "CaptureIntent-\(UUID())")
         let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))

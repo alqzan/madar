@@ -24,6 +24,10 @@ struct MoneyObligationDue: Identifiable, Equatable {
     var estimated = false
     /// M5-X00: a free schedule in words («كل ٦ أشهر»).
     var schedule: String? = nil
+
+    static func total(_ dues: some Sequence<Self>) -> Int128 {
+        dues.reduce(0) { $0 + Int128($1.amountMinor) }
+    }
 }
 
 struct MoneyLadderMonth: Identifiable, Equatable {
@@ -31,11 +35,11 @@ struct MoneyLadderMonth: Identifiable, Equatable {
     var label: String
     /// The Hijri month over the middle of that Gregorian month (both calendars on every date).
     var hijri: String
-    var loanMinor: Int
-    var installmentMinor: Int
-    var billMinor: Int
-    var subscriptionMinor: Int = 0
-    var total: Int { loanMinor + installmentMinor + billMinor + subscriptionMinor }
+    var loanMinor: Int128
+    var installmentMinor: Int128
+    var billMinor: Int128
+    var subscriptionMinor: Int128 = 0
+    var total: Int128 { loanMinor + installmentMinor + billMinor + subscriptionMinor }
 }
 
 struct MoneyLadderEnding: Identifiable, Equatable {
@@ -51,9 +55,9 @@ struct MoneyObligationsReading: Equatable {
     var cycleEnd: GregorianDay
     /// Due inside this cycle, in due order.
     var cycle: [MoneyObligationDue]
-    var fromSalaryMinor: Int
-    var cardsMinor: Int
-    var totalMinor: Int { fromSalaryMinor + cardsMinor }
+    var fromSalaryMinor: Int128
+    var cardsMinor: Int128
+    var totalMinor: Int128 { fromSalaryMinor + cardsMinor }
     var ladder: [MoneyLadderMonth]
     var endings: [MoneyLadderEnding]
     var installments: [MoneyObligationDue]
@@ -105,10 +109,15 @@ extension AppMoneyService {
             let mine = items.filter { $0.obligationID == obligation.id }.sorted { $0.seq == $1.seq ? $0.dueDate < $1.dueDate : $0.seq < $1.seq }
             let unpaid = mine.filter { $0.paidMinor < $0.amountMinor }
             let last = mine.map(\.dueDate).max().map { GregorianDay.containing($0, in: zone) }
-            let left = unpaid.reduce(0) { $0 + $1.amountMinor - $1.paidMinor }
-            for item in unpaid {
+            let amounts = try unpaid.map { item in
+                let remaining = item.amountMinor.subtractingReportingOverflow(item.paidMinor)
+                guard !remaining.overflow else { throw MoneyCommandError.invalidAmount }
+                return remaining.partialValue
+            }
+            let left = Int(exactly: amounts.reduce(Int128(0)) { $0 + Int128($1) })
+            for (item, remaining) in zip(unpaid, amounts) {
                 instalments.append(.init(id: item.id.uuidString, obligationID: obligation.id, group: obligation.kind == "loan" ? .loan : .installment,
-                    name: obligation.provider.map { obligation.name.isEmpty ? $0 : $0 + "، " + obligation.name } ?? obligation.name, amountMinor: item.amountMinor - item.paidMinor,
+                    name: obligation.provider.map { obligation.name.isEmpty ? $0 : $0 + "، " + obligation.name } ?? obligation.name, amountMinor: remaining,
                     due: .containing(item.dueDate, in: zone), paidCount: mine.count - unpaid.count, totalCount: mine.count, remainingMinor: left, lastDue: last))
             }
         }
@@ -156,10 +165,10 @@ extension AppMoneyService {
             let these = instalments.filter { monthKey($0.due) == key }
             var middle = calendar.dateComponents([.year, .month], from: month); middle.day = 15
             return .init(id: key, label: formatter.string(from: month), hijri: hijri.string(from: calendar.date(from: middle) ?? month),
-                loanMinor: these.filter { $0.group == .loan }.reduce(0) { $0 + $1.amountMinor },
-                installmentMinor: these.filter { $0.group == .installment }.reduce(0) { $0 + $1.amountMinor },
-                billMinor: billDues.filter { $0.group == .bill && monthKey($0.due) == key && $0.due >= today }.reduce(0) { $0 + $1.amountMinor },
-                subscriptionMinor: billDues.filter { $0.group == .subscription && monthKey($0.due) == key && $0.due >= today }.reduce(0) { $0 + $1.amountMinor })
+                loanMinor: MoneyObligationDue.total(these.lazy.filter { $0.group == .loan }),
+                installmentMinor: MoneyObligationDue.total(these.lazy.filter { $0.group == .installment }),
+                billMinor: MoneyObligationDue.total(billDues.lazy.filter { $0.group == .bill && monthKey($0.due) == key && $0.due >= today }),
+                subscriptionMinor: MoneyObligationDue.total(billDues.lazy.filter { $0.group == .subscription && monthKey($0.due) == key && $0.due >= today }))
         }
         let horizon = ladder.last?.id ?? ""
         let endings: [MoneyLadderEnding] = Dictionary(grouping: instalments, by: { $0.obligationID! }).compactMap { _, dues in
@@ -172,8 +181,8 @@ extension AppMoneyService {
             rows.compactMap { bill in billDues.filter { $0.obligationID == bill.id && $0.due >= today }.min { $0.due < $1.due } }.sorted { $0.due < $1.due }
         }
         return .init(today: today, cycleStart: start, cycleEnd: end, cycle: cycleDues,
-                     fromSalaryMinor: cycleDues.filter { $0.group != .statement }.reduce(0) { $0 + $1.amountMinor },
-                     cardsMinor: cycleDues.filter { $0.group == .statement }.reduce(0) { $0 + $1.amountMinor },
+                     fromSalaryMinor: MoneyObligationDue.total(cycleDues.lazy.filter { $0.group != .statement }),
+                     cardsMinor: MoneyObligationDue.total(cycleDues.lazy.filter { $0.group == .statement }),
                      ladder: ladder, endings: endings, installments: nextInstalments, bills: next(bills), subscriptions: next(subscriptions),
                      subscriptionSuggestions: subscriptionSuggestions, statements: statements.sorted { $0.due < $1.due })
     }

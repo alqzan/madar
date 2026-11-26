@@ -104,18 +104,12 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
 @MainActor public enum MoneyMutationHandler {
     static func discards(name: String, payload: [String: MadarCore.JSONValue]) -> Bool {
         if name == MoneyCommandPayload.intakeName {
-            return discard(text(payload, "text"))
+            return BankIntake.shouldDiscard(text(payload, "text"))
         }
         if name == "money.pasteBankMessages", case .array(let values) = payload["messages"] {
-            return values.allSatisfy { if case .object(let p) = $0 { discard(text(p, "text")) } else { false } }
+            return values.allSatisfy { if case .object(let p) = $0 { BankIntake.shouldDiscard(text(p, "text")) } else { false } }
         }
         return false
-    }
-    private static func discard(_ text: String) -> Bool {
-        // A bill-issued notice is kept: it becomes an upcoming due (owner, 11 Nov 2026).
-        if BankMessageParser.isDueNotice(text) { return false }
-        let decision = BankIntake.decision(BankMessageParser.classify(text))
-        return decision == .discard || decision == .discardWithoutText
     }
     static func stage(name: String, payload p: [String: MadarCore.JSONValue], id: UUID, issuedAt: Date,
                       source: CommandSource, context: ModelContext, now: Date, writer: String,
@@ -319,7 +313,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             try ingest([p], batch: nil, command: id, issuedAt: issuedAt, context: context, now: now, writer: writer)
         case "money.pasteBankMessages":
             guard case .array(let items) = p["messages"] else { throw MoneyCommandError.invalidReference }
-            let inputs = items.compactMap { if case .object(let item) = $0, !discard(text(item, "text")) { item } else { nil } }
+            let inputs = items.compactMap { if case .object(let item) = $0, !BankIntake.shouldDiscard(text(item, "text")) { item } else { nil } }
             // Hash only messages retained by policy. Never persist an OTP, its hash or a batch containing it.
             let hash = try MadarCore.JSONValue.array(inputs.map(MadarCore.JSONValue.object)).sha256()
             if try context.fetch(FetchDescriptor<ImportBatch>()).contains(where: { $0.kind == "bankBulk" && $0.fileHash == hash }) {
@@ -710,7 +704,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let trackedWallets = try context.fetch(FetchDescriptor<Account>()).filter {
             live($0) && $0.ownership == "mine" && $0.tracked && ["wallet", "savings"].contains($0.kind)
         }.flatMap { [$0.name, $0.bank] }
-        let items = raw.filter { !discard(text($0, "text")) }.map { p in
+        let items = raw.filter { !BankIntake.shouldDiscard(text($0, "text")) }.map { p in
             let stated = MoneyCommandPayload.date(p["receivedAt"]), at = stated ?? issuedAt
             // D5: the arrival time is known when the producer stated it, or for a single live intake (the shortcut runs on arrival).
             // A pasted batch without a stated time knows only when it was pasted.

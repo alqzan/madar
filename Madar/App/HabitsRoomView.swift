@@ -5,6 +5,17 @@ import MadarData
 import MadarDesign
 import MadarCommands
 
+extension HabitPeriodResult {
+    /// Submit the period the user saw. A late tap must not record a completion in its successor.
+    func completionPayload(for id: UUID, delta: Int, slip: Bool = false) -> [String: MadarCore.JSONValue] {
+        var payload: [String: MadarCore.JSONValue] = [
+            "id": .string(id.uuidString), "delta": .number(Double(delta)), "periodKey": .string(key)
+        ]
+        if slip { payload["slip"] = .bool(true) }
+        return payload
+    }
+}
+
 extension HabitFrequency {
     var arabic: String { switch self { case .daily: "يومية"; case .interval: "كل عدة أيام"; case .weekly: "أسبوعية"; case .monthly: "شهرية"; case .yearly: "سنوية" } }
 }
@@ -166,7 +177,7 @@ struct HabitsRoomView: View {
             detailPastDayDraftPresented = false
             if let pendingEditor { editor=pendingEditor;self.pendingEditor=nil }
             applyPendingBahwRootIfReady()
-        }) { row in HabitDetailView(session:session,reading:row,pastDayDraftPresented:$detailPastDayDraftPresented) { pendingEditor = .init(id:row.id,reading:row); detail=nil }.madarSheetErrorAlert(session) }
+        }) { row in HabitDetailView(session:session,reading:row,pastDayDraftPresented:$detailPastDayDraftPresented,refresh:reload) { pendingEditor = .init(id:row.id,reading:row); detail=nil }.madarSheetErrorAlert(session) }
     }
     private func applyPendingBahwRootIfReady() {
         guard pendingBahwRootRequestID != nil, editor == nil, pastDay == nil, !detailPastDayDraftPresented else { return }
@@ -540,13 +551,13 @@ struct HabitsRoomView: View {
         } catch { loadFailed = true }
     }
     private func complete(_ row: HabitReading, delta: Int) {
-        guard !completionInFlight.contains(row.id) else { return }
+        guard !completionInFlight.contains(row.id), let period = row.summary.current else { return }
         completionInFlight.insert(row.id)
-        perform("habit.complete", ["id": .string(row.id.uuidString), "delta": .number(Double(delta))]) {
+        perform("habit.complete", period.completionPayload(for: row.id, delta: delta)) {
             completionInFlight.remove(row.id)
         }
     }
-    private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue],done:@escaping () -> Void = {}) { Task { defer{done()}; do {try await session.executeDiaryCommand(name,payload:payload);reload()}catch{session.errorMessage=madarUserMessage(error)} } }
+    private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue],done:@escaping () -> Void = {}) { Task { defer{reload();done()}; do {try await session.executeDiaryCommand(name,payload:payload)}catch{session.errorMessage=madarUserMessage(error)} } }
 }
 
 private struct HabitPeriodSummaryCard: View {

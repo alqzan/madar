@@ -152,16 +152,17 @@ struct BahwBlockView: View {
             }
         }
         else {
-            guard !completionInFlight.contains(row.id) else { return }
+            guard !completionInFlight.contains(row.id), let period = row.summary.current else { return }
             completionInFlight.insert(row.id)
             Task {
                 defer { completionInFlight.remove(row.id) }
                 do {
-                    try await service.session.executeDiaryCommand("habit.complete", payload: [
-                        "id": .string(row.id.uuidString),
-                        "delta": .number(row.summary.current?.rule.measure == .duration ? 15 : 1)
-                    ])
-                } catch { service.session.errorMessage = madarUserMessage(error) }
+                    let payload = period.completionPayload(for: row.id, delta: period.rule.measure == .duration ? 15 : 1)
+                    try await service.session.executeDiaryCommand("habit.complete", payload: payload)
+                } catch {
+                    try? service.session.reload(domains: .habits)
+                    service.session.errorMessage = madarUserMessage(error)
+                }
             }
         }
     }
