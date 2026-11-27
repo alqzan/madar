@@ -17,7 +17,7 @@ Owner, 17 Nov 2026: apply the Claude Code team's verification practice to Madar,
 1. `git diff --check`.
 2. Package engines touched → `cd Madar/Packages/<Pkg> && swift test --filter <Suite>`.
 3. App build: `cd Madar && xcodebuild -project Madar.xcodeproj -scheme Madar -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO build`. Run XcodeGen first if `project.yml` or file membership changed.
-4. Integration slice: `build-for-testing` once, then `test-without-building -only-testing:MadarTests/<Class>` for every class `features.md` lists for the area.
+4. Integration slice: `build-for-testing` once, then `test-without-building -only-testing:MadarTests/<Class>` (both signed ad hoc, `CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES`; checklist row 27) for every class `features.md` lists for the area.
 5. End-to-end: `-only-testing:MadarUITests/<Class>` for the area's UI test class (the real user flow). Prefer it over unit tests whenever a flow changed.
 6. Smoke the real app: `bash Madar/scripts/verify-smoke.sh [fixture]`. It builds Debug, installs on `Madar 15 Pro Max`, launches with a new isolated `MADAR_UI_STORE_ID` store, waits for the first ready screen, checks for a new crash, and saves a screenshot under `Madar/Artifacts/verify/` (local evidence, not a design capture). Then drive the changed flow like a QA engineer with the iOS Simulator tool (`mcp__Claude_Code_iOS_Simulator__control`: screenshot, tap, swipe, text) and compare with the expected result in `features.md`. iPad layout changes: `SIMULATOR=85FA4D17-2DBF-46D6-837E-9221597B89DD`.
 
