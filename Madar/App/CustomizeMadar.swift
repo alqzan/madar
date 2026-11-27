@@ -326,10 +326,10 @@ func sectionFor(_ key: String) -> String {
     if ["salah.method", "salah.asr"].contains(key) { return "المواقيت" }
     if key == "core.homeCity" { return "مدينتك" }
     // Owner 17 Nov 2026: prayer logging is gone; its settings have no page (keys stay so old values still decode).
-    if ["salah.showMosqueStreak", "salah.askHeart", "salah.pendingDays", "salah.pool", "salah.fridayTallArch", "salah.beforeReminder", "salah.beforeAdhanMin", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.qadaReminder", "salah.trackingStart"].contains(key) { return "—" }
+    if ["salah.showMosqueStreak", "salah.pendingDays", "salah.pool", "salah.fridayTallArch", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.qadaReminder", "salah.trackingStart"].contains(key) { return "—" }
     if ["salah.tripMethod", "salah.travelShortenCombine", "core.travelMode"].contains(key) { return "المواقيت" }
     // FB-39: these prayer keys used to fall through to «المظهر», so travel method and pending days were never on the prayer page.
-    if ["salah.beforeReminder", "salah.beforeAdhanMin", "notes.eveningLine", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil"].contains(key) { return "الإشعارات" }
+    if ["notes.eveningLine", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.dailyBudget", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil"].contains(key) { return "الإشعارات" }
     return "المظهر"
 }
 func normalized(_ text: String) -> String {

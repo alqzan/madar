@@ -249,7 +249,7 @@ private struct RetiredSettingRowSnapshot: Equatable {
             let container = try MadarContainerFactory.makeLocal(at: root)
             let context = ModelContext(container), store = try SettingsStore(context: context)
             baseline = try store.allValues()
-            #expect(store.schema.settings.count == 138)
+            #expect(store.schema.settings.count == 135)
             #expect(store.schema.settings.filter(\.preset).count == 62)
             #expect(retired.allSatisfy(store.schema.removedKeys.contains))
             let now = Date(timeIntervalSince1970: 100_000)
@@ -302,7 +302,7 @@ private struct RetiredSettingRowSnapshot: Equatable {
     }
     @Test func settingsDefaultsPersistenceAndInvalidRejection() throws {
         let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext)
-        #expect(store.schema.settings.count == 138); // 150 before the 12 unused settings were retired (owner + Sol review, 14 Nov)
+        #expect(store.schema.settings.count == 135); // 150 before 12 unused settings were retired (14 Nov); 138 before the three prayer-reminder/heart keys (owner, 27 Nov)
         let ra8 = Set(["core.fontScale", "core.motion", "tabbar.style", "tabbar.labels", "tabbar.openOn", "tabbar.minimizeOnScroll", "bahw.habitsView", "bahw.yearView", "bahw.upcomingView", "bahw.widgetIdentity", "bahw.iphoneWidgetFamily", "salah.balanceView", "quran.toolsOrder", "notes.echoDistances", "mihbara.shape", "mihbara.sunnahPlace", "mihbara.pageStyle", "mihbara.motivateStyle", "mihbara.notebookStyle"])
         #expect(ra8.isSubset(of: Set(store.schema.settings.map(\.key))))
         #expect(store.schema.settings.contains { $0.key == "mihbara.layout" })

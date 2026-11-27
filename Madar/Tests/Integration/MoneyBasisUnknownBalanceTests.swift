@@ -32,4 +32,15 @@ import MadarCore
         XCTAssertEqual(mixed.accounts.count, 2)
         XCTAssertNil(mixed.accounts.first { $0.title == "رصيد مؤكد" }?.valueText)
     }
+
+    /// An overdrawn account is reconciled as a negative balance: «-٥٠٫٢٥» is −50.25 SAR = −5025 halalas, and the
+    /// minus sign the screen writes back after a nudge below zero («-50») reads as typed instead of «لم أفهم المبلغ».
+    func testReconcileReadsAnOverdrawnBalanceTypedWithAMinus() {
+        XCTAssertEqual(MoneyReconcileView.observedMinor("-50", exponent: 2), -5_000)
+        XCTAssertEqual(MoneyReconcileView.observedMinor("−٥٠٫٢٥", exponent: 2), -5_025)
+        XCTAssertEqual(MoneyReconcileView.observedMinor("1,500", exponent: 2), 150_000)
+        XCTAssertNil(MoneyReconcileView.observedMinor("-", exponent: 2))
+        XCTAssertNil(MoneyReconcileView.observedMinor("--5", exponent: 2))
+        XCTAssertNil(MoneyReconcileView.observedMinor("5-", exponent: 2))
+    }
 }

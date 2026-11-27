@@ -529,11 +529,11 @@ final class AppSession {
     private func prepareStyleSettingsFixture() throws {
         let environment = ProcessInfo.processInfo.environment
         guard UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil, let raw = environment["MADAR_UI_STYLE_SETTINGS"] else { return }
-        let allowed: Set = ["mal.figureStyle", "mal.hawlStyle", "notes.fridayStyle", "notes.ramadanStyle", "salah.askHeart"]
+        let allowed: Set = ["mal.figureStyle", "mal.hawlStyle", "notes.fridayStyle", "notes.ramadanStyle"]
         for pair in raw.split(separator: ",") {
             let parts = pair.split(separator: "=", maxSplits: 1).map(String.init)
             guard parts.count == 2, allowed.contains(parts[0]) else { continue }
-            try store.prepare(parts[0] == "salah.askHeart" ? .bool(parts[1] == "true") : .string(parts[1]), for: parts[0], now: prayerNow())
+            try store.prepare(.string(parts[1]), for: parts[0], now: prayerNow())
         }
         try container.mainContext.save()
     }

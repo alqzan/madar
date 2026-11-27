@@ -321,7 +321,10 @@ struct BahwTravelCitySheet: View {
                     TextField("ابحث عن مدينة", text: $query).textFieldStyle(.roundedBorder)
                         .focused($searchFocused).accessibilityIdentifier("bahw-travel-city-search")
                     let results = CityCatalog.search(query).filter { city in
-                        city.name != trip?.city || city.country != legs.last?.country
+                        guard city.name != trip?.city || city.country != legs.last?.country else { return false }
+                        // A trip never starts in the home city itself: it would pause daily money and say «مسافر» at home.
+                        guard trip == nil, let place = try? ActivePlace(latitude: city.lat, longitude: city.lon, timeZoneID: city.tz) else { return true }
+                        return TravelRule.isAway(home: session.activePlace, current: place, thresholdKm: 0)
                     }
                     ForEach(results) { city in
                         let name = TravelRule.locationLabel(city.name, country: city.country, among: legs)

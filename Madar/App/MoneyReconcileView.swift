@@ -511,6 +511,12 @@ struct MoneyReconcileView: View {
     }
     // Keep the last good entry for recovery, but require a valid edit before writing it.
     private static let unreadable = "لم أفهم المبلغ. اكتب مثل ١٥٠٠ أو ١٥٠٠٫٥."
+    /// An overdrawn balance is typed (and shown by `plain`) as a leading minus; the amount reader takes only its size.
+    static func observedMinor(_ input: String, exponent: Int) -> Int? {
+        let negative = input.first.map { "-−".contains($0) } ?? false
+        guard let size = MoneyAmountInput.minor(negative ? String(input.dropFirst()) : input, exponent: exponent) else { return nil }
+        return negative ? -size : size
+    }
     private func commitTyped(_ r: MoneyReconcileRow) {
         let input = typed.trimmingCharacters(in: .whitespacesAndNewlines)
         if input.isEmpty {
@@ -519,7 +525,7 @@ struct MoneyReconcileView: View {
             if typing { entries[r.id] = nil }
             return
         }
-        guard let value = MoneyAmountInput.minor(input, exponent: exponent),
+        guard let value = Self.observedMinor(input, exponent: exponent),
               MoneyCommandPayload.integer(.string(String(value))) != nil,
               MoneyCommandPayload.integer(.string(String(r.expectedMinor))) != nil else {
             inputInvalid = true
