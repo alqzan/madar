@@ -12,7 +12,7 @@ import UIKit
     }
     /// Owner, 17 Nov 2026: habits is a tab of its own, no longer a lobby sub-room.
     /// A row now chooses the habit and opens its story; «التفاصيل» on the story opens the sheet.
-    private func openDetail(_ app:XCUIApplication,_ row:XCUIElement){let d=app.buttons["habit-story-details"].firstMatch;if !d.exists{row.tap()};XCTAssertTrue(d.waitForExistence(timeout:5),app.debugDescription);d.tap()}
+    private func openDetail(_ app:XCUIApplication,_ row:XCUIElement){let d=app.buttons["habit-story-details"].firstMatch;if !d.exists{row.tapCentre()};XCTAssertTrue(d.waitForExistence(timeout:5),app.debugDescription);d.tap()}
     private func open(_ app:XCUIApplication){let tab=app.buttons["tab-habits"].firstMatch;XCTAssertTrue(tab.waitForExistence(timeout:20));tab.tap();XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
     private func shot(_ app:XCUIApplication,_ name:String){guard ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] != nil else {return};let s=app.screenshot(),a=XCTAttachment(screenshot:s);a.name=name;a.lifetime = .keepAlways;add(a); if let dir=ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to:URL(fileURLWithPath:dir).appendingPathComponent(name+".png")) }}
     func testFailedFirstReadShowsRetryAndKeepsExistingHabits() {
@@ -531,8 +531,8 @@ import UIKit
         continueAfterFailure = false
         let app = app("since", habitWriteHoldMS: 3000); open(app)
         let water = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "الماء،")).firstMatch
-        for _ in 0..<6 where !water.isHittable { app.swipeUp(velocity: .slow) }
-        XCTAssertTrue(water.isHittable, app.debugDescription); water.press(forDuration: 1.0)
+        for _ in 0..<6 where !water.isOnScreen(in: app) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(water.isOnScreen(in: app), app.debugDescription); water.pressCentre(forDuration: 1.0)
         let menu = app.buttons["فعلتها في يوم سابق"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5), app.debugDescription); menu.tap()
 
@@ -674,8 +674,8 @@ import UIKit
         continueAfterFailure = false
         let app = app("sinceOverdue"); open(app)
         let gift = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "إهداء من تحب")).firstMatch
-        for _ in 0..<8 where !gift.isHittable { app.swipeUp(velocity: .slow) }
-        XCTAssertTrue(gift.isHittable); openDetail(app,gift)
+        for _ in 0..<8 where !gift.isOnScreen(in: app) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(gift.isOnScreen(in: app)); openDetail(app,gift)
         let since = app.staticTexts["habit-since"]
         XCTAssertTrue(since.waitForExistence(timeout: 10)); XCTAssertEqual(since.label, "منذ سنة")
         XCTAssertTrue(app.staticTexts["مرّت سنة ولم تفعلها؛ لعلّ هذا وقتها"].exists)

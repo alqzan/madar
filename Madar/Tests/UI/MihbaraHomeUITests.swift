@@ -1036,8 +1036,8 @@ import UIKit
     private func undo(_ app: XCUIApplication) {
         let button = app.descendants(matching: .any)["mihbara-undo"].buttons["undo-button"]
         XCTAssertTrue(button.waitForExistence(timeout:8), app.debugDescription)
-        XCTAssertTrue(button.isHittable, app.debugDescription)
-        button.tap()
+        XCTAssertTrue(button.isOnScreen(in: app), app.debugDescription)
+        button.tapCentre()
     }
     private func shot(_ app: XCUIApplication, _ name: String) {
         let s = app.screenshot(), a = XCTAttachment(screenshot:s); a.name = name; a.lifetime = .keepAlways; add(a)
@@ -1271,8 +1271,8 @@ import UIKit
         XCTAssertTrue(homeScroll.waitForExistence(timeout: 8), app.debugDescription)
         for _ in 0..<6 { homeScroll.swipeDown(velocity: .slow) }
         let wantShelfTab = app.buttons["mihbara-shelf-want"]
-        XCTAssertTrue(wantShelfTab.isHittable, app.debugDescription)
-        wantShelfTab.tap()
+        XCTAssertTrue(wantShelfTab.isOnScreen(in: app), app.debugDescription)
+        wantShelfTab.tapCentre()
         let book = app.otherElements["mihbara-wall-want"].buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-book-")).firstMatch
         XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
         let prompt = app.buttons["mihbara-paper-index-prompt"]
@@ -1337,7 +1337,7 @@ import UIKit
         XCTAssertTrue(homeScroll.waitForExistence(timeout: 8), app.debugDescription)
         for _ in 0..<6 { homeScroll.swipeDown(velocity: .slow) }
         let wantShelfTab = app.buttons["mihbara-shelf-want"]
-        XCTAssertTrue(wantShelfTab.isHittable, app.debugDescription); wantShelfTab.tap()
+        XCTAssertTrue(wantShelfTab.isOnScreen(in: app), app.debugDescription); wantShelfTab.tapCentre()
         let book = app.otherElements["mihbara-wall-want"].buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-book-")).firstMatch
         XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
 

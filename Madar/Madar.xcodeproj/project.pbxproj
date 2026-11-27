@@ -434,6 +434,7 @@
 		8A1CF107E1D07DD11EDB6514 /* TemporaryFilesCleanup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B854664447BB1FB97EFFE1A /* TemporaryFilesCleanup.swift */; };
 		8AFEF693B46EE0AFD61ADF6E /* QuranFreeIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5530CFCEB8EEF7F56BE18E26 /* QuranFreeIntegrationTests.swift */; };
 		8B0491B1EF06343586EC4A63 /* FoundationHome.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C4E870846C8F0F11086BEB /* FoundationHome.swift */; };
+		8C1DECAD8E6F9E6D70247904 /* ScreenReach.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88DFA36E47D7EE680483D42 /* ScreenReach.swift */; };
 		8C394D8C60E8C0E6316C36FE /* AppInboxLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3F6E4B2C320BA85D0C94586 /* AppInboxLifecycleTests.swift */; };
 		8C469FE631651835E87CCCB6 /* MoneyCashbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63B7758C2313A1A9E69D850 /* MoneyCashbackView.swift */; };
 		8C8613CD8A6637BF93559366 /* DiaryQuestionsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1334733B509CB3E2A906EE34 /* DiaryQuestionsCard.swift */; };
@@ -1225,6 +1226,7 @@
 		B6B644CCC83C35ABDC3339CE /* scan-order-poc.epub */ = {isa = PBXFileReference; path = "scan-order-poc.epub"; sourceTree = "<group>"; };
 		B824AE40F77475D638431FF6 /* MoneyEnvelopesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyEnvelopesView.swift; sourceTree = "<group>"; };
 		B8265DEB75EC6FB6E7BBCA1D /* MoneyCategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyCategoriesView.swift; sourceTree = "<group>"; };
+		B88DFA36E47D7EE680483D42 /* ScreenReach.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenReach.swift; sourceTree = "<group>"; };
 		B91224D2ACB382FDF05CB706 /* MihbaraQuotationScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraQuotationScriptTests.swift; sourceTree = "<group>"; };
 		B9CCE045BAC0B101E4D7B737 /* HabitRhythmBands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitRhythmBands.swift; sourceTree = "<group>"; };
 		B9E990D756DE3A7FBCDAE0CD /* MoneyPhase3UITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyPhase3UITests.swift; sourceTree = "<group>"; };
@@ -1876,6 +1878,7 @@
 				6ED4EF15351D65F5D0541270 /* RoomGlyphUITests.swift */,
 				23BB816D63D8185EAD3F7332 /* RoomGlyphUITests.swift.bak */,
 				662BA644B81BA7A5A6AF6006 /* RoomWidgetsUITests.swift */,
+				B88DFA36E47D7EE680483D42 /* ScreenReach.swift */,
 				0C9A92BA15E9DD05DF1BA621 /* TapCrawlUITests.swift */,
 				C0B38841267CB0E01EBC2842 /* WidgetMakerUITests.swift */,
 			);
@@ -2609,6 +2612,7 @@
 				3C36914064A316EAE1065E1C /* QuranYearUITests.swift in Sources */,
 				31EBC366B73ABD52E032CDD8 /* RoomGlyphUITests.swift in Sources */,
 				DF8C5265BA62665A5AA0BE71 /* RoomWidgetsUITests.swift in Sources */,
+				8C1DECAD8E6F9E6D70247904 /* ScreenReach.swift in Sources */,
 				66FAF63FF291E616105D2231 /* TapCrawlUITests.swift in Sources */,
 				27F9B28F1DCD7AA8303CD58F /* WidgetMakerUITests.swift in Sources */,
 			);

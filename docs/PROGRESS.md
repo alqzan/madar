@@ -328,7 +328,7 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 
 ### Next
 
-- إصلاحات الأداء من فحص المساعد: اقتراحات البهو تُقرأ على الخيط الرئيسي كل دقيقة (`BahwSuggestionsView`/`AppBahwService.suggestions`)، و`session.values` يُعاد إسناده في كل reload ولو لم يتغيّر، و`TimelineView` يلفّ البهو كله. بعدها البناء والرفع والدفع.
+- تمّ من فحص الأداء (`4ca6ed52`): لا إعادة رسم عند reload بقيم إعدادات مطابقة، واقتراحات البهو لا تُقرأ وهو خلف غرفة أخرى، والبلاطات لا تراقب إلا ما تستعمله. باقٍ منه: `TimelineView` يلفّ البهو كله، وحساب `roomHabitsLeft` في جسم غرفة العادات، وحلقة صحة العادات تعمل خلف الغرف. بعدها: أرشفة البناء ٧٧ ورفعه ثم دفع `main`.
 - قاعدة الاختبار: ابنِ اختبارات الواجهة موقّعة توقيعًا محليًا (`CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES`، بند ٢٧ في checklist)؛ البناء غير الموقّع يُسقط امتداد الودجات فتفشل كل الاختبارات عند التشغيل.
 
 ### Model/effort
