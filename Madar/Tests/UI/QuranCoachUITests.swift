@@ -42,6 +42,10 @@ import XCTest
         XCTAssertTrue(app.buttons["quran-session-save-partial"].exists)
         XCTAssertTrue(app.buttons["quran-session-discard"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["quran-session-discard-explanation"].exists)
+        // Owner 27 Nov: leaving today's hifz says what it costs the khatma in days.
+        let delay = app.staticTexts["quran-session-delay-line"]
+        XCTAssertTrue(delay.exists, app.debugDescription)
+        XCTAssertTrue(delay.label.hasPrefix("تأجيل ورد اليوم يؤخر الختمة "), delay.label)
         attach(app, "M2-V02-exit-L")
         app.buttons["quran-session-keep"].tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))

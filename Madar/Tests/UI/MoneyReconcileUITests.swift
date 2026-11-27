@@ -16,18 +16,19 @@ import XCTest
     private func selectAccount(_ name: String, in app: XCUIApplication) {
         let account = app.buttons["money-reconcile-row-" + name]
         revealAboveSave(account, in: app)
-        account.tap()
+        account.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let selected = app.buttons["money-reconcile-account"]
         let updated = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", name), object: selected)
         XCTAssertEqual(XCTWaiter.wait(for: [updated], timeout: 5), .completed, app.debugDescription)
     }
     private func revealAboveSave(_ element: XCUIElement, in app: XCUIApplication) {
         let save = app.buttons["money-reconcile-save"]
-        for _ in 0..<8 {
-            if element.isHittable, element.frame.midY < save.frame.minY { break }
-            app.swipeUp(velocity: .slow)
-        }
-        XCTAssertTrue(element.isHittable, app.debugDescription)
+        // iOS 27 lists a full-screen «شريط الأدوات» above the sheet, so XCUITest calls rows under it not hittable although
+        // a finger reaches them (checked by hand, 27 Nov): require the row on screen and above the pinned save instead.
+        func clear() -> Bool { element.exists && element.frame.minY > 60 && element.frame.midY < save.frame.minY }
+        for _ in 0..<8 where !clear() { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(element.exists, app.debugDescription)
+        XCTAssertGreaterThan(element.frame.minY, 60, app.debugDescription)
         XCTAssertLessThan(element.frame.midY, save.frame.minY, app.debugDescription)
     }
 

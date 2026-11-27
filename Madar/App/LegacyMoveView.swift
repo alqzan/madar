@@ -20,6 +20,9 @@ struct LegacyMoveView: View {
     @State private var confirmUndo = false
     @State private var failure: String?
     @State private var diaryOpen = false
+    @State private var diaryFile: URL?
+    @State private var diaryEntries = 0
+    @State private var buildingDiary = false
     private var service: AppLegacyMoveService { .init(app: app) }
     private var digits: MadarNumberFormatter { .init(style: app.string("core.numerals") == "western" ? .western : .hindi) }
 
@@ -68,7 +71,11 @@ struct LegacyMoveView: View {
         .confirmationDialog("ترجع بياناتك كما كانت قبل النقل؟", isPresented: $confirmUndo, titleVisibility: .visible) {
             Button("تراجع عن النقل", role: .destructive, action: undo).accessibilityIdentifier("legacy-move-undo-confirm")
         } message: { Text("يُزال ما نُقل، وما عدّلته بعد النقل يبقى كما هو.") }
-        .fullScreenCover(isPresented: $diaryOpen) { DiaryDayOneImportView(app: app).environment(\.roomTheme, theme) }
+        .fullScreenCover(isPresented: $diaryOpen, onDismiss: removeDiaryFile) { DiaryDayOneImportView(app: app, initialURL: diaryFile).environment(\.roomTheme, theme) }
+        .task(id: preview?.id) {
+            guard let data = preview?.data else { diaryEntries = 0; return }
+            diaryEntries = await Task.detached { () -> Int in LegacyDiaryArchive.entryCount(inBackup: data) }.value
+        }
         .onAppear { last = service.lastMove() }
     }
 
@@ -102,6 +109,13 @@ struct LegacyMoveView: View {
                     roomRow(room.title, room.symbol, room.isEmpty ? ["لا شيء منها في الملف"] : room.lines, muted: room.isEmpty)
                         .accessibilityIdentifier("legacy-move-room-" + room.id)
                 }
+            }
+            if !p.notMoved.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("لا يُنقل من هذا الملف").font(MadarTypography.caption().weight(.semibold))
+                    ForEach(p.notMoved, id: \.self) { Text($0).fixedSize(horizontal: false, vertical: true) }
+                }
+                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("legacy-move-not-moved")
             }
             Text("كل غرفة تُنقل وحدها. الصلاة المسجّلة هنا في يومها، والعادة بالاسم نفسه، والحساب برقمه، تبقى كما هي وتأخذ تاريخها القديم معها. الرسائل البنكية تمرّ بالمراجعة كأنها وصلت الآن.")
                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
@@ -172,20 +186,24 @@ struct LegacyMoveView: View {
         }
     }
 
-    /// The old app exported the diary as a Day One file; it moves through the diary's own import.
+    /// With a backup open, the diary inside it becomes a Day One-shaped archive and goes through the diary's own import;
+    /// without one, the card opens that import for a Day One file picked by hand.
     private var diaryCard: some View {
-        Button { diaryOpen = true } label: {
+        let fromBackup = preview != nil && diaryEntries > 0
+        return Button { openDiary(fromBackup) } label: {
             HStack(spacing: 12) {
                 Image(systemName: "book.closed").frame(width: 28)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("مذكراتك").font(MadarTypography.section())
-                    Text("صدّرها مدار القديم ملفًا بصيغة داي ون؛ تنتقل من هنا بأيامها وصورها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                    Text(fromBackup ? "مذكراتك من هذا الملف: " + service.counted(diaryEntries, ["مدخلة واحدة", "مدخلتان", "مدخلات", "مدخلة"]) + " بصورها؛ تراجعها قبل أن تُنقل."
+                         : "انقلها من ملف داي ون، أو افتح نسخة مدار القديم أولًا لتنتقل مذكراتها من هنا.")
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.backward").font(.caption).foregroundStyle(theme.secondaryInk)
+                if buildingDiary { ProgressView() } else { Image(systemName: "chevron.backward").font(.caption).foregroundStyle(theme.secondaryInk) }
             }
             .padding(16).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 14)).contentShape(.rect)
-        }.buttonStyle(.madarPlain).disabled(moving != nil).accessibilityIdentifier("legacy-move-diary")
+        }.buttonStyle(.madarPlain).disabled(moving != nil || buildingDiary).accessibilityIdentifier("legacy-move-diary")
     }
 
     // MARK: pieces
@@ -231,6 +249,29 @@ struct LegacyMoveView: View {
     private func read(_ url: URL) {
         do { preview = try service.open(url); receipt = nil; undone = nil }
         catch { failure = (error as? LocalizedError)?.errorDescription ?? "لم يُقرأ الملف. تأكد أنه نسخة مدار القديم كما صدّرها." }
+    }
+    private func openDiary(_ fromBackup: Bool) {
+        guard fromBackup, let data = preview?.data else { diaryFile = nil; diaryOpen = true; return }
+        failure = nil; buildingDiary = true
+        Task { @MainActor in
+            defer { buildingDiary = false }
+            do {
+                let url: URL? = try await Task.detached { () throws -> URL? in
+                    guard let zip = try LegacyDiaryArchive.zip(fromBackup: data) else { return nil }
+                    let folder = FileManager.default.temporaryDirectory.appending(path: "LegacyDiary").appending(path: UUID().uuidString)
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.protectionKey: FileProtectionType.complete])
+                    let file = folder.appending(path: "Journal.zip")
+                    try zip.write(to: file, options: [.atomic, .completeFileProtection])
+                    return file
+                }.value
+                guard let url else { failure = "لا مدخلات صالحة للنقل في هذا الملف."; return }
+                diaryFile = url; diaryOpen = true
+            } catch { failure = "تعذّر تجهيز المذكرات من هذا الملف." }
+        }
+    }
+    private func removeDiaryFile() {
+        if let url = diaryFile { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        diaryFile = nil
     }
     private func commit(_ p: LegacyMovePreview) {
         failure = nil; movementProgress = nil; moving = p.rooms.first { !$0.isEmpty }?.title ?? ""

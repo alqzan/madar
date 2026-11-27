@@ -7,6 +7,8 @@ import MadarCommands
 /// notes-app/12-import «من داي ون»: choose the export → preview → «استورد» → result with one undo.
 struct DiaryDayOneImportView: View {
     @Bindable var app: AppSession
+    /// A file already chosen (the old app's diary, converted); read once on appear instead of asking for one.
+    var initialURL: URL? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @Environment(\.scenePhase) private var phase
@@ -52,6 +54,7 @@ struct DiaryDayOneImportView: View {
                     else { failure = "لم يُفتح الملف. جرّب اختياره مرة أخرى." }
                 }
             }
+            .task { if let initialURL, draft == nil, preview == nil { read(initialURL) } }
             .onChange(of: choice) { _, value in
                 guard let draft else { return }
                 do { preview = try service.preview(draft, choice: value); failure = nil }

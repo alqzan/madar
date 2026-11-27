@@ -13,6 +13,11 @@ import MadarCore
         XCTAssertNil(PrayerNotificationCoordinator.typedAmount("-٣"))
         XCTAssertNil(PrayerNotificationCoordinator.typedAmount("٣ص٥"))
         XCTAssertNil(PrayerNotificationCoordinator.typedAmount("٣ ٥"))
+        // A thousands separator groups (a habit of ١٬٠٠٠ steps is 1000), while «٢،٥» and «2,5» stay a fraction (3).
+        XCTAssertEqual(PrayerNotificationCoordinator.typedAmount("١٬٠٠٠"), 1_000)
+        XCTAssertEqual(PrayerNotificationCoordinator.typedAmount("12,500"), 12_500)
+        XCTAssertEqual(PrayerNotificationCoordinator.typedAmount("٢،٥"), 3)
+        XCTAssertEqual(PrayerNotificationCoordinator.typedAmount("2,5"), 3)
     }
 
     func testCardRemindersAreAmountFreeAndStopAfterPaymentOrOff() throws {

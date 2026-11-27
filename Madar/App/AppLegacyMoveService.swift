@@ -16,6 +16,20 @@ struct LegacyMoveRoom: Identifiable, Hashable, Codable {
 struct LegacyMovePreview: Identifiable {
     let id = UUID()
     let fileName: String, data: Data, rooms: [LegacyMoveRoom]
+    /// Parts of the file that are present but do not move, one line each; empty when nothing is left behind.
+    var notMoved: [String] = []
+}
+/// Pure inspection of the old app's file: password-protected? which parts stay behind, with counts?
+enum LegacyMoveInspection: Equatable {
+    case encrypted
+    case readable(diary: Int, books: Int, readingLogs: Int, prayerLogs: Int)
+
+    static func inspect(_ data: Data) -> LegacyMoveInspection? {
+        guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        if root["__madar_enc"] is String, root["salt"] != nil, root["iv"] != nil, root["data"] != nil { return .encrypted }
+        func count(_ key: String) -> Int { (root[key] as? [Any])?.count ?? 0 }
+        return .readable(diary: count("journalEntries"), books: count("books"), readingLogs: count("readingLogs"), prayerLogs: count("prayerLogs"))
+    }
 }
 /// The result per room after a move: what was added, what the owner already had, and what could not move.
 struct LegacyMoveOutcome: Identifiable, Hashable, Codable {
@@ -87,10 +101,25 @@ struct LegacyMoveUndo {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let data = try Data(contentsOf: url)
-        guard (try? JSONSerialization.jsonObject(with: data)) is [String: Any] else { throw LegacyMoveError.notOldMadar }
+        guard let inspection = LegacyMoveInspection.inspect(data) else { throw LegacyMoveError.notOldMadar }
+        if inspection == .encrypted { throw LegacyMoveError.encrypted }
         let rooms = preview(data)
         guard rooms.contains(where: { !$0.isEmpty }) else { throw LegacyMoveError.notOldMadar }
-        return LegacyMovePreview(fileName: url.lastPathComponent, data: data, rooms: rooms)
+        return LegacyMovePreview(fileName: url.lastPathComponent, data: data, rooms: rooms, notMoved: notMovedLines(inspection))
+    }
+
+    /// Only parts really present in the file; the diary moves from its own card on this screen, prayer records are gone from Madar.
+    func notMovedLines(_ inspection: LegacyMoveInspection?) -> [String] {
+        guard case let .readable(_, books, readingLogs, prayerLogs)? = inspection else { return [] }
+        var lines: [String] = []
+        if books > 0 || readingLogs > 0 {
+            var parts: [String] = []
+            if books > 0 { parts.append(counted(books, ["كتاب واحد", "كتابان", "كتب", "كتابًا"])) }
+            if readingLogs > 0 { parts.append(counted(readingLogs, ["جلسة قراءة واحدة", "جلستا قراءة", "جلسات قراءة", "جلسة قراءة"])) }
+            lines.append("الكتب والقراءة (" + parts.joined(separator: " و") + "): لا تُنقل.")
+        }
+        if prayerLogs > 0 { lines.append("سجلات الصلاة (أُلغيت من مدار).") }
+        return lines
     }
 
     func counted(_ n: Int, _ forms: [String]) -> String { arabicCount(n, forms, digits) }
@@ -248,6 +277,8 @@ struct LegacyMoveUndo {
 }
 
 enum LegacyMoveError: LocalizedError {
-    case notOldMadar
-    var errorDescription: String? { "هذا الملف ليس نسخة من مدار القديم. صدّر من مدار القديم نسخة احتياطية بصيغة JSON، ثم اخترها كما هي." }
+    case notOldMadar, encrypted
+    var errorDescription: String? {
+        if case .encrypted = self { return "هذا الملف مشفّر بكلمة مرور. صدّره من مدار القديم مرة ثانية وكلمة المرور مطفأة، ثم انقله." }
+        return "هذا الملف ليس نسخة من مدار القديم. صدّر من مدار القديم نسخة احتياطية بصيغة JSON، ثم اخترها كما هي." }
 }

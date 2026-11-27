@@ -205,6 +205,8 @@ struct QuranUICoach: Sendable {
     var stageTitle: String; var pageProgress: String; var caption: String
     var pages: [Int]; var referenceText: String?
     var pastDay: Bool
+    /// Hifz session only: «تأجيل ورد اليوم يؤخر الختمة …», from the plan's own forecast; nil when the plan has no pace.
+    var delayLine: String? = nil
     var review = false
     var flaggedAyahs: Set<Int> = []
     var flaggedWords: Set<String> = []

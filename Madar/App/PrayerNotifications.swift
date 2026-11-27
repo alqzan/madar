@@ -354,7 +354,11 @@ final class PrayerNotificationCoordinator {
     /// «٣»، «3»، «٢٫٥» → a whole amount (a fraction rounds to the nearest; below one half is not an amount).
     nonisolated static func typedAmount(_ text: String) -> Int? {
         let map: [Character: Character] = ["٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9","٫":".","،":".",",":"."]
-        let latin = String(text.trimmingCharacters(in: .whitespacesAndNewlines).map { map[$0] ?? $0 })
+        var digits = String(text.trimmingCharacters(in: .whitespacesAndNewlines).map { c in c.wholeNumberValue.map { Character(String($0)) } ?? c })
+        // «١٬٠٠٠» and «1,000» are thousands, not a fraction: «٬» always groups, «,» only in whole groups of three.
+        digits.removeAll { $0 == "٬" }
+        if digits.contains(","), digits.wholeMatch(of: /[0-9]{1,3}(,[0-9]{3})+/) != nil { digits.removeAll { $0 == "," } }
+        let latin = String(digits.map { map[$0] ?? $0 })
         guard latin.allSatisfy({ ($0.isASCII && $0.isNumber) || $0 == "." }),
               let value = Double(latin), value >= 0.5, value <= 100_000 else { return nil }
         return Int(value.rounded())

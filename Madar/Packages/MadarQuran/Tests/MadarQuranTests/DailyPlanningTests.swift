@@ -205,6 +205,12 @@ final class DailyPlanningTests: XCTestCase {
         // From Saturday, 4 faces end Sunday and 6 end Monday: 1 day.
         XCTAssertEqual(QuranProgressEngine.skipDelayDays(remainingPages: 4, dailyPages: 2, startingOn: try day("2026-11-14"), restDay: .friday), 1)
         // Nothing left, or no pace: no claim.
+        // Exit-dialog line. 2026-11-11 is Wednesday. 2 faces at 1/day end Thursday; 3 end Saturday (Friday rests): 2 days.
+        XCTAssertEqual(QuranProgressEngine.skipDelayDays(remainingPages: 2, dailyPages: 1, startingOn: try day("2026-11-11"), restDay: .friday), 2)
+        // No rest day: 3 faces end Friday, 4 end Saturday: 1 day.
+        XCTAssertEqual(QuranProgressEngine.skipDelayDays(remainingPages: 3, dailyPages: 1, startingOn: try day("2026-11-11"), restDay: .none), 1)
+        // 1 face left at 2/day from Saturday ends Saturday; 3 faces need Sunday: 1 day.
+        XCTAssertEqual(QuranProgressEngine.skipDelayDays(remainingPages: 1, dailyPages: 2, startingOn: try day("2026-11-14"), restDay: .friday), 1)
         XCTAssertNil(QuranProgressEngine.skipDelayDays(remainingPages: 0, dailyPages: 2, startingOn: try day("2026-11-14"), restDay: .friday))
         XCTAssertNil(QuranProgressEngine.skipDelayDays(remainingPages: 4, dailyPages: 0, startingOn: try day("2026-11-14"), restDay: .friday))
     }

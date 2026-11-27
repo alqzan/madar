@@ -47,6 +47,37 @@ import XCTest
         XCTAssertEqual(commit.frame.minY, frame.minY, accuracy: 2, "The action stays fixed while the room list scrolls")
     }
 
+    /// Owner 27 Nov: the old app's diary (journalEntries, media embedded) moves from the same backup through the diary's own
+    /// import, and the preview names what stays behind. Synthetic file only.
+    func testOldDiaryMovesFromTheBackupThroughTheDiaryImport() throws {
+        continueAfterFailure = false
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("synthetic-old-madar-diary-\(UUID()).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try Data(#"{"habits":[{"id":"h","name":"عادة تجريبية","logs":["2026-10-21"]}],"prayerLogs":[{"date":"2026-07-02","prayers":{}}],"journalEntries":[{"id":"j1","date":"2026-09-01","time":"21:00","content":"سطر من مدار القديم"},{"id":"j2","date":"2026-09-02","content":"سطر ثان"}]}"#.utf8).write(to: file)
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_LEGACY_BACKUP": file.path,
+                                 "MADAR_UI_HABIT_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+        tap(app, "tab-customize", timeout: 20)
+        let advanced = app.descendants(matching: .any)["settings-advanced"].firstMatch
+        for _ in 0..<14 where !advanced.isHittable { app.swipeUp(velocity: .fast) }
+        advanced.tap()
+        let link = app.buttons["legacy-move-link"]
+        for _ in 0..<14 where !link.isHittable { app.swipeUp(velocity: .fast) }
+        XCTAssertTrue(link.isHittable); link.tap()
+        tap(app, "legacy-move-choose")
+        XCTAssertTrue(app.descendants(matching: .any)["legacy-move-room-habits"].waitForExistence(timeout: 20))
+        let left = app.descendants(matching: .any)["legacy-move-not-moved"].firstMatch
+        XCTAssertTrue(left.waitForExistence(timeout: 5), app.debugDescription)
+        let diary = app.buttons["legacy-move-diary"]
+        let counted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "مدخلتان"), object: diary)
+        XCTAssertEqual(XCTWaiter.wait(for: [counted], timeout: 10), .completed, app.debugDescription)
+        tap(app, "legacy-move-diary")
+        XCTAssertTrue(app.descendants(matching: .any)["dayone-preview-range"].firstMatch.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.buttons["dayone-confirm"].exists, app.debugDescription)
+        shot(app, "L01-old-diary-preview-L")
+    }
+
     func testRejectedMoveNamesTheIncompleteRoomInsteadOfClaimingNoNewData() throws {
         continueAfterFailure = false
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("synthetic-unmovable-\(UUID()).json")

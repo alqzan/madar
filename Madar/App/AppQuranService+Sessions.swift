@@ -392,6 +392,12 @@ extension AppQuranService {
                 plannedAyahs: isBridge ? Set(coach.bridgeAyahs) : ids, revealedAyahs: value.revealedAyahs ?? [],
                 repetition: coach.repetitions, target: target, bridge: isBridge, method: value.method, stageTitle: stageTitle,
                 pageProgress: "الوجه " + numerals.string((pages.firstIndex(of: draft.page) ?? 0) + 1) + " من " + numerals.string(pages.count), caption: caption, pages: pages, referenceText: reference, pastDay: draft.storedDay.date != (try snapshot().day.date))
+            if draft.kind == .hifz, state.coach?.pastDay == false {
+                let snap = try snapshot()
+                if let days = try? forecast(planInput(from: snap), snapshot: snap, resourceCatalog: catalog).skipDelayDays, days > 0 {
+                    state.coach?.delayLine = "تأجيل ورد اليوم يؤخر الختمة " + arabicCount(days, ["يومًا", "يومين", "أيام", "يومًا"], numerals)
+                }
+            }
             state.availableMethods = Dictionary(uniqueKeysWithValues: QuranLearningMethod.allCases.filter { ($0 != .link || draft.page > 1) && ($0 != .next || draft.ayahID > 1) }.map { ($0.rawValue, $0.title) })
             if isBridge { state.primaryTitle = "ابدأ الورد" }
             else if !finished { state.primaryTitle = switch draft.coachStage {

@@ -117,6 +117,10 @@ struct QuranHifzCoachView: View {
                         if state.method != "readGrade" {
                             sheetButton("سجّل ما أنجزته", id: "quran-session-save-partial") { action(.commitPartial) }
                         }
+                        if let line = coach.delayLine {
+                            Text(line).font(font(12)).foregroundStyle(theme.secondaryInk)
+                                .accessibilityIdentifier("quran-session-delay-line")
+                        }
                         Text("«حذف الجلسة» لا يسجّل شيئًا مما أنجزته الآن.")
                             .font(font(12)).foregroundStyle(theme.secondaryInk)
                             .accessibilityIdentifier("quran-session-discard-explanation")

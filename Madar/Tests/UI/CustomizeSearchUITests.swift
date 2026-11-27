@@ -45,18 +45,21 @@ import XCTest
     func testAdvancedCalendarAndTimesAreAvailableWithoutSearch() {
         continueAfterFailure = false
         let (app, _) = openSearch()
+        // iOS 27 lists a full-screen «شريط الأدوات» above the settings list, so XCUITest reports rows under it as not
+        // hittable although a finger reaches them (checked by hand, 27 Nov). Check the row is on screen above the
+        // tab bar and tap its centre; the page it opens is still asserted below.
+        func onScreen(_ element: XCUIElement) -> Bool {
+            element.exists && element.frame.minY > 60 && element.frame.maxY < app.frame.maxY - 90
+        }
         let advanced = app.descendants(matching: .any)["settings-advanced"].firstMatch
-        for _ in 0..<9 where !advanced.isHittable || advanced.frame.midY > app.frame.maxY - 90 {
-            app.swipeUp(velocity: .slow)
-        }
-        XCTAssertTrue(advanced.isHittable, app.debugDescription)
-        advanced.tap()
+        for _ in 0..<9 where !onScreen(advanced) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(onScreen(advanced), app.debugDescription)
+        advanced.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let calendar = app.buttons["settings-link-ضبط التقويم والمواقيت"]
-        for _ in 0..<4 where !calendar.isHittable || calendar.frame.midY > app.frame.maxY - 90 {
-            app.swipeUp(velocity: .slow)
-        }
-        XCTAssertTrue(calendar.isHittable, app.debugDescription)
-        calendar.tap()
+        XCTAssertTrue(calendar.waitForExistence(timeout: 5), app.debugDescription)
+        for _ in 0..<4 where !onScreen(calendar) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(onScreen(calendar), app.debugDescription)
+        calendar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(app.buttons["option-core.hijriSource-ummAlQura"].waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.staticTexts["قاعدة خطوط العرض العالية"].exists, app.debugDescription)
         XCTAssertFalse(app.switches["setting-core.spotlightIndex"].exists)
