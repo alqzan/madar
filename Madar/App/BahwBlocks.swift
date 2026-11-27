@@ -41,8 +41,9 @@ struct BahwBlockView: View {
             .clipShape(.rect(cornerRadius: 22))
             .task(id: block) { refreshMihbaraSnapshot() }
             .onChange(of: mayReadMihbara) { _, _ in refreshMihbaraSnapshot() }
-            .onChange(of: service.session.prayerRevision) { _, _ in if isFrontRoom { refreshMihbaraSnapshot() } }
-            .onChange(of: service.session.selectedTab) { _, selected in
+            // Only the Mihbara tile reads these: other tiles must not re-render on every write or tab switch.
+            .onChange(of: block == .mihbara ? service.session.prayerRevision : 0) { _, _ in if isFrontRoom { refreshMihbaraSnapshot() } }
+            .onChange(of: block == .mihbara ? service.session.selectedTab : "") { _, selected in
                 if selected == "foundation" { refreshMihbaraSnapshot() }
             }
     }

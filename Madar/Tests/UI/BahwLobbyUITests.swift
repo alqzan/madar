@@ -586,9 +586,14 @@ import XCTest
         }
         func tap(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
             XCTAssertTrue(element.waitForExistence(timeout: 20), app.debugDescription, file: file, line: line)
-            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: element)
+            // iOS 27 lists a full-screen «شريط الأدوات» over settings, so XCUITest calls visible controls not hittable
+            // (checklist row 26): wait until the control is enabled and on screen, then tap its centre.
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { object, _ in
+                guard let e = object as? XCUIElement, e.exists, e.isEnabled else { return false }
+                return e.frame.minY > 40 && e.frame.maxY < app.frame.maxY - 20 && e.frame.width > 0
+            }, object: element)
             XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 8), .completed, app.debugDescription, file: file, line: line)
-            element.tap()
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         }
         func selectCity(_ name: String, country: String) {
             let search = app.textFields["bahw-travel-city-search"]

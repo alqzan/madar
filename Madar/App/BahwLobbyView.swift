@@ -436,8 +436,12 @@ private struct BahwSuggestionsView: View {
     @State private var suggestions: [BahwSuggestion] = []
     @Environment(\.roomTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isFrontRoom) private var isFrontRoom
+    /// Behind another room the lobby stays alive; it skips these main-actor reads (prayer times, Quran, diary, bank,
+    /// Mihbara) on every write and minute there, and reads once when it comes to the front again.
     private var refreshKey: String {
-        "\(session.prayerRevision)-\(session.habitReadingsVersion)-\(session.string("bahw.smartPresence"))-\(Int(session.prayerNow().timeIntervalSince1970 / 60))-\(session.protectedDataAuthorized)"
+        guard isFrontRoom else { return "behind" }
+        return "\(session.prayerRevision)-\(session.habitReadingsVersion)-\(session.string("bahw.smartPresence"))-\(Int(session.prayerNow().timeIntervalSince1970 / 60))-\(session.protectedDataAuthorized)"
     }
     /// «الآن» for the one step that leads; the following rows are «بعدها».
     private var heading: String { suggestions.count > 1 ? "الآن، ثم بعدها" : "الآن" }
@@ -468,6 +472,7 @@ private struct BahwSuggestionsView: View {
                 }.accessibilityElement(children: .contain).accessibilityIdentifier("bahw-suggestions")
             }
         }.task(id: refreshKey) {
+            guard isFrontRoom else { return }
             let next = AppBahwService(session: session).suggestions()
             guard next.map({ $0.id + $0.title + $0.detail }) != suggestions.map({ $0.id + $0.title + $0.detail }) else { return }
             // The first reading arrives quietly; later changes (a step done, the next one rising) move in place.

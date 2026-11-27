@@ -314,7 +314,9 @@ final class AppSession {
         if changed.contains(.quran) { plannedQuranReminderDetails.removeAll() }
         store = SettingsStore(context: ModelContext(container), schema: schema)
         // One read per table, not one per setting: this runs after every write and every return to the app.
-        values = try store.allValues()
+        // Assign only on a real change: every screen reads `values`, so an equal reassignment re-rendered them all.
+        let fresh = try store.allValues()
+        if fresh != values { values = fresh }
         // B2-13: the shortcut cannot open the store, so it reads the home currency from this one shared value.
         if case .string(let currency) = values["core.currency"], let defaults = UserDefaults(suiteName: "group.com.alqzan.madar2"), defaults.string(forKey: "core.currency") != currency {
             defaults.set(currency, forKey: "core.currency")
