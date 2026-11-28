@@ -160,11 +160,13 @@ struct HabitsRoomView: View {
                 if fresh != liveHealth { liveHealth = fresh; reload() }
             } catch { session.errorMessage = "لم تتجدد قراءة الصحة؛ سجلك السابق محفوظ." }
         }
-        .task {
+        // The tab stays alive behind the others: the minute Health poll runs only while habits is the room being looked at,
+        // and stops entirely (no sleeping loop) behind other rooms.
+        .task(id: session.selectedTab == "habits" && HabitHealthStore.available) {
+            guard session.selectedTab == "habits", HabitHealthStore.available else { return }
             while !Task.isCancelled {
-                // The tab stays alive behind the others: only poll Health while habits is the room being looked at.
-                if session.selectedTab == "habits" { do { let fresh=try await HabitHealthStore.refresh(session:session,closedDays:false); if fresh != liveHealth { liveHealth=fresh;reload() } }catch{} }
-                try? await Task.sleep(for:.seconds(60))
+                do { let fresh = try await HabitHealthStore.refresh(session: session, closedDays: false); if fresh != liveHealth { liveHealth = fresh; reload() } } catch {}
+                try? await Task.sleep(for: .seconds(60))
             }
         }
         .confirmationDialog("حذف العادة وسجلها؟",isPresented:Binding(get:{deletingArchived != nil},set:{if !$0{deletingArchived=nil}}),titleVisibility:.visible) {
@@ -330,7 +332,7 @@ struct HabitsRoomView: View {
         let group = active.filter { $0.summary.current?.rule.band == frequency }
         let rows = group.filter { !$0.paused && !$0.quitting && ($0.summary.current?.target ?? 0) > 0 }
         let done = rows.filter { $0.summary.current?.met == true }.count
-        let count = rows.isEmpty ? (group.isEmpty ? "لا عادات" : "لا شيء مستحقّ") : digits.string(done) + " من " + digits.string(rows.count)
+        let count = rows.isEmpty ? (group.isEmpty ? "لا عادات" : "لا عادات تنتظرك") : digits.string(done) + " من " + digits.string(rows.count)
         return .init(title: periodTitle(frequency), count: count, share: rows.isEmpty ? 0 : Double(done) / Double(rows.count), frequency: frequency)
     }
     private func periodTitle(_ f: HabitFrequency) -> String { f == .daily ? "اليوم" : f == .weekly ? "الأسبوع" : f == .monthly ? "الشهر" : f == .yearly ? "السنة" : "المُدد" }
@@ -516,7 +518,7 @@ struct HabitsRoomView: View {
         default: return "أضف واحدًا إلى " + name
         }
     }
-    private func progress(_ row:HabitReading)->String { guard let p=row.summary.current else{return "لا فترة بعد"}; if p.rule.measure == .abstain { return row.summary.streak > 0 ? habitPeriodCount(row.summary.streak,.daily,digits)+" بلا زلّة" : "بدأت من جديد اليوم" }; return p.target == 0 ? "سجلك محفوظ" : p.rule.measure == .once && p.target == 1 ? (p.value >= 1 ? "تمّت" : "") : habitProgressText(p.value,p.target,p.rule.unit,digits) }
+    private func progress(_ row:HabitReading)->String { guard let p=row.summary.current else{return "لم تبدأ بعد"}; if p.rule.measure == .abstain { return row.summary.streak > 0 ? habitPeriodCount(row.summary.streak,.daily,digits)+" بلا زلّة" : "بدأت من جديد اليوم" }; return p.target == 0 ? "سجلك محفوظ" : p.rule.measure == .once && p.target == 1 ? (p.value >= 1 ? "تمّت" : "") : habitProgressText(p.value,p.target,p.rule.unit,digits) }
     /// Owner, 5 Nov 2026 («اضغط العاده يعلق التطبيق»): every table of every habit is read on a background context, and only the
     /// latest request lands, so a tap, a Health refresh and a prayer write in a row never stack reads on the main thread.
     private func reload() {
@@ -721,7 +723,7 @@ enum HabitType {
 
 /// The daily list's header: the hint to tap a ring only while nothing is done yet, the count while some are, and a plain «أتممتها كلها» at the end.
 func habitsDailyHeader(done: Int, due: Int, digits: MadarNumberFormatter) -> String {
-    if due == 0 { return "لا شيء مستحقّ اليوم" }
+    if due == 0 { return "لا عادات تنتظرك اليوم" }
     if done == 0 { return lobbyDailyTally(met: 0, total: due, digits: digits) + "، اضغط الحلقة إذا سويتها" }
     return lobbyDailyTally(met: done, total: due, digits: digits)
 }

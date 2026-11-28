@@ -21,7 +21,7 @@ struct DiaryIntentionsView:View {
     private var service:AppDiaryService{.init(app:app)}
     private var hasUnsavedInput:Bool {
         if let editing, let row=rows.first(where:{$0.id==editing}) { return text != row.text }
-        return !text.isEmpty
+        return !text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
     }
     var body:some View {
         Group {

@@ -136,7 +136,7 @@ struct DiaryHubView: View {
                     if canReadDiary, aiAvailability == .ready || aiAvailability == .needsDownload {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button { aiComposerOpen = true } label: { Image(systemName: "sparkles") }
-                                .accessibilityLabel("اسأل يومياتك")
+                                .accessibilityLabel("اسأل مذكراتك")
                                 .accessibilityIdentifier("diary-hub-ai")
                         }
                     }
@@ -231,7 +231,7 @@ struct DiaryHubView: View {
                         guard !Task.isCancelled, canReadDiary else { return }
                         archive = nil
                         travelDays = []
-                        failure = "تعذّر فتح سجل اليوميات."
+                        failure = "تعذّر فتح سجل المذكرات."
                     }
                 }
         }

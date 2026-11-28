@@ -13,7 +13,7 @@ import XCTest
         XCTAssertTrue(days.waitForExistence(timeout: 25), app.debugDescription); days.tap()
         let error = app.staticTexts["diary-hub-error"]
         XCTAssertTrue(error.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertEqual(error.label, "تعذّر فتح سجل اليوميات.")
+        XCTAssertEqual(error.label, "تعذّر فتح سجل المذكرات.")
         shot(app, "AU-74-hub-read-error-L")
         app.buttons["diary-hub-retry"].tap()
         // The archive opens on «الأيام» (14 Nov); its view menu shows only once the read succeeded.

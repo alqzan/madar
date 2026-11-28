@@ -95,6 +95,18 @@ final class AppSession {
     private(set) var undoToastVisible = false
     /// Owner 22 Nov 2026 (mockup «أ»): a removal made while the pill still shows leaves the earlier one peeking behind it.
     private(set) var undoEarlierMessage: String?
+    /// Owner 28 Nov 2026: «يهمني الايموشنز». Every saved change answers once under the finger, from one place (`TabShell`),
+    /// instead of ninety screens each closing in silence: a removal feels firm, a finished thing succeeds, a save is a soft tap.
+    /// A habit completion is left to the ring's own sweep so it is never felt twice.
+    enum Feel: Equatable { case done, saved, removed }
+    private(set) var feel: Feel = .saved
+    private(set) var feelPulse = 0
+    static func feel(for message: String) -> Feel? {
+        if message == "سُجّلت" { return nil }
+        if undoIsWorthShowing(message) { return .removed }
+        if ["سُجّل المصروف", "سُجّل الدخل", "فُتحت الدورة", "سُجّلت الجلسة"].contains(message) || message.hasPrefix("خُتم") || message.hasPrefix("اكتمل") { return .done }
+        return .saved
+    }
     /// UI tests reach the toast after several steps, so a UI-test store keeps it two minutes unless
     /// MADAR_UI_UNDO_SECONDS says otherwise (DEBUG only). The app itself shows it for four seconds.
     static var undoToastSeconds: Double {
@@ -938,7 +950,7 @@ final class AppSession {
             return result
         }
         if let id = result.undoToken, let receipt = try ModelContext(container).fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }), let deadline = receipt.undoExpiresAt {
-            let message = name == "quran.deleteSession" ? "حُذفت جلسة القرآن" : "حُفظ التغيير"
+            let message = name == "quran.deleteSession" ? "حُذفت جلسة القرآن" : name == "quran.commitSession" ? "سُجّلت الجلسة" : "حُفظ التغيير"
             showUndo(AppUndoToken(id: id, expiresAt: deadline), message: message)
         }
         return result
@@ -1252,6 +1264,7 @@ final class AppSession {
     private func showUndo(_ token: AppUndoToken, message: String) {
         let earlier = undoToastVisible && Self.undoIsWorthShowing(message) ? undoMessage : nil
         undoToken = token; undoMessage = message; expiryTask?.cancel(); toastTask?.cancel()
+        if let kind = Self.feel(for: message) { feel = kind; feelPulse &+= 1 }
         withAnimation(.smooth(duration: 0.3)) { undoEarlierMessage = earlier }
         setUndoToast(Self.undoIsWorthShowing(message))
         toastTask = Task { [weak self] in

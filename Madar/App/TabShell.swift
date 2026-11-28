@@ -67,6 +67,13 @@ struct TabShell<Content: View>: View {
         .tint(theme.accent)
         .onChange(of: usesSidebar, initial: true) { _, _ in updateTabBarHeight() }
         .sensoryFeedback(.selection, trigger: selection)
+        .sensoryFeedback(trigger: session.feelPulse) { _, _ in
+            switch session.feel {
+            case .done: .success
+            case .saved: .impact(flexibility: .soft, intensity: 0.55)
+            case .removed: .impact(flexibility: .rigid, intensity: 0.75)
+            }
+        }
         .onChange(of: selection, initial: true) { _, tab in
             // Retained rooms keep drafts, but their keyboard must not cover the destination.
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)

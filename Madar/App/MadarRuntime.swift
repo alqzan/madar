@@ -38,6 +38,8 @@ struct MadarLaunchPlaceholder: View {
         // The verified Quran catalog (about half a second to parse) is needed by the lobby, the widgets and the reminders:
         // read it on a background thread while the store opens instead of on the main thread under the first screen.
         Task.detached(priority: .userInitiated) { _ = try? QuranResources.catalog() }
+        // The once-per-build hash of the Quran files waits its turn behind everything the user sees (owner, 28 Nov 2026).
+        Task.detached(priority: .background) { QuranResources.verifyOncePerBuild() }
         Task.detached(priority: .background) { TemporaryFilesCleanup.run() }
         let task = Task { await openSession() }
         loading = task

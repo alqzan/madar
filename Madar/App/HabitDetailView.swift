@@ -110,8 +110,8 @@ struct HabitDetailView:View {
     private func stateLine(_ p:HabitPeriodResult)->String? {
         if reading.paused || reading.summary.atRisk || p.met || p.target == 0 { return reading.statusTitle(digits) }
         if reading.isNow { return "وقتها الآن" }
-        guard p.rule.measure != .once, p.value > 0, p.target > p.value else { return nil }
-        return "بقي "+habitUnitCount(p.target-p.value,p.rule.unit,digits)
+        // The line above already says «٣ من ٨ أكواب»; «بقي ٥ أكواب» under it said the same thing twice (28 Nov).
+        return nil
     }
     private func filled(_ title:String)->some View { Text(title).font(HabitType.section()).frame(maxWidth:.infinity,minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
     @ViewBuilder private func primary(_ current:HabitPeriodResult)->some View {

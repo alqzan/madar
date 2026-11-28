@@ -126,6 +126,7 @@
 | 36 | Owner 23 Nov (to Claude): «وتاكد لي موضوع الاشعارات وافكارها بكل التطبيق بشكل كامل كيفهن وكذا وخلها ذكيه» — audit every notification in the app (kinds, timing, wording, refresh after the user acts) and make them smart. | built — awaiting owner (Claude). Mapped every kind (Quran wird/again/late, habits grouped/eve/final, diary niyya/line/letter/onThisDay, money card/bill/80%/reconcile/zakat, digest, open-app nudge) and fixed: (1) a line written, edited or deleted re-plans the evening «كيف كان يومك؟» at once through the debounced refresh (it used to stay queued until the next return to the app); (2) a new day while the app stays open re-plans the day's reminders (NSCalendarDayChanged); (3) the wird reminder names what is waiting («ورد اليوم: البقرة …» / «تثبيت اليوم: …» / «مراجعة اليوم: N أوجه») above the gentle line, and the late review names the faces due; (4) reminders no longer pile into one minute: each diary kind keeps a fixed place behind the Quran reminder (intention and line +3 min, letter and memory +6), re-clamped by the sanctity guard and independent of siblings, so a re-plan never moves or cancels one (golden tests; a first arbiter-level spread was replaced after the review found that a re-plan between minutes cancelled the spread reminders); (5) the bill reminder says «اليوم / غدًا / بعد ثلاثة أيام» instead of «قريبًا»; (6) leftovers of the retired prayer reminders removed: the salah intro's «اسألني عن الصلاة بعد الأذان» switch and the permission card's dependence on `salah.askReminder`/`salah.beforeReminder`. Kept on purpose: card and bill names stay off the lock screen (the M5-V12 test guards it; RU2 spirit); quiet hours stay off by default (schema default; the owner can turn on «هدوء بعد العشاء»). |
 | 37 | Owner 23 Nov (to Claude): «خل معاك سب ايجنتس يساعدونك بالتنفيذ والمتابعه». | done (Claude): protocol line in AGENTS.md/CLAUDE.md and DECISIONS row. First batch with implementing sub-agents (Sonnet), main agent reviewed every diff and ran the checks: (1) 44 permanently skipped tests deleted (28 FB-33 Quran home tafsir references, 14 FB-34 Mihbara desk/notebook, 2 obsolete diary editor), each verified to start with an unconditional skip; (2) motion in the money budget totals and split bar, goal upfront bar, reserve bar and preview chip, Quran year month bars (Reduce Motion shows the end state); (3) keyboard over a settings field: a third attempt (hide the floating bar while the keyboard is up) built and broke nothing (r43 37/39) but did not fix `test_M0S2_SecurePasswordTypingTransport`, so it was reverted — blocker recorded, the protocol limit of two repairs is passed. Finding for later: a fresh synthetic store takes 15–30 s on the simulator before the welcome screen (launch mark only; the app is idle, logs stop after the location manager starts); seen also on 22 Nov. Delivery: build 65 uploaded to internal TestFlight (`Artifacts/OWNER-TestFlight-65`, «Upload succeeded»). |
 | 38 | Owner 27 Nov (to Claude): «شيك آخر التغيرات الي سواها كوديكس كلها واكمل التطوير ولا توقف الا اذا بقى ٥٪» then «سو تشك كامل وتطوير كامل للتطبيق بكل النواحي… وشيك github my dream وعلمني هل فيه شي احتاج اعدله عشان تضبط الاستيراد». | done — build 77 uploaded (Claude). Three read-only helpers reviewed Codex's 13 commits (23–26 Nov). Fixed: (1) reconcile refused an overdrawn (negative) balance — a nudge below zero wrote «-50» and the screen locked on «لم أفهم المبلغ» (`MoneyReconcileView.observedMinor`, new test); (2) a manual trip could start in the home city, pausing daily money and saying «مسافر» at home — the city list no longer offers a city inside the home radius for a new trip. Owner answers recorded (Ideas rows). My-dream checked: no change needed there; its plain JSON backup (without a password) moves Quran, habits, letters/days and money. Then: (3) the old diary moves from the same My-dream backup: `LegacyDiaryArchive` turns `journalEntries` (embedded photos/audio/PDF) into a Day One-shaped archive and the «مذكراتك» card opens the diary's own import on it (preview, undo); the card no longer claims the old app exported Day One (it never did); (4) a password-protected My-dream file now says so instead of «ليس نسخة من مدار القديم»; the preview lists what stays behind (books/reading, old prayer logs); (5) Quran exit sheet says what leaving today's hifz costs: «تأجيل ورد اليوم يؤخر الختمة يومين» (owner 27 Nov, existing `skipDelayDays`); (6) a habit notification answer «١٬٠٠٠» or «12,500» reads as thousands instead of being refused. The two UI tests that failed at base (`MoneyReconcileUITests`, `CustomizeSearchUITests` advanced) were test-side: iOS 27 lists a full-screen «شريط الأدوات» so XCUITest calls visible rows not hittable (tap works by hand); repaired per checklist row 26. Test-run lesson: UI tests built with `CODE_SIGNING_ALLOWED=NO` crash the widget extension at start and every test fails at launch — build tests with `CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES`. |
+| 39 | Owner 28 Nov (to Claude): «أكمل تطوير مدار بشكل كامل… يهمني الايموشنز والتصميم والخفه والمرونه… وش الاختصار الي احطه بجوالي عشان يبدا يقرا الرسايل» ثم «دائم مداره إذا حدثت التطبيق ما يفتح معي، لازم أحذفه وأحمله مرة ثانية… كل تحديث» ثم توضيح: «مو بتحديث احذفه من تطبيق… من آخر التطبيقات المفتوحة» — يغلقه من مبدّل التطبيقات ويفتحه، فالبيانات سليمة. | in progress (Claude): update-launch failure first (crash logs from the paired iPhone, reproduce old build → new build on the simulator); then central save/remove haptics, habits Health poll only in front, copy fixes, three bug-hunt fixes. |
 
 
 ### طلب المالك: إعادة بناء المذكرات — ٩ نوفمبر
@@ -240,6 +241,7 @@ Bigger improvement ideas from Claude or Codex (new features, rule or data-model 
 
 | Idea | What and why | From | Owner |
 |---|---|---|---|
+| رسائل البنك والجوال مقفل | اليوم إجراء «سجّل رسالة بنك في مدار» يطلب فتح القفل (`requiresAuthentication`)، فرسالة تصل والجوال مقفل قد لا تُسجَّل حتى تفتحه. السماح بتشغيله والجوال مقفل يجعل الأتمتة تعمل دائمًا، لكنه يتيح لمن يمسك الجوال المقفل إدخال رسالة مزيفة (والمشتريات الصغيرة تُسجَّل تلقائيًا). تغيير ضابط أمان، فلا يُبنى قبل قرارك. | Claude, 28 Nov | pending |
 | Keep or delete old store generations and migration safety copies | Previous generations under `Generations/` and `MigrationSafety/…/RecordsV1.json` hold full copies of your private records on the device. They now have file protection, but they stay and grow. Options: keep the last one only; keep for 30 days; keep forever. Deleting data is a rule change, so nothing is deleted until you choose. | Claude (18 Nov audit) | **decided 18 Nov: keep only the last copy; built in build 58** (`ManagedDataStore.pruneOldCopies`). |
 | Mac sees the iPhone's data | The Mac app is local-only (RA1), so it starts with an empty store. Two routes: restore an encrypted backup file on the Mac, or activate CloudKit sync. | Claude 15 Nov (Mac start) | **Approved 15 Nov: iCloud sync** («بنفعل مزامنه الايكلاود») — queue row 28 |
 | Manual rates for valid foreign accounts and obligations outside travel | Current global basis can only read manually recorded trip rates; the trip rate editor requires a real trip. Define an explicit per-currency source and date/precision policy before adding general rates. Preserve frozen transaction rates and never guess a conversion or create a fake trip. | Whole-app cleanup, 8 Nov 2026 | **Approved 22 Nov:** a manual rate per currency with its date; recorded movements keep their frozen rate — queue row 31 |
@@ -301,6 +303,45 @@ M0-T06 paperwork, M0-T09 privacy matrix, M0-T12 contrast inspector, app-switcher
 M7 still needs owner-device/system acceptance, measured real-device Release performance and final resource/public-release evidence. Internal TestFlight uploads are authorized and have succeeded; public release and App Review are separate. Direct @als remains deferred. CloudKit development activation is authorized but currently blocked by the verified signing/profile failure in row 28; do not infer a blocker from older snapshots when the task resumes.
 
 # Handovers
+
+## Handover — التحديث لا يفتح، اللمسات، الخفة — 2026-11-28 — Claude
+
+### Works now
+
+- **التحديث يفتح مباشرة.** سجلا انهيار البناء ٧٧ من جوال المالك (٢٧ و٢٨ نوفمبر، `Madar/Artifacts/claude-20261128/crashes/`) يقولان 0x8BADF00D: بلاطة العادات في البهو تنتظر على الخيط الرئيسي قفل `QuranResources.catalog()`، والقفل ممسوك لتجزئة ١١٦ م.ب من ملفات القرآن في أول تشغيل لكل بناء جديد. الكتالوج يُفتح الآن بلا تجزئة، والتحقق مرة لكل بناء في مهمة خلفية بلا قفل تنتظره شاشة (`verifyOncePerBuild`). وفهرس الاقتباسات في المحبرة كان يجزّئ كل الملفات عند أول استعمال في كل تشغيل؛ صار يستعمل الكتالوج نفسه. بند checklist ٢٨.
+- كل حفظ يُحَسّ مرة من مكان واحد (`AppSession.feel` + `TabShell`): الحذف حازم، وما اكتمل (مصروف، دخل، دورة، جلسة قرآن) نجاح، وباقي الحفظ ناعم؛ إتمام العادة لحلقتها فقط.
+- العادات تقرأ الصحة كل دقيقة فقط وهي أمامك، وفورًا حين تعود إليها.
+- تكرار أقل: «٣ من ٨ أكواب» بلا «بقي ٥ أكواب» تحته، «لا عادات تنتظرك»، «لم تبدأ بعد»، «+ ٥ آيات» في ختام اليوم، «مذكرات» بدل «يوميات»، ومحرر فيه مسافات فقط يُغلق بلا سؤال.
+- إصلاحات من فحص الأخطاء: نسخة مدار القديم التي فيها مذكرات فقط لم تعد تُرفض («ليست نسخة من مدار القديم»)؛ تصدير المذكرات يعيد القراءة مرة بهدوء إذا حُفظ شيء أثناءه بدل رسالة فشل؛ قراءة الأرقام لا تنهار مع «⑩».
+- فكرة للمالك: تشغيل إجراء رسائل البنك والجوال مقفل (قسم Ideas).
+
+### Verified
+
+- `swift test QuranResourceVerificationTests` ٣/٣ (منها اختبار يمسك التحقق ويثبت أن الكتالوج يفتح).
+- تكامل ٥٤/٥٤ (`int1.xcresult`): CustomizationCopy، RoomWidgetSnapshot، RoomNotificationsIntegration، LegacyMoveFile، DiaryExportIntegration.
+- واجهات (`ui1.xcresult`): ٥٩ نُفّذت، تخطٍّ واحد مقصود، فشلان في العادات. `testBahwRootRoute…` نجح عند الإعادة (isHittable، بند ٢٦). `testAutomaticTheme…LobbyAndHabitSheets` يفشل على HEAD قبل تعديلاتي أيضًا (`ui5-head.xcresult`): لا تظهر «habit-story-details» بعد لمس صف «الماء» القريب من الأعلى. محاولة تمرير في مساعد الاختبار لم تُصلحه وأفشلت `testSinceLastTimeAndPastDay`، فأُرجعت. فشل سابق مسجّل، يحتاج تشخيصًا مستقلًا.
+- إعادة كل `HabitsUITests` بعد التعديلات (`ui6.xcresult`): ٢٩ نُفّذت؛ فشل `testAutomaticTheme…` السابق وفشل `testSinceLastTimeAndPastDay` بسبب محاولة التمرير التي أُرجعت (نجح في `ui1`).
+
+### Differences left
+
+- `TimelineView` ما زال يلف البهو كله (يتوقف خارج الواجهة، نبضه دقيقة)؛ منخفض الأثر.
+- باقي ملاحظات الصياغة (درجات الخطة في القرآن، تأكيد الزلّة والإنهاء، «ودجة») لم تُنفّذ: بعضها قرارات سابقة للمالك.
+
+### Not verified
+
+- البناء ٧٨ على جوال المالك: أول فتح بعد التحديث هو الاختبار الحقيقي. الإحساس باللمسات لا يظهر على المحاكي.
+
+### Next
+
+- بعد تحديث المالك إلى ٧٨: اقرأ سجلات `Madar-*.ips` الجديدة من جواله (بند ٢٨). تحقق من معالجة ٧٧ و٧٨.
+
+### Model/effort
+
+- Claude Opus 5.5 (الجهد غير متاح). مساعدون Sonnet: خريطة اللمسات، فحص الأخطاء، فحص الصياغة (قراءة فقط)، وتنفيذ محدود في ملفات المذكرات؛ راجعت كل فرق وأعدت الفحوص.
+
+### Usage
+
+- البداية: ٢٪ من الخمس ساعات و٢٩٪ من الأسبوع.
 
 ## Handover — مراجعة تعديلات كوديكس والاستيراد من مدار القديم — 2026-11-27 — Claude
 
@@ -374,36 +415,3 @@ M7 still needs owner-device/system acceptance, measured real-device Release perf
 ### Usage
 
 - البداية ٩٨٪ لخمس ساعات و١٣٪ للأسبوع. عند الأرشفة ٣٩٪ و٤٪. بعد الرفع ٢٩٪ و٢٪ على الترتيب.
-
-## Handover — جولة الاستخدام الفعلي — 2026-11-26 — Codex
-
-### Works now
-
-- دليل ربط حقول أتمتة رسائل البنك. تمر إشعارات الفواتير من الاختصار إلى المستحقات مع اسم الجهة. تُستبعد صيغ إضافية لرموز التحقق وتُرفض فواصل المصروف غير الصالحة. شمل التحليل المحلي ٣٧٧٠ رسالة من ٨٧ مرسلًا.
-- تُكتب المسودة الموسّعة عند مغادرة المذكرات. يسجّل زر العادة للفترة المعروضة. ينتظر فتح PDF الأصلي اكتمال حفظ الموضع والجلسة من الكتاب المنساب.
-- فهرسة معاينة النسخ والاستعادة، وحساب مجاميع الالتزامات دون تجاوز سعة الأعداد مع إبقاء الدفعات الفردية.
-
-### Verified
-
-- بناء iOS للاختبار، ٢٥٢ اختبار حزم، الحالات الخاصة بالرسائل ١٦/١٦، ٤٠ اختبار تكامل، ١٩ مسار واجهة مميزًا على الآيفون والآيباد، تشغيل معزول على المحاكيين، وجود إجراءات الاختصارات وحقولها في الحزمة، وفحص RU1 والفروقات. أدلة المحاكي في `Madar/Artifacts/owner-20261126-final/`.
-- بقيت ثلاثة اختبارات واجهة حمراء في `recheck.xcresult`: التمرير إلى حقل كلمة المرور في اختباري النسخ، وإتاحة الضغط على صف العادة بعد إعادة الفتح. ظهر صف العادة وحالته «تمّت». أُزيلت محاولتا تعديل الاختبارات اللتان لم تحلا التعثر. مرّ اختبار إعادة محاولة PDF بعد مطابقة علامات اتجاه رقم الصفحة.
-
-### Differences left
-
-- دليل رسائل البنك يوضح الحقول في تصميم الصفحة الحالي. حالة التعافي في المحبرة تنتظر تجربة المالك.
-
-### Not verified
-
-- واجهة النسخ ومسار استعادة العادة كاملًا، والاستقبال على الآيفون تحت القفل وبعد إعادة التشغيل، وتجربة المالك. أُجّل بناء ٧٦ لأن شرط تحقق الجولة لم يكتمل. آخر رفع هو ٧٥.
-
-### Next
-
-- افحص ما يعترض لمس صفحة النسخ وصف العادة بعد العودة، وأعد حالتي النسخ وحالة العادة على الآيفون المعتمد، ثم نفّذ رفعًا داخليًا واحدًا. دليل الأتمتة الخاص موجود محليًا خارج Git.
-
-### Model/effort
-
-- Codex وثلاثة مساعدين، النموذج والجهد التفصيليان غير متاحين.
-
-### Usage
-
-- البداية ٩٨٪ متبقٍ لخمس ساعات و٢٨٪ للأسبوع. قبل إقفال الجولة ٧٪ و١٤٪ على الترتيب.

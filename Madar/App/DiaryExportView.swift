@@ -84,7 +84,10 @@ struct DiaryExportView:View {
         Task { @MainActor in
             defer { busy = false }
             do {
-                let file = try await service.exportDiary(selection)
+                // A save or a return to the app while the pages are read starts the read again once, quietly, instead of failing.
+                let file: DiaryExportArtifact
+                do { file = try await service.exportDiary(selection) }
+                catch is CancellationError where started == generation { file = try await service.exportDiary(selection) }
                 if started == generation { artifact = file }
                 else { try? FileManager.default.removeItem(at: file.url.deletingLastPathComponent()) }
             } catch {

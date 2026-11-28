@@ -326,7 +326,7 @@ enum WidgetCopy {
         return digits.string(value)+" من "+unitCount(target,unit == nil ? "" : unit,digits,genitive:true)
     }
     static func periodProgress(met:Int,total:Int,digits:MadarNumberFormatter)->String {
-        if total==0{return "لا شيء مستحقّ"}
+        if total==0{return "لا عادات تنتظرك"}
         if met==total{return total==1 ? "تمّت" : "تمّت كلها"}
         if met==0{
             switch total {case 1:return "عادة واحدة تنتظرك";case 2:return "عادتان تنتظرانك"

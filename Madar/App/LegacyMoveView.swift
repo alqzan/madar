@@ -50,7 +50,7 @@ struct LegacyMoveView: View {
         }
         .scrollPosition($scroll)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if moving == nil, receipt == nil, undone == nil, let preview {
+            if moving == nil, receipt == nil, undone == nil, let preview, preview.rooms.contains(where: { !$0.isEmpty }) {
                 Button("انقل إلى مدار") { commit(preview) }
                     .buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("legacy-move-commit")
                     .padding(.horizontal, 21).padding(.vertical, 12)
@@ -104,10 +104,16 @@ struct LegacyMoveView: View {
                     Image(systemName: "doc.text"); Text(p.fileName).font(MadarTypography.caption()).lineLimit(1).truncationMode(.middle).environment(\.layoutDirection, .leftToRight)
                     Spacer(minLength: 0)
                 }.foregroundStyle(theme.secondaryInk)
-                ForEach(p.rooms) { room in
+                if p.rooms.contains(where: { !$0.isEmpty }) {
+                    ForEach(p.rooms) { room in
+                        Divider().overlay(theme.line)
+                        roomRow(room.title, room.symbol, room.isEmpty ? ["لا شيء منها في الملف"] : room.lines, muted: room.isEmpty)
+                            .accessibilityIdentifier("legacy-move-room-" + room.id)
+                    }
+                } else {
+                    // A diary-only backup has nothing for the rooms; its diary waits in the card below.
                     Divider().overlay(theme.line)
-                    roomRow(room.title, room.symbol, room.isEmpty ? ["لا شيء منها في الملف"] : room.lines, muted: room.isEmpty)
-                        .accessibilityIdentifier("legacy-move-room-" + room.id)
+                    Text("في هذا الملف مذكراتك فقط؛ انقلها من بطاقة المذكرات أدناه.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("legacy-move-diary-only")
                 }
             }
             if !p.notMoved.isEmpty {

@@ -188,7 +188,7 @@ struct DiaryDayOneImportView: View {
             card {
                 let restoredTags = r.summary.restoredTags ?? 0
                 let importedEntries = r.summary.added + r.summary.keptBoth + r.summary.updated
-                let title = r.status == "partial" ? "دخلت صفحاتك، وبعض المرفقات ناقصة" : restoredTags > 0 && importedEntries == 0 ? "استُعيدت وسوم يومياتك" : "دخلت صفحاتك إلى دفترك"
+                let title = r.status == "partial" ? "دخلت صفحاتك، وبعض المرفقات ناقصة" : restoredTags > 0 && importedEntries == 0 ? "استُعيدت وسوم مذكراتك" : "دخلت صفحاتك إلى دفترك"
                 HStack(spacing: 10) { Image(systemName: "checkmark.seal"); Text(title).font(MadarTypography.section()) }.accessibilityIdentifier("dayone-done")
                 Divider().overlay(theme.line)
                 if importedEntries > 0 || r.summary.days > 0 {

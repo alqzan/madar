@@ -83,4 +83,16 @@ final class CustomizationCopyTests: XCTestCase {
             }
         }
     }
+
+    /// Owner 28 Nov 2026: every saved change is felt once; removals firm, finished things succeed, habit completions left to the ring.
+    @MainActor func test_owner20261128_FeelFollowsWhatHappened() {
+        XCTAssertEqual(AppSession.feel(for: "حُذفت الحركة"), .removed)
+        XCTAssertEqual(AppSession.feel(for: "حُذفت العادة نهائيًا"), .removed)
+        XCTAssertEqual(AppSession.feel(for: "سُجّل المصروف"), .done)
+        XCTAssertEqual(AppSession.feel(for: "فُتحت الدورة"), .done)
+        XCTAssertEqual(AppSession.feel(for: "سُجّلت الجلسة"), .done)
+        XCTAssertEqual(AppSession.feel(for: "حُفظت الفئة"), .saved)
+        XCTAssertEqual(AppSession.feel(for: "حُفظ السطر"), .saved)
+        XCTAssertNil(AppSession.feel(for: "سُجّلت"), "the habit ring already answers a completion")
+    }
 }

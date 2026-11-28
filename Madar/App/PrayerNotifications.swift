@@ -354,7 +354,7 @@ final class PrayerNotificationCoordinator {
     /// «٣»، «3»، «٢٫٥» → a whole amount (a fraction rounds to the nearest; below one half is not an amount).
     nonisolated static func typedAmount(_ text: String) -> Int? {
         let map: [Character: Character] = ["٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9","٫":".","،":".",",":"."]
-        var digits = String(text.trimmingCharacters(in: .whitespacesAndNewlines).map { c in c.wholeNumberValue.map { Character(String($0)) } ?? c })
+        var digits = String(text.trimmingCharacters(in: .whitespacesAndNewlines).map { c in c.wholeNumberValue.flatMap { (0...9).contains($0) ? Character(String($0)) : nil } ?? c })
         // «١٬٠٠٠» and «1,000» are thousands, not a fraction: «٬» always groups, «,» only in whole groups of three.
         digits.removeAll { $0 == "٬" }
         if digits.contains(","), digits.wholeMatch(of: /[0-9]{1,3}(,[0-9]{3})+/) != nil { digits.removeAll { $0 == "," } }

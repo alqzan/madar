@@ -18,6 +18,8 @@ import MadarCore
         XCTAssertEqual(PrayerNotificationCoordinator.typedAmount("12,500"), 12_500)
         XCTAssertEqual(PrayerNotificationCoordinator.typedAmount("٢،٥"), 3)
         XCTAssertEqual(PrayerNotificationCoordinator.typedAmount("2,5"), 3)
+        // «⑩» has a whole-number value of ten; it used to become Character("10") and trap.
+        XCTAssertNil(PrayerNotificationCoordinator.typedAmount("⑩"))
     }
 
     func testCardRemindersAreAmountFreeAndStopAfterPaymentOrOff() throws {

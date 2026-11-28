@@ -39,8 +39,9 @@ struct DiaryPhotoViewer: View {
     private var service: AppDiaryService { AppDiaryService(app: app, clock: { app.prayerNow() }) }
     private var current: DiaryViewerItem? { items.first { $0.id == selection } }
     private var hasUnsavedComment: Bool {
-        if let item = current, editing, draft != item.comment { return true }
-        return commentDrafts.contains { pair in items.first { $0.id == pair.key }?.comment != pair.value }
+        func differs(_ a: String, _ b: String) -> Bool { a.trimmingCharacters(in: .whitespacesAndNewlines) != b.trimmingCharacters(in: .whitespacesAndNewlines) }
+        if let item = current, editing, differs(draft, item.comment) { return true }
+        return commentDrafts.contains { pair in differs(items.first { $0.id == pair.key }?.comment ?? "", pair.value) }
     }
     private var commentBinding: Binding<String> {
         Binding(get: { draft }, set: { value in

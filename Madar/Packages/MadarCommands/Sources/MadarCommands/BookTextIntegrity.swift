@@ -24,7 +24,7 @@ public struct QuranQuotationIndex: Sendable {
     private let byFirstWord: [String: [[String]]]
     private static let wordExpression = try! NSRegularExpression(pattern: #"[\p{L}\p{M}ـ]+"#)
     private static let bundledResult: Result<QuranQuotationIndex, Error> = Result {
-        let catalog = try QuranResourceCatalog.bundled()
+        let catalog = try QuranResources.catalog() // never the 116 MB hash on a reading path (owner, 28 Nov 2026)
         return QuranQuotationIndex(ayahTexts: catalog.ayahs.flatMap { [$0.searchText, $0.uthmaniText] })
     }
     public static func bundled() throws -> Self { try bundledResult.get() }

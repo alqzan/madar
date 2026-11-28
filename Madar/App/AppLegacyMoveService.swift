@@ -104,7 +104,9 @@ struct LegacyMoveUndo {
         guard let inspection = LegacyMoveInspection.inspect(data) else { throw LegacyMoveError.notOldMadar }
         if inspection == .encrypted { throw LegacyMoveError.encrypted }
         let rooms = preview(data)
-        guard rooms.contains(where: { !$0.isEmpty }) else { throw LegacyMoveError.notOldMadar }
+        // A backup that holds only the diary is still an old Madar file: its diary moves from the diary card on this screen.
+        let diaryOnly: Bool = { if case let .readable(diary, _, _, _) = inspection { diary > 0 } else { false } }()
+        guard rooms.contains(where: { !$0.isEmpty }) || diaryOnly else { throw LegacyMoveError.notOldMadar }
         return LegacyMovePreview(fileName: url.lastPathComponent, data: data, rooms: rooms, notMoved: notMovedLines(inspection))
     }
 

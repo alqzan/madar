@@ -31,7 +31,7 @@ import MadarPrayer
         XCTAssertEqual(lobbyDailyTally(met:2,total:6,digits:digits),"٢ من ٦")
         XCTAssertEqual(habitsDailyHeader(done:0,due:6,digits:digits),"٦ عادات تنتظرك، اضغط الحلقة إذا سويتها")
         XCTAssertEqual(habitsDailyHeader(done:6,due:6,digits:digits),"أتممتها كلها")
-        XCTAssertEqual(habitsDailyHeader(done:0,due:0,digits:digits),"لا شيء مستحقّ اليوم")
+        XCTAssertEqual(habitsDailyHeader(done:0,due:0,digits:digits),"لا عادات تنتظرك اليوم")
         XCTAssertEqual(quranWeekClosedLine(closed:1,eligible:6,digits:digits),"أغلقت الحلقتين في ١ من ٦ أيام الحفظ")
         XCTAssertEqual(quranWeekClosedLine(closed:1,eligible:1,digits:digits),"أغلقت الحلقتين في يوم الحفظ الوحيد")
         XCTAssertEqual(quranWeekClosedLine(closed:0,eligible:0,digits:digits),"لا يوم حفظ في آخر سبعة أيام")
@@ -71,7 +71,7 @@ import MadarPrayer
         let habits=try XCTUnwrap(app.snapshotStore.read("habits",as:RoomWidgetSnapshot.self,now:now)).payload
         XCTAssertEqual(habits.heading,"أتممت عادتك","one due habit, finished: say so instead of a bare count")
         XCTAssertEqual(habits.periods.first{$0.id=="daily"}?.value,"تمّت");XCTAssertEqual(habits.periods.first{$0.id=="daily"}?.detail,"تمّ")
-        XCTAssertEqual(habits.periods.first{$0.id=="weekly"}?.value,"لا شيء مستحقّ");XCTAssertEqual(habits.periods.first{$0.id=="weekly"}?.detail,"")
+        XCTAssertEqual(habits.periods.first{$0.id=="weekly"}?.value,"لا عادات تنتظرك");XCTAssertEqual(habits.periods.first{$0.id=="weekly"}?.detail,"")
         let daily = try XCTUnwrap(habits.periods.first { $0.id == "daily" })
         XCTAssertEqual(daily.completedCount, 1); XCTAssertEqual(daily.targetCount, 1)
         XCTAssertEqual(habits.periods.first { $0.id == "weekly" }?.targetCount, 0)

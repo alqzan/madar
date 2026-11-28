@@ -106,14 +106,14 @@ struct QuranDayCloseView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text("في صدرك").font(font(14, bold: true)); Spacer(minLength: 8)
-                Text(value.addedFaces > 0 ? "+ " + faces(value.addedFaces) : value.addedAyahs > 0 ? "آيات جديدة" : "لا زيادة اليوم")
+                Text(value.addedFaces > 0 ? "+ " + faces(value.addedFaces) : value.addedAyahs > 0 ? "+ " + QuranDayCloseCopy.ayahs(value.addedAyahs, digits: service.numerals) : "لا زيادة اليوم")
                     .font(font(12, bold: true)).foregroundStyle(theme.color("hifzText"))
             }
             Text(service.numerals.string(value.beforeFaces) + " ← " + faces(value.afterFaces))
                 .font(quranSerif(24)).accessibilityLabel(faces(value.beforeFaces) + " ← " + faces(value.afterFaces))
                 .accessibilityIdentifier("quran-day-close-coverage")
             if value.addedAyahs > 0 && value.addedFaces == 0 {
-                Text(QuranDayCloseCopy.ayahs(value.addedAyahs, digits: service.numerals) + "، والوجه لم يكتمل بعد")
+                Text("والوجه لم يكتمل بعد")
                     .font(font(12)).foregroundStyle(theme.secondaryInk)
             }
         }.frame(maxWidth: .infinity, alignment: .leading).padding(14)
