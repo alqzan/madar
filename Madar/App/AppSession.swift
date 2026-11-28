@@ -101,6 +101,18 @@ final class AppSession {
     enum Feel: Equatable { case done, saved, removed }
     private(set) var feel: Feel = .saved
     private(set) var feelPulse = 0
+    /// Played from here, not from a view: a save made inside a full-screen cover (quick expense, Quran session, the reader)
+    /// must be felt even when the tab shell is out of the window.
+    private func answer(_ kind: Feel) {
+        feel = kind; feelPulse &+= 1
+        #if canImport(UIKit) && !os(watchOS)
+        switch kind {
+        case .done: UINotificationFeedbackGenerator().notificationOccurred(.success)
+        case .saved: UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.55)
+        case .removed: UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.75)
+        }
+        #endif
+    }
     static func feel(for message: String) -> Feel? {
         if message == "سُجّلت" { return nil }
         if undoIsWorthShowing(message) { return .removed }
@@ -1077,6 +1089,9 @@ final class AppSession {
         if ["book.importPDF", "book.importEPUB", "book.importGoodreads", "book.savePaper", "book.updatePaper", "book.delete", "book.restore"].contains(name) {
             await reconcileSpotlightIndex()
         }
+        // A reading position is saved on every page turn: it is neither a change to undo nor one to feel. Answering it replaced
+        // the last real undo (a removed highlight) with the page, tapped once per page and reloaded the highlights (Opus review, 28 Nov 2026).
+        if name == "book.setLocator" { return }
         if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: undoMessage) }
         else if BookCommand.parse(name, payload)?.isUndoable == false { clearUndo() }
     }
@@ -1264,7 +1279,7 @@ final class AppSession {
     private func showUndo(_ token: AppUndoToken, message: String) {
         let earlier = undoToastVisible && Self.undoIsWorthShowing(message) ? undoMessage : nil
         undoToken = token; undoMessage = message; expiryTask?.cancel(); toastTask?.cancel()
-        if let kind = Self.feel(for: message) { feel = kind; feelPulse &+= 1 }
+        if let kind = Self.feel(for: message) { answer(kind) }
         withAnimation(.smooth(duration: 0.3)) { undoEarlierMessage = earlier }
         setUndoToast(Self.undoIsWorthShowing(message))
         toastTask = Task { [weak self] in
@@ -1311,8 +1326,13 @@ final class AppSession {
         snapshotTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(1200))
             guard let self, !Task.isCancelled else { return }
+            // The habit read is the heavy part; it runs off the main thread. `snapshotTask` stays set meanwhile so leaving the app
+            // still publishes at once through `flushPendingSnapshot` (which cancels this task).
+            let container = self.container, instant = self.prayerNow()
+            let rows = await Task.detached(priority: .utility) { try? HabitRepository(context: ModelContext(container)).readings(at: instant) }.value
+            guard !Task.isCancelled else { return }
             self.snapshotTask = nil
-            try? self.publishSnapshotNow()
+            try? self.publishSnapshotNow(readHabitReadings: rows.map { rows -> () throws -> [HabitReading] in { rows } })
             // Callers that reloaded every timeline right after asking ran before the files existed; reload once they do.
             WidgetCenter.shared.reloadAllTimelines()
         }

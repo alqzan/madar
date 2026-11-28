@@ -8,6 +8,14 @@ import MadarData
 import MadarCommands
 import MadarSnapshots
 
+/// The room values every widget-maker draft reads, built once per catalogue publication instead of once per draft.
+struct WidgetMakerInputs {
+    let quran: QuranWidgetSnapshot?
+    let rooms: [BuiltRoomWidget: RoomWidgetSnapshot]
+    let book: MihbaraSnapshot
+    let prayer: PrayerNextSnapshot?
+}
+
 struct WidgetMakerDraft: Identifiable, Hashable {
     var id = UUID()
     var name = ""
@@ -35,9 +43,11 @@ extension AppSession {
     func publishWidgetCatalog(at now: Date, readHabitReadings: (() throws -> [HabitReading])? = nil) throws {
         let service = AppBahwService(session: self, evaluationDate: now), day = service.today, dates = dateLabels(day)
         let locked = false // the app lock is removed (owner 10 Nov 2026); the widget payload still carries the field
-        let configs = try widgetMakerDrafts().map { draft in
+        let drafts = try widgetMakerDrafts()
+        let inputs = locked || drafts.isEmpty ? nil : widgetMakerInputs(at: now, readHabitReadings: readHabitReadings)
+        let configs = try drafts.map { draft in
             WidgetCatalogSnapshot.Config(id: draft.id, name: locked ? "ودجة مدار" : draft.name, familyID: draft.familyID,
-                                         styleJSON: try JSONEncoder().encode(draft.style), rows: locked ? [] : widgetMakerRows(draft, at: now, readHabitReadings: readHabitReadings))
+                                         styleJSON: try JSONEncoder().encode(draft.style), rows: locked ? [] : widgetMakerRows(draft, at: now, readHabitReadings: readHabitReadings, inputs: inputs))
         }
         let location = service.prayerLocation(), nextDay = day.adding(days: 1)
         let end: Date?
@@ -66,18 +76,25 @@ extension AppSession {
                                                  payload: WidgetCatalogSnapshot(datePrimary: dates.primary, dateSecondary: dates.secondary, configs: metadata, locked: locked)))
         WidgetCenter.shared.reloadTimelines(ofKind: "MadarMaker")
     }
-    func widgetMakerRows(_ draft: WidgetMakerDraft, at now: Date, outside: Bool = true, readHabitReadings: (() throws -> [HabitReading])? = nil) -> [WidgetCatalogSnapshot.Row] {
+    func widgetMakerInputs(at now: Date, readHabitReadings: (() throws -> [HabitReading])? = nil) -> WidgetMakerInputs {
+        .init(quran: try? AppQuranService(session: self, clock: { now }).widgetSnapshot().payload,
+              rooms: roomWidgetPayloads(locked: false, at: now, readHabitReadings: readHabitReadings),
+              book: mihbaraWidgetSnapshot(locked: false, at: now),
+              prayer: snapshotStore.read("prayerNext", as: PrayerNextSnapshot.self, now: now)?.payload)
+    }
+    /// `inputs` (built once by `publishWidgetCatalog`) must come from the same `now`; `nil` builds them for this draft alone.
+    func widgetMakerRows(_ draft: WidgetMakerDraft, at now: Date, outside: Bool = true, readHabitReadings: (() throws -> [HabitReading])? = nil, inputs: WidgetMakerInputs? = nil) -> [WidgetCatalogSnapshot.Row] {
         let service = AppBahwService(session: self, evaluationDate: now), digits = service.digits, day = service.today
         let dates = dateLabels(day)
-        let quran = try? AppQuranService(session: self, clock: { now }).widgetSnapshot().payload
-        var roomValues = roomWidgetPayloads(locked: false, at: now, readHabitReadings: readHabitReadings)
+        let inputs = inputs ?? widgetMakerInputs(at: now, readHabitReadings: readHabitReadings)
+        let quran = inputs.quran
+        var roomValues = inputs.rooms
         if !outside {
             roomValues[.diaryWrite]?.rows = diaryWidgetRows(today: day)
             roomValues[.money] = moneyWidgetPayload(hidden: bool("core.hideMoneyUntilTouch"), at: now)
         }
         let readings = (try? (readHabitReadings?() ?? HabitRepository(context: ModelContext(container)).readings(at: now))) ?? []
-        let book = mihbaraWidgetSnapshot(locked: false, at: now)
-        let prayer = snapshotStore.read("prayerNext", as: PrayerNextSnapshot.self, now: now)?.payload
+        let book = inputs.book, prayer = inputs.prayer
         var result: [WidgetCatalogSnapshot.Row] = []
         func from(_ row: RoomWidgetSnapshot.Row, id: String, glyph: String, money: Bool = false) -> WidgetCatalogSnapshot.Row {
             .init(id: id, title: row.title, value: row.value, detail: row.detail, secondDate: row.secondDate, glyph: glyph, route: row.route, share: money && ["•••", "—"].contains(row.value) ? nil : row.share, money: money)

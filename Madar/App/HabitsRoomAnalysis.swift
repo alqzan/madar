@@ -14,8 +14,11 @@ private let habitWeekdayLetters = ["ح", "ن", "ث", "ر", "خ", "ج", "س"]
 struct HabitRowRing: View {
     let share: Double; let done: Bool; let colour: Color; let symbol: String?; let glyph: String?
     var water = false
+    /// A habit Madar counts from another room fills without a touch, so it is never felt.
+    var manual = true
     @Environment(\.roomTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isFrontRoom) private var isFrontRoom
     var body: some View {
         ZStack {
             Circle().fill(done ? colour : theme.surface)
@@ -31,7 +34,12 @@ struct HabitRowRing: View {
                     .frame(width: 17, height: 14).animation(reduceMotion ? nil : .easeOut(duration: 0.35).delay(0.08), value: done)
                 if !done { Circle().fill(colour.opacity(0.5)).frame(width: 7, height: 7) }
             }
-        }.padding(1.5).frame(width: 46, height: 46).animation(reduceMotion ? nil : .smooth(duration: 0.3), value: done).accessibilityHidden(true)
+        }.padding(1.5).frame(width: 46, height: 46).animation(reduceMotion ? nil : .smooth(duration: 0.3), value: done)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.45), value: share)
+            // Completing a habit in its own room used to be silent: the orbit light in the habit's colour and one success tap.
+            .orbitCompletionSweep(done: done, lineWidth: 3, tint: colour, feels: manual)
+            .sensoryFeedback(trigger: share) { old, new in manual && isFrontRoom && !done && new > old ? .impact(flexibility: .soft, intensity: 0.55) : nil }
+            .accessibilityHidden(true)
     }
 }
 

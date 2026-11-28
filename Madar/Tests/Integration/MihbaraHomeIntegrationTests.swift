@@ -287,6 +287,28 @@ import UIKit
         XCTAssertEqual(Set(reloaded.books.map(\.id)), [convertedID, ordinaryID])
     }
 
+    /// Opus review, 28 Nov 2026: each page turn saved its position as an undoable change, which replaced the last real undo
+    /// and tapped the finger once per page. A position is neither undone nor felt.
+    func testPageTurnKeepsTheLastUndoAndIsNotFelt() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraLocatorUndo-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let bytes = Data("synthetic EPUB".utf8)
+        let media = Media(); media.kind = "doc"; media.contentType = "org.idpf.epub-container"; media.data = bytes
+        media.sizeBytes = bytes.count; media.sha256 = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        let book = Book(); book.title = "كتاب اختباري"; book.kind = "file"; book.format = "epub"
+        book.mediaID = media.id; book.fileHash = media.sha256; book.shelf = "reading"
+        let context = ModelContext(container); context.insert(media); context.insert(book); try context.save()
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        try await app.executeBookCommand("book.moveShelf", payload: ["id": .string(book.id.uuidString), "shelf": .string("want")], undoMessage: "حُفظ في المحبرة")
+        let token = try XCTUnwrap(app.undoToken?.id), pulse = app.feelPulse
+        let locator = "{\"href\":\"Text/chapter.xhtml\",\"type\":\"application/xhtml+xml\",\"locations\":{\"position\":2,\"progression\":0.2,\"totalProgression\":0.2}}"
+        try await app.executeBookCommand("book.setLocator", payload: ["id": .string(book.id.uuidString), "locator": .string(locator)])
+        XCTAssertEqual(app.undoToken?.id, token, "the shelf move stays undoable after a page turn")
+        XCTAssertEqual(app.feelPulse, pulse, "a page turn is not felt")
+    }
+
     func testReadingSavesRetryAfterStoreMaintenanceEnds() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraMaintenanceRetry-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

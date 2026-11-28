@@ -23,7 +23,8 @@ import MadarPrayer
         let boundary = DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr
         let nextDay = today.adding(days: 1)
         let prayerByDay = Dictionary(prayerDays.filter { $0.place == place }.map { ($0.day, $0) }, uniquingKeysWith: { first, _ in first })
-        let readings = try HabitRepository(context: context).readings(at: now)
+        let container = session.container
+        let readings = try await Task.detached(priority: .utility) { try HabitRepository(context: ModelContext(container)).readings(at: now) }.value
         for reading in readings {
             guard reading.reminder == "push", reading.source == nil, !reading.archived, !reading.paused,
                   let current = reading.summary.current, current.target > 0, !current.met else { continue }

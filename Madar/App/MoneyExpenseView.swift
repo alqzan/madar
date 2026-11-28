@@ -13,6 +13,9 @@ struct MoneyExpenseView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reading: MoneyExpenseReading?
     @State private var raw = ""
+    @State private var keyFeel = 0
+    @State private var keyFeelKind: SensoryFeedback = .selection
+    @State private var refusals = 0
     @State private var foreign = true
     @State private var merchant = ""
     @State private var methodID = ""
@@ -213,6 +216,7 @@ struct MoneyExpenseView: View {
             Text(figure: service.amount(minor, currency: inputCurrency) + (raw.last == "." || raw.last == "٫" ? "٫" : "")).font(.custom("thmanyahserifdisplay-Black", size: 60, relativeTo: .largeTitle)).contentTransition(.numericText()).accessibilityIdentifier("money-expense-amount")
             Text((inputCurrency == "SAR" ? "ريال" : service.currencyName(inputCurrency)) + dailyDescription).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         }.frame(maxWidth: .infinity).frame(minHeight: 94)
+        .keyframeAnimator(initialValue: 0.0, trigger: refusals) { view, x in view.offset(x: reduceMotion ? 0 : x) } keyframes: { _ in KeyframeTrack { LinearKeyframe(-6, duration: 0.06); LinearKeyframe(5, duration: 0.06); LinearKeyframe(-2, duration: 0.06); LinearKeyframe(0, duration: 0.07) } }
     }
     private var dailyDescription: String {
         guard visible, let part = ExpenseEntry.dailyPart(amountMinor: homeMinor, dailyMinor: reading?.cycle?.headline.todayAllowanceMinor) else { return "" }
@@ -343,8 +347,14 @@ struct MoneyExpenseView: View {
                 }
             }
         }.padding(.top, 3)
+        .sensoryFeedback(trigger: keyFeel) { _, _ in keyFeelKind }
     }
     private func tap(_ key: String) {
+        let before = raw
+        defer {
+            if raw != before { keyFeelKind = key == "clear" ? .impact(weight: .medium) : .selection; keyFeel &+= 1 }
+            else if !(key == "clear" || key == "delete") { keyFeelKind = .impact(flexibility: .rigid, intensity: 0.6); refusals += 1; keyFeel &+= 1 }
+        }
         let update = {
             let decimal = raw.firstIndex { $0 == "." || $0 == "٫" }
             if key == "clear" { raw = "" }

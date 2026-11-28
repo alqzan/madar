@@ -493,7 +493,7 @@ struct HabitsRoomView: View {
     }
     /// A once-habit's ring is its own checkbox: one circle per row, tapped to finish. Count habits keep the ring as progress and a «+».
     @ViewBuilder private func leading(_ row:HabitReading,share:Double,met:Bool,colour:Color)->some View {
-        let ring = HabitRowRing(share:share,done:met,colour:colour,symbol:row.source == nil ? nil : row.symbol,glyph:row.source == nil ? row.nameGlyph : nil,water:row.isWater)
+        let ring = HabitRowRing(share:share,done:met,colour:colour,symbol:row.source == nil ? nil : row.symbol,glyph:row.source == nil ? row.nameGlyph : nil,water:row.isWater,manual:row.source == nil)
         if let p=row.summary.current, row.source == nil, !row.paused, p.target > 0, p.rule.measure == .once, !met {
             Button { complete(row, delta: 1) } label: { ring.contentShape(.circle) }
                 .buttonStyle(.madarPlain).disabled(completionInFlight.contains(row.id))
@@ -542,7 +542,9 @@ struct HabitsRoomView: View {
             }
             #endif
             let fresh = try result.get()
-            readings = fresh; loaded = true
+            // A finished habit slides to its place and its arc fills instead of jumping; the first load stays instant.
+            if loaded && !reduceMotion { withAnimation(.smooth(duration: 0.45)) { readings = fresh } } else { readings = fresh }
+            loaded = true
             if let selected = detail, let updated = selected.refreshed(in: fresh) { detail = updated }
             if let id = session.habitRouteID {
                 if let row = fresh.first(where: { $0.id == id }) {
@@ -592,6 +594,9 @@ private struct HabitPeriodSummaryCard: View {
 struct HabitRingGlyph:View {
     let share:Double; let done:Bool; let symbol:String?
     var lineWidth:CGFloat = 3.5
+    /// A habit Madar counts from another room fills without a touch, so it is never felt.
+    var manual = true
+    @Environment(\.isFrontRoom) private var isFrontRoom
     @Environment(\.roomTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body:some View {
@@ -605,7 +610,9 @@ struct HabitRingGlyph:View {
         }.padding(lineWidth/2)
             .animation(reduceMotion ? nil : .smooth(duration: 0.5), value: share)
             .animation(reduceMotion ? nil : .smooth(duration: 0.35), value: done)
-            .orbitCompletionSweep(done: done, lineWidth: lineWidth)
+            .orbitCompletionSweep(done: done, lineWidth: lineWidth, feels: manual)
+            // A step towards the target (a cup, ten minutes) is a soft tap in time with the arc.
+            .sensoryFeedback(trigger: share) { old, new in manual && isFrontRoom && !done && new > old ? .impact(flexibility: .soft, intensity: 0.55) : nil }
             .accessibilityHidden(true)
     }
 }
@@ -655,7 +662,7 @@ struct HabitMiniRing:View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body:some View { ZStack { Circle().stroke(theme.line,lineWidth:3.5); Circle().trim(from:0,to:min(1,max(0,share))).stroke(theme.accentFill,style:.init(lineWidth:3.5,lineCap:.round)).rotationEffect(.degrees(-90)) }
         .animation(reduceMotion ? nil : .smooth(duration: 0.5), value: share)
-        .orbitCompletionSweep(done: share >= 1, lineWidth: 3.5).accessibilityHidden(true) }
+        .orbitCompletionSweep(done: share >= 1, lineWidth: 3.5, feels: false).accessibilityHidden(true) }
 }
 /// «٣ من ٨ أكواب»; before anything is logged, the goal alone («الهدف: ٨ أكواب») rather than «٠ من ٨».
 func habitProgressText(_ value:Int,_ target:Int,_ unit:String?,_ digits:MadarNumberFormatter)->String {

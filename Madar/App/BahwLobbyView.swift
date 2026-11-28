@@ -95,6 +95,7 @@ struct BahwLobbyView: View {
     @Bindable var session: AppSession
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var arranging = false
+    @State private var reorders = 0
     @State private var drawerOpen = false
     @State private var wiggle = false
     @State private var attention: BahwAttention?
@@ -203,6 +204,8 @@ struct BahwLobbyView: View {
         }
         .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]).madarSheetErrorAlert(session) }
         .onChange(of: arranging) { _, on in wiggle = on && !reduceMotion }
+        .sensoryFeedback(trigger: arranging) { o, n in n && !o ? .impact(weight: .medium) : nil }
+        .sensoryFeedback(.selection, trigger: reorders)
         .task(id: moneyRevealID) {
             guard moneyRevealed else { return }
             try? await Task.sleep(for: .seconds(4))
@@ -337,6 +340,7 @@ struct BahwLobbyView: View {
                     value.blocks.remove(at: from)
                     value.blocks.insert(moved, at: value.blocks.firstIndex(of: block.rawValue) ?? value.blocks.endIndex)
                 }
+                reorders &+= 1
                 return true
             }
             .accessibilityElement(children: .contain)

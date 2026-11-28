@@ -10,6 +10,8 @@ struct QuranHifzCoachView: View {
     let action: (QuranUISessionAction) -> Void
     let close: () -> Void
     @Environment(\.roomTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var gradePill
     @State private var sheet: CoachSheet?
     @State private var fullPage = false
     private enum CoachSheet: String, Identifiable { case methods, exit; var id: String { rawValue } }
@@ -59,14 +61,14 @@ struct QuranHifzCoachView: View {
                                                 .lineLimit(1)
                                                 .frame(maxWidth: .infinity, minHeight: 32)
                                                 .foregroundStyle(value == grade.grade ? theme.onAccent : theme.ink)
-                                                .background(value == grade.grade ? theme.accent : theme.surface, in: Capsule())
+                                                .background { ZStack { Capsule().fill(theme.surface); if value == grade.grade { Capsule().fill(theme.accent).matchedGeometryEffect(id: "grade-\(grade.page)", in: gradePill) } } }
                                                 .frame(minHeight: 44).contentShape(Rectangle())
                                         }.buttonStyle(.madarPlain).accessibilityAddTraits(value == grade.grade ? .isSelected : [])
                                             .accessibilityIdentifier("quran-coach-grade-" + value.rawValue)
                                     }
-                                }
+                                }.animation(reduceMotion ? nil : .snappy(duration: 0.25), value: grade.grade)
                             }
-                        }.accessibilityLabel(state.method == "readGrade" ? "تقييمك لهذا الورد" : "تقييمك لهذا الوجه")
+                        }.sensoryFeedback(.selection, trigger: state.grades.map(\.grade)).accessibilityLabel(state.method == "readGrade" ? "تقييمك لهذا الورد" : "تقييمك لهذا الوجه")
                         Button { action(state.primaryAction) } label: {
                             Image(systemName: "arrow.left").font(.system(size: 16, weight: .semibold))
                                 .frame(width: 44, height: 36).foregroundStyle(theme.onAccent)

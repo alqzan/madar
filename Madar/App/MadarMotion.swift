@@ -10,7 +10,12 @@ import SwiftUI
 struct OrbitCompletionSweep: ViewModifier {
     let done: Bool
     let lineWidth: CGFloat
+    var tint: Color? = nil
+    /// Aggregate rings (the day's count) show the light but stay silent: the habit that finished it already answered.
+    var feels = true
     @Environment(\.roomTheme) private var theme
+    /// A room kept alive behind another (the lobby behind habits) never taps the finger for a ring nobody is looking at.
+    @Environment(\.isFrontRoom) private var isFrontRoom
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var runs = 0
 
@@ -23,7 +28,7 @@ struct OrbitCompletionSweep: ViewModifier {
                     .scaleEffect(value.bloom)
                     .overlay {
                         Circle().trim(from: 0, to: 0.22)
-                            .stroke(AngularGradient(colors: [theme.accentFill.opacity(0), theme.accentFill, .white.opacity(0.9)],
+                            .stroke(AngularGradient(colors: [(tint ?? theme.accentFill).opacity(0), tint ?? theme.accentFill, .white.opacity(0.9)],
                                                     center: .center, startAngle: .degrees(0), endAngle: .degrees(80)),
                                     style: .init(lineWidth: lineWidth * 1.5, lineCap: .round))
                             .padding(lineWidth / 2)
@@ -51,13 +56,13 @@ struct OrbitCompletionSweep: ViewModifier {
                 guard new, !old, !reduceMotion else { return }
                 runs &+= 1
             }
-            .sensoryFeedback(trigger: done) { old, new in new && !old ? .success : nil }
+            .sensoryFeedback(trigger: done) { old, new in new && !old && feels && isFrontRoom ? .success : nil }
     }
 }
 
 extension View {
-    func orbitCompletionSweep(done: Bool, lineWidth: CGFloat) -> some View {
-        modifier(OrbitCompletionSweep(done: done, lineWidth: lineWidth))
+    func orbitCompletionSweep(done: Bool, lineWidth: CGFloat, tint: Color? = nil, feels: Bool = true) -> some View {
+        modifier(OrbitCompletionSweep(done: done, lineWidth: lineWidth, tint: tint, feels: feels))
     }
 
     /// A bar that grows from its start edge (the right in Arabic) the first time it appears, one after another.

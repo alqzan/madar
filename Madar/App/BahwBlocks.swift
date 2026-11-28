@@ -184,7 +184,7 @@ struct BahwBlockView: View {
             VStack(spacing: 2) {
                 ZStack(alignment: .topTrailing) {
                     // DA-05: the same coloured ring and glyph as the wide card.
-                    HabitRingGlyph(share: row.paused ? 0 : share, done: current?.met == true, symbol: row.symbol == "checkmark" ? nil : row.symbol, lineWidth: 4)
+                    HabitRingGlyph(share: row.paused ? 0 : share, done: current?.met == true, symbol: row.symbol == "checkmark" ? nil : row.symbol, lineWidth: 4, manual: row.source == nil)
                         .environment(\.roomTheme, ringTheme).opacity(row.paused ? 0.45 : 1)
                         .frame(width: ringSide, height: ringSide)
                     if row.paused || (row.source != nil && current?.outcome == .complete) {
@@ -233,7 +233,7 @@ struct BahwBlockView: View {
         return Button { activateHabit(row) } label: {
             VStack(spacing: 3) {
                 ZStack(alignment: .topTrailing) {
-                    HabitRingGlyph(share: row.paused ? 0 : share, done: done, symbol: row.symbol == "checkmark" ? nil : row.symbol, lineWidth: 4.5)
+                    HabitRingGlyph(share: row.paused ? 0 : share, done: done, symbol: row.symbol == "checkmark" ? nil : row.symbol, lineWidth: 4.5, manual: row.source == nil)
                         .environment(\.roomTheme, ringTheme)
                         .opacity(row.paused ? 0.45 : 1)
                         .frame(width: 46, height: 46)

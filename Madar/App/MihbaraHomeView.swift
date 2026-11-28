@@ -112,9 +112,10 @@ struct MihbaraHomeView: View {
         .onChange(of: app.mihbaraRootDraftBlockers.isEmpty) { _, empty in
             if empty, let route = app.mihbaraRoute { openRoute(route) }
         }
-        .onChange(of: app.undoToken?.id) { load() }
+        // Behind an open reader the shelf waits: the reader's own dismissal reloads it once.
+        .onChange(of: app.undoToken?.id) { if readerRoute == nil { load() } }
         // Book writes also bump the habits revision. The reading goal changes when its linked habit does.
-        .onChange(of: app.habitsRevision) { load() }
+        .onChange(of: app.habitsRevision) { if readerRoute == nil { load() } }
         .modifier(MihbaraHomeConfirmations(
             slotBook: $slotBook, pendingRemoval: $pendingRemoval,
             replacementBooks: { replacementBooks(for: $0) },

@@ -119,6 +119,14 @@ public struct HabitRepository {
         var readingCache: [HabitFact]?
         var diaryCache: [HabitFact]?
         var wirdCache: (facts: [HabitFact], streak: Int)?
+        // The review and wird habits read the same Quran snapshot; build it once per call.
+        var quranCache: QuranDataSnapshot?
+        func quranSnapshot() throws -> QuranDataSnapshot {
+            if let quranCache { return quranCache }
+            let built = try QuranRepository(context: context, catalog: QuranResources.catalog()).snapshot(at: now)
+            quranCache = built
+            return built
+        }
         var result: [HabitReading] = []
         for habit in habits {
             let habitEvents = eventsByHabit[habit.id] ?? []
@@ -164,7 +172,7 @@ public struct HabitRepository {
                     facts = jamaahCache!.facts; ownerStreak = jamaahCache!.streak
                 case "review":
                     if reviewCache == nil {
-                        let snapshot = try QuranRepository(context: context, catalog: QuranResources.catalog()).snapshot(at: now)
+                        let snapshot = try quranSnapshot()
                         var seen = Set<String>()
                         let reviewFacts: [HabitFact] = snapshot.sessions.filter { [.review, .free, .qiyam].contains($0.kind) }.flatMap { session in
                             session.grades.compactMap { grade -> HabitFact? in
@@ -197,7 +205,7 @@ public struct HabitRepository {
                     // Owner, 6 Nov 2026 («عادات التطبيق… والورد»): one time per day on which a new hifz portion was
                     // recorded in the Quran room (a hifz session with its ayahs, not deleted), the Quran's own fact.
                     if wirdCache == nil {
-                        let snapshot = try QuranRepository(context: context, catalog: QuranResources.catalog()).snapshot(at: now)
+                        let snapshot = try quranSnapshot()
                         let days = Set(snapshot.activities.filter { $0.kind == .hifz && $0.countsForStreak }.map(\.dayKey))
                         wirdCache = (days.sorted().map { HabitFact(id: StableIdentity.uuid(for: "habit-wird:\($0)"), day: $0, periodKey: "", delta: 1) },
                                      QuranProgressEngine.streak(activities: snapshot.activities, through: today, restDay: snapshot.restDay).days)

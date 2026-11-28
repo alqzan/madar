@@ -89,7 +89,7 @@ struct HabitDetailView:View {
                 Button { slipping = true } label: { outline(Label("زلّة",systemImage:"arrow.counterclockwise")) }.buttonStyle(.madarPlain).disabled(busy).accessibilityIdentifier("habit-slip")
                     .confirmationDialog("تسجيل زلّة اليوم يبدأ العدّ من جديد، وسجلّك السابق يبقى.",isPresented:$slipping,titleVisibility:.visible) {
                         Button("سجّل زلّة اليوم",role:.destructive) { perform("habit.complete",current.completionPayload(for:reading.id,delta:1,slip:true)) }.accessibilityIdentifier("habit-slip-confirm")
-                        Button("تراجع",role:.cancel) {}
+                        Button("إلغاء",role:.cancel) {}
                     }
             }
             Text("مدار لا يسألك عنها ولا يذكّرك؛ العدّ يمضي ما لم تسجّل زلّة.").font(HabitType.caption()).foregroundStyle(theme.secondaryInk)
@@ -151,7 +151,7 @@ struct HabitDetailView:View {
             Button { ending=true } label: { outline(Label("أنهِها",systemImage:"archivebox")) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-delete")
                 .confirmationDialog(endingSummary,isPresented:$ending,titleVisibility:.visible) {
                     Button("أنهِها وأبقِ سجلّها") { perform("habit.archive",["id":.string(reading.id.uuidString),"archived":.bool(true)]) }.accessibilityIdentifier("habit-delete-confirm")
-                    Button("تراجع",role:.cancel) {}
+                    Button("أبقها",role:.cancel) {}
                 }
         }
     }
